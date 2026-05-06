@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -263,6 +264,28 @@ class TestSourceCommitParsing(unittest.TestCase):
         )
 
 
+class TestGitOriginRevIdParsing(unittest.TestCase):
+    def test_extract_git_origin_rev_id_returns_none_without_trailer(self):
+        self.assertIsNone(sync_repo_with_copybara.extract_git_origin_rev_id("subject\n\nbody"))
+
+    def test_extract_git_origin_rev_id_uses_bottom_most_trailer(self):
+        commit_message = textwrap.dedent(
+            """\
+            SERVER-82640 Upload mongod --version output to S3 during compile.
+            GitOrigin-RevId: bf6eaef
+
+            (cherry picked from commit c97e1c1)
+
+            GitOrigin-RevId: 757225a
+            """
+        )
+
+        self.assertEqual(
+            sync_repo_with_copybara.extract_git_origin_rev_id(commit_message),
+            "757225a",
+        )
+
+
 @unittest.skipIf(
     sys.platform == "win32" or sys.platform == "darwin",
     reason="No need to run this unittest on windows or macos",
@@ -465,6 +488,53 @@ class TestBranchFunctions(unittest.TestCase):
 
             with self.assertRaises(SystemExit):
                 sync_repo_with_copybara.find_matching_commit(source_dir, destination_dir)
+
+    def test_find_matching_commit_pair_uses_bottom_most_origin_trailer(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            destination_dir = os.path.join(tmpdir, "destination")
+            os.mkdir(source_dir)
+            os.mkdir(destination_dir)
+
+            private_hashes = TestBranchFunctions.create_mock_repo_commits(source_dir, 3)
+
+            os.chdir(destination_dir)
+            sync_repo_with_copybara.run_command("git init")
+            sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
+            sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
+            sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
+
+            public_hashes = []
+            stale_origin = private_hashes[2]
+            for i in range(2):
+                with open("test.txt", "a") as file:
+                    file.write(str(i))
+                sync_repo_with_copybara.run_command("git add test.txt")
+                commit_message = textwrap.dedent(
+                    f"""\
+                    public backport {i}
+
+                    GitOrigin-RevId: {stale_origin}
+
+                    (cherry picked from commit c97e1c1)
+
+                    GitOrigin-RevId: {private_hashes[i]}
+                    """
+                ).strip()
+                sync_repo_with_copybara.run_command(f"git commit -m {shlex.quote(commit_message)}")
+                public_hashes.append(
+                    sync_repo_with_copybara.run_command('git log --pretty=format:"%H" -1')
+                )
+
+            result = sync_repo_with_copybara.find_matching_commit_pair(source_dir, destination_dir)
+
+            self.assertEqual(
+                result,
+                sync_repo_with_copybara.MatchingCommit(
+                    source_commit=private_hashes[1],
+                    destination_commit=public_hashes[1],
+                ),
+            )
 
     def test_find_matching_commit_pair_returns_source_and_destination(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3948,23 +4018,31 @@ class TestMainWorkflow(unittest.TestCase):
             preview_dir=Path("/tmp/preview"),
             docker_command=("echo",),
             copybara_config=sync_repo_with_copybara.CopybaraConfig(
+                source=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url="https://example.com/source.git",
+                    repo_name="10gen/mongo",
+                    branch="v8.2",
+                    ref="tagsha123",
+                ),
                 destination=sync_repo_with_copybara.CopybaraRepoConfig(
                     git_url="https://example.com/destination.git",
                     repo_name="10gen/mongo-copybara",
                     branch="v8.2.7",
-                )
+                ),
             ),
             release_tag="r8.2.7",
             release_source_commit="tagsha123",
         )
 
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
-    @patch("buildscripts.copybara.sync_repo_with_copybara.resolve_release_tag_destination_commit")
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.resolve_release_tag_destination_commit_from_repos"
+    )
     @patch("buildscripts.copybara.sync_repo_with_copybara.get_remote_tag_origin")
     def test_publish_release_tag_skips_existing_tag_with_matching_origin(
         self,
         mock_get_remote_tag_origin,
-        mock_resolve_release_tag_destination_commit,
+        mock_resolve_release_tag_destination_commit_from_repos,
         mock_run_command,
     ):
         sync = self.make_release_tag_sync()
@@ -3978,16 +4056,18 @@ class TestMainWorkflow(unittest.TestCase):
             sync_repo_with_copybara.publish_release_tag(sync, {})
 
         self.assertIn("already synced", stdout.getvalue())
-        mock_resolve_release_tag_destination_commit.assert_not_called()
+        mock_resolve_release_tag_destination_commit_from_repos.assert_not_called()
         mock_run_command.assert_not_called()
 
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
-    @patch("buildscripts.copybara.sync_repo_with_copybara.resolve_release_tag_destination_commit")
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.resolve_release_tag_destination_commit_from_repos"
+    )
     @patch("buildscripts.copybara.sync_repo_with_copybara.get_remote_tag_origin")
     def test_publish_release_tag_rejects_existing_tag_with_different_origin(
         self,
         mock_get_remote_tag_origin,
-        mock_resolve_release_tag_destination_commit,
+        mock_resolve_release_tag_destination_commit_from_repos,
         mock_run_command,
     ):
         sync = self.make_release_tag_sync()
@@ -4000,26 +4080,78 @@ class TestMainWorkflow(unittest.TestCase):
             sync_repo_with_copybara.publish_release_tag(sync, {})
 
         self.assertIn("expected tagsha123", str(raised.exception))
-        mock_resolve_release_tag_destination_commit.assert_not_called()
+        mock_resolve_release_tag_destination_commit_from_repos.assert_not_called()
         mock_run_command.assert_not_called()
 
+    @patch("buildscripts.copybara.sync_repo_with_copybara.shutil.rmtree")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.tempfile.mkdtemp")
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.resolve_release_tag_destination_commit_from_repos"
+    )
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
-    @patch("buildscripts.copybara.sync_repo_with_copybara.resolve_release_tag_destination_commit")
     @patch("buildscripts.copybara.sync_repo_with_copybara.get_remote_tag_origin")
     def test_publish_release_tag_pushes_when_tag_is_absent(
         self,
         mock_get_remote_tag_origin,
-        mock_resolve_release_tag_destination_commit,
         mock_run_command,
+        mock_resolve_release_tag_destination_commit_from_repos,
+        mock_mkdtemp,
+        mock_rmtree,
     ):
         sync = self.make_release_tag_sync()
         mock_get_remote_tag_origin.return_value = None
-        mock_resolve_release_tag_destination_commit.return_value = "publicsha123"
+        mock_resolve_release_tag_destination_commit_from_repos.return_value = "publicsha123"
+        source_repo_dir = Path("/tmp/copybara-release-tag-source")
+        destination_repo_dir = Path("/tmp/copybara-release-tag-destination")
+        mock_mkdtemp.side_effect = [str(source_repo_dir), str(destination_repo_dir)]
 
         sync_repo_with_copybara.publish_release_tag(sync, {})
 
-        mock_run_command.assert_called_once()
-        self.assertIn("publicsha123:refs/tags/r8.2.7", mock_run_command.call_args.args[0])
+        mock_run_command.assert_has_calls(
+            [
+                call(
+                    "git clone --filter=blob:none --no-checkout "
+                    f"{sync_repo_with_copybara.shell_quote('https://example.com/source.git')} "
+                    f"{sync_repo_with_copybara.shell_quote(source_repo_dir)}"
+                ),
+                call(
+                    " ".join(
+                        [
+                            "git",
+                            "clone",
+                            "--filter=blob:none",
+                            "--no-checkout",
+                            "--single-branch",
+                            "-b",
+                            "v8.2.7",
+                            "https://example.com/destination.git",
+                            sync_repo_with_copybara.shell_quote(destination_repo_dir),
+                        ]
+                    )
+                ),
+                call(
+                    " ".join(
+                        [
+                            "git",
+                            "-C",
+                            sync_repo_with_copybara.shell_quote(destination_repo_dir),
+                            "push",
+                            "https://example.com/destination.git",
+                            "publicsha123:refs/tags/r8.2.7",
+                        ]
+                    )
+                ),
+            ]
+        )
+        mock_resolve_release_tag_destination_commit_from_repos.assert_called_once_with(
+            sync, source_repo_dir, destination_repo_dir
+        )
+        mock_rmtree.assert_has_calls(
+            [
+                call(source_repo_dir, ignore_errors=True),
+                call(destination_repo_dir, ignore_errors=True),
+            ]
+        )
 
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
