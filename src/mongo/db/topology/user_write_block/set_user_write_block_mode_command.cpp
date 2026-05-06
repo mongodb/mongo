@@ -47,7 +47,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
 #include "mongo/db/topology/user_write_block/set_user_write_block_mode_gen.h"
-#include "mongo/db/topology/user_write_block/user_writes_recoverable_critical_section_service.h"
+#include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"

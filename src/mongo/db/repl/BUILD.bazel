@@ -2307,6 +2307,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/op_observer:op_observer_impl",
         "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/op_observer:operation_logger_transaction_proxy",
+        "//src/mongo/db/op_observer:replica_set_write_block_op_observer",
         "//src/mongo/db/op_observer:user_write_block_mode_op_observer",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/storage:storage_options",

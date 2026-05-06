@@ -53,7 +53,7 @@
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
-#include "mongo/db/topology/user_write_block/write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"

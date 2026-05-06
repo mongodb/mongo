@@ -76,7 +76,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/topology/sharding_state.h"
-#include "mongo/db/topology/user_write_block/write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/write_concern_options.h"

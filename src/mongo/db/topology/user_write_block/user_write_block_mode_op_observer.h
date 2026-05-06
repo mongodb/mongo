@@ -55,6 +55,7 @@ namespace mongo {
  * OpObserver for user write blocking. On write operations, checks whether the current global user
  * write blocking state allows the write, and uasserts if not.
  */
+// TODO (SERVER-125476): Change the class modularity to PRIVATE
 class MONGO_MOD_NEEDS_REPLACEMENT UserWriteBlockModeOpObserver final : public OpObserverNoop {
     UserWriteBlockModeOpObserver(const UserWriteBlockModeOpObserver&) = delete;
     UserWriteBlockModeOpObserver& operator=(const UserWriteBlockModeOpObserver&) = delete;

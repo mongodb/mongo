@@ -159,6 +159,9 @@ public:
             // Implicitly checked often to keep mayBypassWriteBlockingMode() fast
             Privilege(ResourcePattern::forClusterResource(boost::none),
                       ActionType::bypassWriteBlockingMode),
+            // Implicitly checked often to keep mayBypassReplicaSetWriteBlocking() fast
+            Privilege(ResourcePattern::forClusterResource(boost::none),
+                      ActionType::bypassReplicaSetWriteBlocking),
             // Operations which do not specify a maxTimeMS check if the defaultMaxTimeMS can be
             // bypassed.
             Privilege(ResourcePattern::forClusterResource(boost::none),

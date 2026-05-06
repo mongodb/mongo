@@ -36,7 +36,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
 #include "mongo/db/topology/user_write_block/user_writes_critical_section_document_gen.h"
-#include "mongo/db/topology/user_write_block/user_writes_recoverable_critical_section_service.h"
+#include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
@@ -55,7 +55,7 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                                              OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
 
-    if (!defaultFromMigrate) {
+    if (!defaultFromMigrate && nss != NamespaceString::kReplicaSetWritesCriticalSectionsNamespace) {
         _checkWriteAllowed(opCtx, nss);
     }
 
@@ -91,7 +91,8 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
                                             OpStateAccumulator* opAccumulator) {
     const auto& nss = args.coll->ns();
 
-    if (args.updateArgs->source != OperationSource::kFromMigrate) {
+    if (args.updateArgs->source != OperationSource::kFromMigrate &&
+        nss != NamespaceString::kReplicaSetWritesCriticalSectionsNamespace) {
         _checkWriteAllowed(opCtx, nss);
     }
 
@@ -131,7 +132,7 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
                                             const OplogDeleteEntryArgs& args,
                                             OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
-    if (!args.fromMigrate) {
+    if (!args.fromMigrate && nss != NamespaceString::kReplicaSetWritesCriticalSectionsNamespace) {
         _checkWriteAllowed(opCtx, nss);
     }
 
