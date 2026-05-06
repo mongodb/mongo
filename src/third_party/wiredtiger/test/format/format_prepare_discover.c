@@ -116,7 +116,7 @@ wts_prepare_discover(WT_CONNECTION *conn)
     }
     testutil_check(cursor->close(cursor));
 
-    session->checkpoint(session, NULL);
+    testutil_check(session->checkpoint(session, NULL));
     /* FIXME-WT-15357 Checkpoint cursors are not compatible with disagg for now. */
     wts_verify_mirrors(g.wts_conn, g.disagg_storage_config ? NULL : "WiredTigerCheckpoint", NULL);
     testutil_check(session->close(session, NULL));

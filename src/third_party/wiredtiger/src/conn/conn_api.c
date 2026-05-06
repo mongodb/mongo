@@ -3161,7 +3161,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
     WT_SESSION *wt_session;
-    WT_SESSION_IMPL *session, *verify_session;
+    WT_SESSION_IMPL *chunk_cache_cleanup_session, *session, *verify_session;
     bool config_base_set, try_salvage, verify_meta;
     const char *enc_cfg[] = {NULL, NULL}, *merge_cfg;
     char version[64];
@@ -3621,7 +3621,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__wti_connection_workers(session, cfg));
 
     /* The chunk cache metadata table may exist on upgrade. Discard it. */
-    WT_ERR(__conn_cleanup_chunk_cache(session));
+    WT_ERR(__wt_open_internal_session(
+      conn, "chunk-cache-cleanup", false, 0, 0, &chunk_cache_cleanup_session));
+    ret = __conn_cleanup_chunk_cache(chunk_cache_cleanup_session);
+    WT_TRET(__wt_session_close_internal(chunk_cache_cleanup_session));
+    WT_ERR(ret);
 
     /*
      * If the user wants to verify WiredTiger metadata, verify the history store now that the

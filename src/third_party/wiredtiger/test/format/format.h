@@ -497,6 +497,7 @@ void table_verify(TABLE *, void *);
 void timestamp_init(void);
 wt_timestamp_t timestamp_minimum_committed(void);
 void timestamp_once(WT_SESSION *, bool, bool);
+void timestamp_sync_threads_commit_ts(void);
 void replay_adjust_key(TINFO *, uint64_t);
 wt_timestamp_t replay_commit_ts(TINFO *);
 wt_timestamp_t replay_rollback_ts(TINFO *);

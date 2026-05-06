@@ -1719,7 +1719,8 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
         WT_WITH_SCHEMA_LOCK(
           session, ret = __checkpoint_process_disagg_metadata(session, &drop_size));
-        WT_ERR(ret);
+        WT_ERR_MSG_CHK(session, ret,
+          "Disaggregated storage checkpoint failed while processing shared metadata queue");
     }
 
     /*
@@ -1879,6 +1880,16 @@ err:
 
     if (F_ISSET(txn, WT_TXN_RUNNING)) {
         /*
+         * In disaggregated storage, a checkpoint failure is unrecoverable once the checkpoint
+         * transaction has started. The transaction cannot be safely rolled back, panic before
+         * attempting the rollback.
+         */
+        if (failed && __wt_conn_is_disagg(session))
+            WT_RET_PANIC(session, ret,
+              "Disaggregated storage checkpoint failed, unable to rollback, panic to avoid "
+              "corruption");
+
+        /*
          * Clear the dhandle so the visibility check doesn't get confused about the snap min. Don't
          * bother restoring the handle since it doesn't make sense to carry a handle across a
          * checkpoint.
@@ -2022,6 +2033,15 @@ __wt_checkpoint_db(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
     if (ret != 0 && flush)
         WT_IGNORE_RET(
           __wt_panic(session, ret, "checkpoint can not fail when flush_tier is enabled"));
+    /*
+     * In disaggregated storage, a checkpoint failure once the checkpoint transaction has started is
+     * unrecoverable: there is no WAL to replay from, and checkpoint metadata may already have been
+     * written to the durable object storage. Rolling back the in-memory transaction would leave the
+     * object storage ahead of the in-memory state, which is permanent corruption. Panic instead.
+     */
+    if (ret != 0 && __wt_conn_is_disagg(session) && F_ISSET(session->txn, WT_TXN_RUNNING))
+        WT_ERR_PANIC(
+          session, ret, "Disaggregated storage checkpoint failed, panic to avoid corruption");
     WT_ERR(ret);
 
     /* Trigger the checkpoint cleanup thread to remove the obsolete pages. */
@@ -2704,9 +2724,12 @@ __checkpoint_disagg_put(WT_SESSION_IMPL *session, wt_timestamp_t ckpt_ts)
          * will retry on the next checkpoint. Therefore, it is okay to continue.
          */
         if (conn->key_provider != NULL)
-            WT_TRET(__wt_disagg_put_crypt_helper(session));
-        WT_TRET(__wt_disagg_put_checkpoint_meta(
-          session, conn->disaggregated_storage.last_checkpoint_root, 0, ckpt_ts));
+            WT_TRET_MSG(session, __wt_disagg_put_crypt_helper(session), "%s",
+              "Disaggregated storage checkpoint failed to write encryption metadata");
+        WT_TRET_MSG(session,
+          __wt_disagg_put_checkpoint_meta(
+            session, conn->disaggregated_storage.last_checkpoint_root, 0, ckpt_ts),
+          "%s", "Disaggregated storage checkpoint failed to write checkpoint metadata");
     }
 
     return (ret);
@@ -2847,20 +2870,6 @@ __checkpoint_tree(WT_SESSION_IMPL *session, bool is_checkpoint, const char *cfg[
 
         fake_ckpt = true;
         __wt_checkpoint_update_generation(session, btree);
-
-        if (__wt_conn_is_disagg(session)) {
-            /*
-             * In disaggregated storage, fake checkpoints must go through the block manager
-             * start/resolve cycle so their metadata is pushed to shared storage. Without this, the
-             * fake checkpoint only exists in local metadata. If leadership changes, the new node
-             * has no knowledge of the fake checkpoint and starts the checkpoint order at 1 again,
-             * producing a duplicate order with a different time and risking data corruption when
-             * metadata is merged.
-             */
-            WT_ERR(bm->checkpoint_start(bm, session));
-            resolve_bm = true;
-        }
-
         goto fake;
     }
 

@@ -62,6 +62,26 @@ timestamp_minimum_committed(void)
 }
 
 /*
+ * timestamp_sync_threads_commit_ts --
+ *     Advance each ops thread's recorded last-used commit timestamp to g.timestamp. Callers must
+ *     ensure ops threads are quiescent (e.g. between operations() runs); this is used during disagg
+ *     role switch so the next timestamp_once advances stable past all in-memory follower commits.
+ */
+void
+timestamp_sync_threads_commit_ts(void)
+{
+    TINFO **tlp;
+    wt_timestamp_t ts;
+
+    if (tinfo_list == NULL)
+        return;
+
+    WT_ACQUIRE_READ_WITH_BARRIER(ts, g.timestamp);
+    for (tlp = tinfo_list; *tlp != NULL; ++tlp)
+        WT_RELEASE_WRITE_WITH_BARRIER((*tlp)->commit_ts, ts);
+}
+
+/*
  * timestamp_query --
  *     Query a timestamp.
  */

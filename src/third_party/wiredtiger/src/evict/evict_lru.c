@@ -142,6 +142,32 @@ __evict_lru_cmp(const void *a_arg, const void *b_arg)
 }
 
 /*
+ * __evict_page_updates_candidate --
+ *     Check whether evicting the page will help reduce tracked updates usage.
+ */
+static WT_INLINE bool
+__evict_page_updates_candidate(WT_PAGE *page)
+{
+    if (page == NULL || page->modify == NULL)
+        return (false);
+
+    /*
+     * Internal pages don't track bytes_updates, but still need to be evicted when updates pressure
+     * is active. Evicting and reconciling an internal page frees the underlying disk blocks of any
+     * fast-truncate children whose deletions have become globally visible.
+     */
+    if (WT_PAGE_IS_INTERNAL(page))
+        return (true);
+
+    /*
+     * For leaf pages, only queue the page if it has non-zero tracked update bytes. Freshly-split
+     * child pages start at zero, and evicting a page with no tracked update bytes does not reduce
+     * updates cache pressure.
+     */
+    return (page->modify->bytes_updates != 0);
+}
+
+/*
  * __evict_list_clear --
  *     Clear an entry in the LRU eviction list.
  */
@@ -1591,7 +1617,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
         else
             WT_STAT_CONN_DSRC_INCR(session, cache_eviction_pages_queued_clean);
 
-        if (page->modify != NULL)
+        if (__evict_page_updates_candidate(page))
             WT_STAT_CONN_DSRC_INCR(session, cache_eviction_pages_queued_updates);
     }
     queue->evict_current = queue->evict_queue;
@@ -2552,7 +2578,7 @@ __evict_try_queue_page(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, WT_REF 
     evict_clean =
       F_ISSET(evict, WT_EVICT_CACHE_CLEAN) && !F_ISSET(btree, WT_BTREE_IN_MEMORY) && !modified;
     evict_dirty = F_ISSET(evict, WT_EVICT_CACHE_DIRTY) && modified;
-    evict_updates = F_ISSET(evict, WT_EVICT_CACHE_UPDATES) && page->modify != NULL;
+    evict_updates = F_ISSET(evict, WT_EVICT_CACHE_UPDATES) && __evict_page_updates_candidate(page);
     should_evict_page = evict_clean || evict_dirty || evict_updates;
     /* Skip pages we don't want. */
     if (!should_evict_page) {
@@ -2746,7 +2772,7 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, u_int max_en
         else
             ++pages_seen_clean;
 
-        if (page->modify != NULL)
+        if (__evict_page_updates_candidate(page))
             ++pages_seen_updates;
 
         /* Count internal pages seen. */
@@ -3462,7 +3488,7 @@ __verbose_dump_cache_single(WT_SESSION_IMPL *session, uint64_t *total_bytesp,
                 leaf_dirty_bytes += size;
                 leaf_dirty_bytes_max = WT_MAX(leaf_dirty_bytes_max, size);
             }
-            if (page->modify != NULL)
+            if (__evict_page_updates_candidate(page))
                 updates_bytes += page->modify->bytes_updates;
         }
     }

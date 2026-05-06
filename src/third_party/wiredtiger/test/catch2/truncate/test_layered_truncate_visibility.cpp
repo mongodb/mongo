@@ -113,7 +113,8 @@ public:
         WT_TRUNCATE *entry = nullptr;
 
         REQUIRE(__wt_calloc_one(session, &entry) == 0);
-        REQUIRE(__wt_strdup(session, layered_table.iface.name, &entry->uri) == 0);
+        entry->layered_table = &layered_table;
+        WT_DHANDLE_ACQUIRE(&layered_table.iface);
         entry->txn_id = txn_id;
         entry->start_ts = start_ts;
         entry->durable_ts = durable_ts;

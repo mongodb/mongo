@@ -73,12 +73,7 @@ struct __wt_table {
  *	Queue to track truncate entries in the layered table handle.
  */
 struct __wt_truncate {
-    /*
-     * The uri is used to grab the layered table handle.
-     *
-     * FIXME-WT-16789: Investigate if there is more efficient way to get the dhandle.
-     */
-    const char *uri;
+    WT_LAYERED_TABLE *layered_table;
     uint64_t txn_id;
     wt_timestamp_t start_ts;
     wt_timestamp_t durable_ts;
@@ -115,8 +110,7 @@ struct __wt_layered_table {
     /*
      * Queue head for fast truncate logic.
      *
-     * FIXME-WT-16789: Make list sorted by start key or start timestamp for performance
-     * optimization.
+     * FIXME-WT-17330: Evaluate data structure for performance optimization.
      */
     TAILQ_HEAD(__truncate_table_list_qh, __wt_truncate) truncateqh;
 

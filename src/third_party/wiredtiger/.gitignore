@@ -25,3 +25,9 @@ TCMALLOC_LIB/
 .idea
 cmake-build-release
 cmake-build-debug
+
+# Claude Code
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/agent-memory-local/
+.claude/worktrees/
