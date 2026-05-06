@@ -543,7 +543,7 @@ void BackgroundSync::_produce() {
                                  source,
                                  _replCoord->getConfig(),
                                  syncSourceResp.rbid,
-                                 bgSyncOplogFetcherBatchSize));
+                                 bgSyncOplogFetcherBatchSize.load()));
         stdx::lock_guard<Latch> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;

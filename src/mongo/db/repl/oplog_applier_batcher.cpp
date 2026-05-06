@@ -390,7 +390,7 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
                 Milliseconds(feature_flags::gReduceMajorityWriteLatency.isEnabled(
                                  serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
                                  ? 0
-                                 : oplogBatchDelayMillis);
+                                 : oplogBatchDelayMillis.load());
             ops = fassertNoTrace(31004,
                                  getNextApplierBatch(opCtx.get(), batchLimits, waitToFillBatch));
         } catch (const ExceptionForCat<ErrorCategory::CancellationError>& e) {

@@ -432,9 +432,9 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsSingleBatch) {
 }
 
 TEST_F(TenantCollectionClonerTest, BatchSizeStoredInConstructor) {
-    auto batchSizeDefault = collectionClonerBatchSize;
-    collectionClonerBatchSize = 3;
-    ON_BLOCK_EXIT([&]() { collectionClonerBatchSize = batchSizeDefault; });
+    auto batchSizeDefault = collectionClonerBatchSize.load();
+    collectionClonerBatchSize.store(3);
+    ON_BLOCK_EXIT([&]() { collectionClonerBatchSize.store(batchSizeDefault); });
 
     // Set up data for preliminary stages.
     _mockServer->setCommandReply("count", createCountResponse(7));

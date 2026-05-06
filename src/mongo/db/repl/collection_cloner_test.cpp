@@ -383,9 +383,9 @@ TEST_F(CollectionClonerTestResumable, InsertDocumentsSingleBatch) {
 }
 
 TEST_F(CollectionClonerTestResumable, BatchSizeStoredInConstructor) {
-    auto batchSizeDefault = collectionClonerBatchSize;
-    collectionClonerBatchSize = 3;
-    ON_BLOCK_EXIT([&]() { collectionClonerBatchSize = batchSizeDefault; });
+    auto batchSizeDefault = collectionClonerBatchSize.load();
+    collectionClonerBatchSize.store(3);
+    ON_BLOCK_EXIT([&]() { collectionClonerBatchSize.store(batchSizeDefault); });
 
     // Set up data for preliminary stages.
     setMockServerReplies(BSON("size" << 10),

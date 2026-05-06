@@ -1245,7 +1245,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         _syncSource,
         config,
         _rollbackChecker->getBaseRBID(),
-        initialSyncOplogFetcherBatchSize,
+        initialSyncOplogFetcherBatchSize.load(),
         OplogFetcher::RequireFresherSyncSource::kDontRequireFresherSyncSource);
     oplogFetcherConfig.startingPoint = OplogFetcher::StartingPoint::kEnqueueFirstDoc;
     _oplogFetcher = (*_createOplogFetcherFn)(
