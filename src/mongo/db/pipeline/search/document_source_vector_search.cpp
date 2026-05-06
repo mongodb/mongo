@@ -64,14 +64,14 @@ DocumentSourceVectorSearch::DocumentSourceVectorSearch(
     : DocumentSource(kStageName, expCtx),
       exec::agg::Stage(kStageName, expCtx),
       _taskExecutor(taskExecutor),
-      _originalSpec(originalSpec.getOwned()) {
-    if (auto limitElem = _originalSpec.getField(kLimitFieldName)) {
+      _stageSpec(originalSpec.getOwned()) {
+    if (auto limitElem = _stageSpec.getField(kLimitFieldName)) {
         uassert(
             8575100, "Expected limit field to be a number in $vectorSearch", limitElem.isNumber());
         _limit = limitElem.safeNumberLong();
         uassert(7912700, "Expected limit to be positive", *_limit > 0);
     }
-    if (auto filterElem = _originalSpec.getField(kFilterFieldName)) {
+    if (auto filterElem = _stageSpec.getField(kFilterFieldName)) {
         _filterExpr = uassertStatusOK(MatchExpressionParser::parse(filterElem.Obj(), expCtx));
     }
 
@@ -85,7 +85,7 @@ void DocumentSourceVectorSearch::initializeOpDebugVectorSearchMetrics() {
             return 0.0;
         }
 
-        auto numCandidatesElem = _originalSpec.getField(kNumCandidatesFieldName);
+        auto numCandidatesElem = _stageSpec.getField(kNumCandidatesFieldName);
         if (!numCandidatesElem.isNumber()) {
             return 0.0;
         }
@@ -109,7 +109,7 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
             builder.append(kFilterFieldName, _filterExpr->serialize(opts));
         }
 
-        if (auto indexElem = _originalSpec.getField(kIndexFieldName)) {
+        if (auto indexElem = _stageSpec.getField(kIndexFieldName)) {
             builder.append(kIndexFieldName,
                            opts.serializeIdentifier(indexElem.valueStringDataSafe()));
         }
@@ -120,7 +120,7 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
     // We don't want router to make a remote call to mongot even though it can generate explain
     // output.
     if (!opts.verbosity || pExpCtx->getInRouter()) {
-        return Value(Document{{kStageName, _originalSpec}});
+        return Value(Document{{kStageName, _stageSpec}});
     }
 
     // If the query is an explain that executed the query, we obtain the explain object from the
@@ -131,9 +131,9 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
         explainResponse = _cursor->getCursorExplain();
     }
 
-    auto explainSpec = _originalSpec;
+    auto explainSpec = _stageSpec;
     BSONObj explainInfo = explainResponse.value_or_eval([&] {
-        // If the request was on a view over a sharded collection, _originalSpec will include the
+        // If the request was on a view over a sharded collection, _stageSpec will include the
         // view field. Remove it from explain output as it will be included in $_internalIdLookup
         // and thus redundant.
         if (explainSpec.hasField("view")) {
@@ -216,8 +216,7 @@ DocumentSource::GetNextResult DocumentSourceVectorSearch::doGetNext() {
 
     // If this is the first call, establish the cursor.
     if (!_cursor) {
-        _cursor =
-            search_helpers::establishVectorSearchCursor(pExpCtx, _originalSpec, _taskExecutor);
+        _cursor = search_helpers::establishVectorSearchCursor(pExpCtx, _stageSpec, _taskExecutor);
     }
 
     return getNextAfterSetup();
@@ -261,14 +260,14 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::desugar() {
         executor::getMongotTaskExecutor(pExpCtx->getOperationContext()->getServiceContext());
 
     std::list<intrusive_ptr<DocumentSource>> desugaredPipeline = {
-        make_intrusive<DocumentSourceVectorSearch>(pExpCtx, executor, _originalSpec.getOwned())};
+        make_intrusive<DocumentSourceVectorSearch>(pExpCtx, executor, _stageSpec.getOwned())};
 
     search_helpers::promoteStoredSourceOrAddIdLookup(
         pExpCtx,
         desugaredPipeline,
         isStoredSource(),
         _limit.value_or(0),
-        search_helpers::getViewFromBSONObj(_originalSpec));
+        search_helpers::getViewFromBSONObj(_stageSpec));
 
     return desugaredPipeline;
 }

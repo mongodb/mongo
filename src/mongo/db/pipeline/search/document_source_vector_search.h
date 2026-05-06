@@ -64,6 +64,38 @@ public:
         return kStageName.data();
     }
 
+    /**
+     * This method is used exclusively by query analysis to replace the filter predicate in the
+     * original spec with the filter rewritten with encryption placeholders. This method returns
+     * true if the stage's filter is replaced, otherwise it returns false.
+     *
+     * Callers of this method provide a functor which accepts a MatchExpression, and returns the
+     * rewritten expression with encryption placeholders as serialized BSON. If no rewrites took
+     * place, the functor returns an empty BSONObj.
+     *
+     * Note, the filter specification in the _stageSpec BSON is also replaced to reflect the updated
+     * filter. This is necessary because we must not operate on the unencrypted plain-text secure
+     * payloads.
+     */
+    bool rebuildWithNewFilterForFLE(std::function<BSONObj(const MatchExpression&)> fn) {
+        if (!_filterExpr) {
+            return false;
+        }
+        // It's important that we reparse the _filterExpr from the rebuilt _stageSpec, because the
+        // parsed MatchExpression holds references to BSONElements of the source BSONObj.
+        if (auto rewrittenFilter = fn(*_filterExpr); !rewrittenFilter.isEmpty()) {
+            _stageSpec = _stageSpec.removeField(kFilterFieldName)
+                             .addFields(BSON(kFilterFieldName << rewrittenFilter));
+            auto filterElem = _stageSpec.getField(kFilterFieldName);
+            tassert(12350700,
+                    "Could not reparse $vectorSearch prefilter during fle rewrite",
+                    filterElem.ok());
+            _filterExpr = uassertStatusOK(MatchExpressionParser::parse(filterElem.Obj(), pExpCtx));
+            return true;
+        }
+        return false;
+    }
+
     bool isStoredSource() const {
         // If the user specifies storedSource: true and the knob is off, we will not error and
         // simply return false.
@@ -74,7 +106,7 @@ public:
                 ->getValue(pExpCtx->getNamespaceString().tenantId())
                 .getEnabled();
         return isVectorSearchStoredSourceEnabled
-            ? _originalSpec.getBoolField(kReturnStoredSourceFieldName)
+            ? _stageSpec.getBoolField(kReturnStoredSourceFieldName)
             : false;
     }
 
@@ -110,8 +142,7 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override {
         auto expCtx = newExpCtx ? newExpCtx : pExpCtx;
-        return make_intrusive<DocumentSourceVectorSearch>(
-            expCtx, _taskExecutor, _originalSpec.copy());
+        return make_intrusive<DocumentSourceVectorSearch>(expCtx, _taskExecutor, _stageSpec.copy());
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {
@@ -184,8 +215,8 @@ private:
     // The limit that we send to mongot is received and stored on the '_request' object above.
     boost::optional<long long> _limit;
 
-    // Keep track of the original request BSONObj's extra fields in case there were fields mongod
+    // Keep track of the request BSONObj's extra fields in case there were fields mongod
     // doesn't know about that mongot will need later.
-    BSONObj _originalSpec;
+    BSONObj _stageSpec;
 };
 }  // namespace mongo
