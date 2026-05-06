@@ -264,27 +264,78 @@ TEST_F(FeatureCompatibilityVersionTestFixture, ResolveReturnToOriginalFCVDuringC
 
 struct FCVTestParams {
     SetFCVPhaseEnum phase;
-    bool isCleaningServerMetadata;
+    boost::optional<bool> isCleaningServerMetadata;
+    bool symmetricFCVEnabled;
+    SetFCVPhaseEnum expectedStartPhase;
+    SetFCVPhaseEnum expectedEndPhase;
 };
 
 class SetFeatureCompatibilityVersionParamTestFixture
     : public FeatureCompatibilityVersionTestFixture,
       public testing::WithParamInterface<FCVTestParams> {};
 
-INSTANTIATE_TEST_SUITE_P(UpgradingFromDifferentStartingPhases,
+// Without symmetric FCV, the phase stored in the FCV document is ignored and the transition always
+// restarts from kStart with a freshly generated timestamp (legacy "restart from beginning"
+// behavior).
+INSTANTIATE_TEST_SUITE_P(UpgradingFromDifferentStartingPhasesWithoutSymmetricFCV,
                          SetFeatureCompatibilityVersionParamTestFixture,
                          testing::ValuesIn({
-                             FCVTestParams{SetFCVPhaseEnum::kStart, false},
-                             FCVTestParams{SetFCVPhaseEnum::kPrepare, false},
-                             FCVTestParams{SetFCVPhaseEnum::kComplete, true},
+                             FCVTestParams{SetFCVPhaseEnum::kStart,
+                                           false,
+                                           false,
+                                           SetFCVPhaseEnum::kStart,
+                                           SetFCVPhaseEnum::kComplete},
+                             FCVTestParams{SetFCVPhaseEnum::kPrepare,
+                                           false,
+                                           false,
+                                           SetFCVPhaseEnum::kStart,
+                                           SetFCVPhaseEnum::kComplete},
+                             FCVTestParams{SetFCVPhaseEnum::kComplete,
+                                           true,
+                                           false,
+                                           SetFCVPhaseEnum::kStart,
+                                           SetFCVPhaseEnum::kComplete},
+                         }));
+
+// With symmetric FCV, the phase stored in the FCV document is used as the start phase, so the
+// transition resumes from where it was interrupted and reuses the existing change timestamp.
+INSTANTIATE_TEST_SUITE_P(UpgradingFromDifferentStartingPhasesWithSymmetricFCV,
+                         SetFeatureCompatibilityVersionParamTestFixture,
+                         testing::ValuesIn({
+                             FCVTestParams{SetFCVPhaseEnum::kStart,
+                                           false,
+                                           true,
+                                           SetFCVPhaseEnum::kStart,
+                                           SetFCVPhaseEnum::kCommitAddedFeatures},
+                             FCVTestParams{SetFCVPhaseEnum::kPrepare,
+                                           false,
+                                           true,
+                                           SetFCVPhaseEnum::kPrepare,
+                                           SetFCVPhaseEnum::kCommitAddedFeatures},
+                             FCVTestParams{SetFCVPhaseEnum::kComplete,
+                                           true,
+                                           true,
+                                           SetFCVPhaseEnum::kComplete,
+                                           SetFCVPhaseEnum::kCommitAddedFeatures},
+                             FCVTestParams{SetFCVPhaseEnum::kEnableTargetFeatures,
+                                           boost::none,
+                                           true,
+                                           SetFCVPhaseEnum::kEnableTargetFeatures,
+                                           SetFCVPhaseEnum::kCommitAddedFeatures},
+                             FCVTestParams{SetFCVPhaseEnum::kCommitAddedFeatures,
+                                           boost::none,
+                                           true,
+                                           SetFCVPhaseEnum::kCommitAddedFeatures,
+                                           SetFCVPhaseEnum::kCommitAddedFeatures},
                          }));
 
 TEST_P(SetFeatureCompatibilityVersionParamTestFixture, ResolveResumeInterruptedUpgrade) {
-    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", true};
+    const auto& params = GetParam();
+    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV",
+                                                      params.symmetricFCVEnabled};
     const Timestamp lastChangeTimestamp =
         VectorClockMutable::get(operationContext())->tickClusterTime(2).asTimestamp();
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
-    const auto& params = GetParam();
 
     doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
     FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
@@ -299,9 +350,13 @@ TEST_P(SetFeatureCompatibilityVersionParamTestFixture, ResolveResumeInterruptedU
         operationContext(), request, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
 
     ASSERT_EQ(result.transitionalVersion, multiversion::GenericFCV::kUpgradingFromLastLTSToLatest);
-    ASSERT_EQ(result.startPhase, params.phase);
-    ASSERT_EQ(result.endPhase, SetFCVPhaseEnum::kComplete);
-    ASSERT_EQ(result.changeTimestamp, lastChangeTimestamp);
+    ASSERT_EQ(result.startPhase, params.expectedStartPhase);
+    ASSERT_EQ(result.endPhase, params.expectedEndPhase);
+    if (params.symmetricFCVEnabled) {
+        ASSERT_EQ(result.changeTimestamp, lastChangeTimestamp);
+    } else {
+        ASSERT_GT(result.changeTimestamp, lastChangeTimestamp);
+    }
 }
 
 

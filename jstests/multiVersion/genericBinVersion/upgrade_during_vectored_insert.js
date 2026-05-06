@@ -25,10 +25,9 @@ assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastLT
 // Insert a document to cause an error in batch insertion
 assert.commandWorked(testColl.insert([{"_id": "5"}]));
 
-// Switch to upgrade FCV first.  We have to stop this in the middle so we can get the collmods in
-// _upgradeServerMetadata to finish before allowing FCV to actually change.  This is a very
-// unlikely race!
-let upgradeFp = configureFailPoint(primary, "hangWhileUpgrading");
+// Switch to upgrade FCV first.  We have to stop this in the middle so we can get all upgrade
+// metadata changes to finish before allowing FCV to actually change.  This is a very unlikely race!
+let upgradeFp = configureFailPoint(primary, "hangBeforeFinalizingFCV");
 jsTestLog("Switching to upgrade FCV");
 let upgradeFCVThread = new Thread(function (host) {
     let conn = new Mongo(host);

@@ -283,7 +283,9 @@ public:
 
         return ResolvedFCVTransition{it->second.transitionalVersion,
                                      startPhase,
-                                     SetFCVPhaseEnum::kComplete,
+                                     gFeatureFlagSymmetricFCV.isEnabled()
+                                         ? SetFCVPhaseEnum::kCommitAddedFeatures
+                                         : SetFCVPhaseEnum::kComplete,
                                      changeTimestamp};
     }
 

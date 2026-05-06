@@ -76,6 +76,8 @@ structs:
                 type: SetFCVPhase
                 optional: true
 
+# Note: the order of the phases in the enum below matters, as the code relies on the order to determine whether a phase
+# should be run or not based on the current phase stored in the FCV document.
 enums:
     SetFCVPhase:
         description: "Enum that defines the phases of the 3-phase setFCV protocol."
@@ -89,6 +91,10 @@ enums:
             # Tells shards to execute possibly metadata-changing upgrade/downgrade actions and
             # transition to the fully upgraded/downgraded FCV.
             kComplete: "complete"
+            # Tells shards to enable target-version features.
+            kEnableTargetFeatures: "enable_target_features"
+            # Tells shards to commit features added in the target version.
+            kCommitAddedFeatures: "commit_added_features"
 
 feature_flags:
     featureFlagSymmetricFCV:

@@ -417,10 +417,10 @@ rollbackFCVFromDowngradingOrUpgrading(latestFCV, lastLTSFCV);
 
 // Tests the case where we roll back the FCV state from fully downgraded to downgrading (while in
 // isCleaningServerMetadata state).
-rollbackFCVFromDowngradedOrUpgraded(lastLTSFCV, latestFCV, "hangBeforeTransitioningToDowngraded");
+rollbackFCVFromDowngradedOrUpgraded(lastLTSFCV, latestFCV, "hangBeforeFinalizingFCV");
 
 // Tests the case where we roll back the FCV state from fully upgraded to upgrading.
-rollbackFCVFromDowngradedOrUpgraded(latestFCV, lastLTSFCV, "hangWhileUpgrading");
+rollbackFCVFromDowngradedOrUpgraded(latestFCV, lastLTSFCV, "hangBeforeFinalizingFCV");
 
 // Tests the case where we roll back the FCV state from upgrading to downgrading.
 rollbackFCV_FromUpgradingToDowngrading_or_FromDowngradingToUpgrading(latestFCV, lastLTSFCV);

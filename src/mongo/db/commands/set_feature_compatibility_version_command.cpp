@@ -132,6 +132,7 @@ MONGO_FAIL_POINT_DEFINE(failBeforeUpdatingFcvDoc);
 MONGO_FAIL_POINT_DEFINE(failTransitionDuringIsCleaningServerMetadata);
 MONGO_FAIL_POINT_DEFINE(hangBeforeTransitioningToDowngraded);
 MONGO_FAIL_POINT_DEFINE(hangTransitionBeforeIsCleaningServerMetadata);
+MONGO_FAIL_POINT_DEFINE(hangBeforeFinalizingFCV);
 MONGO_FAIL_POINT_DEFINE(failAfterReachingTransitioningState);
 MONGO_FAIL_POINT_DEFINE(hangAtSetFCVStart);
 MONGO_FAIL_POINT_DEFINE(failAfterSendingShardsToDowngradingOrUpgrading);
@@ -583,7 +584,6 @@ public:
         if (resolvedTransition.shouldRun(SetFCVPhaseEnum::kComplete)) {
             invariant(serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
                           .isUpgradingOrDowngrading());
-
             const bool isDowngradeTransition = requestedVersion < actualVersion;
             if (isDowngradeTransition ||
                 repl::feature_flags::gFeatureFlagUpgradingToDowngrading.isEnabled()) {
@@ -619,7 +619,45 @@ public:
             } else {
                 _runUpgrade(opCtx, request, changeTimestamp);
             }
+        }
 
+        // ---------- kEnableTargetFeatures phase ----------
+        if (resolvedTransition.shouldRun(SetFCVPhaseEnum::kEnableTargetFeatures)) {
+            FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+                opCtx,
+                resolvedTransition.transitionalVersion,
+                SetFCVPhaseEnum::kEnableTargetFeatures,
+                changeTimestamp,
+                boost::none /* setIsCleaningServerMetadata */);
+
+            if (role && role->has(ClusterRole::ConfigServer)) {
+                _sendEnterSetFCVPhaseRequestToShard(
+                    opCtx, request, changeTimestamp, SetFCVPhaseEnum::kEnableTargetFeatures);
+            }
+        }
+
+        // ---------- kCommitAddedFeatures phase ----------
+        if (resolvedTransition.shouldRun(SetFCVPhaseEnum::kCommitAddedFeatures)) {
+            FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+                opCtx,
+                resolvedTransition.transitionalVersion,
+                SetFCVPhaseEnum::kCommitAddedFeatures,
+                changeTimestamp,
+                boost::none /* setIsCleaningServerMetadata */);
+
+            if (role && role->has(ClusterRole::ConfigServer)) {
+                _sendEnterSetFCVPhaseRequestToShard(
+                    opCtx, request, changeTimestamp, SetFCVPhaseEnum::kCommitAddedFeatures);
+            }
+        }
+
+        // With symmetric FCV the last protocol phase is kCommitAddedFeatures; without it the last
+        // meaningful phase is kComplete (kEnableTargetFeatures/kCommitAddedFeatures are no-ops).
+        // Either way this finalization must execute after all feature-specific work is done.
+        if (gFeatureFlagSymmetricFCV.isEnabled()
+                ? resolvedTransition.shouldRun(SetFCVPhaseEnum::kCommitAddedFeatures)
+                : resolvedTransition.shouldRun(SetFCVPhaseEnum::kComplete)) {
+            hangBeforeFinalizingFCV.pauseWhileSet(opCtx);
             {
                 // Complete transition by updating the local FCV document to the fully upgraded or
                 // downgraded requestedVersion.
