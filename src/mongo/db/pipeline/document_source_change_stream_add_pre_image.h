@@ -127,7 +127,17 @@ public:
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kOperationTypeField});
         deps->fields.insert(std::string{DocumentSourceChangeStream::kPreImageIdField});
+
+        if (_fullDocumentBeforeChangeMode == FullDocumentBeforeChangeModeEnum::kRequired) {
+            // These fields are only needed to generate error messages when a required pre-image
+            // cannot be found.
+            deps->fields.insert(std::string{DocumentSourceChangeStream::kClusterTimeField});
+            deps->fields.insert(std::string{DocumentSourceChangeStream::kNamespaceField});
+            deps->fields.insert(std::string{DocumentSourceChangeStream::kTxnNumberField});
+        }
+
         // This stage does not restrict the output fields to a finite set, and has no impact on
         // whether metadata is available or needed.
         return DepsTracker::State::SEE_NEXT;
