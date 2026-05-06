@@ -757,6 +757,19 @@ protected:
                                    const CollectionPtr& collection);
 
     /**
+     * Marks the two-phase resumability state in both ReplIndexBuildState and MultiIndexBlock to be
+     * resumable.
+     */
+    void _markTwoPhaseBuildResumable(ReplIndexBuildState& replState,
+                                     repl::OpTime lastOpTimeBeforeInterceptors);
+
+    /**
+     * Marks the two-phase resumability state in both ReplIndexBuildState and MultiIndexBlock to NOT
+     * be resumable.
+     */
+    void _markTwoPhaseBuildNonResumable(ReplIndexBuildState& replState);
+
+    /**
      * Waits for the last optime before the interceptors were installed on the node to be majority
      * committed and sets that the collection scan for the index build should use a majority read
      * cursor. If no such optime was recorded, it will do nothing.

@@ -2982,12 +2982,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
             // collection.
             auto lastOpTimeBeforeInterceptors =
                 indexBuildOptions.startIndexBuildOpTime.value_or(getLatestOplogOpTime(opCtx));
-            replState->setLastOpTimeBeforeInterceptors(lastOpTimeBeforeInterceptors);
-
-            // The hybrid build only becomes resumable once _lastOpTimeBeforeInterceptors is set.
-            // setUpIndexBuild ran before this and so set the builder's _isResumable to false;
-            // refresh it now so a later persistResumeState / abortWithoutCleanup will write state.
-            _indexBuildsManager.setIsResumable(replState->buildUUID, true);
+            _markTwoPhaseBuildResumable(*replState, lastOpTimeBeforeInterceptors);
         }
     } catch (DBException& ex) {
         // It is fine to let the build continue even if we are interrupted, interrupt check before
@@ -3423,6 +3418,20 @@ void IndexBuildsCoordinator::_resumeHybridIndexBuildFromPhase(
     _waitForNextIndexBuildActionAndCommit(opCtx, replState, indexBuildOptions);
 }
 
+void IndexBuildsCoordinator::_markTwoPhaseBuildResumable(
+    ReplIndexBuildState& replState, repl::OpTime lastOpTimeBeforeInterceptors) {
+    invariant(replState.protocol == IndexBuildProtocol::kTwoPhase);
+    // The hybrid build only becomes resumable once _lastOpTimeBeforeInterceptors is set.
+    replState.setLastOpTimeBeforeInterceptors(std::move(lastOpTimeBeforeInterceptors));
+    _indexBuildsManager.setIsResumable(replState.buildUUID, true);
+}
+
+void IndexBuildsCoordinator::_markTwoPhaseBuildNonResumable(ReplIndexBuildState& replState) {
+    invariant(replState.protocol == IndexBuildProtocol::kTwoPhase);
+    replState.clearLastOpTimeBeforeInterceptors();
+    _indexBuildsManager.setIsResumable(replState.buildUUID, false);
+}
+
 void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -3442,7 +3451,7 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
     auto timeoutMillis = gResumableIndexBuildMajorityOpTimeTimeoutMillis;
     if (timeoutMillis == 0) {
         // Disable resumable index build.
-        replState->clearLastOpTimeBeforeInterceptors();
+        _markTwoPhaseBuildNonResumable(*replState);
         return;
     }
 
@@ -3490,7 +3499,7 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
 
     auto status = replCoord->waitUntilMajorityOpTime(opCtx, lastOpTimeBeforeInterceptors, deadline);
     if (!status.isOK()) {
-        replState->clearLastOpTimeBeforeInterceptors();
+        _markTwoPhaseBuildNonResumable(*replState);
         LOGV2(5053900,
               "Index build: timed out waiting for the last optime before interceptors to be "
               "majority committed, continuing as a non-resumable index build",
