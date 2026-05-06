@@ -117,7 +117,6 @@
 #include "mongo/s/index_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -620,15 +619,9 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
     try {
         uassertStatusOK(userAllowedWriteNS(opCtx, *nss));
 
-        auto catalogCache =
-            Grid::get(opCtx)->isInitialized() ? Grid::get(opCtx)->catalogCache() : nullptr;
-        auto sii = catalogCache
-            ? uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, *nss)).sii
-            : boost::none;
         // Attach IGNORED placement version to skip orphans (the range deleter will clear them up)
-        const auto shardVersion = ShardVersionFactory::make(
-            ChunkVersion::IGNORED(),
-            sii ? boost::make_optional(sii->getCollectionIndexes()) : boost::none);
+        const auto shardVersion =
+            ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none /* indexVersion */);
         auto scopedRole = ScopedSetShardRole(opCtx, *nss, shardVersion, boost::none);
         const auto coll =
             acquireCollection(opCtx,
