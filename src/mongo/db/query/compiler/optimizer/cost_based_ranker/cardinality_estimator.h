@@ -92,7 +92,7 @@ public:
         return estimate(plan.root());
     }
 
-protected:
+private:
     // QuerySolutionNodes
     CEResult estimate(const QuerySolutionNode* node);
     CEResult estimate(const CollectionScanNode* node);
@@ -131,8 +131,6 @@ protected:
      * of the child.
      */
     void propagateLimit(const QuerySolutionNode* node, size_t limit);
-
-    CEResult estimateIndexSeeks(const IndexBounds& bounds, bool multiKey);
 
     // Internal helper functions
 

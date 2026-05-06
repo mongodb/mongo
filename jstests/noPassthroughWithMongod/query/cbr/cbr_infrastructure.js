@@ -86,9 +86,10 @@ assert.commandWorked(coll.runCommand({analyze: collName, key: "bool_field", numb
 
 // Test queries
 const queries = [
-    {a: {$gt: 10}, b: {$eq: 99}},
-    {a: {$in: [5, 1]}, b: {$in: [7, 99]}},
-    {a: {$gt: 90}, b: {$eq: 99}, c: {$lt: 5}},
+    // TODO SERVER-100611: re-enable these tests.
+    // {a: {$gt: 10}, b: {$eq: 99}},
+    // {a: {$in: [5, 1]}, b: {$in: [7, 99]}},
+    // {a: {$gt: 90}, b: {$eq: 99}, c: {$lt: 5}},
     /*
     The following query has 4 plans:
     1. Filter: a in (1,5) AND b in (7, 99)
@@ -126,7 +127,8 @@ const queries = [
     {missing_10_percent: {$not: {$exists: false}}},
     {missing_90_percent: {$exists: false}},
     {missing_90_percent: {$not: {$exists: false}}},
-    {a: {$not: {$lt: 130}}, b: 12, c: {$not: {$gt: 1200}}},
+    // TODO SERVER-100611: re-enable this test.
+    // {a: {$not: {$lt: 130}}, b: 12, c: {$not: {$gt: 1200}}},
     {a: {$not: {$in: [[100, 101, 102]]}}},
     {$nor: [{$and: [{a: {$lt: 10}}, {b: {$gt: 19}}]}]},
     {$nor: [{$or: [{a: {$lt: 10}}, {b: {$gt: 19}}]}]},
@@ -139,7 +141,8 @@ const queries = [
     {a: {$gt: 10}, b: {$in: []}},
     {$nor: [{a: 1}]},
     {$nor: [{a: 1}, {b: {$gt: 1000}}]},
-    {$and: [{$nor: [{a: 1}, {a: {$gt: 1000}}]}, {b: {$lt: 100}}]},
+    // TODO SERVER-100611: re-enable these tests.
+    // {$and: [{$nor: [{a: 1}, {a: {$gt: 1000}}]}, {b: {$lt: 100}}]},
     {$and: [{$or: [{$nor: [{a: {$gt: 100}}, {b: {$gt: 50}}]}, {a: 1}]}, {b: {$lt: 100}}]},
     // This query has an empty result, thus should estimate as 0
     {$and: [{$or: [{a: 0}, {a: 1}]}, {$or: [{a: {$gt: 3}}, {a: {$lt: 0}}]}]},
@@ -180,9 +183,10 @@ const queries = [
     // {$or: [{a: 3}, {b: {$size: 9}}]},
 ];
 
-queries.push({$or: [queries[0], queries[1]]});
+// TODO SERVER-100611: re-enable these tests.
+// queries.push({$or: [queries[0], queries[1]]});
 
-function assertCbrExplain(plan, isSamplingCE = false) {
+function assertCbrExplain(plan) {
     assert(plan.hasOwnProperty("cardinalityEstimate"), plan);
     if (plan.stage === "EOF") {
         assert.eq(plan.cardinalityEstimate, 0, plan);
@@ -193,16 +197,10 @@ function assertCbrExplain(plan, isSamplingCE = false) {
     }
     assert(plan.hasOwnProperty("costEstimate"), plan);
     assert.gt(plan.costEstimate, 0, plan);
-    if (isSamplingCE && plan.stage === "IXSCAN") {
-        assert(
-            plan.hasOwnProperty("indexSeekEstimate"),
-            "IXSCAN stage must have indexSeekEstimate in sampling CE mode: " + tojson(plan),
-        );
-    }
     if (plan.hasOwnProperty("inputStage")) {
-        assertCbrExplain(plan.inputStage, isSamplingCE);
+        assertCbrExplain(plan.inputStage);
     } else if (plan.hasOwnProperty("inputStages")) {
-        plan.inputStages.forEach((p) => assertCbrExplain(p, isSamplingCE));
+        plan.inputStages.forEach((p) => assertCbrExplain(p));
     } else {
         assert(plan.hasOwnProperty("numKeysEstimate") || plan.hasOwnProperty("numDocsEstimate"), plan);
     }
@@ -238,24 +236,24 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
     r1.map((e) => assertCbrExplain(e));
 
     // The CBR-chosen winning plan is wrapped in a MultiPlanStage (with a single candidate,
-    // namely the CBR winner) so we can reuse the classic multiplanner's code to:
+    // namely the CBR winner) so we can reuse the classic multiplanner’s code to:
     //
     //   1. Measure how many works() the CBR plan needs to reach a multiplanner exit
     //      condition (results limit / EOF / works limit), and
     //   2. Cache that plan together with the measured works value.
     //
-    // This wrapping can introduce a small off-by-one difference in the "works" metric for
+    // This wrapping can introduce a small off‑by‑one difference in the "works" metric for
     // the winning plan in the specific case where the MultiPlan trial hits EOF:
     //
     //   * During the trial, the child plan reaches EOF once.
     //   * Later, when we call doWork() on the MultiPlanStage in normal execution, it first
     //     drains any buffered results and then calls work() on the child again, observing
     //     EOF a second time.
-    //   * Both EOF probes increment the child plan's works counter, even though no extra
+    //   * Both EOF probes increment the child plan’s works counter, even though no extra
     //     keys or documents are examined.
     //
     // As a result, the CBR path can have exactly one more work() call than the pure plan without the
-    // MultiPlan stage at its root. 'cbrWorksEpsilon' captures this off-by-one.
+    // MultiPlan stage at its root. 'cbrWorksEpsilon' captures this off‑by‑one.
     // TODO SERVER-117425: Remove 'cbrWorksEpsilon' once we no longer do a second EOF probe.
     const cbrWorksEpsilon = 1;
 
@@ -318,39 +316,6 @@ function verifyHeuristicEstimateSource() {
     assert.eq(w1.estimatesMetadata.ceSource, "Heuristics", w1);
 }
 
-function verifySamplingCEIndexSeekEstimate() {
-    coll.drop();
-    const docs = [];
-    for (let i = 0; i < 1000; i++) {
-        docs.push({a: i, b: i % 10});
-    }
-    assert.commandWorked(coll.insertMany(docs));
-    assert.commandWorked(coll.createIndex({a: 1}));
-    assert.commandWorked(coll.createIndex({b: 1}));
-
-    assert.commandWorked(
-        db.adminCommand({
-            setParameter: 1,
-            featureFlagCostBasedRanker: true,
-            internalQueryCBRCEMode: "samplingCE",
-        }),
-    );
-
-    // A query with a range predicate produces a FETCH + IXSCAN plan. Under sampling CE every
-    // IXSCAN stage must expose indexSeekEstimate in explain output.
-    const explain = coll.find({a: {$gt: 100}}).explain();
-    const winningPlan = getWinningPlanFromExplain(explain);
-    assertCbrExplain(winningPlan, true /* isSamplingCE */);
-    getRejectedPlans(explain).forEach((p) => assertCbrExplain(p, true /* isSamplingCE */));
-
-    // A point query also produces a single-seek IXSCAN; indexSeekEstimate should equal 1.
-    const explainPoint = coll.find({a: 42}).hint({a: 1}).explain();
-    const winningPoint = getWinningPlanFromExplain(explainPoint);
-    assertCbrExplain(winningPoint, true /* isSamplingCE */);
-    const ixscanPoint = getPlanStage(winningPoint, "IXSCAN");
-    assert.eq(ixscanPoint.indexSeekEstimate, 1, "Point query IXSCAN should have indexSeekEstimate = 1");
-}
-
 function verifyFetchOverFetchDoesNotAssert() {
     coll.drop();
     assert.commandWorked(coll.insert({_id: 1}));
@@ -398,7 +363,6 @@ try {
 
     verifyCollectionCardinalityEstimate();
     verifyHeuristicEstimateSource();
-    verifySamplingCEIndexSeekEstimate();
     verifyFetchOverFetchDoesNotAssert();
 
     /**

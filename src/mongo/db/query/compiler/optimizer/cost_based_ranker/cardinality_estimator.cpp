@@ -36,7 +36,6 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/heuristic_estimator.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
 
 #include <absl/container/flat_hash_map.h>
 
@@ -437,6 +436,8 @@ OrderedIntervalList makeOpenOil(std::string fieldName) {
 struct EqualityPrefix {
     std::unique_ptr<IndexBounds> eqPrefixPtr;
     bool isEqPrefix;
+    // TODO SERVER-100611: Remove this flag, and all references to it.
+    bool isIndexSkipScan;
 };
 
 /**
@@ -447,138 +448,21 @@ struct EqualityPrefix {
 EqualityPrefix equalityPrefix(const IndexBounds* node) {
     auto eqPrefix = std::make_unique<IndexBounds>();
     bool isEqPrefix = true;
+    bool isIndexSkipScan = false;
     for (auto&& oil : node->fields) {
         if (isEqPrefix) {
             eqPrefix->fields.push_back(oil);
             isEqPrefix = isEqPrefix && oil.isPoint();
         } else {
+            // We set the 'isIndexSkipScan' flag to true if at any point after 'isEqPrefix' is false
+            // we encounter a non-fully open interval.
+            if (!oil.isFullyOpen() && oil.intervals.size() >= 1) {
+                isIndexSkipScan = true;
+            }
             eqPrefix->fields.push_back(makeOpenOil(oil.name));
         }
     }
-    return EqualityPrefix{std::move(eqPrefix), isEqPrefix};
-}
-
-CEResult CardinalityEstimator::estimateIndexSeeks(const IndexBounds& bounds, bool multiKey) {
-    auto oils = bounds.fields;
-
-    double seekEstimate = 1;
-
-    /*
-     * For some example set of bounds:
-     *
-     * a: [[0, 9]], b: [[0, 9]], c: [[0, 9]], d: [[0, 9], [100, 200]]
-     *
-     * An index will seek once initially to {a:0, b:0, c:0, d:0}, and will read
-     * keys until one which falls outside the current intervals is encountered.
-     *
-     * As indexes are sorted lexicographically, assuming for simplicity documents exist inside and
-     * outside every interval, the pattern of seeks will follow:
-     *
-     * {a:0, b:0, c:0, d:0}
-     * {a:0, b:0, c:0, d:100}
-     * {a:0, b:0, c:1, d:0}
-     * {a:0, b:0, c:1, d:100}
-     * {a:0, b:0, c:2, d:0}
-     * {a:0, b:0, c:2, d:100}
-     * ...
-     * {a:0, b:1, c:0, d:0}
-     * ... etc
-     *
-     * The *worst case* seek count would be:
-     *
-     * NDV(a) * NDV(b) * NDV(c) * NumIntervals(d)
-     *
-     * However, in reality, some combinations of (a, b, c) may not exist in the dataset.
-     *
-     * In reality, the scan only needs to seek once per interval of d, per unique value of the
-     * prefix (a, b, c).
-     *
-     * Given the sample, we have the information to find a better estimate for the seeks required,
-     * by combining the NDV estimations. The above example changes to:
-     *
-     *  NDV((a, b, c)) * NumIntervals(d)
-     *
-     * This is a closer reflection of the underlying scan, and is less of a pessimisation.
-     *
-     * *TRAILING FULLY OPEN INTERVALS*
-     *
-     * If trailing fields have interval [MinKey, MaxKey], a document will never be seen which does
-     * not match this, so those fields don't directly cause additional seeks - the index scan can
-     * continue reading and will fall into the next value of the _preceding_ field.
-     *
-     * a: [[0, 9]], b: [[0, 9], [100, 200]], c: [[MinKey, MaxKey]], d: [[MinKey, MaxKey]]
-     *
-     * will seek
-     *
-     * {a:0, b:0, c:MinKey, d:MinKey}
-     * {a:0, b:100, c:MinKey, d:MinKey}
-     * {a:1, b:0, c:MinKey, d:MinKey}
-     * {a:1, b:100, c:MinKey, d:MinKey}
-     * {a:2, b:0, c:MinKey, d:MinKey}
-     * {a:2, b:100, c:MinKey, d:MinKey}
-     *
-     * Note that now b does not need to seek for every *distinct* value, just for every *interval*.
-     *
-     * The seek *count* will be equivalent to that of a scan over a shorter index with just the
-     * preceding fields.
-     *
-     * * NDV(a) * NumIntervals(b) * 1 * 1
-     */
-
-    // Trailing fully open intervals do not change the number of seeks - a cursor will only need
-    // to seek after encountering a key which does not match the current bounds.
-    while (!oils.empty() && oils.back().isFullyOpen()) {
-        oils.pop_back();
-    }
-
-    if (!oils.empty()) {
-        // This is the last (rightmost) field with a non-fully-open interval.
-        // A single seek will be required per interval for this field.
-        if (oils.back().intervals.empty()) {
-            // This field has no intervals; there will be no key for the
-            // ixscan to seek to to start, and no documents returned.
-            return zeroCE;
-        }
-        seekEstimate *= oils.back().intervals.size();
-        oils.pop_back();
-    }
-
-    // Remove point OILs (NDV=1, contribute a factor of 1 to seeks) and empty OILs in a single
-    // pass. Track whether any empty OIL is encountered - an empty OIL means no index keys can
-    // match.
-    bool isEmptyInterval = false;
-    std::erase_if(oils, [&](const OrderedIntervalList& oil) {
-        if (oil.intervals.empty()) {
-            isEmptyInterval = true;
-        }
-        return oil.intervals.empty() || oil.isPoint();
-    });
-
-    if (isEmptyInterval) {
-        return zeroCE;
-    }
-
-    if (oils.empty()) {
-        return CardinalityEstimate{CardinalityType{seekEstimate}, EstimationSource::Sampling};
-    }
-
-    std::vector<ce::FieldPathAndEqSemantics> fieldAndEqs;
-    for (const auto& oil : oils) {
-        // For index bounds, using the default null == missing semantics is fine.
-        fieldAndEqs.emplace_back(oil.name);
-    }
-    auto oilSpan = std::span<const OrderedIntervalList>(oils);
-    CardinalityEstimate ndv = multiKey
-        ? _samplingEstimator->estimateNDVMultiKey(fieldAndEqs, oilSpan)
-        : _samplingEstimator->estimateNDV(fieldAndEqs, oilSpan);
-
-    ndv = std::max(oneCE, ndv);
-    seekEstimate *= ndv.toDouble();
-
-    tassert(10061109, "IndexBounds should always have >=1 seek estimate", seekEstimate >= 1.0);
-
-    auto seekCE = CardinalityEstimate{CardinalityType{seekEstimate}, EstimationSource::Sampling};
-    return seekCE;
+    return EqualityPrefix{std::move(eqPrefix), isEqPrefix, isIndexSkipScan};
 }
 
 CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
@@ -649,18 +533,17 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
             // We can avoid computing input selectivity for sampling CE queries over
             // non-multikey fields without residual filter.
             auto prefix = equalityPrefix(&node->bounds);
+            if (prefix.isIndexSkipScan) {
+                return Status(ErrorCodes::UnsupportedCbrNode, "encountered index skip scan case");
+            }
             if (prefix.isEqPrefix) {
                 // If the prefix is equal to all the bounds, the number of keys scanned is equal to
                 // the resulting docs.
                 est.inCE = est.outCE;
             } else {
-                est.inCE = ridsEstFunct(node->bounds, nullptr);
+                // Evaluate only the equality prefix against the sample.
+                est.inCE = ridsEstFunct(*prefix.eqPrefixPtr, nullptr);
             }
-        }
-
-        auto seekCE = estimateIndexSeeks(node->bounds, node->index.multikey);
-        if (seekCE.isOK()) {
-            est.indexSeekCE = seekCE.getValue();
         }
 
         CardinalityEstimate outCE{est.outCE};
@@ -1308,15 +1191,23 @@ CEResult CardinalityEstimator::estimate(
  * Intervals
  */
 
-CEResult CardinalityEstimator::estimate(const IndexBounds* bounds) {
-    if (bounds->isSimpleRange) {
+CEResult CardinalityEstimator::estimate(const IndexBounds* node) {
+    if (node->isSimpleRange) {
         // TODO SERVER-96816: Implement support for estimation of simple ranges
         return Status(ErrorCodes::UnsupportedCbrNode, "simple ranges unsupported");
     }
 
     if (_rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
-        return _ceCache.getOrCompute(
-            bounds, [&] { return _samplingEstimator->estimateKeysScanned(*bounds); });
+        // TODO SERVER-122572: avoid copies to construct the equality prefix. We could do this by
+        // teaching SamplingEstimator or IndexBounds about the equality prefix concept.
+        auto eqPrefix = equalityPrefix(node);
+        if (eqPrefix.isIndexSkipScan) {
+            return Status(ErrorCodes::UnsupportedCbrNode, "encountered index skip scan case");
+        }
+        const auto eqPrefixPtr = eqPrefix.eqPrefixPtr.get();
+        return _ceCache.getOrCompute(std::move(eqPrefix.eqPrefixPtr), [&] {
+            return _samplingEstimator->estimateKeysScanned(*eqPrefixPtr);
+        });
     }
 
     // Iterate over all intervals over individual index fields (OILs). These intervals are
@@ -1338,7 +1229,7 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* bounds) {
     bool isEqPrefix = true;  // Tracks if an OIL is part of an equality prefix
     // Ignore selectivities pushed by other operators up to this point.
     size_t selOffset = _conjSels.size();
-    for (const auto& field : bounds->fields) {
+    for (const auto& field : node->fields) {
         const OrderedIntervalList* oil = &field;
         // Notice that OILs are considered leaves from CE perspective.
         auto ceRes = estimate(oil);
@@ -1349,6 +1240,10 @@ CEResult CardinalityEstimator::estimate(const IndexBounds* bounds) {
         if (isEqPrefix) {
             _conjSels.emplace_back(sel);
         } else {
+            // TODO SERVER-100611: Remove this code.
+            if (!oil->isFullyOpen() && oil->intervals.size() >= 1) {
+                return Status(ErrorCodes::UnsupportedCbrNode, "encountered index skip scan case");
+            }
             residualSels.emplace_back(sel);
         }
         isEqPrefix = isEqPrefix && oil->isPoint();
@@ -1461,12 +1356,6 @@ void CardinalityEstimator::propagateLimit(const QuerySolutionNode* node, size_t 
             }
             applyLimitToSelf();
             inCE = limitFraction * inCE;
-
-            // If we have an estimate for index seeks, naively scale this
-            // down by the limit fraction.
-            if (auto& indexSeekEst = _qsnEstimates[node]->indexSeekCE) {
-                *indexSeekEst = std::max(*indexSeekEst * limitFraction, oneCE);
-            }
             break;
         }
         case STAGE_FETCH: {

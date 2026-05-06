@@ -44,21 +44,6 @@ const collZeroRows = db[collZeroRowsName];
 collZeroRows.createIndex({a: 1});
 collZeroRows.runCommand({analyze: collZeroRows, key: "a"});
 
-// Collection used to test NDV-based seek estimation for skip-scan index scans.
-// field 'unique' has 2000 distinct values; 'binary' has 2 values (0 or 1, half each).
-const collSkipScanName = collName + "_skip_scan";
-const collSkipScan = db[collSkipScanName];
-collSkipScan.drop();
-{
-    const docs = [];
-    for (let i = 0; i < 2000; i++) {
-        docs.push({unique: i, binary: i % 2});
-    }
-    collSkipScan.insert(docs);
-    collSkipScan.createIndex({unique: 1, binary: 1});
-    collSkipScan.createIndex({binary: 1});
-}
-
 /**
  * Extracts the complete cost of the winning plan
  */
@@ -180,27 +165,10 @@ function runTest(planRankerMode) {
 
         // IXSCAN of same number of keys over one or more than one interval should have similar
         // cost.
-        if (planRankerMode == "samplingCE") {
-            // IXSCAN of same number of keys over multiple intervals will estimate a higher than
-            // expected cost; estimation of seeks doesn't predict that contiguous intervals will be
-            // provided.
-            assert.lt(
-                ixscanCost({predicate: {a: {$lte: 3}}, hint: {a: 1}}),
-                ixscanCost({predicate: {$or: [{a: 0}, {a: 1}, {a: 2}, {a: 3}]}, hint: {a: 1}}),
-            );
-
-            // IXSCAN of same number of keys over multiple non-consecutive intervals will *correctly*
-            // estimate a higher cost than one interval.
-            assert.lt(
-                ixscanCost({predicate: {a: {$lte: 3}}, hint: {a: 1}}),
-                ixscanCost({predicate: {$or: [{a: 0}, {a: 2}, {a: 4}, {a: 6}]}, hint: {a: 1}}),
-            );
-        } else {
-            assert.close(
-                ixscanCost({predicate: {a: {$lte: 3}}, hint: {a: 1}}),
-                ixscanCost({predicate: {$or: [{a: 0}, {a: 1}, {a: 2}, {a: 3}]}, hint: {a: 1}}),
-            );
-        }
+        assert.close(
+            ixscanCost({predicate: {a: {$lte: 3}}, hint: {a: 1}}),
+            ixscanCost({predicate: {$or: [{a: 0}, {a: 1}, {a: 2}, {a: 3}]}, hint: {a: 1}}),
+        );
 
         // IXSCAN over $or should have similar cost as an IXSCAN over an equivalent $in.
         assert.close(
@@ -230,84 +198,12 @@ function runTest(planRankerMode) {
     //          ixscanCost({predicate: {a_multikey: 1}, hint: {a_multikey: 1}}));
 
     // IXSCAN with a single seek should have a lower cost than an index scan with skips.
-    const predicateOverAandB = {a: 5, b: {$gt: 0}};
-    assert.lt(
-        ixscanCost({predicate: predicateOverAandB, hint: {a: 1, b: 1}}),
-        ixscanCost({predicate: predicateOverAandB, hint: {b: 1, a: 1}}),
-    );
-
-    if (planRankerMode === "samplingCE") {
-        // Specifically validate that NDV-based seek count estimation produces correct plan
-        // selection for skip-scan patterns.
-
-        {
-            const skipScanExplain = collSkipScan.find({unique: {$gte: 0}, binary: 1}).explain();
-            const skipScanWinningPlan = getWinningPlanFromExplain(skipScanExplain);
-            const winningIxScan = getPlanStage(skipScanWinningPlan, "IXSCAN");
-            assert.eq(
-                winningIxScan.indexName,
-                "binary_1",
-                "CBR should prefer {binary:1} over skip-scan {unique:1,binary:1}",
-            );
-        }
-        {
-            // This test fails with the equality-prefix heuristic.
-            //
-            // With the equality-prefix heuristic:
-            //
-            // {unique:1, binary:1} estimates
-            //  * numKeys ~1200
-            //  * cardinality ~600
-            //
-            // and {binary:1}
-            //  * numKeys ~1000
-            //  * cardinality ~1000
-            //
-            // And the heuristic wrongly prefers the skip-scan, as the lower cardinality leads
-            // to a lower overall plan cost (including a FETCH).
-            //
-            // With NDV-based seek estimation, the skip-scan must seek ~NDV(unique<=1200)=1200 times,
-            // making it more expensive than a single-seek scan over {binary:1}.
-            const skipScanExplain = collSkipScan.find({unique: {$lte: 1200}, binary: 1}).explain();
-            const skipScanWinningPlan = getWinningPlanFromExplain(skipScanExplain);
-            const winningIxScan = getPlanStage(skipScanWinningPlan, "IXSCAN");
-            assert.eq(
-                winningIxScan.indexName,
-                "binary_1",
-                "CBR with NDV based seek estimation should prefer {binary:1} over skip-scan {unique:1,binary:1}",
-            );
-        }
-
-        // Verify that indexSeekEstimate is present in explain for IXSCAN stages. It is only
-        // populated in sampling CE mode.
-        {
-            // A point query uses a single seek, so indexSeekEstimate should be 1.
-            const explainPoint = coll.find({a: 1}).hint({a: 1}).explain();
-            const ixscanPoint = getPlanStage(explainPoint, "IXSCAN");
-            assert(
-                ixscanPoint.hasOwnProperty("indexSeekEstimate"),
-                "IXSCAN should have indexSeekEstimate in sampling CE mode: " + tojson(ixscanPoint),
-            );
-            assert.eq(ixscanPoint.indexSeekEstimate, 1, "Point query should require exactly 1 seek");
-
-            // A skip-scan over {unique:1, binary:1} with a range on 'unique' requires seeking
-            // for each distinct value of 'unique', so indexSeekEstimate should be >> 1.
-            const explainSkipScan = collSkipScan
-                .find({unique: {$gte: 0}, binary: 1})
-                .hint({unique: 1, binary: 1})
-                .explain();
-            const ixscanSkipScan = getPlanStage(explainSkipScan, "IXSCAN");
-            assert(
-                ixscanSkipScan.hasOwnProperty("indexSeekEstimate"),
-                "Skip-scan IXSCAN should have indexSeekEstimate in sampling CE mode: " + tojson(ixscanSkipScan),
-            );
-            assert.gt(
-                ixscanSkipScan.indexSeekEstimate,
-                1,
-                "Skip-scan should require multiple seeks: " + tojson(ixscanSkipScan),
-            );
-        }
-    }
+    const predicateOverAandB = {a: 5, b: {$gt: 6}};
+    // TODO SERVER-100611: re-enable these tests.
+    // assert.lt(
+    //     ixscanCost({predicate: predicateOverAandB, hint: {a: 1, b: 1}}),
+    //     ixscanCost({predicate: predicateOverAandB, hint: {b: 1, a: 1}}),
+    // );
 
     // IXSCAN over an index that matches all predicates should produce a lower-cost
     // plan than any of the alternatives.

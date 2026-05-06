@@ -109,13 +109,15 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             const auto totalIncrementalFieldCost =
                 incrementalFieldCost * (numIncrementalFields * inCE);
 
-            const auto& seekEst = qsnEst.indexSeekCE.value_or(oneCE);
+            // TODO SERVER-100611: Incorporate index seek cost (coefficient 'indexSeek') by adding
+            // 'indexSeek * estimatedNumSeeks' to 'nodeCost'. In the meantime, we know there will
+            // always be at least one seek.
             if (ixscanNode->direction == 1) {
                 nodeCost += indexScanForwardExamineKey * inCE + totalIncrementalFieldCost +
-                    indexForwardSeek * seekEst;
+                    indexForwardSeek * oneCE;
             } else {
                 nodeCost += indexScanBackwardExamineKey * inCE + totalIncrementalFieldCost +
-                    indexBackwardSeek * seekEst;
+                    indexBackwardSeek * oneCE;
             }
 
             if (filter) {
