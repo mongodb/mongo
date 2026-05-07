@@ -327,7 +327,6 @@ ResolvedNamespace ResolvedNamespace::fromBSON(const BSONObj& commandResponseObj)
 
 void TimeseriesViewMetadata::serialize(BSONObjBuilder* subObjBuilder) const {
     if (options) {
-        // TODO(SERVER-125735): Evaluate if the structure of the BSON needs to be fixed
         BSONObjBuilder tsObj(subObjBuilder->subobjStart(kTimeseriesOptions));
         options->serialize(&tsObj);
     }

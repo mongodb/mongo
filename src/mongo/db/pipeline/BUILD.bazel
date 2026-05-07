@@ -666,6 +666,19 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "resolved_namespace_test",
+    srcs = [
+        "resolved_namespace_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":lite_parsed_document_source",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/unittest",
+    ],
+)
+
 idl_generator(
     name = "document_source_current_op_gen",
     src = "document_source_current_op.idl",
