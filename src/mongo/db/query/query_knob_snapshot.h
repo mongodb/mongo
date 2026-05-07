@@ -32,7 +32,9 @@
 #include "mongo/db/query/query_knob.h"
 #include "mongo/util/assert_util.h"
 
+#include <algorithm>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 namespace mongo {
@@ -124,6 +126,11 @@ public:
     }
 
     [[nodiscard]] QueryKnobSnapshot build() && {
+        tassert(12611000,
+                "invalid call to QueryKnobSnapshot::build() with unset query knob values",
+                std::all_of(_values.cbegin(), _values.cend(), [](const auto& v) -> bool {
+                    return !std::holds_alternative<DeleteQueryKnobOverride>(v);
+                }));
         return QueryKnobSnapshot(std::move(_values), std::move(_sources));
     }
 

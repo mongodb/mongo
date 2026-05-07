@@ -39,41 +39,35 @@ namespace mongo {
 namespace {
 
 TEST(QueryKnobSnapshotTest, SizeMatchesConstructorArgument) {
-    auto snap = QueryKnobSnapshotBuilder{5}.build();
-    ASSERT_EQ(snap.size(), 5u);
-}
-
-TEST(QueryKnobSnapshotTest, DefaultSourceIsDefault) {
-    auto snap = QueryKnobSnapshotBuilder{3}.build();
-    for (size_t i = 0; i < snap.size(); ++i) {
-        ASSERT_EQ(snap.getSource(i), KnobSource::kDefault);
+    auto builder = QueryKnobSnapshotBuilder{5};
+    for (int i = 0; i < 5; i++) {
+        builder.set(i, QueryKnobValue{i}, KnobSource::kDefault);
     }
+    ASSERT_EQ(std::move(builder).build().size(), 5u);
 }
 
 TEST(QueryKnobSnapshotTest, RoundTripAllQueryKnobValueTypes) {
     // One slot per QueryKnobValue alternative plus enum (stored as int).
-    // Slot 0: DeleteQueryKnobOverride
-    // Slot 1: int
-    // Slot 2: long long
-    // Slot 3: double
-    // Slot 4: bool
-    // Slot 5: enum (QueryFrameworkControlEnum stored as int, retrieved via get<EnumT>)
+    // Slot 0: int
+    // Slot 1: long long
+    // Slot 2: double
+    // Slot 3: bool
+    // Slot 4: enum (QueryFrameworkControlEnum stored as int, retrieved via get<EnumT>)
     constexpr auto kEnumVal = QueryFrameworkControlEnum::kTrySbeRestricted;
     auto snap =
-        std::move(QueryKnobSnapshotBuilder{6}
-                      .set(1, QueryKnobValue{42}, KnobSource::kDefault)
-                      .set(2, QueryKnobValue{123456789LL}, KnobSource::kDefault)
-                      .set(3, QueryKnobValue{2.718}, KnobSource::kDefault)
-                      .set(4, QueryKnobValue{true}, KnobSource::kDefault)
-                      .set(5, QueryKnobValue{static_cast<int>(kEnumVal)}, KnobSource::kDefault))
+        std::move(QueryKnobSnapshotBuilder{5}
+                      .set(0, QueryKnobValue{42}, KnobSource::kDefault)
+                      .set(1, QueryKnobValue{123456789LL}, KnobSource::kDefault)
+                      .set(2, QueryKnobValue{2.718}, KnobSource::kDefault)
+                      .set(3, QueryKnobValue{true}, KnobSource::kDefault)
+                      .set(4, QueryKnobValue{static_cast<int>(kEnumVal)}, KnobSource::kDefault))
             .build();
 
-    ASSERT_EQ(snap.get<DeleteQueryKnobOverride>(0), DeleteQueryKnobOverride());
-    ASSERT_EQ(snap.get<int>(1), 42);
-    ASSERT_EQ(snap.get<long long>(2), 123456789LL);
-    ASSERT_APPROX_EQUAL(snap.get<double>(3), 2.718, 1e-9);
-    ASSERT_EQ(snap.get<bool>(4), true);
-    ASSERT_EQ(snap.get<QueryFrameworkControlEnum>(5), kEnumVal);
+    ASSERT_EQ(snap.get<int>(0), 42);
+    ASSERT_EQ(snap.get<long long>(1), 123456789LL);
+    ASSERT_APPROX_EQUAL(snap.get<double>(2), 2.718, 1e-9);
+    ASSERT_EQ(snap.get<bool>(3), true);
+    ASSERT_EQ(snap.get<QueryFrameworkControlEnum>(4), kEnumVal);
 }
 
 TEST(QueryKnobSnapshotTest, RoundTripInt) {
@@ -199,11 +193,13 @@ TEST(QueryKnobSnapshotTest, LastWriteWins) {
 }
 
 DEATH_TEST_REGEX(QueryKnobSnapshotDeathTest, GetOutOfBounds, "12312300") {
-    QueryKnobSnapshotBuilder{2}.build().get<int>(2);
+    QueryKnobSnapshotBuilder{0}.build().get<int>(2);
 }
 
 DEATH_TEST_REGEX(QueryKnobSnapshotDeathTest, GetSourceOutOfBounds, "12312301") {
-    QueryKnobSnapshotBuilder{2}.build().getSource(2);
+    std::move(QueryKnobSnapshotBuilder{1}.set(0, QueryKnobValue{0}, KnobSource::kDefault))
+        .build()
+        .getSource(2);
 }
 
 DEATH_TEST_REGEX(QueryKnobSnapshotDeathTest, SetOutOfBounds, "12312302") {
@@ -212,6 +208,13 @@ DEATH_TEST_REGEX(QueryKnobSnapshotDeathTest, SetOutOfBounds, "12312302") {
 
 DEATH_TEST_REGEX(QueryKnobSnapshotDeathTest, SetDeleteQueryKnobOverrideValue, "12312303") {
     QueryKnobSnapshotBuilder{1}.set(0, DeleteQueryKnobOverride(), KnobSource::kDefault);
+}
+
+DEATH_TEST_REGEX(QueryKnobSnapshotDeathTest,
+                 UnsetQueryKnobValues,
+                 "12611000.*invalid call to QueryKnobSnapshot::build\\(\\) with unset query knob "
+                 "values") {
+    std::ignore = QueryKnobSnapshotBuilder(1).build();
 }
 
 }  // namespace
