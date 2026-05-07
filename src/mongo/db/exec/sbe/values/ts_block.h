@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/column/bson_element_storage.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/path_request.h"
@@ -39,6 +40,8 @@
 #include <memory>
 #include <utility>
 #include <vector>
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo::sbe::value {
 class TsBlock;
@@ -181,20 +184,10 @@ public:
         return static_cast<bool>(_decompressedBlock);
     }
 
-    boost::optional<size_t> argMin() override {
-        ensureDeblocked();
-        return _decompressedBlock->argMin();
-    }
+    boost::optional<size_t> argMin() override;
+    boost::optional<size_t> argMax() override;
 
-    boost::optional<size_t> argMax() override {
-        ensureDeblocked();
-        return _decompressedBlock->argMax();
-    }
-
-    TagValueView at(size_t idx) override {
-        ensureDeblocked();
-        return _decompressedBlock->at(idx);
-    }
+    TagValueView at(size_t idx) override;
 
     TypeTags getBlockTag() const {
         return _block.tag();
@@ -213,6 +206,7 @@ public:
 
 private:
     void ensureDeblocked();
+    void ensureAtCacheAllocator();
 
     /**
      * Deblocks the values from a BSON object block.
@@ -257,6 +251,17 @@ private:
     // Cached result of tryDense(). Populated lazily on first call. Mutable because tryDense()
     // is const.
     mutable boost::optional<bool> _densenessCache;
+
+    // Maps logical row index -> tag/value view for elements materialized by argMin/argMax or at()
+    // boundary fast paths. For deep types, the view's Value points into _atCacheAllocator's
+    // storage. Clones start empty: BSONElementStorage uses thread_unsafe_counter refcounting, and
+    // the class invariant requires clones to be fully owned with no pointers into outside data.
+    absl::flat_hash_map<size_t, TagValueView> _atCache;
+
+    // Owns BSONElementStorage for any deep-type bytes referenced by _atCache. Lazily constructed by
+    // ensureAtCacheAllocator() on the first cache-miss path that materializes via a bsoncolumn
+    // expression.
+    boost::intrusive_ptr<BSONElementStorage> _atCacheAllocator;
 };
 
 /**

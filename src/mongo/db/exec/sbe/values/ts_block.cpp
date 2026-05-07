@@ -611,6 +611,14 @@ std::unique_ptr<TsBlock> TsBlock::cloneStrongTyped() const {
     }
     cpy->_densenessCache = _densenessCache;
 
+    // _atCache and _atCacheAllocator are deliberately NOT copied. The
+    // allocator (BSONElementStorage) uses boost::thread_unsafe_counter
+    // refcounting, so sharing it across clones would be unsafe if they
+    // live on different threads. More fundamentally, this class's
+    // invariant (documented above on _block) is that cloned TsBlocks are
+    // fully owned with no pointers into outside data. Cloned blocks
+    // repopulate the cache on demand via the usual fast paths.
+
     return cpy;
 }
 
@@ -679,6 +687,12 @@ value::TagValueView TsBlock::tryMax() const {
     return {TypeTags::Nothing, Value{0u}};
 }
 
+void TsBlock::ensureAtCacheAllocator() {
+    if (!_atCacheAllocator) {
+        _atCacheAllocator = new BSONElementStorage();
+    }
+}
+
 void TsBlock::ensureDeblocked() {
     if (!_decompressedBlock) {
         if (_block.tag() == TypeTags::bsonObject) {
@@ -689,6 +703,88 @@ void TsBlock::ensureDeblocked() {
         tassert(
             8867300, "Decompressed block must be set after ensureDeblocked()", _decompressedBlock);
     }
+}
+
+boost::optional<size_t> TsBlock::argMin() {
+    if (_isTimeField && isTimeFieldSorted()) {
+        return 0;
+    }
+    if (_decompressedBlock) {
+        return _decompressedBlock->argMin();
+    }
+    if (_block.tag() == TypeTags::bsonObject) {
+        // v1 bucket — no BSONColumn fast path; fall through to existing behavior.
+        ensureDeblocked();
+        return _decompressedBlock->argMin();
+    }
+
+    ensureAtCacheAllocator();
+    // Passing comparator=nullptr is safe only because block processing in the SBE stage builder is
+    // disabled when a non-simple collator is in scope (see gen_group.cpp's _state.getCollatorSlot()
+    // check), so this path is never reached for queries that would require collation-aware string
+    // ordering. If that gate is ever relaxed, this call needs to thread an appropriate
+    // StringDataComparator through.
+    auto [elem, idx] = mongo::bsoncolumn::min<sbe::bsoncolumn::SBEColumnMaterializer>(
+        getBinData(), _atCacheAllocator, /*comparator=*/nullptr);
+    if (sbe::bsoncolumn::SBEColumnMaterializer::isMissing(elem)) {
+        return boost::none;
+    }
+    // Returned idx is the logical row position of the extreme element, which is
+    // by construction non-missing, so caching (idx, elem) is always consistent
+    // with what a subsequent at(idx) would materialize via ensureDeblocked.
+    _atCache.emplace(idx, value::rawToView(elem));
+    return idx;
+}
+
+boost::optional<size_t> TsBlock::argMax() {
+    if (_isTimeField && isTimeFieldSorted()) {
+        return _count - 1;
+    }
+    if (_decompressedBlock) {
+        return _decompressedBlock->argMax();
+    }
+    if (_block.tag() == TypeTags::bsonObject) {
+        // v1 bucket — no BSONColumn fast path; fall through to existing behavior.
+        ensureDeblocked();
+        return _decompressedBlock->argMax();
+    }
+
+    ensureAtCacheAllocator();
+    // See note in argMin() above: comparator=nullptr is safe because the SBE stage builder disables
+    // block processing when a non-simple collator is in scope.
+    auto [elem, idx] = mongo::bsoncolumn::max<sbe::bsoncolumn::SBEColumnMaterializer>(
+        getBinData(), _atCacheAllocator, /*comparator=*/nullptr);
+    if (sbe::bsoncolumn::SBEColumnMaterializer::isMissing(elem)) {
+        return boost::none;
+    }
+    _atCache.emplace(idx, value::rawToView(elem));
+    return idx;
+}
+
+value::TagValueView TsBlock::at(size_t idx) {
+    tassert(11422200, "TsBlock::at(idx) called on an empty block", _count > 0);
+    if (auto it = _atCache.find(idx); it != _atCache.end()) {
+        return it->second;
+    }
+    if (_decompressedBlock) {
+        return _decompressedBlock->at(idx);
+    }
+    if (_block.tag() != TypeTags::bsonObject && tryDense().get_value_or(false)) {
+        if (idx == 0) {
+            ensureAtCacheAllocator();
+            auto elem = mongo::bsoncolumn::first<sbe::bsoncolumn::SBEColumnMaterializer>(
+                getBinData(), _atCacheAllocator);
+            return _atCache.emplace(0u, value::rawToView(elem)).first->second;
+        }
+        if (idx == _count - 1) {
+            ensureAtCacheAllocator();
+            auto elem = mongo::bsoncolumn::last<sbe::bsoncolumn::SBEColumnMaterializer>(
+                getBinData(), _atCacheAllocator);
+            return _atCache.emplace(_count - 1, value::rawToView(elem)).first->second;
+        }
+    }
+    ensureDeblocked();
+    return _decompressedBlock->at(idx);
 }
 
 bool TsBlock::isTimeFieldSorted() const {

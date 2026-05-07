@@ -939,4 +939,132 @@ TimeseriesTest.run((insert) => {
             }
         }
     }
+
+    {
+        // Tests correctness of the argMin/argMax + at() fast paths used by $top/$bottom
+        // in SBE block processing.  The collection has value extremes at interior bucket
+        // positions and a sparse field to exercise the deblocked fallback.
+        const coll3 = db[jsTestName() + "_argMinMax"];
+        coll3.drop();
+        assert.commandWorked(
+            db.createCollection(coll3.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
+        );
+
+        const docs = [];
+        const base = ISODate("2024-01-01T00:00:00Z");
+
+        // Meta "A": 1500 docs spanning 2 buckets. value min at i=0 (first slot of the
+        // first bucket) and max at i=1499 (last slot of the second bucket), so that
+        // at(argMin) and at(argMax) hit the bsoncolumn::first/last boundary fast path.
+        // sparseValue is present on 3 docs in the first bucket (making it non-dense):
+        // it is also at i=0 so that the sparse-column query (which sorts by value) can
+        // look up sparseValue via at(0), where tryDense() is false and at() falls
+        // through to ensureDeblocked().
+        for (let i = 0; i < 1500; i++) {
+            let v = 100 + i;
+            if (i === 0) v = 1;
+            if (i === 1499) v = 9999;
+            const doc = {
+                [timeFieldName]: new Date(base.getTime() + i * 1000),
+                [metaFieldName]: "A",
+                value: v,
+            };
+            if (i === 0) doc.sparseValue = 99;
+            if (i === 100) doc.sparseValue = 88;
+            if (i === 500) doc.sparseValue = 42;
+            docs.push(doc);
+        }
+
+        // Meta "B": 1100 docs spanning 2 buckets (>1000). value min at i=0 (first slot
+        // of the first bucket) and max at i=1099 (last slot of the second bucket).
+        for (let i = 0; i < 1100; i++) {
+            let v = 200 + i;
+            if (i === 0) v = 5;
+            if (i === 1099) v = 8888;
+            docs.push({
+                [timeFieldName]: new Date(base.getTime() + (1500 + i) * 1000),
+                [metaFieldName]: "B",
+                value: v,
+            });
+        }
+        assert.commandWorked(coll3.insertMany(docs));
+
+        // Assert that block_group appears in the SBE plan, which confirms the block
+        // accumulator path is used (not just block bucket reading).  Skipped on
+        // variants that fall back to classic (explainVersion "1").
+        function assertBlockGroup(pipeline) {
+            const explain = coll3.explain("executionStats").aggregate(pipeline);
+            const queryInfo = getQueryInfoAtTopLevelOrFirstStage(explain);
+            if (queryInfo.explainVersion === "2") {
+                const groupStages = getSbePlanStages(explain, "block_group");
+                assert.eq(groupStages.length, 1, () => "Expected block_group in SBE plan: " + tojson(explain));
+            }
+        }
+
+        // Query 1: $top/$bottom sorted by value.
+        // Exercises argMin/argMax on the value column.  Unlike $min/$max, $top/$bottom
+        // cannot be answered from the bucket control document alone: the control doc
+        // records the extreme value but not the row index where it occurs, and without
+        // the index we cannot look up correlated fields such as the timestamp.
+        //
+        // Each accumulator's output must be a single field path (not a multi-field
+        // document) so that the stage builder can vectorize the value expression and
+        // use the block accumulator (valueBlockAggTopN), which is what triggers the
+        // argMin/argMax fast path.
+        //
+        // Note: $top and $bottom accumulators sharing the same sortBy key but of the
+        // same type (e.g. two $top with sortBy:{value:1}) would be merged by the
+        // pipeline optimizer into a single accumulator with an object output, which
+        // the SBE vectorizer cannot handle, causing block_group to fall back to scalar
+        // mode.  We therefore use one $top and one $bottom (different types) with the
+        // same sortBy, which avoids the merge and keeps block processing enabled.
+        {
+            const pipeline = [
+                {
+                    $group: {
+                        _id: "$" + metaFieldName,
+                        minVal: {$top: {sortBy: {value: 1}, output: "$value"}},
+                        maxVal: {$bottom: {sortBy: {value: 1}, output: "$value"}},
+                    },
+                },
+                {$sort: {_id: 1}},
+            ];
+            const result = coll3.aggregate(pipeline).toArray();
+            assert.eq(result.length, 2);
+            assert.eq(result[0]._id, "A");
+            assert.eq(result[0].minVal, 1, "A: min value");
+            assert.eq(result[0].maxVal, 9999, "A: max value");
+            assert.eq(result[1]._id, "B");
+            assert.eq(result[1].minVal, 5, "B: min value");
+            assert.eq(result[1].maxVal, 8888, "B: max value");
+
+            assertBlockGroup(pipeline);
+        }
+
+        // Query 2: sparse output field.
+        // sparseValue is non-dense (present on only 3 of the 1000 docs in the first
+        // "A" bucket), so tryDense() returns false and at() falls through to
+        // ensureDeblocked() rather than using bsoncolumn::first/last.  argMin on the
+        // dense value column returns i=750; at(750) on the sparse sparseValue column
+        // deblocks and returns 99.
+        {
+            const result = coll3
+                .aggregate([
+                    {
+                        $group: {
+                            _id: "$" + metaFieldName,
+                            minSparse: {$top: {sortBy: {value: 1}, output: "$sparseValue"}},
+                        },
+                    },
+                    {$match: {_id: "A"}},
+                ])
+                .toArray();
+            assert.eq(result.length, 1);
+            assert.eq(result[0].minSparse, 99, "sparse field at min-value position must be 99");
+        }
+
+        coll3.drop();
+    }
 });

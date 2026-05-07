@@ -875,4 +875,301 @@ TEST_F(TsSbeValueTest, TsBlockTryDenseFastPath) {
         ASSERT_EQ(first, boost::optional<bool>(true));
     }
 }
+
+TEST_F(TsSbeValueTest, TsBlockArgMinMaxBSONColumnFastPath) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            .compressedBucket;
+    ASSERT(compressedBucketOpt);
+    auto compressedBucket = *compressedBucketOpt;
+
+    // Non-time dense numeric field: argMin/argMax must run via
+    // bsoncolumn::min/max and must NOT trigger full decompression.
+    auto tsBlock = makeTsBlockFromBucket(compressedBucket, "_id");
+
+    auto minIdx = tsBlock->argMin();
+    auto maxIdx = tsBlock->argMax();
+    ASSERT_TRUE(minIdx.has_value());
+    ASSERT_TRUE(maxIdx.has_value());
+    ASSERT_FALSE(tsBlock->decompressed())
+        << "argMin/argMax should not trigger ensureDeblocked on a BSONColumn-backed block";
+    ASSERT_LT(*minIdx, tsBlock->count());
+    ASSERT_LT(*maxIdx, tsBlock->count());
+
+    // Verify the indices actually point to the extreme values. at() triggers
+    // ensureDeblocked(), which is the current behavior before any fast-path
+    // optimization of at() itself.
+    const auto expectedMin =
+        bson::convertToView(kBucketWithMinMaxAndArrays["control"]["min"]["_id"]);
+    const auto expectedMax =
+        bson::convertToView(kBucketWithMinMaxAndArrays["control"]["max"]["_id"]);
+    auto [minTag, minVal] = tsBlock->at(*minIdx);
+    auto [maxTag, maxVal] = tsBlock->at(*maxIdx);
+    ASSERT_THAT(std::make_pair(minTag, minVal), ValueEq(expectedMin))
+        << "argMin index must point to the minimum value in the block";
+    ASSERT_THAT(std::make_pair(maxTag, maxVal), ValueEq(expectedMax))
+        << "argMax index must point to the maximum value in the block";
+}
+
+TEST_F(TsSbeValueTest, TsBlockArgMinMaxSparseColumn) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            .compressedBucket;
+    ASSERT(compressedBucketOpt);
+    auto compressedBucket = *compressedBucketOpt;
+
+    auto tsBlock = makeTsBlockFromBucket(compressedBucket, "sometimesMissing");
+    auto minIdx = tsBlock->argMin();
+    ASSERT_TRUE(minIdx.has_value());
+    ASSERT_LT(*minIdx, tsBlock->count());
+    ASSERT_FALSE(tsBlock->decompressed())
+        << "Sparse columns also go through the bsoncolumn::min fast path";
+}
+
+TEST_F(TsSbeValueTest, TsBlockArgMinTimeSortedShortcut) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            .compressedBucket;
+    ASSERT(compressedBucketOpt);
+    auto compressedBucket = *compressedBucketOpt;
+
+    auto tsBlock = makeTsBlockFromBucket(compressedBucket, "time");
+    ASSERT_EQ(tsBlock->argMin(), boost::optional<size_t>(0u));
+    ASSERT_EQ(tsBlock->argMax(), boost::optional<size_t>(tsBlock->count() - 1));
+    ASSERT_FALSE(tsBlock->decompressed()) << "Time-sorted argMin/argMax must not deblock";
+}
+
+// Exercises the middle dispatch branch: when _decompressedBlock is already set,
+// argMin/argMax must delegate to it rather than re-running the BSONColumn fast path.
+TEST_F(TsSbeValueTest, TsBlockArgMinDelegatesToDecompressedBlock) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            .compressedBucket;
+    ASSERT(compressedBucketOpt);
+    auto compressedBucket = *compressedBucketOpt;
+
+    // _id has values {0, 1, 2}: min at index 0, max at index 2.
+    auto tsBlock = makeTsBlockFromBucket(compressedBucket, "_id");
+
+    // Force deblocking so that _decompressedBlock is populated.
+    [[maybe_unused]] auto unused = tsBlock->extract();
+    ASSERT_TRUE(tsBlock->decompressed()) << "extract() must populate _decompressedBlock";
+
+    // Now argMin/argMax must go through the _decompressedBlock delegation branch.
+    auto minIdx = tsBlock->argMin();
+    auto maxIdx = tsBlock->argMax();
+    ASSERT_TRUE(minIdx.has_value());
+    ASSERT_TRUE(maxIdx.has_value());
+
+    // The block is still decompressed after the call (the delegation branch must
+    // not reset _decompressedBlock).
+    ASSERT_TRUE(tsBlock->decompressed())
+        << "argMin/argMax via delegation must leave _decompressedBlock intact";
+
+    // Verify the indices point to the correct extreme values.
+    const auto expectedMin =
+        bson::convertToView(kBucketWithMinMaxAndArrays["control"]["min"]["_id"]);
+    const auto expectedMax =
+        bson::convertToView(kBucketWithMinMaxAndArrays["control"]["max"]["_id"]);
+    auto [minTag, minVal] = tsBlock->at(*minIdx);
+    auto [maxTag, maxVal] = tsBlock->at(*maxIdx);
+    ASSERT_THAT(std::make_pair(minTag, minVal), ValueEq(expectedMin))
+        << "argMin (via decompressed delegation) must return the true minimum index";
+    ASSERT_THAT(std::make_pair(maxTag, maxVal), ValueEq(expectedMax))
+        << "argMax (via decompressed delegation) must return the true maximum index";
+}
+
+TEST_F(TsSbeValueTest, TsBlockAtBoundaryFastPathDense) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            .compressedBucket;
+    ASSERT(compressedBucketOpt);
+    auto compressedBucket = *compressedBucketOpt;
+
+    // Dense non-time field.
+    auto tsBlock = makeTsBlockFromBucket(compressedBucket, "_id");
+
+    auto first = tsBlock->at(0);
+    auto last = tsBlock->at(tsBlock->count() - 1);
+    ASSERT_FALSE(tsBlock->decompressed())
+        << "at(0)/at(count-1) on a dense column should use bsoncolumn::first/last";
+
+    // The _id field in kBucketWithMinMaxAndArrays holds {0, 1, 2}, so
+    // at(0) must yield 0 and at(count-1) must yield 2. Asserting on the
+    // actual values (not just non-Nothing) catches regressions where the
+    // boundary fast path returns the wrong element.
+    const auto expectedFirst =
+        bson::convertToView(kBucketWithMinMaxAndArrays["control"]["min"]["_id"]);
+    const auto expectedLast =
+        bson::convertToView(kBucketWithMinMaxAndArrays["control"]["max"]["_id"]);
+    ASSERT_THAT(std::make_pair(first.tag, first.value), ValueEq(expectedFirst));
+    ASSERT_THAT(std::make_pair(last.tag, last.value), ValueEq(expectedLast));
+
+    // Second call hits cache; still no decompression.
+    auto firstAgain = tsBlock->at(0);
+    ASSERT_FALSE(tsBlock->decompressed());
+    ASSERT_THAT(std::make_pair(firstAgain.tag, firstAgain.value), ValueEq(expectedFirst));
+}
+
+TEST_F(TsSbeValueTest, TsBlockAtSparseFallsThroughToDeblock) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            .compressedBucket;
+    ASSERT(compressedBucketOpt);
+    auto compressedBucket = *compressedBucketOpt;
+
+    // Sparse field: boundary fast path is not safe, so at() must fall through.
+    auto tsBlock = makeTsBlockFromBucket(compressedBucket, "sometimesMissing");
+    (void)tsBlock->at(0);
+    ASSERT_TRUE(tsBlock->decompressed())
+        << "at() on a sparse BSONColumn must fall through to ensureDeblocked()";
+}
+
+TEST_F(TsSbeValueTest, TsBlockAtSparseCorrectValues) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            .compressedBucket;
+    ASSERT(compressedBucketOpt);
+    auto compressedBucket = *compressedBucketOpt;
+
+    // "sometimesMissing" is sparse: position 0 -> 0, position 1 -> missing, position 2 -> 9.
+    // at() must fall through to ensureDeblocked() and return the correct value at each index.
+    auto tsBlock = makeTsBlockFromBucket(compressedBucket, "sometimesMissing");
+    ASSERT_EQ(tsBlock->count(), 3u);
+
+    auto first = tsBlock->at(0);
+    ASSERT_TRUE(tsBlock->decompressed()) << "at(0) on sparse column must deblock";
+    ASSERT_EQ(first.tag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(first.value), 0);
+
+    auto missing = tsBlock->at(1);
+    ASSERT_EQ(missing.tag, value::TypeTags::Nothing)
+        << "at(1) on a missing position must return Nothing";
+
+    auto last = tsBlock->at(tsBlock->count() - 1);
+    ASSERT_EQ(last.tag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(last.value), 9);
+}
+
+TEST_F(TsSbeValueTest, TsBlockAtInteriorIndexDeblocks) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            .compressedBucket;
+    ASSERT(compressedBucketOpt);
+    auto compressedBucket = *compressedBucketOpt;
+
+    auto tsBlock = makeTsBlockFromBucket(compressedBucket, "_id");
+    // Interior, non-cached index: must fall through.
+    size_t interior = tsBlock->count() / 2;
+    ASSERT_GT(interior, 0u);
+    ASSERT_LT(interior, tsBlock->count() - 1);
+    (void)tsBlock->at(interior);
+    ASSERT_TRUE(tsBlock->decompressed()) << "at(interior) must fall through to ensureDeblocked()";
+}
+
+TEST_F(TsSbeValueTest, TsBlockArgMinThenAtHitsCache) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            .compressedBucket;
+    ASSERT(compressedBucketOpt);
+    auto compressedBucket = *compressedBucketOpt;
+
+    auto tsBlock = makeTsBlockFromBucket(compressedBucket, "_id");
+    auto idx = tsBlock->argMin();
+    ASSERT_TRUE(idx.has_value());
+    auto elem = tsBlock->at(*idx);
+    ASSERT_FALSE(tsBlock->decompressed())
+        << "argMin populates the cache; at(argMin) must not deblock";
+    ASSERT_NE(elem.tag, value::TypeTags::Nothing);
+}
+
+// Bucket with a string column whose values are all >7 chars, so the SBEColumnMaterializer
+// emits 'bsonString' (heap-allocated via the BSONElementStorage) rather than 'StringSmall'
+// (inline). The min and max are at interior indices (1 and 2) so that at(argMin/argMax) cannot
+// short-circuit through the boundary fast paths in TsBlock::at() and must instead hit the
+// _atCache populated by argMin/argMax.
+const BSONObj kBucketWithDeepStrings = fromjson(R"(
+{
+    "_id": ObjectId("64a33d9cdf56a62781061049"),
+    "control": {
+        "version": 1,
+        "min": {
+            "_id": 0,
+            "time": {$date: "2023-06-30T21:29:00.000Z"},
+            "name": "alpha-001"
+        },
+        "max": {
+            "_id": 3,
+            "time": {$date: "2023-06-30T21:29:15.000Z"},
+            "name": "delta-004"
+        }
+    },
+    "meta": "A",
+    "data": {
+        "_id": {"0": 0, "1": 1, "2": 2, "3": 3},
+        "time": {
+            "0": {$date: "2023-06-30T21:29:00.000Z"},
+            "1": {$date: "2023-06-30T21:29:05.000Z"},
+            "2": {$date: "2023-06-30T21:29:10.000Z"},
+            "3": {$date: "2023-06-30T21:29:15.000Z"}
+        },
+        "name": {
+            "0": "bravo-002",
+            "1": "alpha-001",
+            "2": "delta-004",
+            "3": "charlie-03"
+        }
+    }
+})");
+
+TEST_F(TsSbeValueTest, TsBlockArgMinMaxAtCacheStoresDeepString) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithDeepStrings, "time"_sd, {}, false).compressedBucket;
+    ASSERT(compressedBucketOpt);
+
+    auto tsBlock = makeTsBlockFromBucket(*compressedBucketOpt, "name");
+
+    auto minIdx = tsBlock->argMin();
+    auto maxIdx = tsBlock->argMax();
+    ASSERT_EQ(minIdx, boost::optional<size_t>(1u)) << "argMin must point to the interior min slot";
+    ASSERT_EQ(maxIdx, boost::optional<size_t>(2u)) << "argMax must point to the interior max slot";
+    ASSERT_FALSE(tsBlock->decompressed()) << "argMin/argMax must not deblock";
+
+    auto check = [&](size_t idx, StringData expected) {
+        auto [tag, val] = tsBlock->at(idx);
+        ASSERT_FALSE(tsBlock->decompressed())
+            << "at(idx) on an interior index must hit _atCache, not deblock or use boundary path";
+        ASSERT_EQ(tag, value::TypeTags::bsonString)
+            << "Strings >7 chars must materialize via the allocator as bsonString";
+        ASSERT_EQ(value::getStringView(tag, val), expected)
+            << "Cached string contents must be intact (allocator kept it alive)";
+    };
+    check(*minIdx, "alpha-001"_sd);
+    check(*maxIdx, "delta-004"_sd);
+}
+
+TEST_F(TsSbeValueTest, TsBlockCloneStartsWithEmptyCache) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxAndArrays, "time"_sd, {}, false)
+            .compressedBucket;
+    ASSERT(compressedBucketOpt);
+    auto compressedBucket = *compressedBucketOpt;
+
+    // Use a sparse (non-dense) column so argMin goes through the BSONColumn fast
+    // path and populates _atCache without triggering ensureDeblocked().
+    auto original = makeTsBlockFromBucket(compressedBucket, "sometimesMissing");
+    auto idx = original->argMin();
+    ASSERT_TRUE(idx.has_value());
+    ASSERT_FALSE(original->decompressed())
+        << "argMin on a sparse column must not deblock the original";
+
+    // Clone. The clone must start with an empty _atCache.
+    auto cloned = original->cloneStrongTyped();
+
+    // at(*idx) on the clone must deblock: if the cache had been copied from the
+    // original, the clone would return the cached value without decompressing.
+    (void)cloned->at(*idx);
+    ASSERT_TRUE(cloned->decompressed())
+        << "clone must deblock on at(argMin): empty cache proves cache was not shared";
+}
 }  // namespace mongo::sbe
