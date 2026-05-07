@@ -33,9 +33,11 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -262,6 +264,8 @@ public:
         }
     }
 
+    // TODO (SERVER-121209) Update this function according to the changes applied under
+    // SERVER-121209
     void stopMigrations(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const UUID&,
@@ -271,8 +275,11 @@ public:
                       BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                                nss, SerializationContext::stateDefault())),
                       BSON("$set" << BSON(CollectionType::kAllowMigrationsFieldName << false)));
+        _bumpOneChunk(opCtx, nss);
     }
 
+    // TODO (SERVER-121209) Update this function according to the changes applied under
+    // SERVER-121209
     void resumeMigrations(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const UUID&,
@@ -282,6 +289,7 @@ public:
                       BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                                nss, SerializationContext::stateDefault())),
                       BSON("$unset" << BSON(CollectionType::kAllowMigrationsFieldName << "")));
+        _bumpOneChunk(opCtx, nss);
     }
 
     std::unique_ptr<CausalityBarrier> buildCausalityBarrier(std::vector<ShardId>,
@@ -325,6 +333,32 @@ private:
 
     std::vector<StatusWith<bool>> _searchIndexResults;
     bool _searchIndexDefaultResult{false};
+
+    // Bumps the minor version of one chunk belonging to the collection at 'nss' in config.chunks.
+    // This keeps the catalog cache invariant satisfied after allowMigrations is toggled: the
+    // invariant requires that any change to allowMigrations is accompanied by a placement version
+    // bump so that cached routing tables are invalidated on the next refresh.
+    void _bumpOneChunk(OperationContext* opCtx, const NamespaceString& nss) {
+        DBDirectClient client(opCtx);
+        auto collDoc =
+            client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
+                           BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                                    nss, SerializationContext::stateDefault())));
+        if (collDoc.isEmpty())
+            return;
+        auto collUUID = uassertStatusOK(UUID::parse(collDoc[CollectionType::kUuidFieldName]));
+        FindCommandRequest findChunk(NamespaceString::kConfigsvrChunksNamespace);
+        findChunk.setFilter(BSON(ChunkType::collectionUUID() << collUUID));
+        findChunk.setSort(BSON(ChunkType::lastmod.name() << -1));
+        auto chunkDoc = client.findOne(std::move(findChunk));
+        if (chunkDoc.isEmpty())
+            return;
+        auto current = chunkDoc[ChunkType::lastmod.name()].timestamp();
+        Timestamp bumped(current.getSecs(), current.getInc() + 1);
+        client.update(NamespaceString::kConfigsvrChunksNamespace,
+                      BSON("_id" << chunkDoc["_id"]),
+                      BSON("$set" << BSON(ChunkType::lastmod.name() << bumped)));
+    }
 
     CoordinatorStateEnum _getCurrentPhaseOnDisk(OperationContext* opCtx) {
         DBDirectClient client(opCtx);
