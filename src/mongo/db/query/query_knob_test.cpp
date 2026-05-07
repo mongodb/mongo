@@ -31,34 +31,35 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/db/query/query_knob_test_gen.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/synchronized_value.h"
 
 #include <algorithm>
 
 namespace mongo {
-namespace {
 
-AtomicWord<int> testAtomicInt{42};
-AtomicWord<double> testAtomicDouble{3.14};
-AtomicWord<bool> testAtomicBool{true};
-AtomicWord<long long> testAtomicLongLong{100LL};
-synchronized_value<QueryFrameworkControlEnum> testSyncEnum{
-    QueryFrameworkControlEnum::kTrySbeEngine};
+void TestEnumKnob::append(OperationContext*,
+                          BSONObjBuilder* b,
+                          StringData name,
+                          const boost::optional<TenantId>&) {
+    *b << name << idl::serialize(_data.get());
+}
 
-}  // namespace
+Status TestEnumKnob::setFromString(StringData value, const boost::optional<TenantId>&) {
+    _data = idl::deserialize<TestKnobModeEnum>(value, IDLParserContext("testEnumKnob"));
+    return Status::OK();
+}
 
 namespace test_knobs {
 
-inline QueryKnob<int> testIntKnob{"testIntKnob", &readGlobalValue<testAtomicInt>};
-inline QueryKnob<double> testDoubleKnob{"testDoubleKnob", &readGlobalValue<testAtomicDouble>};
-inline QueryKnob<bool> testBoolKnob{"testBoolKnob", &readGlobalValue<testAtomicBool>};
-inline QueryKnob<long long> testLLKnob{"testLLKnob", &readGlobalValue<testAtomicLongLong>};
-inline QueryKnob<QueryFrameworkControlEnum> testEnumKnob{"testEnumKnob",
-                                                         &readGlobalValue<testSyncEnum>};
+inline QueryKnob<int> testIntKnob{"testIntKnob", &readGlobalValue<gTestIntKnob>};
+inline QueryKnob<double> testDoubleKnob{"testDoubleKnob", &readGlobalValue<gTestDoubleKnob>};
+inline QueryKnob<bool> testBoolKnob{"testBoolKnob", &readGlobalValue<gTestBoolKnob>};
+inline QueryKnob<long long> testLLKnob{"testLLKnob", &readGlobalValue<gTestLLKnob>};
+inline QueryKnob<TestKnobModeEnum> testEnumKnob{"testEnumKnob", &readGlobalValue<TestEnumKnob>};
 
 }  // namespace test_knobs
 
@@ -114,46 +115,41 @@ TEST(QueryKnobTest, ReadGlobalLongLong) {
 TEST(QueryKnobTest, ReadGlobalSynchronizedEnum) {
     auto val = test_knobs::testEnumKnob.readGlobal();
     ASSERT(std::holds_alternative<int>(val));
-    ASSERT_EQ(std::get<int>(val), static_cast<int>(QueryFrameworkControlEnum::kTrySbeEngine));
+    ASSERT_EQ(std::get<int>(val), static_cast<int>(TestKnobModeEnum::kAlpha));
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesInt) {
-    testAtomicInt.store(999);
+    RAIIServerParameterControllerForTest controller("testIntKnob", 999);
     auto val = test_knobs::testIntKnob.readGlobal();
     ASSERT_EQ(std::get<int>(val), 999);
-    testAtomicInt.store(42);  // Restore.
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesDouble) {
-    testAtomicDouble.store(6.28);
+    RAIIServerParameterControllerForTest controller("testDoubleKnob", 6.28);
     auto val = test_knobs::testDoubleKnob.readGlobal();
     ASSERT_APPROX_EQUAL(std::get<double>(val), 6.28, 1e-9);
-    testAtomicDouble.store(3.14);  // Restore.
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesBool) {
-    testAtomicBool.store(false);
+    RAIIServerParameterControllerForTest controller("testBoolKnob", false);
     auto val = test_knobs::testBoolKnob.readGlobal();
     ASSERT_EQ(std::get<bool>(val), false);
-    testAtomicBool.store(true);  // Restore.
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesLongLong) {
-    testAtomicLongLong.store(9999LL);
+    RAIIServerParameterControllerForTest controller("testLLKnob", 9999LL);
     auto val = test_knobs::testLLKnob.readGlobal();
     ASSERT_EQ(std::get<long long>(val), 9999LL);
-    testAtomicLongLong.store(100LL);  // Restore.
 }
 
 TEST(QueryKnobTest, ReadGlobalReflectsUpdatesSynchronizedEnum) {
-    *testSyncEnum = QueryFrameworkControlEnum::kForceClassicEngine;
+    RAIIServerParameterControllerForTest controller("testEnumKnob", "beta");
     auto val = test_knobs::testEnumKnob.readGlobal();
-    ASSERT_EQ(std::get<int>(val), static_cast<int>(QueryFrameworkControlEnum::kForceClassicEngine));
-    *testSyncEnum = QueryFrameworkControlEnum::kTrySbeEngine;  // Restore.
+    ASSERT_EQ(std::get<int>(val), static_cast<int>(TestKnobModeEnum::kBeta));
 }
 
 TEST(QueryKnobTest, EnumKnobFromBSONRoundTrip) {
-    auto enumAsInt = static_cast<int>(QueryFrameworkControlEnum::kTrySbeRestricted);
+    auto enumAsInt = static_cast<int>(TestKnobModeEnum::kBeta);
     QueryKnobValue original{enumAsInt};
     BSONObjBuilder b;
     test_knobs::testEnumKnob.toBSON(b, "v"_sd, original);
@@ -164,8 +160,8 @@ TEST(QueryKnobTest, EnumKnobFromBSONRoundTrip) {
 }
 
 TEST(QueryKnobTest, EnumKnobFromBSONString) {
-    auto val = test_knobs::testEnumKnob.fromBSON(BSON("v" << "forceClassicEngine").firstElement());
-    ASSERT_EQ(std::get<int>(val), static_cast<int>(QueryFrameworkControlEnum::kForceClassicEngine));
+    auto val = test_knobs::testEnumKnob.fromBSON(BSON("v" << "beta").firstElement());
+    ASSERT_EQ(std::get<int>(val), static_cast<int>(TestKnobModeEnum::kBeta));
 }
 
 TEST(QueryKnobTest, FromBSONInt) {

@@ -32,11 +32,16 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 
+#include <concepts>
 #include <type_traits>
 #include <variant>
 #include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 
@@ -44,7 +49,7 @@ namespace mongo {
 // Enum-typed knobs are stored as int.
 using QueryKnobValue = std::variant<std::monostate, int, long long, double, bool>;
 
-using ReadGlobalFn = QueryKnobValue (*)();
+using ReadGlobalFn = QueryKnobValue (*)(StringData);
 
 template <typename S>
 concept AtomicLoadable = requires(const S& s) {
@@ -52,24 +57,33 @@ concept AtomicLoadable = requires(const S& s) {
 };
 
 template <typename S>
-concept SynchronizedEnum = requires(const S& s) {
-    { s.get() } -> std::convertible_to<typename S::value_type>;
-    requires std::is_enum_v<typename S::value_type>;
+concept EnumServerParameter = std::derived_from<S, ServerParameter> && requires(S s) {
+    { s._data.get() };
 };
 
 /**
- * Concept-dispatched reader. The `auto&` NTTP produces one instantiation per global variable.
- * Enum values from synchronized_value<EnumType> are cast to int in the variant.
+ * Concept-dispatched reader. Atomic globals are handled by the 'storage' NTTP which produces one
+ * instantiation per global variable.
  */
 template <auto& storage>
-QueryKnobValue readGlobalValue() {
-    using Storage = std::remove_cvref_t<decltype(storage)>;
-    if constexpr (AtomicLoadable<Storage>) {
-        return QueryKnobValue{storage.load()};
-    } else if constexpr (SynchronizedEnum<Storage>) {
-        return QueryKnobValue{static_cast<int>(storage.get())};
-    } else {
-        static_assert(sizeof(Storage) == 0, "Unsupported storage type for readGlobalValue");
+requires AtomicLoadable<std::remove_cvref_t<decltype(storage)>>
+QueryKnobValue readGlobalValue(StringData paramName) {
+    return QueryKnobValue{storage.load()};
+}
+
+/**
+ * Enum knobs are handled by looking up the ServerParameter by its name and type. Enum values are
+ * internally represented as ints.
+ */
+template <typename SPT>
+requires EnumServerParameter<SPT>
+QueryKnobValue readGlobalValue(StringData paramName) {
+    try {
+        auto* sp = ServerParameterSet::getNodeParameterSet()->template get<SPT>(paramName);
+        return QueryKnobValue{static_cast<int>(sp->_data.get())};
+    } catch (const DBException&) {
+        tasserted(exceptionToStatus().withContext(
+            fmt::format("Failed to read query knob global '{}'", paramName)));
     }
 }
 
@@ -80,19 +94,30 @@ QueryKnobValue readGlobalValue() {
  *
  * Non-copyable to prevent object slicing when used through the base pointer.
  */
-struct QueryKnobBase {
-    QueryKnobBase(StringData name, ReadGlobalFn readFn)
-        : paramName(name), readGlobal(readFn), fromBSON(nullptr), toBSON(nullptr) {}
+class QueryKnobBase {
+public:
+    QueryKnobBase(StringData paramName, ReadGlobalFn readFn)
+        : paramName(paramName), _readFn(readFn) {}
     virtual ~QueryKnobBase() = default;
-    QueryKnobBase(const QueryKnobBase&) = delete;
-    QueryKnobBase& operator=(const QueryKnobBase&) = delete;
 
-    StringData paramName;
+    QueryKnobBase(const QueryKnobBase&) = delete;
+    QueryKnobBase(QueryKnobBase&&) = delete;
+    QueryKnobBase& operator=(const QueryKnobBase&) = delete;
+    QueryKnobBase& operator=(QueryKnobBase&&) = delete;
+
+    virtual QueryKnobValue fromBSON(const BSONElement& elem) = 0;
+    virtual void toBSON(BSONObjBuilder& b, StringData field, const QueryKnobValue& val) = 0;
+
+    QueryKnobValue readGlobal() const {
+        return _readFn(paramName);
+    }
+
     // TODO SERVER-125549: refactor to use a strongly typed KnobId.
     size_t index = ~size_t{0};  // Sentinel until QueryKnobRegistry assigns a dense index.
-    ReadGlobalFn readGlobal;
-    QueryKnobValue (*fromBSON)(const BSONElement&);
-    void (*toBSON)(BSONObjBuilder&, StringData, const QueryKnobValue&);
+    StringData paramName;
+
+private:
+    ReadGlobalFn _readFn;
 };
 
 /**
@@ -176,11 +201,18 @@ struct ConverterTraits<bool> {
  * fromBSON/toBSON auto-wired via ConverterTraits<T>.
  */
 template <typename T>
-struct QueryKnob : QueryKnobBase {
+class QueryKnob final : public QueryKnobBase {
+public:
     QueryKnob(StringData name, ReadGlobalFn readFn) : QueryKnobBase(name, readFn) {
-        fromBSON = &detail::ConverterTraits<T>::fromBSON;
-        toBSON = &detail::ConverterTraits<T>::toBSON;
         QueryKnobDescriptorSet::get().add(*this);
+    }
+
+    QueryKnobValue fromBSON(const BSONElement& elem) override {
+        return detail::ConverterTraits<T>::fromBSON(elem);
+    }
+
+    void toBSON(BSONObjBuilder& b, StringData field, const QueryKnobValue& val) override {
+        return detail::ConverterTraits<T>::toBSON(b, field, val);
     }
 };
 

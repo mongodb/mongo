@@ -374,16 +374,26 @@ mongo_cc_unit_test(
     ],
 )
 
+idl_generator(
+    name = "query_knob_test_gen",
+    src = "query_knob_test.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "query_knob_test",
     srcs = [
         "query_knob_snapshot_test.cpp",
         "query_knob_test.cpp",
+        ":query_knob_test_gen",
     ],
     tags = ["mongo_unittest_second_group"],
     deps = [
         ":query_knob",
         ":query_knobs",
+        "//src/mongo/db:server_base",
     ],
 )
 
