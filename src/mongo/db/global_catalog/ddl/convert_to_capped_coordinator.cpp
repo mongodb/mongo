@@ -522,16 +522,14 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     }
                 }
 
-                // If the coordinator succeeded to convert the collection to capped and the
-                // collection is tracked, the sharding catalog must be updated. Thus throw the error
-                // and retry relying on _mustAlwaysMakeProgress that will always be true reached
-                // this phase.
-                if (_mustAlwaysMakeProgress() || _isRetriableErrorForDDLCoordinator(status)) {
-                    // Retry the operation.
-                    return status;
-                }
-
-                if (_doc.getPhase() >= Phase::kAcquireCriticalSectionOnCoordinator) {
+                // Trigger cleanup for non-retriable errors in phases where the critical section is
+                // held but the collection hasn't been capped yet — the operation can safely be
+                // aborted. _mustAlwaysMakeProgress() returning true from
+                // kAcquireCriticalSectionOnCoordinator ensures that if triggerCleanup() fails
+                // transiently, the base class retries and this block is reached again.
+                if (!_isRetriableErrorForDDLCoordinator(status) &&
+                    _doc.getPhase() >= Phase::kAcquireCriticalSectionOnCoordinator &&
+                    _doc.getPhase() < Phase::kConvertCollectionToCappedOnDataShard) {
                     triggerCleanup(opCtx, status);
                     MONGO_UNREACHABLE_TASSERT(10083519);
                 }
@@ -546,12 +544,11 @@ bool ConvertToCappedCoordinator::isInCriticalSection(Phase phase) const {
 }
 
 bool ConvertToCappedCoordinator::_mustAlwaysMakeProgress() {
-    // If the collection was originally tracked on the sharding catalog, the coodinator must always
-    // make forward progress after converting the collection to capped in order to align local and
-    // sharding catalog.
-    const bool isCollectionTrackedOnTheShardingCatalog = _doc.getOriginalCollection().has_value();
-    return isCollectionTrackedOnTheShardingCatalog &&
-        _doc.getPhase() >= Phase::kConvertCollectionToCappedOnDataShard;
+    // Once the critical section is acquired, the coordinator must always make forward progress
+    // so cleanup (critical section release) cannot be skipped. _mustAlwaysMakeProgress()
+    // returning true ensures that even if triggerCleanup() fails transiently, the base class
+    // retries _runImpl and calls triggerCleanup again.
+    return _doc.getPhase() >= Phase::kAcquireCriticalSectionOnCoordinator;
 }
 
 ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(

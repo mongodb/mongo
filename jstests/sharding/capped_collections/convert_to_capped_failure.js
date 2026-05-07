@@ -1,10 +1,14 @@
 /**
  * Tests the convertToCapped coordinator behavior when there is an hypothetical failure during the
  * local convertToCapped operation.
+ * @tags: [
+ *  # TODO SERVER-126244: Remove once 9.0 becomes last LTS.
+ *  # In the newest version convertToCapped will also retry errors in untracked collections.
+ *  multiversion_incompatible,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -29,27 +33,13 @@ assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primarySha
 
     const waitForConvertToCapped = startParallelShell(
         funWithArgs(
-            function (dbName, collName, isTracked) {
+            function (dbName, collName) {
                 const testDB = db.getSiblingDB(dbName);
-                if (isTracked) {
-                    // The coordinator will eventually succeed since once the collection has been
-                    // locally capped, the sharding catalog has to be updated.
-                    assert.commandWorked(testDB.runCommand({convertToCapped: collName, size: 1000}));
-                } else {
-                    // The coordinator will fail the first time because it doesn't retry on error if the
-                    // collection is not tracked (since the sharding catalog doesn't need to be
-                    // updated). So let's retry the operation once the failpoint has been disabled to
-                    // make sure it eventually succeeds.
-                    assert.commandFailedWithCode(
-                        testDB.runCommand({convertToCapped: collName, size: 1000}),
-                        ErrorCodes.InternalError,
-                    );
-                    assert.commandWorked(testDB.runCommand({convertToCapped: collName, size: 1000}));
-                }
+                // An error on the coordinator right after the collection is locally capped should trigger the retry logic, so the operation eventually succeeds.
+                assert.commandWorked(testDB.runCommand({convertToCapped: collName, size: 1000}));
             },
             db.getName(),
             coll.getName(),
-            FixtureHelpers.isTracked(coll),
         ),
         st.s.port,
     );
