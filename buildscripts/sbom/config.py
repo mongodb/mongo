@@ -53,6 +53,7 @@ third_party_folders_remove = [
 license_replacements = [
     # "LicenseRef-The-BSD-License" is not a valid SPDX identifier; replace with BSD-2-Clause
     ["LicenseRef-The-BSD-License", "BSD-2-Clause"],
+    ["LicenseRef-Unicode-3.0", "Unicode-3.0"],
 ]
 
 # ################ Component Renaming ################

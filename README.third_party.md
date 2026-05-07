@@ -33,7 +33,7 @@ a notice will be included in
 | [CRoaring]                                           | Apache-2.0 OR MIT                              | 3.0.1                                    |                      | ✗                               |
 | [Cyrus SASL]                                         | BSD-Attribution-HPND-disclaimer                | 2.1.28                                   |                      |                                 |
 | [fmt]                                                | MIT                                            | 11.2.0                                   |                      | ✗                               |
-| [folly]                                              | Apache-2.0                                     | 2023.12.25.00                            |                      | ✗                               |
+| [folly]                                              | Apache-2.0                                     | 2025.04.21.00                            |                      | ✗                               |
 | [fuzztest]                                           | BSD-3-Clause, Apache-2.0, HPND                 | 2025-07-28                               |                      |                                 |
 | [googletest]                                         | BSD-3-Clause                                   | 1.17.0                                   |                      |                                 |
 | [gperftools]                                         | BSD-3-Clause                                   | 2.9.1                                    |                      | ✗                               |
