@@ -300,12 +300,13 @@ TEST_F(QueryStageNearTest, Spilling) {
     ASSERT_EQUALS(results.size(), expectedResultCount);
     assertAscendingAndValid(results);
 
-    const auto* stats = static_cast<const NearStats*>(nearStage.getSpecificStats());
-    ASSERT_GT(stats->spillingStats.getSpills(), 0);
-    ASSERT_GT(stats->spillingStats.getSpilledRecords(), results.size() / 2);
+    const auto fullStats = nearStage.getStats();
+    const auto* nearStats = static_cast<const NearStats*>(fullStats->specific.get());
+    ASSERT_GT(nearStats->spillingStats.getSpills(), 0);
+    ASSERT_GT(nearStats->spillingStats.getSpilledRecords(), results.size() / 2);
 
     size_t approximateBytesPerSpilledRecord =
-        stats->spillingStats.getSpilledBytes() / stats->spillingStats.getSpilledRecords();
+        nearStats->spillingStats.getSpilledBytes() / nearStats->spillingStats.getSpilledRecords();
     ASSERT_LTE(16, approximateBytesPerSpilledRecord);
     ASSERT_GTE(64, approximateBytesPerSpilledRecord);
 }

@@ -292,7 +292,6 @@ bool NearStage::isEOF() const {
 
 std::unique_ptr<PlanStageStats> NearStage::getStats() {
     auto ret = std::make_unique<PlanStageStats>(_commonStats, _stageType);
-    updateSpillingStats();
     ret->specific = _specificStats.clone();
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
         ret->children.emplace_back(_childrenIntervals[i]->covering->getStats());
