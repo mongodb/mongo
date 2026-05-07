@@ -5,6 +5,7 @@
  *
  * @tags: [
  *   requires_fcv_71,
+ *   resource_intensive,
  *   # TODO(SERVER-124153): Remove.
  *   featureFlagReplicatedFastCount_incompatible,
  * ]
@@ -17,6 +18,22 @@ import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_s
 
 const calculatePercentage = AnalyzeShardKeyUtil.calculatePercentage;
 const assertApprox = AnalyzeShardKeyUtil.assertApprox;
+
+/**
+ * Runs analyzeShardKey, retrying on the sporadic $sample duplicate-document error (28799).
+ */
+function runAnalyzeShardKeyWithRetry(conn, ns, shardKey) {
+    let res;
+    assert.soon(() => {
+        res = conn.adminCommand({analyzeShardKey: ns, key: shardKey});
+        if (res.code === 28799) {
+            jsTest.log("analyzeShardKey hit transient $sample failure (28799), retrying: " + tojson(res));
+            return false;
+        }
+        return true;
+    }, "analyzeShardKey continued to fail with $sample error 28799");
+    return res;
+}
 
 function sum(nums) {
     return nums.reduce((partialSum, num) => partialSum + num);
@@ -440,7 +457,7 @@ function waitForSampledQueries(conn, ns, shardKey, testCase) {
     assert.soon(() => {
         numTries++;
 
-        res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: shardKey}));
+        res = assert.commandWorked(runAnalyzeShardKeyWithRetry(conn, ns, shardKey));
         const numShardKeyUpdates =
             (res.writeDistribution.percentageOfShardKeyUpdates * res.writeDistribution.sampleSize.total) / 100;
 
@@ -525,7 +542,7 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
 
     // Verify that the analyzeShardKey command returns zeros for the read and write sample size
     // when there are no sampled queries.
-    res = assert.commandWorked(fixture.conn.adminCommand({analyzeShardKey: sampledNs, key: shardKey}));
+    res = assert.commandWorked(runAnalyzeShardKeyWithRetry(fixture.conn, sampledNs, shardKey));
     assertMetricsEmptySampleSize(res);
 
     // Turn on query sampling and wait for sampling to become active.
