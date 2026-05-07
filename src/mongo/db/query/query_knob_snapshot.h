@@ -98,8 +98,8 @@ private:
 };
 
 /**
- * Builder for QueryKnobSnapshot. Slots are pre-filled with monostate / KnobSource::kDefault;
- * call set() for each slot that needs a non-default value, then call build().
+ * Builder for QueryKnobSnapshot. Slots are pre-filled with DeleteQueryKnobOverride /
+ * KnobSource::kDefault; call set() for each slot that needs a non-default value, then call build().
  *
  * Supports fluent chaining from a temporary: QueryKnobSnapshotBuilder{n}.set(...).build().
  * For a named builder, move it before building: std::move(builder).build().
@@ -116,8 +116,8 @@ public:
     QueryKnobSnapshotBuilder& set(size_t index, QueryKnobValue value, KnobSource source) {
         tassert(12312302, "QueryKnobSnapshotBuilder index out of bounds", index < _values.size());
         tassert(12312303,
-                "QueryKnobSnapshotBuilder::set() value must not be monostate",
-                !std::holds_alternative<std::monostate>(value));
+                "QueryKnobSnapshotBuilder::set() value must not be DeleteQueryKnobOverride",
+                !std::holds_alternative<DeleteQueryKnobOverride>(value));
         _values[index] = std::move(value);
         _sources[index] = source;
         return *this;

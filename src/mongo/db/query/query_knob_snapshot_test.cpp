@@ -30,6 +30,7 @@
 #include "mongo/db/query/query_knob_snapshot.h"
 
 #include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_knob.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -51,7 +52,7 @@ TEST(QueryKnobSnapshotTest, DefaultSourceIsDefault) {
 
 TEST(QueryKnobSnapshotTest, RoundTripAllQueryKnobValueTypes) {
     // One slot per QueryKnobValue alternative plus enum (stored as int).
-    // Slot 0: std::monostate — the null/removal sentinel; default-constructed slot holds it.
+    // Slot 0: DeleteQueryKnobOverride
     // Slot 1: int
     // Slot 2: long long
     // Slot 3: double
@@ -67,7 +68,7 @@ TEST(QueryKnobSnapshotTest, RoundTripAllQueryKnobValueTypes) {
                       .set(5, QueryKnobValue{static_cast<int>(kEnumVal)}, KnobSource::kDefault))
             .build();
 
-    ASSERT_EQ(snap.get<std::monostate>(0), std::monostate{});
+    ASSERT_EQ(snap.get<DeleteQueryKnobOverride>(0), DeleteQueryKnobOverride());
     ASSERT_EQ(snap.get<int>(1), 42);
     ASSERT_EQ(snap.get<long long>(2), 123456789LL);
     ASSERT_APPROX_EQUAL(snap.get<double>(3), 2.718, 1e-9);
@@ -209,8 +210,8 @@ DEATH_TEST_REGEX(QueryKnobSnapshotDeathTest, SetOutOfBounds, "12312302") {
     QueryKnobSnapshotBuilder{2}.set(5, QueryKnobValue{1}, KnobSource::kDefault);
 }
 
-DEATH_TEST_REGEX(QueryKnobSnapshotDeathTest, SetMonostateValue, "12312303") {
-    QueryKnobSnapshotBuilder{1}.set(0, QueryKnobValue{}, KnobSource::kDefault);
+DEATH_TEST_REGEX(QueryKnobSnapshotDeathTest, SetDeleteQueryKnobOverrideValue, "12312303") {
+    QueryKnobSnapshotBuilder{1}.set(0, DeleteQueryKnobOverride(), KnobSource::kDefault);
 }
 
 }  // namespace

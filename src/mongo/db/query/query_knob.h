@@ -45,9 +45,13 @@
 
 namespace mongo {
 
-// std::monostate is a removal sentinel (null on wire, used during PQS merge).
+// Removal sentinel (null on wire, used during PQS merge).
+struct DeleteQueryKnobOverride {
+    friend constexpr bool operator==(DeleteQueryKnobOverride, DeleteQueryKnobOverride) = default;
+};
+
 // Enum-typed knobs are stored as int.
-using QueryKnobValue = std::variant<std::monostate, int, long long, double, bool>;
+using QueryKnobValue = std::variant<DeleteQueryKnobOverride, int, long long, double, bool>;
 
 using ReadGlobalFn = QueryKnobValue (*)(StringData);
 

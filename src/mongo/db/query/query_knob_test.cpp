@@ -216,9 +216,9 @@ TEST(QueryKnobTest, ToBSONRoundTripLongLong) {
     ASSERT_EQ(std::get<long long>(roundTripped), 777LL);
 }
 
-TEST(QueryKnobTest, MonostateDefault) {
+TEST(QueryKnobTest, DeleteQueryKnobOverrideDefault) {
     QueryKnobValue v;
-    ASSERT(std::holds_alternative<std::monostate>(v));
+    ASSERT(std::holds_alternative<DeleteQueryKnobOverride>(v));
 }
 
 TEST(QueryKnobTest, ParamNameStoredCorrectly) {
