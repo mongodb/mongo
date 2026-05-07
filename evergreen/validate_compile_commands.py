@@ -17,6 +17,10 @@ STANDARD_COMPILE_COMMAND_KEYS = frozenset({"arguments", "command", "directory", 
 COMPILEDB_GENERATION_TARGETS = ["compiledb", "install-wiredtiger"]
 
 
+def _get_bazel_binary() -> str:
+    return os.environ.get("BAZEL_BINARY", "bazel")
+
+
 def _get_workspace_dir() -> str:
     workspace_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
     if workspace_dir:
@@ -35,7 +39,7 @@ def _ensure_compiledb_exists(compdb_path: str) -> None:
         "Attempting to run "
         f"'bazel build {' '.join(COMPILEDB_GENERATION_TARGETS)}' to generate it.\n"
     )
-    subprocess.run(["bazel", "build", *COMPILEDB_GENERATION_TARGETS], check=True)
+    subprocess.run([_get_bazel_binary(), "build", *COMPILEDB_GENERATION_TARGETS], check=True)
 
 
 def _parse_repo_env_from_bazelrc(bazelrc_path: str, var_name: str) -> str | None:

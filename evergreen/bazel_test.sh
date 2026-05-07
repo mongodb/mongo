@@ -21,6 +21,7 @@ bazel_evergreen_shutils::export_ssl_paths_if_needed
 eval echo "Execution environment: Targets: ${targets}"
 
 BAZEL_BINARY="$(bazel_evergreen_shutils::bazel_get_binary_path)"
+export BAZEL_BINARY
 
 # Mode-specific LOCAL_ARG and release flag
 LOCAL_ARG="$(bazel_evergreen_shutils::compute_local_arg test)"

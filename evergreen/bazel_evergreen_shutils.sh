@@ -281,7 +281,9 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
     local timeout_str="$(bazel_evergreen_shutils::timeout_prefix "${evergreen_remote_exec:-}")"
 
     # Get command log path for usage afterwards
-    last_command_log_path=$(bazel info command_log)
+    # Use the selected Bazel binary so PPC/s390x don't fall back to a different
+    # bazel on PATH with different JDK behavior.
+    last_command_log_path=$("$BAZEL_BINARY" info command_log 2>/dev/null || true)
 
     # Everything else is the Bazel subcommand + flags (and possibly redirections/pipes).
     # We *intentionally* keep it as raw words and reassemble to a single string for eval.

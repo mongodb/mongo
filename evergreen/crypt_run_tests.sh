@@ -5,6 +5,7 @@
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
+. "$DIR/bazel_evergreen_shutils.sh"
 
 cd src
 
@@ -15,6 +16,8 @@ if [ "$(uname)" != "Linux" ]; then
     echo "Skipping test, this is for linux only"
     exit 0
 fi
+
+BAZEL_BINARY="$(bazel_evergreen_shutils::bazel_get_binary_path)"
 
 EXTRACT_DIR="bazel-bin/install"
 # EXTRACT_DIR is typically a Bazel symlink tree; dereference to the real path up front.
@@ -85,5 +88,5 @@ $UNITTEST_PATH
 echo "Mongo Crypt Shared Library unit test succeeded!"
 
 echo "Running Mongo Crypt Shared Library debuggability test"
-MONGO_WRAPPER_OUTPUT_ALL=1 bazel run gdb -- "$UNITTEST_PATH" --batch -ex "source ${EXTRACT_DIR}/crypt_debuggability_test.py"
+MONGO_WRAPPER_OUTPUT_ALL=1 "$BAZEL_BINARY" run gdb -- "$UNITTEST_PATH" --batch -ex "source ${EXTRACT_DIR}/crypt_debuggability_test.py"
 echo "Mongo Crypt Shared Library shared library debuggability test succeeded!"

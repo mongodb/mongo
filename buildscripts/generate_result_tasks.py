@@ -47,6 +47,10 @@ NIGHTLY_PROJECT_CONFIG = "etc/evergreen_nightly.yml"
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
 
+def _bazel_binary() -> str:
+    return os.environ.get("BAZEL_BINARY", "bazel")
+
+
 def make_results_task(target: str) -> Task:
     commands = [
         FunctionCall("execute resmoke tests via bazel", {"targets": target, "result_task": True}),
@@ -358,7 +362,7 @@ def query_targets(
         query = " + ".join(tag_queries)
 
     cmd = (
-        ["bazel", "cquery"]
+        [_bazel_binary(), "cquery"]
         + flags_list
         + [
             query,

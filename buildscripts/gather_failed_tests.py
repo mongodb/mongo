@@ -8,6 +8,10 @@ from pathlib import Path
 import typer
 
 
+def _bazel_binary() -> str:
+    return os.environ.get("BAZEL_BINARY", "bazel")
+
+
 def process_bep(bep_path):
     failed_tests = []
     successful_tests = []
@@ -36,7 +40,7 @@ def _relink_binaries_with_symbols(failed_test_labels: list[str]):
 
     bazel_build_flags.append("--remote_download_outputs=toplevel")
 
-    relink_command = ["bazel", "build", *bazel_build_flags, *failed_test_labels]
+    relink_command = [_bazel_binary(), "build", *bazel_build_flags, *failed_test_labels]
 
     print(f"Running command: {' '.join(relink_command)}")
     subprocess.run(

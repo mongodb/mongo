@@ -23,6 +23,7 @@ bazel_evergreen_shutils::export_ssl_paths_if_needed
 eval echo "Execution environment: Args: ${args} Target: ${target} redact_args: ${redact_args}"
 
 BAZEL_BINARY="$(bazel_evergreen_shutils::bazel_get_binary_path)"
+export BAZEL_BINARY
 
 # Build LOCAL_ARG for run-mode
 LOCAL_ARG="$(bazel_evergreen_shutils::compute_local_arg run)"
