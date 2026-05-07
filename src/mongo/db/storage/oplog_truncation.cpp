@@ -30,6 +30,8 @@
 #include "mongo/db/storage/oplog_truncation.h"
 
 #include "mongo/db/repl/local_oplog_info.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 
@@ -113,6 +115,17 @@ RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayT
                                   "error"_attr = status);
                     return false;
                 }
+
+                if (isReplicatedFastCountEnabled(opCtx)) {
+                    const boost::optional<UUID> uuid = oplog.uuid();
+                    invariant(uuid.has_value());
+                    UncommittedFastCountChange::getForWrite(opCtx).record(
+                        NamespaceString::kRsOplogNamespace,
+                        *uuid,
+                        -truncateMarker->records,
+                        -truncateMarker->bytes);
+                }
+
                 txn.commit();
 
                 // Remove the truncate marker after a successful truncation.

@@ -799,43 +799,12 @@ bool CollectionImpl::isCappedAndNeedsDelete(OperationContext* opCtx) const {
         return false;
     }
 
-    long long currentDataSize;
-    long long currentNumRecords;
-
-    // TODO(SERVER-125506): Remove latestSizeCountEnabled, the entire if-else statement, and the
-    // declaration of currentDataSize and currentNumRecords. See SERVER-123334 for the concise
-    // version of this code.
-    const bool latestSizeCountEnabled =
-        gFeatureFlagReplicatedFastCountDurability.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    if (latestSizeCountEnabled && isReplicatedFastCountEnabled(opCtx)) {
-        // When writes are batched, the capped collection insert is not written to the oplog until
-        // the top-level WriteUnitOfWork commits. When writes are not batched, the capped collection
-        // insert is written to the oplog immediately. latestSizeCount() scans the oplog to compute
-        // the latest collection size/count, so it misses the latest insert when writes are batched.
-        // To correctly compute currentDataSize and currentNumRecords, we include the uncommitted
-        // size/count changes if and only if writes are batched.
-        const bool batched = BatchedWriteContext::get(opCtx).writesAreBatched();
-        const CollectionSizeCount uncommittedChanges = (batched)
-            ? UncommittedFastCountChange::getForRead(opCtx).find(uuid())
-            : CollectionSizeCount{.size = 0, .count = 0};
-
-        const auto [latestSize, latestCount] = latestSizeCount(opCtx);
-
-        currentDataSize = latestSize + uncommittedChanges.size;
-        currentNumRecords = latestCount + uncommittedChanges.count;
-    } else {
-        currentDataSize = dataSize(opCtx);
-        currentNumRecords = numRecords(opCtx);
-    }
-
-    if (currentDataSize > getCollectionOptions().cappedSize) {
+    if (dataSize(opCtx) > getCollectionOptions().cappedSize) {
         return true;
     }
 
     const auto cappedMaxDocs = getCollectionOptions().cappedMaxDocs;
-    if ((cappedMaxDocs != 0) && (currentNumRecords > cappedMaxDocs)) {
+    if ((cappedMaxDocs != 0) && (numRecords(opCtx) > cappedMaxDocs)) {
         return true;
     }
 
@@ -1155,11 +1124,7 @@ long long CollectionImpl::dataSize(OperationContext* opCtx) const {
 }
 
 CollectionSizeCount CollectionImpl::latestSizeCount(OperationContext* opCtx) const {
-    return (shouldReadFromReplicatedFastCount(opCtx, _ns))
-        ? replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
-              .findLatest(opCtx, uuid())
-        : CollectionSizeCount{_shared->_recordStore->dataSize(),
-                              _shared->_recordStore->numRecords()};
+    return {.size = dataSize(opCtx), .count = numRecords(opCtx)};
 }
 
 CollectionSizeCount CollectionImpl::persistedSizeCount(OperationContext* opCtx) const {

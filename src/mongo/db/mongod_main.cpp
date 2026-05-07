@@ -958,6 +958,18 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
                 TransactionParticipant::getOldestActiveTimestamp);
         }
 
+        // Initialize collection size and count metadata. initializeMetadata() must be called after
+        // replication coordinator startup because it assumes the WiredTiger checkpoint has been
+        // loaded and the oplog has been replayed. When data access is delayed during startup, the
+        // checkpoint may not be loaded at this point in the program, so we call
+        // initializeMetadata() elsewhere.
+        if (isReplicatedFastCountEnabled(startupOpCtx.get()) &&
+            !rss.getPersistenceProvider().shouldDelayDataAccessDuringStartup()) {
+            replicated_fast_count::ReplicatedFastCountManager::get(
+                startupOpCtx.get()->getServiceContext())
+                .initializeMetadata(startupOpCtx.get());
+        }
+
         if (getReplSetMemberInStandaloneMode(serviceContext)) {
             LOGV2_WARNING_OPTIONS(
                 20547,

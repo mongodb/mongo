@@ -931,11 +931,6 @@ void startupRecovery(OperationContext* opCtx,
             clearTempCollections(opCtx, dbName);
         }
     });
-
-    if (isReplicatedFastCountEnabled(opCtx)) {
-        replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
-            .initializeMetadata(opCtx);
-    }
 }
 
 // Returns true if the oplog collection exists. Will always return false if the cached pointer to

@@ -82,6 +82,153 @@ TEST_F(ReplicatedFastCountManagerIdempotenceTest, IdempotentStartupAndShutdown) 
     manager->shutdown(operationContext());
 }
 
+using ReplicatedFastCountManagerNoCollectionsTest = CatalogTestFixture;
+
+TEST_F(ReplicatedFastCountManagerNoCollectionsTest, InitializeMetadataDoesNothing) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    ReplicatedFastCountManager manager;
+    manager.initializeMetadata(operationContext());
+
+    EXPECT_EQ(manager.find(UUID::gen()), CollectionSizeCount(0, 0));
+}
+
+using ReplicatedFastCountManagerInitializeMetadataTest = ReplicatedFastCountManagerTest;
+
+TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataNoData) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    manager->initializeMetadata(operationContext());
+
+    EXPECT_EQ(manager->find(UUID::gen()), CollectionSizeCount(0, 0));
+}
+
+TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoStoreData) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(
+            Timestamp(2, 2), collB, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100));
+
+    manager->initializeMetadata(operationContext());
+
+    {
+
+        const CollectionSizeCount result = CollectionSizeCount{.size = 10, .count = 1};
+        EXPECT_EQ(manager->find(collA.uuid), result);
+    }
+    {
+
+        const CollectionSizeCount result = CollectionSizeCount{.size = 100, .count = 1};
+        EXPECT_EQ(manager->find(collB.uuid), result);
+    }
+}
+
+TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogData) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       sizeCountStore,
+                                       collA.uuid,
+                                       SizeCountStore::Entry(Timestamp::min(), 5, 1));
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       sizeCountStore,
+                                       collB.uuid,
+                                       SizeCountStore::Entry(Timestamp::min(), 6, 2));
+
+    manager->initializeMetadata(operationContext());
+
+    {
+
+        const CollectionSizeCount result = CollectionSizeCount{.size = 5, .count = 1};
+        EXPECT_EQ(manager->find(collA.uuid), result);
+    }
+    {
+
+        const CollectionSizeCount result = CollectionSizeCount{.size = 6, .count = 2};
+        EXPECT_EQ(manager->find(collB.uuid), result);
+    }
+}
+
+TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogAfterTimestamp) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       sizeCountStore,
+                                       collA.uuid,
+                                       SizeCountStore::Entry(Timestamp::min(), 5, 1));
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       sizeCountStore,
+                                       collB.uuid,
+                                       SizeCountStore::Entry(Timestamp::min(), 6, 2));
+
+    test_helpers::insertSizeCountTimestamp(
+        operationContext(), sizeCountTimestampStore, Timestamp(3, 3));
+
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(
+            Timestamp(2, 2), collB, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100));
+
+    manager->initializeMetadata(operationContext());
+
+    {
+
+        const CollectionSizeCount result = CollectionSizeCount{.size = 5, .count = 1};
+        EXPECT_EQ(manager->find(collA.uuid), result);
+    }
+    {
+
+        const CollectionSizeCount result = CollectionSizeCount{.size = 6, .count = 2};
+        EXPECT_EQ(manager->find(collB.uuid), result);
+    }
+}
+
+
+TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, StoreAndOplogData) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       sizeCountStore,
+                                       collA.uuid,
+                                       SizeCountStore::Entry(Timestamp::min(), 5, 1));
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       sizeCountStore,
+                                       collB.uuid,
+                                       SizeCountStore::Entry(Timestamp::min(), 6, 2));
+
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(
+            Timestamp(2, 2), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(
+            Timestamp(3, 3), collB, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100));
+
+    manager->initializeMetadata(operationContext());
+
+    {
+
+        const CollectionSizeCount result = CollectionSizeCount{.size = 5 + 10, .count = 1 + 1};
+        EXPECT_EQ(manager->find(collA.uuid), result);
+    }
+    {
+
+        const CollectionSizeCount result = CollectionSizeCount{.size = 6 + 100, .count = 2 + 1};
+        EXPECT_EQ(manager->find(collB.uuid), result);
+    }
+}
+
 using ReplicatedFastCountManagerFindLatestTest = ReplicatedFastCountManagerTest;
 
 TEST_F(ReplicatedFastCountManagerFindLatestTest, FindLatestCombinesStoredValuesWithOplogDeltas) {

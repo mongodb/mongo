@@ -779,6 +779,9 @@ public:
     bool shouldForceUpdateWithFullDocument() const override {
         return true;
     }
+    bool shouldUseReplicatedFastCount() const override {
+        return true;
+    }
 };
 
 // When the provider requires replicated RecordIds, the recordIdsReplicated field must appear in

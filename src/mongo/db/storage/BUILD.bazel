@@ -319,6 +319,8 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/repl:local_oplog_info",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_uncommitted_changes",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/shard_role/shard_catalog:collection_catalog",

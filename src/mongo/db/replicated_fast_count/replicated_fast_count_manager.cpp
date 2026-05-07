@@ -128,39 +128,45 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
     _metrics.setIsRunning(false);
 }
 
-int ReplicatedFastCountManager::_hydrateMetadataFromDisk(
-    OperationContext* opCtx, const CollectionOrViewAcquisition& acquisition) {
-    int numRecordsScanned = 0;
-    std::lock_guard lock(_metadataMutex);
-    auto cursor = acquisition.getCollectionPtr()->getCursor(opCtx);
-    while (auto record = cursor->next()) {
-        Record& rec = *record;
-        UUID uuid = _UUIDForKey(rec.id);
-        BSONObj data = rec.data.releaseToBson();
-
-        ++numRecordsScanned;
-
-        auto& meta = _metadata[uuid];
-        meta.sizeCount.count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
-        meta.sizeCount.size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
-        meta.validAsOf = data.getField(kValidAsOfKey).timestamp();
-    }
-    return numRecordsScanned;
-}
-
 void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
+    // Initialize the in-memory map by loading all persisted collection size/count information. The
+    // block scope is required to avoid a lock cycle fassert when reading the oplog below.
+    {
+        const auto acquisition = acquireFastCountCollectionForRead(opCtx);
+        if (!acquisition.has_value()) {
+            // This should only be the case on cold boot.
+            LOGV2(11999600, "Internal fastcount collection not present during initialization.");
+            return;
+        }
 
-    auto acquisition = acquireFastCountCollectionForRead(opCtx);
+        const Date_t loadStartTime = Date_t::now();
+        int numRecordsScanned = 0;
 
-    if (!acquisition.has_value()) {
-        // This should only be the case on cold boot.
-        LOGV2(11999600, "Internal fastcount collection not present during initialization.");
-        return;
+        std::lock_guard lock(_metadataMutex);
+        // initializeMetadata() is called after oplog replay. During oplog replay, _metadata may be
+        // updated as changes are committed. To avoid double counting, we erase all existing entries
+        // before re-initializing them.
+        _metadata.erase(_metadata.begin(), _metadata.end());
+
+        auto cursor = acquisition->getCollectionPtr()->getCursor(opCtx);
+        while (auto record = cursor->next()) {
+            const UUID uuid = _UUIDForKey(record->id);
+            const BSONObj data = record->data.releaseToBson();
+
+            ++numRecordsScanned;
+
+            StoredSizeCount& entry = _metadata[uuid];
+            entry.sizeCount.count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
+            entry.sizeCount.size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
+            entry.validAsOf = data.getField(kValidAsOfKey).timestamp();
+        }
+
+        LOGV2(
+            11648801,
+            "ReplicatedFastCountManager persisted collection size/count information read complete",
+            "numRecordsScanned"_attr = numRecordsScanned,
+            "duration"_attr = Date_t::now() - loadStartTime);
     }
-
-    const auto startTime = Date_t::now();
-
-    const int numRecordsScanned = _hydrateMetadataFromDisk(opCtx, *acquisition);
 
     // Seed the in-memory checkpoint timestamp from disk so the `oplog_lag_secs` gauge has a real
     // baseline on warm restart. Without this, the gauge would stay at 0 until the first post-boot
@@ -170,10 +176,33 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
         recordCheckpointAdvanced(*persistedCheckpoint);
     }
 
-    LOGV2(11648801,
-          "ReplicatedFastCountManager initialization complete",
-          "numRecordsScanned"_attr = numRecordsScanned,
-          "duration"_attr = Date_t::now() - startTime);
+    const Date_t oplogScanStartTime = Date_t::now();
+    const Timestamp seekAfterTimestamp = _timestampStore->read(opCtx).value_or(Timestamp::min());
+
+    // Scan the oplog from seekAfterTimestamp and accumulate size and count deltas for every UUID
+    // that has been updated since the last checkpoint.
+    const auto scanResult = [&]() -> OplogScanResult {
+        AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
+        const auto& oplogColl = oplogRead.getCollection();
+        massert(12554000, "oplog collection not found", oplogColl);
+
+        auto oplogCursor = oplogColl->getRecordStore()->getCursor(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        // We pass the oplog UUID here to include the oplog's own size and count in the aggregation.
+        return aggregateSizeCountDeltasInOplog(
+            *oplogCursor, seekAfterTimestamp, {}, /*isCheckpoint=*/false, oplogColl->uuid());
+    }();
+
+    for (const auto& [uuid, delta] : scanResult.deltas) {
+        _metadata[uuid].sizeCount.count += delta.sizeCount.count;
+        _metadata[uuid].sizeCount.size += delta.sizeCount.size;
+    }
+
+    LOGV2(12554001,
+          "ReplicatedFastCountManager oplog scan during initialization complete",
+          "seekAfterTimestamp"_attr = seekAfterTimestamp,
+          "metadataEntriesUpdated"_attr = scanResult.deltas.size(),
+          "duration"_attr = Date_t::now() - oplogScanStartTime);
 }
 
 void ReplicatedFastCountManager::commit(

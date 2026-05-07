@@ -87,7 +87,9 @@
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/replicated_fast_count/init_replicated_fast_count_oplog_entry_gen.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -273,14 +275,19 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
+    const size_t nRecords = records->size();
+    int64_t totalLength = 0;
+    for (size_t i = 0; i < nRecords; ++i) {
+        totalLength += (*records)[i].data.size();
+    }
+
+    if (isReplicatedFastCountEnabled(opCtx)) {
+        UncommittedFastCountChange::getForWrite(opCtx).record(
+            oplogCollection->ns(), oplogCollection->uuid(), nRecords, totalLength);
+    }
+
     if (auto truncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers()) {
         // records[nRecords - 1] is the record in the oplog with the highest recordId.
-        auto nRecords = records->size();
-        int64_t totalLength = 0;
-        for (size_t i = 0; i < nRecords; i++) {
-            auto& record = (*records)[i];
-            totalLength += record.data.size();
-        }
         auto wall = [&] {
             BSONObj obj = (*records)[nRecords - 1].data.toBson();
             BSONElement ele = obj[repl::DurableOplogEntry::kWallClockTimeFieldName];

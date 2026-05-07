@@ -136,8 +136,14 @@ public:
     void shutdown(OperationContext* opCtx);
 
     /**
-     * Initializes state for the ReplicatedFastCountManager. Populates in-memory _metadata values
-     * with those persisted on disk. Should be performed once per start-up.
+     * Initializes the in-memory collection size/count information stored in the
+     * ReplicatedFastCountManager.
+     *
+     * This function combines the persisted size/count for each collection with any additional
+     * size/count updates in the oplog since the last checkpoint.
+     *
+     * Should be called once per startup. If no replicated size/count store exists, this function
+     * does nothing.
      */
     void initializeMetadata(OperationContext* opCtx);
 
@@ -257,13 +263,6 @@ private:
                             const UUID& uuid,
                             const CollectionSizeCount& sizeCount,
                             const Timestamp& validAsOfTS);
-
-    /**
-     * Populates the in-memory values of _metadata with the values persisted in the internal fast
-     * count collection. Returns the number of records that were scanned.
-     */
-    int _hydrateMetadataFromDisk(OperationContext* opCtx,
-                                 const CollectionOrViewAcquisition& acquisition);
 
     /**
      * Formats and returns the document to write to the fastcount collection.
