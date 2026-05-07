@@ -19,12 +19,13 @@ const donorShardNames = reshardingTest.donorShardNames;
 
 const timeseriesInfo = {
     timeField: "ts",
-    metaField: "meta",
+    metaField: "metaTest",
 };
 
 const coll = reshardingTest.createShardedCollection({
     ns: ns,
-    shardKeyPattern: {"meta.x": 1},
+    // "metaTest.x" is the user-facing field; it will be translated internally to {"meta.x": 1}.
+    shardKeyPattern: {"metaTest.x": 1},
     chunks: [
         {min: {"meta.x": MinKey}, max: {"meta.x": 0}, shard: donorShardNames[0]},
         {min: {"meta.x": 0}, max: {"meta.x": MaxKey}, shard: donorShardNames[1]},
@@ -37,10 +38,10 @@ const coll = reshardingTest.createShardedCollection({
 // Insert some docs
 assert.commandWorked(
     coll.insert([
-        {data: 1, ts: new Date(), meta: {x: 1, y: -1}},
-        {data: 3, ts: new Date(), meta: {x: 2, y: -2}},
-        {data: 3, ts: new Date(), meta: {x: 4, y: -3}},
-        {data: 1, ts: new Date(), meta: {x: 5, y: -4}},
+        {data: 1, ts: new Date(), metaTest: {x: 1, y: -1}},
+        {data: 3, ts: new Date(), metaTest: {x: 2, y: -2}},
+        {data: 3, ts: new Date(), metaTest: {x: 4, y: -3}},
+        {data: 1, ts: new Date(), metaTest: {x: 5, y: -4}},
     ]),
 );
 

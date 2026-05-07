@@ -20,12 +20,13 @@ const recipientShardNames = reshardingTest.recipientShardNames;
 
 const timeseriesInfo = {
     timeField: "ts",
-    metaField: "meta",
+    metaField: "metaTest",
 };
 
 const coll = reshardingTest.createShardedCollection({
     ns: ns,
-    shardKeyPattern: {"meta.x": 1},
+    // "metaTest.x" is the user-facing field; it will be translated internally to {"meta.x": 1}.
+    shardKeyPattern: {"metaTest.x": 1},
     chunks: [
         {min: {"meta.x": MinKey}, max: {"meta.x": 0}, shard: donorShardNames[0]},
         {min: {"meta.x": 0}, max: {"meta.x": MaxKey}, shard: donorShardNames[1]},
@@ -46,12 +47,12 @@ assert.eq(timeseriesCollDoc.key, {"meta.x": 1});
 // Insert some docs
 assert.commandWorked(
     coll.insert([
-        {data: 1, ts: new Date(), meta: {x: -1, y: -1}},
-        {data: 6, ts: new Date(), meta: {x: -1, y: -1}},
-        {data: 3, ts: new Date(), meta: {x: -2, y: -2}},
-        {data: 3, ts: new Date(), meta: {x: 4, y: 3}},
-        {data: 9, ts: new Date(), meta: {x: 4, y: 3}},
-        {data: 1, ts: new Date(), meta: {x: 5, y: 4}},
+        {data: 1, ts: new Date(), metaTest: {x: -1, y: -1}},
+        {data: 6, ts: new Date(), metaTest: {x: -1, y: -1}},
+        {data: 3, ts: new Date(), metaTest: {x: -2, y: -2}},
+        {data: 3, ts: new Date(), metaTest: {x: 4, y: 3}},
+        {data: 9, ts: new Date(), metaTest: {x: 4, y: 3}},
+        {data: 1, ts: new Date(), metaTest: {x: 5, y: 4}},
     ]),
 );
 
@@ -87,7 +88,8 @@ assert.eq(6, coll.countDocuments({}));
 
 reshardingTest.withReshardingInBackground(
     {
-        newShardKeyPattern: {"meta.y": 1},
+        // "metaTest.y" is the user-facing field; it will be translated internally to {"meta.y": 1}.
+        newShardKeyPattern: {"metaTest.y": 1},
         newChunks: [
             {min: {"meta.y": MinKey}, max: {"meta.y": 0}, shard: recipientShardNames[0]},
             {min: {"meta.y": 0}, max: {"meta.y": MaxKey}, shard: recipientShardNames[1]},
@@ -97,8 +99,8 @@ reshardingTest.withReshardingInBackground(
         reshardingTest.awaitCloneTimestampChosen();
         assert.commandWorked(
             coll.insert([
-                {data: 14, ts: new Date(), meta: {x: -1, y: -1}},
-                {data: 9, ts: new Date(), meta: {x: 15, y: -9}},
+                {data: 14, ts: new Date(), metaTest: {x: -1, y: -1}},
+                {data: 9, ts: new Date(), metaTest: {x: 15, y: -9}},
             ]),
         );
     },

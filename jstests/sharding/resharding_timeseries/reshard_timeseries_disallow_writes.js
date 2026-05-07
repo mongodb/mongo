@@ -15,14 +15,15 @@ const ns = "test.foo";
 
 const timeseriesInfo = {
     timeField: "ts",
-    metaField: "meta",
+    metaField: "metaTest",
 };
 
 const donorShardNames = reshardingTest.donorShardNames;
 
 const coll = reshardingTest.createShardedCollection({
     ns: ns,
-    shardKeyPattern: {"meta.x": 1},
+    // "metaTest.x" is the user-facing field; it will be translated internally to {"meta.x": 1}.
+    shardKeyPattern: {"metaTest.x": 1},
     chunks: [
         {min: {"meta.x": MinKey}, max: {"meta.x": 0}, shard: donorShardNames[0]},
         {min: {"meta.x": 0}, max: {"meta.x": MaxKey}, shard: donorShardNames[1]},
@@ -33,13 +34,14 @@ const coll = reshardingTest.createShardedCollection({
 });
 const db = coll.getDB();
 
-assert.commandWorked(coll.insert({data: 1, ts: new Date(), meta: {x: -1, y: -1, z: 0}}));
+assert.commandWorked(coll.insert({data: 1, ts: new Date(), metaTest: {x: -1, y: -1, z: 0}}));
 assert.commandWorked(coll.createIndexes([{indexToDropDuringResharding: 1}, {indexToDropAfterResharding: 1}]));
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.withReshardingInBackground(
     {
-        newShardKeyPattern: {"meta.y": 1},
+        // "metaTest.y" is the user-facing field; it will be translated internally to {"meta.y": 1}.
+        newShardKeyPattern: {"metaTest.y": 1},
         newChunks: [
             {min: {"meta.y": MinKey}, max: {"meta.y": 0}, shard: recipientShardNames[0]},
             {min: {"meta.y": 0}, max: {"meta.y": MaxKey}, shard: recipientShardNames[1]},
@@ -51,7 +53,7 @@ reshardingTest.withReshardingInBackground(
             jsTestLog("Attempting insert");
             let res = coll.runCommand({
                 insert: coll.getName(),
-                documents: [{data: 3, ts: new Date(), meta: {x: -2, y: -2}}],
+                documents: [{data: 3, ts: new Date(), metaTest: {x: -2, y: -2}}],
                 maxTimeMS: 3000,
             });
             assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
@@ -67,7 +69,7 @@ reshardingTest.withReshardingInBackground(
             jsTestLog("Attempting update");
             res = coll.runCommand({
                 update: coll.getName(),
-                updates: [{q: {"meta.x": -1}, u: {$set: {"meta.x": -15}}, multi: true}],
+                updates: [{q: {"metaTest.x": -1}, u: {$set: {"metaTest.x": -15}}, multi: true}],
                 maxTimeMS: 3000,
             });
             assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
@@ -83,7 +85,7 @@ reshardingTest.withReshardingInBackground(
             jsTestLog("Attempting delete");
             res = coll.runCommand({
                 delete: coll.getName(),
-                deletes: [{q: {"meta.x": -1}, limit: 1}],
+                deletes: [{q: {"metaTest.x": -1}, limit: 1}],
                 maxTimeMS: 3000,
             });
             assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
@@ -99,7 +101,7 @@ reshardingTest.withReshardingInBackground(
             jsTestLog("Attempting createIndex");
             res = coll.runCommand({
                 createIndexes: coll.getName(),
-                indexes: [{key: {"meta.z": 1}, name: "metaz_0"}],
+                indexes: [{key: {"metaTest.z": 1}, name: "metatestz_0"}],
                 maxTimeMS: 3000,
             });
             assert(ErrorCodes.isExceededTimeLimitError(res.code));
@@ -154,20 +156,20 @@ reshardingTest.withReshardingInBackground(
 jsTestLog("Verify that writes succeed after resharding operation has completed");
 
 assert.commandWorked(
-    coll.runCommand({insert: coll.getName(), documents: [{data: 3, ts: new Date(), meta: {x: -2, y: -2}}]}),
+    coll.runCommand({insert: coll.getName(), documents: [{data: 3, ts: new Date(), metaTest: {x: -2, y: -2}}]}),
 );
 
 assert.commandWorked(
     coll.runCommand({
         update: coll.getName(),
-        updates: [{q: {"meta.x": -1}, u: {$set: {"meta.x": -15}}, multi: true}],
+        updates: [{q: {"metaTest.x": -1}, u: {$set: {"metaTest.x": -15}}, multi: true}],
     }),
 );
 
-assert.commandWorked(coll.runCommand({delete: coll.getName(), deletes: [{q: {"meta.x": -1}, limit: 1}]}));
+assert.commandWorked(coll.runCommand({delete: coll.getName(), deletes: [{q: {"metaTest.x": -1}, limit: 1}]}));
 
 assert.commandWorked(
-    coll.runCommand({createIndexes: coll.getName(), indexes: [{key: {"meta.z": 1}, name: "metaz_0"}]}),
+    coll.runCommand({createIndexes: coll.getName(), indexes: [{key: {"metaTest.z": 1}, name: "metatestz_0"}]}),
 );
 
 assert.commandWorked(coll.runCommand({collMod: coll.getName()}));
