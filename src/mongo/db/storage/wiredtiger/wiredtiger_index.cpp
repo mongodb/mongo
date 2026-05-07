@@ -319,12 +319,12 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndex::insert(
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
     auto& pp = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-    // The _id index is excluded from blind writes: its duplicate-key detection depends on
-    // WT returning WT_DUPLICATE_KEY, which only happens with overwrite=false.
-    const bool allowOverwrite = !isIdIndex() &&
-        chooseBlindWriteOverwrite(/*defaultOverwrite=*/false,
-                                  pp.shouldUseBlindWriteWhenSafe(opCtx),
-                                  opCtx->getClient()->getPrng());
+    // On a standby the primary already validated uniqueness, so all indexes including _id can use
+    // blind writes to skip the stable-table lookup. Primaries always do non-blind writes for all
+    // indexes.
+    const bool allowOverwrite = chooseBlindWriteOverwrite(/*defaultOverwrite=*/false,
+                                                          pp.shouldUseBlindWriteWhenSafe(opCtx),
+                                                          opCtx->getClient()->getPrng());
     auto cursorParams = getWiredTigerCursorParams(wtRu, _container.tableId(), allowOverwrite);
     WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
     wtRu.assertInActiveTxn();
@@ -343,12 +343,12 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
     auto& pp = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-    // The _id index is excluded from blind writes: its duplicate-key detection depends on
-    // WT returning WT_DUPLICATE_KEY, which only happens with overwrite=false.
-    const bool allowOverwrite = !isIdIndex() &&
-        chooseBlindWriteOverwrite(/*defaultOverwrite=*/false,
-                                  pp.shouldUseBlindWriteWhenSafe(opCtx),
-                                  opCtx->getClient()->getPrng());
+    // On a standby the primary already validated uniqueness, so all indexes including _id can use
+    // blind writes to skip the stable-table lookup. Primaries always do non-blind writes for all
+    // indexes.
+    const bool allowOverwrite = chooseBlindWriteOverwrite(/*defaultOverwrite=*/false,
+                                                          pp.shouldUseBlindWriteWhenSafe(opCtx),
+                                                          opCtx->getClient()->getPrng());
     auto cursorParams = getWiredTigerCursorParams(wtRu, _container.tableId(), allowOverwrite);
     WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
     wtRu.assertInActiveTxn();
