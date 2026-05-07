@@ -869,7 +869,6 @@ public:
         WindowBounds bounds = WindowBounds::defaultBounds();
         boost::intrusive_ptr<::mongo::Expression> input;
 
-        std::vector<std::pair<std::string, boost::intrusive_ptr<mongo::Expression>>> linearFillVec;
         bool windowFieldMissing = true;
         for (const auto& arg : obj) {
             auto argName = arg.fieldNameStringData();
