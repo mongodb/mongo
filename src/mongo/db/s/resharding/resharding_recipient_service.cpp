@@ -139,8 +139,6 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeEnteringStrictConsistency)
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeTransitionToCreateCollection);
 MONGO_FAIL_POINT_DEFINE(reshardingRecipientFailInPhase);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeCleanup);
-MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeInitCancelState);
-MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientAfterInitCancelState);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientInAbortBeforePromiseSet);
 MONGO_FAIL_POINT_DEFINE(reshardingSkipWriteStrictConsistencyOplog);
 
@@ -190,6 +188,14 @@ bool inPotentialAbortScenario(const RecipientStateEnum& state) {
     // state kDone. Additionally, if the recipient is in state kError, it is guaranteed that the
     // coordinator will eventually begin the abort process.
     return state == RecipientStateEnum::kError || state == RecipientStateEnum::kDone;
+}
+
+auto makeCancelState(const RecipientShardContext& recipientCtx) {
+    primary_only_service_helpers::CancelState cancelState;
+    if (recipientCtx.getState() == RecipientStateEnum::kDone && recipientCtx.getAbortReason()) {
+        cancelState.abort();
+    }
+    return cancelState;
 }
 
 using resharding_metrics::getIntervalEndFieldName;
@@ -342,6 +348,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _startConfigTxnCloneAt{recipientDoc.getStartConfigTxnCloneTime()},
       _markKilledExecutor{resharding::makeThreadPoolForMarkKilledExecutor(
           "RecipientStateMachineCancelableOpCtxPool")},
+      _cancelState(makeCancelState(_recipientCtx)),
       _critSecReason(BSON("command"
                           << "resharding_recipient"
                           << "collection"
@@ -446,9 +453,9 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                   "Recipient _runUntilStrictConsistencyOrErrored encountered unrecoverable error",
                   "error"_attr = redact(status));
         })
-        .runOn(**executor, _cancelState->getAbortOrStepdownToken())
+        .runOn(**executor, _cancelState.getAbortOrStepdownToken())
         .onError([this, executor](Status status) {
-            if (_cancelState->isAbortedOrSteppingDown()) {
+            if (_cancelState.isAbortedOrSteppingDown()) {
                 return ExecutorFuture<void>(**executor, status);
             }
 
@@ -488,10 +495,10 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                           "error while transitioning to state kError",
                           "error"_attr = redact(status));
                 })
-                .runOn(**executor, _cancelState->getAbortOrStepdownToken());
+                .runOn(**executor, _cancelState.getAbortOrStepdownToken());
         })
         .onCompletion([this, executor](Status status) {
-            if (_cancelState->isAbortedOrSteppingDown()) {
+            if (_cancelState.isAbortedOrSteppingDown()) {
                 return ExecutorFuture<void>(**executor, status);
             }
 
@@ -533,10 +540,10 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
                   "coordinator's decision",
                   "error"_attr = redact(status));
         })
-        .runOn(**executor, _cancelState->getAbortOrStepdownToken())
+        .runOn(**executor, _cancelState.getAbortOrStepdownToken())
         .then([this] {
             return future_util::withCancellation(_coordinatorHasDecisionPersisted.getFuture(),
-                                                 _cancelState->getAbortOrStepdownToken());
+                                                 _cancelState.getAbortOrStepdownToken());
         });
 }
 
@@ -546,10 +553,10 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
         ->withAutomaticRetry([this, executor](auto factory) {
             return ExecutorFuture<void>(**executor)
                 .then([this, executor, factory] {
-                    if (_cancelState->isAbortedOrSteppingDown()) {
+                    if (_cancelState.isAbortedOrSteppingDown()) {
                         return future_util::withCancellation(
                                    _dataReplicationQuiesced.thenRunOn(**executor),
-                                   _cancelState->getStepdownToken())
+                                   _cancelState.getStepdownToken())
                             .thenRunOn(**executor)
                             .onError([](Status status) {
                                 // Wait for all of the data replication components to halt. We
@@ -570,7 +577,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                     // It is safe to drop the oplog collections once either (1) the
                     // collection is renamed or (2) the operation is aborting.
                     invariant(_recipientCtx.getState() >= RecipientStateEnum::kStrictConsistency ||
-                              _cancelState->isAbortedOrSteppingDown());
+                              _cancelState.isAbortedOrSteppingDown());
                     _cleanupReshardingCollections(factory);
                 })
                 .then([this, factory] {
@@ -613,7 +620,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                   "error"_attr = redact(status));
         })
         .onUnrecoverableError([](const Status& status) {})
-        .runOn(**executor, _cancelState->getStepdownToken());
+        .runOn(**executor, _cancelState.getStepdownToken());
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMandatoryCleanup(
@@ -648,7 +655,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
                 // If the stepdownToken was triggered, it takes priority in order to make sure that
                 // the promise is set with an error that the coordinator can retry with. If it ran
                 // into an unrecoverable error, it would have fasserted earlier.
-                auto statusForPromise = _cancelState->isSteppingDown()
+                auto statusForPromise = _cancelState.isSteppingDown()
                     ? Status{ErrorCodes::InterruptedDueToReplStateChange,
                              "Resharding operation recipient state machine interrupted due to "
                              "replica set stepdown"}
@@ -675,15 +682,15 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
         : otel::traces::Span::createTelemetryContext();
     auto span = _startSpan(telemetryCtx, "ReshardingRecipientService::run");
 
-    _initCancelState(stepdownToken);
+    _cancelState.attachStepdownToken(stepdownToken);
     _markKilledExecutor->startup();
     _retryingCancelableOpCtxFactory.emplace(
-        _cancelState->getAbortOrStepdownToken(),
+        _cancelState.getAbortOrStepdownToken(),
         _markKilledExecutor,
         resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern);
 
     _finishOperationFactory.emplace(
-        _cancelState->getStepdownToken(),
+        _cancelState.getStepdownToken(),
         _markKilledExecutor,
         resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern);
 
@@ -702,15 +709,15 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
         .onCompletion(
             [this, executor, telemetryCtx = telemetryCtx->clone()](Status status) mutable {
                 _retryingCancelableOpCtxFactory.emplace(
-                    _cancelState->getAbortOrStepdownToken(),
+                    _cancelState.getAbortOrStepdownToken(),
                     _markKilledExecutor,
                     resharding::kRetryabilityPredicateIncludeLockTimeoutAndWriteConcern);
-                if (_cancelState->isSteppingDown()) {
+                if (_cancelState.isSteppingDown()) {
                     // Propagate any errors from the recipient stepping down.
                     return ExecutorFuture<void>(**executor, status);
                 }
 
-                if (!status.isOK() && !_cancelState->isAbortedOrSteppingDown()) {
+                if (!status.isOK() && !_cancelState.isAbortedOrSteppingDown()) {
                     // Propagate any errors from the recipient failing to notify the coordinator.
                     return ExecutorFuture<void>(**executor, status);
                 }
@@ -719,7 +726,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
             })
         .then([this, executor]() { return _finishReshardingOperation(executor); })
         .onError([this](Status status) {
-            if (_cancelState->isSteppingDown()) {
+            if (_cancelState.isSteppingDown()) {
                 // The operation will continue on a new RecipientStateMachine.
                 return status;
             }
@@ -748,6 +755,7 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
     if (_dataReplication) {
         _dataReplication->shutdown();
     }
+    ensureFulfilledPromise(lk, _completionPromise, status);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::prepareForCriticalSection() {
@@ -836,7 +844,6 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
 void ReshardingRecipientService::RecipientStateMachine::onCoordinatorStateAdvanced(
     CoordinatorStateEnum newState, boost::optional<CloneDetails> cloneDetails) {
     std::lock_guard<std::mutex> lk(_mutex);
-    _assertRecipientInitialized(lk);
     _onCoordinatorStateAdvanced(lk, newState, std::move(cloneDetails));
 }
 
@@ -864,9 +871,8 @@ void ReshardingRecipientService::RecipientStateMachine::_onCoordinatorStateAdvan
 SemiFuture<void>
 ReshardingRecipientService::RecipientStateMachine::awaitTransitionedToCreateCollection() {
     std::lock_guard<std::mutex> lk(_mutex);
-    _assertRecipientInitialized(lk);
     return future_util::withCancellation(_transitionedToCreateCollection.getFuture(),
-                                         _cancelState->getAbortOrStepdownToken());
+                                         _cancelState.getAbortOrStepdownToken());
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
@@ -884,7 +890,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     }
 
     return future_util::withCancellation(_allDonorsPreparedToDonate.getFuture(),
-                                         _cancelState->getAbortOrStepdownToken())
+                                         _cancelState.getAbortOrStepdownToken())
         .thenRunOn(**executor)
         .then([this, executor, factory](
                   ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails) {
@@ -901,7 +907,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                                                   cloneDetails.approxBytesToCopy);
         })
         .then([this, factory] {
-            return resharding::waitForMajority(_cancelState->getAbortOrStepdownToken(), *factory);
+            return resharding::waitForMajority(_cancelState.getAbortOrStepdownToken(), *factory);
         })
         .thenRunOn(**executor)
         .then([this] {
@@ -1044,7 +1050,7 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
             dataReplication
                 ->runUntilStrictlyConsistent(**executor,
                                              _recipientService->getInstanceCleanupExecutor(),
-                                             _cancelState->getAbortOrStepdownToken(),
+                                             _cancelState.getAbortOrStepdownToken(),
                                              factory,
                                              txnCloneTime.value())
                 .share();
@@ -1114,7 +1120,7 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
         _changeStreamsMonitor
             ->startMonitoring(**executor,
                               _recipientService->getInstanceCleanupExecutor(),
-                              _cancelState->getAbortOrStepdownToken(),
+                              _cancelState.getAbortOrStepdownToken(),
                               factory)
             .share();
     _metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
@@ -1134,7 +1140,7 @@ ReshardingRecipientService::RecipientStateMachine::_awaitChangeStreamsMonitorCom
 
     invariant(_changeStreamsMonitor);
     return future_util::withCancellation(_changeStreamsMonitor->awaitFinalChangeEvent(),
-                                         _cancelState->getAbortOrStepdownToken())
+                                         _cancelState.getAbortOrStepdownToken())
         .thenRunOn(**executor)
         .onCompletion([this](Status status) {
             std::lock_guard<std::mutex> lk(_mutex);
@@ -1201,7 +1207,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToBuildin
             return SemiFuture<void>();
         }
         return future_util::withCancellation(_dataReplication->awaitCloningDone(),
-                                             _cancelState->getAbortOrStepdownToken());
+                                             _cancelState.getAbortOrStepdownToken());
     }();
 
     return std::move(cloningFuture).thenRunOn(**executor).then([this, factory] {
@@ -1302,10 +1308,10 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                 return future_util::withCancellation(
                            resharding::waitForReplicationOnVotingMembers(
                                **executor,
-                               _cancelState->getAbortOrStepdownToken(),
+                               _cancelState.getAbortOrStepdownToken(),
                                factory,
                                getMaxReplicationLagSecondsBeforeBuildingIndexes),
-                           _cancelState->getAbortOrStepdownToken())
+                           _cancelState.getAbortOrStepdownToken())
                     .thenRunOn(**executor)
                     .then([indexSpecs] { return indexSpecs; });
             }
@@ -1377,7 +1383,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                return uassertStatusOK(indexBuildFuture);
                            }
                        }(),
-                       _cancelState->getAbortOrStepdownToken())
+                       _cancelState.getAbortOrStepdownToken())
                 .thenRunOn(**executor)
                 .then([this, factory](const ReplIndexBuildState::IndexCatalogStats& stats) {
                     if (auto opCtx = _makeOperationContext(factory);
@@ -1416,7 +1422,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                 });
         })
         .onCompletion([this, executor](Status status) {
-            if (_cancelState->isAbortedOrSteppingDown()) {
+            if (_cancelState.isAbortedOrSteppingDown()) {
                 return ExecutorFuture<void>(**executor, status);
             }
 
@@ -1467,7 +1473,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                 reshardingPauseRecipientBeforeWaitingForCriticalSection.pauseWhileSet();
                 return future_util::withCancellation(
                     _coordinatorHasEngagedCriticalSection.getFuture(),
-                    _cancelState->getAbortOrStepdownToken());
+                    _cancelState.getAbortOrStepdownToken());
             }
 
             {
@@ -1475,7 +1481,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                 reshardingPauseRecipientDuringOplogApplication.pauseWhileSet(opCtx.get());
             }
             return future_util::withCancellation(_dataReplication->awaitStrictlyConsistent(),
-                                                 _cancelState->getAbortOrStepdownToken());
+                                                 _cancelState.getAbortOrStepdownToken());
         })
         .then([this, factory] {
             if (_skipCloningAndApplying) {
@@ -1569,7 +1575,7 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
     resharding::data_copy::ensureOplogCollectionsDropped(
         opCtx.get(), _metadata.getReshardingUUID(), _metadata.getSourceUUID(), _donorShards);
 
-    if (_cancelState->isAbortedOrSteppingDown() && !_cancelState->isSteppingDown()) {
+    if (_cancelState.isAbortedOrSteppingDown() && !_cancelState.isSteppingDown()) {
         {
             // We need to do this even though the feature flag is not on because the resharding can
             // be aborted by setFCV downgrade, when the FCV is already in downgrading and the
@@ -1690,7 +1696,7 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToDone(
     std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kDone);
-    if (_cancelState->isAbortedOrSteppingDown() && !_cancelState->isSteppingDown()) {
+    if (_cancelState.isAbortedOrSteppingDown() && !_cancelState.isSteppingDown()) {
         resharding::emplaceTruncatedAbortReasonIfExists(newRecipientCtx,
                                                         resharding::kCoordinatorAbortedError);
     }
@@ -1993,7 +1999,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_restore
                   "Unrecoverable error while restoring metrics",
                   "error"_attr = redact(status));
         })
-        .runOn(**executor, _cancelState->getAbortOrStepdownToken());
+        .runOn(**executor, _cancelState.getAbortOrStepdownToken());
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
@@ -2184,33 +2190,6 @@ void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
     _metrics->updateRecipientCtx(_recipientCtx);
 }
 
-void ReshardingRecipientService::RecipientStateMachine::_initCancelState(
-    const CancellationToken& stepdownToken) {
-    reshardingPauseRecipientBeforeInitCancelState.pauseWhileSet();
-    {
-        std::lock_guard<std::mutex> lk(_mutex);
-        _cancelState = std::make_unique<primary_only_service_helpers::CancelState>(stepdownToken);
-    }
-
-    if (_recipientCtx.getState() == RecipientStateEnum::kDone && _recipientCtx.getAbortReason()) {
-        // A recipient in state kDone with an abortReason is indication that the coordinator
-        // has persisted the decision and called abort on all participants. Abort the
-        // _cancelState to avoid repeating the future chain.
-        _cancelState->abort();
-    }
-
-    if (auto future = _coordinatorHasDecisionPersisted.getFuture(); future.isReady()) {
-        if (auto status = future.getNoThrow(); !status.isOK()) {
-            // An abort was signaled (via _coordinatorHasDecisionPersisted error)
-            // before _cancelState was initialized. Now that _cancelState exists, abort it to
-            // ensure the abortToken reflects the true state and any future chains are canceled.
-            _cancelState->abort();
-        }
-    }
-
-    reshardingPauseRecipientAfterInitCancelState.pauseWhileSet();
-}
-
 void ReshardingRecipientService::RecipientStateMachine::_tryFetchBuildIndexMetrics(
     OperationContext* opCtx) {
     try {
@@ -2304,38 +2283,24 @@ ReshardingRecipientService::RecipientStateMachine::_tryFetchCloningMetrics(
 }
 
 void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancelled) {
-    auto cancelStateInitialized = [&] {
+    {
         std::lock_guard<std::mutex> lk(_mutex);
         _userCanceled.emplace(isUserCancelled);
         if (_dataReplication) {
             _dataReplication->shutdown();
         }
-
-        return _cancelState != nullptr;
-    }();
-
-    if (cancelStateInitialized) {
-        _cancelState->abort();
     }
+
+    _cancelState.abort();
 
     reshardingPauseRecipientInAbortBeforePromiseSet.pauseWhileSet();
 
-    bool cancelAfterSettingPromise = false;
     {
         std::lock_guard<std::mutex> lk(_mutex);
         ensureFulfilledPromise(
             lk, _coordinatorHasEngagedCriticalSection, resharding::kCoordinatorAbortedError);
         ensureFulfilledPromise(
             lk, _coordinatorHasDecisionPersisted, resharding::kCoordinatorAbortedError);
-
-        // If _cancelState is initialized between our initial read and setting the
-        // promises, we may miss aborting it. Re-check _cancelState here.
-        if (!cancelStateInitialized && _cancelState != nullptr) {
-            cancelAfterSettingPromise = true;
-        }
-    }
-    if (cancelAfterSettingPromise) {
-        _cancelState->abort();
     }
 }
 
@@ -2383,13 +2348,6 @@ otel::traces::Span ReshardingRecipientService::RecipientStateMachine::_startSpan
     auto span = otel::traces::Span::start(telemetryCtx, spanName, keepSpan);
     TRACING_SPAN_ATTR(span, "reshardingUUID", _metadata.getReshardingUUID().toString());
     return span;
-}
-
-void ReshardingRecipientService::RecipientStateMachine::_assertRecipientInitialized(
-    WithLock) const {
-    uassert(ErrorCodes::PrimaryOnlyServiceInitializing,
-            "Recipient is still undergoing initialization",
-            _cancelState != nullptr);
 }
 
 }  // namespace mongo

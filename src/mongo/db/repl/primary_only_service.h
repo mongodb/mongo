@@ -78,6 +78,7 @@ namespace repl {
 extern FailPoint PrimaryOnlyServiceHangBeforeRebuildingInstances;
 extern FailPoint PrimaryOnlyServiceFailRebuildingInstances;
 extern FailPoint PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic;
+extern FailPoint PrimaryOnlyServiceHangBeforeRunningInstance;
 
 /**
  * A PrimaryOnlyService is a group of tasks (represented in memory as Instances) that should only

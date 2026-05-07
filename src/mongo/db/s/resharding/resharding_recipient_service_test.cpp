@@ -1762,13 +1762,6 @@ TEST_F(ReshardingRecipientServiceTest, ReportForCurrentOpAfterCompletion) {
         ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
                   ErrorCodes::InterruptedDueToReplStateChange);
 
-        // TODO (SERVER-115139): Remove this failpoint after making the recipient able to reliably
-        // handle the case where abort request comes in before the cancellation source is
-        // initialized.
-        auto initCancelStateFp =
-            globalFailPointRegistry().find("reshardingPauseRecipientAfterInitCancelState");
-        auto initCancelStateFpTimesEntered = initCancelStateFp->setMode(FailPoint::alwaysOn);
-
         // Now call step up. The old recipient object has not yet been destroyed because we
         // still hold a shared pointer to it ('recipient') - this can happen in production after
         // a failover if a state machine is slow to clean up.
@@ -1788,9 +1781,6 @@ TEST_F(ReshardingRecipientServiceTest, ReportForCurrentOpAfterCompletion) {
         ASSERT_FALSE(isPausedOrShutdown);
         auto newRecipient = *maybeRecipient;
         ASSERT_NE(recipient, newRecipient);
-
-        initCancelStateFp->waitForTimesEntered(initCancelStateFpTimesEntered + 1);
-        initCancelStateFp->setMode(FailPoint::off);
 
         // No need to finish the resharding op, so we just cancel the op.
         newRecipient->abort(false);
@@ -1988,13 +1978,6 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
         ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
                   ErrorCodes::InterruptedDueToReplStateChange);
 
-        // TODO (SERVER-115139): Remove this failpoint after making the recipient able to reliably
-        // handle the case where abort request comes in before the cancellation source is
-        // initialized.
-        auto initCancelStateFp =
-            globalFailPointRegistry().find("reshardingPauseRecipientAfterInitCancelState");
-        auto initCancelStateFpTimesEntered = initCancelStateFp->setMode(FailPoint::alwaysOn);
-
         recipient.reset();
         stepUp(opCtx.get());
 
@@ -2003,10 +1986,6 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
         ASSERT_TRUE(maybeRecipient);
         ASSERT_FALSE(isPausedOrShutdown);
         recipient = *maybeRecipient;
-
-        initCancelStateFp->waitForTimesEntered(initCancelStateFpTimesEntered + 1);
-        initCancelStateFp->setMode(FailPoint::off);
-
         recipient->abort(false);
 
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
@@ -2038,94 +2017,6 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
                                   MODE_IS);
             ASSERT_FALSE(coll.exists());
         }
-    }
-}
-
-TEST_F(ReshardingRecipientServiceTest, AbortRacesWithInitCancelStateOnStepUp) {
-    auto fpBeforeInit =
-        globalFailPointRegistry().find("reshardingPauseRecipientBeforeInitCancelState");
-    auto fpAfterInit =
-        globalFailPointRegistry().find("reshardingPauseRecipientAfterInitCancelState");
-    auto fpInAbort =
-        globalFailPointRegistry().find("reshardingPauseRecipientInAbortBeforePromiseSet");
-
-    for (const auto& testOptions : makeBasicTestOptions()) {
-        setupFeatureFlags(testOptions);
-
-        LOGV2(11513901,
-              "Running case",
-              "test"_attr = unittest::getTestName(),
-              "testOptions"_attr = testOptions);
-
-        // Drive instance 1 to kCreatingCollection and pause there before stepDown(),
-        // matching the synchronization pattern from StepDownStepUpEachTransition. Calling
-        // stepDown() directly after getOrCreate races with run() scheduling and the
-        // completion future does not resolve.
-        PauseDuringStateTransitions creatingCollectionGuard{
-            controller(), RecipientStateEnum::kCreatingCollection};
-        auto doc = makeRecipientDocument(testOptions);
-        auto instanceId =
-            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
-
-        auto opCtx = makeOperationContext();
-        if (testOptions.isAlsoDonor) {
-            createSourceCollection(opCtx.get(), doc);
-        }
-
-        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
-        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
-
-        notifyToStartCloning(opCtx.get(), *recipient, doc);
-        creatingCollectionGuard.wait(RecipientStateEnum::kCreatingCollection);
-        stepDown();
-        creatingCollectionGuard.unset(RecipientStateEnum::kCreatingCollection);
-        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
-                  ErrorCodes::InterruptedDueToReplStateChange);
-        recipient.reset();
-
-        // Arm failpoints before stepUp so instance 2's run() pauses at the start of
-        // _initCancelState the moment it is scheduled.
-        auto fpBeforeBaseline = fpBeforeInit->setMode(FailPoint::alwaysOn);
-        auto fpAfterBaseline = fpAfterInit->setMode(FailPoint::alwaysOn);
-        auto fpAbortBaseline = fpInAbort->setMode(FailPoint::alwaysOn);
-
-        stepUp(opCtx.get());
-
-        auto [maybeRecipient, isPausedOrShutdown] =
-            RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
-        ASSERT_TRUE(maybeRecipient);
-        ASSERT_FALSE(isPausedOrShutdown);
-        recipient = *maybeRecipient;
-
-        // Instance 2's run() paused at the start of _initCancelState; _cancelState is null.
-        fpBeforeInit->waitForTimesEntered(fpBeforeBaseline + 1);
-
-        // abort() will observe _cancelState == nullptr, skip the fast-path cancel, and
-        // pause before setting the coordinator promises.
-        stdx::thread abortThread([&] { recipient->abort(false); });
-        ON_BLOCK_EXIT([&] {
-            if (abortThread.joinable()) {
-                abortThread.join();
-            }
-        });
-        fpInAbort->waitForTimesEntered(fpAbortBaseline + 1);
-
-        // Let _initCancelState publish _cancelState. Its isReady() safety-net check sees
-        // the promise is not yet set (abort is paused), so it skips the safety-net cancel.
-        fpBeforeInit->setMode(FailPoint::off);
-        fpAfterInit->waitForTimesEntered(fpAfterBaseline + 1);
-
-        // Release abort() and let it finish its late cancel.
-        fpInAbort->setMode(FailPoint::off);
-        abortThread.join();
-
-        fpAfterInit->setMode(FailPoint::off);
-
-        // The recipient must complete the abort path even though abort() and
-        // _initCancelState raced; a regression would leave _cancelState uncanceled and
-        // hang here.
-        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
-        checkRecipientDocumentRemoved(opCtx.get());
     }
 }
 
@@ -3018,19 +2909,8 @@ TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordi
             createSourceCollection(opCtx.get(), doc);
         }
 
-        // TODO (SERVER-115139): Remove this failpoint after making the recipient able to reliably
-        // handle the case where abort request comes in before the cancellation source is
-        // initialized.
-        auto initCancelStateFp =
-            globalFailPointRegistry().find("reshardingPauseRecipientAfterInitCancelState");
-        auto initCancelStateFpTimesEntered = initCancelStateFp->setMode(FailPoint::alwaysOn);
-
         RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
         auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
-
-        initCancelStateFp->waitForTimesEntered(initCancelStateFpTimesEntered + 1);
-        initCancelStateFp->setMode(FailPoint::off);
-
         recipient->abort(false);
         removeRecipientDocFailpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
 
@@ -3098,13 +2978,6 @@ TEST_F(ReshardingRecipientServiceTest, FailoverDuringErrorState) {
                   ErrorCodes::InterruptedDueToReplStateChange);
         recipient.reset();
 
-        // TODO (SERVER-115139): Remove this failpoint after making the recipient able to reliably
-        // handle the case where abort request comes in before the cancellation source is
-        // initialized.
-        auto initCancelStateFp =
-            globalFailPointRegistry().find("reshardingPauseRecipientAfterInitCancelState");
-        auto initCancelStateFpTimesEntered = initCancelStateFp->setMode(FailPoint::alwaysOn);
-
         stepUp(opCtx.get());
 
         auto [maybeRecipient, isPausedOrShutdown] =
@@ -3121,10 +2994,6 @@ TEST_F(ReshardingRecipientServiceTest, FailoverDuringErrorState) {
         }
 
         recipient->abort(false);
-
-        initCancelStateFp->waitForTimesEntered(initCancelStateFpTimesEntered + 1);
-        initCancelStateFp->setMode(FailPoint::off);
-
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
     }
 }
@@ -3461,38 +3330,6 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringApplying) {
     }
 }
 
-TEST_F(ReshardingRecipientServiceTest, OnCoordinatorStateAdvancedThrowsWhenUninitialized) {
-    auto fpBeforeInit =
-        globalFailPointRegistry().find("reshardingPauseRecipientBeforeInitCancelState");
-
-    auto testOptions = makeBasicTestOptions().front();
-    setupFeatureFlags(testOptions);
-
-    auto fpBaseline = fpBeforeInit->setMode(FailPoint::alwaysOn);
-
-    auto doc = makeRecipientDocument(testOptions);
-    auto opCtx = makeOperationContext();
-    if (testOptions.isAlsoDonor) {
-        createSourceCollection(opCtx.get(), doc);
-    }
-    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
-    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
-
-    fpBeforeInit->waitForTimesEntered(fpBaseline + 1);
-
-    ASSERT_THROWS_CODE(
-        recipient->onCoordinatorStateAdvanced(
-            CoordinatorStateEnum::kCloning,
-            RecipientStateMachine::CloneDetails{Timestamp(10, 0), 0, 0, doc.getDonorShards()}),
-        DBException,
-        ErrorCodes::PrimaryOnlyServiceInitializing);
-
-    // Cleanup.
-    fpBeforeInit->setMode(FailPoint::off);
-    stepDown();
-    ASSERT_NOT_OK(recipient->getCompletionFuture().getNoThrow());
-}
-
 TEST_F(ReshardingRecipientServiceTest,
        OnCoordinatorStateAdvancedSkipsAllDonorsPreparedWithoutCloneDetails) {
     auto testOptions = makeBasicTestOptions().front();
@@ -3525,6 +3362,27 @@ TEST_F(ReshardingRecipientServiceTest,
     // Cleanup.
     stepDown();
     ASSERT_NOT_OK(recipient->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientServiceTest, StepDownBeforeRunFulfillsCompletionPromise) {
+    auto testOptions = makeBasicTestOptions().front();
+    setupFeatureFlags(testOptions);
+
+    auto& fp = repl::PrimaryOnlyServiceHangBeforeRunningInstance;
+    auto timesEntered = fp.setMode(FailPoint::alwaysOn);
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    fp.waitForTimesEntered(timesEntered + 1);
+    stepDown();
+
+    ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+              ErrorCodes::InterruptedDueToReplStateChange);
+
+    fp.setMode(FailPoint::off);
 }
 
 }  // namespace

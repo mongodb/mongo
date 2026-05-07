@@ -440,11 +440,6 @@ private:
 
     void _updateContextMetrics(OperationContext* opCtx);
 
-    // Initializes the _cancelState. Note: Should only be called once per lifetime.
-    void _initCancelState(const CancellationToken& stepdownToken);
-
-    void _assertRecipientInitialized(WithLock) const;
-
     // Get indexesToBuild and indexesBuilt from the index catalog, then save them in _metrics
     void _tryFetchBuildIndexMetrics(OperationContext* opCtx);
 
@@ -523,9 +518,8 @@ private:
     // Protects the state below
     mutable std::mutex _mutex;
 
-    // Manages abort state and provides cancellation tokens for async operations. Initialized in
-    // _initCancelState().
-    std::unique_ptr<primary_only_service_helpers::CancelState> _cancelState;
+    // Manages abort state and provides cancellation tokens for async operations.
+    primary_only_service_helpers::CancelState _cancelState;
 
     std::unique_ptr<ReshardingDataReplicationInterface> _dataReplication;
     std::shared_ptr<ReshardingChangeStreamsMonitor> _changeStreamsMonitor;

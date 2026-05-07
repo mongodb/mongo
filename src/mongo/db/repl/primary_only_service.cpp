@@ -83,6 +83,7 @@ MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceSkipRebuildingInstances);
 MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceHangBeforeRebuildingInstances);
 MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceFailRebuildingInstances);
 MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic);
+MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceHangBeforeRunningInstance);
 
 namespace {
 const auto _registryDecoration = ServiceContext::declareDecoration<PrimaryOnlyServiceRegistry>();
@@ -850,6 +851,7 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::_insertNewInst
                             "service"_attr = serviceName,
                             "instanceID"_attr = instanceID);
 
+                PrimaryOnlyServiceHangBeforeRunningInstance.pauseWhileSet();
                 return instance->run(std::move(scopedExecutor), token);
             })
             // TODO SERVER-61717 remove this error handler once instance are automatically released
