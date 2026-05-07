@@ -2069,6 +2069,14 @@ def _impl(ctx):
         enabled = True,
     )
 
+    # Marker feature for Mongo's Linux toolchain. The compiledb aspect uses
+    # this to fail loudly if future toolchain upgrades start enabling
+    # module-map-driven features that require extra compile variables.
+    mongo_linux_toolchain_marker_feature = feature(
+        name = "mongo_linux_toolchain_marker",
+        enabled = True,
+    )
+
     features = [
         enable_all_warnings_feature,
         general_clang_or_gcc_warnings_feature,
@@ -2159,6 +2167,7 @@ def _impl(ctx):
         trivial_auto_var_init_pattern_feature,
         glibcxx_assertions_feature,
         rules_rust_unsupported_feature,
+        mongo_linux_toolchain_marker_feature,
     ] + get_common_features(ctx) + [
         # These flags are at the bottom so they get applied after anything else.
         # These are things like the flags people apply directly on cc_library through copts/linkopts

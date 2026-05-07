@@ -3,6 +3,13 @@
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 
+_COMPILEDB_WORKAROUND_FEATURES = [
+    "layering_check",
+    "parse_headers",
+]
+
+_MONGO_LINUX_TOOLCHAIN_MARKER = "mongo_linux_toolchain_marker"
+
 _SOURCE_EXTENSIONS = {
     "c": True,
     "cc": True,
@@ -142,6 +149,63 @@ def _requested_and_unsupported_features(ctx):
                 requested_features.append(feature)
 
     return requested_features, unsupported_features
+
+def _compiledb_requested_and_unsupported_features(ctx):
+    requested_features, unsupported_features = _requested_and_unsupported_features(ctx)
+
+    # Bazel 7.5's Starlark create_compile_variables() path does not thread
+    # module-map state through to the compile variables, so layering_check /
+    # parse_headers-enabled toolchains fail looking for module_name.
+    #
+    # Newer Bazel exposes more module-map state to Starlark (notably
+    # CcModuleMap.name plus artifact-capable variables_extension), so this
+    # could be replaced by explicitly injecting module_name,
+    # module_map_file, and dependent_module_map_files from the target's
+    # compilation context.
+    for feature in _COMPILEDB_WORKAROUND_FEATURES:
+        requested_features = [
+            requested_feature
+            for requested_feature in requested_features
+            if requested_feature != feature
+        ]
+        if feature not in unsupported_features:
+            unsupported_features.append(feature)
+
+    return requested_features, unsupported_features
+
+def _enabled_features(feature_configuration, feature_names):
+    return [
+        feature_name
+        for feature_name in feature_names
+        if cc_common.is_enabled(
+            feature_configuration = feature_configuration,
+            feature_name = feature_name,
+        )
+    ]
+
+def _fail_if_mongo_linux_toolchain_needs_module_map_support(feature_configuration):
+    if not cc_common.is_enabled(
+        feature_configuration = feature_configuration,
+        feature_name = _MONGO_LINUX_TOOLCHAIN_MARKER,
+    ):
+        return
+
+    enabled_workaround_features = _enabled_features(
+        feature_configuration,
+        _COMPILEDB_WORKAROUND_FEATURES,
+    )
+    if not enabled_workaround_features:
+        return
+
+    enabled_workaround_features_str = ", ".join(enabled_workaround_features)
+    fail(
+        "compiledb_aspect currently strips %s for Bazel 7.5 compatibility. " %
+        enabled_workaround_features_str +
+        "The selected Mongo Linux toolchain now enables %s, " %
+        enabled_workaround_features_str +
+        "so compiledb must be updated to inject module_name, module_map_file, " +
+        "and dependent_module_map_files instead of using the workaround.",
+    )
 
 def _toolchain_flags(feature_configuration, action_name, compile_variables):
     return cc_common.get_memory_inefficient_command_line(
@@ -326,7 +390,16 @@ def _compiledb_aspect_impl(target, ctx):
         ]
 
     cc_toolchain = find_cpp_toolchain(ctx)
-    requested_features, unsupported_features = _requested_and_unsupported_features(ctx)
+    original_requested_features, original_unsupported_features = _requested_and_unsupported_features(ctx)
+    original_feature_configuration = cc_common.configure_features(
+        ctx = ctx,
+        cc_toolchain = cc_toolchain,
+        requested_features = original_requested_features,
+        unsupported_features = original_unsupported_features,
+    )
+    _fail_if_mongo_linux_toolchain_needs_module_map_support(original_feature_configuration)
+
+    requested_features, unsupported_features = _compiledb_requested_and_unsupported_features(ctx)
     feature_configuration = cc_common.configure_features(
         ctx = ctx,
         cc_toolchain = cc_toolchain,
