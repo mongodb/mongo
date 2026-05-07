@@ -288,8 +288,12 @@ Status createStorage(OperationContext* opCtx,
         return status;
     }
 
-    ru.onRollback([ident = std::string(ident)](OperationContext* opCtx) {
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    ru.onRollback([ident = std::string(ident), storageEngine = storageEngine](OperationContext*) {
+        // Note: We cannot safely access the provided opCtx here because it may have been destroyed
+        // by the time the rollback handler is executed. This is especially true for rollback
+        // handlers that are executed during shutdown and as the shutdown thread calls into
+        // `abortUnitOfWork` while destroying instancess of `TxnResources`.
+        // TODO SERVER-125732: Avoid storing `opCtx` pointers inside instances of `RecoveryUnit`.
         storageEngine->addDropPendingIdent(Timestamp::min(), std::make_shared<Ident>(ident));
     });
 
