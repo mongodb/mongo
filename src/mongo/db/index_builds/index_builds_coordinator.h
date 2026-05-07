@@ -676,13 +676,22 @@ protected:
                                                const std::vector<IndexBuildInfo>& indexes,
                                                const UUID& buildUUID);
     /**
-     * Reconstructs the in-memory state of the index build so that it can be resumed from the phase
-     * it was in when the build was interrupted.
+     * Registers an index build to be resumed, validating the state against the catalog. Can be
+     * called on any thread, as no actual setup is performed.
+     */
+    Status _registerResumeIndexBuild(OperationContext* opCtx,
+                                     const DatabaseName& dbName,
+                                     const UUID& collectionUUID,
+                                     const std::vector<IndexBuildInfo>& indexes,
+                                     const UUID& buildUUID,
+                                     const ResumeIndexInfo& resumeInfo,
+                                     IndexBuildProtocol protocol);
+
+    /**
+     * Sets up an already-registerd index build to be resumed. Must be called on the builder thread
+     * if the protocol involves establishing resources tied to the calling thread.
      */
     Status _setUpResumeIndexBuild(OperationContext* opCtx,
-                                  const DatabaseName& dbName,
-                                  const UUID& collectionUUID,
-                                  const std::vector<IndexBuildInfo>& indexes,
                                   const UUID& buildUUID,
                                   const ResumeIndexInfo& resumeInfo,
                                   IndexBuildProtocol protocol);

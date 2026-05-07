@@ -408,13 +408,21 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                   indexBuildOptions.indexBuildProtocol == IndexBuildProtocol::kPrimaryDriven);
         auto status = Status::OK();
         if (resumeInfo) {
-            status = _setUpResumeIndexBuild(opCtx,
-                                            dbName,
-                                            collectionUUID,
-                                            indexes,
-                                            buildUUID,
-                                            resumeInfo.value(),
-                                            indexBuildOptions.indexBuildProtocol);
+            // TODO (SERVER-126234): Consolidate registration for resuming index builds.
+            status = _registerResumeIndexBuild(opCtx,
+                                               dbName,
+                                               collectionUUID,
+                                               indexes,
+                                               buildUUID,
+                                               resumeInfo.value(),
+                                               indexBuildOptions.indexBuildProtocol);
+            if (status.isOK() &&
+                indexBuildOptions.indexBuildProtocol != IndexBuildProtocol::kPrimaryDriven) {
+                // If the build is primary-driven, defer setup to the builder thread since it
+                // involves setting up storage engine resources that are tied to the calling thread.
+                status = _setUpResumeIndexBuild(
+                    opCtx, buildUUID, resumeInfo.value(), indexBuildOptions.indexBuildProtocol);
+            }
         } else {
             // Primary-driven index builds can only be resumed or aborted, not restarted.
             invariant(indexBuildOptions.indexBuildProtocol == IndexBuildProtocol::kTwoPhase,
@@ -548,6 +556,16 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                 startPromise.setError(status);
                 // Do not exit with an incomplete future, even if setup fails, we should still
                 // signal waiters.
+                invariant(replState->sharedPromise.getFuture().isReady());
+                return;
+            }
+        } else if (resumeInfo &&
+                   indexBuildOptions.indexBuildProtocol == IndexBuildProtocol::kPrimaryDriven) {
+            status = _setUpResumeIndexBuild(
+                opCtx.get(), buildUUID, *resumeInfo, indexBuildOptions.indexBuildProtocol);
+            if (!status.isOK()) {
+                startPromise.setError(status);
+                replState->sharedPromise.setError(status);
                 invariant(replState->sharedPromise.getFuture().isReady());
                 return;
             }

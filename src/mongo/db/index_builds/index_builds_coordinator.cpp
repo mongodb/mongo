@@ -935,13 +935,13 @@ Status IndexBuildsCoordinator::_dropIndexesForRepair(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
-                                                      const DatabaseName& dbName,
-                                                      const UUID& collectionUUID,
-                                                      const std::vector<IndexBuildInfo>& indexes,
-                                                      const UUID& buildUUID,
-                                                      const ResumeIndexInfo& resumeInfo,
-                                                      IndexBuildProtocol protocol) {
+Status IndexBuildsCoordinator::_registerResumeIndexBuild(OperationContext* opCtx,
+                                                         const DatabaseName& dbName,
+                                                         const UUID& collectionUUID,
+                                                         const std::vector<IndexBuildInfo>& indexes,
+                                                         const UUID& buildUUID,
+                                                         const ResumeIndexInfo& resumeInfo,
+                                                         IndexBuildProtocol protocol) {
     NamespaceStringOrUUID nssOrUuid{dbName, collectionUUID};
     // Make a mutable copy to populate indexIdent from the catalog; the caller's vector is const.
     auto mutableIndexes = indexes;
@@ -1013,6 +1013,24 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
         return status;
     }
     indexBuildsSSS.registered.addAndFetch(1);
+    return Status::OK();
+}
+
+Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
+                                                      const UUID& buildUUID,
+                                                      const ResumeIndexInfo& resumeInfo,
+                                                      IndexBuildProtocol protocol) {
+    auto replIndexBuildState = invariant(_getIndexBuild(buildUUID));
+
+    Lock::DBLock dbLock(opCtx,
+                        replIndexBuildState->dbName,
+                        MODE_IX,
+                        Date_t::max(),
+                        Lock::DBLockSkipOptions{
+                            .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
+    CollectionNamespaceOrUUIDLock collLock(
+        opCtx, {replIndexBuildState->dbName, replIndexBuildState->collectionUUID}, MODE_X);
+    CollectionWriter collection(opCtx, replIndexBuildState->collectionUUID);
 
     IndexBuildsManager::SetupOptions options;
     options.protocol = protocol;
@@ -1021,13 +1039,13 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
         ? IndexBuildMethodEnum::kPrimaryDriven
         : IndexBuildMethodEnum::kHybrid;
     options.isResumable = replIndexBuildState->isResumable();
-    status = _indexBuildsManager.setUpIndexBuild(opCtx,
-                                                 collection,
-                                                 mutableIndexes,
-                                                 buildUUID,
-                                                 MultiIndexBlock::kNoopOnInitFn,
-                                                 options,
-                                                 resumeInfo);
+    auto status = _indexBuildsManager.setUpIndexBuild(opCtx,
+                                                      collection,
+                                                      replIndexBuildState->getIndexes(),
+                                                      buildUUID,
+                                                      MultiIndexBlock::kNoopOnInitFn,
+                                                      options,
+                                                      resumeInfo);
     if (!status.isOK()) {
         activeIndexBuilds.unregisterIndexBuild(
             &_indexBuildsManager, replIndexBuildState, IndexBuildOutcome::kFailure);
