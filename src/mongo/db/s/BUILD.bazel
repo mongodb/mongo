@@ -1092,6 +1092,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/global_catalog:index_on_config_test.cpp",
         "//src/mongo/db/global_catalog/ddl:configsvr_coordinator_service_test.cpp",
         "//src/mongo/db/global_catalog/ddl:create_database_util_test.cpp",
+        "//src/mongo/db/global_catalog/ddl:placement_history_cleaner_test.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager_add_shard_to_zone_test.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager_assign_key_range_to_zone_test.cpp",
         "//src/mongo/db/global_catalog/ddl:sharding_catalog_manager_bump_collection_version_and_change_metadata_test.cpp",

@@ -49,6 +49,7 @@
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/pcre_util.h"
 
 #include <algorithm>
@@ -291,10 +292,14 @@ AggregateCommandRequest findAllShardsAggRequest(OperationContext* opCtx) {
                                    findAllPipeline->serializeToBson());
 }
 
-void setInitializationTimeOnPlacementHistory(
-    OperationContext* opCtx,
-    Timestamp initializationTime,
-    std::vector<ShardId> placementResponseForPreInitQueries) {
+/*
+ * Persists new initialization metadata within config.placementHistory through two 'internal'
+ * documents identified by 'kConfigsvrPlacementHistoryNamespace' (removing the existing one, if
+ * any).
+ */
+void setInitializationMetadataOnPlacementHistory(OperationContext* opCtx,
+                                                 Timestamp initializationTime,
+                                                 std::vector<ShardId> clusterTopologyAtInitTime) {
     auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
                                 ExecutorPtr txnExec) -> SemiFuture<void> {
         write_ops::DeleteCommandRequest deleteOldMetadata(
@@ -312,7 +317,7 @@ void setInitializationTimeOnPlacementHistory(
 
         write_ops::InsertCommandRequest insertNewMetadata =
             ShardingCatalogManager::buildInsertReqForPlacementHistoryOperationalBoundaries(
-                initializationTime, placementResponseForPreInitQueries);
+                initializationTime, clusterTopologyAtInitTime);
 
         auto insertResponse = txnClient.runCRUDOpSync(insertNewMetadata, {});
         uassertStatusOK(insertResponse.toStatus());
@@ -338,6 +343,67 @@ void setInitializationTimeOnPlacementHistory(
           "Initialization metadata of placement.history have been updated",
           "initializationTime"_attr = initializationTime);
 }
+
+/*
+ * Applies newInitializationTime on the 'timestamp' field of the initialization marker document of
+ * config.placementHistory, definining a new lower operational boundary for the information
+ * contained in such a collection.
+ */
+void bumpInitializationTimeOnPlacementHistory(OperationContext* opCtx,
+                                              Timestamp newInitializationTime) {
+    auto transactionChain = [&](const txn_api::TransactionClient& txnClient,
+                                ExecutorPtr txnExec) -> SemiFuture<void> {
+        // Find & update the initialization doc (identified by the 'marker' namespace and an empty
+        // set of 'shards').
+        auto updateRequest = BatchedCommandRequest::buildUpdateOp(
+            NamespaceString::kConfigsvrPlacementHistoryNamespace,
+            BSON(NamespacePlacementType::kNssFieldName
+                 << NamespaceStringUtil::serialize(
+                        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
+                        SerializationContext::stateDefault())
+                 << NamespacePlacementType::kShardsFieldName << BSONArray()),
+            BSON("$set" << BSON(NamespacePlacementType::kTimestampFieldName
+                                << newInitializationTime)),
+            false /* upsert */,
+            true /* multi */);
+
+        auto updateResponse = txnClient.runCRUDOpSync(updateRequest, {});
+        uassertStatusOK(updateResponse.toStatus());
+        // Raise an error in case the operation matched no document (the reset was triggered while
+        // the collection was not yet initialized).
+        if (updateResponse.getN() != 1) {
+            LOGV2_WARNING(
+                10988501,
+                "Unexpected amount of initialization metadata documents found while attempting to "
+                "clean up config.placementHistory",
+                "numInitMetadataDocs"_attr = updateResponse.getN());
+            uasserted(ErrorCodes::IllegalOperation,
+                      "Cannot clean up config.placementHistory when it does not contain the "
+                      "expected initialization metadata");
+        }
+
+        return SemiFuture<void>::makeReady();
+    };
+
+    WriteConcernOptions originalWC = opCtx->getWriteConcern();
+    opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
+                                               WriteConcernOptions::SyncMode::UNSET,
+                                               WriteConcernOptions::kNoTimeout});
+
+    ScopeGuard resetWriteConcernGuard([opCtx, &originalWC] { opCtx->setWriteConcern(originalWC); });
+
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
+    txn_api::SyncTransactionWithRetries txn(
+        opCtx, executor, nullptr /* resourceYielder */, inlineExecutor);
+    txn.run(opCtx, transactionChain);
+
+    LOGV2(10678201,
+          "Initialization time of placement.history has been bumped",
+          "newInitializationTime"_attr = newInitializationTime);
+}
+
 
 /**
  * Helper class used to do the heavy-lifting for 'ShardingCatalogManager::getHistoricalPlacement()'.
@@ -1319,7 +1385,7 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx,
                                               consumeBatchResponse,
                                               resetOnRetriableFailure));
 
-        setInitializationTimeOnPlacementHistory(
+        setInitializationMetadataOnPlacementHistory(
             opCtx, initializationTime, std::move(shardsAtInitializationTime));
     }
 }
@@ -1328,25 +1394,14 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
                                                      const Timestamp& earliestClusterTime) {
     LOGV2(
         7068803, "Cleaning up placement history", "earliestClusterTime"_attr = earliestClusterTime);
+
     /*
      * The method implements the following optimistic approach for data cleanup:
      * 1. Set earliestOpTime as the new initialization time of config.placementHistory;
      * this will have the effect of hiding older(deletable) documents when the collection is queried
      * by the ShardingCatalogClient.
-     * TODO SERVER-108231 validate the code against an empty set of shards and future values for
-     * earliestClusterTime; add tassertions accordingly.
      */
-    auto allShardIds = [&] {
-        const auto clusterPlacementAtEarliestClusterTime =
-            getHistoricalPlacement(opCtx,
-                                   boost::none /*namespace*/,
-                                   earliestClusterTime,
-                                   true /* checkIfPointInTimeIsInFuture */,
-                                   false /* ignoreRemovedShards */);
-        return clusterPlacementAtEarliestClusterTime.getShards();
-    }();
-
-    setInitializationTimeOnPlacementHistory(opCtx, earliestClusterTime, std::move(allShardIds));
+    bumpInitializationTimeOnPlacementHistory(opCtx, earliestClusterTime);
 
     /*
      * 2. Build up and execute the delete request to remove the disposable documents. This
@@ -1435,14 +1490,22 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
     write_ops::DeleteCommandRequest deleteRequest(
         NamespaceString::kConfigsvrPlacementHistoryNamespace);
     deleteRequest.setDeletes(std::move(deleteStatements));
-    uassertStatusOK(
+
+    const auto swResponse =
         _localConfigShard->runCommand(opCtx,
                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                       NamespaceString::kConfigsvrPlacementHistoryNamespace.dbName(),
                                       deleteRequest.toBSON(),
-                                      Shard::RetryPolicy::kIdempotent));
+                                      Shard::RetryPolicy::kIdempotent);
 
-    LOGV2_DEBUG(7068808, 2, "Cleaning up placement history - done deleting entries");
+    BatchedCommandResponse batchedResponse;
+    uassertStatusOK(
+        Shard::CommandResponse::processBatchWriteResponse(swResponse, &batchedResponse));
+
+    LOGV2_DEBUG(7068808,
+                2,
+                "Cleaning up placement history - done deleting entries",
+                "numEntriesDeleted"_attr = batchedResponse.getN());
 }
 
 }  // namespace mongo

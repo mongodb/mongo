@@ -61,6 +61,7 @@ structs:
             config.placementHistory collection.
             Each document encodes placement information (at shard granularity) on a given
             namespace at a specific point in time."
+        generate_comparison_operators: true
         strict: false
         fields:
             nss:

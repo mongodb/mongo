@@ -151,28 +151,31 @@ void PlacementHistoryCleaner::runOnce(Client* client, size_t minPlacementHistory
         auto earliestOplogTime = getEarliestOpLogTimestampAmongAllShards(opCtx);
         if (!earliestOplogTime) {
             LOGV2(7068802,
-                  "Skipping cleanup of config.placementHistory - no earliestOplogTime could "
-                  "be retrieved");
+                  "PlacementHistoryCleaner: skipping round - no earliestOplogTime could be "
+                  "retrieved");
             return;
         }
 
         // Check the latest initialization time is not greater than the earliestOpTime.
         // The clean-up must always move the new initialization time forward.
-        const auto match =
-            BSON(NamespacePlacementType::kNssFieldName
-                 << NamespaceStringUtil::serialize(
-                        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
-                        SerializationContext::stateDefault())
-                 << NamespacePlacementType::kTimestampFieldName
-                 << BSON("$gte" << earliestOplogTime->toBSON()));
+        const auto match = BSON(
+            NamespacePlacementType::kNssFieldName
+            << NamespaceStringUtil::serialize(
+                   ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
+                   SerializationContext::stateDefault())
+            << NamespacePlacementType::kTimestampFieldName << BSON("$gte" << *earliestOplogTime));
 
         if (store.count(opCtx, match) > 0) {
+            LOGV2(1099885,
+                  "PlacementHistoryCleaner: skipping round - earliestOplogTime is behind the "
+                  "timestamp of the latest initialization of config.placementHistory",
+                  "earliestOplogTime"_attr = earliestOplogTime);
             return;
         }
 
         ShardingCatalogManager::get(opCtx)->cleanUpPlacementHistory(opCtx, *earliestOplogTime);
     } catch (const DBException& e) {
-        LOGV2(7068804, "Periodic cleanup of config.placementHistory failed", "error"_attr = e);
+        LOGV2_WARNING(7068804, "PlacementHistoryCleaner: round failed", "error"_attr = e);
     }
 }
 

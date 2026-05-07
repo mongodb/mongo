@@ -59,11 +59,11 @@ public:
     void pause();
     void resume(OperationContext* opCtx);
 
+    static void runOnce(Client* client, size_t minPlacementHistoryEntries);
+
 private:
     PlacementHistoryCleaner(const PlacementHistoryCleaner&) = delete;
     PlacementHistoryCleaner& operator=(const PlacementHistoryCleaner&) = delete;
-
-    static void runOnce(Client* opCtx, size_t minPlacementHistoryEntries);
 
     void _start(OperationContext* opCtx, bool steppingUp);
 
