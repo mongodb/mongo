@@ -997,10 +997,13 @@ TEST_F(NetworkInterfaceTest, NumRequestsTimedOutBeforeSentToRemoteMetric) {
     auto futB = runCommand(
         cbB,
         makeTestCommand(
-            Milliseconds(100), BSON("ping" << 1), nullptr, false, ErrorCodes::MaxTimeMSExpired));
+            Seconds(2), BSON("ping" << 1), nullptr, false, ErrorCodes::MaxTimeMSExpired));
 
     // Wait for B's deadline to expire while its sendRequest is blocked behind A.
-    sleepmillis(500);
+    // B's 2-second deadline is long enough to survive any OS scheduling jitter between
+    // makeTestCommand() stamping the deadline and getClient() checking it, while still
+    // expiring well before the failpoint releases.
+    sleepmillis(2500);
 
     // Release the failpoint. A's sendRequest continues (sends ping), then the reactor picks
     // up B's queued sendRequest, which finds its deadline expired and increments the metric.
