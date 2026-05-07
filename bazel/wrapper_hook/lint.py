@@ -523,10 +523,10 @@ def _git_unstaged_files() -> str:
     return result.stdout.strip() + os.linesep
 
 
-def _get_files_changed_since_fork_point(origin_branch: str = "origin/master") -> list[str]:
+def _get_files_changed_since_fork_point(origin_branch: str) -> list[str]:
     """Query git to get a list of files in the repo from a diff."""
     # There are 3 diffs we run:
-    # 1. List of commits between origin/master and HEAD of current branch
+    # 1. List of commits between the origin branch and HEAD of current branch
     # 2. Cached/Staged files (--cached)
     # 3. Working Tree files git tracks
 
@@ -700,7 +700,7 @@ def get_parsed_args(args):
         "--origin-branch",
         type=str,
         default="auto",
-        help="Base branch to compare changes against (example: origin/master).",
+        help="Base branch to compare changes against (example: origin/<branch>).",
     )
     parser.add_argument("--large-files", action="store_true", default=False)
     parser.add_argument(
@@ -728,10 +728,9 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
     if parsed_args.origin_branch == "auto":
         from git import Repo
 
-        from buildscripts.bazel_rules_mongo.utils.evergreen_git import get_mongodb_remote
+        from buildscripts.bazel_rules_mongo.utils.evergreen_git import get_default_origin_branch
 
-        remote = get_mongodb_remote(Repo())
-        parsed_args.origin_branch = f"{remote.name}/master"
+        parsed_args.origin_branch = get_default_origin_branch(Repo())
 
     if parsed_args.fix:
         create_build_files_in_new_js_dirs()

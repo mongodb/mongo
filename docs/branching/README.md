@@ -207,6 +207,17 @@ branch.
 
 #### Finally: format and lint
 
+Run the following automation and verify results:
+
+```sh
+sed -i "s/DEFAULT_ORIGIN_BRANCH = \"master\"/DEFAULT_ORIGIN_BRANCH = \"v$VERSION\"/g" buildscripts/bazel_rules_mongo/utils/evergreen_git.py
+```
+
+In the file
+[`buildscripts/bazel_rules_mongo/utils/evergreen_git.py`](../../buildscripts/bazel_rules_mongo/utils/evergreen_git.py),
+`DEFAULT_ORIGIN_BRANCH` should be updated to the new branch. This makes `bazel run format` and
+`bazel run lint --fix` compare changed files against the new release branch instead of `master`.
+
 ```sh
 bazel run format && bazel run lint --fix
 ```

@@ -5,7 +5,7 @@ import subprocess
 from typing import Union
 
 from git import Repo
-from utils.evergreen_git import get_mongodb_remote
+from utils.evergreen_git import get_default_origin_branch
 
 from buildscripts.bazel_custom_formatter import (
     validate_bazel_groups,
@@ -45,10 +45,10 @@ def _git_unstaged_files() -> str:
     return result.stdout.strip() + os.linesep
 
 
-def _get_files_changed_since_fork_point(origin_branch: str = "origin/master") -> list[str]:
+def _get_files_changed_since_fork_point(origin_branch: str) -> list[str]:
     """Query git to get a list of files in the repo from a diff."""
     # There are 3 diffs we run:
-    # 1. List of commits between origin/master and HEAD of current branch
+    # 1. List of commits between the origin branch and HEAD of current branch
     # 2. Cached/Staged files (--cached)
     # 3. Working Tree files git tracks
 
@@ -189,7 +189,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--origin-branch",
-        help="The branch to use as the fork point for changed files (example: origin/master)",
+        help="The branch to use as the fork point for changed files (example: origin/<branch>)",
         default="auto",
     )
     parser.add_argument(
@@ -205,8 +205,7 @@ def main() -> int:
 
     origin_branch = args.origin_branch
     if origin_branch == "auto":
-        remote = get_mongodb_remote(Repo())
-        origin_branch = f"{remote.name}/master"
+        origin_branch = get_default_origin_branch(Repo())
 
     files_to_format = "all"
     if args.file:

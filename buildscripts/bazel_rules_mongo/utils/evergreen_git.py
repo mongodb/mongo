@@ -6,6 +6,9 @@ import yaml
 from git import Remote, Repo
 
 
+DEFAULT_ORIGIN_BRANCH = "master"
+
+
 @cache
 def get_expansions(expansions_file: str) -> dict[str, any]:
     if not expansions_file:
@@ -62,6 +65,11 @@ def get_mongodb_remote(repo: Repo) -> Remote:
         raise RuntimeError("Could not find valid remote")
 
     return picked_remote
+
+
+def get_default_origin_branch(repo: Repo) -> str:
+    remote = get_mongodb_remote(repo)
+    return f"{remote.name}/{DEFAULT_ORIGIN_BRANCH}"
 
 
 def get_remote_branch_ref(repo: Repo, branch: str = None) -> str:

@@ -167,3 +167,10 @@ class TestChangedFiles(unittest.TestCase):
     def test_remote_picker(self):
         remote = evergreen_git.get_mongodb_remote(self.repo)
         self.assertIn("10gen/mongo", remote.url, msg="The wrong remote was found.")
+
+    def test_default_origin_branch(self):
+        remote = evergreen_git.get_mongodb_remote(self.repo)
+        self.assertEqual(
+            evergreen_git.get_default_origin_branch(self.repo),
+            f"{remote.name}/{evergreen_git.DEFAULT_ORIGIN_BRANCH}",
+        )
