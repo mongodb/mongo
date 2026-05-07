@@ -37,21 +37,16 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_path.h"
-#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/pcre_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 #include <array>
 #include <cstddef>
@@ -1706,7 +1701,7 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
         case MatchExpression::EXPRESSION: {
             // Agg expressions are rewritten in-place, so we must clone the expression tree.
             auto clonedExpr =
-                static_cast<const ExprMatchExpression*>(root)->getExpression()->clone();
+                static_cast<const ExprMatchExpression*>(root)->getExpression()->clone(*expCtx);
             // Attempt to rewrite the aggregation expression and return a new ExprMatchExpression.
             if (auto rewrittenExpr = rewriteAggExpressionTree(
                     expCtx, clonedExpr, fields, allowInexact, backingBsonObjs)) {

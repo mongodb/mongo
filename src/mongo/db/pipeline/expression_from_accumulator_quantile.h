@@ -35,7 +35,6 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_visitor.h"
-#include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/pipeline/percentile_algo_continuous.h"
 #include "mongo/db/pipeline/percentile_algo_discrete.h"
 #include "mongo/db/pipeline/variables.h"
@@ -95,9 +94,9 @@ public:
         return _method;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionFromAccumulatorQuantile<TAccumulator>>(
-            getExpressionContext(), _ps, cloneChild(0), _method);
+            &expCtx, _ps, cloneChild(0, expCtx), _method);
     }
 
 private:

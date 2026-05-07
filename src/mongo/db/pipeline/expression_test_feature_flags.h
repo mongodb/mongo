@@ -85,8 +85,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionTestFeatureFlagLatest>(getExpressionContext());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionTestFeatureFlagLatest>(&expCtx);
     }
 };
 
@@ -109,8 +109,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionTestFeatureFlagLastLTS>(getExpressionContext());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionTestFeatureFlagLastLTS>(&expCtx);
     }
 };
 }  // namespace mongo

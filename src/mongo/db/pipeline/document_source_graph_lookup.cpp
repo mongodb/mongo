@@ -42,12 +42,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
-#include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
@@ -344,7 +339,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())) {
     if (_params.startWith) {
         // re-create startWith expression using newExpCtx.
-        _params.startWith = _params.startWith->cloneUsingNewExpCtx(newExpCtx.get());
+        _params.startWith = _params.startWith->clone(*newExpCtx);
     }
     if (original._unwind) {
         _unwind =

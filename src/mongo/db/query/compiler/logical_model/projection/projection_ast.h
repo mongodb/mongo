@@ -30,12 +30,8 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_visitor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -367,7 +363,8 @@ class ExpressionASTNode final : public ASTNode {
 public:
     ExpressionASTNode(boost::intrusive_ptr<Expression> expr) : _expr(std::move(expr)) {}
     ExpressionASTNode(const ExpressionASTNode& other) : ASTNode(other) {
-        _expr = other._expr->clone();
+        ExpressionContext* expCtx = other._expr->getExpressionContext();
+        _expr = other._expr->clone(*expCtx);
     }
 
     void acceptVisitor(ProjectionASTMutableVisitor* visitor) override {

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -74,9 +73,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionInternalOwningShard>(getExpressionContext(),
-                                                             cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionInternalOwningShard>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -173,9 +171,9 @@ public:
     }
 
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionInternalIndexKey>(
-            getExpressionContext(), cloneChild(_kDocExpr), cloneChild(_kSpecExpr));
+            &expCtx, cloneChild(_kDocExpr, expCtx), cloneChild(_kSpecExpr, expCtx));
     }
 
 private:

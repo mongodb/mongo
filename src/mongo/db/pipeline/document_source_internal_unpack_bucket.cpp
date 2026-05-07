@@ -44,11 +44,9 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
@@ -74,17 +72,14 @@
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
-#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 #include <algorithm>
 #include <iterator>
@@ -427,7 +422,7 @@ boost::intrusive_ptr<Expression> rewriteMetaFieldPaths(
     // We need to clone here to avoid corrupting the original expression if the optimization cannot
     // be made. E.g., if a subsequent group by element contains a field path that references a time
     // series field.
-    auto clonedExpr = expr->clone();
+    auto clonedExpr = expr->clone(*pExpCtx);
     auto renameMap =
         StringMap<std::string>{{metaField.value(), std::string{timeseries::kBucketMetaFieldName}}};
     SubstituteFieldPathWalker walker{renameMap};

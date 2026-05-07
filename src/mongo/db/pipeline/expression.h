@@ -37,17 +37,14 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/fle_crypto_predicate.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/accumulator_percentile_enum_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -61,15 +58,11 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/named_enum.h"
 #include "mongo/db/update/pattern_cmp.h"
-#include "mongo/db/version_context.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/pcre.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -253,17 +246,11 @@ public:
     }
 
     /**
-     * Creates a deep copy of the expression tree.
+     * Creates a deep copy of the expression tree. 'expCtx' is the context the cloned expression
+     * will be bound to (stored as a raw pointer on each node), which may differ from the
+     * ExpressionContext of the original Expression.
      */
-    virtual boost::intrusive_ptr<Expression> clone() const = 0;
-
-    /**
-     * Every node in the expression tree maintains an unowned pointer to the query's
-     * ExpressionContext. This variant of clone() creates a deep copy of the expression tree where
-     * every node in the tree points to newExprCtx (instead of whatever expression context it used
-     * to point to).
-     */
-    boost::intrusive_ptr<Expression> cloneUsingNewExpCtx(ExpressionContext* newExpCtx) const;
+    virtual boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const = 0;
 
     /**
      * Serialize the Expression tree recursively.
@@ -434,7 +421,7 @@ protected:
      * array if it had no children. If a child expression is nullptr, a corresponding element
      * in the returned array will also be set to nullptr.
      */
-    ExpressionVector cloneChildren() const;
+    ExpressionVector cloneChildren(ExpressionContext& expCtx) const;
 
     /**
      * Creates a deep copy of a child node at position 'childIdx' in the children vector, or returns
@@ -442,7 +429,7 @@ protected:
      *
      * Throws an exception if 'childIdx' is out of bounds of the 'children' container.
      */
-    boost::intrusive_ptr<Expression> cloneChild(size_t childIdx) const;
+    boost::intrusive_ptr<Expression> cloneChild(size_t childIdx, ExpressionContext& expCtx) const;
 
     /**
      * Owning container for all sub-Expressions.
@@ -545,8 +532,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionConstant>(getExpressionContext(), _value);
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionConstant>(&expCtx, _value);
     }
 
 private:
@@ -741,9 +728,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionFromAccumulator<AccumulatorState>>(
-            this->getExpressionContext(), this->cloneChildren());
+            &expCtx, this->cloneChildren(expCtx));
     }
 };
 
@@ -786,9 +773,9 @@ public:
     }
 
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionFromAccumulatorN<AccumulatorN>>(
-            getExpressionContext(), cloneChild(_kNExpr), cloneChild(_kOutputExpr));
+            &expCtx, cloneChild(_kNExpr, expCtx), cloneChild(_kOutputExpr, expCtx));
     }
 
 private:
@@ -902,8 +889,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionAbs>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionAbs>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -933,8 +920,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionAdd>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionAdd>(&expCtx, cloneChildren(expCtx));
     }
 
 private:
@@ -966,8 +953,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionAllElementsTrue>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionAllElementsTrue>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1000,8 +987,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionAnd>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionAnd>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1024,8 +1011,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionAnyElementTrue>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionAnyElementTrue>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1062,8 +1049,8 @@ public:
 
     bool selfAndChildrenAreConstant() const final;
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionArray>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionArray>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1091,8 +1078,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionArrayElemAt>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionArrayElemAt>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1119,8 +1106,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionFirst>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionFirst>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1147,8 +1134,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionLast>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionLast>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1171,8 +1158,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionObjectToArray>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionObjectToArray>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1195,8 +1182,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionArrayToObject>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionArrayToObject>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1221,8 +1208,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionBsonSize>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionBsonSize>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1244,8 +1231,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionCeil>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionCeil>(&expCtx, cloneChildren(expCtx));
     }
 
 private:
@@ -1301,8 +1288,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionCompare>(getExpressionContext(), cmpOp, cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionCompare>(&expCtx, cmpOp, cloneChildren(expCtx));
     }
 
 private:
@@ -1332,8 +1319,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionConcat>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionConcat>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1361,8 +1348,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionConcatArrays>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionConcatArrays>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1397,8 +1384,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionCond>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionCond>(&expCtx, cloneChildren(expCtx));
     }
 
 private:
@@ -1477,13 +1464,13 @@ public:
         return _parsedTimeZone;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionDateFromString>(getExpressionContext(),
-                                                        cloneChild(_kDateString),
-                                                        cloneChild(_kTimeZone),
-                                                        cloneChild(_kFormat),
-                                                        cloneChild(_kOnNull),
-                                                        cloneChild(_kOnError));
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionDateFromString>(&expCtx,
+                                                        cloneChild(_kDateString, expCtx),
+                                                        cloneChild(_kTimeZone, expCtx),
+                                                        cloneChild(_kFormat, expCtx),
+                                                        cloneChild(_kOnNull, expCtx),
+                                                        cloneChild(_kOnError, expCtx));
     }
 
 private:
@@ -1568,19 +1555,19 @@ public:
         return _parsedTimeZone;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionDateFromParts>(getExpressionContext(),
-                                                       cloneChild(_kYear),
-                                                       cloneChild(_kMonth),
-                                                       cloneChild(_kDay),
-                                                       cloneChild(_kHour),
-                                                       cloneChild(_kMinute),
-                                                       cloneChild(_kSecond),
-                                                       cloneChild(_kMillisecond),
-                                                       cloneChild(_kIsoWeekYear),
-                                                       cloneChild(_kIsoWeek),
-                                                       cloneChild(_kIsoDayOfWeek),
-                                                       cloneChild(_kTimeZone));
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionDateFromParts>(&expCtx,
+                                                       cloneChild(_kYear, expCtx),
+                                                       cloneChild(_kMonth, expCtx),
+                                                       cloneChild(_kDay, expCtx),
+                                                       cloneChild(_kHour, expCtx),
+                                                       cloneChild(_kMinute, expCtx),
+                                                       cloneChild(_kSecond, expCtx),
+                                                       cloneChild(_kMillisecond, expCtx),
+                                                       cloneChild(_kIsoWeekYear, expCtx),
+                                                       cloneChild(_kIsoWeek, expCtx),
+                                                       cloneChild(_kIsoDayOfWeek, expCtx),
+                                                       cloneChild(_kTimeZone, expCtx));
     }
 
 private:
@@ -1642,11 +1629,11 @@ public:
         return _parsedTimeZone;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionDateToParts>(getExpressionContext(),
-                                                     cloneChild(_kDate),
-                                                     cloneChild(_kTimeZone),
-                                                     cloneChild(_kIso8601));
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionDateToParts>(&expCtx,
+                                                     cloneChild(_kDate, expCtx),
+                                                     cloneChild(_kTimeZone, expCtx),
+                                                     cloneChild(_kIso8601, expCtx));
     }
 
 
@@ -1722,12 +1709,12 @@ public:
         return _parsedTimeZone;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionDateToString>(getExpressionContext(),
-                                                      cloneChild(_kDate),
-                                                      cloneChild(_kFormat),
-                                                      cloneChild(_kTimeZone),
-                                                      cloneChild(_kOnNull));
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionDateToString>(&expCtx,
+                                                      cloneChild(_kDate, expCtx),
+                                                      cloneChild(_kFormat, expCtx),
+                                                      cloneChild(_kTimeZone, expCtx),
+                                                      cloneChild(_kOnNull, expCtx));
     }
 
 private:
@@ -1761,9 +1748,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionDayOfMonth>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -1786,9 +1773,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionDayOfWeek>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -1811,9 +1798,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionDayOfYear>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -1891,13 +1878,13 @@ public:
         return _parsedStartOfWeek;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionDateDiff>(getExpressionContext(),
-                                                  cloneChild(_kStartDate),
-                                                  cloneChild(_kEndDate),
-                                                  cloneChild(_kUnit),
-                                                  cloneChild(_kTimeZone),
-                                                  cloneChild(_kStartOfWeek));
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionDateDiff>(&expCtx,
+                                                  cloneChild(_kStartDate, expCtx),
+                                                  cloneChild(_kEndDate, expCtx),
+                                                  cloneChild(_kUnit, expCtx),
+                                                  cloneChild(_kTimeZone, expCtx),
+                                                  cloneChild(_kStartOfWeek, expCtx));
     }
 
 private:
@@ -1952,8 +1939,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionDivide>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionDivide>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -1976,8 +1963,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionExp>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionExp>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -2065,9 +2052,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return boost::intrusive_ptr<Expression>(
-            new ExpressionFieldPath(getExpressionContext(), _fieldPath.fullPath(), _variable));
+            new ExpressionFieldPath(&expCtx, _fieldPath.fullPath(), _variable));
     }
 
 protected:
@@ -2134,15 +2121,15 @@ public:
         return _limit;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionFilter>(getExpressionContext(),
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionFilter>(&expCtx,
                                                 _varName,
                                                 _varId,
                                                 _idxName,
                                                 _idxId,
-                                                cloneChild(_kInput),
-                                                cloneChild(_kCond),
-                                                _limit ? cloneChild(*_limit) : nullptr);
+                                                cloneChild(_kInput, expCtx),
+                                                cloneChild(_kCond, expCtx),
+                                                _limit ? cloneChild(*_limit, expCtx) : nullptr);
     }
 
 private:
@@ -2188,8 +2175,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionFloor>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionFloor>(&expCtx, cloneChildren(expCtx));
     }
 
 private:
@@ -2216,9 +2203,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionHour>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -2244,8 +2231,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionIfNull>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionIfNull>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -2270,8 +2257,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionIn>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionIn>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -2304,8 +2291,8 @@ public:
         return _parsedIndexMap;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionIndexOfArray>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionIndexOfArray>(&expCtx, cloneChildren(expCtx));
     }
 
 private:
@@ -2332,8 +2319,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionIndexOfBytes>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionIndexOfBytes>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -2359,8 +2346,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionIndexOfCP>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionIndexOfCP>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -2417,8 +2404,8 @@ public:
         return _children[_kSubExpression].get();
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        ExpressionVector children = cloneChildren();
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        ExpressionVector children = cloneChildren(expCtx);
         VariableMap vars;
 
         for (size_t idx = 0; idx < _orderedVariableIds.size(); ++idx) {
@@ -2440,7 +2427,7 @@ public:
                 _variables.size() == vars.size());
 
         return make_intrusive<ExpressionLet>(
-            getExpressionContext(), std::move(vars), std::move(children), _orderedVariableIds);
+            &expCtx, std::move(vars), std::move(children), _orderedVariableIds);
     }
 
 private:
@@ -2471,8 +2458,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionLn>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionLn>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -2498,8 +2485,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionLog>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionLog>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -2521,8 +2508,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionLog10>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionLog10>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -2553,12 +2540,12 @@ public:
         return _evaluatorV2;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         tassert(3100302,
                 "zerosDecryptionTokens array is empty",
                 !_evaluatorV2.zerosDecryptionTokens().empty());
         return make_intrusive<ExpressionInternalFLEEqual>(
-            getExpressionContext(), cloneChild(0), _evaluatorV2.zerosDecryptionTokens()[0]);
+            &expCtx, cloneChild(0, expCtx), _evaluatorV2.zerosDecryptionTokens()[0]);
     }
 
 private:
@@ -2592,9 +2579,9 @@ public:
         return _evaluatorV2;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionInternalFLEBetween>(
-            getExpressionContext(), cloneChild(0), _evaluatorV2.zerosDecryptionTokens());
+            &expCtx, cloneChild(0, expCtx), _evaluatorV2.zerosDecryptionTokens());
     }
 
 private:
@@ -2644,14 +2631,14 @@ public:
         return _varId;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionMap>(getExpressionContext(),
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionMap>(&expCtx,
                                              _varName,
                                              _varId,
                                              _idxName,
                                              _idxId,
-                                             cloneChild(_kInput),
-                                             cloneChild(_kEach));
+                                             cloneChild(_kInput, expCtx),
+                                             cloneChild(_kEach, expCtx));
     }
 
 private:
@@ -2692,8 +2679,8 @@ public:
         return _metaType;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionMeta>(getExpressionContext(), _metaType);
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionMeta>(&expCtx, _metaType);
     }
 
 private:
@@ -2778,8 +2765,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionInternalRawSortKey>(getExpressionContext());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionInternalRawSortKey>(&expCtx);
     }
 };
 
@@ -2801,9 +2788,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionMillisecond>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -2826,9 +2813,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionMinute>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -2851,8 +2838,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionMod>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionMod>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -2882,8 +2869,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionMultiply>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionMultiply>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -2905,9 +2892,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionMonth>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -2931,8 +2918,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionNot>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionNot>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -2983,15 +2970,13 @@ public:
 
     bool selfAndChildrenAreConstant() const final;
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> expressions;
-
         expressions.reserve(_expressions.size());
         for (auto&& [fieldName, expr] : _expressions) {
-            expressions.emplace_back(fieldName, expr->clone());
+            expressions.emplace_back(fieldName, expr->clone(expCtx));
         }
-
-        return ExpressionObject::create(getExpressionContext(), std::move(expressions));
+        return ExpressionObject::create(&expCtx, std::move(expressions));
     }
 
 private:
@@ -3034,8 +3019,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionOr>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionOr>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -3061,8 +3046,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionPow>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionPow>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -3086,8 +3071,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionRange>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionRange>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -3157,11 +3142,11 @@ public:
         return _accumulatedValueDepthCheckInterval;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionReduce>(getExpressionContext(),
-                                                cloneChild(_kInput),
-                                                cloneChild(_kInitial),
-                                                cloneChild(_kIn),
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionReduce>(&expCtx,
+                                                cloneChild(_kInput, expCtx),
+                                                cloneChild(_kInitial, expCtx),
+                                                cloneChild(_kIn, expCtx),
                                                 _idxName,
                                                 _idxId,
                                                 _thisName,
@@ -3261,11 +3246,11 @@ public:
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionReplaceOne>(getExpressionContext(),
-                                                    cloneChild(_kInput),
-                                                    cloneChild(_kFind),
-                                                    cloneChild(_kReplacement));
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionReplaceOne>(&expCtx,
+                                                    cloneChild(_kInput, expCtx),
+                                                    cloneChild(_kFind, expCtx),
+                                                    cloneChild(_kReplacement, expCtx));
     }
 };
 
@@ -3298,11 +3283,11 @@ public:
 
     Value evaluate(const Document& root, Variables* variables) const final;
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionReplaceAll>(getExpressionContext(),
-                                                    cloneChild(_kInput),
-                                                    cloneChild(_kFind),
-                                                    cloneChild(_kReplacement));
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionReplaceAll>(&expCtx,
+                                                    cloneChild(_kInput, expCtx),
+                                                    cloneChild(_kFind, expCtx),
+                                                    cloneChild(_kReplacement, expCtx));
     }
 };
 
@@ -3324,9 +3309,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionSecond>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -3347,8 +3332,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSetDifference>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSetDifference>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -3380,8 +3365,8 @@ public:
         return _cachedConstant;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSetEquals>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSetEquals>(&expCtx, cloneChildren(expCtx));
     }
 
 private:
@@ -3423,8 +3408,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSetIntersection>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSetIntersection>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -3451,8 +3436,8 @@ public:
         return _cachedRhsSet;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSetIsSubset>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSetIsSubset>(&expCtx, cloneChildren(expCtx));
     }
 
 private:
@@ -3498,8 +3483,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSetUnion>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSetUnion>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -3556,9 +3541,9 @@ public:
         return kName.data();
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionSimilarityDotProduct>(
-            getExpressionContext(), _score, cloneChildren());
+            &expCtx, _score, cloneChildren(expCtx));
     }
 };
 
@@ -3589,9 +3574,8 @@ public:
         return kName.data();
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSimilarityCosine>(
-            getExpressionContext(), _score, cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSimilarityCosine>(&expCtx, _score, cloneChildren(expCtx));
     }
 };
 
@@ -3622,9 +3606,9 @@ public:
         return kName.data();
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionSimilarityEuclidean>(
-            getExpressionContext(), _score, cloneChildren());
+            &expCtx, _score, cloneChildren(expCtx));
     }
 };
 
@@ -3651,8 +3635,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSize>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSize>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -3676,8 +3660,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionReverseArray>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionReverseArray>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -3718,9 +3702,8 @@ public:
         return _sortBy;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSortArray>(
-            getExpressionContext(), cloneChild(_kInput), _sortBy);
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSortArray>(&expCtx, cloneChild(_kInput, expCtx), _sortBy);
     }
 
 private:
@@ -3750,8 +3733,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSlice>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSlice>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -3798,9 +3781,9 @@ public:
         return _sortBy;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionTopN>(
-            getExpressionContext(), cloneChild(_kN), cloneChild(_kInput), _sortBy);
+            &expCtx, cloneChild(_kN, expCtx), cloneChild(_kInput, expCtx), _sortBy);
     }
 
 private:
@@ -3847,8 +3830,8 @@ public:
         return _sortBy;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionTop>(getExpressionContext(), cloneChild(_kInput), _sortBy);
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionTop>(&expCtx, cloneChild(_kInput, expCtx), _sortBy);
     }
 
 private:
@@ -3899,9 +3882,9 @@ public:
         return _sortBy;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionBottomN>(
-            getExpressionContext(), cloneChild(_kN), cloneChild(_kInput), _sortBy);
+            &expCtx, cloneChild(_kN, expCtx), cloneChild(_kInput, expCtx), _sortBy);
     }
 
 private:
@@ -3948,9 +3931,8 @@ public:
         return _sortBy;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionBottom>(
-            getExpressionContext(), cloneChild(_kInput), _sortBy);
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionBottom>(&expCtx, cloneChild(_kInput, expCtx), _sortBy);
     }
 
 private:
@@ -3984,8 +3966,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionIsArray>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionIsArray>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4046,9 +4028,9 @@ public:
         return FieldPath(constVal.getString());
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionInternalFindAllValuesAtPath>(getExpressionContext(),
-                                                                     cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionInternalFindAllValuesAtPath>(&expCtx,
+                                                                     cloneChildren(expCtx));
     }
 };
 
@@ -4070,8 +4052,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionRound>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionRound>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4097,8 +4079,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSplit>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSplit>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4121,8 +4103,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSqrt>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSqrt>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4145,8 +4127,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionStrcasecmp>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionStrcasecmp>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4169,8 +4151,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSubstrBytes>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSubstrBytes>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4193,8 +4175,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSubstrCP>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSubstrCP>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4218,8 +4200,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionStrLenBytes>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionStrLenBytes>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4247,8 +4229,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionBinarySize>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionBinarySize>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4271,8 +4253,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionStrLenCP>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionStrLenCP>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4295,8 +4277,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSubtract>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSubtract>(&expCtx, cloneChildren(expCtx));
     }
 
 private:
@@ -4360,8 +4342,8 @@ public:
         return _children.back().get();
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSwitch>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSwitch>(&expCtx, cloneChildren(expCtx));
     }
 
 private:
@@ -4390,8 +4372,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionToLower>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionToLower>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4415,8 +4397,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionToUpper>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionToUpper>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4480,12 +4462,12 @@ public:
         return _trimType;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionTrim>(getExpressionContext(),
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionTrim>(&expCtx,
                                               _trimType,
                                               _name,
-                                              cloneChild(_kInput),
-                                              cloneChild(_kCharacters));
+                                              cloneChild(_kInput, expCtx),
+                                              cloneChild(_kCharacters, expCtx));
     }
 
 private:
@@ -4515,8 +4497,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionTrunc>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionTrunc>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4544,8 +4526,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionType>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionType>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4572,8 +4554,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSubtype>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSubtype>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4596,8 +4578,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionIsNumber>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionIsNumber>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -4618,9 +4600,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionWeek>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -4643,9 +4625,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionIsoWeekYear>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -4668,9 +4650,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionIsoDayOfWeek>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -4693,9 +4675,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionIsoWeek>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -4717,9 +4699,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionYear>(
-            getExpressionContext(), cloneChild(_kDate), cloneChild(_kTimeZone));
+            &expCtx, cloneChild(_kDate, expCtx), cloneChild(_kTimeZone, expCtx));
     }
 };
 
@@ -4769,8 +4751,8 @@ public:
         return _defaults;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        ExpressionVector children = cloneChildren();
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        ExpressionVector children = cloneChildren(expCtx);
         std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> inputs;
         std::vector<std::reference_wrapper<boost::intrusive_ptr<Expression>>> defaults;
 
@@ -4791,7 +4773,7 @@ public:
             defaults.push_back(children[childIdx]);
         }
 
-        return make_intrusive<ExpressionZip>(getExpressionContext(),
+        return make_intrusive<ExpressionZip>(&expCtx,
                                              _useLongestLength,
                                              std::move(children),
                                              std::move(inputs),
@@ -4943,15 +4925,15 @@ public:
         return _allowBinDataConvertNumeric;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionConvert>(getExpressionContext(),
-                                                 cloneChild(_kInput),
-                                                 cloneChild(_kTo),
-                                                 cloneChild(_kBase),
-                                                 cloneChild(_kFormat),
-                                                 cloneChild(_kOnError),
-                                                 cloneChild(_kOnNull),
-                                                 cloneChild(_kByteOrder),
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionConvert>(&expCtx,
+                                                 cloneChild(_kInput, expCtx),
+                                                 cloneChild(_kTo, expCtx),
+                                                 cloneChild(_kBase, expCtx),
+                                                 cloneChild(_kFormat, expCtx),
+                                                 cloneChild(_kOnError, expCtx),
+                                                 cloneChild(_kOnNull, expCtx),
+                                                 cloneChild(_kByteOrder, expCtx),
                                                  _allowBinDataConvert,
                                                  _allowBinDataConvertNumeric);
     }
@@ -5079,11 +5061,11 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionRegexFind>(getExpressionContext(),
-                                                   cloneChild(_kInput),
-                                                   cloneChild(_kRegex),
-                                                   cloneChild(_kOptions),
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionRegexFind>(&expCtx,
+                                                   cloneChild(_kInput, expCtx),
+                                                   cloneChild(_kRegex, expCtx),
+                                                   cloneChild(_kOptions, expCtx),
                                                    getOpName());
     }
 };
@@ -5105,11 +5087,11 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionRegexFindAll>(getExpressionContext(),
-                                                      cloneChild(_kInput),
-                                                      cloneChild(_kRegex),
-                                                      cloneChild(_kOptions),
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionRegexFindAll>(&expCtx,
+                                                      cloneChild(_kInput, expCtx),
+                                                      cloneChild(_kRegex, expCtx),
+                                                      cloneChild(_kOptions, expCtx),
                                                       getOpName());
     }
 };
@@ -5132,11 +5114,11 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionRegexMatch>(getExpressionContext(),
-                                                    cloneChild(_kInput),
-                                                    cloneChild(_kRegex),
-                                                    cloneChild(_kOptions),
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionRegexMatch>(&expCtx,
+                                                    cloneChild(_kInput, expCtx),
+                                                    cloneChild(_kRegex, expCtx),
+                                                    cloneChild(_kOptions, expCtx),
                                                     getOpName());
     }
 };
@@ -5168,8 +5150,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionRandom>(getExpressionContext());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionRandom>(&expCtx);
     }
 };
 
@@ -5200,8 +5182,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionCurrentDate>(getExpressionContext());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionCurrentDate>(&expCtx);
     }
 };
 
@@ -5228,8 +5210,8 @@ public:
     Value evaluate(const Document& root, Variables* variables) const override;
     Value serialize(const SerializationOptions& options = {}) const final;
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionToHashedIndexKey>(getExpressionContext(), cloneChild(0));
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionToHashedIndexKey>(&expCtx, cloneChild(0, expCtx));
     }
 };
 
@@ -5316,12 +5298,12 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionDateAdd>(getExpressionContext(),
-                                                 cloneChild(_kStartDate),
-                                                 cloneChild(_kUnit),
-                                                 cloneChild(_kAmount),
-                                                 cloneChild(_kTimeZone),
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionDateAdd>(&expCtx,
+                                                 cloneChild(_kStartDate, expCtx),
+                                                 cloneChild(_kUnit, expCtx),
+                                                 cloneChild(_kAmount, expCtx),
+                                                 cloneChild(_kTimeZone, expCtx),
                                                  getOpName());
     }
 
@@ -5348,12 +5330,12 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionDateSubtract>(getExpressionContext(),
-                                                      cloneChild(_kStartDate),
-                                                      cloneChild(_kUnit),
-                                                      cloneChild(_kAmount),
-                                                      cloneChild(_kTimeZone),
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionDateSubtract>(&expCtx,
+                                                      cloneChild(_kStartDate, expCtx),
+                                                      cloneChild(_kUnit, expCtx),
+                                                      cloneChild(_kAmount, expCtx),
+                                                      cloneChild(_kTimeZone, expCtx),
                                                       getOpName());
     }
 
@@ -5506,13 +5488,13 @@ public:
         return _parsedStartOfWeek;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionDateTrunc>(getExpressionContext(),
-                                                   cloneChild(_kDate),
-                                                   cloneChild(_kUnit),
-                                                   cloneChild(_kBinSize),
-                                                   cloneChild(_kTimeZone),
-                                                   cloneChild(_kStartOfWeek));
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionDateTrunc>(&expCtx,
+                                                   cloneChild(_kDate, expCtx),
+                                                   cloneChild(_kUnit, expCtx),
+                                                   cloneChild(_kBinSize, expCtx),
+                                                   cloneChild(_kTimeZone, expCtx),
+                                                   cloneChild(_kStartOfWeek, expCtx));
     }
 
 private:
@@ -5597,9 +5579,9 @@ public:
         return _children[_kInput].get();
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionGetField>(
-            getExpressionContext(), cloneChild(_kField), cloneChild(_kInput));
+            &expCtx, cloneChild(_kField, expCtx), cloneChild(_kInput, expCtx));
     }
 
     static constexpr auto kExpressionName = "$getField"_sd;
@@ -5658,9 +5640,11 @@ public:
         return _children[_kValue].get();
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionSetField>(
-            getExpressionContext(), cloneChild(_kField), cloneChild(_kInput), cloneChild(_kValue));
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionSetField>(&expCtx,
+                                                  cloneChild(_kField, expCtx),
+                                                  cloneChild(_kInput, expCtx),
+                                                  cloneChild(_kValue, expCtx));
     }
 
     static constexpr auto kExpressionName = "$setField"_sd;
@@ -5704,8 +5688,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionTsSecond>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionTsSecond>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -5733,8 +5717,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionTsIncrement>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionTsIncrement>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -5789,8 +5773,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionBitAnd>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionBitAnd>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -5823,8 +5807,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionBitOr>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionBitOr>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -5858,8 +5842,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionBitXor>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionBitXor>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -5885,8 +5869,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionBitNot>(getExpressionContext(), cloneChildren());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionBitNot>(&expCtx, cloneChildren(expCtx));
     }
 };
 
@@ -5970,9 +5954,9 @@ public:
         return _children[_kCollation].get();
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionInternalKeyStringValue>(
-            getExpressionContext(), cloneChild(_kInput), cloneChild(_kCollation));
+            &expCtx, cloneChild(_kInput, expCtx), cloneChild(_kCollation, expCtx));
     }
 
 private:
@@ -6007,8 +5991,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionCreateUUID>(getExpressionContext());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionCreateUUID>(&expCtx);
     }
 };
 
@@ -6037,8 +6021,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionCreateObjectId>(getExpressionContext());
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionCreateObjectId>(&expCtx);
     }
 };
 
@@ -6069,7 +6053,7 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final;
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final;
 
     const Expression& getInput() const;
     const Expression* getRelaxed() const;
@@ -6112,7 +6096,7 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final;
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final;
 
     const Expression& getInput() const;
     const Expression* getOnError() const;
@@ -6162,7 +6146,7 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final;
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final;
 
     const Expression& getInput() const;
     const Expression& getAlgorithm() const;
@@ -6229,9 +6213,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionEncStrStartsWith>(
-            getExpressionContext(), cloneChild(_kInput), cloneChild(_kTextOperand));
+            &expCtx, cloneChild(_kInput, expCtx), cloneChild(_kTextOperand, expCtx));
     }
 };
 
@@ -6257,9 +6241,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionEncStrEndsWith>(
-            getExpressionContext(), cloneChild(_kInput), cloneChild(_kTextOperand));
+            &expCtx, cloneChild(_kInput, expCtx), cloneChild(_kTextOperand, expCtx));
     }
 };
 
@@ -6285,9 +6269,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionEncStrContains>(
-            getExpressionContext(), cloneChild(_kInput), cloneChild(_kTextOperand));
+            &expCtx, cloneChild(_kInput, expCtx), cloneChild(_kTextOperand, expCtx));
     }
 };
 
@@ -6313,9 +6297,9 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionEncStrNormalizedEq>(
-            getExpressionContext(), cloneChild(_kInput), cloneChild(_kTextOperand));
+            &expCtx, cloneChild(_kInput, expCtx), cloneChild(_kTextOperand, expCtx));
     }
 };
 

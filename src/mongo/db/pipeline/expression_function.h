@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -38,7 +37,6 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
 
 #include <string>
@@ -108,9 +106,8 @@ public:
     static constexpr auto kExpressionName = "$function"_sd;
     static constexpr auto kJavaScript = "js";
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return ExpressionFunction::create(
-            getExpressionContext(), cloneChild(0), _funcSource, _lang);
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return ExpressionFunction::create(&expCtx, cloneChild(0, expCtx), _funcSource, _lang);
     }
 
 private:

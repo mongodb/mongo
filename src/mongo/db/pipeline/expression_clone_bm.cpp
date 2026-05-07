@@ -66,7 +66,7 @@ protected:
 class ExpressionNativeCloneBenchmarkFixture : public ExpressionCloneBenchmarkFixture {
 protected:
     boost::intrusive_ptr<Expression> cloneExpression(const Expression* expr) const final {
-        return expr->clone();
+        return expr->clone(*expr->getExpressionContext());
     }
 };
 

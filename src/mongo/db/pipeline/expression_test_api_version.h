@@ -70,9 +70,8 @@ public:
         return visitor->visit(this);
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionTestApiVersion>(
-            getExpressionContext(), _unstable, _deprecated);
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionTestApiVersion>(&expCtx, _unstable, _deprecated);
     }
 
 private:

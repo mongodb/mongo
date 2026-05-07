@@ -33,7 +33,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
@@ -115,10 +114,10 @@ public:
         return _matchExpr;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return make_intrusive<ExpressionInternalFindPositional>(getExpressionContext(),
-                                                                cloneChild(_kPreImageExpr),
-                                                                cloneChild(_kPostImageExpr),
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return make_intrusive<ExpressionInternalFindPositional>(&expCtx,
+                                                                cloneChild(_kPreImageExpr, expCtx),
+                                                                cloneChild(_kPostImageExpr, expCtx),
                                                                 _path,
                                                                 _matchExpr);
     }
@@ -189,9 +188,9 @@ public:
         return _limit;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionInternalFindSlice>(
-            getExpressionContext(), cloneChild(0), _path, _skip, _limit);
+            &expCtx, cloneChild(0, expCtx), _path, _skip, _limit);
     }
 
 private:
@@ -260,9 +259,9 @@ public:
         return _matchExpr;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
         return make_intrusive<ExpressionInternalFindElemMatch>(
-            getExpressionContext(), cloneChild(0), _path, _matchExpr);
+            &expCtx, cloneChild(0, expCtx), _path, _matchExpr);
     }
 
 private:

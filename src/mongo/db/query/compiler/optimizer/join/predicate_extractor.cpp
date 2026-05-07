@@ -94,7 +94,7 @@ struct PredicateExtractor {
     std::unique_ptr<MatchExpression> aggToMatchExpr(
         boost::intrusive_ptr<const Expression> aggExpr) {
         boost::intrusive_ptr<ExpressionContext> expCtx(aggExpr->getExpressionContext());
-        return std::make_unique<ExprMatchExpression>(aggExpr->clone(), expCtx);
+        return std::make_unique<ExprMatchExpression>(aggExpr->clone(*expCtx), expCtx);
     }
 
     boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(

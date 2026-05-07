@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -38,10 +37,7 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/str.h"
 
 #include <string>
 #include <utility>
@@ -90,8 +86,8 @@ public:
         return _funcSource;
     }
 
-    boost::intrusive_ptr<Expression> clone() const final {
-        return ExpressionInternalJsEmit::create(getExpressionContext(), cloneChild(0), _funcSource);
+    boost::intrusive_ptr<Expression> clone(ExpressionContext& expCtx) const final {
+        return ExpressionInternalJsEmit::create(&expCtx, cloneChild(0, expCtx), _funcSource);
     }
 
 private:

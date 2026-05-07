@@ -30,24 +30,17 @@
 #include "mongo/db/pipeline/variables.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/auth/auth_name.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/role_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/variable_validation.h"
-#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -525,8 +518,8 @@ std::pair<LegacyRuntimeConstants, BSONObj> VariablesParseState::transitionalComp
     return {vars.transitionalExtractRuntimeConstants(), bob.obj()};
 }
 
-LetVariable LetVariable::cloneUsingNewExpCtx(ExpressionContext* newExpCtx) const {
-    auto clonedExpr = expression ? expression->cloneUsingNewExpCtx(newExpCtx) : nullptr;
+LetVariable LetVariable::clone(ExpressionContext& expCtx) const {
+    auto clonedExpr = expression ? expression->clone(expCtx) : nullptr;
     return {name, std::move(clonedExpr), id};
 }
 }  // namespace mongo

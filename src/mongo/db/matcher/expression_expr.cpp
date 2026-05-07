@@ -29,18 +29,10 @@
 
 #include "mongo/db/matcher/expression_expr.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
-#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/platform/compiler.h"
 
 #include <utility>
 
@@ -105,7 +97,7 @@ void ExprMatchExpression::_doSetCollator(const CollatorInterface* collator) {
 
 
 std::unique_ptr<MatchExpression> ExprMatchExpression::clone() const {
-    boost::intrusive_ptr<Expression> clonedExpr = _expression->clone();
+    boost::intrusive_ptr<Expression> clonedExpr = _expression->clone(*_expCtx);
     auto clone =
         std::make_unique<ExprMatchExpression>(std::move(clonedExpr), _expCtx, _errorAnnotation);
     if (_rewriteResult) {

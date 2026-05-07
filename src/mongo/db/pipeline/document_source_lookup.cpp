@@ -39,7 +39,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -54,14 +53,12 @@
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 #include "mongo/db/pipeline/variable_validation.h"
-#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
@@ -571,7 +568,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
             static_cast<DocumentSourceUnwind*>(original._unwindSrc->clone(getExpCtx()).get());
     }
     // clone let variables with new expCtx in case the original expCtx is deleted.
-    copyLetVariablesWithNewExpCtx(original._letVariables, newExpCtx.get());
+    copyLetVariablesWithNewExpCtx(original._letVariables, *newExpCtx);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::clone(
@@ -580,12 +577,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::clone(
 }
 
 void DocumentSourceLookUp::copyLetVariablesWithNewExpCtx(const std::vector<LetVariable>& src,
-                                                         ExpressionContext* newExpCtx) {
+                                                         ExpressionContext& newExpCtx) {
     _letVariables.clear();
     _letVariables.reserve(src.size());
 
     for (const auto& var : src) {
-        _letVariables.emplace_back(var.cloneUsingNewExpCtx(newExpCtx));
+        _letVariables.emplace_back(var.clone(newExpCtx));
     }
 }
 

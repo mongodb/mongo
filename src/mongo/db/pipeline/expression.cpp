@@ -46,17 +46,12 @@
 // IWYU pragma: no_include <pstl/glue_algorithm_defs.h>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
-#include "mongo/base/parse_number.h"
-#include "mongo/bson/bsonelement_comparator_interface.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/db/api_parameters.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_flag.h"
@@ -69,16 +64,12 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
-#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 using Parser = Expression::Parser;
@@ -88,7 +79,7 @@ using std::pair;
 using std::string;
 using std::vector;
 
-Expression::ExpressionVector Expression::cloneChildren() const {
+Expression::ExpressionVector Expression::cloneChildren(ExpressionContext& expCtx) const {
     if (_children.empty()) {
         return {};
     }
@@ -97,35 +88,19 @@ Expression::ExpressionVector Expression::cloneChildren() const {
 
     copy.resize(_children.size());
     for (size_t childIdx = 0; childIdx < _children.size(); ++childIdx) {
-        copy[childIdx] = cloneChild(childIdx);
+        copy[childIdx] = cloneChild(childIdx, expCtx);
     }
 
     return copy;
 }
 
-boost::intrusive_ptr<Expression> Expression::cloneChild(size_t childIdx) const {
+boost::intrusive_ptr<Expression> Expression::cloneChild(size_t childIdx,
+                                                        ExpressionContext& expCtx) const {
     tassert(
         3100300,
         fmt::format("Child index is out of bounds: idx={}, size={}", childIdx, _children.size()),
         childIdx < _children.size());
-    return _children[childIdx] ? _children[childIdx]->clone() : nullptr;
-}
-
-// Clone by serializing and reparsing.
-boost::intrusive_ptr<Expression> Expression::cloneUsingNewExpCtx(
-    ExpressionContext* newExpCtx) const {
-    // Serialize this expression to a generic Value.
-    SerializationOptions opts{.serializeForCloning = true};
-    auto val = serialize(opts);
-
-    // Wrap it into a BSONObj as the value of a dummy field.
-    BSONObjBuilder bob;
-    val.addToBsonObj(&bob, "");
-    BSONObj obj = bob.obj();
-    BSONElement elem = obj.firstElement();
-
-    // Re-parse as an operand in the new ExpressionContext.
-    return Expression::parseOperand(newExpCtx, elem, newExpCtx->variablesParseState);
+    return _children[childIdx] ? _children[childIdx]->clone(expCtx) : nullptr;
 }
 
 Value ExpressionConstant::serializeConstant(const SerializationOptions& opts,
@@ -5115,11 +5090,11 @@ Value ExpressionSerializeEJSON::serialize(const SerializationOptions& options) c
     }});
 }
 
-boost::intrusive_ptr<Expression> ExpressionSerializeEJSON::clone() const {
-    return make_intrusive<ExpressionSerializeEJSON>(getExpressionContext(),
-                                                    cloneChild(_kInputIdx),
-                                                    cloneChild(_kRelaxedIdx),
-                                                    cloneChild(_kOnErrorIdx));
+boost::intrusive_ptr<Expression> ExpressionSerializeEJSON::clone(ExpressionContext& expCtx) const {
+    return make_intrusive<ExpressionSerializeEJSON>(&expCtx,
+                                                    cloneChild(_kInputIdx, expCtx),
+                                                    cloneChild(_kRelaxedIdx, expCtx),
+                                                    cloneChild(_kOnErrorIdx, expCtx));
 }
 
 const Expression& ExpressionSerializeEJSON::getInput() const {
@@ -5206,9 +5181,10 @@ Value ExpressionDeserializeEJSON::serialize(const SerializationOptions& options)
     }});
 }
 
-boost::intrusive_ptr<Expression> ExpressionDeserializeEJSON::clone() const {
+boost::intrusive_ptr<Expression> ExpressionDeserializeEJSON::clone(
+    ExpressionContext& expCtx) const {
     return make_intrusive<ExpressionDeserializeEJSON>(
-        getExpressionContext(), cloneChild(_kInputIdx), cloneChild(_kOnErrorIdx));
+        &expCtx, cloneChild(_kInputIdx, expCtx), cloneChild(_kOnErrorIdx, expCtx));
 }
 
 const Expression& ExpressionDeserializeEJSON::getInput() const {
@@ -5300,9 +5276,9 @@ Value ExpressionHash::serialize(const SerializationOptions& options) const {
     }});
 }
 
-boost::intrusive_ptr<Expression> ExpressionHash::clone() const {
+boost::intrusive_ptr<Expression> ExpressionHash::clone(ExpressionContext& expCtx) const {
     return make_intrusive<ExpressionHash>(
-        getExpressionContext(), cloneChild(_kInputIdx), cloneChild(_kAlgorithmIdx));
+        &expCtx, cloneChild(_kInputIdx, expCtx), cloneChild(_kAlgorithmIdx, expCtx));
 }
 
 const Expression& ExpressionHash::getInput() const {
