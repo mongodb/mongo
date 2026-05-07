@@ -52,6 +52,11 @@ public:
     /**
      * Persists the given session information, or clears it if 'osi' is boost::none. The
      * OperationSessionTracker will call this with boost::none when releasing a session.
+     *
+     * Implementations must ensure the write is majority-committed before returning, so that
+     * the session cannot be used before it is durably recorded. This can be achieved either by
+     * writing with a majority write concern or by explicitly waiting for majority replication
+     * after the write.
      */
     virtual void writeSession(OperationContext* opCtx,
                               const boost::optional<OperationSessionInfo>& osi) = 0;

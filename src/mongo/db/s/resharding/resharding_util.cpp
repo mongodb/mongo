@@ -736,14 +736,18 @@ ReshardingCoordinatorDocument getCoordinatorDoc(
     return getCoordinatorDoc(readOpCtx.get(), reshardingUUID);
 }
 
-SemiFuture<void> waitForMajority(const CancellationToken& token,
-                                 const HierarchicalCancelableOperationContextFactory& factory) {
-    auto opCtx = factory.makeOperationContext(&cc());
+SemiFuture<void> waitForMajority(OperationContext* opCtx, const CancellationToken& token) {
     auto client = opCtx->getClient();
-    repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx.get());
+    repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx);
     auto opTime = repl::ReplClientInfo::forClient(client).getLastOp();
     return WaitForMajorityService::get(client->getServiceContext())
         .waitUntilMajorityForWrite(opTime, token);
+}
+
+SemiFuture<void> waitForMajority(const CancellationToken& token,
+                                 const HierarchicalCancelableOperationContextFactory& factory) {
+    auto opCtx = factory.makeOperationContext(&cc());
+    return waitForMajority(opCtx.get(), token);
 }
 
 ExecutorFuture<void> waitForReplicationOnVotingMembers(

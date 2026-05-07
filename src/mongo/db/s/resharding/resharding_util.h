@@ -603,8 +603,11 @@ ReshardingCoordinatorDocument getCoordinatorDoc(
     const UUID& reshardingUUID);
 
 // Waits for majority replication of the latest opTime unless token is cancelled.
-SemiFuture<void> waitForMajority(const CancellationToken& token,
-                                 const HierarchicalCancelableOperationContextFactory& factory);
+[[nodiscard]] SemiFuture<void> waitForMajority(OperationContext* opCtx,
+                                               const CancellationToken& token);
+[[nodiscard]] SemiFuture<void> waitForMajority(
+    const CancellationToken& token, const HierarchicalCancelableOperationContextFactory& factory);
+
 
 /**
  * Waits for the replication lag across all voting members to be below the given threshold.

@@ -257,7 +257,9 @@ void ReshardingCoordinator::writeSession(OperationContext* opCtx,
     if (osi) {
         session.emplace(*osi->getSessionId(), *osi->getTxnNumber());
     }
-    _installCoordinatorDoc(_coordinatorDao.updateSession(opCtx, session));
+    auto updatedDoc = _coordinatorDao.updateSession(opCtx, session);
+    resharding::waitForMajority(opCtx, _ctHolder->getStepdownToken()).get(opCtx);
+    _installCoordinatorDoc(updatedDoc);
 }
 
 OperationSessionInfo ReshardingCoordinator::_getNewSession(OperationContext* opCtx) {
