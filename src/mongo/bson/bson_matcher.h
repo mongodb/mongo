@@ -225,6 +225,20 @@ BSON_MATCHER_SIMPLE_CMP_(BSONObjGE, ">=", >=);
 #undef BSON_MATCHER_SIMPLE_CMP_
 
 /**
+ * `BSONObjBinaryEQ(obj)` Matcher for bson objects that test equality via BSONObj::binaryEqual.
+ *
+ * Example:
+ *   ASSERT_THAT(actual, BSONObjBinaryEQ(expected));
+ */
+MATCHER_P(BSONObjBinaryEQ,
+          rhs,
+          fmt::format("{} a BSONObj binary equal to {}",
+                      negation ? "isn't" : "is",
+                      rhs.toString())) {
+    return arg.binaryEqual(rhs);
+}
+
+/**
  * `BSONElement{EQ,NE,LT,LE,GT,GE}(elem)` Comparsion machers for bson elemens that uses
  * the SimpleBSONElementComparator.
  *

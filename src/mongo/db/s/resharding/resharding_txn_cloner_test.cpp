@@ -385,7 +385,7 @@ protected:
             client.findOne(NamespaceString::kRsOplogNamespace,
                            BSON(repl::OplogEntryBase::kSessionIdFieldName << sessionId.toBSON()));
 
-        ASSERT_BSONOBJ_EQ(bsonOplog, {});
+        ASSERT_BSONOBJ_EQ(bsonOplog, BSONObj());
         ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber(), txnNum);
     }
 

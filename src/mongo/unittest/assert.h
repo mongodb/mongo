@@ -38,6 +38,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_matcher.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
@@ -273,78 +274,45 @@ T assertGet(StatusWith<T>&& swt) {
 
 
 /**
- * BSON comparison utility macro. Do not use directly.
- */
-#define ASSERT_BSON_COMPARISON(NAME, a, b, astr, bstr) \
-    ::mongo::unittest::assertComparison_##NAME(__FILE__, __LINE__, astr, bstr, a, b)
-
-/**
  * Use to compare two instances of type BSONObj under the default comparator in unit tests.
  */
-#define ASSERT_BSONOBJ_EQ(a, b) ASSERT_BSON_COMPARISON(BSONObjEQ, a, b, #a, #b)
-#define ASSERT_BSONOBJ_LT(a, b) ASSERT_BSON_COMPARISON(BSONObjLT, a, b, #a, #b)
-#define ASSERT_BSONOBJ_LTE(a, b) ASSERT_BSON_COMPARISON(BSONObjLTE, a, b, #a, #b)
-#define ASSERT_BSONOBJ_GT(a, b) ASSERT_BSON_COMPARISON(BSONObjGT, a, b, #a, #b)
-#define ASSERT_BSONOBJ_GTE(a, b) ASSERT_BSON_COMPARISON(BSONObjGTE, a, b, #a, #b)
-#define ASSERT_BSONOBJ_NE(a, b) ASSERT_BSON_COMPARISON(BSONObjNE, a, b, #a, #b)
+#define ASSERT_BSONOBJ_EQ(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONObjEQ(b))
+#define ASSERT_BSONOBJ_LT(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONObjLT(b))
+#define ASSERT_BSONOBJ_LTE(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONObjLE(b))
+#define ASSERT_BSONOBJ_GT(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONObjGT(b))
+#define ASSERT_BSONOBJ_GTE(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONObjGE(b))
+#define ASSERT_BSONOBJ_NE(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONObjNE(b))
 
 /**
  * Use to compare two instances of type BSONObj with unordered fields in unit tests.
  */
-#define ASSERT_BSONOBJ_EQ_UNORDERED(a, b) ASSERT_BSON_COMPARISON(BSONObjEQ_UNORDERED, a, b, #a, #b)
-#define ASSERT_BSONOBJ_LT_UNORDERED(a, b) ASSERT_BSON_COMPARISON(BSONObjLT_UNORDERED, a, b, #a, #b)
+#define ASSERT_BSONOBJ_EQ_UNORDERED(a, b) \
+    ASSERT_THAT(a, ::mongo::unittest::match::BSONObjUnorderedEQ(b))
+#define ASSERT_BSONOBJ_LT_UNORDERED(a, b) \
+    ASSERT_THAT(a, ::mongo::unittest::match::BSONObjUnorderedLT(b))
 #define ASSERT_BSONOBJ_LTE_UNORDERED(a, b) \
-    ASSERT_BSON_COMPARISON(BSONObjLTE_UNORDERED, a, b, #a, #b)
-#define ASSERT_BSONOBJ_GT_UNORDERED(a, b) ASSERT_BSON_COMPARISON(BSONObjGT_UNORDERED, a, b, #a, #b)
+    ASSERT_THAT(a, ::mongo::unittest::match::BSONObjUnorderedLE(b))
+#define ASSERT_BSONOBJ_GT_UNORDERED(a, b) \
+    ASSERT_THAT(a, ::mongo::unittest::match::BSONObjUnorderedGT(b))
 #define ASSERT_BSONOBJ_GTE_UNORDERED(a, b) \
-    ASSERT_BSON_COMPARISON(BSONObjGTE_UNORDERED, a, b, #a, #b)
-#define ASSERT_BSONOBJ_NE_UNORDERED(a, b) ASSERT_BSON_COMPARISON(BSONObjNE_UNORDERED, a, b, #a, #b)
+    ASSERT_THAT(a, ::mongo::unittest::match::BSONObjUnorderedGE(b))
+#define ASSERT_BSONOBJ_NE_UNORDERED(a, b) \
+    ASSERT_THAT(a, ::mongo::unittest::match::BSONObjUnorderedNE(b))
 
 /**
  * Use to compare two instances of type BSONElement under the default comparator in unit tests.
  */
-#define ASSERT_BSONELT_EQ(a, b) ASSERT_BSON_COMPARISON(BSONElementEQ, a, b, #a, #b)
-#define ASSERT_BSONELT_LT(a, b) ASSERT_BSON_COMPARISON(BSONElementLT, a, b, #a, #b)
-#define ASSERT_BSONELT_LTE(a, b) ASSERT_BSON_COMPARISON(BSONElementLTE, a, b, #a, #b)
-#define ASSERT_BSONELT_GT(a, b) ASSERT_BSON_COMPARISON(BSONElementGT, a, b, #a, #b)
-#define ASSERT_BSONELT_GTE(a, b) ASSERT_BSON_COMPARISON(BSONElementGTE, a, b, #a, #b)
-#define ASSERT_BSONELT_NE(a, b) ASSERT_BSON_COMPARISON(BSONElementNE, a, b, #a, #b)
+#define ASSERT_BSONELT_EQ(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONElementEQ(b))
+#define ASSERT_BSONELT_LT(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONElementLT(b))
+#define ASSERT_BSONELT_LTE(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONElementLE(b))
+#define ASSERT_BSONELT_GT(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONElementGT(b))
+#define ASSERT_BSONELT_GTE(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONElementGE(b))
+#define ASSERT_BSONELT_NE(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONElementNE(b))
 
-#define ASSERT_BSONOBJ_BINARY_EQ(a, b) \
-    ::mongo::unittest::assertComparison_BSONObjBINARY_EQ(__FILE__, __LINE__, #a, #b, a, b)
-
-#define DECLARE_BSON_CMP_FUNC(BSONTYPE, NAME)                          \
-    MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS                             \
-    void assertComparison_##BSONTYPE##NAME(const std::string& theFile, \
-                                           unsigned theLine,           \
-                                           StringData aExpression,     \
-                                           StringData bExpression,     \
-                                           const BSONTYPE& aValue,     \
-                                           const BSONTYPE& bValue);
-
-DECLARE_BSON_CMP_FUNC(BSONObj, EQ);
-DECLARE_BSON_CMP_FUNC(BSONObj, LT);
-DECLARE_BSON_CMP_FUNC(BSONObj, LTE);
-DECLARE_BSON_CMP_FUNC(BSONObj, GT);
-DECLARE_BSON_CMP_FUNC(BSONObj, GTE);
-DECLARE_BSON_CMP_FUNC(BSONObj, NE);
-
-DECLARE_BSON_CMP_FUNC(BSONObj, EQ_UNORDERED);
-DECLARE_BSON_CMP_FUNC(BSONObj, LT_UNORDERED);
-DECLARE_BSON_CMP_FUNC(BSONObj, LTE_UNORDERED);
-DECLARE_BSON_CMP_FUNC(BSONObj, GT_UNORDERED);
-DECLARE_BSON_CMP_FUNC(BSONObj, GTE_UNORDERED);
-DECLARE_BSON_CMP_FUNC(BSONObj, NE_UNORDERED);
-
-DECLARE_BSON_CMP_FUNC(BSONObj, BINARY_EQ);
-
-DECLARE_BSON_CMP_FUNC(BSONElement, EQ);
-DECLARE_BSON_CMP_FUNC(BSONElement, LT);
-DECLARE_BSON_CMP_FUNC(BSONElement, LTE);
-DECLARE_BSON_CMP_FUNC(BSONElement, GT);
-DECLARE_BSON_CMP_FUNC(BSONElement, GTE);
-DECLARE_BSON_CMP_FUNC(BSONElement, NE);
-#undef DECLARE_BSON_CMP_FUNC
+/**
+ * Like ASSERT_BSONOBJ_EQ but requires wire-identical BSON (`binaryEqual`), not logical equality.
+ */
+#define ASSERT_BSONOBJ_BINARY_EQ(a, b) ASSERT_THAT(a, ::mongo::unittest::match::BSONObjBinaryEQ(b))
 
 /**
  * Given a BSONObj, return a string that wraps the json form of the BSONObj with
