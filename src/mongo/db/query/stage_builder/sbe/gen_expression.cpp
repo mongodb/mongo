@@ -3268,31 +3268,7 @@ public:
         generateDateExpressionAcceptingTimeZone(sbe::EFn::kYear, expr);
     }
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {
-        size_t arity = expr->getChildren().size();
-        _context->ensureArity(arity);
-        if (arity == 0) {
-            pushExpr(_b.makeNullConstant());
-        } else if (arity == 1) {
-            SbExpr singleInput = popExpr();
-            auto frameId = _context->state.frameId();
-            SbVar singleInputVar{frameId, 0};
-
-            SbExpr avgOfArrayExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
-                SbExpr::makeExprPairVector(
-                    SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
-                               _b.makeNullConstant()},
-                    SbExprPair{_b.makeFunction(sbe::EFn::kIsArray, singleInputVar),
-                               _b.makeFillEmptyNull(
-                                   _b.makeFunction(sbe::EFn::kAvgOfArray, singleInputVar))},
-                    SbExprPair{_b.makeFunction(sbe::EFn::kIsNumber, singleInputVar),
-                               singleInputVar}),
-                _b.makeNullConstant());
-
-            pushExpr(_b.makeLet(
-                frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(avgOfArrayExpr)));
-        } else {
-            generateExpressionFromAccumulatorExpression(expr, _context, sbe::EFn::kAvgOfArray);
-        }
+        unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -3301,11 +3277,11 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {
-        visitMaxMinFunction(expr, _context, sbe::EFn::kMaxOfArray);
+        unsupportedExpression(expr->getOpName());
     }
 
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {
-        visitMaxMinFunction(expr, _context, sbe::EFn::kMinOfArray);
+        unsupportedExpression(expr->getOpName());
     }
 
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {
@@ -3321,92 +3297,13 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {
-        size_t arity = expr->getChildren().size();
-        _context->ensureArity(arity);
-
-        if (arity == 0) {
-            pushExpr(_b.makeNullConstant());
-        } else if (arity == 1) {
-            SbExpr singleInput = popExpr();
-
-            auto frameId = _context->state.frameId();
-            SbVar singleInputVar{frameId, 0};
-
-            SbExpr stdDevPopExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
-                SbExpr::makeExprPairVector(
-                    SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
-                               _b.makeNullConstant()},
-                    SbExprPair{_b.makeFunction(sbe::EFn::kIsArray, singleInputVar),
-                               _b.makeFillEmptyNull(
-                                   _b.makeFunction(sbe::EFn::kStdDevPop, singleInputVar))},
-                    SbExprPair{
-                        _b.makeFunction(sbe::EFn::kIsNumber, singleInputVar),
-                        // Population standard deviation for a single numeric input is always 0.
-                        _b.makeInt32Constant(0)}),
-                _b.makeNullConstant());
-
-            pushExpr(_b.makeLet(
-                frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(stdDevPopExpr)));
-        } else {
-            generateExpressionFromAccumulatorExpression(expr, _context, sbe::EFn::kStdDevPop);
-        }
+        unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {
-        size_t arity = expr->getChildren().size();
-        _context->ensureArity(arity);
-
-        if (arity == 0) {
-            pushExpr(_b.makeNullConstant());
-        } else if (arity == 1) {
-            SbExpr singleInput = popExpr();
-
-            auto frameId = _context->state.frameId();
-            SbVar singleInputVar{frameId, 0};
-
-            SbExpr stdDevSampExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
-                SbExpr::makeExprPairVector(
-                    SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
-                               _b.makeNullConstant()},
-                    SbExprPair{_b.makeFunction(sbe::EFn::kIsArray, singleInputVar),
-                               _b.makeFillEmptyNull(
-                                   _b.makeFunction(sbe::EFn::kStdDevSamp, singleInputVar))}),
-                // Sample standard deviation is undefined for a single input.
-                _b.makeNullConstant());
-
-            pushExpr(_b.makeLet(
-                frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(stdDevSampExpr)));
-        } else {
-            generateExpressionFromAccumulatorExpression(expr, _context, sbe::EFn::kStdDevSamp);
-        }
+        unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {
-        size_t arity = expr->getChildren().size();
-        _context->ensureArity(arity);
-        if (arity == 0) {
-            pushExpr(_b.makeNullConstant());
-        } else if (arity == 1) {
-            SbExpr singleInput = popExpr();
-
-            auto frameId = _context->state.frameId();
-            SbVar singleInputVar{frameId, 0};
-
-            // $sum returns 0 if the operand is missing, undefined, or non-numeric.
-            SbExpr sumOfArrayExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
-                SbExpr::makeExprPairVector(
-                    SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
-                               _b.makeInt32Constant(0)},
-                    SbExprPair{_b.makeFunction(sbe::EFn::kIsArray, singleInputVar),
-                               _b.makeFillEmptyNull(
-                                   _b.makeFunction(sbe::EFn::kSumOfArray, singleInputVar))},
-                    SbExprPair{_b.makeFunction(sbe::EFn::kIsNumber, singleInputVar),
-                               singleInputVar}),
-                _b.makeInt32Constant(0));
-
-            pushExpr(_b.makeLet(
-                frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(sumOfArrayExpr)));
-        } else {
-            generateExpressionFromAccumulatorExpression(expr, _context, sbe::EFn::kSumOfArray);
-        }
+        unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -4061,72 +3958,6 @@ private:
 
         // Build local binding tree.
         pushExpr(_b.makeLet(frameId, std::move(binds), std::move(resultExpr)));
-    }
-
-    /*
-     * Generates an EExpression that returns the maximum for $max and minimum for $min.
-     */
-    void visitMaxMinFunction(const Expression* expr,
-                             ExpressionVisitorContext* _context,
-                             sbe::EFn maxMinFunction) {
-        size_t arity = expr->getChildren().size();
-        _context->ensureArity(arity);
-
-        if (arity == 0) {
-            pushExpr(_b.makeNullConstant());
-        } else if (arity == 1) {
-            SbExpr singleInput = popExpr();
-
-            auto frameId = _context->state.frameId();
-            SbVar singleInputVar{frameId, 0};
-
-            SbExpr maxMinExpr = _b.buildMultiBranchConditionalFromCaseValuePairs(
-                SbExpr::makeExprPairVector(
-                    SbExprPair{_b.generateNullMissingOrUndefined(singleInputVar),
-                               _b.makeNullConstant()},
-                    SbExprPair{
-                        _b.makeFunction(sbe::EFn::kIsArray, singleInputVar),
-                        // In the case of a single argument, if the input is an array, $min or $max
-                        // operates on the elements of array to return a single value.
-                        _b.makeFillEmptyNull(_b.makeFunction(maxMinFunction, singleInputVar))}),
-                singleInputVar);
-
-            pushExpr(_b.makeLet(
-                frameId, SbExpr::makeSeq(std::move(singleInput)), std::move(maxMinExpr)));
-        } else {
-            generateExpressionFromAccumulatorExpression(expr, _context, maxMinFunction);
-        }
-    }
-
-    /*
-     * Converts n > 1 children into an array and generates an EExpression for
-     * ExpressionFromAccumulator expressions. Accepts an Expression, ExpressionVisitorContext, and
-     * the name of a builtin function.
-     */
-    void generateExpressionFromAccumulatorExpression(const Expression* expr,
-                                                     ExpressionVisitorContext* _context,
-                                                     sbe::EFn functionCall) {
-        size_t arity = expr->getChildren().size();
-
-        SbExpr::Vector binds;
-        for (size_t idx = 0; idx < arity; ++idx) {
-            binds.emplace_back(popExpr());
-        }
-        std::reverse(std::begin(binds), std::end(binds));
-
-        auto frameId = _context->state.frameId();
-        sbe::value::SlotId numLocalVars = 0;
-
-        SbExpr::Vector argVars;
-        for (size_t idx = 0; idx < arity; ++idx) {
-            argVars.push_back(SbVar{frameId, numLocalVars++});
-        }
-
-        // Take in all arguments and construct an array.
-        auto arrayExpr = _b.makeLet(
-            frameId, std::move(binds), _b.makeFunction(sbe::EFn::kNewArray, std::move(argVars)));
-
-        pushExpr(_b.makeFillEmptyNull(_b.makeFunction(functionCall, std::move(arrayExpr))));
     }
 
     /**

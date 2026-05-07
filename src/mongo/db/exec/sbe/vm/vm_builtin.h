@@ -238,12 +238,6 @@ enum class Builtin : uint16_t {
     objectToArray,
     setToArray,
     arrayToObject,
-    avgOfArray,  // Returns the $avg of an array.
-    maxOfArray,  // Returns the $max element of an array.
-    minOfArray,  // Returns the $min element of an array.
-    stdDevPop,   // Returns the $stdDevPop of an array.
-    stdDevSamp,  // Returns the $stdDevSamp of an array.
-    sumOfArray,  // Returns the $sum of an array
     unwindArray,
     arrayToSet,
     collArrayToSet,

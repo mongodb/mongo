@@ -761,68 +761,6 @@ TEST_F(GoldenGenExpressionTest, TestExprDate) {
     }
 }
 
-TEST_F(GoldenGenExpressionTest, TestExprAccumulator) {
-    auto root = BSON("_id" << 0 << "bar" << 5 << "arr" << BSON_ARRAY(1 << 2.5));
-    auto rootSlotId = _env->registerSlot("root"_sd,
-                                         sbe::value::TypeTags::bsonObject,
-                                         sbe::value::bitcastFrom<const char*>(root.objdata()),
-                                         false,
-                                         &_slotIdGenerator);
-    auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
-
-    Value val = Value(9.25);
-    auto constExpr = ExpressionConstant::create(_expCtx.get(), val);
-    auto fieldExpr = ExpressionFieldPath::createPathFromString(
-        _expCtx.get(), "bar", _expCtx->variablesParseState);
-    auto arrExpr = ExpressionFieldPath::createPathFromString(
-        _expCtx.get(), "arr", _expCtx->variablesParseState);
-
-    {
-        ExpressionFromAccumulator<AccumulatorAvg> accumAvgExpr(_expCtx.get());
-        accumAvgExpr.addOperand(fieldExpr);
-        accumAvgExpr.addOperand(constExpr);
-        runTest(
-            &accumAvgExpr, rootSlot, Value(7.125), "ExpressionFromAccumulator<AccumulatorAvg>"_sd);
-    }
-    {
-        ExpressionFromAccumulator<AccumulatorMax> accumMaxExpr(_expCtx.get());
-        accumMaxExpr.addOperand(arrExpr);
-        runTest(
-            &accumMaxExpr, rootSlot, Value(2.5), "ExpressionFromAccumulator<AccumulatorMax>"_sd);
-    }
-    {
-        ExpressionFromAccumulator<AccumulatorMin> accumMinExpr(_expCtx.get());
-        accumMinExpr.addOperand(fieldExpr);
-        accumMinExpr.addOperand(constExpr);
-        runTest(&accumMinExpr, rootSlot, Value(5), "ExpressionFromAccumulator<AccumulatorMin>"_sd);
-    }
-    {
-        ExpressionFromAccumulator<AccumulatorStdDevPop> accumStdDevPopExpr(_expCtx.get());
-        accumStdDevPopExpr.addOperand(arrExpr);
-        runTest(&accumStdDevPopExpr,
-                rootSlot,
-                Value(0.75),
-                "ExpressionFromAccumulator<AccumulatorStdDevPop>"_sd);
-    }
-    {
-        boost::intrusive_ptr<ExpressionFromAccumulator<AccumulatorStdDevSamp>> accumStdDevSampExpr{
-            new ExpressionFromAccumulator<AccumulatorStdDevSamp>(_expCtx.get())};
-        accumStdDevSampExpr->addOperand(arrExpr);
-        auto constExpr = ExpressionConstant::create(_expCtx.get(), Value(4));
-        ExpressionTrunc truncExpr(_expCtx.get(), {accumStdDevSampExpr, constExpr});
-        runTest(&truncExpr,
-                rootSlot,
-                Value(1.0606),
-                "ExpressionFromAccumulator<AccumulatorStdDevSamp>"_sd);
-    }
-    {
-        ExpressionFromAccumulator<AccumulatorSum> accumSumExpr(_expCtx.get());
-        accumSumExpr.addOperand(fieldExpr);
-        accumSumExpr.addOperand(constExpr);
-        runTest(
-            &accumSumExpr, rootSlot, Value(14.25), "ExpressionFromAccumulator<AccumulatorSum>"_sd);
-    }
-}
 
 TEST_F(GoldenGenExpressionTest, TestExprArraySet) {
     auto root = BSON("_id" << 0 << "arr1" << BSONArray() << "arr2" << BSON_ARRAY(1 << 2.5 << "str")

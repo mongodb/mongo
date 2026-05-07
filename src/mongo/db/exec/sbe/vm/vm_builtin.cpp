@@ -347,18 +347,6 @@ std::string builtinToString(Builtin b) {
             return "objectToArray";
         case Builtin::arrayToObject:
             return "arrayToObject";
-        case Builtin::avgOfArray:
-            return "avgOfArray";
-        case Builtin::maxOfArray:
-            return "maxOfArray";
-        case Builtin::minOfArray:
-            return "minOfArray";
-        case Builtin::stdDevPop:
-            return "stdDevPop";
-        case Builtin::stdDevSamp:
-            return "stdDevSamp";
-        case Builtin::sumOfArray:
-            return "sumOfArray";
         case Builtin::unwindArray:
             return "unwindArray";
         case Builtin::arrayToSet:
@@ -954,18 +942,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinObjectToArray(arity);
         case Builtin::arrayToObject:
             return builtinArrayToObject(arity);
-        case Builtin::avgOfArray:
-            return builtinAvgOfArray(arity);
-        case Builtin::maxOfArray:
-            return builtinMaxOfArray(arity);
-        case Builtin::minOfArray:
-            return builtinMinOfArray(arity);
-        case Builtin::stdDevPop:
-            return builtinStdDevPop(arity);
-        case Builtin::stdDevSamp:
-            return builtinStdDevSamp(arity);
-        case Builtin::sumOfArray:
-            return builtinSumOfArray(arity);
         case Builtin::unwindArray:
             return builtinUnwindArray(arity);
         case Builtin::arrayToSet:
