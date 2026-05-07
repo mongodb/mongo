@@ -36,11 +36,13 @@ namespace mongo::document_transformation {
 
 /**
  * Modify path which defines the new value using an Expression.
+ * These are emitted exclusively by projection executors ($set/$addFields/$project), which
+ * traverse prefix arrays element-by-element, so sibling subpaths are preserved.
  */
 class ExpressionModifyPath final : public ModifyPath {
 public:
     ExpressionModifyPath(StringData path, boost::intrusive_ptr<Expression> expr)
-        : ModifyPath(path), _expr(expr) {}
+        : ModifyPath(path, ModifiedPrefixPolicy::kPreserveArrays), _expr(expr) {}
 
     bool isRemoved() const override {
         return false;
@@ -64,10 +66,13 @@ private:
 
 /**
  * A simple path removal, not a modification to $$REMOVE.
+ * Emitted exclusively by exclusion projection executors, which traverse prefix arrays
+ * element-by-element, so sibling subpaths are preserved.
  */
 class RemovePath final : public ModifyPath {
 public:
-    explicit RemovePath(StringData path) : ModifyPath(path) {}
+    explicit RemovePath(StringData path)
+        : ModifyPath(path, ModifiedPrefixPolicy::kPreserveArrays) {}
 
     bool isRemoved() const override {
         return true;
@@ -214,7 +219,7 @@ void describeGetModPathsReturn(DocumentOperationVisitor& visitor,
         } else if (!complexRenames.contains(path)) {
             // The DocumentOperationVisitor does not see complexRenames as modifications.
             // Instead, it will see them as a RenamePath operation with the appropriate flags.
-            visitor(ModifyPath{path});
+            visitor(ModifyPath{path, ModifiedPrefixPolicy::kNotSupported});
         }
     }
     for (const auto& [newPath, oldPath] : renames) {

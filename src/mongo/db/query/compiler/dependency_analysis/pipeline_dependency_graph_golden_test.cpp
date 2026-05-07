@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/pipeline/resolved_namespace.h"
 #include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
 #include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph_test_util.h"
 #include "mongo/unittest/golden_test.h"
@@ -97,8 +98,14 @@ private:
         }
         const NamespaceString kTestNss =
             NamespaceString::createNamespaceString_forTest("test", "collection");
+        const NamespaceString kCollB =
+            NamespaceString::createNamespaceString_forTest("test", "coll_b");
         AggregateCommandRequest request(kTestNss, rawPipeline);
         boost::intrusive_ptr<ExpressionContextForTest> ctx = new ExpressionContextForTest(kTestNss);
+        ResolvedNamespaceMap resolvedNs;
+        resolvedNs.insert_or_assign(kTestNss, {kTestNss, std::vector<BSONObj>{}});
+        resolvedNs.insert_or_assign(kCollB, {kCollB, std::vector<BSONObj>{}});
+        ctx->setResolvedNamespaces(std::move(resolvedNs));
         return pipeline_factory::makePipeline(
             request.getPipeline(), ctx, pipeline_factory::kOptionsMinimal);
     }
@@ -476,6 +483,26 @@ TEST_F(PipelineDependencyGraphGoldenTest, ExpressionWholeDocumentDependencyInLat
         .pipeline = "[{$set: {a: 1}},"
                     " {$set: {b: '$$ROOT'}},"
                     " {$set: {c: 2}}]",
+    });
+}
+
+// Since we don't know if 'a' is an array, we should assume that as: "a.b" could
+// discard the array and replace it with {a: {b: <result>}}
+TEST_F(PipelineDependencyGraphGoldenTest, LookupDottedAsPrefixCanBeArray) {
+    runVariation({
+        .name = "LookupDottedAsPrefixCanBeArray",
+        .pipeline = R"([{$set: {'a.c': 1}},
+                        {$lookup: {from: "coll_b", as: "a.b", pipeline: []}}])",
+    });
+}
+
+// Since we know 'a' cannot be an array, the field 'c' can be preserved.
+TEST_F(PipelineDependencyGraphGoldenTest, LookupDottedAsPrefixCannotBeArray) {
+    runVariation({
+        .name = "LookupDottedAsPrefixCannotBeArray",
+        .pipeline = R"([{$set: {a: 1}},
+                        {$set: {'a.c': 1}},
+                        {$lookup: {from: "coll_b", as: "a.b", pipeline: []}}])",
     });
 }
 

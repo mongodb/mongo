@@ -38,14 +38,15 @@
 namespace mongo::document_transformation {
 
 /**
- * A subclass for a modification which will never evaluate to an array.
+ * A subclass for a modification which will never evaluate to an array and has the kEnsureObjects
+ * prefix semantics.
  * Example:
  * {$lookup: {as: 'a.b.c'}} {$unwind: '$a.b.c'} - "$a.b.c" never evaluates to an array
  */
 class NonArrayModifyPath final : public ModifyPath {
 public:
     NonArrayModifyPath(StringData path, bool canLeafBeArray)
-        : ModifyPath(path), _canLeafBeArray(canLeafBeArray) {}
+        : ModifyPath(path, ModifiedPrefixPolicy::kEnsureObjects), _canLeafBeArray(canLeafBeArray) {}
 
     bool canLeafBeArray() const override {
         return _canLeafBeArray;

@@ -1753,6 +1753,21 @@ TEST_F(PipelineDependencyGraphTest, ArrayLeafSiblingRedeclared) {
         ASSERT_FALSE(graph->canPathBeArray(stages[0].get(), "a"));
         ASSERT_FALSE(graph->canPathBeArray(stages[0].get(), "a.b"));
         ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+    });
+}
+
+// $lookup writes its 'as' field directly. When the prefix component 'a' is an array, $lookup
+// replaces it with an object, destroying any subfields that existed before (e.g. 'a.c').
+TEST_F(PipelineDependencyGraphTest, ModifyPathLookupDottedAsMayDestroySibling) {
+    setPipeline(R"([{$lookup: {from: "coll_b", as: "a.b", pipeline: []}}])");
+
+    runTest([&] {
+        // 'a.c' may have been destroyed if 'a' was an array, so we attribute it to the lookup.
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.c"), stages[0]);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.b"), stages[0]);
+        // The prefix is always a plain object.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.c"));
         ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
     });
 }
@@ -1987,6 +2002,77 @@ TEST_F(PipelineDependencyGraphTest, PathWithDollarPrefixEmptyComponent) {
     // $match interprets field names starting with '$' as operators (e.g., $gt, $eq).
     // Since "$." is not a recognized operator, it fails.
     ASSERT_THROWS(setPipeline(R"([{$match: {"$.": 1}}])"), DBException);
+}
+
+// When 'a' is known to be non-array, $lookup will preserve all siblings, same as $set in this case.
+TEST_F(PipelineDependencyGraphTest, ModifyPathLookupDottedAsPreservesSiblingWhenNonArray) {
+    pathArrayness->addPath("a.c", {}, true);
+    setPipeline(R"([{$lookup: {from: "coll_b", as: "a.b", pipeline: []}}])");
+
+    runTest([&] {
+        // 'a.c' definitely comes from the base document, if it exists.
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.c"), nullptr);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.b"), stages[0]);
+        // The prefix is always a plain object.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.c"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+    });
+}
+
+// Same as above, given that 'a' could be an array, the $lookup is considered to not preserve the
+// sibling paths.
+TEST_F(PipelineDependencyGraphTest, ModifyPathLookupDottedAsShadowsPriorSibling) {
+    setPipeline(R"([
+        {$set: {'a.c': 1}},
+        {$lookup: {from: "coll_b", as: "a.b", pipeline: []}}
+    ])");
+
+    runTest([&] {
+        // The $set declared 'a.c', but the $lookup will discard it if 'a' is an array.
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.c"), stages[1]);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.b"), stages[1]);
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+    });
+}
+
+// When the prefix is known to be non-array, $lookup will preserve 'a.c'.
+TEST_F(PipelineDependencyGraphTest, ModifyPathLookupDottedAsPreservesPriorSiblingWhenNonArray) {
+    pathArrayness->addPath("a", {}, true);
+    setPipeline(R"([
+        {$set: {'a.c': 1}},
+        {$lookup: {from: "coll_b", as: "a.b", pipeline: []}}
+    ])");
+
+    runTest([&] {
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.c"), stages[0]);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.b"), stages[1]);
+    });
+}
+
+// $lookup with a 3-level deep path, ensures 'a' is non-array, 'a.b' is non-array.
+TEST_F(PipelineDependencyGraphTest, LookupDeepAsDestroySiblingsAtAllLevels) {
+    setPipeline(R"([{$lookup: {from: "coll_b", as: "a.b.c", pipeline: []}}])");
+    runTest([&] {
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.d"), stages[0]);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.b.d"), stages[0]);
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+    });
+}
+
+// Only 'a' is non-array, but 'a.b' could be. So siblings of 'a.b' are preserved, but not siblings
+// of 'a.b.c'.
+TEST_F(PipelineDependencyGraphTest, LookupDeepAsPartialPreservation) {
+    pathArrayness->addPath("a", {}, true);
+    setPipeline(R"([{$lookup: {from: "coll_b", as: "a.b.c", pipeline: []}}])");
+
+    runTest([&] {
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.d"), nullptr);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.b.d"), stages[0]);
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+    });
 }
 
 }  // namespace

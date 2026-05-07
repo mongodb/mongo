@@ -172,6 +172,7 @@ using ScopeId = TypedId<Scope>;
 using FieldId = TypedId<Field>;
 
 using FieldMap = absl::flat_hash_map<StringPool::Id, FieldId>;
+using ModifiedPrefixPolicy = document_transformation::ModifiedPrefixPolicy;
 
 /// Represents the set of field definition nodes that a stage or a field definition node depends on.
 /// When a stage depends on a field definition, it means that the stage references a field that was
@@ -712,9 +713,13 @@ private:
      * If 'a' already exists, any fields are preserved.
      * The 'dependencies' and 'metadata' are assigned to the declared field 'a.b'.
      * Returns the FieldId for the base component in path (for 'a.b' returns 'a').
+     * 'prefixPolicy' dictates whether the modification preserves arrays on the base field. When
+     * kEnsureObjects, writing to 'a.b' modifies 'a' to a plain object: if 'a' can be an array,
+     * 'a.c' from a prior stage may be discarded, so sibling subfields cannot be inherited.
      */
     FieldId declareField(ScopeId scope,
                          ParsedPathView path,
+                         ModifiedPrefixPolicy prefixPolicy,
                          FieldDependencies dependencies,
                          FieldMetadata metadata = {},
                          ParsedPathView collectionPathPrefix = {}) {
@@ -759,8 +764,10 @@ private:
             // updated embedded scope.
             auto embeddedScope = _scopes.getNextId();
             newBaseField = _fields.append(Field{scope, embeddedScope});
-            auto [exhaustiveEmbeddedScope, parentEmbeddedScope] =
-                resolveNewBaseFieldScopes(existingBaseField, embeddedScope);
+
+            auto [exhaustiveEmbeddedScope, parentEmbeddedScope] = resolveNewBaseFieldScopes(
+                prefixPolicy, existingBaseField, embeddedScope, collectionPathPrefix, path.front());
+
             if (parentEmbeddedScope) {
                 // The new field depends on the previous field, since it inherits paths.
                 _fields[newBaseField].dependencies.insert(existingBaseField);
@@ -769,12 +776,17 @@ private:
             _scopes[scope].fields[basePath.front()] = newBaseField;
             populateBaseFieldMetadata(
                 newBaseField, existingBaseField, collectionPathPrefix, basePath.front());
+            if (prefixPolicy == ModifiedPrefixPolicy::kEnsureObjects) {
+                // The modification modifies 'a' to a plain object, so 'a' is no longer an array.
+                _fields[newBaseField].metadata.canFieldBeArray = false;
+            }
         }
         // Finally, declare the subPath in the embeddedScope we found or created.
         ParsedPath nestedPrefix(collectionPathPrefix.begin(), collectionPathPrefix.end());
         nestedPrefix.push_back(basePath.front());
         auto embeddedField = declareField(_fields[newBaseField].embeddedScope,
                                           subPath,
+                                          prefixPolicy,
                                           std::move(dependencies),
                                           std::move(metadata),
                                           nestedPrefix);
@@ -787,12 +799,49 @@ private:
      * 'existingBaseField' is the result of looking up the base field.
      * 'embeddedScope' is the ScopeId for the new scope that will be created for the base field.
      */
-    std::pair<ScopeId, ScopeId> resolveNewBaseFieldScopes(FieldId existingBaseField,
-                                                          ScopeId embeddedScope) const {
-        auto parentEmbeddedScope =
-            existingBaseField ? _fields[existingBaseField].embeddedScope : ScopeId::none();
-        // Where unknown subfields originate:
-        auto exhaustiveEmbeddedScope = [&]() {
+    std::pair<ScopeId, ScopeId> resolveNewBaseFieldScopes(ModifiedPrefixPolicy prefixPolicy,
+                                                          FieldId existingBaseField,
+                                                          ScopeId embeddedScope,
+                                                          ParsedPathView collectionPathPrefix,
+                                                          StringPool::Id fieldNameId) const {
+        // The prior embedded scope (sibling subfields) is only safe to inherit when the base
+        // field's existing contents are guaranteed to survive the modification:
+        //   - kPreserveArrays
+        //   - kEnsureObjects + non-array base
+        bool isParentEmbeddedScopePreserved = [&]() {
+            switch (prefixPolicy) {
+                case ModifiedPrefixPolicy::kPreserveArrays:
+                    return true;
+                case ModifiedPrefixPolicy::kEnsureObjects:
+                    bool prefixCanBeArray;
+                    if (existingBaseField) {
+                        prefixCanBeArray = _fields[existingBaseField].metadata.canFieldBeArray;
+                    } else {
+                        // The base field is a collection field. Check the PathArrayness API.
+                        prefixCanBeArray =
+                            canCollectionFieldBeArray(collectionPathPrefix, fieldNameId);
+                    }
+                    return !prefixCanBeArray;
+                case ModifiedPrefixPolicy::kNotSupported:
+                    return false;
+            }
+            MONGO_UNREACHABLE_TASSERT(12569301);
+        }();
+
+        // Determines whether any fields are inherited from a parent scope.
+        ScopeId parentEmbeddedScope = [&]() {
+            if (isParentEmbeddedScopePreserved && existingBaseField) {
+                return _fields[existingBaseField].embeddedScope;
+            }
+            return ScopeId::none();
+        }();
+
+        // Determines where unknown subfields originates.
+        ScopeId exhaustiveEmbeddedScope = [&]() {
+            if (!isParentEmbeddedScopePreserved) {
+                // If the parent scope is discarded, then exhaustive scope is this one.
+                return embeddedScope;
+            }
             if (!existingBaseField) {
                 // No previous field -> base collection.
                 return ScopeId::none();
@@ -809,6 +858,7 @@ private:
             // TODO(SERVER-126001): We should not return none here.
             return ScopeId::none();
         }();
+
         return {exhaustiveEmbeddedScope, parentEmbeddedScope};
     }
 
@@ -881,7 +931,7 @@ private:
         // two, so we declare the field to avoid incorrect dependency tracking.
         // TODO(SERVER-119392): Track whether or not the parent field is known to be a scalar.
         if (shadowedByParent) {
-            declareField(scope, path, {parentBaseField});
+            declareField(scope, path, ModifiedPrefixPolicy::kPreserveArrays, {parentBaseField});
             return;
         }
 
@@ -906,7 +956,8 @@ private:
             case FieldMatchType::kBaseDocument:
                 // 'a' is not included in the current scope, so we need to declare it then include
                 // 'b'.
-                FieldId newBaseField = declareField(scope, basePath, {parentBaseField});
+                FieldId newBaseField = declareField(
+                    scope, basePath, ModifiedPrefixPolicy::kPreserveArrays, {parentBaseField});
                 ScopeId newEmbeddedScope = _scopes.getNextId();
                 declareScope(_scopes[scope].stage, newEmbeddedScope, ScopeId::none());
                 _fields[newBaseField].embeddedScope = newEmbeddedScope;
@@ -967,6 +1018,18 @@ private:
     }
 
     /**
+     * Returns whether a field that comes directly from the collection (not redefined by any stage)
+     * can be an array. Appends 'fieldNameId' to 'collectionPathPrefix' and queries the
+     * PathArrayness API on the resulting dotted path.
+     */
+    bool canCollectionFieldBeArray(ParsedPathView collectionPathPrefix,
+                                   StringPool::Id fieldNameId) const {
+        ParsedPath path(collectionPathPrefix.begin(), collectionPathPrefix.end());
+        path.push_back(fieldNameId);
+        return _canPathBeArray(buildDottedPath(path));
+    }
+
+    /**
      * Populate metadata when a base field is redefined.
      */
     void populateBaseFieldMetadata(FieldId newBaseField,
@@ -979,10 +1042,8 @@ private:
         } else {
             // The included base field is a collection field. Query the PathArrayness API to
             // determine if the field can be an array, using the full collection path.
-            ParsedPath fullCollectionPath(collectionPathPrefix.begin(), collectionPathPrefix.end());
-            fullCollectionPath.push_back(fieldNameId);
             _fields[newBaseField].metadata.canFieldBeArray =
-                _canPathBeArray(buildDottedPath(fullCollectionPath));
+                canCollectionFieldBeArray(collectionPathPrefix, fieldNameId);
         }
     }
 
@@ -1127,7 +1188,11 @@ private:
                             deps = depsFromStage;
                         }
                     }
-                    declareField(scopeId, parsedPath, std::move(deps), std::move(metadata));
+                    declareField(scopeId,
+                                 parsedPath,
+                                 p.getPrefixPolicy(),
+                                 std::move(deps),
+                                 std::move(metadata));
                 },
                 [&](const RenamePath& p) {
                     maybeDeclareInheritedScope();
@@ -1215,7 +1280,11 @@ private:
                     }
 
                     // Each rename modifies the new field and depends on the previous field.
-                    declareField(scopeId, parsedNewPath, std::move(deps), std::move(metadata));
+                    declareField(scopeId,
+                                 parsedNewPath,
+                                 ModifiedPrefixPolicy::kPreserveArrays,
+                                 std::move(deps),
+                                 std::move(metadata));
 
                     // Store alias for the leaf field of the new path.
                     if (!aliasCollectionPath.empty()) {

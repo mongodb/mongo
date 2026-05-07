@@ -46,11 +46,12 @@ using namespace mongo::unittest::match;
 using namespace std::string_literals;
 
 TEST(DocumentTransformationTest, ModifyPathDefaults) {
-    ModifyPath op{"a.b.c"};
+    ModifyPath op{"a.b.c", ModifiedPrefixPolicy::kNotSupported};
     EXPECT_EQ(op.getPath(), "a.b.c"_sd);
     EXPECT_TRUE(op.isComputed());
     EXPECT_FALSE(op.isRemoved());
     EXPECT_EQ(op.getExpression(), nullptr);
+    EXPECT_EQ(op.getPrefixPolicy(), ModifiedPrefixPolicy::kNotSupported);
 }
 
 TEST(DocumentTransformationTest, SimpleRenamePathDefaults) {
@@ -82,7 +83,7 @@ public:
     void describeTransformation(DocumentOperationVisitor& visitor) const {
         visitor(ReplaceRoot{});
         visitor(PreservePath{"preserve"});
-        visitor(ModifyPath{"modify"});
+        visitor(ModifyPath{"modify", ModifiedPrefixPolicy::kNotSupported});
         visitor(RenamePath{"renameTo", "renameFrom"});
     }
 };

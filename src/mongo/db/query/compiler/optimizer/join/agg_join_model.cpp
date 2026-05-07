@@ -223,53 +223,6 @@ Status addExprJoinPredicates(MutableJoinGraph& graph,
 }
 
 /**
- * Helper function to determine the arrayness of a field that may have been modified by the pipeline
- * while tracking "as" path arrayness. Note: 'expCtx' must be non-const since the arrayness check
- * updates state that provides a non-multikey guarantee for any field we check the arrayness of.
- *
- * TODO SERVER-125693: replace this function once dependency analysis supports tracking arrayness of
- * lookup "as" fields.
- */
-bool canPipelinePathBeArray(const pipeline::dependency_graph::DependencyGraph& pipelineBaseCollDeps,
-                            ExpressionContext* expCtx,
-                            DocumentSource* ds,
-                            const FieldPath& fp) {
-    auto path = fp.fullPath();
-    auto* declStage = pipelineBaseCollDeps.getDeclaringStage(ds, path).get();
-    tassert(11371801, "Expected stage to differ", declStage != ds);
-    if (auto* originLookup = dynamic_cast<DocumentSourceLookUp*>(declStage); originLookup) {
-        // The "as" field produced by a previous $lookup cannot be an array, since any previous
-        // $lookup must have an $unwind + be eligible for join-optimization (i.e. be part of the
-        // prefix).
-        auto asField = originLookup->getAsField();
-        if (fp == asField) {
-            return false;
-        }
-
-        if (asField.isPrefixOf(fp)) {
-            // This is a sub-field of the $lookup's "as" field- we need to look at the secondary
-            // collection to learn about its arrayness.
-            // TODO SERVER-123953: We will need to actually look at a dependency graph here the
-            // second we support any subpipeline more complex than a single $match stage.
-            return expCtx->canPathBeArrayForNss(fp.subtractPrefix(asField.getPathLength()),
-                                                originLookup->getFromNs());
-        }
-
-        tassert(11371800,
-                "It should not be possible for a $lookup to modify a field unrelated to its "
-                "'as' field",
-                fp.isPrefixOf(asField));
-        // We're in a scenario where our "as" field is something like "a.b", vs the join predicate
-        // field we're looking at is in fact field "a". We should verify the arrayness of field "a"
-        // at the point when it was last modified.
-        return canPipelinePathBeArray(pipelineBaseCollDeps, expCtx, declStage, fp);
-    }
-
-    // If this path doesn't originate from a $lookup, we can just check the base coll deps.
-    return pipelineBaseCollDeps.canPathBeArray(ds, path);
-};
-
-/**
  * Validates that neither field in the join predicate can include arrays.
  * TODO SERVER-123953: Use a dependency graph instead of directly accessing foreign path arrayness.
  */
@@ -279,7 +232,7 @@ bool canJoinPredicateIncludeArrays(const pipeline::dependency_graph::DependencyG
                                    const FieldPath& localField,
                                    const NamespaceString& foreignNs,
                                    const FieldPath& foreignField) {
-    return canPipelinePathBeArray(baseCollDeps, expCtx, ds, localField) ||
+    return baseCollDeps.canPathBeArray(ds, localField.fullPath()) ||
         expCtx->canPathBeArrayForNss(foreignField, foreignNs);
 }
 

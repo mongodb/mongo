@@ -1,0 +1,127 @@
+VARIATION LookupDottedAsPrefixCannotBeArray
+input: {
+    "pipeline": [
+        {
+            "$set": {
+                "a": {
+                    "$const": 1
+                }
+            }
+        },
+        {
+            "$set": {
+                "a": {
+                    "c": {
+                        "$const": 1
+                    }
+                }
+            }
+        },
+        {
+            "$lookup": {
+                "from": "coll_b",
+                "as": "a.b",
+                "let": {},
+                "pipeline": []
+            }
+        }
+    ]
+}
+output: {
+    "$set:0": {
+        "scope:0": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:0": {
+                    "declaringScope": "scope:0",
+                    "dependencies": []
+                },
+                "a:1": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": []
+                }
+            }
+        },
+        "dependencies": []
+    },
+    "$set:1": {
+        "scope:1": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:2": {
+                    "declaringScope": "scope:1",
+                    "dependencies": []
+                },
+                "a:3": {
+                    "declaringScope": "scope:1",
+                    "scope:2": {
+                        "exhaustiveScope": "scope:2",
+                        "fields": {
+                            "<missing>:4": {
+                                "declaringScope": "scope:2",
+                                "dependencies": []
+                            },
+                            "c:5": {
+                                "declaringScope": "scope:2",
+                                "metadata": {
+                                    "array": false
+                                },
+                                "dependencies": []
+                            }
+                        }
+                    },
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": [
+                        "c:5"
+                    ]
+                }
+            }
+        },
+        "dependencies": [
+            "a:1"
+        ]
+    },
+    "$lookup:2": {
+        "scope:3": {
+            "exhaustiveScope": "scope:-1",
+            "fields": {
+                "<missing>:6": {
+                    "declaringScope": "scope:3",
+                    "dependencies": []
+                },
+                "a:7": {
+                    "declaringScope": "scope:3",
+                    "scope:4": {
+                        "exhaustiveScope": "scope:-1",
+                        "fields": {
+                            "<missing>:8": {
+                                "declaringScope": "scope:4",
+                                "dependencies": []
+                            },
+                            "b:9": {
+                                "declaringScope": "scope:4",
+                                "dependencies": []
+                            },
+                            "c:5": "c:5"
+                        }
+                    },
+                    "metadata": {
+                        "array": false
+                    },
+                    "dependencies": [
+                        "a:3",
+                        "b:9"
+                    ]
+                }
+            }
+        },
+        "dependencies": [],
+        "subpipelineGraph": {}
+    }
+}
+

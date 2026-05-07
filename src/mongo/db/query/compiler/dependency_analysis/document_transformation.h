@@ -100,6 +100,35 @@ private:
 };
 
 /**
+ * Reports the semantics of the path modification.
+ */
+enum class ModifiedPrefixPolicy {
+    /**
+     * Not supported - the caller should not assume a policy.
+     * Arrays on the modified path may or may not be preserved, they may or may not be replaced with
+     * objects.
+     */
+    kNotSupported,
+    /**
+     * Prefix arrays are traversed implicitly and the modification is applied inside each element.
+     * Example:
+     * $set: {'a.b': 1}
+     * -> If 'a' is an array, the field 'b' is updated in each element.
+     * -> If 'b' is an object, the field 'b' is updated.
+     * -> Else, the path 'a.b' is created.
+     */
+    kPreserveArrays,
+    /**
+     * Prefix components are coerced to plain objects.
+     * Example:
+     * $lookup: {as: 'a.b', ...}
+     * -> If 'a' is an array (or non-object), it is replaced with {b: <results>}
+     * -> If 'a' is object, only the field 'b' is replaced with <results>
+     */
+    kEnsureObjects,
+};
+
+/**
  * Describes a path modification.
  * This can include a trivial path removal (exclusion projection) or an expression computation,
  * which itself could remove the path ($$REMOVE case).
@@ -108,11 +137,16 @@ private:
  */
 class ModifyPath : public DocumentOperation {
 public:
-    explicit ModifyPath(StringData path) : _path(path) {}
+    ModifyPath(StringData path, ModifiedPrefixPolicy policy) : _path(path), _prefixPolicy(policy) {}
 
     /// The path being modified.
     StringData getPath() const {
         return _path;
+    }
+
+    /// Returns the prefix policy.
+    ModifiedPrefixPolicy getPrefixPolicy() const {
+        return _prefixPolicy;
     }
 
     /// True if the modification removes the path completely.
@@ -136,6 +170,7 @@ public:
 
 private:
     const StringData _path;
+    const ModifiedPrefixPolicy _prefixPolicy;
 };
 
 /**
