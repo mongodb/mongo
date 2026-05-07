@@ -696,6 +696,51 @@ TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropAtTimestampReportsDropErrors
     ASSERT_EQUALS(reaper.getAllIdentNames(), std::set{identName});
 }
 
+TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropAtTimestampRetriesOnObjectIsBusy) {
+    const std::string identName = "ident";
+    Timestamp dropTimestamp(50, 0);
+    Timestamp replicatedIdentDropTimestamp(60, 0);
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    dropIdentAtOldest(reaper, dropTimestamp, identName);
+
+    int attempts = 0;
+    engine->dropIdentFn = [&](RecoveryUnit&, StringData) -> Status {
+        if (++attempts < 3) {
+            return Status(ErrorCodes::ObjectIsBusy, "Mock EBUSY");
+        }
+        return Status::OK();
+    };
+
+    auto opCtx = makeOpCtx();
+    ASSERT_OK(reaper.immediatelyCompletePendingDropAtTimestamp(
+        opCtx.get(), identName, replicatedIdentDropTimestamp));
+    ASSERT_EQUALS(attempts, 3);
+    ASSERT_EQUALS(engine->getDroppedIdentNames(), std::vector{identName});
+    ASSERT_TRUE(reaper.getAllIdentNames().empty());
+}
+
+TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropAtTimestampReturnsInterruptStatus) {
+    const std::string identName = "ident";
+    Timestamp dropTimestamp(50, 0);
+    Timestamp replicatedIdentDropTimestamp(60, 0);
+    auto engine = getEngine();
+    KVDropPendingIdentReaper reaper(engine);
+    dropIdentAtOldest(reaper, dropTimestamp, identName);
+
+    auto opCtx = makeOpCtx();
+    engine->dropIdentFn = [&](RecoveryUnit&, StringData) -> Status {
+        opCtx->markKilled(ErrorCodes::InterruptedAtShutdown);
+        return Status(ErrorCodes::ObjectIsBusy, "Mock EBUSY");
+    };
+
+    ASSERT_EQUALS(reaper.immediatelyCompletePendingDropAtTimestamp(
+                      opCtx.get(), identName, replicatedIdentDropTimestamp),
+                  ErrorCodes::InterruptedAtShutdown);
+    ASSERT_TRUE(engine->droppedIdents.empty());
+    ASSERT_EQUALS(reaper.getAllIdentNames(), std::set{identName});
+}
+
 TEST_F(KVDropPendingIdentReaperTest, ImmediatelyDropAtTimestampTooEarlyReturnsObjectIsBusy) {
     const std::string identName = "ident";
     Timestamp dropTimestamp(50, 50);

@@ -438,7 +438,28 @@ Status KVDropPendingIdentReaper::immediatelyCompletePendingDropAtTimestamp(Opera
         }
     }
 
-    return _immediatelyAttemptToCompletePendingDrop(opCtx, ident, timestamp);
+    for (size_t retries = 1;; ++retries) {
+        auto status = _immediatelyAttemptToCompletePendingDrop(opCtx, ident, timestamp);
+        if (status != ErrorCodes::ObjectIsBusy) {
+            return status;
+        }
+
+        if (auto interruptStatus = opCtx->checkForInterruptNoAssert(); !interruptStatus.isOK()) {
+            return interruptStatus;
+        }
+
+        // The drop is replicated and applied on every node. Even though no other thread on this
+        // node logically references the ident, a transient reader can still hold the WT data handle
+        // (e.g. the disagg checkpoint installer reconfiguring per-table state). Backoff and retry.
+        logAndBackoff(12611400,
+                      logv2::LogComponent::kStorage,
+                      logv2::LogSeverity::Log(),
+                      retries,
+                      "Retrying replicated drop of drop-pending ident",
+                      "ident"_attr = ident,
+                      "timestamp"_attr = timestamp,
+                      "error"_attr = status);
+    }
 }
 
 Status KVDropPendingIdentReaper::_immediatelyAttemptToCompletePendingDrop(
