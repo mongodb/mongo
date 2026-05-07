@@ -11,16 +11,18 @@ from pathlib import Path
 
 import gdb
 
-# When we run under gdb, both this file and mongo_printers.py are sourced and run in one global
-# namespace, so we don't want to import mongo_printers here. A real import would trigger Python
-# to load mongo_printers.py a second time as a module with its own namespace, which in turn
-# triggers a second load of this file and clobbers the gdb Command registrations made when this
-# file was first sourced into __main__. The guarded import is kept only to satisfy linters that
-# would otherwise flag the names used from mongo_printers as undefined.
-# TODO SERVER-125403 factor out shared functionality to avoid the guarded import.
-if not gdb:
-    sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-    from buildscripts.gdb.mongo_printers import absl_get_nodes, get_bytes, get_unique_ptr
+sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
+from buildscripts.gdb.mongo_utils import (
+    RegisterMongoCommand,
+    absl_get_nodes,
+    get_boost_optional,
+    get_current_thread_name,
+    get_decorable_info,
+    get_object_decoration,
+    get_thread_id,
+    get_unique_ptr,
+    lookup_type,
+)
 
 
 def detect_toolchain(progspace):
@@ -155,70 +157,6 @@ def get_process_name():
     return os.path.splitext(os.path.basename(main_binary_name))[0]
 
 
-def get_thread_id():
-    """Return the thread_id of the current GDB thread."""
-    # GDB thread example:
-    #  RHEL
-    #   [Current thread is 1 (Thread 0x7f072426cca0 (LWP 12867))]
-    thread_info = gdb.execute("thread", from_tty=False, to_string=True)
-
-    if sys.platform.startswith("linux"):
-        match = re.search(r"Thread (?P<pthread_id>0x[0-9a-f]+)", thread_info)
-        if match:
-            return int(match.group("pthread_id"), 16)
-    elif sys.platform.startswith("sunos"):
-        match = re.search(r"Thread (?P<pthread_id>[0-9]+)", thread_info)
-        if match:
-            return int(match.group("pthread_id"), 10)
-        lwpid = gdb.selected_thread().ptid[1]
-        if lwpid != 0:
-            return lwpid
-    raise ValueError("Failed to find thread id in {}".format(thread_info))
-
-
-MAIN_GLOBAL_BLOCK = None
-
-
-def lookup_type(gdb_type_str: str) -> gdb.Type:
-    """
-    Try to find the type object from string.
-
-    GDB says it searches the global blocks, however this appear not to be the
-    case or at least it doesn't search all global blocks, sometimes it required
-    to get the global block based off the current frame.
-    """
-    global MAIN_GLOBAL_BLOCK
-
-    exceptions = []
-    try:
-        return gdb.lookup_type(gdb_type_str)
-    except Exception as exc:
-        exceptions.append(exc)
-
-    if MAIN_GLOBAL_BLOCK is None:
-        MAIN_GLOBAL_BLOCK = gdb.lookup_symbol("main")[0].symtab.global_block()
-
-    try:
-        return gdb.lookup_type(gdb_type_str, MAIN_GLOBAL_BLOCK)
-    except Exception as exc:
-        exceptions.append(exc)
-
-    raise gdb.error("Failed to get type, tried:\n%s" % "\n".join([str(exc) for exc in exceptions]))
-
-
-def get_current_thread_name():
-    """Return the name of the current GDB thread."""
-    fallback_name = '"%s"' % (gdb.selected_thread().name or "")
-    try:
-        # This goes through the pretty printer for StringData which adds "" around the name.
-        name = str(gdb.parse_and_eval("mongo::getThreadName()"))
-        if name == '""':
-            return fallback_name
-        return name
-    except gdb.error:
-        return fallback_name
-
-
 def get_global_service_context():
     """Return the global ServiceContext object."""
     return gdb.parse_and_eval("'mongo::(anonymous namespace)::globalServiceContext'").dereference()
@@ -295,40 +233,6 @@ def get_decorations(obj):
             print("Failed to look up decoration type: " + deco_type_name + ": " + str(err))
 
 
-def get_object_decoration(decorable, start, index):
-    decoration_data = get_bytes(decorable["_decorations"]["_data"])
-    entry = start[index]
-    deco_type_info = str(entry["typeInfo"])
-    deco_type_name = re.sub(r".* <typeinfo for (.*)>", r"\1", deco_type_info)
-    offset = int(entry["offset"])
-    obj = decoration_data[offset]
-    obj_addr = re.sub(r"^(.*) .*", r"\1", str(obj.address))
-    obj = _cast_decoration_value(deco_type_name, int(obj.address))
-    return (deco_type_name, obj, obj_addr)
-
-
-def get_decorable_info(decorable):
-    decorable_t = decorable.type.template_argument(0).name
-    reg_sym, _ = gdb.lookup_symbol("mongo::decorable_detail::gdbRegistry<{}>".format(decorable_t))
-    decl_vector = reg_sym.value()["_entries"]
-    start = decl_vector["_M_impl"]["_M_start"]
-    finish = decl_vector["_M_impl"]["_M_finish"]
-    decinfo_t = lookup_type("mongo::decorable_detail::Registry::Entry")
-    count = int((int(finish) - int(start)) / decinfo_t.sizeof)
-    return start, count
-
-
-def _cast_decoration_value(type_name: str, decoration_address: int, /) -> gdb.Value:
-    # We cannot use gdb.lookup_type() when the decoration type is a pointer type, e.g.
-    # ServiceContext::declareDecoration<VectorClock*>(). gdb.parse_and_eval() is one of the few
-    # ways to convert a type expression into a gdb.Type value. Some care is taken to quote the
-    # non-pointer portion of the type so resolution for a type defined within an anonymous
-    # namespace works correctly.
-    type_name_regex = re.compile(r"^(.*[\w>])([\s\*]*)$")
-    escaped = type_name_regex.sub(r"'\1'\2*", type_name)
-    return gdb.parse_and_eval(f"({escaped}) {decoration_address}").dereference()
-
-
 def get_decoration(obj, type_name):
     """Find a decoration on 'obj' where the string 'type_name' is in the decoration's type name.
 
@@ -346,29 +250,6 @@ def get_decoration(obj, type_name):
     return None
 
 
-def get_boost_optional(optional):
-    """
-    Retrieve the value stored in a boost::optional type, if it is non-empty.
-
-    Returns None if the optional is empty.
-
-    TODO: Import the boost pretty printers instead of using this custom function.
-    """
-    if not optional["m_initialized"]:
-        return None
-    value_ref_type = optional.type.template_argument(0).pointer()
-
-    # boost::optional<T> is either stored using boost::optional_detail::aligned_storage<T> or
-    # using direct storage of `T`. Scalar types are able to take advantage of direct storage.
-    #
-    # https://www.boost.org/doc/libs/1_79_0/libs/optional/doc/html/boost_optional/tutorial/performance_considerations.html
-    if optional["m_storage"].type.strip_typedefs().pointer() == value_ref_type:
-        return optional["m_storage"]
-
-    storage = optional["m_storage"]["dummy_"]["data"]
-    return storage.cast(value_ref_type).dereference()
-
-
 def get_field_names(value):
     """Return a list of all field names on a given GDB value."""
     return [typ.name for typ in value.type.fields()]
@@ -379,25 +260,6 @@ def get_field_names(value):
 # Commands
 #
 ###################################################################################################
-
-
-class RegisterMongoCommand(object):
-    """Class to register mongo commands with GDB."""
-
-    _MONGO_COMMANDS = {}  # type: ignore
-
-    @classmethod
-    def register(cls, obj, name, command_class):
-        """Register a command with no completer as a mongo command."""
-        gdb.Command.__init__(obj, name, command_class)
-        cls._MONGO_COMMANDS[name] = obj.__doc__
-
-    @classmethod
-    def print_commands(cls):
-        """Print the registered mongo commands."""
-        print("Command - Description")
-        for key in cls._MONGO_COMMANDS:
-            print("%s - %s" % (key, cls._MONGO_COMMANDS[key]))
 
 
 class DumpGlobalServiceContext(gdb.Command):

@@ -17,20 +17,16 @@ from src.third_party.immer.dist.tools.gdb_pretty_printers.printers import (
     ListIter as ImmerListIter,
 )
 
-# When we run under gdb, both this file and mongo.py are sourced and run in one global namespace,
-# so we don't want to import mongo here. A real import would trigger Python to load mongo.py a
-# second time as a module with its own namespace, clobbering the gdb Command registrations made
-# when mongo.py was first sourced into __main__. The guarded import is kept only to satisfy
-# linters that would otherwise flag the names used from mongo as undefined.
-# TODO SERVER-125403 factor out shared functionality to avoid the guarded import.
-if not gdb:
-    from buildscripts.gdb.mongo import (
-        get_boost_optional,
-        get_decorable_info,
-        get_object_decoration,
-        lookup_type,
-    )
-    from buildscripts.gdb.optimizer_printers import register_optimizer_printers
+from buildscripts.gdb.mongo_utils import (
+    absl_container_size,
+    absl_get_nodes,
+    absl_get_settings,
+    get_boost_optional,
+    get_decorable_info,
+    get_object_decoration,
+    lookup_type,
+)
+from buildscripts.gdb.optimizer_printers import register_optimizer_printers
 
 try:
     import collections
@@ -47,25 +43,6 @@ if sys.version_info[0] < 3:
     raise gdb.GdbError(
         "MongoDB gdb extensions only support Python 3. Your GDB was compiled against Python 2"
     )
-
-
-def get_bytes(obj):
-    """
-    Returns a gdb.Value where its type resolves to `unsigned char*`. The caller must take care to
-    cast the returned value themselves. This function is particularly useful in the context of
-    mongo::Decorable<> types which store the decorations as a slab of memory with unsigned char*.
-    """
-    return obj.cast(gdb.lookup_type("unsigned char").pointer())
-
-
-def get_unique_ptr_bytes(obj):
-    """Read the value of a libstdc++ std::unique_ptr."""
-    return obj.cast(gdb.lookup_type("std::_Head_base<0, unsigned char*, false>"))["_M_head_impl"]
-
-
-def get_unique_ptr(obj):
-    """Read the value of a libstdc++ std::unique_ptr."""
-    return get_unique_ptr_bytes(obj).cast(obj.type.template_argument(0).pointer())
 
 
 ###################################################################################################
@@ -916,81 +893,6 @@ def absl_insert_version_after_absl(cpp_name):
     return (
         cpp_name[:absl_ns_end] + ABSL_OPTION_INLINE_NAMESPACE_NAME + "::" + cpp_name[absl_ns_end:]
     )
-
-
-# Cache for types found via find_type_from_info_types as they can be expensive to look up.
-_type_cache: dict[str, gdb.Type] = {}
-
-
-# Helper to find the gdb.Type of the given symbol given by a regex.
-# This is useful when compilers disagree about the spelling of a symbol/template instantiation.
-# Uses `info types <regex>` gdb command to find the type, parses the output and then looks up the type.
-def find_type_from_info_types(regex):
-    if regex in _type_cache:
-        return _type_cache[regex]
-
-    output = gdb.execute(f"info types {regex}", to_string=True)
-
-    # Example output:
-    # All types matching regular expression "absl::lts_.*::container_internal::internal_compressed_tuple::Storage<absl::lts_.*::container_internal::CommonFields, 0.*, false>":
-    # File src/third_party/abseil-cpp/dist/absl/container/internal/compressed_tuple.h:
-    # 85:	absl::lts_20250512::container_internal::internal_compressed_tuple::Storage<absl::lts_20250512::container_internal::CommonFields, 0, false>;
-
-    # Regex looking for: number + colon + whitespace + capture group + semicolon
-    type_pattern = re.compile(r"^\s*\d+:\s+(.*?);$", re.MULTILINE)
-
-    match = re.search(type_pattern, output)
-
-    if match:
-        type_str = match.group(1)
-        res = gdb.lookup_type(type_str)
-        _type_cache[regex] = res
-        return res
-
-    raise RuntimeError(f"No types found for regex: {regex}")
-
-
-def absl_get_settings(val):
-    """Gets the settings_ field for abseil (flat/node)_hash_(map/set)."""
-
-    # Find the type of the CompressedTuple Storage template.
-    # Abseil uses an inline namespace for versioning, so it may contain '::lts_20250512' in the middle of the symbol name.
-    # Clang and GCC may mangle the templates differently for the 0 size_t parameter, so we use '0.*' to match both '0' and '0ul'.
-    common_fields_storage_type = find_type_from_info_types(
-        "absl.*::container_internal::internal_compressed_tuple::Storage<absl.*::container_internal::CommonFields, 0.*, false>",
-    )
-
-    # The Hash, Eq, or Alloc functors may not be zero-sized objects.
-    # mongo::LogicalSessionIdHash is one such example. An explicit cast is needed to
-    # disambiguate which `value` member variable of the CompressedTuple is to be accessed.
-    return val["settings_"].cast(common_fields_storage_type)["value"]
-
-
-def absl_container_size(settings):
-    return settings["size_"]["data_"] >> 17
-
-
-def absl_get_nodes(val):
-    """Return a generator of every node in absl::container_internal::raw_hash_set and derived classes."""
-    settings = absl_get_settings(val)
-
-    size = absl_container_size(settings)
-    if size == 0:
-        return
-
-    capacity = int(settings["capacity_"])
-    heap = settings["heap_or_soo_"]["heap"]
-    ctrl = heap["control"]
-
-    # Derive the underlying type stored in the container.
-    slot_type = lookup_type(str(val.type.strip_typedefs().name) + "::slot_type").strip_typedefs()
-
-    # Using the array of ctrl bytes, search for in-use slots and return them
-    # https://github.com/abseil/abseil-cpp/blob/8a3caf7dea955b513a6c1b572a2423c6b4213402/absl/container/internal/raw_hash_set.h#L2108-L2113
-    for item in range(capacity):
-        ctrl_t = int(ctrl[item])
-        if ctrl_t >= 0:
-            yield heap["slot_array"]["p"].cast(slot_type.pointer())[item]
 
 
 class AbslHashSetPrinterBase(object):

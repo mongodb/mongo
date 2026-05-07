@@ -6,9 +6,8 @@ from pprint import pprint
 import bson
 import gdb
 
-if not gdb:
-    sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
-    from buildscripts.gdb.mongo import lookup_type
+sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
+from buildscripts.gdb.mongo_utils import lookup_type
 
 DEBUGGING = False
 """
