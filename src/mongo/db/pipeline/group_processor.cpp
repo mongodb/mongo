@@ -262,6 +262,7 @@ void GroupProcessor::spill() {
         default:  // multiple values, serialize as array-typed Value
             for (size_t i = 0; i < ptrs.size(); i++) {
                 std::vector<Value> accums;
+                accums.reserve(ptrs[i]->second.size());
                 for (size_t j = 0; j < ptrs[i]->second.size(); j++) {
                     accums.push_back(ptrs[i]->second[j]->getValue(/*toBeMerged=*/true));
                 }

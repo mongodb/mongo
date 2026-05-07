@@ -260,6 +260,7 @@ std::unique_ptr<sbe::PlanStage> makeProjectStage(std::unique_ptr<sbe::PlanStage>
     // Populate the vector for field actions with Keep for all fields since we want inclusion
     // projection.
     std::vector<sbe::MakeObjSpec::FieldAction> fieldActions;
+    fieldActions.reserve(topLevelSampleFieldNames.size());
     for (size_t i = 0; i < topLevelSampleFieldNames.size(); i++) {
         fieldActions.emplace_back(sbe::MakeObjSpec::Keep{});
     }
@@ -774,6 +775,7 @@ std::vector<CardinalityEstimate> SamplingEstimatorImpl::estimateCardinality(
     }
 
     std::vector<CardinalityEstimate> estimates;
+    estimates.reserve(counts.size());
     for (size_t i = 0; i < counts.size(); i++) {
         estimates.push_back(
             makeScaledEstimate(counts[i], errorCounts[i], _sampleSize, getCollCard()));

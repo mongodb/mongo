@@ -641,6 +641,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortArray(ArityT
         if (inputSize) {
             resultView->reserve(inputSize);
             std::vector<value::TagValueView> sortVector;
+            sortVector.reserve(inputSize);
             for (size_t i = 0; i < inputSize; i++) {
                 sortVector.push_back(inputView->getAt(i));
             }
@@ -893,6 +894,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomNImpl(ArityT
 
         resultView->reserve(std::min(inputSize, static_cast<size_t>(n)));
         std::vector<std::pair<value::TypeTags, value::Value>> sortVector;
+        sortVector.reserve(inputSize);
         for (size_t i = 0; i < inputSize; i++) {
             sortVector.push_back(inputView->getAt(i));
         }

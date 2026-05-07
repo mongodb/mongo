@@ -308,6 +308,12 @@ std::vector<Value> convertBinDataVectorToArray(const Value& val, bool isLittleEn
 
     // The rest of the binData vector is the elements.
     std::vector<Value> results;
+
+    // 'results' will be at least as large as 'view->dataLength'. It can end up even larger, but the
+    // resulting size depends on the contents of the data view. Do a conservative allocation upfront
+    // to avoid frequent reallocs.
+    results.reserve(view->dataLength);
+
     const std::byte* dataPointer = view->data;
 
     for (int i = 0; i < view->dataLength;) {

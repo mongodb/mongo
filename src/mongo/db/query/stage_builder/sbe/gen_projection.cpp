@@ -197,6 +197,7 @@ std::unique_ptr<sbe::MakeObjSpec> buildMakeObjSpecImpl(StageBuilderState& state,
     }
 
     std::vector<FieldAction> actions;
+    actions.reserve(pa.actions.size());
 
     for (size_t i = 0; i < pa.actions.size(); i++) {
         size_t nextArgIdx = args.size();

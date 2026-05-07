@@ -258,6 +258,7 @@ void makeCartesianProduct(const IndexBounds& bounds,
     tassert(11321020, "fieldsToExplode must be greater than 0", fieldsToExplode > 0);
     const OrderedIntervalList& firstOil = bounds.fields[0];
     tassert(11321021, "firstOil.intervals must not be empty", !firstOil.intervals.empty());
+    prefixForScans.reserve(firstOil.intervals.size());
     for (size_t i = 0; i < firstOil.intervals.size(); ++i) {
         const Interval& ival = firstOil.intervals[i];
         tassert(11321022, "all ivals must be points", ival.isPoint());

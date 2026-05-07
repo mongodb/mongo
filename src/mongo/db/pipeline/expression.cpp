@@ -2498,7 +2498,9 @@ void ExpressionNary::addOperand(const intrusive_ptr<Expression>& pExpression) {
 
 Value ExpressionNary::serialize(const SerializationOptions& options) const {
     const size_t nOperand = _children.size();
-    vector<Value> array;
+    std::vector<Value> array;
+    array.reserve(nOperand);
+
     /* build up the array */
     for (size_t i = 0; i < nOperand; i++) {
         // If this input is a constant, bypass the standard serialization that wraps the

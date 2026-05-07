@@ -418,7 +418,9 @@ public:
     std::vector<StringData> getMatchList() const {
         std::vector<StringData> vec;
         if (*_regex) {
-            for (size_t i = 0; i <= captureCount(); ++i)
+            const size_t n = captureCount();
+            vec.reserve(n);
+            for (size_t i = 0; i <= n; ++i)
                 vec.push_back((*this)[i]);
         }
         return vec;
@@ -427,7 +429,9 @@ public:
     std::vector<StringData> getCaptures() const {
         std::vector<StringData> vec;
         if (*_regex) {
-            for (size_t i = 1; i <= captureCount(); ++i)
+            const size_t n = captureCount();
+            vec.reserve(n);
+            for (size_t i = 1; i <= n; ++i)
                 vec.push_back((*this)[i]);
         }
         return vec;

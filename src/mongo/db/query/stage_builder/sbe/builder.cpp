@@ -1586,6 +1586,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QueryS
         orderBy.reserve(sortPattern.size());
 
         SbExprOptSlotVector projects;
+        projects.reserve(sortPattern.size());
+        direction.reserve(sortPattern.size());
         for (size_t i = 0; i < sortPattern.size(); ++i) {
             projects.emplace_back(std::move(sortKeys.keyExprs[i]), boost::none);
             direction.push_back(sortPattern[i].isAscending ? sbe::value::SortDirection::Ascending
@@ -3836,6 +3838,7 @@ public:
 
     std::vector<std::string> getWindowOutputPaths() {
         std::vector<std::string> windowFields;
+        windowFields.reserve(windowNode->outputFields.size());
 
         for (size_t i = 0; i < windowNode->outputFields.size(); i++) {
             auto& outputField = windowNode->outputFields[i];

@@ -50,6 +50,12 @@ size_t numberOfBytesForCodePoint(char charByte) {
 
 std::vector<StringData> extractCodePointsFromChars(StringData utf8String) {
     std::vector<StringData> codePoints;
+
+    // Do a conservative upfront allocation for 'codePoints'. Each UTF-8 character is at most 4
+    // bytes large. In the worst case, more allocations need to happen inside the loop, but this
+    // ensures we do not overallocate.
+    codePoints.reserve(utf8String.size() / 4);
+
     std::size_t i = 0;
     while (i < utf8String.size()) {
         uassert(5156305,
@@ -58,8 +64,9 @@ std::vector<StringData> extractCodePointsFromChars(StringData utf8String) {
                               << ": Detected invalid UTF-8. Got continuation byte when expecting "
                                  "the start of a new code point.",
                 !str::isUTF8ContinuationByte(utf8String[i]));
-        codePoints.push_back(utf8String.substr(i, numberOfBytesForCodePoint(utf8String[i])));
-        i += numberOfBytesForCodePoint(utf8String[i]);
+        size_t numberOfBytes = numberOfBytesForCodePoint(utf8String[i]);
+        codePoints.push_back(utf8String.substr(i, numberOfBytes));
+        i += numberOfBytes;
     }
     uassert(5156304,
             str::stream()

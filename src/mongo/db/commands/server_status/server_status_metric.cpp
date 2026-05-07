@@ -211,6 +211,7 @@ private:
         auto sub = std::make_unique<BSONObjBuilder>(frame.bob->subobjStart(key));
         auto subPtr = &*sub;
         std::vector<TreeNodeCursor> cursors;
+        cursors.reserve(relevant.size());
         for (auto&& cp : relevant)
             cursors.push_back(TreeNodeCursor{&cp->getSubtree()});
         return Frame{
@@ -234,6 +235,7 @@ private:
     /** Initialize with a frame pointing at the start of the roots of all trees. */
     void _init(std::vector<const MetricTree*> trees, BSONObjBuilder* b, BSONObj excludePaths) {
         std::vector<TreeNodeCursor> cursors;
+        cursors.reserve(trees.size());
         for (const MetricTree* node : trees)
             cursors.push_back(TreeNodeCursor{node});
         _stack.push_back(Frame{std::move(cursors), b, nullptr, false, "", std::move(excludePaths)});
@@ -265,6 +267,7 @@ private:
     /** Returns current path built from the `_stack` keys. */
     std::vector<StringData> _pathDiag() const {
         std::vector<StringData> parts;
+        parts.reserve(_stack.size());
         for (auto&& fr : _stack)
             parts.push_back(fr.key);
         return parts;

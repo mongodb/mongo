@@ -1020,6 +1020,7 @@ std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots> buil
     const auto& accStmts = groupNode.accumulators;  // explicit accs in the original query
 
     std::vector<SbSlotVector> aggSlotsVec;
+    aggSlotsVec.reserve(accStmts.size());
     auto groupOutSlotsIt = groupOutSlots.begin();
 
     for (size_t idxAcc = 0; idxAcc < accStmts.size(); ++idxAcc) {

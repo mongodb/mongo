@@ -1136,6 +1136,7 @@ std::pair<bool, std::vector<MatchExpression*>> traverseAndPropagateANDRelatedPre
     }
 
     // Traverse non-leaf nodes.
+    indexedPreds.reserve(indexedPreds.size() + node->numChildren());
     for (size_t i = 0; i < node->numChildren(); ++i) {
         auto [childAssigned, childPreds] =
             traverseAndPropagateANDRelatedPredicates(node->getChild(i), wildcardField, idx);
@@ -1144,7 +1145,7 @@ std::pair<bool, std::vector<MatchExpression*>> traverseAndPropagateANDRelatedPre
         }
         indexedPreds.insert(indexedPreds.end(), childPreds.begin(), childPreds.end());
     }
-    return {wildcardFieldAssigned, indexedPreds};
+    return {wildcardFieldAssigned, std::move(indexedPreds)};
 }
 
 /**
