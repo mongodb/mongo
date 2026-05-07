@@ -45,6 +45,9 @@ filters:
   - "benchmarks_query.yml":
     approvers:
       - 10gen/query
+  - "benchmarks_sorter.yml":
+    approvers:
+      - 10gen/server-external-sorter
   - "buildscripts_test.yml":
     approvers:
       - 10gen/devprod-test-infrastructure

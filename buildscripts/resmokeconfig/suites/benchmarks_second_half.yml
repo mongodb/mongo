@@ -44,6 +44,7 @@ selector:
     # These benchmarks are being run as part of the benchmarks_util.yml test suite.
     - bazel-bin/**/tracking_allocator_bm*
     # These benchmarks are being run as part of the benchmarks_sorter.yml test suite.
+    - bazel-bin/**/sorter_bm*
     - bazel-bin/**/sorter_checksum_calculator_bm*
     # These benchmarks are being run as part of the benchmarks_audit.yml test suite.
     - bazel-bin/**/audit_bm*
