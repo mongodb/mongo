@@ -19,8 +19,6 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 export class StandbyClusterTestFixture {
     /**
@@ -90,9 +88,9 @@ export class StandbyClusterTestFixture {
         this.st.stopAllMongos();
 
         if (this.st.isConfigShardMode) {
-            // In embedded config server mode one of the shards is the config server. Stop the non-config
-            // shards first (allowing data cleanup), then stop the config shard while preserving
-            // its data on disk.
+            // In embedded config server mode one of the shards is the config server. Stop the
+            // non-config shards first (allowing data cleanup), then stop the config shard while
+            // preserving its data on disk.
             for (const rs of this.st._rs) {
                 if (rs.test !== configRS) {
                     rs.test.stopSet();
@@ -134,9 +132,9 @@ export class StandbyClusterTestFixture {
         // newly-allocated ports, and remove the configsvr field. Only node 0 is electable
         // (priority 1; others priority 0), so it deterministically wins the election and becomes
         // primary -- this mirrors a real standby cluster where the injector is always primary.
-        // Node 0 is tagged with _internalProcessType: INJECTOR so the topology matches production: the
-        // RSM keeps the INJECTOR-tagged primary visible for replication purposes but excludes it
-        // from server selection, forcing client traffic to the secondaries.
+        // Node 0 is tagged with _internalProcessType: INJECTOR so the topology matches production:
+        // the RSM keeps the INJECTOR-tagged primary visible for replication purposes but excludes
+        // it from server selection, forcing client traffic to the secondaries.
         const newMembers = existingConfig.members.map((member, idx) => {
             const newMember = Object.extend({}, member, /*deep=*/ true);
             const hostParts = newMember.host.split(":");
@@ -172,7 +170,8 @@ export class StandbyClusterTestFixture {
                 noCleanData: true,
                 ...(this._keyFile ? {noauth: ""} : {}),
             });
-            assert(standalone, `Failed to start standalone mongod for config node ${i} on port ${oldPorts[i]}`);
+            assert(standalone,
+                   `Failed to start standalone mongod for config node ${i} on port ${oldPorts[i]}`);
 
             const replSetColl = standalone.getDB("local").getCollection("system.replset");
 
@@ -187,8 +186,8 @@ export class StandbyClusterTestFixture {
         // MongoRunner from wiping the dbpath on first start.
         this.standbyRS = new ReplSetTest({
             name: "standby",
-            ports: newPorts,
-            nodes: dbPaths.map((dbPath) => ({dbpath: dbPath, noCleanData: true})),
+            nodes: dbPaths.map((dbPath, idx) =>
+                                   ({dbpath: dbPath, noCleanData: true, port: newPorts[idx]})),
             ...(this._keyFile ? {keyFile: this._keyFile} : {}),
         });
         // startSet() launches the processes with --replSet standby but does NOT call
@@ -232,7 +231,8 @@ export class StandbyClusterTestFixture {
         });
         // Wait for each sentry process to be alive before continuing.
         for (const {pid, port} of this._sentries) {
-            assert.soon(() => checkProgram(pid).alive, `mongosentry failed to start on retired port ${port}`);
+            assert.soon(() => checkProgram(pid).alive,
+                        `mongosentry failed to start on retired port ${port}`);
         }
     }
 
@@ -247,7 +247,8 @@ export class StandbyClusterTestFixture {
         for (const {pid, port} of this._sentries || []) {
             const {alive} = checkProgram(pid);
             if (!alive) {
-                jsTest.log.info(`mongosentry on retired port ${port} received a command and hit an invariant`);
+                jsTest.log(
+                    `mongosentry on retired port ${port} received a command and hit an invariant`);
                 failedPorts.push(port);
             } else {
                 stopMongoProgramByPid(pid);
@@ -261,7 +262,7 @@ export class StandbyClusterTestFixture {
                 try {
                     this._injectorFailpoint.off();
                 } catch (e) {
-                    jsTest.log.info(`Failed to disable injector failpoint during teardown: ${e}`);
+                    jsTest.log(`Failed to disable injector failpoint during teardown: ${e}`);
                 }
                 this._injectorFailpoint = null;
             }
@@ -271,7 +272,8 @@ export class StandbyClusterTestFixture {
         }
 
         if (failedPorts.length > 0) {
-            throw new Error(`Commands were sent to retired ports after standby transition: ` + failedPorts.join(", "));
+            throw new Error(`Commands were sent to retired ports after standby transition: ` +
+                            failedPorts.join(", "));
         }
     }
 }

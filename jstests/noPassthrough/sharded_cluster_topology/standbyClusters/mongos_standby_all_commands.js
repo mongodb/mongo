@@ -14,7 +14,9 @@
  * ]
  */
 
-import {StandbyClusterTestFixture} from "jstests/noPassthrough/libs/sharded_cluster_topology/standby_cluster_test_fixture.js";
+import {
+    StandbyClusterTestFixture
+} from "jstests/noPassthrough/libs/sharded_cluster_topology/standby_cluster_test_fixture.js";
 
 const dbName = "testDb";
 const collName = "testColl";
@@ -39,6 +41,7 @@ const allCommands = {
     _clusterWriteWithoutShardKey: {skip: isAnInternalCommand},
     _dropConnectionsToMongot: {skip: isAnInternalCommand},
     _flushShardRegistry: {skip: isAnInternalCommand},
+    _getAuditConfigGeneration: {skip: isAnInternalCommand},
     _hashBSONElement: {skip: isAnInternalCommand},
     _isSelf: {skip: isAnInternalCommand},
     _killOperations: {skip: isAnInternalCommand},
@@ -89,7 +92,8 @@ const allCommands = {
     },
     changePrimary: {command: {changePrimary: dbName, to: "shard0"}, isAdminCommand: true},
     checkMetadataConsistency: {command: {checkMetadataConsistency: 1}, isAdminCommand: true},
-    cleanupReshardCollection: {skip: "requires additional setup through a failed resharding operation"},
+    cleanupReshardCollection:
+        {skip: "requires additional setup through a failed resharding operation"},
     cleanupStructuredEncryptionData: {skip: "requires encrypted collection setup"},
     clearJumboFlag: {
         command: {clearJumboFlag: fullNs, bounds: [{x: MinKey}, {x: MaxKey}]},
@@ -164,7 +168,8 @@ const allCommands = {
     findAndModify: {
         command: {findAndModify: collName, query: {x: 1}, update: {$set: {x: 99}}},
     },
-    flushRouterConfig: {command: {flushRouterConfig: 1}, isAdminCommand: true, standbyAllowed: true},
+    flushRouterConfig:
+        {command: {flushRouterConfig: 1}, isAdminCommand: true, standbyAllowed: true},
     fsync: {command: {fsync: 1}, isAdminCommand: true},
     fsyncUnlock: {command: {fsyncUnlock: 1}, isAdminCommand: true},
     getAuditConfig: {command: {getAuditConfig: 1}, isAdminCommand: true},
@@ -175,14 +180,17 @@ const allCommands = {
     getCmdLineOpts: {command: {getCmdLineOpts: 1}, isAdminCommand: true, standbyAllowed: true},
     getDatabaseVersion: {command: {getDatabaseVersion: dbName}, isAdminCommand: true},
     getDefaultRWConcern: {command: {getDefaultRWConcern: 1}, isAdminCommand: true},
-    getDiagnosticData: {command: {getDiagnosticData: 1}, isAdminCommand: true, standbyAllowed: true},
+    getDiagnosticData:
+        {command: {getDiagnosticData: 1}, isAdminCommand: true, standbyAllowed: true},
     getLog: {command: {getLog: "global"}, isAdminCommand: true, standbyAllowed: true},
     getMore: {skip: requiresCursor},
-    getParameter: {command: {getParameter: 1, logLevel: 1}, isAdminCommand: true, standbyAllowed: true},
+    getParameter:
+        {command: {getParameter: 1, logLevel: 1}, isAdminCommand: true, standbyAllowed: true},
     getQueryableEncryptionCountInfo: {skip: isAnInternalCommand},
     getShardMap: {command: {getShardMap: 1}, isAdminCommand: true, standbyAllowed: true},
     getShardVersion: {command: {getShardVersion: fullNs}, isAdminCommand: true},
-    getTrafficRecordingStatus: {command: {getTrafficRecordingStatus: 1}, isAdminCommand: true, standbyAllowed: true},
+    getTrafficRecordingStatus:
+        {command: {getTrafficRecordingStatus: 1}, isAdminCommand: true, standbyAllowed: true},
     getTransitionToDedicatedConfigServerStatus: {
         command: {getTransitionToDedicatedConfigServerStatus: 1},
         isAdminCommand: true,
@@ -193,7 +201,8 @@ const allCommands = {
     hello: {command: {hello: 1}, isAdminCommand: true, standbyAllowed: true},
     hostInfo: {command: {hostInfo: 1}, isAdminCommand: true, standbyAllowed: true},
     insert: {command: {insert: collName, documents: [{_id: ObjectId()}]}},
-    invalidateUserCache: {command: {invalidateUserCache: 1}, isAdminCommand: true, standbyAllowed: true},
+    invalidateUserCache:
+        {command: {invalidateUserCache: 1}, isAdminCommand: true, standbyAllowed: true},
     isdbgrid: {command: {isdbgrid: 1}, isAdminCommand: true, standbyAllowed: true},
     isMaster: {command: {isMaster: 1}, isAdminCommand: true, standbyAllowed: true},
     killAllSessions: {command: {killAllSessions: []}, isAdminCommand: true},
@@ -219,8 +228,8 @@ const allCommands = {
     mapReduce: {
         command: {
             mapReduce: collName,
-            map: function () {},
-            reduce: function (key, vals) {},
+            map: function() {},
+            reduce: function(key, vals) {},
             out: {inline: 1},
         },
     },
@@ -327,7 +336,8 @@ const allCommands = {
         isAdminCommand: true,
     },
     setProfilingFilterGlobally: {skip: "requires special startup parameter"},
-    setParameter: {command: {setParameter: 1, quiet: 1}, isAdminCommand: true, standbyAllowed: true},
+    setParameter:
+        {command: {setParameter: 1, quiet: 1}, isAdminCommand: true, standbyAllowed: true},
     setClusterParameter: {skip: "requires specific cluster parameter setup"},
     setQuerySettings: {skip: "requires specific query settings setup"},
     setUserWriteBlockMode: {
@@ -345,6 +355,7 @@ const allCommands = {
         isAdminCommand: true,
     },
     splitVector: {skip: isAnInternalCommand},
+    startRecordingTraffic: {skip: "requires an actual file path to record traffic to"},
     startShardDraining: {command: {startShardDraining: "shard0"}, isAdminCommand: true},
     startTrafficRecording: {skip: "requires a file path to record traffic to"},
     startTransitionToDedicatedConfigServer: {
@@ -352,6 +363,7 @@ const allCommands = {
         isAdminCommand: true,
     },
     startSession: {command: {startSession: 1}, isAdminCommand: true, standbyAllowed: true},
+    stopRecordingTraffic: {skip: "requires an actual file path to record traffic to"},
     stopShardDraining: {command: {stopShardDraining: "shard0"}, isAdminCommand: true},
     stopTrafficRecording: {skip: "requires a file path to record traffic to"},
     stopTransitionToDedicatedConfigServer: {
@@ -409,7 +421,7 @@ const allCommands = {
 // ---------------------------------------------------------------------------
 
 function runStandbyAllCommandsTest({configShard}) {
-    jsTest.log.info(`Running standby all-commands test (configShard=${configShard})`);
+    jsTest.log(`Running standby all-commands test (configShard=${configShard})`);
 
     const fixtureOptions = {
         name: jsTestName(),
@@ -424,14 +436,11 @@ function runStandbyAllCommandsTest({configShard}) {
     }
     const fixture = new StandbyClusterTestFixture(fixtureOptions);
 
-    jsTest.log.info("Setting up initial data before standby transition");
+    jsTest.log("Setting up initial data before standby transition");
 
     // Create testDb.testColl with some documents and an index.
     assert.commandWorked(
-        fixture.st.s
-            .getDB(dbName)
-            .getCollection(collName)
-            .insertMany([{x: 1}, {x: 2}, {x: 3}]),
+        fixture.st.s.getDB(dbName).getCollection(collName).insertMany([{x: 1}, {x: 2}, {x: 3}]),
     );
     assert.commandWorked(fixture.st.s.getDB(dbName).getCollection(collName).createIndex({x: 1}));
 
@@ -439,9 +448,10 @@ function runStandbyAllCommandsTest({configShard}) {
     assert.commandWorked(fixture.st.s.adminCommand({shardCollection: fullNs, key: {x: 1}}));
 
     // Create a second database.
-    assert.commandWorked(fixture.st.s.getDB("otherDb").getCollection("otherColl").insertOne({y: 1}));
+    assert.commandWorked(
+        fixture.st.s.getDB("otherDb").getCollection("otherColl").insertOne({y: 1}));
 
-    jsTest.log.info("Transitioning to standby");
+    jsTest.log("Transitioning to standby");
     fixture.transitionToStandby();
 
     // Start a mongoS against the standby config server in config-only mode.
@@ -468,11 +478,12 @@ function runStandbyAllCommandsTest({configShard}) {
         }
 
         if (test.skip !== undefined) {
-            assert(!test.standbyAllowed, `'${cmdName}' has both skip and standbyAllowed set; pick one`);
+            assert(!test.standbyAllowed,
+                   `'${cmdName}' has both skip and standbyAllowed set; pick one`);
             continue;
         }
 
-        jsTest.log.info(`Testing ${cmdName}`);
+        jsTest.log(`Testing ${cmdName}`);
 
         const db = test.isAdminCommand ? mongos.getDB("admin") : mongos.getDB(dbName);
 

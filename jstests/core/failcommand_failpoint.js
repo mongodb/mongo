@@ -638,7 +638,8 @@ assert(!res.hasOwnProperty("errorLabels"), res);
 const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
     Boolean(TestData.multiversionBinVersion);
 
-// TODO SERVER-126137: Enable these tests in multiversion once this has been backported to 8.0.
+// failCommandsExcept is a new option and is not understood by older binaries,
+// so skip these tests when running against mixed-version clusters.
 if (!isMultiversion) {
     // Test failAllCommands with failCommandsExcept: every command fails except those allowlisted.
     assert.commandWorked(

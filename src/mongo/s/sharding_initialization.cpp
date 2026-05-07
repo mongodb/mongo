@@ -332,6 +332,12 @@ Status preWarmConnectionPool(OperationContext* opCtx) {
         return Status::OK();
     }
 
+    // In configOnly mode there are no shards to pre-warm connections to, and getAllShards()
+    // would throw (uassert 12319006) which is not caught by the Status-based caller.
+    if (serverGlobalParams.configOnly) {
+        return Status::OK();
+    }
+
     // There's no reason this can't run on a shard or config server, but it currently only runs on a
     // mongos, and we'd need to consider the implications of it running on either kind of mongod.
     tassert(71961,
