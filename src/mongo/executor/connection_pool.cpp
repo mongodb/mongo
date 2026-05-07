@@ -944,7 +944,8 @@ ConnectionPool::SpecificPool::SpecificPool(std::shared_ptr<ConnectionPool> paren
       _sslMode(sslMode),
       _hostAndPort(hostAndPort),
       _id(_parent->_nextPoolId++),
-      _readyPool(std::numeric_limits<size_t>::max()) {
+      _readyPool(std::numeric_limits<size_t>::max()),
+      _lastActiveTime(_parent->_factory->now()) {
     invariant(_parent);
     _eventTimer = _parent->_factory->makeTimer();
 }

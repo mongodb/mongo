@@ -3176,6 +3176,137 @@ TEST_F(ConnectionPoolTest, CancellationCallbackSurvivesPoolDestruction) {
     ASSERT_NOT_OK(std::move(connFuture).getNoThrow());
 }
 
+// Controller that groups two hosts into the same HostGroupState and returns
+// canShutdown = stats.isExpired, mirroring the default LimitController's policy but
+// spanning two hosts.
+class HostGroupLimitController final : public ConnectionPool::ControllerInterface {
+public:
+    HostGroupLimitController(HostAndPort primary, HostAndPort secondary)
+        : _primary(std::move(primary)), _secondary(std::move(secondary)) {}
+
+    void addHost(PoolId id, const HostAndPort& host) override {
+        std::lock_guard lk(_mutex);
+        _poolData[id] = {host, 0};
+    }
+
+    HostGroupState updateHost(PoolId id, const PoolMetrics& stats) override {
+        std::lock_guard lk(_mutex);
+        auto& data = _poolData[id];
+        auto opts = getPoolOptions();
+
+        data.target = stats.requests + stats.active + stats.leased;
+        if (data.target < opts.minConnections) {
+            data.target = opts.minConnections;
+        } else if (data.target > opts.maxConnections) {
+            data.target = opts.maxConnections;
+        }
+
+        return {{_primary, _secondary}, stats.isExpired};
+    }
+
+    void removeHost(PoolId id) override {
+        std::lock_guard lk(_mutex);
+        if (auto it = _poolData.find(id); it != _poolData.end()) {
+            _removedHosts.insert(it->second.host);
+            _poolData.erase(it);
+        }
+    }
+
+    bool wasRemoved(const HostAndPort& host) const {
+        std::lock_guard lk(_mutex);
+        return _removedHosts.count(host) > 0;
+    }
+
+    ConnectionControls getControls(PoolId id) override {
+        std::lock_guard lk(_mutex);
+        return {getPoolOptions().maxConnecting, _poolData[id].target};
+    }
+
+    Milliseconds hostTimeout() const override {
+        return getPoolOptions().hostTimeout;
+    }
+    Milliseconds pendingTimeout() const override {
+        return getPoolOptions().refreshTimeout;
+    }
+    Milliseconds toRefreshTimeout() const override {
+        return getPoolOptions().refreshRequirement;
+    }
+    size_t connectionRequestsMaxQueueDepth() const override {
+        return getPoolOptions().connectionRequestsMaxQueueDepth;
+    }
+    size_t maxConnections() const override {
+        return getPoolOptions().maxConnections;
+    }
+    StringData name() const override {
+        return "HostGroupLimitController"_sd;
+    }
+    void updateConnectionPoolStats(ConnectionPoolStats*) const override {}
+
+private:
+    struct PoolData {
+        HostAndPort host;
+        size_t target = 0;
+    };
+    HostAndPort _primary;
+    HostAndPort _secondary;
+    mutable std::mutex _mutex;
+    stdx::unordered_map<PoolId, PoolData> _poolData;
+    std::set<HostAndPort> _removedHosts;
+};
+
+// Idle pools have no incoming requests or returning connections to trigger a state update.
+// Instead, a repeating timer fires periodically, and that timer is the only mechanism by which
+// an idle pool can detect that it has expired and shut itself down.
+//
+// Verify that the timer respects the configured host timeout.
+TEST_F(ConnectionPoolTest, HostGroupPoolExpiresAfterHostTimeout) {
+    const HostAndPort primary("primary:27017");
+    const HostAndPort secondary("secondary:27017");
+
+    // hostTimeout is set to 2s (two timer periods) so the idle timer fires exactly twice:
+    // once at 1s before hostTimeout has elapsed, and once at 2s when hostTimeout has elapsed
+    // and the pool should expire.
+    auto controller = std::make_shared<HostGroupLimitController>(primary, secondary);
+    ConnectionPool::Options options;
+    options.hostTimeout = Milliseconds(2000);
+    options.controllerFactory =
+        [controller]() -> std::shared_ptr<ConnectionPool::ControllerInterface> {
+        return controller;
+    };
+    auto pool = makePool(options);
+
+    auto now = Date_t::now();
+    PoolImpl::setNow(now);
+
+    // A get() to the primary causes the controller to create the secondary pool as well.
+    // The secondary's idle timer is set to fire at now+kHostRetryTimeout.
+    ConnectionImpl::pushSetup(Status::OK());
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        pool->get_forTest(
+            primary, Milliseconds(60000), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                monitor.exec([&]() {
+                    ASSERT_OK(swConn.getStatus());
+                    doneWith(swConn.getValue());
+                });
+            });
+    });
+
+    // Advance past kHostRetryTimeout so the idle timer fires for the first time.
+    // hostTimeout has not yet elapsed so the pool should survive.
+    PoolImpl::setNow(now + Milliseconds(1001));
+    ASSERT(!controller->wasRemoved(primary))
+        << "Primary pool must not be destroyed before hostTimeout elapses";
+    ASSERT(!controller->wasRemoved(secondary))
+        << "Secondary pool must not be destroyed before hostTimeout elapses";
+
+    // Advance past hostTimeout (2*kHostRetryTimeout) so the idle timer fires a second time.
+    // hostTimeout has elapsed so the pool should be removed.
+    PoolImpl::setNow(now + Milliseconds(2001));
+    ASSERT(controller->wasRemoved(primary)) << "Primary pool should have expired after hostTimeout";
+    ASSERT(controller->wasRemoved(secondary))
+        << "Secondary pool should have expired after hostTimeout";
+}
+
 }  // namespace connection_pool_test_details
 }  // namespace executor
 }  // namespace mongo
