@@ -4123,8 +4123,10 @@ class TestMainWorkflow(unittest.TestCase):
                             "--no-checkout",
                             "--single-branch",
                             "-b",
-                            "v8.2.7",
-                            "https://example.com/destination.git",
+                            sync_repo_with_copybara.shell_quote("v8.2.7"),
+                            sync_repo_with_copybara.shell_quote(
+                                "https://example.com/destination.git"
+                            ),
                             sync_repo_with_copybara.shell_quote(destination_repo_dir),
                         ]
                     )
@@ -4136,8 +4138,10 @@ class TestMainWorkflow(unittest.TestCase):
                             "-C",
                             sync_repo_with_copybara.shell_quote(destination_repo_dir),
                             "push",
-                            "https://example.com/destination.git",
-                            "publicsha123:refs/tags/r8.2.7",
+                            sync_repo_with_copybara.shell_quote(
+                                "https://example.com/destination.git"
+                            ),
+                            sync_repo_with_copybara.shell_quote("publicsha123:refs/tags/r8.2.7"),
                         ]
                     )
                 ),
