@@ -70,8 +70,8 @@ function assertNoInconsistencies() {
     // Check on a clean cluster.
     assertNoInconsistencies();
 
-    const kCollectionName = "coll";
-    const kCollectionName2 = "coll2";
+    const kCollectionName = jsTestName() + "_sharded";
+    const kCollectionName2 = jsTestName() + "_unsharded";
     const kNss = db.getName() + "." + kCollectionName;
     const kNss2 = db.getName() + "." + kCollectionName2;
     let kDDLCommands = [{enableSharding: db.getName()}, {shardCollection: kNss, key: {_id: 1}}];
