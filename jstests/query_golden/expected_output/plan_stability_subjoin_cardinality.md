@@ -26,7 +26,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$and":[{"p_type":{"$eq":"LARGE BURNISHED NICKEL"}},{"p_retailprice":{"$gt":1699.79}}]}
 ```
-Estimated cardinality: 0  
+Estimated cardinality: 1  
 Actual cardinality: 29  
 Orders of magnitude: 1
 
@@ -93,13 +93,13 @@ db.part.aggregate(EJSON.deserialize(
 {"$match":{"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000255"}},{"s_acctbal":{"$lte":7307.62}}]},{}]}}]}},
 {"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}},
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","as":"nation","pipeline":[
-{"$match":{"$and":[{"$or":[{"n_name":{"$eq":"BRAZIL"}},{"n_name":{"$not":{"$in":["CHINA","GERMANY"]}}}]},{}]}}]}},
+{"$match":{"$or":[{"n_name":{"$eq":"BRAZIL"}},{"n_name":{"$not":{"$in":["CHINA","GERMANY"]}}}]}}]}},
 {"$unwind":"$nation"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$nation"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-INLJ supplier.s_nationkey = n_nationkey
+NLJ supplier.s_nationkey = n_nationkey
   -> [none] INLJ partsupp.ps_suppkey = s_suppkey
       -> [none] INLJ p_partkey = ps_partkey
           -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$and":[{"p_type":{"$eq":"LARGE BURNISHED NICKEL"}},{"p_retailprice":{"$gt":1699.79}}]} 
@@ -107,8 +107,7 @@ INLJ supplier.s_nationkey = n_nationkey
               -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
       -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"$or":[{"s_name":{"$eq":"Supplier#000000255"}},{"s_acctbal":{"$lte":7307.62}}]} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.supplier s_suppkey_1
-  -> [nation_s] FETCH: plan_stability_subjoin_cardinality_md.nation {"$or":[{"n_name":{"$eq":"BRAZIL"}},{"n_name":{"$not":{"$in":["CHINA","GERMANY"]}}}]} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.nation n_nationkey_1
+  -> [nation_s] COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"$or":[{"n_name":{"$eq":"BRAZIL"}},{"n_name":{"$not":{"$in":["CHINA","GERMANY"]}}}]}
 ```
 Estimated cardinality: 0  
 Actual cardinality: 4  
@@ -127,17 +126,17 @@ db.part.aggregate(EJSON.deserialize(
 {"$match":{"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000255"}},{"s_acctbal":{"$lte":7307.62}}]},{}]}}]}},
 {"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}},
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","as":"nation","pipeline":[
-{"$match":{"$and":[{"$or":[{"n_name":{"$eq":"BRAZIL"}},{"n_name":{"$not":{"$in":["CHINA","GERMANY"]}}}]},{}]}}]}},
+{"$match":{"$or":[{"n_name":{"$eq":"BRAZIL"}},{"n_name":{"$not":{"$in":["CHINA","GERMANY"]}}}]}}]}},
 {"$unwind":"$nation"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$nation"]}}},
 {"$lookup":{"from":"region","localField":"n_regionkey","foreignField":"r_regionkey","as":"region","pipeline":[
-{"$match":{"$and":[{"$nor":[{"r_name":{"$eq":"EUROPE"}},{"r_name":{"$eq":"AFRICA"}}]},{}]}}]}},
+{"$match":{"$nor":[{"r_name":{"$eq":"EUROPE"}},{"r_name":{"$eq":"AFRICA"}}]}}]}},
 {"$unwind":"$region"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$region"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-INLJ nation_s.n_regionkey = r_regionkey
-  -> [none] INLJ supplier.s_nationkey = n_nationkey
+NLJ nation_s.n_regionkey = r_regionkey
+  -> [none] NLJ supplier.s_nationkey = n_nationkey
       -> [none] INLJ partsupp.ps_suppkey = s_suppkey
           -> [none] INLJ p_partkey = ps_partkey
               -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$and":[{"p_type":{"$eq":"LARGE BURNISHED NICKEL"}},{"p_retailprice":{"$gt":1699.79}}]} 
@@ -145,10 +144,8 @@ INLJ nation_s.n_regionkey = r_regionkey
                   -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
           -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"$or":[{"s_name":{"$eq":"Supplier#000000255"}},{"s_acctbal":{"$lte":7307.62}}]} 
               -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.supplier s_suppkey_1
-      -> [nation_s] FETCH: plan_stability_subjoin_cardinality_md.nation {"$or":[{"n_name":{"$eq":"BRAZIL"}},{"n_name":{"$not":{"$in":["CHINA","GERMANY"]}}}]} 
-          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.nation n_nationkey_1
-  -> [region_s] FETCH: plan_stability_subjoin_cardinality_md.region {"$nor":[{"r_name":{"$eq":"EUROPE"}},{"r_name":{"$eq":"AFRICA"}}]} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.region r_regionkey_1
+      -> [nation_s] COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"$or":[{"n_name":{"$eq":"BRAZIL"}},{"n_name":{"$not":{"$in":["CHINA","GERMANY"]}}}]} 
+  -> [region_s] COLLSCAN: plan_stability_subjoin_cardinality_md.region {"$nor":[{"r_name":{"$eq":"EUROPE"}},{"r_name":{"$eq":"AFRICA"}}]}
 ```
 Estimated cardinality: 0  
 Actual cardinality: 3  
@@ -8322,7 +8319,7 @@ Subjoin plan:
 FETCH: plan_stability_subjoin_cardinality_md.orders {"o_clerk":{"$eq":"Clerk#000000849"}} 
   -> IXSCAN: plan_stability_subjoin_cardinality_md.orders o_orderdate_1 {"o_orderdate":["(new Date(707529600000), new Date(756259200000))"]}
 ```
-Estimated cardinality: 0  
+Estimated cardinality: 1  
 Actual cardinality: 32  
 Orders of magnitude: 1
 
@@ -8332,21 +8329,21 @@ Orders of magnitude: 1
 db.orders.aggregate(EJSON.deserialize(
 [
 {"$match":{"$and":[{"o_clerk":{"$eq":"Clerk#000000849"}},{"o_orderdate":{"$gt":"1992-06-03T00:00:00.000Z","$lt":"1993-12-19T00:00:00.000Z"}}]}},
-{"$lookup":{"from":"lineitem","localField":"o_orderkey","foreignField":"l_orderkey","as":"lineitem","pipeline":[
-{"$match":{"$and":[{"l_shipdate":{"$not":{"$lte":"1994-01-25T00:00:00.000Z"}}},{}]}}]}},
-{"$unwind":"$lineitem"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$lineitem"]}}}]
+{"$lookup":{"from":"customer","localField":"o_custkey","foreignField":"c_custkey","as":"customer","pipeline":[
+{"$match":{"$and":[{"$or":[{"c_name":{"$eq":"Customer#000005090"}},{"c_acctbal":{"$gt":-624.49}}]},{}]}}]}},
+{"$unwind":"$customer"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$customer"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-INLJ o_orderkey = l_orderkey
+INLJ o_custkey = c_custkey
   -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"o_clerk":{"$eq":"Clerk#000000849"}} 
       -> IXSCAN: plan_stability_subjoin_cardinality_md.orders o_orderdate_1 {"o_orderdate":["(new Date(707529600000), new Date(756259200000))"]}
-  -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_shipdate":{"$not":{"$lte":"1994-01-25T00:00:00.000Z"}}} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
+  -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$or":[{"c_name":{"$eq":"Customer#000005090"}},{"c_acctbal":{"$gt":-624.49}}]} 
+      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_custkey_1
 ```
-Estimated cardinality: 0  
-Actual cardinality: 11  
+Estimated cardinality: 1  
+Actual cardinality: 31  
 Orders of magnitude: 1
 
 ---
@@ -8355,26 +8352,26 @@ Orders of magnitude: 1
 db.orders.aggregate(EJSON.deserialize(
 [
 {"$match":{"$and":[{"o_clerk":{"$eq":"Clerk#000000849"}},{"o_orderdate":{"$gt":"1992-06-03T00:00:00.000Z","$lt":"1993-12-19T00:00:00.000Z"}}]}},
-{"$lookup":{"from":"lineitem","localField":"o_orderkey","foreignField":"l_orderkey","as":"lineitem","pipeline":[
-{"$match":{"$and":[{"l_shipdate":{"$not":{"$lte":"1994-01-25T00:00:00.000Z"}}},{}]}}]}},
-{"$unwind":"$lineitem"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$lineitem"]}}},
 {"$lookup":{"from":"customer","localField":"o_custkey","foreignField":"c_custkey","as":"customer","pipeline":[
 {"$match":{"$and":[{"$or":[{"c_name":{"$eq":"Customer#000005090"}},{"c_acctbal":{"$gt":-624.49}}]},{}]}}]}},
-{"$unwind":"$customer"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$customer"]}}}]
+{"$unwind":"$customer"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$customer"]}}},
+{"$lookup":{"from":"lineitem","localField":"o_orderkey","foreignField":"l_orderkey","as":"lineitem","pipeline":[
+{"$match":{"$and":[{"l_shipdate":{"$not":{"$lte":"1994-01-25T00:00:00.000Z"}}},{}]}}]}},
+{"$unwind":"$lineitem"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$lineitem"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-INLJ orders.o_custkey = c_custkey
-  -> [none] INLJ o_orderkey = l_orderkey
+INLJ orders.o_orderkey = l_orderkey
+  -> [none] INLJ o_custkey = c_custkey
       -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"o_clerk":{"$eq":"Clerk#000000849"}} 
           -> IXSCAN: plan_stability_subjoin_cardinality_md.orders o_orderdate_1 {"o_orderdate":["(new Date(707529600000), new Date(756259200000))"]}
-      -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_shipdate":{"$not":{"$lte":"1994-01-25T00:00:00.000Z"}}} 
-          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
-  -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$or":[{"c_name":{"$eq":"Customer#000005090"}},{"c_acctbal":{"$gt":-624.49}}]} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_custkey_1
+      -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$or":[{"c_name":{"$eq":"Customer#000005090"}},{"c_acctbal":{"$gt":-624.49}}]} 
+          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_custkey_1
+  -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_shipdate":{"$not":{"$lte":"1994-01-25T00:00:00.000Z"}}} 
+      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 0  
+Estimated cardinality: 3  
 Actual cardinality: 11  
 Orders of magnitude: 1
 
@@ -8384,12 +8381,12 @@ Orders of magnitude: 1
 db.orders.aggregate(EJSON.deserialize(
 [
 {"$match":{"$and":[{"o_clerk":{"$eq":"Clerk#000000849"}},{"o_orderdate":{"$gt":"1992-06-03T00:00:00.000Z","$lt":"1993-12-19T00:00:00.000Z"}}]}},
-{"$lookup":{"from":"lineitem","localField":"o_orderkey","foreignField":"l_orderkey","as":"lineitem","pipeline":[
-{"$match":{"$and":[{"l_shipdate":{"$not":{"$lte":"1994-01-25T00:00:00.000Z"}}},{}]}}]}},
-{"$unwind":"$lineitem"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$lineitem"]}}},
 {"$lookup":{"from":"customer","localField":"o_custkey","foreignField":"c_custkey","as":"customer","pipeline":[
 {"$match":{"$and":[{"$or":[{"c_name":{"$eq":"Customer#000005090"}},{"c_acctbal":{"$gt":-624.49}}]},{}]}}]}},
 {"$unwind":"$customer"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$customer"]}}},
+{"$lookup":{"from":"lineitem","localField":"o_orderkey","foreignField":"l_orderkey","as":"lineitem","pipeline":[
+{"$match":{"$and":[{"l_shipdate":{"$not":{"$lte":"1994-01-25T00:00:00.000Z"}}},{}]}}]}},
+{"$unwind":"$lineitem"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$lineitem"]}}},
 {"$lookup":{"from":"supplier","localField":"c_nationkey","foreignField":"s_nationkey","as":"supplier","pipeline":[
 {"$match":{"$and":[{"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000836"}},{"s_nationkey":{"$eq":23}},{"s_acctbal":{"$gt":6089.75}}]},{"$or":[{"s_name":{"$eq":"Supplier#000000920"}},{"s_acctbal":{"$lt":9537.73}},{"s_acctbal":{"$gte":7448.46}}]}]},{}]}}]}},
 {"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}}]
@@ -8398,22 +8395,20 @@ db.orders.aggregate(EJSON.deserialize(
 Subjoin plan:
 ```
 INLJ customer.c_nationkey = s_nationkey
-  -> [none] INLJ orders.o_custkey = c_custkey
-      -> [none] INLJ o_orderkey = l_orderkey
+  -> [none] INLJ orders.o_orderkey = l_orderkey
+      -> [none] INLJ o_custkey = c_custkey
           -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"o_clerk":{"$eq":"Clerk#000000849"}} 
               -> IXSCAN: plan_stability_subjoin_cardinality_md.orders o_orderdate_1 {"o_orderdate":["(new Date(707529600000), new Date(756259200000))"]}
-          -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_shipdate":{"$not":{"$lte":"1994-01-25T00:00:00.000Z"}}} 
-              -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
-      -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$or":[{"c_name":{"$eq":"Customer#000005090"}},{"c_acctbal":{"$gt":-624.49}}]} 
-          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_custkey_1
+          -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$or":[{"c_name":{"$eq":"Customer#000005090"}},{"c_acctbal":{"$gt":-624.49}}]} 
+              -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_custkey_1
+      -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_shipdate":{"$not":{"$lte":"1994-01-25T00:00:00.000Z"}}} 
+          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
   -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000836"}},{"s_nationkey":{"$eq":23}},{"s_acctbal":{"$gt":6089.75}}]},{"$or":[{"s_name":{"$eq":"Supplier#000000920"}},{"s_acctbal":{"$lt":9537.73}},{"s_acctbal":{"$gte":7448.46}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.supplier s_nationkey_1
 ```
-Estimated cardinality: 0  
+Estimated cardinality: 42  
 Actual cardinality: 159  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 1
 
 ---
 ## >>> Command idx 212

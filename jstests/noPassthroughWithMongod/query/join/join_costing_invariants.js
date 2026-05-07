@@ -129,11 +129,11 @@ function assertCostEq(command1, command2, path) {
     );
 }
 
-function assertCostsAlmostZero(commands, path) {
+function assertCostsAlmostZero(commands, path, threshold = 0.1) {
     assert(path !== undefined);
     for (const command of commands) {
         const cost = getCost(command, path);
-        assert(cost < 0.1, `Expected cost at path '${path}' to be less than 0.1 (${cost}).`);
+        assert(cost < threshold, `Expected cost at path '${path}' to be less than ${threshold} (${cost}).`);
     }
 }
 
@@ -164,6 +164,11 @@ describe("Costing of individual inputs to a join", () => {
     });
 
     it("Inputs with no matching rows should have near-zero costs (IXSCAN)", () => {
+        // CBR's sampling estimator observes zero matches for 'i_idx: -1' but the sample only
+        // covers part of the collection, so CardinalityEstimator::clampZeroEstimates replaces
+        // the Sampling-sourced zero with kMinCE (1) to avoid the cost-model degeneracy this
+        // ticket fixes. Cost is therefore the fixed FETCH+IXSCAN overhead for one row
+        // (~1 unit) rather than collapsing to minCost.
         assertCostsAlmostZero(
             [
                 {
@@ -191,6 +196,7 @@ describe("Costing of individual inputs to a join", () => {
                 },
             ],
             "queryPlan.inputStages[0]",
+            2.0,
         );
     });
 
@@ -325,6 +331,10 @@ describe("Costing entire joins", () => {
     });
 
     it("Joins with empty input should have an almost-zero cost (IXSCAN).", () => {
+        // See "Inputs with no matching rows (IXSCAN)" above: with CardinalityEstimator's
+        // zero-estimate clamp, the empty-match IXSCAN is costed as one-row, so the whole
+        // NLJ is cost-equivalent to a 1-row x many_rows join (~25) rather than collapsing
+        // to minCost.
         assertCostsAlmostZero(
             [
                 {
@@ -352,6 +362,7 @@ describe("Costing entire joins", () => {
                 },
             ],
             "queryPlan",
+            30.0,
         );
     });
 

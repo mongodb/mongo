@@ -139,8 +139,11 @@ function runTest(planRankerMode) {
 
     // Some cost assertions require actual, non-heuristic cardinality estimates
     if (planRankerMode !== "heuristicCE") {
-        // IXSCAN cost for an interval containing no documents should be small.
-        assert.close(ixscanCost({predicate: {a: {$lt: 0}}, hint: {a: 1}}), 0.000009);
+        // IXSCAN cost for an interval containing no documents should be small. The CE for
+        // such an interval is approximate-source zero, which clampZeroEstimates clamps to
+        // 1, so the cost matches that of a one-document interval rather than collapsing to
+        // minCost.
+        assert.between(0.0, ixscanCost({predicate: {a: {$lt: 0}}, hint: {a: 1}}), 0.005);
 
         // IXSCAN cost for an interval containing one document should be small.
         assert.between(0.0, ixscanCost({predicate: {a: {$lte: 0}}, hint: {a: 1}}), 0.005);
@@ -198,7 +201,9 @@ function runTest(planRankerMode) {
     //          ixscanCost({predicate: {a_multikey: 1}, hint: {a_multikey: 1}}));
 
     // IXSCAN with a single seek should have a lower cost than an index scan with skips.
-    const predicateOverAandB = {a: 5, b: {$gt: 6}};
+    // Use a predicate that actually matches (in the dataset a == b == i, so a=5 AND b>4 matches
+    // one document, i=5) to avoid the 1.0 inflation that kicks in for zero CEs.
+    const predicateOverAandB = {a: 5, b: {$gt: 4}};
     // TODO SERVER-100611: re-enable these tests.
     // assert.lt(
     //     ixscanCost({predicate: predicateOverAandB, hint: {a: 1, b: 1}}),

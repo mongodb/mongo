@@ -40,7 +40,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/classic/multi_plan.h"
-#include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -55,14 +54,11 @@
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranking_decision.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/idl/server_parameter_test_controller.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
@@ -462,10 +458,11 @@ public:
         auto soln = pickBestPlan(cq.get());
         ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, soln->root()).isOK());
 
-        // TODO SERVER-97933: The two plans have the same cost since CE is 0, so CBR happens
-        // to pick the wrong one.
-        // auto cbrSoln = bestCBRPlan(cq.get(), N);
-        // ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
+        // Both plans see CE = 0 from the sampler. CardinalityEstimator::clampZeroEstimates
+        // floors approximate zeros to kMinCE and the CostEstimator's additive per-stage minimum
+        // breaks the resulting tie in favour of the structurally cheaper covered plan.
+        auto cbrSoln = bestCBRPlan(cq.get(), N);
+        ASSERT(QueryPlannerTestLib::solutionMatches(bestPlan, cbrSoln->root()).isOK());
     }
 };
 

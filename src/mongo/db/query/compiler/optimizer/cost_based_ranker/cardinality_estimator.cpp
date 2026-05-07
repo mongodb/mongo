@@ -87,6 +87,53 @@ CardinalityEstimator::CardinalityEstimator(const CollectionInfo& collInfo,
     }
 }
 
+CEResult CardinalityEstimator::estimatePlan(const QuerySolution& plan) {
+    // Restore initial state so that the estimator can be reused for multiple plans.
+    _inputCard = _collCard;
+    _conjSels.clear();
+
+    auto ceRes = estimate(plan.root());
+    if (!ceRes.isOK()) {
+        return ceRes;
+    }
+
+    // Replace zero-valued approximate CEs with inferred non-zero values. This runs after
+    // the full estimation walk (including propagateLimit from estimate(LimitNode)) has
+    // completed, so the zero-guard in propagateLimit still sees the raw estimates.
+    clampZeroEstimates();
+
+    // Return the possibly-clamped root estimate.
+    return _qsnEstimates.at(plan.root())->outCE;
+}
+
+void CardinalityEstimator::clampZeroEstimates() {
+    const auto clamp = [](CardinalityEstimate ce) -> CardinalityEstimate {
+        if (ce != zeroCE) {
+            return ce;
+        }
+        switch (ce.source()) {
+            case EstimationSource::Sampling:
+            case EstimationSource::Histogram:
+            case EstimationSource::Heuristics:
+            case EstimationSource::Mixed:
+                return CardinalityEstimate{CardinalityType{kMinCE}, ce.source()};
+            case EstimationSource::Metadata:
+            case EstimationSource::Code:
+                return ce;
+            case EstimationSource::Unknown:
+                tasserted(12307002, "Encountered a CE with unknown source during clamping");
+        }
+        MONGO_UNREACHABLE;
+    };
+
+    for (auto& [node, est] : _qsnEstimates) {
+        if (est->inCE) {
+            est->inCE = clamp(*est->inCE);
+        }
+        est->outCE = clamp(est->outCE);
+    }
+}
+
 CEResult CardinalityEstimator::estimate(const QuerySolutionNode* node) {
     StageType nodeType = node->getType();
     CEResult ceRes(ErrorCodes::CEFailure, "Unable to estimate expression");

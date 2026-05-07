@@ -242,7 +242,17 @@ CardinalityEstimate makeScaledEstimate(double matchCount,
                                        double collCard) {
     size_t effectiveSampleSize = sampleSize - errorCount;
     double estimate = effectiveSampleSize > 0 ? (matchCount * collCard) / effectiveSampleSize : 0.0;
-    return CardinalityEstimate{CardinalityType{estimate}, EstimationSource::Sampling};
+    // The estimate is authoritative (tagged 'Code' rather than 'Sampling') when either:
+    // * the expression errored for every sampled document - the zero is not an approximation
+    // * the sample covers the entire collection - 'matchCount' is the true match count and
+    //   'estimate' is exact.
+    // Tagging these as Code prevents CardinalityEstimator::clampZeroEstimates from inflating
+    // the estimates.
+    const bool isAuthoritative =
+        effectiveSampleSize == 0 || static_cast<double>(effectiveSampleSize) >= collCard;
+    return CardinalityEstimate{CardinalityType{estimate},
+                               isAuthoritative ? EstimationSource::Code
+                                               : EstimationSource::Sampling};
 }
 
 /**

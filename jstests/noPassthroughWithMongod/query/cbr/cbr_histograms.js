@@ -65,8 +65,10 @@ try {
         {query: {a: 90}, expectedCE: 46},
         {query: {a: {$gt: 5}}, expectedCE: 4372},
         {query: {a: {$lt: 5}}, expectedCE: 486},
-        // Check non existing value (max value in dataset: 98)
-        {query: {a: 250}, expectedCE: 0},
+        // Check non existing value (max value in dataset: 98).
+        // An approximate-source (Histogram) zero is clamped to 1 by
+        // CardinalityEstimator::clampZeroEstimates.
+        {query: {a: 250}, expectedCE: 1},
         // CollScan with sargable filter should use histogram
         {query: {b: 4}, expectedCE: 1030},
         {query: {b: {$gt: 3}}, expectedCE: 1030},

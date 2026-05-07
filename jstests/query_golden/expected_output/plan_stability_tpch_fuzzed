@@ -20,8 +20,8 @@
 {"$unwind":"$region_s"},
 {"$match":{"$and":[{"p_type":"LARGE BURNISHED NICKEL"},{"p_retailprice":{"$gt":1699.79}}]}}],"cursor":{},"idx":1},
     "winningPlan": [
-"INLJ nation_s.n_regionkey = r_regionkey",
-"  -> [none] INLJ supplier.s_nationkey = n_nationkey",
+"NLJ nation_s.n_regionkey = r_regionkey",
+"  -> [none] NLJ supplier.s_nationkey = n_nationkey",
 "      -> [none] INLJ partsupp.ps_suppkey = s_suppkey",
 "          -> [none] INLJ p_partkey = ps_partkey",
 "              -> [none] COLLSCAN: plan_stability_tpch_fuzzed.part {'$and':[{'p_type':{'$eq':'LARGE BURNISHED NICKEL'}},{'p_retailprice':{'$gt':1699.79}}]} ",
@@ -29,12 +29,10 @@
 "                  -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.partsupp ps_partkey_1",
 "          -> [supplier] FETCH: plan_stability_tpch_fuzzed.supplier {'$or':[{'s_name':{'$eq':'Supplier#000000255'}},{'s_acctbal':{'$lte':7307.62}}]} ",
 "              -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.supplier s_suppkey_1",
-"      -> [nation_s] FETCH: plan_stability_tpch_fuzzed.nation {'$or':[{'n_name':{'$eq':'BRAZIL'}},{'n_name':{'$not':{'$in':['CHINA','GERMANY']}}}]} ",
-"          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.nation n_nationkey_1",
-"  -> [region_s] FETCH: plan_stability_tpch_fuzzed.region {'$nor':[{'r_name':{'$eq':'EUROPE'}},{'r_name':{'$eq':'AFRICA'}}]} ",
-"      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.region r_regionkey_1"],
-    "keys" :       132,
-    "docs" :     20132,
+"      -> [nation_s] COLLSCAN: plan_stability_tpch_fuzzed.nation {'$or':[{'n_name':{'$eq':'BRAZIL'}},{'n_name':{'$not':{'$in':['CHINA','GERMANY']}}}]} ",
+"  -> [region_s] COLLSCAN: plan_stability_tpch_fuzzed.region {'$nor':[{'r_name':{'$eq':'EUROPE'}},{'r_name':{'$eq':'AFRICA'}}]}"],
+    "keys" :       124,
+    "docs" :     20244,
     "rows" :         3,
     "csum" : "3faef6da4d2dd39c"},
 
@@ -4868,18 +4866,18 @@
 {"$unwind":"$supplier"},
 {"$match":{"$or":[{"orders.o_shippriority":{"$gt":0}},{"orders.o_totalprice":{"$lte":280828.89}},{"l_linestatus":{"$in":["O"]}},{"orders.o_totalprice":{"$eq":240982.46}},{"customer.c_mktsegment":"HOUSEHOLD"}]}}],"cursor":{},"idx":209},
     "winningPlan": [
-"INLJ orders.o_custkey = c_custkey",
-"  -> [none] INLJ o_orderkey = l_orderkey",
+"INLJ orders.o_orderkey = l_orderkey",
+"  -> [none] INLJ o_custkey = c_custkey",
 "      -> [orders] FETCH: plan_stability_tpch_fuzzed.orders {'$and':[{'o_clerk':{'$eq':'Clerk#000000567'}},{'o_totalprice':{'$lte':202028.47}}]} ",
 "          -> IXSCAN: plan_stability_tpch_fuzzed.orders o_orderdate_1 {'o_orderdate':['[MinKey, new Date(717897600000))','(new Date(9223372036854775807), MaxKey]']}",
-"      -> [none] FETCH: plan_stability_tpch_fuzzed.lineitem ",
-"          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.lineitem l_orderkey_1",
-"  -> [customer] FETCH: plan_stability_tpch_fuzzed.customer {'c_name':{'$not':{'$eq':'Customer#000013237'}}} ",
-"      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.customer c_custkey_1",
+"      -> [customer] FETCH: plan_stability_tpch_fuzzed.customer {'c_name':{'$not':{'$eq':'Customer#000013237'}}} ",
+"          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.customer c_custkey_1",
+"  -> [none] FETCH: plan_stability_tpch_fuzzed.lineitem ",
+"      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.lineitem l_orderkey_1",
 "$match",
 "$lookup supplier s_nationkey_1"],
-    "keys" :     18103,
-    "docs" :     18102,
+    "keys" :     18088,
+    "docs" :     18087,
     "rows" :        90,
     "csum" : "511c2249dd4223ae"},
 
@@ -4919,18 +4917,18 @@
 {"$match":{"$nor":[{"l_shipdate":{"$lte":"1994-01-25T00:00:00.000Z"}}]}}],"cursor":{},"idx":211},
     "winningPlan": [
 "INLJ customer.c_nationkey = s_nationkey",
-"  -> [none] INLJ orders.o_custkey = c_custkey",
-"      -> [none] INLJ o_orderkey = l_orderkey",
+"  -> [none] INLJ orders.o_orderkey = l_orderkey",
+"      -> [none] INLJ o_custkey = c_custkey",
 "          -> [orders] FETCH: plan_stability_tpch_fuzzed.orders {'o_clerk':{'$eq':'Clerk#000000849'}} ",
 "              -> IXSCAN: plan_stability_tpch_fuzzed.orders o_orderdate_1 {'o_orderdate':['(new Date(707529600000), new Date(756259200000))']}",
-"          -> [none] FETCH: plan_stability_tpch_fuzzed.lineitem {'l_shipdate':{'$not':{'$lte':'1994-01-25T00:00:00.000Z'}}} ",
-"              -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.lineitem l_orderkey_1",
-"      -> [customer] FETCH: plan_stability_tpch_fuzzed.customer {'$or':[{'c_name':{'$eq':'Customer#000005090'}},{'c_acctbal':{'$gt':-624.49}}]} ",
-"          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.customer c_custkey_1",
+"          -> [customer] FETCH: plan_stability_tpch_fuzzed.customer {'$or':[{'c_name':{'$eq':'Customer#000005090'}},{'c_acctbal':{'$gt':-624.49}}]} ",
+"              -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.customer c_custkey_1",
+"      -> [none] FETCH: plan_stability_tpch_fuzzed.lineitem {'l_shipdate':{'$not':{'$lte':'1994-01-25T00:00:00.000Z'}}} ",
+"          -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.lineitem l_orderkey_1",
 "  -> [supplier] FETCH: plan_stability_tpch_fuzzed.supplier {'$and':[{'$or':[{'s_name':{'$eq':'Supplier#000000836'}},{'s_nationkey':{'$eq':23}},{'s_acctbal':{'$gt':6089.75}}]},{'$or':[{'s_name':{'$eq':'Supplier#000000920'}},{'s_acctbal':{'$lt':9537.73}},{'s_acctbal':{'$gte':7448.46}}]}]} ",
 "      -> INDEX_PROBE_NODE: plan_stability_tpch_fuzzed.supplier s_nationkey_1"],
-    "keys" :     35081,
-    "docs" :     35081,
+    "keys" :     35100,
+    "docs" :     35100,
     "rows" :       159,
     "csum" : "81d79f7f00653521"},
 
@@ -5322,7 +5320,7 @@
     "csum" : "ca7f0bfcb0e88d85"}
 
 ],
-">>>totals": {"commands": 222, "keys":   1418505, "docs":  14600273, "rows":     41006}
+">>>totals": {"commands": 222, "keys":   1418501, "docs":  14600389, "rows":     41006}
 }
 
 

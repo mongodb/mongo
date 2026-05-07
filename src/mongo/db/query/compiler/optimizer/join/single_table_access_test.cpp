@@ -45,7 +45,11 @@ using SingleTableAccessTestFixture = JoinOrderingTestFixture;
 void assertQuerySolutionHasEstimate(const QuerySolutionNode* qsn, const EstimateMap& estimates) {
     auto it = estimates.find(qsn);
     ASSERT(it != estimates.end());
-    ASSERT_EQ(EstimationSource::Sampling, it->second->outCE.source());
+    // 'Code' is also valid: when the effective sample covers the full collection, the
+    // sampling estimator tags the resulting CE as authoritative (see SERVER-123070).
+    auto source = it->second->outCE.source();
+    ASSERT(source == EstimationSource::Sampling || source == EstimationSource::Code)
+        << "unexpected source " << toStringData(source);
     for (auto&& child : qsn->children) {
         assertQuerySolutionHasEstimate(child.get(), estimates);
     }

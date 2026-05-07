@@ -54,16 +54,15 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
                                           const std::vector<CostEstimate>& childCosts,
                                           const std::vector<CardinalityEstimate>& childCEs,
                                           QSNEstimate& qsnEst) {
-    if (qsnEst.inCE && *qsnEst.inCE == zeroCE) {
-        qsnEst.cost = minCost;
-        return;
-    }
-
     auto addEstimates = [](const auto& e1, const auto& e2) {
         return e1 + e2;
     };
 
     CostEstimate nodeCost = zeroCost;
+    // Sum of the children's costs. Zero for leaf stages (empty 'childCosts'). Used both by the
+    // per-case cost formulae and by the additive floor below.
+    const CostEstimate childSum =
+        std::accumulate(childCosts.begin(), childCosts.end(), zeroCost, addEstimates);
     // Empty predicates may be represented as an empty AND.
     const MatchExpression* filter = node->filter
         ? (node->filter->matchType() == MatchExpression::AND && node->filter->numChildren() == 0)
@@ -126,7 +125,7 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             break;
         }
         case STAGE_FETCH: {
-            nodeCost = childCosts[0];
+            nodeCost = childSum;
             const auto& inCE = childCEs[0];
             auto fetchNode = static_cast<const FetchNode*>(node);
 
@@ -148,8 +147,7 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
                                   << childCEs.size(),
                     childCEs.size() == 2);
             // The cost to read all children
-            nodeCost +=
-                std::accumulate(childCosts.begin(), childCosts.end(), zeroCost, addEstimates);
+            nodeCost += childSum;
 
             const auto& numReturned = qsnEst.outCE;
             nodeCost += andHashBuild * childCEs[0] + andHashProbe * childCEs[1] +
@@ -159,8 +157,7 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
         }
         case STAGE_AND_SORTED: {
             // Intersects streams of sorted RIDs
-            nodeCost +=
-                std::accumulate(childCosts.begin(), childCosts.end(), zeroCost, addEstimates);
+            nodeCost += childSum;
 
             const auto& numProcessed =
                 std::accumulate(childCEs.begin(), childCEs.end(), zeroCE, addEstimates);
@@ -177,8 +174,7 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             tassert(11028601, "Encountered an OR stage with a filter", !orNode->filter);
             tassert(11028605, "Encountered an OR stage with dedup = false", orNode->dedup);
 
-            nodeCost =
-                std::accumulate(childCosts.begin(), childCosts.end(), zeroCost, addEstimates);
+            nodeCost = childSum;
 
             const auto& numProcessed =
                 std::accumulate(childCEs.begin(), childCEs.end(), zeroCE, addEstimates);
@@ -189,8 +185,7 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
         case STAGE_SORT_MERGE: {
             // Merges the outputs of N children, each of which is sorted in the order specified by
             // some pattern.
-            nodeCost +=
-                std::accumulate(childCosts.begin(), childCosts.end(), zeroCost, addEstimates);
+            nodeCost += childSum;
 
             const auto& numProcessed =
                 std::accumulate(childCEs.begin(), childCEs.end(), zeroCE, addEstimates);
@@ -210,7 +205,7 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
         }
         case STAGE_SORT_DEFAULT:
         case STAGE_SORT_SIMPLE: {
-            nodeCost = childCosts[0];
+            nodeCost = childSum;
 
             // The 'numProcessedLogFactor' is used to estimate the number of sort steps. Even for
             // very small estimates make sure to count at least one sort step per input document.
@@ -274,21 +269,26 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
         }
         case STAGE_PROJECTION_DEFAULT: {
             const auto& inCE = childCEs[0];
-            nodeCost = defaultProjectionIncrement * inCE + childCosts[0];
+            nodeCost = defaultProjectionIncrement * inCE + childSum;
             break;
         }
         case STAGE_PROJECTION_COVERED: {
             const auto& inCE = childCEs[0];
-            nodeCost = coveredProjectionIncrement * inCE + childCosts[0];
+            nodeCost = coveredProjectionIncrement * inCE + childSum;
             break;
         }
         case STAGE_PROJECTION_SIMPLE: {
             const auto& inCE = childCEs[0];
-            nodeCost = simpleProjectionIncrement * inCE + childCosts[0];
+            nodeCost = simpleProjectionIncrement * inCE + childSum;
+            break;
+        }
+        case STAGE_EOF: {
+            // EOF stages produce no rows; they are costed purely via the per-stage overhead
+            // enforced by the additive floor below.
             break;
         }
         case STAGE_LIMIT: {
-            nodeCost = childCosts[0];
+            nodeCost = childSum;
             const auto& inCE = childCEs[0];
             auto limitNode = static_cast<const LimitNode*>(node);
             auto limitCE = CardinalityEstimate{
@@ -298,7 +298,7 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             break;
         }
         case STAGE_SKIP: {
-            nodeCost = childCosts[0];
+            nodeCost = childSum;
             const auto& inCE = childCEs[0];
             auto skipNode = static_cast<const SkipNode*>(node);
             auto skipCE = CardinalityEstimate{CardinalityType{static_cast<double>(skipNode->skip)},
@@ -317,7 +317,13 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
             MONGO_UNIMPLEMENTED_TASSERT(9695102);
     }
 
-    qsnEst.cost = (nodeCost < minCost) ? minCost : nodeCost;
+    // Each stage's cost must be at least 'minCost' above the sum of its children's costs.
+    // The resulting invariant 'cost(parent) >= sum(cost(children)) + minCost' is what
+    // differentiates structurally different plans when input cardinalities collapse to zero.
+    // TODO SERVER-97933 make this even more fine-grained with different minCosts for different
+    // node types.
+    const CostEstimate additiveFloor = childSum + minCost;
+    qsnEst.cost = (nodeCost < additiveFloor) ? additiveFloor : nodeCost;
 }
 
 /**

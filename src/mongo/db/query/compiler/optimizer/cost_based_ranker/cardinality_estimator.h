@@ -84,13 +84,7 @@ public:
     CardinalityEstimator& operator=(const CardinalityEstimator&) = delete;
     CardinalityEstimator& operator=(CardinalityEstimator&&) = delete;
 
-    CEResult estimatePlan(const QuerySolution& plan) {
-        // Restore initial state so that the estimator can be reused for multiple plans.
-        _inputCard = _collCard;
-        _conjSels.clear();
-
-        return estimate(plan.root());
-    }
+    CEResult estimatePlan(const QuerySolution& plan);
 
 private:
     // QuerySolutionNodes
@@ -131,6 +125,26 @@ private:
      * of the child.
      */
     void propagateLimit(const QuerySolutionNode* node, size_t limit);
+
+    /**
+     * "At least one row" floor used by 'clampZeroEstimates' for approximate-source zeros.
+     */
+    static constexpr double kMinCE = 1.0;
+
+    /**
+     * Walk '_qsnEstimates' and replace zero-valued approximate-source cardinality estimates
+     * (Sampling / Histogram / Heuristics / Mixed) with a non-zero inferred value. A zero from
+     * an approximate source means "not observed" rather than "truly zero"; letting it reach
+     * the cost model causes structurally different plans to tie at the per-node minCost.
+     *
+     * Policy:
+     *   - Sampling, Histogram, Heuristics, Mixed -> kMinCE ("at least one row")
+     *   - Metadata, Code -> untouched (authoritative zeros)
+     *
+     * Authoritative zeros are deliberately preserved; the 'CostEstimator' handles them via an
+     * additive per-stage minimum so structurally different plans still receive distinct costs.
+     */
+    void clampZeroEstimates();
 
     // Internal helper functions
 

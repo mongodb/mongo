@@ -396,13 +396,18 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Code: NumberLong(0),
                     });
                 } else {
+                    // 'coll' has 100 documents, which is smaller than the default sample size
+                    // (384 at 5% margin, 95% CI). The sampler therefore observes every document
+                    // and SamplingEstimatorImpl::makeScaledEstimate tags the CE as 'Code' - an
+                    // authoritative estimate that CardinalityEstimator::clampZeroEstimates
+                    // leaves alone.
                     assert.eq(cbrSection.cardinalityEstimationMethods, {
                         Histogram: NumberLong(0),
-                        Sampling: NumberLong(1),
+                        Sampling: NumberLong(0),
                         Heuristics: NumberLong(0),
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
-                        Code: NumberLong(0),
+                        Code: NumberLong(1),
                     });
                 }
             } finally {
@@ -462,15 +467,16 @@ function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
                         Code: NumberLong(0),
                     });
                 } else {
-                    // The best CBR plan (using the regular {d: 1} index) should have its
-                    // Sampling CE method captured even though multiple solutions were returned.
+                    // 'multiSolnColl' has 200 documents, which is smaller than the default
+                    // sample size (384). The sampler observes every document, so the best CBR
+                    // plan's CE is tagged 'Code' (authoritative) rather than 'Sampling'.
                     assert.eq(cbrSection.cardinalityEstimationMethods, {
                         Histogram: NumberLong(0),
-                        Sampling: NumberLong(1),
+                        Sampling: NumberLong(0),
                         Heuristics: NumberLong(0),
                         Mixed: NumberLong(0),
                         Metadata: NumberLong(0),
-                        Code: NumberLong(0),
+                        Code: NumberLong(1),
                     });
                     assert.gt(
                         cbrSection.nDocsSampled.sum,

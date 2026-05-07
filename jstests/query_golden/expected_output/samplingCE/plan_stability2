@@ -588,9 +588,9 @@
     "rows" :    142},
 
 {">>>pipeline": [{"$match":{"$or":[{"field30_Decimal128_idx":{"$type":"decimal"},"field15_mixed_idx":{"$ne":230}},{"$and":[{"field31_list_idx":[6,19,61,53,92],"field3_Decimal128_idx":{"$gt":{"$numberDecimal":"9.3"}},"field46_datetime":{"$exists":false}},{"$nor":[{"field19_datetime_idx":{"$ne":"2024-02-01T00:00:00.000Z"},"field40_list":{"$regex":{"$regex":"u","$options":""}},"field14_dict_idx":{"$ne":{"d":2}}},{"field9_bool_idx":{"$gt":true},"field8_int_idx":{"$gt":252}}]},{"field0_bool_idx":{"$eq":true},"field36_bool":{"$gte":false},"field40_list":{"$eq":"h"},"field46_datetime":{"$gte":"2024-02-20T00:00:00.000Z"}},{"$nor":[{"field26_int_idx":{"$ne":88},"field22_list_idx":{"$type":"int"},"field13_list_idx":{"$ne":485}},{"field43_str":{"$lt":"d"},"field11_Timestamp_idx":{"$gt":{"$timestamp":{"t":1762000102,"i":0}}}},{"field35_int_idx":{"$eq":225},"field28_datetime_idx":{"$lt":"2024-01-03T00:00:00.000Z"}},{"$or":[{"field2_Timestamp_idx":{"$lt":{"$timestamp":{"t":1734813169,"i":0}}},"field13_list_idx":{"$exists":false},"field4_list_idx":"d","field3_Decimal128_idx":{"$lte":{"$numberDecimal":"1.2"}}},{"field27_bool_idx":{"$eq":false},"field40_list":94}]}]}]}],"$and":[{"$or":[{"$and":[{"field21_Decimal128_idx":{"$lt":{"$numberDecimal":"22.1"}},"field40_list":{"$elemMatch":{"$size":17}}},{"field25_str_idx":{"$gt":"zR"},"field17_int_idx":{"$lt":602},"field35_int_idx":{"$lt":2863},"field22_list_idx":{"$elemMatch":{"$gte":65}}},{"field3_Decimal128_idx":{"$eq":{"$numberDecimal":"25.1"}},"field16_str_idx":{"$gt":"NS"}}]},{"field16_str_idx":{"$eq":"a"},"field37_datetime":{"$gt":"2024-01-07T00:00:00.000Z"}}]},{"field6_mixed_idx":{"$ne":74747},"field5_dict_idx":{"$gte":{"b":10}}}]}}],
-    "winningPlan": {"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field3_Decimal128_idx_1_field18_bool_idx_-1","indexBounds":{"field3_Decimal128_idx":["[25.1, 25.1]"],"field18_bool_idx":["[MaxKey, MinKey]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field16_str_idx_-1","indexBounds":{"field16_str_idx":["[\"a\", \"a\"]"]}}}]}},
-    "keys" :    809,
-    "docs" :    827,
+    "winningPlan": {"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field16_str_idx_-1","indexBounds":{"field16_str_idx":["[\"a\", \"a\"]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field22_list_idx_1","indexBounds":{"field22_list_idx":["[65.0, inf]"]}}}]}},
+    "keys" :    843,
+    "docs" :    861,
     "sorts":      0,
     "plans":     13,
     "rows" :      3},
@@ -8268,7 +8268,7 @@
     "rows" :  96224}
 
 ],
-">>>totals": {"pipelines": 1032, "plans": 7958, "keys": 29209574, "docs": 28822016, "sorts": 9788519, "rows": 10011323, "errors":      0},
+">>>totals": {"pipelines": 1032, "plans": 7958, "keys": 29209608, "docs": 28822050, "sorts": 9788519, "rows": 10011323, "errors":      0},
 ">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryCBRCEMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":true}}
 
 

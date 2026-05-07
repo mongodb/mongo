@@ -4116,9 +4116,9 @@
     "rows" :    178},
 
 {">>>pipeline": [{"$match":{"$or":[{"a_compound":{"$elemMatch":{"$in":[1,14,7]}}},{"i_compound":{"$exists":false}},{"a_compound":{"$elemMatch":{"$in":[2,12,2,11],"$nin":[13,6]}}},{"c_idx":{"$in":[20,15,13]}}],"a_compound":{"$exists":true}}},{"$limit":128}],
-    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"i_compound_1","indexBounds":{"i_compound":["[null, null]"]}}},{"stage":"IXSCAN","indexName":"c_idx_1","indexBounds":{"c_idx":["[13.0, 13.0]","[15.0, 15.0]","[20.0, 20.0]"]}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[1.0, 1.0]","[2.0, 2.0]","[7.0, 7.0]","[11.0, 11.0]","[12.0, 12.0]","[14.0, 14.0]"]}}}]}}},
-    "keys" :    128,
-    "docs" :    256,
+    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[MinKey, MaxKey]"]}}}},
+    "keys" :    165,
+    "docs" :    165,
     "sorts":      0,
     "plans":     12,
     "rows" :    128},
@@ -8380,7 +8380,7 @@
     "rows" :  20000}
 
 ],
-">>>totals": {"pipelines": 1043, "plans": 10395, "keys": 99532281, "docs": 56050456, "sorts": 75090318, "rows": 38020022, "errors":      0},
+">>>totals": {"pipelines": 1043, "plans": 10395, "keys": 99532318, "docs": 56050365, "sorts": 75090318, "rows": 38020022, "errors":      0},
 ">>>parameters": {"featureFlagCostBasedRanker":{"value":true,"fcv_gated":false,"currentlyEnabled":true},"internalQueryCBRCEMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":true}}
 
 
