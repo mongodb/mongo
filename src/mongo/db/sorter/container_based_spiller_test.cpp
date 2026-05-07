@@ -956,6 +956,44 @@ TEST_P(ContainerBasedSpillerTest, SpillDirPathFromIdent) {
     }
 }
 
+TEST_P(ContainerBasedSpillerTest, SpillerWithStartingKeyPreservesExistingEntries) {
+    auto opCtx = makeOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    dynamic_cast<repl::ReplicationCoordinatorMock*>(repl::ReplicationCoordinator::get(opCtx.get()))
+        ->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container{
+        std::make_shared<Ident>(ident::generateNewInternalIdent("starting_key_test"_sd))};
+    SorterContainerStats stats{nullptr};
+    using Settings = Spiller<IntWrapper, IntWrapper, IWComparator>::Settings;
+
+    auto makeSpiller = [&](int64_t startingKey) {
+        return ContainerBasedSpiller<IntWrapper, IntWrapper, IWComparator>{
+            *opCtx,
+            ru,
+            container,
+            stats,
+            boost::none,
+            sorter::kLatestChecksumVersion,
+            [] {},
+            batchSize(),
+            batchBytes(),
+            testSpillingMinAvailableDiskSpaceBytes,
+            startingKey};
+    };
+
+    std::vector<std::pair<IntWrapper, IntWrapper>> batch1{{10, -10}, {20, -20}, {30, -30}};
+    std::vector<std::pair<IntWrapper, IntWrapper>> batch2{{40, -40}, {50, -50}};
+
+    auto spiller1 = makeSpiller(1);
+    spiller1.spill(SortOptions{}, Settings{}, std::span{batch1});
+    EXPECT_EQ(container.entries().size(), 3U);
+
+    auto spiller2 = makeSpiller(4);
+    spiller2.spill(SortOptions{}, Settings{}, std::span{batch2});
+    EXPECT_EQ(container.entries().size(), 5U);
+}
+
 // Verifies getSortedIterator() on ContainerBasedStorage: reads back exactly the entries
 // written by makeWriter and passes the final checksum check on exhaustion.
 TEST_F(SortedContainerWriterTest, GetSortedIteratorReadsRange) {

@@ -403,16 +403,18 @@ public:
                           OnSpillFn onSpill,
                           int64_t batchSize,
                           int64_t batchBytes,
-                          int64_t minAvailableDiskBytesToSpill)
+                          int64_t minAvailableDiskBytesToSpill,
+                          int64_t startingKey = 1)
         : SpillerBase<Key, Value, Comparator>(
               std::make_unique<ContainerBasedStorage<Key, Value>>(
-                  opCtx, ru, container, stats, 1, std::move(dbName), checksumVersion),
+                  opCtx, ru, container, stats, startingKey, std::move(dbName), checksumVersion),
               minAvailableDiskBytesToSpill),
           _opCtx(opCtx),
           _ru(ru),
           _onSpill(std::move(onSpill)),
           _batchSize(batchSize),
-          _batchBytes(batchBytes) {}
+          _batchBytes(batchBytes),
+          _current(startingKey) {}
 
     void mergeSpills(const SortOptions& opts,
                      const SpillerBase<Key, Value, Comparator>::Settings& settings,
@@ -591,7 +593,7 @@ private:
     OnSpillFn _onSpill;
     int64_t _batchSize;
     int64_t _batchBytes;
-    int64_t _current = 1;
+    int64_t _current;
 };
 
 }  // namespace mongo::sorter
