@@ -7,8 +7,9 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
-function runTest(primary) {
+function runTest(primary, hmacKeyConn = primary) {
     const dbName = "testDb";
     const collName0 = "testColl0";
     const collName1 = "testColl1";
@@ -18,6 +19,15 @@ function runTest(primary) {
     const adminDb = primary.getDB("admin");
     assert.commandWorked(adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
     assert(adminDb.auth("super", "super"));
+    // In a sharded cluster, HMAC keys are stored on the config server, not on the shards, so
+    // awaitHMACKeys must be called on the config server primary. Authenticate there first so the
+    // find on admin.system.keys is authorized.
+    if (hmacKeyConn !== primary) {
+        const hmacAdminDb = hmacKeyConn.getDB("admin");
+        assert.commandWorked(hmacAdminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
+        assert(hmacAdminDb.auth("super", "super"));
+    }
+    QuerySamplingUtil.awaitHMACKeys(hmacKeyConn);
     const testDb = adminDb.getSiblingDB(dbName);
     const docs = [];
     const numDocs = 1000;
@@ -117,7 +127,7 @@ function runTest(primary) {
 {
     const st = new ShardingTest({shards: 1, keyFile: "jstests/libs/key1"});
 
-    runTest(st.rs0.getPrimary());
+    runTest(st.rs0.getPrimary(), st.configRS.getPrimary());
 
     st.stop();
 }
