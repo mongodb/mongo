@@ -31,12 +31,14 @@
 #include <array>
 #include <cerrno>
 #include <fcntl.h>
+#include <fstream>
 #include <map>
 #include <system_error>
 #include <unistd.h>
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+#include <fmt/format.h>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include "mongo/bson/bsonelement.h"
@@ -45,8 +47,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/procparser.h"
 #include "mongo/util/string_map.h"
@@ -788,6 +790,30 @@ TEST_F(FTDCProcMountStats, TestLocalMountStats) {
     ASSERT_OK(procparser::parseProcSelfMountStatsFile("/proc/self/mountinfo", &bb));
     auto obj = bb.obj();
     ASSERT(obj.hasElement("/"));
+}
+
+TEST_F(FTDCProcMountStats, HugeFile) {
+    unittest::TempDir tempDir("fakeProc");
+    auto path = tempDir.path() + "/mountinfo.fake";
+
+    std::ofstream out(path);
+    size_t bytes = 0;
+    size_t minFileSize = size_t{2} << 20;
+    for (size_t i = 0; bytes < minFileSize; ++i) {
+        auto line =
+            fmt::format("{} 26 0:{} / /tmp/mount{} rw shared:19 - tmpfs tmpfs rw\n", i, i, i);
+        bytes += line.size();
+        out << line;
+    }
+    out.close();
+
+    BSONObjBuilder bb;
+    boost::optional<Status> st;
+    ASSERT_DOES_NOT_THROW([&] {
+        st = procparser::parseProcSelfMountStatsFile(path, &bb);
+    }());
+    ASSERT_EQ(st->code(), ErrorCodes::FileStreamFailed);
+    ASSERT_STRING_CONTAINS(st->reason(), fmt::format("Huge file \"{}\"", path));
 }
 
 class FTDCProcVMStat : public BaseProcTest {

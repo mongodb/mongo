@@ -151,7 +151,7 @@ Status detectHugeFile(StringData filename, const BufBuilder& builder) {
             "partialContents"_attr =
                 StringData(builder.buf(), static_cast<size_t>(builder.len())).substr(0, 256));
     }
-    return {ErrorCodes::FileStreamFailed, fmt::format("Huge file {:?}", filename)};
+    return {ErrorCodes::FileStreamFailed, fmt::format("Huge file \"{}\"", filename)};
 }
 
 /**
