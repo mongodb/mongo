@@ -51,3 +51,6 @@ filters:
   - "release_memory*":
     approvers:
       - 10gen/query-execution
+  - "opcounters_aggregate.js":
+    approvers:
+      - 10gen/query-integration-observability

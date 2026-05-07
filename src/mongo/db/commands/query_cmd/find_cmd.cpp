@@ -305,8 +305,7 @@ public:
     }
 
     /**
-     * A find command does not increment the command counter, but rather increments the
-     * query counter.
+     * Counted via opcounters.queries rather than the generic command counter.
      */
     bool shouldAffectCommandCounter() const override {
         return false;

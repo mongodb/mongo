@@ -535,7 +535,7 @@ public:
 
     /**
      * Override and return true if the query opcounters should be incremented on
-     * behalf of this command.
+     * behalf of this command. Only 'find' returns true.
      */
     virtual bool shouldAffectQueryCounter() const {
         return false;

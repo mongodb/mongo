@@ -94,6 +94,7 @@ OpCounters::OpCounters()
       deletes(makeLocalOpCounter()),
       getMores(makeLocalOpCounter()),
       commands(makeLocalOpCounter()),
+      aggregates(makeLocalOpCounter()),
       nestedAggregates(makeLocalOpCounter()),
       insertsOnExistingDoc(makeLocalOpCounter()),
       updatesOnMissingDoc(makeLocalOpCounter()),
@@ -108,13 +109,15 @@ OpCounters::OpCounters(otel::metrics::MetricName insertName,
                        otel::metrics::MetricName updateName,
                        otel::metrics::MetricName deleteOpName,
                        otel::metrics::MetricName getMoreName,
-                       otel::metrics::MetricName commandName)
+                       otel::metrics::MetricName commandName,
+                       otel::metrics::MetricName aggregateName)
     : inserts(makeOtelOpCounter(insertName)),
       queries(makeOtelOpCounter(queryName)),
       updates(makeOtelOpCounter(updateName)),
       deletes(makeOtelOpCounter(deleteOpName)),
       getMores(makeOtelOpCounter(getMoreName)),
       commands(makeOtelOpCounter(commandName)),
+      aggregates(makeOtelOpCounter(aggregateName)),
       nestedAggregates(makeLocalOpCounter()),
       insertsOnExistingDoc(makeLocalOpCounter()),
       updatesOnMissingDoc(makeLocalOpCounter()),
@@ -132,6 +135,7 @@ BSONObj OpCounters::getObj() const {
     b.append("delete", deletes->value());
     b.append("getmore", getMores->value());
     b.append("command", commands->value());
+    b.append("aggregate", aggregates->value());
 
     auto queryDep = queriesDeprecated->value();
     if (queryDep > 0) {
@@ -171,6 +175,7 @@ OpCounters& globalOpCounters() {
         MetricNames::kDeleteOpCount,
         MetricNames::kGetMoreOpCount,
         MetricNames::kCommandOpCount,
+        MetricNames::kAggregateOpCount,
     };
     return *instance;
 }

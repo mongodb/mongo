@@ -55,7 +55,8 @@ TEST(OpCountersOtelTest, MainCountersAreExported) {
                         otel::metrics::MetricNames::kUpdateOpCount,
                         otel::metrics::MetricNames::kDeleteOpCount,
                         otel::metrics::MetricNames::kGetMoreOpCount,
-                        otel::metrics::MetricNames::kCommandOpCount);
+                        otel::metrics::MetricNames::kCommandOpCount,
+                        otel::metrics::MetricNames::kAggregateOpCount);
 
     counters.gotInserts(3);
     counters.gotInsert();
@@ -75,6 +76,9 @@ TEST(OpCountersOtelTest, MainCountersAreExported) {
 
     counters.gotCommand();
     EXPECT_EQ(1, capturer.readInt64Counter(otel::metrics::MetricNames::kCommandOpCount));
+
+    counters.gotAggregate();
+    EXPECT_EQ(1, capturer.readInt64Counter(otel::metrics::MetricNames::kAggregateOpCount));
 }
 #endif  // MONGO_CONFIG_OTEL
 
@@ -93,6 +97,7 @@ TEST(OpCountersGetObjTest, ReflectsCounterValues) {
     counters.gotDelete();
     counters.gotGetMore();
     counters.gotCommand();
+    counters.gotAggregate();
 
     BSONObj obj = counters.getObj();
     EXPECT_EQ(3, obj["insert"].numberLong());
@@ -101,6 +106,7 @@ TEST(OpCountersGetObjTest, ReflectsCounterValues) {
     EXPECT_EQ(1, obj["delete"].numberLong());
     EXPECT_EQ(1, obj["getmore"].numberLong());
     EXPECT_EQ(1, obj["command"].numberLong());
+    EXPECT_EQ(1, obj["aggregate"].numberLong());
 }
 
 TEST(OpCountersGetObjTest, OmitsDeprecatedAndConstraintsRelaxedWhenZero) {

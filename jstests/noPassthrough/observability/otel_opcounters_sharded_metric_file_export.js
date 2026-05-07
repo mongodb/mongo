@@ -5,6 +5,16 @@
  * Operations routed through mongos increment opcounters on mongos; the same operations forwarded
  * to a shard also increment opcounters on that shard. Both metric streams are verified.
  *
+ * Counter semantics
+ * -----------------
+ * All operation-specific counters are mutually exclusive — each command increments exactly one:
+ *
+ *   aggregate call        →  aggregates++   (queries and commands are NOT incremented)
+ *   find call             →  queries++      (aggregates and commands are NOT incremented)
+ *   getMore call          →  get_mores++    (commands is NOT incremented)
+ *   insert/update/delete  →  their own++   (commands is NOT incremented)
+ *   ping, serverStatus, etc.  →  commands++ (no specific counter for these)
+ *
  * @tags: [requires_otel_build, requires_sharding]
  */
 
@@ -188,7 +198,35 @@ describe("OTel opcounters metric file export in a sharded cluster", function () 
         });
     });
 
+    it("exports opcounters.aggregates on both mongos and shard", function () {
+        // opcounters.aggregates increments once per top-level aggregate call only.
+        // 'find' increments 'queries' but NOT 'aggregates'; the two are fully exclusive.
+        // Neither aggregate nor find increments 'commands'.
+        const start = new Date();
+        const mongosInitial = currentValue(this.mongosMetricsDir, "opcounters.aggregates");
+        const shardInitial = currentValue(this.shardMetricsDir, "opcounters.aggregates");
+
+        this.coll.aggregate([{$match: {}}]).toArray();
+        this.coll.aggregate([{$match: {}}, {$count: "n"}]).toArray();
+
+        waitForMetric({
+            metricsDir: this.mongosMetricsDir,
+            metricName: "opcounters.aggregates",
+            minValue: mongosInitial + 2,
+            afterDate: start,
+        });
+        waitForMetric({
+            metricsDir: this.shardMetricsDir,
+            metricName: "opcounters.aggregates",
+            minValue: shardInitial + 2,
+            afterDate: start,
+        });
+    });
+
     it("exports opcounters.commands on both mongos and shard", function () {
+        // opcounters.commands increments for recognized commands that have no specific counter of
+        // their own (e.g. ping, serverStatus). 'aggregate', 'find', getMore, and write ops all
+        // suppress this counter and increment their own specific counters instead.
         const start = new Date();
         const mongosInitial = currentValue(this.mongosMetricsDir, "opcounters.commands");
         // No assertion/expectation on the shard.

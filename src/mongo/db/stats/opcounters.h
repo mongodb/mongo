@@ -78,7 +78,8 @@ struct OpCounters {
                otel::metrics::MetricName updateName,
                otel::metrics::MetricName deleteOpName,
                otel::metrics::MetricName getMoreName,
-               otel::metrics::MetricName commandName);
+               otel::metrics::MetricName commandName,
+               otel::metrics::MetricName aggregateName);
 
     /**
      * Constructs an OpCounters whose counters are local only — values are tracked but not exported
@@ -120,6 +121,9 @@ struct OpCounters {
     void gotCommand() {
         commands->add(1);
     }
+    void gotAggregate() {
+        aggregates->add(1);
+    }
     void gotQueryDeprecated() {
         queriesDeprecated->add(1);
     }
@@ -154,6 +158,7 @@ struct OpCounters {
     std::unique_ptr<OpCounter> deletes;  // 'delete' is a keyword.
     std::unique_ptr<OpCounter> getMores;
     std::unique_ptr<OpCounter> commands;
+    std::unique_ptr<OpCounter> aggregates;
     std::unique_ptr<OpCounter> nestedAggregates;
     std::unique_ptr<OpCounter> insertsOnExistingDoc;
     std::unique_ptr<OpCounter> updatesOnMissingDoc;

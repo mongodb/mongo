@@ -9,3 +9,6 @@ filters:
   - "log_component_helpers.js":
     approvers:
       - 10gen/server-networking-and-observability
+  - "opcounters_aggregate.js":
+    approvers:
+      - 10gen/query-integration-observability

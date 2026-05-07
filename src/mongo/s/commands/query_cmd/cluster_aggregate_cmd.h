@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/util/modules.h"
 
@@ -147,6 +148,8 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
+            globalOpCounters().gotAggregate();
+
             const auto& body = unparsedRequest().body;
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx,
                                                              !Pipeline::aggHasWriteStage(body));
@@ -236,15 +239,11 @@ public:
     }
 
     /**
-     * A pipeline/aggregation command does not increment the command counter, but rather increments
-     * the query counter.
+     * Previously counted as a query (opcounters.queries). As of SERVER-123987, aggregate has its
+     * own dedicated counter (opcounters.aggregates), incremented directly in run().
      */
     bool shouldAffectCommandCounter() const final {
         return false;
-    }
-
-    bool shouldAffectQueryCounter() const final {
-        return true;
     }
 
     bool adminOnly() const override {

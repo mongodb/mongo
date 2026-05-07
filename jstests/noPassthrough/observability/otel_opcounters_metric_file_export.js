@@ -1,7 +1,16 @@
 /**
- * Tests that the six main OpCounters (inserts, queries, updates, deletes, get_mores, commands) are
- * exported via the OTel JSONL file exporter and that their values increase to reflect actual
- * operations performed against mongod.
+ * Tests that the main OpCounters are exported via the OTel JSONL file exporter and that their
+ * values increase to reflect actual operations performed against mongod.
+ *
+ * Counter semantics
+ * -----------------
+ * All operation-specific counters are mutually exclusive — each command increments exactly one:
+ *
+ *   aggregate call        →  aggregates++   (queries and commands are NOT incremented)
+ *   find call             →  queries++      (aggregates and commands are NOT incremented)
+ *   getMore call          →  get_mores++    (commands is NOT incremented)
+ *   insert/update/delete  →  their own++   (commands is NOT incremented)
+ *   ping, serverStatus, etc.  →  commands++ (no specific counter for these)
  *
  * @tags: [requires_otel_build]
  */
@@ -117,6 +126,9 @@ describe("OTel opcounters metric file export", function () {
     });
 
     it("increments opcounters.commands on command operations", function () {
+        // opcounters.commands increments for recognized commands that have no specific counter of
+        // their own (e.g. ping, serverStatus). 'aggregate', 'find', getMore, and write ops all
+        // suppress this counter and increment their own specific counters instead.
         const start = new Date();
         const initial = getLatestMetrics(this.metricsDir)?.["opcounters.commands"]?.value ?? 0;
 
@@ -126,6 +138,24 @@ describe("OTel opcounters metric file export", function () {
             metricsDir: this.metricsDir,
             metricName: "opcounters.commands",
             minValue: initial + 1,
+            afterDate: start,
+        });
+    });
+
+    it("increments opcounters.aggregates on aggregate operations", function () {
+        // opcounters.aggregates increments once per top-level aggregate call only.
+        // 'find' increments 'queries' but NOT 'aggregates'; the two are fully exclusive.
+        // Neither aggregate nor find increments 'commands'.
+        const start = new Date();
+        const initial = getLatestMetrics(this.metricsDir)?.["opcounters.aggregates"]?.value ?? 0;
+
+        this.coll.aggregate([{$match: {}}]).toArray();
+        this.coll.aggregate([{$match: {}}, {$count: "n"}]).toArray();
+
+        waitForMetric({
+            metricsDir: this.metricsDir,
+            metricName: "opcounters.aggregates",
+            minValue: initial + 2,
             afterDate: start,
         });
     });

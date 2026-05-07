@@ -58,6 +58,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -94,15 +95,11 @@ public:
     }
 
     /**
-     * A pipeline/aggregation command does not increment the command counter, but rather increments
-     * the query counter.
+     * As of SERVER-123987, aggregate has its own dedicated counter (opcounters.aggregates),
+     * incremented directly in run(). Before that it was counted as a query (opcounters.queries).
      */
     bool shouldAffectCommandCounter() const override {
         return false;
-    }
-
-    bool shouldAffectQueryCounter() const override {
-        return true;
     }
 
     bool shouldAffectReadOptionCounters() const override {
@@ -246,6 +243,8 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
+            globalOpCounters().gotAggregate();
+
             const auto& explain = request().getExplain();
             const auto& body = unparsedRequest().body;
             boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;

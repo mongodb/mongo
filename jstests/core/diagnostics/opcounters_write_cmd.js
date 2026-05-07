@@ -132,16 +132,19 @@ assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
 t.drop();
 t.insert([{_id: 0}, {_id: 1}, {_id: 2}]);
 
+// Aggregate increments opcounters.aggregate, not opcounters.query — the two are exclusive.
 opCounters = newdb.serverStatus().opcounters;
 t.aggregate({$match: {_id: 1}});
-assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
+assert.eq(opCounters.aggregate + 1, newdb.serverStatus().opcounters.aggregate);
+assert.eq(opCounters.query, newdb.serverStatus().opcounters.query);
 
-// Query, with error.
+// Aggregate, with error.
 opCounters = newdb.serverStatus().opcounters;
 assert.throws(function () {
     t.aggregate({$match: {$invalidOp: 1}});
 });
-assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
+assert.eq(opCounters.aggregate + 1, newdb.serverStatus().opcounters.aggregate);
+assert.eq(opCounters.query, newdb.serverStatus().opcounters.query);
 
 //
 // 5. Getmore.
