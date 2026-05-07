@@ -1838,6 +1838,114 @@ TEST_F(MultiIndexBlockTest, WriteStateToContainerOnSpillWhenResumable) {
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+// Sorter spills during the collection scan persist resume state with
+// phase=kCollectionScan and the current scan position. On step-up, a new MultiIndexBlock
+// initialized from that state must reopen the existing tables and resume the scan from the saved
+// position rather than starting over.
+TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    const auto buildUUID = UUID::gen();
+    auto configurePdib = [&](MultiIndexBlock& idx) {
+        idx.setBuildUUID(buildUUID);
+        idx.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+        idx.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+        idx.setIsResumable(true);
+    };
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       engine);
+
+    auto& indexer = *getIndexer();
+    configurePdib(indexer);
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           {indexBuildInfo},
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    // 20 documents of 64 KB exceed the 0.5 MB sorter limit and force multiple mid-scan spills.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        std::string val(64 * 1024, 'a');
+        for (auto i = 0; i < 20; ++i) {
+            ASSERT_OK(
+                Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+        }
+        wuow.commit();
+    }
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo =
+        index_builds::readResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
+    ASSERT_TRUE(resumeInfo);
+    EXPECT_EQ(buildUUID, resumeInfo->getBuildUUID());
+    EXPECT_EQ(IndexBuildPhaseEnum::kCollectionScan, resumeInfo->getPhase());
+    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+
+    // The persisted scan position is a valid RecordId inside the 20-doc collection.
+    // A valid spill checkpoint must satisfy 0 < position <= 20.
+    ASSERT_TRUE(resumeInfo->getCollectionScanPosition());
+    const auto savedPosition = *resumeInfo->getCollectionScanPosition();
+    ASSERT_TRUE(savedPosition.isValid());
+    EXPECT_GT(savedPosition.getLong(), 0);
+    EXPECT_LE(savedPosition.getLong(), 20);
+
+    // Per-index state: every ident allocated by the original IndexBuildInfo round-trips through
+    // the persisted ResumeIndexInfo so that the resumed indexer reopens the same tables.
+    ASSERT_EQ(1U, resumeInfo->getIndexes().size());
+    const auto& indexState = resumeInfo->getIndexes()[0];
+    EXPECT_EQ(*indexBuildInfo.sideWritesIdent, indexState.getSideWritesTable());
+    ASSERT_TRUE(indexState.getSkippedRecordTrackerTable());
+    EXPECT_EQ(*indexBuildInfo.skippedRecordsIdent, *indexState.getSkippedRecordTrackerTable());
+    ASSERT_TRUE(indexState.getStorageIdentifier());
+    EXPECT_EQ(*indexBuildInfo.sorterIdent, *indexState.getStorageIdentifier());
+    EXPECT_EQ("a_1", indexState.getSpec()["name"].String());
+    EXPECT_FALSE(indexState.getIsMultikey());
+
+    // Simulate step-down: drop in-memory state without touching on-disk tables.
+    indexer.markAsCleanedUp();
+
+    // Simulate step-up resume: a new MultiIndexBlock for the same buildUUID initialized from the
+    // persisted kCollectionScan resume info.
+    MultiIndexBlock resumedIndexer;
+    configurePdib(resumedIndexer);
+    ASSERT_OK(resumedIndexer.init(operationContext(),
+                                  coll,
+                                  {indexBuildInfo},
+                                  MultiIndexBlock::kNoopOnInitFn,
+                                  MultiIndexBlock::InitMode::SteadyState,
+                                  resumeInfo));
+
+    // Continue the collection scan from the saved position. If savedPosition < 20 there are
+    // remaining records to scan; if savedPosition == 20 the cursor is past the end and the call
+    // is a no-op. Both must succeed.
+    ASSERT_OK(
+        resumedIndexer.insertAllDocumentsInCollection(operationContext(), getNSS(), savedPosition));
+
+    resumedIndexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 TEST_F(MultiIndexBlockTest, DoNotWriteStateToContainerOnSpillWhenNotResumable) {
     RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
     RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};

@@ -759,11 +759,14 @@ TEST_P(IndexBuildsCoordinatorResumeOnStepUpTest, StepUpResumesPrimaryDriven) {
 INSTANTIATE_TEST_SUITE_P(Phases,
                          IndexBuildsCoordinatorResumeOnStepUpTest,
                          testing::Values(IndexBuildPhaseEnum::kInitialized,
+                                         IndexBuildPhaseEnum::kCollectionScan,
                                          IndexBuildPhaseEnum::kDrainWrites),
                          [](const testing::TestParamInfo<IndexBuildPhaseEnum>& info) {
                              switch (info.param) {
                                  case IndexBuildPhaseEnum::kInitialized:
                                      return "Initialized";
+                                 case IndexBuildPhaseEnum::kCollectionScan:
+                                     return "CollectionScan";
                                  case IndexBuildPhaseEnum::kDrainWrites:
                                      return "DrainWrites";
                                  default:
