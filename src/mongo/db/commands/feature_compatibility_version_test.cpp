@@ -32,9 +32,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_control.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
@@ -359,6 +362,70 @@ TEST_P(SetFeatureCompatibilityVersionParamTestFixture, ResolveResumeInterruptedU
     }
 }
 
+TEST_F(FeatureCompatibilityVersionTestFixture, CanInitFCVWithIncompleteForegroundIndexBuild) {
+    // Create an incomplete index build in the catalog for a collection in the admin database
+    {
+        const auto nss =
+            NamespaceString::createNamespaceString_forTest("admin.incompleteForegroundIndexBuild");
+        ASSERT_OK(
+            storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
+
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest{nss,
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kWrite},
+            MODE_X);
+        WriteUnitOfWork wuow(operationContext());
+        CollectionWriter writer{operationContext(), &coll};
+        auto writableColl = writer.getWritableCollection(operationContext());
+        IndexDescriptor desc{IndexNames::BTREE,
+                             BSON("v" << 2 << "name"
+                                      << "x_1"
+                                      << "key" << BSON("x" << 1))};
+        ASSERT_OK(writableColl->prepareForIndexBuild(
+            operationContext(), &desc, "index-ident", boost::none));
+        wuow.commit();
+    }
+
+    // Simulate the startup path by closing the catalog and reopening it without reconciling (as
+    // that happens after FCV is initialized). This would fail if we tried to initialize the entire
+    // admin db as a non-fcv collection is in an invalid state.
+    Lock::GlobalLock globalLk(operationContext(), MODE_X);
+    catalog::closeCatalog(operationContext());
+
+    auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    storageEngine->loadMDBCatalog(operationContext(), StorageEngine::LastShutdownState::kClean);
+    catalog::initializeCollectionCatalog(operationContext(), storageEngine);
+    FeatureCompatibilityVersion::initializeForStartup(operationContext());
+}
+
+TEST_F(FeatureCompatibilityVersionTestFixture,
+       FindFeatureCompatibilityVersionDocumentDoesNotRequireIndex) {
+    doStartupFCVSequence(multiversion::GenericFCV::kLatest);
+
+    // Remove the _id index from the collection to verify that FCV lookup doesn't rely on it
+    {
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest{NamespaceString::kServerConfigurationNamespace,
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kWrite},
+            MODE_X);
+        WriteUnitOfWork wuow(operationContext());
+        CollectionWriter writer{operationContext(), &coll};
+        auto writableColl = writer.getWritableCollection(operationContext());
+        ASSERT_TRUE(writableColl->isIndexPresent("_id_"));
+        writableColl->removeIndex(operationContext(), "_id_");
+        ASSERT_FALSE(writableColl->isIndexPresent("_id_"));
+        wuow.commit();
+    }
+
+    ASSERT_OK(
+        FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext()));
+}
 
 }  // namespace
 }  // namespace mongo

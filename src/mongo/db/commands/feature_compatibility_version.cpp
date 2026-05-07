@@ -60,6 +60,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
@@ -79,6 +80,7 @@
 
 #include <algorithm>
 #include <initializer_list>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -363,16 +365,39 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 
 StatusWith<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
     OperationContext* opCtx) try {
-    auto options = auto_get_collection::Options{}.globalLockOptions(Lock::GlobalLockOptions{
-        .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
-    AutoGetCollection autoColl(
-        opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX, options);
-    invariant(autoColl.ensureDbExists(opCtx),
-              redactTenant(NamespaceString::kServerConfigurationNamespace));
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::kServerConfigurationNamespace,
+                                     PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    if (!coll.exists()) {
+        return Status(ErrorCodes::NamespaceNotFound, "FCV collection does not exist");
+    }
 
-    const auto query = BSON("_id" << multiversion::kParameterName);
-    return repl::StorageInterface::get(opCtx)->findById(
-        opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
+    // FCV is initialized before catalog repair on startup (as index builds may care about FCV),
+    // which means that if we crash during initial sync there may be incomplete foreground index
+    // builds that stop us from loading the index catalog. As a result, we need to perform a
+    // collection scan instead of findById(). The collection also contains sharding configuration so
+    // there can be more than one document, but it should still be a very small number.
+    auto result = repl::StorageInterface::get(opCtx)->findDocuments(
+        opCtx,
+        NamespaceString::kServerConfigurationNamespace,
+        boost::none,
+        repl::StorageInterface::ScanDirection::kForward,
+        {},
+        BoundInclusion::kIncludeStartKeyOnly,
+        std::numeric_limits<size_t>::max());
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+    for (auto&& doc : result.getValue()) {
+        if (doc["_id"].valueStringDataSafe() == multiversion::kParameterName) {
+            return doc;
+        }
+    }
+    return {ErrorCodes::NoSuchKey, "FCV document not found"};
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
@@ -718,8 +743,7 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
         const auto& status = featureCompatibilityVersion.getStatus();
         // NamespaceNotFound is expected on a new cluster, and NoSuchKey is expected if the
         // featureCompatibilityVersion document is not found and --repair is used.
-        if (status.code() != ErrorCodes::NamespaceNotFound &&
-            status.code() != ErrorCodes::NoSuchKey) {
+        if (status != ErrorCodes::NamespaceNotFound && status != ErrorCodes::NoSuchKey) {
             LOGV2_FATAL(11379202, "FCV initialization failed", "status"_attr = status);
         }
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
