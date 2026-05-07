@@ -92,7 +92,9 @@ def print_diff_and_instructions(old_codeowners_contents, new_codeowners_contents
     )
     sys.stdout.writelines(diff)
 
-    print("If you are seeing this message in CI you likely need to run `bazel run codeowners`")
+    print("\n" + "#" * 90)
+    print("# ACTION REQUIRED: If you are seeing this in CI you need to run `bazel run codeowners`")
+    print("#" * 90 + "\n")
 
 
 def validate_generated_codeowners(validator_path: str) -> int:
