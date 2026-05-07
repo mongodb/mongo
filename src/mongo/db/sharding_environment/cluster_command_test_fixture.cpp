@@ -376,7 +376,7 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
         return [value, &fieldName](const executor::RemoteCommandRequest& request) {
             auto elt = request.cmdObj[fieldName];
             ASSERT(!elt.eoo());
-            ASSERT_EQ(elt.boolean(), value);
+            ASSERT_EQ(value, elt.boolean());
         };
     };
 

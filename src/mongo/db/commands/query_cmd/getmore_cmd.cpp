@@ -729,7 +729,10 @@ public:
             curOp->setEndOfOpMetrics(numResults);
             collectQueryStatsMongod(opCtx, cursorPin);
 
-            boost::optional<CursorMetrics> metrics = cmd.getIncludeQueryStatsMetrics()
+            const bool includeQueryStatsMetrics =
+                cmd.getIncludeQueryStatsMetrics().value_or(false) ||
+                cmd.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats();
+            boost::optional<CursorMetrics> metrics = includeQueryStatsMetrics
                 ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
                 : boost::none;
             nextBatch.done(respondWithId,
@@ -863,7 +866,8 @@ public:
                 admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
             }
 
-            if (cmd.getIncludeQueryStatsMetrics()) {
+            if (cmd.getIncludeQueryStatsMetrics().value_or(false) ||
+                cmd.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats()) {
                 curOp->debug().getQueryStatsInfo().metricsRequested = true;
             }
 

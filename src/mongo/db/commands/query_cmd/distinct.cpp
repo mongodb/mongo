@@ -156,8 +156,9 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
+    auto& distinctReq = *parsedDistinct->distinctCommandRequest;
     auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
-        expCtx, queryShapeHash, nss, parsedDistinct->distinctCommandRequest->getQuerySettings());
+        expCtx, queryShapeHash, nss, distinctReq.getQuerySettings());
     expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     // We do not collect queryStats on explain for distinct.
@@ -169,12 +170,13 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
             uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
             return std::make_unique<query_stats::DistinctKey>(
                 expCtx,
-                *parsedDistinct->distinctCommandRequest,
+                distinctReq,
                 std::move(deferredShape->getValue()),
                 collOrViewAcquisition.getCollectionType());
         });
 
-        if (parsedDistinct->distinctCommandRequest->getIncludeQueryStatsMetrics()) {
+        if (distinctReq.getIncludeQueryStatsMetrics().value_or(false) ||
+            distinctReq.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats()) {
             CurOp::get(opCtx)->debug().getQueryStatsInfo().metricsRequested = true;
         }
     }

@@ -216,25 +216,27 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
 
     // Perform the query settings lookup and attach it to 'expCtx'.
     auto& querySettingsService = query_settings::QuerySettingsService::get(opCtx);
+    auto& findReq = *parsedRequest->findCommandRequest;
     auto querySettings = querySettingsService.lookupQuerySettingsWithRejectionCheck(
-        expCtx, queryShapeHash, nss, parsedRequest->findCommandRequest->getQuerySettings());
+        expCtx, queryShapeHash, nss, findReq.getQuerySettings());
     expCtx->setQuerySettingsIfNotPresent(std::move(querySettings));
 
     // Register query stats collection. Exclude queries with encrypted fields as indicated by the
     // inclusion of encryptionInformation in the request.
     // It is important to do this before canonicalizing and optimizing the query, each of which
     // would alter the query shape.
-    if (!parsedRequest->findCommandRequest->getEncryptionInformation()) {
+    if (!findReq.getEncryptionInformation()) {
         query_stats::registerRequest(opCtx, nss, [&]() {
             uassertStatusOKWithContext(deferredShape->getStatus(), "Failed to compute query shape");
             return std::make_unique<query_stats::FindKey>(
                 expCtx,
-                *parsedRequest->findCommandRequest,
+                findReq,
                 std::move(deferredShape->getValue()),
                 collOrViewAcquisition.getCollectionType());
         });
 
-        if (parsedRequest->findCommandRequest->getIncludeQueryStatsMetrics()) {
+        if (findReq.getIncludeQueryStatsMetrics().value_or(false) ||
+            findReq.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats()) {
             CurOp::get(opCtx)->debug().getQueryStatsInfo().metricsRequested = true;
         }
     }
@@ -665,7 +667,8 @@ public:
                 uassertStatusOK(replCoord->updateTerm(opCtx, *term));
             }
 
-            const bool includeMetrics = cmdRequest->getIncludeQueryStatsMetrics();
+            const bool includeMetrics = cmdRequest->getIncludeQueryStatsMetrics().value_or(false) ||
+                cmdRequest->getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats();
 
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.

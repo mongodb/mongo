@@ -393,6 +393,7 @@ idl_generator(
     deps = [
         ":hint_gen",
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query/client_cursor:cursor_response_gen",
         "//src/mongo/db/query/query_settings:query_settings_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
@@ -490,6 +491,7 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/auth:access_checks_gen",
         "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/db/query/client_cursor:cursor_response_gen",
         "//src/mongo/db/query/query_shape:query_shape_hash_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],

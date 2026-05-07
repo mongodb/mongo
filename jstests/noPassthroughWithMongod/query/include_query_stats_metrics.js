@@ -124,6 +124,45 @@ function assertWriteMetricsEqual(
     }
 
     {
+        // includeMetrics.queryStats is interchangeable with includeQueryStatsMetrics.
+        const result = testDB.runCommand({find: coll.getName(), filter: {a: 1}, includeMetrics: {queryStats: true}});
+        assert.commandWorked(result);
+        assertMetricsEqual(result.cursor, {
+            keysExamined: 0,
+            docsExamined: 5,
+            hasSortStage: false,
+            usedDisk: false,
+            fromMultiPlanner: false,
+        });
+    }
+
+    {
+        // OR behavior: includeQueryStatsMetrics:true alone is sufficient even when
+        // includeMetrics.queryStats is false.
+        const result = testDB.runCommand({
+            find: coll.getName(),
+            filter: {a: 1},
+            includeQueryStatsMetrics: true,
+            includeMetrics: {queryStats: false},
+        });
+        assert.commandWorked(result);
+        assert(result.cursor.hasOwnProperty("metrics"), "metrics missing when OR should be true");
+    }
+
+    {
+        // OR behavior: includeMetrics.queryStats:true alone is sufficient even when
+        // includeQueryStatsMetrics is false.
+        const result = testDB.runCommand({
+            find: coll.getName(),
+            filter: {a: 1},
+            includeQueryStatsMetrics: false,
+            includeMetrics: {queryStats: true},
+        });
+        assert.commandWorked(result);
+        assert(result.cursor.hasOwnProperty("metrics"), "metrics missing when OR should be true");
+    }
+
+    {
         // Find command against a non-existent collection, metrics should still appear.
         let nonExistentCollection = testDB[jsTestName() + "_does_not_exist"];
         nonExistentCollection.drop();

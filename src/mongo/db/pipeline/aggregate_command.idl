@@ -367,9 +367,16 @@ commands:
                 type: object_owned
                 optional: true
                 stability: internal
+            # TODO SERVER-126099: Remove the internal 'includeQueryStatsMetrics' option in favor of
+            # 'includeMetrics.queryStats'
             includeQueryStatsMetrics:
                 description: "Determines whether or not to include query stats metrics in the response."
                 type: optionalBool
+                stability: internal
+            includeMetrics:
+                description: "Specifies which metrics to include in the response."
+                type: IncludeMetrics
+                optional: true
                 stability: internal
             $_isHybridSearch:
                 description: >-

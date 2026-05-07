@@ -47,6 +47,16 @@ enums:
             DocumentResult: "results"
 
 structs:
+    IncludeMetrics:
+        description: "Specifies which metrics to include in the cursor response."
+        strict: false
+        fields:
+            queryStats:
+                description: "If true, include query stats metrics in the response."
+                type: bool
+                default: false
+                stability: internal
+
     CardinalityEstimationMethods:
         description: "Counts of cardinality estimation methods used by the cost-based ranker."
         strict: false

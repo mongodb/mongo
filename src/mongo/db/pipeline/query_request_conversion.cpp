@@ -168,6 +168,7 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
         result.setStartAt(findCommand.getStartAt().getOwned());
     }
     result.setIncludeQueryStatsMetrics(findCommand.getIncludeQueryStatsMetrics());
+    result.setIncludeMetrics(findCommand.getIncludeMetrics());
 
     if (hasExplain) {
         result.setExplain(true);
@@ -234,6 +235,7 @@ AggregateCommandRequest asAggregateCommandRequest(const CountCommandRequest& cou
 
     result.setDbName(nss.dbName());
     result.setIncludeQueryStatsMetrics(countCommand.getIncludeQueryStatsMetrics());
+    result.setIncludeMetrics(countCommand.getIncludeMetrics());
     result.setSerializationContext(countCommand.getSerializationContext());
     result.setGenericArguments(countCommand.getGenericArguments());
 

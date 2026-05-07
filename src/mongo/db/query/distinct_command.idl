@@ -32,6 +32,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/query/client_cursor/cursor_response.idl"
     - "mongo/db/query/hint.idl"
     - "mongo/db/query/query_settings/query_settings.idl"
     - "mongo/db/query/query_shape/query_shape_hash.idl"
@@ -73,9 +74,15 @@ commands:
                 description: "Query settings for the given query"
                 type: QuerySettings
                 optional: true
+            # TODO SERVER-126099: Remove the internal 'includeQueryStatsMetrics' option in favor of
+            # 'includeMetrics.queryStats'.
             includeQueryStatsMetrics:
                 description: "Determines whether or not to include query stats metrics in the response."
                 type: optionalBool
+            includeMetrics:
+                description: "Specifies which metrics to include in the response."
+                type: IncludeMetrics
+                optional: true
             originalQueryShapeHash:
                 description:
                     "The query shape hash of the first query to enter the query system. For example

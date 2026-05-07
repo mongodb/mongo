@@ -163,17 +163,18 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeCreatingAggCatalogState);
 
 bool checkRetryableWriteAlreadyApplied(const AggExState& aggExState,
                                        rpc::ReplyBuilderInterface* result) {
+    const auto& aggReq = aggExState.getRequest();
+
     // The isRetryableWrite() check here is to check that the client executed write was
     // a retryable write (which would've spawned an internal session for a retryable write to
     // execute the two phase write without shard key protocol), otherwise we skip the retryable
     // write check.
-    auto isClusterQueryWithoutShardKeyCmd =
-        aggExState.getRequest().getIsClusterQueryWithoutShardKeyCmd();
+    auto isClusterQueryWithoutShardKeyCmd = aggReq.getIsClusterQueryWithoutShardKeyCmd();
     if (!aggExState.getOpCtx()->isRetryableWrite() || !isClusterQueryWithoutShardKeyCmd) {
         return false;
     }
 
-    auto stmtId = aggExState.getRequest().getStmtId();
+    auto stmtId = aggReq.getStmtId();
     tassert(7058100, "StmtId must be set for a retryable write without shard key", stmtId);
     bool wasWriteAlreadyApplied = TransactionParticipant::get(aggExState.getOpCtx())
                                       .checkStatementExecuted(aggExState.getOpCtx(), *stmtId);
@@ -183,15 +184,15 @@ bool checkRetryableWriteAlreadyApplied(const AggExState& aggExState,
     CursorResponseBuilder::Options options;
     options.isInitialResponse = true;
     CursorResponseBuilder responseBuilder(result, options);
-    boost::optional<CursorMetrics> metrics = aggExState.getRequest().getIncludeQueryStatsMetrics()
-        ? boost::make_optional(CursorMetrics{})
-        : boost::none;
+    const bool includeQueryStatsMetrics = aggReq.getIncludeQueryStatsMetrics().value_or(false) ||
+        aggReq.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats();
+    boost::optional<CursorMetrics> metrics =
+        includeQueryStatsMetrics ? boost::make_optional(CursorMetrics{}) : boost::none;
     responseBuilder.setWasStatementExecuted(true);
-    responseBuilder.done(
-        0LL,
-        aggExState.getOriginalNss(),
-        std::move(metrics),
-        SerializationContext::stateCommandReply(aggExState.getRequest().getSerializationContext()));
+    responseBuilder.done(0LL,
+                         aggExState.getOriginalNss(),
+                         std::move(metrics),
+                         SerializationContext::stateCommandReply(aggReq.getSerializationContext()));
     return true;
 }
 
@@ -489,14 +490,16 @@ boost::optional<ClientCursorPin> executeSingleExecUntilFirstBatch(
 
     collectQueryStats(aggExState, expCtx, execs[0].get(), maybePinnedCursor.get_ptr());
 
-    boost::optional<CursorMetrics> metrics = aggExState.getRequest().getIncludeQueryStatsMetrics()
+    const auto& aggReq = aggExState.getRequest();
+    const bool includeQueryStatsMetrics = aggReq.getIncludeQueryStatsMetrics().value_or(false) ||
+        aggReq.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats();
+    boost::optional<CursorMetrics> metrics = includeQueryStatsMetrics
         ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
         : boost::none;
-    responseBuilder.done(
-        cursorId,
-        aggExState.getOriginalNss(),
-        std::move(metrics),
-        SerializationContext::stateCommandReply(aggExState.getRequest().getSerializationContext()));
+    responseBuilder.done(cursorId,
+                         aggExState.getOriginalNss(),
+                         std::move(metrics),
+                         SerializationContext::stateCommandReply(aggReq.getSerializationContext()));
 
     return maybePinnedCursor;
 }
@@ -927,9 +930,10 @@ void computeShapeAndRegisterQueryStats(const AggExState& aggExState,
     auto collectionType = aggCatalogState.determineCollectionType();
     CurOp::get(aggExState.getOpCtx())->debug().collectionType = collectionType;
 
+    const auto& aggReq = aggExState.getRequest();
     // Exclude queries with encrypted fields as indicated by the inclusion of encryptionInformation
     // in the request. We still collect query stats on collection-less aggregations.
-    if (aggExState.getRequest().getEncryptionInformation()) {
+    if (aggReq.getEncryptionInformation()) {
         return;
     }
     NamespaceStringSet pipelineInvolvedNamespaces(aggExState.getInvolvedNamespaces());
@@ -948,7 +952,8 @@ void computeShapeAndRegisterQueryStats(const AggExState& aggExState,
         },
         aggExState.hasChangeStream());
 
-    if (aggExState.getRequest().getIncludeQueryStatsMetrics()) {
+    if (aggReq.getIncludeQueryStatsMetrics().value_or(false) ||
+        aggReq.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats()) {
         CurOp::get(aggExState.getOpCtx())->debug().getQueryStatsInfo().metricsRequested = true;
     }
 }

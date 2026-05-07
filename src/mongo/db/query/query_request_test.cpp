@@ -604,6 +604,7 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
         "allowPartialResults: true,"
         "readOnce: true,"
         "includeQueryStatsMetrics: true,"
+        "includeMetrics : {queryStats : true},"
         "'$db': 'test'}");
 
     unique_ptr<FindCommandRequest> findCommand(
@@ -616,6 +617,8 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
     ASSERT(findCommand->getAllowPartialResults());
     ASSERT(findCommand->getReadOnce());
     ASSERT(findCommand->getIncludeQueryStatsMetrics());
+    ASSERT(findCommand->getIncludeMetrics().has_value());
+    ASSERT(findCommand->getIncludeMetrics()->getQueryStats());
 }
 
 TEST(QueryRequestTest, OplogReplayFlagIsAllowedButIgnored) {
@@ -645,7 +648,8 @@ TEST(QueryRequestTest, ParseFromCommandIncludeQueryStatsMetricsDefaultsToFalse) 
 
     unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmdObj));
-    ASSERT(!findCommand->getIncludeQueryStatsMetrics());
+    ASSERT_FALSE(findCommand->getIncludeQueryStatsMetrics());
+    ASSERT_FALSE(findCommand->getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats());
 }
 
 TEST(QueryRequestTest, ParseFromCommandValidMinMax) {
@@ -1621,6 +1625,13 @@ TEST(QueryRequestTest, ConvertToAggregationWithIncludeQueryStatsMetricsTrueSucce
     auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
     ASSERT_TRUE(ar.getIncludeQueryStatsMetrics());
+    ASSERT_FALSE(ar.getIncludeMetrics().has_value());
+
+    IncludeMetrics im;
+    im.setQueryStats(true);
+    findCommand.setIncludeMetrics(im);
+    auto ar2 = query_request_conversion::asAggregateCommandRequest(findCommand);
+    ASSERT_TRUE(ar2.getIncludeMetrics()->getQueryStats());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithIncludeQueryStatsMetricsFalseSucceeds) {
@@ -1629,6 +1640,13 @@ TEST(QueryRequestTest, ConvertToAggregationWithIncludeQueryStatsMetricsFalseSucc
     auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
 
     ASSERT_FALSE(ar.getIncludeQueryStatsMetrics());
+    ASSERT_FALSE(ar.getIncludeMetrics().has_value());
+
+    IncludeMetrics im;
+    im.setQueryStats(false);
+    findCommand.setIncludeMetrics(im);
+    auto ar2 = query_request_conversion::asAggregateCommandRequest(findCommand);
+    ASSERT_FALSE(ar2.getIncludeMetrics()->getQueryStats());
 }
 
 TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseTrueSucceeds) {

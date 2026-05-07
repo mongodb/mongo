@@ -213,6 +213,9 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesMostFields) {
     aggRequest.setResumeAfter(BSON("rid" << 12345));
     aggRequest.setStartAt(BSON("rid" << 67890));
     aggRequest.setIncludeQueryStatsMetrics(true);
+    IncludeMetrics im;
+    im.setQueryStats(true);
+    aggRequest.setIncludeMetrics(im);
     const BSONObj query = BSON("hello" << 1);
     const HashBlock<SHA256BlockTraits> queryShapeHash =
         SHA256Block::computeHash((const uint8_t*)query.objdata(), query.objsize());
@@ -258,6 +261,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesMostFields) {
     ASSERT_BSONOBJ_EQ(result.getResumeAfter().value(), BSON("rid" << 12345));
     ASSERT_BSONOBJ_EQ(result.getStartAt().value(), BSON("rid" << 67890));
     ASSERT_TRUE(result.getIncludeQueryStatsMetrics());
+    ASSERT_TRUE(result.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats());
     ASSERT_EQ(result.getOriginalQueryShapeHash(), queryShapeHash);
     ASSERT_TRUE(result.getIsHybridSearch().value_or(false));
     ASSERT_EQ(result.getMaxTimeMS().value(), 100u);

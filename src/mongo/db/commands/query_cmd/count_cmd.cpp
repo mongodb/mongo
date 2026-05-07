@@ -552,7 +552,8 @@ public:
                         collectionOrView.getCollectionType());
                 });
 
-                if (req.getIncludeQueryStatsMetrics()) {
+                if (req.getIncludeQueryStatsMetrics().value_or(false) ||
+                    req.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats()) {
                     curOp->debug().getQueryStatsInfo().metricsRequested = true;
                 }
             }
