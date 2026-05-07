@@ -454,8 +454,8 @@ public:
             return;
 
         shard_role_details::getRecoveryUnit(opCtx)->registerPreCommitHook(
-            [](OperationContext* opCtx, boost::optional<Timestamp> commitTs) {
-                PublishCatalogUpdates::preCommit(opCtx, commitTs);
+            [](OperationContext* preCommitOpCtx, boost::optional<Timestamp> commitTs) {
+                PublishCatalogUpdates::preCommit(preCommitOpCtx, commitTs);
             });
         shard_role_details::getRecoveryUnit(opCtx)->registerChangeForCatalogVisibility(
             std::make_unique<PublishCatalogUpdates>(uncommittedCatalogUpdates));
