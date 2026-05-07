@@ -511,9 +511,9 @@ const Lock::GlobalLockOptions kLockFreeReadsGlobalLockOptions{[] {
  * accepts the current read source and possible read inconsistent data
  */
 void validateAgainstSnapshotPolicy(OperationContext* opCtx,
+                                   TransactionResources& txnResources,
                                    RecoveryUnit::ReadSource newReadSource,
                                    SnapshotHelper::NodeRole newNodeRole) {
-    auto& txnResources = TransactionResources::get(opCtx);
     auto currentSnapshotPolicy = txnResources.snapshotPolicy;
     auto& acquisitions = txnResources.acquiredCollections;
     tassert(10141602,
@@ -561,13 +561,13 @@ void updateSnapshotPolicy(TransactionResources& txnResources,
 
 CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks(
     OperationContext* opCtx,
+    TransactionResources& txnResources,
     const CollectionCatalog& catalog,
     ResolvedNamespaceOrViewAcquisitionRequests& sortedAcquisitionRequests,
     RecoveryUnit::ReadSource readSource,
     SnapshotHelper::NodeRole nodeRole) {
     CollectionOrViewAcquisitions acquisitions;
 
-    auto& txnResources = TransactionResources::get(opCtx);
     invariant(txnResources.state != shard_role_details::TransactionResources::State::YIELDED,
               "Cannot make a new acquisition in the YIELDED state");
     invariant(txnResources.state != shard_role_details::TransactionResources::State::FAILED,
@@ -1558,8 +1558,13 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
     bool isSnapshotOpen = shard_role_details::getRecoveryUnit(opCtx)->isActive();
     auto catalogAtReadSource =
         getConsistentCatalog(opCtx, acquisitionRequests, false /* isWriteAcquisition */);
-    validateAgainstSnapshotPolicy(
-        opCtx, catalogAtReadSource.readSource, catalogAtReadSource.nodeRole);
+
+    auto& txnResources = TransactionResources::get(opCtx);
+    // No need to validate against the snapshot policy if this is the first collection acquisition.
+    if (!txnResources.acquiredCollections.empty()) {
+        validateAgainstSnapshotPolicy(
+            opCtx, txnResources, catalogAtReadSource.readSource, catalogAtReadSource.nodeRole);
+    }
     try {
         // Second sharding placement check.
         checkShardingPlacement(opCtx, acquisitionRequests);
@@ -1568,6 +1573,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
             opCtx, *catalogAtReadSource.catalog, acquisitionRequests, lockFreeReadsResources);
 
         return acquireResolvedCollectionsOrViewsWithoutTakingLocks(opCtx,
+                                                                   txnResources,
                                                                    *catalogAtReadSource.catalog,
                                                                    sortedAcquisitionRequests,
                                                                    catalogAtReadSource.readSource,
@@ -1695,13 +1701,17 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
         bool openSnapshot = !shard_role_details::getRecoveryUnit(opCtx)->isActive();
         auto catalogAtReadSource =
             getConsistentCatalog(opCtx, acquisitionRequests, isWriteAcquisition);
-        validateAgainstSnapshotPolicy(
-            opCtx, catalogAtReadSource.readSource, catalogAtReadSource.nodeRole);
+        auto& txnResources = TransactionResources::get(opCtx);
+        if (!txnResources.acquiredCollections.empty()) {
+            validateAgainstSnapshotPolicy(
+                opCtx, txnResources, catalogAtReadSource.readSource, catalogAtReadSource.nodeRole);
+        }
         auto catalog = catalogAtReadSource.catalog;
 
         try {
             return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
                 opCtx,
+                txnResources,
                 *catalog,
                 sortedAcquisitionRequests,
                 catalogAtReadSource.readSource,
