@@ -689,11 +689,14 @@ if env.TargetOSIs('linux'):
         target='procparser',
         source=[
             "procparser.cpp",
+            'procparser_parameters.cpp',
+            'procparser_parameters.idl',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
         ],
         LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/server_base',
             'pcre_wrapper',
         ],
     )

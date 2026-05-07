@@ -38,6 +38,10 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/filesystem.hpp>
 #include <fcntl.h>
+#include <fstream>
+#include <istream>
+#include <map>
+#include <set>
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -50,6 +54,9 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -82,6 +89,41 @@ const size_t kFileReadRetryCount = 5;
 constexpr auto kSysBlockDeviceDirectoryName = "device";
 
 /**
+ * Open and read a whole file, discarding data, just to get its size.
+ * Full read is needed for special files because stat will report 0 size.
+ */
+size_t fileByteCount(StringData filename) {
+    std::ifstream ifs(std::string{filename});
+    auto buf = std::make_unique_for_overwrite<std::array<char, kFileBufferSize>>();
+    size_t nr = 0;
+    while (ifs) {
+        ifs.read(buf->data(), buf->size());
+        nr += ifs.gcount();
+    }
+    return nr;
+}
+
+Status detectHugeFile(StringData filename, const BufBuilder& builder) {
+    const size_t sizeLimit = procparser::getProcFileSizeLimit();
+    if (static_cast<size_t>(builder.len()) < sizeLimit)
+        return Status::OK();
+    static logv2::SeveritySuppressor logSeverity(
+        Minutes{5}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(3));
+    if (auto sev = logSeverity(); shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, sev)) {
+        LOGV2_DEBUG(
+            11558400,
+            sev.toInt(),
+            "Huge file",
+            "filename"_attr = filename,
+            "byteCount"_attr = fileByteCount(filename),
+            "sizeLimit"_attr = static_cast<long long>(sizeLimit),
+            "partialContents"_attr =
+                StringData(builder.buf(), static_cast<size_t>(builder.len())).substr(0, 256));
+    }
+    return {ErrorCodes::FileStreamFailed, fmt::format("Huge file \"{}\"", filename)};
+}
+
+/**
  * Read a file from disk as a string with a null-terminating byte using the POSIX file api.
  *
  * This function is designed to get all the data it needs from small /proc files in a single read.
@@ -102,7 +144,7 @@ StatusWith<std::string> readFileAsString(StringData filename) {
     ScopeGuard scopedGuard([fd] { close(fd); });
 
     BufBuilder builder(kFileBufferSize);
-    std::array<char, kFileBufferSize> buf;
+    auto buf = std::make_unique_for_overwrite<std::array<char, kFileBufferSize>>();
 
     ssize_t size_read = 0;
 
@@ -113,7 +155,7 @@ StatusWith<std::string> readFileAsString(StringData filename) {
         size_t retry = 0;
 
         do {
-            size_read = read(fd, buf.data(), kFileBufferSize);
+            size_read = read(fd, buf->data(), buf->size());
 
             if (size_read == -1) {
                 auto ec = lastPosixError();
@@ -134,7 +176,9 @@ StatusWith<std::string> readFileAsString(StringData filename) {
         } while (true);
 
         if (size_read != 0) {
-            builder.appendBuf(buf.data(), size_read);
+            builder.appendBuf(buf->data(), size_read);
+            if (auto err = detectHugeFile(filename, builder); !err.isOK())
+                return err;
         }
     } while (size_read != 0);
 
@@ -173,9 +217,20 @@ const char* const kDiskFields[] = {
 
 const size_t kDiskFieldCount = std::extent<decltype(kDiskFields)>::value;
 
+size_t procFileSizeLimit = size_t{1} * 1024 * 1024;  // 1MiB
+
 }  // namespace
 
 namespace procparser {
+
+void setProcFileSizeLimit(size_t limit) {
+    procFileSizeLimit = limit;
+}
+
+size_t getProcFileSizeLimit() {
+    return procFileSizeLimit;
+}
+
 // Here is an example of the type of string it supports.
 // Note: intr output has been trimmed
 //
