@@ -284,6 +284,14 @@ bool isTimeseries(const boost::optional<CollectionAcquisition>& collection) {
         collection->getCollectionPtr()->getTimeseriesOptions().has_value();
 }
 
+// TODO SERVER-81447: This method should go away when we explicitly use the IDL chained structs
+// since it will explicitly serialize the full collation.
+Collation parseCollationBackwardsCompatible(const BSONObj& spec) {
+    // Empty spec is sent whenever the collation is actually the simple one.
+    const auto& actualSpec = spec.isEmpty() ? CollationSpec::kSimpleSpec : spec;
+    return Collation::parse(actualSpec);
+}
+
 bool viewlessTimeseriesEnabled(OperationContext* opCtx) {
     return gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
         VersionContext::getDecoration(opCtx));
@@ -796,15 +804,16 @@ void checkShardingCatalogCollectionOptions(OperationContext* opCtx,
                                            request.getCollation(),
                                            request.getUnsplittable(),
                                            request.getRegisterExistingCollectionInGlobalCatalog());
-        const auto defaultCollator =
-            cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
+        const auto defaultCollator = cm.getDefaultCollator()
+            ? cm.getDefaultCollator()->getSpec()
+            : Collation::parse(CollationSpec::kSimpleSpec);
         uassert(ErrorCodes::AlreadyInitialized,
                 fmt::format("Collection '{}' already exists with a different 'collator' option. "
                             "Requested {} but found {}",
                             targetNss.toStringForErrorMsg(),
                             requestedCollator.toString(),
-                            defaultCollator.toString()),
-                SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == requestedCollator));
+                            defaultCollator.toBSON().toString()),
+                defaultCollator == parseCollationBackwardsCompatible(requestedCollator));
     }
 
     {
@@ -1457,8 +1466,27 @@ void CreateCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
     const auto otherDoc = CreateCollectionCoordinatorDocument::parse(
         doc, IDLParserContext("CreateCollectionCoordinatorDocument"));
 
-    const auto& selfReq = _request.toBSON();
-    const auto& otherReq = otherDoc.getShardsvrCreateCollectionRequest().toBSON();
+    // Normalize collations such that checks are done with the semantically equivalent values.
+    // {locale: "simple"} is equivalent to the full explicit collation with default values for
+    // example.
+    // TODO SERVER-81447: This should go away once the coordinator document reuses the create
+    // command IDL.
+    const auto& selfReq = [&] {
+        auto copy = _request;
+        if (copy.getCollation().has_value()) {
+            auto collation = Collation::parse(*copy.getCollation());
+            copy.setCollation(collation.toBSON());
+        }
+        return copy.toBSON();
+    }();
+    const auto& otherReq = [&] {
+        auto copy = otherDoc.getShardsvrCreateCollectionRequest();
+        if (copy.getCollation().has_value()) {
+            auto collation = Collation::parse(*copy.getCollation());
+            copy.setCollation(collation.toBSON());
+        }
+        return copy.toBSON();
+    }();
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Another create collection with different arguments is already "
@@ -2239,7 +2267,6 @@ void CreateCollectionCoordinator::_notifyChangeStreamReadersOnPlacementChanged(
         opCtx, notification, changeStreamsNotifierShardId, buildNewSessionFn, executor, token);
 }
 
-
 void CreateCollectionCoordinator::_commitOnGlobalCatalog(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -2265,7 +2292,8 @@ void CreateCollectionCoordinator::_commitOnGlobalCatalog(
                     opCtx,
                     nss(),
                     shardKeyPattern.toBSON(),
-                    _doc.getTranslatedRequestParams()->getCollation(),
+                    parseCollationBackwardsCompatible(
+                        _doc.getTranslatedRequestParams()->getCollation()),
                     _request.getUnique().value_or(false),
                     _request.getUnsplittable().value_or(false));
             committedSpecs.has_value()) {

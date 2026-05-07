@@ -428,7 +428,7 @@ bool ShardKeyPattern::isIndexUniquenessAndCollationCompatible(const BSONObj& ind
         return true;
     }
     const bool hasSimpleCollation = collation.isEmpty() ||
-        SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
+        Collation::parse(collation) == Collation::parse(CollationSpec::kSimpleSpec);
     return _keyPattern.toBSON().isFieldNamePrefixOf(indexPattern) && hasSimpleCollation;
 }
 

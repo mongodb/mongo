@@ -463,7 +463,7 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithOpt
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& key,
-    const BSONObj& collation,
+    const Collation& collation,
     bool unique,
     bool unsplittable) {
     auto cm = uassertStatusOK(
@@ -477,8 +477,8 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithOpt
         return boost::none;
     }
 
-    auto defaultCollator =
-        cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
+    auto defaultCollator = cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec()
+                                                   : Collation::parse(CollationSpec::kSimpleSpec);
 
     // If the collection is already sharded, fail if the deduced options in this request do not
     // match the options the collection was originally sharded with.
@@ -486,8 +486,8 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithOpt
             str::stream() << "collection already exists with different options for collection "
                           << nss.toStringForErrorMsg(),
             SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() == key) &&
-                SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == collation) &&
-                cm.isUnique() == unique && cm.isUnsplittable() == unsplittable);
+                defaultCollator == collation && cm.isUnique() == unique &&
+                cm.isUnsplittable() == unsplittable);
 
     CreateCollectionResponse response(ShardVersionFactory::make(cm));
     response.setCollectionUUID(cm.getUUID());
