@@ -80,12 +80,8 @@ bool ModuleLoader::init(JSContext* cx, const std::string& loadPath) {
     _baseUrl = resolveBaseUrl(cx, loadPath);
     LOGV2_DEBUG(716281, 2, "Resolved module base url.", "baseUrl"_attr = _baseUrl.c_str());
 
-    // Initialize search paths from MONGO_PATH environment variable
-    _searchPaths = parseMongoPath();
-    // Base URL has highest priority - insert it first if not already present
-    if (_searchPaths.empty() || _searchPaths[0] != _baseUrl) {
-        _searchPaths.insert(_searchPaths.begin(), _baseUrl);
-    }
+    // If MONGO_PATH is not set, use the resolved baseUrl as the default.
+    _searchPaths = parseMongoPath(_baseUrl);
 
     LOGV2_DEBUG(99745619,
                 2,

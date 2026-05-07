@@ -37,12 +37,16 @@
 namespace mongo {
 
 std::vector<std::string> parseMongoPath() {
+    return parseMongoPath(boost::filesystem::current_path().string());
+}
+
+std::vector<std::string> parseMongoPath(const std::string& defaultPath) {
     std::vector<std::string> paths;
 
     const char* mongoPath = std::getenv("MONGO_PATH");
     if (!mongoPath || std::strlen(mongoPath) == 0) {
-        // Default to current working directory if MONGO_PATH not set
-        paths.push_back(boost::filesystem::current_path().string());
+        // Use the provided default path if MONGO_PATH not set
+        paths.push_back(defaultPath);
         return paths;
     }
 
