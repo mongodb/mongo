@@ -80,7 +80,7 @@ public:
 
     mongo::BSONObj serialize() const override {
         BSONObjBuilder spec;
-        spec.append("limit", _buildSpecWithExtractedLimit());
+        spec.append("limit", _buildLimitSpec());
         spec.append("inPlaceRuleApplied", true);
         return BSON(_name << spec.obj());
     }
@@ -101,7 +101,7 @@ public:
             return ctx->hasAtLeastNNextStages(2) &&
                 ctx->getNthNextStage(2)->getName() == "$extensionLimit";
         }
-        return ruleName == "noopInPlace";
+        return ruleName == "noopInPlace" || ruleName == "applyPipelineBounds";
     }
 
     bool evaluateRuleTransform(std::string_view ruleName,
@@ -117,21 +117,48 @@ public:
         if (ruleName == "noopInPlace") {
             _inPlaceRuleApplied = true;
         }
+
+        if (ruleName == "applyPipelineBounds") {
+            auto bounds = ctx->getPipelineSuffixBounds();
+            _minBoundsType = bounds.minBounds.type;
+            _maxBoundsType = bounds.maxBounds.type;
+            if (_maxBoundsType == kDocsNeededConstraintDiscrete) {
+                setExtractedLimitVal_deprecated(static_cast<long long>(bounds.maxBounds.value));
+            }
+        }
+
         return false;
     }
 
 private:
-    // Helper to build the stage spec including the extracted limit value for testing purposes.
-    mongo::BSONObj _buildSpecWithExtractedLimit() const {
+    static mongo::StringData boundsTypeStr(MongoExtensionDocsNeededConstraintType type) {
+        switch (type) {
+            case kDocsNeededConstraintDiscrete:
+                return "discrete";
+            case kDocsNeededConstraintNeedAll:
+                return "needAll";
+            case kDocsNeededConstraintUnknown:
+                return "unknownConstraints";
+            default:
+                return "unknown";
+        }
+    }
+
+    // Helper to build the stage spec including the extracted limit and bounds types for testing.
+    mongo::BSONObj _buildLimitSpec() const {
         mongo::BSONObjBuilder builder;
         builder.appendElements(_arguments);
         if (auto limit = getExtractedLimitVal()) {
             builder.append("extractedLimit", *limit);
         }
+        builder.append("minBoundsType", boundsTypeStr(_minBoundsType));
+        builder.append("maxBoundsType", boundsTypeStr(_maxBoundsType));
         return builder.obj();
     }
 
     mutable bool _inPlaceRuleApplied = false;
+    MongoExtensionDocsNeededConstraintType _minBoundsType = kDocsNeededConstraintUnknown;
+    MongoExtensionDocsNeededConstraintType _maxBoundsType = kDocsNeededConstraintUnknown;
 };
 
 class TestVectorSearchAstNode : public sdk::TestAstNode<TestVectorSearchLogicalStage> {
@@ -264,6 +291,7 @@ public:
             {"eraseStage", kPipelineRewriteRuleTagReordering},
             {"eraseExtensionLimit", kPipelineRewriteRuleTagReordering},
             {"noopInPlace", kPipelineRewriteRuleTagInPlace},
+            {"applyPipelineBounds", kPipelineRewriteRuleTagInPlace},
         };
         _registerStageRules<TestVectorSearchStageDescriptor>(portal, rules);
     }

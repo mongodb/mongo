@@ -219,6 +219,15 @@ public:
     }
 
     /**
+     * Returns a read-only snapshot of all document sources *after* (not including) the current
+     * position. Makes a shallow copy of the list; the const element type prevents callers from
+     * mutating stages through the returned container.
+     */
+    ConstDocumentSourceContainer getSuffixSources() const {
+        return ConstDocumentSourceContainer{std::next(_itr), _container.end()};
+    }
+
+    /**
      * Returns a DepsTracker representing the dependency set of all stages after the current one.
      * This is distinct from the DependencyGraph on PipelineRewriteContext, which tracks inter-stage
      * ordering dependencies. This DepsTracker reflects what data (fields, metadata) the suffix

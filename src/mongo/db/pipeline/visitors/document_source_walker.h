@@ -58,6 +58,7 @@ public:
      */
     void reverseWalk(const Pipeline& pipeline);
     void reverseWalk(const DocumentSourceContainer& sources);
+    void reverseWalk(const ConstDocumentSourceContainer& sources);
 
 private:
     const DocumentSourceVisitorRegistry& _registry;

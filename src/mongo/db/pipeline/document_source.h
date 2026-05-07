@@ -155,6 +155,8 @@ namespace mongo {
 class DocumentSource;
 using DocumentSourceContainer MONGO_MOD_UNFORTUNATELY_OPEN =
     std::list<boost::intrusive_ptr<DocumentSource>>;
+using ConstDocumentSourceContainer MONGO_MOD_PRIVATE =
+    std::list<boost::intrusive_ptr<const DocumentSource>>;
 
 class Pipeline;
 

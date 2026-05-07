@@ -94,7 +94,14 @@ struct MONGO_MOD_PUB DocsNeededBoundsContext : public DocumentSourceVisitorConte
  * define more stage-specific visitors in this file or other
  * document_source_visitor_docs_needed_bounds.cpp files in other modules.
  */
+void visitExtensionStage(DocsNeededBoundsContext* ctx,
+                         const extension::host::DocumentSourceExtensionOptimizable& source);
+void visitExtensionStage(DocsNeededBoundsContext* ctx,
+                         const extension::host::DocumentSourceExtensionForQueryShape& source);
+
 DocsNeededBounds extractDocsNeededBounds(const DocumentSourceContainer& sources,
+                                         const ExpressionContext& expCtx);
+DocsNeededBounds extractDocsNeededBounds(const ConstDocumentSourceContainer& sources,
                                          const ExpressionContext& expCtx);
 
 DocsNeededBounds extractDocsNeededBounds(const Pipeline& pipeline);

@@ -36,8 +36,10 @@
 #include "mongo/db/extension/shared/handle/pipeline_rewrite_context_handle.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock_stages.h"
 #include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/unittest/unittest.h"
@@ -315,6 +317,70 @@ TEST(PipelineDependenciesAdapterTest, GetNeededFieldsReturnsFieldPaths) {
     ASSERT_BSONOBJ_EQ(*result, BSON_ARRAY("a" << "a.b" << "x"));
 }
 
+
+TEST(PipelineRewriteContextAdapterTest, GetPipelineSuffixBoundsEmptySuffix) {
+    // When the current stage is the only stage, the suffix is empty and bounds are Unknown/Unknown.
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    DocumentSourceContainer container;
+    container.push_back(DocumentSourceLimit::create(expCtx, 10));
+
+    PipelineRewriteContext rbrCtx(*expCtx, container);
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+
+    auto bounds = PipelineRewriteContextAPI(&adapter).getPipelineSuffixBounds();
+    ASSERT_EQUALS(kDocsNeededConstraintUnknown, bounds.minBounds.type);
+    ASSERT_EQUALS(kDocsNeededConstraintUnknown, bounds.maxBounds.type);
+}
+
+TEST(PipelineRewriteContextAdapterTest, GetPipelineSuffixBoundsWithLimit) {
+    // Suffix containing a $limit yields discrete bounds equal to that limit value.
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    DocumentSourceContainer container;
+    container.push_back(DocumentSourceLimit::create(expCtx, 10));  // current stage
+    container.push_back(DocumentSourceLimit::create(expCtx, 5));   // suffix
+
+    PipelineRewriteContext rbrCtx(*expCtx, container);
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+
+    auto bounds = PipelineRewriteContextAPI(&adapter).getPipelineSuffixBounds();
+    ASSERT_EQUALS(kDocsNeededConstraintDiscrete, bounds.minBounds.type);
+    ASSERT_EQUALS(5u, bounds.minBounds.value);
+    ASSERT_EQUALS(kDocsNeededConstraintDiscrete, bounds.maxBounds.type);
+    ASSERT_EQUALS(5u, bounds.maxBounds.value);
+}
+
+TEST(PipelineRewriteContextAdapterTest, GetPipelineSuffixBoundsWithBlockingStage) {
+    // A blocking stage ($sort) in the suffix yields NeedAll/NeedAll bounds.
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    DocumentSourceContainer container;
+    container.push_back(DocumentSourceLimit::create(expCtx, 10));             // current stage
+    container.push_back(DocumentSourceSort::create(expCtx, BSON("a" << 1)));  // suffix
+
+    PipelineRewriteContext rbrCtx(*expCtx, container);
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+
+    auto bounds = PipelineRewriteContextAPI(&adapter).getPipelineSuffixBounds();
+    ASSERT_EQUALS(kDocsNeededConstraintNeedAll, bounds.minBounds.type);
+    ASSERT_EQUALS(kDocsNeededConstraintNeedAll, bounds.maxBounds.type);
+}
+
+TEST(PipelineRewriteContextAdapterTest, GetPipelineSuffixBoundsWithMixedBounds) {
+    // Suffix [$match, $limit] yields min=discrete, max=unknown: $match has unknown selectivity
+    // so it resets the discrete max to Unknown while leaving the min bound intact.
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    DocumentSourceContainer container;
+    container.push_back(DocumentSourceLimit::create(expCtx, 10));              // current stage
+    container.push_back(DocumentSourceMatch::create(BSON("a" << 1), expCtx));  // start of suffix
+    container.push_back(DocumentSourceLimit::create(expCtx, 12));
+
+    PipelineRewriteContext rbrCtx(*expCtx, container);
+    PipelineRewriteContextAdapter adapter(host::PipelineRewriteContext::make(&rbrCtx));
+
+    auto bounds = PipelineRewriteContextAPI(&adapter).getPipelineSuffixBounds();
+    ASSERT_EQUALS(kDocsNeededConstraintDiscrete, bounds.minBounds.type);
+    ASSERT_EQUALS(12u, bounds.minBounds.value);
+    ASSERT_EQUALS(kDocsNeededConstraintUnknown, bounds.maxBounds.type);
+}
 
 }  // namespace
 }  // namespace mongo::extension

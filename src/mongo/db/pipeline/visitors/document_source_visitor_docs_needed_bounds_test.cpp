@@ -660,13 +660,18 @@ TEST_F(VisitorDocsNeededBoundsTest, SearchBucketAutoSetVariableFromSubPipelineLo
     assertNeedAll(bounds.getMaxBounds());
 }
 
-TEST_F(VisitorDocsNeededBoundsTest, InternalSearchIdLookup) {
-    // In the context of using these bounds for mongot batchSize tuning, $_internalSearchIdLookUp
-    // should never be encountered since this algorithm is run prior to desugaring $search.
-    // For that reason, this stage does not have an implemented visitor and should fall into the
-    // "unknown" case.
+TEST_F(VisitorDocsNeededBoundsTest, InternalSearchIdLookupIsTransparent) {
+    // $_internalSearchIdLookup is treated as a transparent stage for batchSize tuning purposes.
+    // A suffix of just [$_internalSearchIdLookup] (no limit) still produces Unknown bounds.
     auto bounds = buildPipelineAndExtractBounds({internalSearchIdLookup()});
     assertUnknown(bounds.getMinBounds());
     assertUnknown(bounds.getMaxBounds());
+}
+
+TEST_F(VisitorDocsNeededBoundsTest, InternalSearchIdLookupWithDownstreamLimit) {
+    // Because $_internalSearchIdLookup is transparent, a downstream $limit propagates through it.
+    auto bounds = buildPipelineAndExtractBounds({internalSearchIdLookup(), limit(10)});
+    assertDiscreteAndEq(bounds.getMinBounds(), 10);
+    assertDiscreteAndEq(bounds.getMaxBounds(), 10);
 }
 }  // namespace mongo

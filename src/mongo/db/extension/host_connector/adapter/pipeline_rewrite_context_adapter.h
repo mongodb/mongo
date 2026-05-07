@@ -77,11 +77,14 @@ private:
         MongoExtensionPipelineRewriteContext* extCtx, size_t index, bool* out);
     static MongoExtensionStatus* _hostHasAtLeastNNextStages(
         const MongoExtensionPipelineRewriteContext* extCtx, size_t n, bool* out);
+    static MongoExtensionStatus* _hostGetPipelineSuffixBounds(
+        const MongoExtensionPipelineRewriteContext* extCtx, MongoExtensionDocsNeededBounds* out);
 
     static constexpr ::MongoExtensionPipelineRewriteContextVTable VTABLE = {
         .get_nth_next_stage = &_hostGetNthNextStage,
         .erase_nth_next_stage = &_hostEraseNthNextStage,
         .has_at_least_n_next_stages = &_hostHasAtLeastNNextStages,
+        .get_pipeline_suffix_bounds = &_hostGetPipelineSuffixBounds,
     };
 
     std::unique_ptr<host::PipelineRewriteContext> _ctx;

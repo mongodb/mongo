@@ -143,6 +143,10 @@ DEATH_TEST(PipelineRewriteContextAPIDeathTest, NullGetNthNextStageTasserts, "122
         .has_at_least_n_next_stages = [](const MongoExtensionPipelineRewriteContext*,
                                          size_t,
                                          bool*) -> MongoExtensionStatus* { return nullptr; },
+        .get_pipeline_suffix_bounds = [](const MongoExtensionPipelineRewriteContext*,
+                                         MongoExtensionDocsNeededBounds*) -> MongoExtensionStatus* {
+            return nullptr;
+        },
     };
     MongoExtensionPipelineRewriteContext ctx{&kVTable};
     [[maybe_unused]] PipelineRewriteContextAPI api(&ctx);
@@ -159,6 +163,10 @@ DEATH_TEST(PipelineRewriteContextAPIDeathTest, NullEraseNthNextStageTasserts, "1
         .has_at_least_n_next_stages = [](const MongoExtensionPipelineRewriteContext*,
                                          size_t,
                                          bool*) -> MongoExtensionStatus* { return nullptr; },
+        .get_pipeline_suffix_bounds = [](const MongoExtensionPipelineRewriteContext*,
+                                         MongoExtensionDocsNeededBounds*) -> MongoExtensionStatus* {
+            return nullptr;
+        },
     };
     MongoExtensionPipelineRewriteContext ctx{&kVTable};
     [[maybe_unused]] PipelineRewriteContextAPI api(&ctx);
@@ -175,6 +183,29 @@ DEATH_TEST(PipelineRewriteContextAPIDeathTest, NullHasAtLeastNNextStagesTasserts
                                    size_t,
                                    bool*) -> MongoExtensionStatus* { return nullptr; },
         .has_at_least_n_next_stages = nullptr,
+        .get_pipeline_suffix_bounds = [](const MongoExtensionPipelineRewriteContext*,
+                                         MongoExtensionDocsNeededBounds*) -> MongoExtensionStatus* {
+            return nullptr;
+        },
+    };
+    MongoExtensionPipelineRewriteContext ctx{&kVTable};
+    [[maybe_unused]] PipelineRewriteContextAPI api(&ctx);
+}
+
+DEATH_TEST(PipelineRewriteContextAPIDeathTest, NullGetPipelineSuffixBoundsTasserts, "12200501") {
+    static MongoExtensionPipelineRewriteContextVTable kVTable = {
+        .get_nth_next_stage = [](const MongoExtensionPipelineRewriteContext*,
+                                 size_t,
+                                 MongoExtensionLogicalAggStage**) -> MongoExtensionStatus* {
+            return nullptr;
+        },
+        .erase_nth_next_stage = [](MongoExtensionPipelineRewriteContext*,
+                                   size_t,
+                                   bool*) -> MongoExtensionStatus* { return nullptr; },
+        .has_at_least_n_next_stages = [](const MongoExtensionPipelineRewriteContext*,
+                                         size_t,
+                                         bool*) -> MongoExtensionStatus* { return nullptr; },
+        .get_pipeline_suffix_bounds = nullptr,
     };
     MongoExtensionPipelineRewriteContext ctx{&kVTable};
     [[maybe_unused]] PipelineRewriteContextAPI api(&ctx);

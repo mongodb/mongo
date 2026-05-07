@@ -64,6 +64,29 @@ mongo_cc_library(
     ],
 )
 
+# Standalone library for extension DocumentSource types to avoid circular dependencies.
+# Both pipeline (e.g. docs_needed_bounds_visitor) and extension_host can depend on this.
+# Must not depend on host_adapters or host_services_adapter.
+mongo_cc_library(
+    name = "extension_host_document_source_types",
+    hdrs = [
+        "catalog_context.h",
+        "document_source_extension_for_query_shape.h",
+        "document_source_extension_optimizable.h",
+    ],
+    deps = [
+        ":extension_host_utils",
+        ":extension_mongot_server_status",
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/extension/host/aggregation_stage",
+        "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:lite_parsed_desugarer",
+    ],
+)
+
 mongo_cc_library(
     name = "extension_host",
     srcs = [
@@ -85,6 +108,7 @@ mongo_cc_library(
         "//src/mongo/db/extension/host_connector/handle:host_handles",
         "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
         "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:docs_needed_bounds_visitor",
         "//src/mongo/db/pipeline:lite_parsed_desugarer",
     ],
 )

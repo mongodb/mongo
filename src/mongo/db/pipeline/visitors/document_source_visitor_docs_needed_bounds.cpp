@@ -28,8 +28,6 @@
  */
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 
-#include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
-#include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
@@ -53,7 +51,8 @@ using NeedAll = docs_needed_bounds::NeedAll;
 using Unknown = docs_needed_bounds::Unknown;
 
 namespace {
-void extractDocsNeededBoundsHelper(const DocumentSourceContainer& sources,
+template <typename Container>
+void extractDocsNeededBoundsHelper(const Container& sources,
                                    const ExpressionContext& expCtx,
                                    DocsNeededBoundsContext* ctx) {
     ServiceContext* serviceCtx = expCtx.getOperationContext()->getServiceContext();
@@ -300,6 +299,14 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceFacet& source) {
     ctx->maxBounds = mostRestrictiveMaxBounds;
 }
 
+void visit(DocsNeededBoundsContext* ctx, const DocumentSourceInternalSearchIdLookUp& source) {
+    // No change. $_internalSearchIdLookup is a 1:1 lookup stage produced by desugaring $search and
+    // $vectorSearch. It may skip documents whose _id is not found locally, but for the purposes
+    // of up-front pipeline bounds estimation we will ignore this. (Batch size tuning, the main
+    // consumer of the maximum bound, will also dynamically adjust batch sizes based on the idLookup
+    // success rate.)
+}
+
 void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSearch& source) {
     // No change, since $search is the stage that populates the result stream initially.
 }
@@ -360,17 +367,13 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSequentialDocumentC
 
 void visitExtensionStage(DocsNeededBoundsContext* ctx,
                          const extension::host::DocumentSourceExtensionOptimizable& source) {
-    // We can't make any assumptions about the bounds of an extension stage, so we conservatively
-    // set bounds to unknown.
-    // TODO SERVER-118423: Allow extension stages to implement DocsNeededBounds.
+    // TODO SERVER-118423: Allow extension stages to report their own bounds.
     ctx->applyUnknownStage();
 }
 
 void visitExtensionStage(DocsNeededBoundsContext* ctx,
                          const extension::host::DocumentSourceExtensionForQueryShape& source) {
-    // extractDocsNeededBounds() runs after LiteParsedDesugarer::desugar(), so pre-desugar extension
-    // stages should have already been expanded into DocumentSourceExtensionOptimizable by the time
-    // this visitor runs.
+    // extractDocsNeededBounds() runs after desugaring; a pre-desugar stage should never reach here.
     tasserted(11628000,
               "DocsNeededBounds visitor should not encounter a pre-desugar "
               "DocumentSourceExtensionForQueryShape");
@@ -382,6 +385,13 @@ const ServiceContext::ConstructorActionRegisterer docsNeededBoundsRegisterer{
 
 
 DocsNeededBounds extractDocsNeededBounds(const DocumentSourceContainer& sources,
+                                         const ExpressionContext& expCtx) {
+    DocsNeededBoundsContext ctx;
+    extractDocsNeededBoundsHelper(sources, expCtx, &ctx);
+    return DocsNeededBounds(ctx.minBounds, ctx.maxBounds);
+}
+
+DocsNeededBounds extractDocsNeededBounds(const ConstDocumentSourceContainer& sources,
                                          const ExpressionContext& expCtx) {
     DocsNeededBoundsContext ctx;
     extractDocsNeededBoundsHelper(sources, expCtx, &ctx);

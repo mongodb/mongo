@@ -102,11 +102,6 @@
 #include "mongo/db/s/resharding/document_source_resharding_ownership_match.h"
 #include "mongo/util/modules.h"
 
-namespace mongo::extension::host {
-class DocumentSourceExtensionForQueryShape;
-class DocumentSourceExtensionOptimizable;
-}  // namespace mongo::extension::host
-
 namespace mongo {
 
 /**
@@ -137,6 +132,13 @@ void registerMongodVisitor(ServiceContext* service) {
                        // is CQF, which won't encounter these DocumentSources.
                        // DocumentSourceCursor,
                        // DocumentSourceGeoNearCursor,
+                       //
+                       // Extension DocumentSources (DocumentSourceExtensionForQueryShape,
+                       // DocumentSourceExtensionOptimizable) are also excluded here because
+                       // including extension_host would create a circular BUILD dependency
+                       // (docs_needed_bounds_visitor --> extension_host --> host_adapters -->
+                       // docs_needed_bounds_visitor). Extension types will instead self-register
+                       // their visitor functions via ServiceContext::ConstructorActionRegisterer.
                        DocumentSourceBucketAuto,
                        DocumentSourceChangeStreamAddPostImage,
                        DocumentSourceChangeStreamAddPreImage,
@@ -150,8 +152,6 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceCollStats,
                        DocumentSourceCurrentOp,
                        DocumentSourceExchange,
-                       extension::host::DocumentSourceExtensionForQueryShape,
-                       extension::host::DocumentSourceExtensionOptimizable,
                        DocumentSourceFacet,
                        DocumentSourceFindAndModifyImageLookup,
                        DocumentSourceGeoNear,

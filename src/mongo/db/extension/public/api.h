@@ -1091,6 +1091,36 @@ typedef struct MongoExtensionPipelineRewriteRule {
 } MongoExtensionPipelineRewriteRule;
 
 /**
+ * Enum specifying the type of constraint represented by a DocsNeededConstraint object.
+ */
+typedef enum MongoExtensionDocsNeededConstraintType : uint32_t {
+    /** Constraint is unknown (cannot infer a bound). */
+    kDocsNeededConstraintUnknown = 0,
+    /** All documents are needed (e.g. downstream blocking stage). */
+    kDocsNeededConstraintNeedAll = 1,
+    /** A discrete count; see the accompanying value field. */
+    kDocsNeededConstraintDiscrete = 2,
+} MongoExtensionDocsNeededConstraintType;
+
+/**
+ * Represents a bound (upper or lower) for number of docs needed by the pipeline. Can encapsulate a
+ * discrete value, unknown, or all documents.
+ */
+typedef struct MongoExtensionDocsNeededConstraint {
+    MongoExtensionDocsNeededConstraintType type;
+    /** Only meaningful when type == kDocsNeededConstraintDiscrete. */
+    uint64_t value;
+} MongoExtensionDocsNeededConstraint;
+
+/**
+ * Encapsulates the min and max bounds of documents needed by the pipeline.
+ */
+typedef struct MongoExtensionDocsNeededBounds {
+    MongoExtensionDocsNeededConstraint minBounds;
+    MongoExtensionDocsNeededConstraint maxBounds;
+} MongoExtensionDocsNeededBounds;
+
+/**
  * Provides extension optimization rules with the ability to inspect and modify the
  * pipeline during rule-based rewriting.
  */
@@ -1123,6 +1153,13 @@ typedef struct MongoExtensionPipelineRewriteContextVTable {
      */
     MongoExtensionStatus* (*has_at_least_n_next_stages)(
         const MongoExtensionPipelineRewriteContext* ctx, size_t n, bool* out);
+
+    /**
+     * Computes the DocsNeededBounds for all stages in the pipeline after the current stage
+     * (the pipeline suffix) and writes the result into the caller-provided output struct.
+     */
+    MongoExtensionStatus* (*get_pipeline_suffix_bounds)(
+        const MongoExtensionPipelineRewriteContext* ctx, MongoExtensionDocsNeededBounds* out);
 } MongoExtensionPipelineRewriteContextVTable;
 
 /**

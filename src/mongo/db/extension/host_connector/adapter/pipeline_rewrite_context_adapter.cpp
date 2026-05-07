@@ -70,6 +70,32 @@ MongoExtensionStatus* PipelineRewriteContextAdapter::_hostHasAtLeastNNextStages(
     });
 }
 
+MongoExtensionStatus* PipelineRewriteContextAdapter::_hostGetPipelineSuffixBounds(
+    const MongoExtensionPipelineRewriteContext* ctx, MongoExtensionDocsNeededBounds* out) {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        const auto& hostCtx = static_cast<const PipelineRewriteContextAdapter*>(ctx)->getCtxImpl();
+        DocsNeededBounds bounds = hostCtx.getPipelineSuffixBounds();
+
+        auto convertConstraint =
+            [](const DocsNeededConstraint& c) -> MongoExtensionDocsNeededConstraint {
+            return visit(OverloadedVisitor{
+                             [](long long v) -> MongoExtensionDocsNeededConstraint {
+                                 return {kDocsNeededConstraintDiscrete, static_cast<uint64_t>(v)};
+                             },
+                             [](docs_needed_bounds::NeedAll) -> MongoExtensionDocsNeededConstraint {
+                                 return {kDocsNeededConstraintNeedAll, 0};
+                             },
+                             [](docs_needed_bounds::Unknown) -> MongoExtensionDocsNeededConstraint {
+                                 return {kDocsNeededConstraintUnknown, 0};
+                             },
+                         },
+                         c);
+        };
+
+        *out = {convertConstraint(bounds.getMinBounds()), convertConstraint(bounds.getMaxBounds())};
+    });
+}
+
 using PipelineRewriteContext = rule_based_rewrites::pipeline::PipelineRewriteContext;
 using HostPipelineRewriteRule = rule_based_rewrites::pipeline::PipelineRewriteRule;
 

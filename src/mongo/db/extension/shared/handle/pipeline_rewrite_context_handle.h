@@ -105,6 +105,18 @@ public:
         return result;
     }
 
+    /**
+     * Computes and returns the DocsNeededBounds for all stages in the pipeline after the current
+     * stage.
+     */
+    MongoExtensionDocsNeededBounds getPipelineSuffixBounds() const {
+        MongoExtensionDocsNeededBounds result{};
+
+        invokeCAndConvertStatusToException(
+            [&]() { return _vtable().get_pipeline_suffix_bounds(get(), &result); });
+        return result;
+    }
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(12200600,
                 "PipelineRewriteContextAPI 'get_nth_next_stage' is null",
@@ -115,6 +127,9 @@ public:
         tassert(12200607,
                 "PipelineRewriteContextAPI 'has_at_least_n_next_stages' is null",
                 vtable.has_at_least_n_next_stages != nullptr);
+        tassert(12200501,
+                "PipelineRewriteContextAPI 'get_pipeline_suffix_bounds' is null",
+                vtable.get_pipeline_suffix_bounds != nullptr);
     }
 };
 

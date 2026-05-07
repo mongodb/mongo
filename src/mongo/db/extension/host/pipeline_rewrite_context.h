@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension::host {
@@ -51,6 +52,12 @@ public:
 
     bool hasAtLeastNNextStages(size_t n) const {
         return _ctx->hasAtLeastNNextStages(n);
+    }
+
+    // Returns the docs-needed bounds computed from all stages after this one in the pipeline.
+    DocsNeededBounds getPipelineSuffixBounds() const {
+        auto suffix = _ctx->getSuffixSources();
+        return extractDocsNeededBounds(suffix, _ctx->getExpCtx());
     }
 
     static inline std::unique_ptr<PipelineRewriteContext> make(

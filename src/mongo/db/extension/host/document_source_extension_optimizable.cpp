@@ -45,6 +45,8 @@
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/vector_search_helper.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::extension::host {
@@ -577,10 +579,12 @@ DocumentSourceContainer::iterator DocumentSourceExtensionOptimizable::optimizeAt
         }
     }
 
-    // TODO SERVER-122005: Only apply the limit optimization when featureFlagExtensionsOptimizations
-    // is disabled.
-    _limit = search_helpers::setVectorSearchLimitForOptimization(itr, container, _limit);
-    _logicalStage->setExtractedLimitVal_deprecated(_limit);
+    // Only apply the special-case limit optimization when extension rewrite rules are not enabled.
+    // If rewrite rules are enabled, the extension can implement this optimization on its own.
+    if (!feature_flags::gFeatureFlagExtensionsOptimizations.isEnabled()) {
+        _limit = search_helpers::setVectorSearchLimitForOptimization(itr, container, _limit);
+        _logicalStage->setExtractedLimitVal_deprecated(_limit);
+    }
     return std::next(itr);
 }
 
@@ -703,3 +707,22 @@ REGISTER_RULES_WITH_FEATURE_FLAG(
 REGISTER_RULES(DocumentSourceExtensionOptimizable,
                OPTIMIZE_AT_RULE(DocumentSourceExtensionOptimizable));
 }  // namespace mongo::rule_based_rewrites::pipeline
+
+// Register DocsNeededBounds visitor functions for extension DocumentSource types here rather than
+// in docs_needed_bounds_visitor, to avoid a circular BUILD dependency:
+//   docs_needed_bounds_visitor → extension_host → host_adapters → docs_needed_bounds_visitor
+// By registering from extension_host, only binaries that link extension_host (e.g. mongod) pay
+// the typeinfo cost; binaries like dbtest that link docs_needed_bounds_visitor but not
+// extension_host compile and link cleanly.
+const mongo::ServiceContext::ConstructorActionRegisterer extensionDocsNeededBoundsVisitorRegisterer{
+    "ExtensionDocsNeededBoundsVisitorRegisterer", [](mongo::ServiceContext* service) {
+        using namespace mongo;
+        auto& registry = getDocumentSourceVisitorRegistry(service);
+        registry.registerVisitorFunc<DocsNeededBoundsContext,
+                                     extension::host::DocumentSourceExtensionOptimizable>(
+            &visit<DocsNeededBoundsContext, extension::host::DocumentSourceExtensionOptimizable>);
+        registry.registerVisitorFunc<DocsNeededBoundsContext,
+                                     extension::host::DocumentSourceExtensionForQueryShape>(
+            &visit<DocsNeededBoundsContext, extension::host::DocumentSourceExtensionForQueryShape>);
+    }};
+
