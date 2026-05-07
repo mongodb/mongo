@@ -759,18 +759,8 @@ private:
             // updated embedded scope.
             auto embeddedScope = _scopes.getNextId();
             newBaseField = _fields.append(Field{scope, embeddedScope});
-            auto parentEmbeddedScope =
-                existingBaseField ? _fields[existingBaseField].embeddedScope : ScopeId::none();
-            // Where unknown subfields originate:
-            //  - no previous field -> base collection.
-            //  - previous field's scope is exhaustive -> inherit it.
-            //  - previous field is a leaf in a non-exhaustive scope -> this new scope.
-            auto exhaustiveEmbeddedScope = existingBaseField
-                ? _scopes[_fields[existingBaseField].declaringScope].exhaustiveScope
-                : ScopeId::none();
-            if (existingBaseField && !parentEmbeddedScope && !exhaustiveEmbeddedScope) {
-                exhaustiveEmbeddedScope = embeddedScope;
-            }
+            auto [exhaustiveEmbeddedScope, parentEmbeddedScope] =
+                resolveNewBaseFieldScopes(existingBaseField, embeddedScope);
             if (parentEmbeddedScope) {
                 // The new field depends on the previous field, since it inherits paths.
                 _fields[newBaseField].dependencies.insert(existingBaseField);
@@ -790,6 +780,36 @@ private:
                                           nestedPrefix);
         _fields[newBaseField].dependencies.insert(embeddedField);
         return newBaseField;
+    }
+
+    /**
+     * Returns the ScopeIds for a new base field.
+     * 'existingBaseField' is the result of looking up the base field.
+     * 'embeddedScope' is the ScopeId for the new scope that will be created for the base field.
+     */
+    std::pair<ScopeId, ScopeId> resolveNewBaseFieldScopes(FieldId existingBaseField,
+                                                          ScopeId embeddedScope) const {
+        auto parentEmbeddedScope =
+            existingBaseField ? _fields[existingBaseField].embeddedScope : ScopeId::none();
+        // Where unknown subfields originate:
+        auto exhaustiveEmbeddedScope = [&]() {
+            if (!existingBaseField) {
+                // No previous field -> base collection.
+                return ScopeId::none();
+            }
+            if (auto previousExhaustiveScope =
+                    _scopes[_fields[existingBaseField].declaringScope].exhaustiveScope) {
+                // Previous field's scope is exhaustive -> inherit it.
+                return previousExhaustiveScope;
+            }
+            if (!parentEmbeddedScope) {
+                // Previous field is a leaf in a non-exhaustive scope -> this new scope
+                return embeddedScope;
+            }
+            // TODO(SERVER-126001): We should not return none here.
+            return ScopeId::none();
+        }();
+        return {exhaustiveEmbeddedScope, parentEmbeddedScope};
     }
 
     /**

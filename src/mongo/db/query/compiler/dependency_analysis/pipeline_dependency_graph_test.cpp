@@ -1277,6 +1277,18 @@ TEST_F(PipelineDependencyGraphTest, SetFieldThenIncludeDottedPath) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, DottedPathAfterBaseField) {
+    setPipeline(
+        "[{$set: { a: 1 }},"
+        "{$set: { 'a.a': 1 }},"
+        "{$set: { 'a.b.a': 1 }}]");
+
+    runTest([&] {
+        // TODO(SERVER-126001): a.x was modified by the first stage
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.x"), nullptr) << graph->toDebugString();
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, ComplexPathsMultiple) {
     setPipeline(
         "[{$set: { a: 1, b: 1, 'c.c': 1 }},"
