@@ -97,7 +97,7 @@ public:
 // used internally
 class RelevantTag : public MatchExpression::TagData {
 public:
-    RelevantTag() : elemMatchExpr(nullptr), pathPrefix("") {}
+    RelevantTag() : elemMatchExpr(nullptr), notExpr(nullptr), pathPrefix("") {}
 
     std::vector<size_t> first;
     std::vector<size_t> notFirst;
@@ -112,6 +112,11 @@ public:
     // attached to an expression not contained in an $elemMatch, then
     // 'elemMatchExpr' is NULL. Not owned here.
     MatchExpression* elemMatchExpr;
+
+    // Points to innermost containing $not within the innermost containing $elemMatch, provided
+    // the tagged-node is bounds generating. Set to nullptr whenever there is no $not or there is no
+    // $not within the innermost containing $elemMatch.
+    MatchExpression* notExpr;
 
     // If not contained inside an elemMatch, 'pathPrefix' contains the
     // part of 'path' prior to the first dot. For example, if 'path' is

@@ -285,6 +285,22 @@ void tagForSort(MatchExpression* tree) {
     }
 }
 
+bool isNodeEligibleForContainedOrPushdown(MatchExpression* node) {
+    const auto* rt = static_cast<const RelevantTag*>(node->getTag());
+    if (rt->elemMatchExpr && rt->notExpr) {
+        // Do not extract an index predicate which is a negation inside the $elemMatch. For example,
+        // do not extract {a.b: {$ne: 2}} from {a: {$elemMatch: {b: {$ne: 2}}}. Due to the potential
+        // presence of arrays at "a", the negation predicate itself is an "under-approximation" of
+        // the elemMatch predicate (it may admit less documents than the $elemMatch). For example,
+        // {a: [{b: 1}, {b: 2}]} matches {a: {$elemMatch: {b: {$ne: 2}}}} but does not match
+        // {a.b: {$ne: 2}}. Predicates extracted from the $elemMatch should be "over-approximations"
+        // (admit more documents). For example, {a.b: $eq: 2} would be an over-approximation to
+        // {a: {$elemMatch: {b: {$eq: 2}}}}.
+        return false;
+    }
+    return true;
+}
+
 }  // namespace
 
 
@@ -384,6 +400,7 @@ std::pair<MemoID, NodeAssignment*> PlanEnumerator::allocateAssignment(MatchExpre
 bool PlanEnumerator::prepMemo(MatchExpression* node, const PrepMemoContext& context) {
     PrepMemoContext childContext;
     childContext.elemMatchExpr = context.elemMatchExpr;
+    childContext.notExpr = context.notExpr;
     childContext.outsidePreds = context.outsidePreds;
 
     if (MatchExpression::OR == node->matchType()) {
@@ -448,6 +465,8 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, const PrepMemoContext& cont
 
         if (MatchExpression::ELEM_MATCH_OBJECT == node->matchType()) {
             childContext.elemMatchExpr = node;
+            // Reset the $not as we're recursing into an $elemMatch.
+            childContext.notExpr = nullptr;
             markTraversedThroughElemMatchObj(&childContext);
         }
 
@@ -497,12 +516,17 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, const PrepMemoContext& cont
         // preds to 'indexedPreds'. Adding the mandatory preds directly to 'indexedPreds' would lead
         // to problems such as pulling a predicate beneath an OR into a set joined by an AND.
         getIndexedPreds(node, childContext, &indexedPreds);
+
         // Pass in the indexed predicates as outside predicates when prepping the subnodes. But if
         // match expression optimization is disabled, skip this part: we don't want to do
-        // OR-pushdown because it relies on the expression being canonicalized.
+        // OR-pushdown because it relies on the expression being canonicalized. We may also skip
+        // nodes that make for invalid outside predicates.
         auto childContextCopy = childContext;
         if (MONGO_likely(!_disableOrPushdown)) {
             for (auto pred : indexedPreds) {
+                if (!isNodeEligibleForContainedOrPushdown(pred)) {
+                    continue;
+                }
                 childContextCopy.outsidePreds[pred] = OutsidePredRoute{};
             }
         }
@@ -1285,6 +1309,9 @@ void PlanEnumerator::getIndexedPreds(MatchExpression* node,
         RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
         tassert(9074700, "RelevantTag is not assigned to the match expression node", rt != nullptr);
 
+        // Store the $not context on the tag.
+        rt->notExpr = context.notExpr;
+
         if (context.elemMatchExpr) {
             // If we're in an $elemMatch context, store the
             // innermost parent $elemMatch, as well as the
@@ -1300,20 +1327,16 @@ void PlanEnumerator::getIndexedPreds(MatchExpression* node,
         // Output this as a pred that can use the index.
         indexedPreds->push_back(node);
     } else if (Indexability::isBoundsGeneratingNot(node)) {
-        if (!context.elemMatchExpr) {
-            // Do not extract an index predicate which is a negation inside the $elemMatch. For
-            // example, do not extract {a.b: $ne: 2} from {a: {$elemMatch: {b: $ne: 2}}}. Due to
-            // potential presence of arrays at "b", the negation predicate itself is an
-            // "under-approximation" of the elemMatch predicate (it may admit less documents than
-            // the elemMatch). Predicates extracted from the elemMatch should be
-            // "over-approximations" (admit more documents). For example {a.b: $eq: 2} would be an
-            // over-approximation to {a: {$elemMatch: {b: {$eq: 2}}}}.
+        PrepMemoContext childContext;
+        childContext.elemMatchExpr = context.elemMatchExpr;
+        childContext.notExpr = node;
+        getIndexedPreds(node->getChild(0), childContext, indexedPreds);
 
-            getIndexedPreds(node->getChild(0), context, indexedPreds);
-        }
     } else if (Indexability::isBoundsGeneratingElemMatchObject(node)) {
         PrepMemoContext childContext;
         childContext.elemMatchExpr = node;
+        // Reset the $not when we recurse down into an $elemMatch.
+        childContext.notExpr = nullptr;
         for (size_t i = 0; i < node->numChildren(); ++i) {
             getIndexedPreds(node->getChild(i), childContext, indexedPreds);
         }
@@ -1357,6 +1380,8 @@ bool PlanEnumerator::prepSubNodes(MatchExpression* node,
         } else if (MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
             PrepMemoContext childContext;
             childContext.elemMatchExpr = child;
+            // Reset the $not context when recursing into an $elemMatch.
+            childContext.notExpr = nullptr;
             childContext.outsidePreds = context.outsidePreds;
             markTraversedThroughElemMatchObj(&childContext);
             if (!prepSubNodes(child, childContext, subnodesOut, mandatorySubnodes)) {
