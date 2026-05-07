@@ -83,6 +83,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
@@ -939,7 +940,8 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
                                                       const UUID& collectionUUID,
                                                       const std::vector<IndexBuildInfo>& indexes,
                                                       const UUID& buildUUID,
-                                                      const ResumeIndexInfo& resumeInfo) {
+                                                      const ResumeIndexInfo& resumeInfo,
+                                                      IndexBuildProtocol protocol) {
     NamespaceStringOrUUID nssOrUuid{dbName, collectionUUID};
     // Make a mutable copy to populate indexIdent from the catalog; the caller's vector is const.
     auto mutableIndexes = indexes;
@@ -1003,7 +1005,6 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
         wuow.commit();
     }
 
-    auto protocol = IndexBuildProtocol::kTwoPhase;
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
         buildUUID, collection->uuid(), dbName, mutableIndexes, protocol, Date_t::now());
 
@@ -1015,6 +1016,11 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
 
     IndexBuildsManager::SetupOptions options;
     options.protocol = protocol;
+    // TODO (SERVER-109664): Remove kPrimaryDriven method check.
+    options.method = (protocol == IndexBuildProtocol::kPrimaryDriven)
+        ? IndexBuildMethodEnum::kPrimaryDriven
+        : IndexBuildMethodEnum::kHybrid;
+    options.isResumable = replIndexBuildState->isResumable();
     status = _indexBuildsManager.setUpIndexBuild(opCtx,
                                                  collection,
                                                  mutableIndexes,
@@ -3353,6 +3359,13 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
             PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
         if (resumeInfo) {
+            LOGV2(12500800,
+                  "Index build: resuming index build from phase",
+                  "buildUUID"_attr = replState->buildUUID,
+                  "method"_attr = idl::serialize(indexBuildOptions.indexBuildMethod),
+                  "protocol"_attr =
+                      indexBuildProtocolToString(indexBuildOptions.indexBuildProtocol),
+                  "phase"_attr = idl::serialize(resumeInfo->getPhase()));
             _resumeHybridIndexBuildFromPhase(
                 opCtx, replState, indexBuildOptions, resumeInfo.value());
         } else if (indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kHybrid) {

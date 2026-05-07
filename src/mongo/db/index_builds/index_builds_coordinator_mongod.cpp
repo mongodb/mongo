@@ -408,9 +408,17 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                   indexBuildOptions.indexBuildProtocol == IndexBuildProtocol::kPrimaryDriven);
         auto status = Status::OK();
         if (resumeInfo) {
-            status = _setUpResumeIndexBuild(
-                opCtx, dbName, collectionUUID, indexes, buildUUID, resumeInfo.value());
+            status = _setUpResumeIndexBuild(opCtx,
+                                            dbName,
+                                            collectionUUID,
+                                            indexes,
+                                            buildUUID,
+                                            resumeInfo.value(),
+                                            indexBuildOptions.indexBuildProtocol);
         } else {
+            // Primary-driven index builds can only be resumed or aborted, not restarted.
+            invariant(indexBuildOptions.indexBuildProtocol == IndexBuildProtocol::kTwoPhase,
+                      "kStartupRepair with kPrimaryDriven requires resumeInfo");
             status = _setUpIndexBuildForTwoPhaseRecovery(
                 opCtx, dbName, collectionUUID, indexes, buildUUID);
         }

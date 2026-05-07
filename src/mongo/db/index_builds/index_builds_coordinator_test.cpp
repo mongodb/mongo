@@ -33,6 +33,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
@@ -625,7 +626,50 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
         indexBuildsCoord->inProgForCollection(singlePhaseUUID, IndexBuildProtocol::kSinglePhase));
 }
 
-TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenResumes) {
+// Persists a minimal kPrimaryDriven ResumeIndexInfo for `buildUUID` at the supplied phase,
+// wired to the side-writes/skipped/sorter idents that `index_builds::primary_driven::start`
+// already created via `indexes`. Lets resume-on-step-up tests stage the same setup without
+// duplicating the IndexStateInfo wiring.
+void persistPrimaryDrivenResumeState(OperationContext* opCtx,
+                                     const std::vector<IndexBuildInfo>& indexes,
+                                     const UUID& buildUUID,
+                                     const UUID& collectionUUID,
+                                     const std::string& resumeStateIdent,
+                                     IndexBuildPhaseEnum phase) {
+    ResumeIndexInfo resumeIndexInfo;
+    resumeIndexInfo.setBuildUUID(buildUUID);
+    resumeIndexInfo.setPhase(phase);
+    resumeIndexInfo.setCollectionUUID(collectionUUID);
+
+    std::vector<IndexStateInfo> indexStateInfos;
+    for (auto&& indexBuildInfo : indexes) {
+        IndexStateInfo indexInfo;
+        indexInfo.setSpec(indexBuildInfo.spec);
+        indexInfo.setIsMultikey(false);
+        indexInfo.setMultikeyPaths({});
+        indexInfo.setSideWritesTable(*indexBuildInfo.sideWritesIdent);
+        indexInfo.setSkippedRecordTrackerTable(indexBuildInfo.skippedRecordsIdent);
+        indexInfo.setStorageIdentifier(indexBuildInfo.sorterIdent);
+        indexStateInfos.push_back(indexInfo);
+    }
+    resumeIndexInfo.setIndexes(indexStateInfos);
+    auto obj = resumeIndexInfo.toBSON();
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    WriteUnitOfWork wuow(opCtx);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto rs =
+        storageEngine->getEngine()->getInternalRecordStore(ru, resumeStateIdent, KeyFormat::Long);
+    ASSERT_OK(rs->insertRecord(opCtx, ru, obj.objdata(), obj.objsize(), Timestamp()));
+    wuow.commit();
+}
+
+// Stages a two-index kPrimaryDriven build, persists resume state at `phase`, drives a
+// step-up, and asserts the build resumed.
+void runResumePrimaryDrivenOnStepUpTest(OperationContext* opCtx,
+                                        repl::StorageInterface* storageInterface,
+                                        StringData testName,
+                                        IndexBuildPhaseEnum phase) {
     // TODO (SERVER-116165): Remove.
     RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
     RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
@@ -633,13 +677,12 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenResumes) {
     RAIIServerParameterControllerForTest ffPDIBResume(
         "featureFlagResumablePrimaryDrivenIndexBuilds", true);
 
-    auto opCtx = operationContext();
     auto opObserver = OpObserverMock::install(opCtx);
     auto* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
 
     const auto nss = NamespaceString::createNamespaceString_forTest(
-        "IndexBuildsCoordinatorTest.StepUpPrimaryDrivenResumes");
-    ASSERT_OK(storageInterface()->createCollection(opCtx, nss, CollectionOptions()));
+        std::string{"IndexBuildsCoordinatorTest."} + std::string{testName});
+    ASSERT_OK(storageInterface->createCollection(opCtx, nss, CollectionOptions()));
 
     // Avoid the empty collection index build optimization.
     auto collectionUUID = [&] {
@@ -650,7 +693,7 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenResumes) {
         return collection.uuid();
     }();
 
-    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     std::vector<IndexBuildInfo> indexes;
     indexes.emplace_back(
         BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1"), "index-1", *storageEngine);
@@ -663,41 +706,21 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenResumes) {
     ASSERT_OK(index_builds::primary_driven::start(
         opCtx, nss.dbName(), collectionUUID, buildUUID, indexes, resumeStateIdent));
 
-    // Persist basic resume state.
-    {
-        ResumeIndexInfo resumeIndexInfo;
-        resumeIndexInfo.setBuildUUID(buildUUID);
-        resumeIndexInfo.setPhase(IndexBuildPhaseEnum::kInitialized);
-        resumeIndexInfo.setCollectionUUID(collectionUUID);
-        std::vector<IndexStateInfo> indexStateInfos;
-        for (auto&& indexBuildInfo : indexes) {
-            IndexStateInfo indexInfo;
-            indexInfo.setSpec(indexBuildInfo.spec);
-            indexInfo.setIsMultikey(false);
-            indexInfo.setMultikeyPaths({});
-            indexInfo.setSideWritesTable(*indexBuildInfo.sideWritesIdent);
-            indexInfo.setSkippedRecordTrackerTable(indexBuildInfo.skippedRecordsIdent);
-            indexInfo.setStorageIdentifier(indexBuildInfo.sorterIdent);
-            indexStateInfos.push_back(indexInfo);
-        }
-        resumeIndexInfo.setIndexes(indexStateInfos);
-        auto obj = resumeIndexInfo.toBSON();
+    persistPrimaryDrivenResumeState(
+        opCtx, indexes, buildUUID, collectionUUID, resumeStateIdent, phase);
 
-        WriteUnitOfWork wuow(opCtx);
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        auto rs = storageEngine->getEngine()->getInternalRecordStore(
-            ru, resumeStateIdent, KeyFormat::Long);
-        ASSERT_OK(rs->insertRecord(opCtx, ru, obj.objdata(), obj.objsize(), Timestamp()));
-        wuow.commit();
-    }
-
-    // Step-up to primary, expecting the index build to be resumed, not aborted.
     indexBuildsCoord->onStepUp(opCtx);
     indexBuildsCoord->awaitStepUpThread_forTestOnly();
     indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(opCtx, collectionUUID);
 
-    // Verify that the op observer was called, that it was given the expected idents, and that the
-    // specified idents were actually used.
+    // The resume-state temp table must be dropped on commit. If options.isResumable was not set,
+    // MultiIndexBlock::commit() skips the drop and the ident lingers.
+    ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(opCtx, resumeStateIdent));
+    {
+        auto& resumeRu = *shard_role_details::getRecoveryUnit(opCtx);
+        EXPECT_FALSE(storageEngine->getEngine()->hasIdent(resumeRu, resumeStateIdent));
+    }
+
     std::vector<std::string> idents;
     for (auto& indexBuildInfo : indexes) {
         idents.push_back(indexBuildInfo.indexIdent);
@@ -709,7 +732,44 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenResumes) {
         opCtx, opObserver->startIndexBuildIdents[0]));
     ASSERT(collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(
         opCtx, opObserver->startIndexBuildIdents[1]));
+
+    // Any phase before kDrainWrites includes a collection scan, which indexes the one document in
+    // the collection as {a: null} → 1 key. kDrainWrites skips straight to draining side-writes → 0
+    // keys.
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    const auto* indexEntry =
+        collection.getCollectionPtr()->getIndexCatalog()->findIndexByName(opCtx, "a_1");
+    ASSERT(indexEntry);
+    const int64_t expectedKeys = (phase == IndexBuildPhaseEnum::kDrainWrites) ? 0 : 1;
+    EXPECT_EQ(expectedKeys, indexEntry->accessMethod()->numKeys(opCtx, ru));
 }
+
+class IndexBuildsCoordinatorResumeOnStepUpTest
+    : public IndexBuildsCoordinatorTest,
+      public testing::WithParamInterface<IndexBuildPhaseEnum> {};
+
+TEST_P(IndexBuildsCoordinatorResumeOnStepUpTest, StepUpResumesPrimaryDriven) {
+    runResumePrimaryDrivenOnStepUpTest(
+        operationContext(),
+        storageInterface(),
+        ::testing::UnitTest::GetInstance()->current_test_info()->name(),
+        GetParam());
+}
+
+INSTANTIATE_TEST_SUITE_P(Phases,
+                         IndexBuildsCoordinatorResumeOnStepUpTest,
+                         testing::Values(IndexBuildPhaseEnum::kInitialized,
+                                         IndexBuildPhaseEnum::kDrainWrites),
+                         [](const testing::TestParamInfo<IndexBuildPhaseEnum>& info) {
+                             switch (info.param) {
+                                 case IndexBuildPhaseEnum::kInitialized:
+                                     return "Initialized";
+                                 case IndexBuildPhaseEnum::kDrainWrites:
+                                     return "DrainWrites";
+                                 default:
+                                     MONGO_UNREACHABLE;
+                             }
+                         });
 
 }  // namespace
 }  // namespace mongo

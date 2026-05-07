@@ -677,14 +677,15 @@ protected:
                                                const UUID& buildUUID);
     /**
      * Reconstructs the in-memory state of the index build so that it can be resumed from the phase
-     * it was in when the node cleanly shut down.
+     * it was in when the build was interrupted.
      */
     Status _setUpResumeIndexBuild(OperationContext* opCtx,
                                   const DatabaseName& dbName,
                                   const UUID& collectionUUID,
                                   const std::vector<IndexBuildInfo>& indexes,
                                   const UUID& buildUUID,
-                                  const ResumeIndexInfo& resumeInfo);
+                                  const ResumeIndexInfo& resumeInfo,
+                                  IndexBuildProtocol protocol);
 
     /**
      * Runs the index build on the caller thread. Handles unregistering the index build and setting

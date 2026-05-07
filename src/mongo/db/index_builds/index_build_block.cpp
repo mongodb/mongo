@@ -107,13 +107,19 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
     uassert(4945000,
             "Index catalog entry not found while attempting to resume index build",
             writableEntry);
+    // TODO (SERVER-109664): Remove kPrimaryDriven method check.
     uassert(4945001,
             "Cannot resume a non-hybrid index build",
-            _method == IndexBuildMethodEnum::kHybrid);
+            _method == IndexBuildMethodEnum::kHybrid ||
+                _method == IndexBuildMethodEnum::kPrimaryDriven);
 
     if (phase == IndexBuildPhaseEnum::kBulkLoad) {
         // A bulk cursor can only be opened on a fresh table, so we drop the table that was created
         // before shutdown and recreate it.
+        // TODO(SERVER-125007): Remove uassert after we enable resuming from load phase for PDIB.
+        uassert(12500802,
+                "Resuming a primary-driven index build from the load phase is not yet supported",
+                _method == IndexBuildMethodEnum::kHybrid);
         auto collectionOptions = collection->getCollectionOptions();
         auto status = durable_catalog::dropAndRecreateIndexIdentForResume(
             opCtx,
