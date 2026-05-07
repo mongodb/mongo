@@ -509,11 +509,28 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                                       << _collectionUUID << ")",
                         stateInfoIt != resumeInfoIndexes.end());
 
+                auto indexTableResumeBehavior = [&] {
+                    switch (_containerWriteBehavior) {
+                        case ContainerWriteBehavior::kDoNotReplicate:
+                            // When not replicating container writes, it is required that the load
+                            // phase uses a new table. Thus, if we're in that phase, recreate it.
+                            return resumeInfo->getPhase() == IndexBuildPhaseEnum::kBulkLoad
+                                ? IndexBuildBlock::IndexTableResumeBehavior::recreate
+                                : IndexBuildBlock::IndexTableResumeBehavior::keep;
+                        case ContainerWriteBehavior::kReplicate:
+                            // When replicating container writes, it is never required to use a new
+                            // table. Further, recreating the table is inherently not a replicated
+                            // operation.
+                            return IndexBuildBlock::IndexTableResumeBehavior::keep;
+                    }
+                    MONGO_UNREACHABLE;
+                }();
+
                 stateInfo = *stateInfoIt;
                 auto status = index.block->initForResume(opCtx,
                                                          collection.getWritableCollection(opCtx),
                                                          indexes[i],
-                                                         resumeInfo->getPhase());
+                                                         indexTableResumeBehavior);
                 if (!status.isOK())
                     return status;
             } else {

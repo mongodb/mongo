@@ -97,7 +97,7 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
 Status IndexBuildBlock::initForResume(OperationContext* opCtx,
                                       Collection* collection,
                                       const IndexBuildInfo& indexBuildInfo,
-                                      IndexBuildPhaseEnum phase) {
+                                      IndexTableResumeBehavior behavior) {
     _indexBuildInfo = indexBuildInfo;
     auto writableEntry = collection->getIndexCatalog()->getWritableEntryByName(
         opCtx,
@@ -113,7 +113,7 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
             _method == IndexBuildMethodEnum::kHybrid ||
                 _method == IndexBuildMethodEnum::kPrimaryDriven);
 
-    if (phase == IndexBuildPhaseEnum::kBulkLoad) {
+    if (behavior == IndexTableResumeBehavior::recreate) {
         // A bulk cursor can only be opened on a fresh table, so we drop the table that was created
         // before shutdown and recreate it.
         // TODO(SERVER-125007): Remove uassert after we enable resuming from load phase for PDIB.

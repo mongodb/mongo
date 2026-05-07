@@ -58,6 +58,14 @@ class IndexBuildBlock {
     IndexBuildBlock& operator=(const IndexBuildBlock&) = delete;
 
 public:
+    /**
+     * When resuming, whether the index table should be kept or recreated.
+     */
+    enum class IndexTableResumeBehavior {
+        keep,
+        recreate,
+    };
+
     IndexBuildBlock(const NamespaceString& nss,
                     const BSONObj& spec,
                     IndexBuildMethodEnum method,
@@ -87,7 +95,7 @@ public:
     Status initForResume(OperationContext* opCtx,
                          Collection* collection,
                          const IndexBuildInfo& indexBuildInfo,
-                         IndexBuildPhaseEnum phase);
+                         IndexTableResumeBehavior behavior);
 
     /**
      * Marks the state of the index as 'ready' and commits the index to disk.
