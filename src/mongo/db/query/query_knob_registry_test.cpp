@@ -57,14 +57,15 @@ namespace {
 
 // Linear scan for the entry whose `knob` refers to `target`. Returns knobCount()
 // on miss so callers can assert without risking an out-of-range `entry()` call.
-size_t findEntryIndex(const QueryKnobBase& target) {
+QueryKnobId findEntryIndex(const QueryKnobBase& target) {
     const auto& reg = QueryKnobRegistry::instance();
     for (size_t i = 0; i < reg.knobCount(); ++i) {
-        if (&reg.entry(i).knob == &target) {
-            return i;
+        auto id = QueryKnobId(i);
+        if (&reg.entry(id).knob == &target) {
+            return id;
         }
     }
-    return reg.knobCount();
+    return QueryKnobId(reg.knobCount());
 }
 
 // The test IDL registers `synthIntPqs` as a ServerParameter, which is convenient
@@ -94,7 +95,7 @@ TEST(QueryKnobRegistryTest, NonPqsKnobInvisibleToLookupButCarriesWireName) {
     ASSERT_FALSE(reg.getKnobIdForName("synthLongNonPqsWire"_sd).has_value());
 
     auto idx = findEntryIndex(test_synth_knobs::synthLongNonPqsKnob);
-    ASSERT_LT(idx, reg.knobCount());
+    ASSERT_LT(idx.value, reg.knobCount());
     const auto& e = reg.entry(idx);
     ASSERT_EQ(e.wireName, "synthLongNonPqsWire"_sd);
     ASSERT_FALSE(e.pqsSettable);
@@ -107,7 +108,8 @@ TEST(QueryKnobRegistryTest, PlainServerParameterNotRegistered) {
     auto* plain = ServerParameterSet::getNodeParameterSet()->getIfExists("synthDoublePlainParam");
     ASSERT(plain);
     for (size_t i = 0; i < reg.knobCount(); ++i) {
-        ASSERT_NE(&reg.entry(i).param, plain);
+        auto id = QueryKnobId(i);
+        ASSERT_NE(&reg.entry(id).param, plain);
     }
 }
 
@@ -123,7 +125,8 @@ TEST(QueryKnobRegistryTest, MinFcvRoundTrip) {
 TEST(QueryKnobRegistryTest, DenseIndicesWrittenBackToDescriptors) {
     const auto& reg = QueryKnobRegistry::instance();
     for (size_t i = 0; i < reg.knobCount(); ++i) {
-        ASSERT_EQ(reg.entry(i).knob.index, i);
+        auto id = QueryKnobId(i);
+        ASSERT_EQ(reg.entry(id).knob.id, id);
     }
 }
 
@@ -132,7 +135,8 @@ TEST(QueryKnobRegistryTest, CountsReflectPqsSplitOverSynthSubset) {
     size_t synthTotal = 0;
     size_t synthPqs = 0;
     for (size_t i = 0; i < reg.knobCount(); ++i) {
-        const auto& e = reg.entry(i);
+        auto id = QueryKnobId(i);
+        const auto& e = reg.entry(id);
         if (e.wireName.starts_with("synth"_sd)) {
             ++synthTotal;
             if (e.pqsSettable) {
@@ -162,7 +166,8 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  EntryGetterOutOfRangeTasserts,
                  "QueryKnobRegistry::entry.*out of range") {
     const auto& reg = QueryKnobRegistry::instance();
-    reg.entry(reg.knobCount());
+    auto id = QueryKnobId(reg.knobCount());
+    reg.entry(id);
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,

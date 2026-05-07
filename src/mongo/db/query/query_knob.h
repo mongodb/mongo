@@ -37,6 +37,8 @@
 #include "mongo/util/assert_util.h"
 
 #include <concepts>
+#include <cstdint>
+#include <limits>
 #include <type_traits>
 #include <variant>
 #include <vector>
@@ -92,6 +94,24 @@ QueryKnobValue readGlobalValue(StringData paramName) {
 }
 
 /**
+ * Strong id type to identify query knobs. Defaults to 'kUninitialized'.
+ */
+struct QueryKnobId {
+    using value_t = std::uint16_t;
+    constexpr static auto kUninitialized = std::numeric_limits<value_t>::max();
+
+    friend bool operator==(const QueryKnobId& lhs, const QueryKnobId& rhs) {
+        return rhs.value == lhs.value;
+    }
+
+    bool initialized() const {
+        return value != kUninitialized;
+    }
+
+    value_t value = kUninitialized;
+};
+
+/**
  * Type-erased descriptor for a single query knob. Each typed QueryKnob<T> inherits from this and
  * self-registers into QueryKnobDescriptorSet at static init time. The index field is left as a
  * sentinel (~0) until QueryKnobRegistry assigns dense indices during startup.
@@ -116,8 +136,7 @@ public:
         return _readFn(paramName);
     }
 
-    // TODO SERVER-125549: refactor to use a strongly typed KnobId.
-    size_t index = ~size_t{0};  // Sentinel until QueryKnobRegistry assigns a dense index.
+    QueryKnobId id;
     StringData paramName;
 
 private:

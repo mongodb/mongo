@@ -72,9 +72,9 @@ public:
     QueryKnobSnapshot& operator=(QueryKnobSnapshot&&) noexcept = default;
 
     template <typename T>
-    T get(size_t index) const {
-        tassert(12312300, "QueryKnobSnapshot index out of bounds", index < _values.size());
-        const QueryKnobValue& val = _values[index];
+    T get(QueryKnobId id) const {
+        tassert(12312300, "QueryKnobSnapshot index out of bounds", id.value < _values.size());
+        const QueryKnobValue& val = _values[id.value];
         if constexpr (std::is_enum_v<T>) {
             return static_cast<T>(std::get<int>(val));
         } else {
@@ -82,9 +82,9 @@ public:
         }
     }
 
-    KnobSource getSource(size_t index) const {
-        tassert(12312301, "QueryKnobSnapshot index out of bounds", index < _sources.size());
-        return _sources[index];
+    KnobSource getSource(QueryKnobId id) const {
+        tassert(12312301, "QueryKnobSnapshot index out of bounds", id.value < _sources.size());
+        return _sources[id.value];
     }
 
     size_t size() const {
@@ -115,13 +115,14 @@ public:
     QueryKnobSnapshotBuilder(const QueryKnobSnapshotBuilder&) = delete;
     QueryKnobSnapshotBuilder& operator=(const QueryKnobSnapshotBuilder&) = delete;
 
-    QueryKnobSnapshotBuilder& set(size_t index, QueryKnobValue value, KnobSource source) {
-        tassert(12312302, "QueryKnobSnapshotBuilder index out of bounds", index < _values.size());
+    QueryKnobSnapshotBuilder& set(QueryKnobId id, QueryKnobValue value, KnobSource source) {
+        tassert(
+            12312302, "QueryKnobSnapshotBuilder index out of bounds", id.value < _values.size());
         tassert(12312303,
                 "QueryKnobSnapshotBuilder::set() value must not be DeleteQueryKnobOverride",
                 !std::holds_alternative<DeleteQueryKnobOverride>(value));
-        _values[index] = std::move(value);
-        _sources[index] = source;
+        _values[id.value] = std::move(value);
+        _sources[id.value] = source;
         return *this;
     }
 

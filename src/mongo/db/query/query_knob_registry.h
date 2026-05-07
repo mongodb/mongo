@@ -76,9 +76,9 @@ public:
     /**
      * PQS-settable knobs only; boost::none for non-PQS or unknown name.
      */
-    boost::optional<size_t> getKnobIdForName(StringData wireName) const;
+    boost::optional<QueryKnobId> getKnobIdForName(StringData wireName) const;
 
-    const Entry& entry(size_t id) const;
+    const Entry& entry(QueryKnobId id) const;
 
     size_t knobCount() const;
     size_t knobsExposedToQuerySettingsCount() const;
@@ -93,7 +93,7 @@ private:
     void _writeBackDescriptorIndexes();
 
     std::vector<Entry> _entries;
-    StringMap<size_t> _wireNameIndex;
+    StringMap<QueryKnobId> _wireNameIndex;
     size_t _knobsExposedToQuerySettingsCount = 0;
     bool _initialized = false;
 };

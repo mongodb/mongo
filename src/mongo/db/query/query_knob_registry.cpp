@@ -104,11 +104,13 @@ void QueryKnobRegistry::init(QueryKnobRegistry reg) {
 
 void QueryKnobRegistry::_writeBackDescriptorIndexes() {
     for (size_t i = 0; i < _entries.size(); ++i) {
-        _entries[i].knob.index = i;
+        auto&& knob = _entries[i].knob;
+        invariant(!knob.id.initialized());
+        knob.id = QueryKnobId(i);
     }
 }
 
-boost::optional<size_t> QueryKnobRegistry::getKnobIdForName(StringData wireName) const {
+boost::optional<QueryKnobId> QueryKnobRegistry::getKnobIdForName(StringData wireName) const {
     auto it = _wireNameIndex.find(wireName);
     if (it == _wireNameIndex.end()) {
         return boost::none;
@@ -116,12 +118,12 @@ boost::optional<size_t> QueryKnobRegistry::getKnobIdForName(StringData wireName)
     return it->second;
 }
 
-const QueryKnobRegistry::Entry& QueryKnobRegistry::entry(size_t id) const {
+const QueryKnobRegistry::Entry& QueryKnobRegistry::entry(QueryKnobId id) const {
     tassert(12317800,
-            str::stream() << "QueryKnobRegistry::entry id " << id << " out of range (size "
+            str::stream() << "QueryKnobRegistry::entry id " << id.value << " out of range (size "
                           << _entries.size() << ")",
-            id < _entries.size());
-    return _entries[id];
+            id.value < _entries.size());
+    return _entries[id.value];
 }
 
 size_t QueryKnobRegistry::knobCount() const {

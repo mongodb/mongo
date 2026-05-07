@@ -81,11 +81,11 @@ TEST(QueryKnobTest, SyntheticKnobsSelfRegister) {
 }
 
 TEST(QueryKnobTest, SentinelIndex) {
-    ASSERT_EQ(test_knobs::testIntKnob.index, ~size_t{0});
-    ASSERT_EQ(test_knobs::testDoubleKnob.index, ~size_t{0});
-    ASSERT_EQ(test_knobs::testBoolKnob.index, ~size_t{0});
-    ASSERT_EQ(test_knobs::testLLKnob.index, ~size_t{0});
-    ASSERT_EQ(test_knobs::testEnumKnob.index, ~size_t{0});
+    ASSERT_FALSE(test_knobs::testIntKnob.id.initialized());
+    ASSERT_FALSE(test_knobs::testDoubleKnob.id.initialized());
+    ASSERT_FALSE(test_knobs::testBoolKnob.id.initialized());
+    ASSERT_FALSE(test_knobs::testLLKnob.id.initialized());
+    ASSERT_FALSE(test_knobs::testEnumKnob.id.initialized());
 }
 
 TEST(QueryKnobTest, ReadGlobalInt) {
