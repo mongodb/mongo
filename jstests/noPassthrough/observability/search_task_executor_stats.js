@@ -1,7 +1,7 @@
 /**
- * Tests that the searchTaskExecutorMetrics section appears in connPoolStats on both mongod and
+ * Tests that the searchTaskExecutorMetrics section appears in serverStatus on both mongod and
  * mongos, and has the expected structure with diagnosticInfo, networkInterface, and connectionPool
- * sub-sections for both the mongot and searchIndexMgmt executors.
+ * sub-sections for both the mongot and searchIndex executors.
  *
  * @tags: [requires_sharding]
  */
@@ -17,12 +17,12 @@ if (_isWindows()) {
 // Callers must set this.conn before these tests run (e.g. in a before/beforeEach hook).
 function searchTaskExecutorMetricsTests() {
     beforeEach(function () {
-        const stats = assert.commandWorked(this.conn.adminCommand({connPoolStats: 1}));
-        this.metrics = stats.searchTaskExecutorMetrics;
+        const status = assert.commandWorked(this.conn.adminCommand({serverStatus: 1}));
+        this.metrics = status.searchTaskExecutorMetrics;
     });
 
     it("has searchTaskExecutorMetrics section", function () {
-        assert(this.metrics !== undefined, "searchTaskExecutorMetrics missing from connPoolStats");
+        assert(this.metrics !== undefined, "searchTaskExecutorMetrics missing from serverStatus");
     });
 
     for (const executorName of ["mongot", "searchIndex"]) {
@@ -51,7 +51,7 @@ function searchTaskExecutorMetricsTests() {
     }
 }
 
-describe("searchTaskExecutorMetrics in connPoolStats", function () {
+describe("searchTaskExecutorMetrics in serverStatus", function () {
     describe("standalone", function () {
         before(function () {
             this.mongotmock = new MongotMock();

@@ -57,29 +57,6 @@
 namespace mongo {
 namespace {
 
-void appendExecutorStats(StringData key,
-                         const StatusWith<std::shared_ptr<executor::TaskExecutor>>& sw,
-                         BSONObjBuilder& bob) {
-    if (!sw.isOK())
-        return;
-    auto& exec = sw.getValue();
-    BSONObjBuilder sub = bob.subobjStart(key);
-    {
-        BSONObjBuilder diagnosticInfo = sub.subobjStart("diagnosticInfo");
-        exec->appendDiagnosticBSON(&diagnosticInfo);
-    }
-    {
-        BSONObjBuilder networkInterface = sub.subobjStart("networkInterface");
-        exec->appendNetworkInterfaceStats(networkInterface);
-    }
-    {
-        BSONObjBuilder connectionPool = sub.subobjStart("connectionPool");
-        executor::ConnectionPoolStats poolStats{};
-        exec->appendConnectionStats(&poolStats);
-        poolStats.appendToBSON(connectionPool);
-    }
-}
-
 class PoolStats final : public BasicCommand {
 public:
     PoolStats() : BasicCommand("connPoolStats") {}
@@ -152,17 +129,6 @@ public:
 
         // Always report all replica sets being tracked.
         ReplicaSetMonitorManager::get()->report(&result);
-
-        // Search executors
-        {
-            BSONObjBuilder searchStats = result.subobjStart("searchTaskExecutorMetrics");
-            appendExecutorStats(
-                "mongot", executor::getMongotTaskExecutor(opCtx->getServiceContext()), searchStats);
-            appendExecutorStats(
-                "searchIndex",
-                executor::getSearchIndexManagementTaskExecutor(opCtx->getServiceContext()),
-                searchStats);
-        }
 
         return true;
     }

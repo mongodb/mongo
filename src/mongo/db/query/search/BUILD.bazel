@@ -109,7 +109,9 @@ mongo_cc_library(
     deps = [
         ":mongot_options",
         ":search_index_options",
+        "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/executor:connection_pool_controllers",
+        "//src/mongo/executor:connection_pool_stats",
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/executor:network_interface_thread_pool",
         "//src/mongo/executor:pinned_connection_task_executor_registry",
