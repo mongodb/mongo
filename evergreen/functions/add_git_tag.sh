@@ -22,4 +22,9 @@ if [ -n "$tag" ]; then
     fi
 
     git tag -a "$tag" -m "$tag"
+
+    # Write the tag version into .bazelrc.target_mongo_version so the build
+    # picks it up (version_expansions_generate.sh reads this file, not git describe).
+    version="${tag#r}"
+    echo "common --define=MONGO_VERSION=${version}" >.bazelrc.target_mongo_version
 fi
