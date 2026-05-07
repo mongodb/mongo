@@ -607,8 +607,16 @@ private:
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
         if (role && role->has(ClusterRole::ConfigServer)) {
+            const auto upgradeOrDowngrade =
+                requestedVersion > originalVersion ? "upgrade" : "downgrade";
+
             // Waiting for recovery here to avoid waiting for recovery while holding the
             // fcvChangeRegion
+            LOGV2(12365900,
+                  "setFeatureCompatibilityVersion waiting for ShardingCoordinatorService "
+                  "recovery before FCV transition",
+                  "upgradeOrDowngrade"_attr = upgradeOrDowngrade,
+                  "toVersion"_attr = requestedVersion);
             ShardingCoordinatorService::getService(opCtx)->waitForRecovery(opCtx);
 
             if (requestedVersion <= originalVersion) {
@@ -616,6 +624,10 @@ private:
                 // cluster parameters (a condition that may cause this command to fail with
                 // a CannotDowngrade error in the checks performed under the
                 // fcvChangeRegion); perform a best-effort drain to avoid the scenario.
+                LOGV2(12365901,
+                      "setFeatureCompatibilityVersion draining InitializePlacementHistory "
+                      "coordinators before FCV downgrade",
+                      "toVersion"_attr = requestedVersion);
                 ShardingCoordinatorService::getService(opCtx)->waitForOngoingCoordinatorsToFinish(
                     opCtx, [](const ShardingCoordinator& instance) -> bool {
                         return instance.operationType() ==
@@ -688,6 +700,11 @@ private:
         // TODO SERVER-103838 Remove this code block once 9.0 becomes LTS.
         if (feature_flags::gPersistRecipientPlacementInfoInMigrationRecoveryDoc
                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            LOGV2(12365909,
+                  "setFeatureCompatibilityVersion draining in-progress migrations on FCV "
+                  "downgrade",
+                  "originalVersion"_attr = originalVersion,
+                  "toVersion"_attr = requestedVersion);
             migrationutil::drainMigrationsOnFcvDowngrade(opCtx);
         }
     }
