@@ -145,7 +145,7 @@ TEST(ContainerIteratorTest, Iterate) {
     EXPECT_EQ(next.first, key1);
     EXPECT_EQ(next.second, value1);
     ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
-    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey1);
+    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey2);
     checkChecksum(iterator);
 
     ASSERT_TRUE(iterator.more());
@@ -153,21 +153,21 @@ TEST(ContainerIteratorTest, Iterate) {
     EXPECT_EQ(next.first, key2);
     EXPECT_EQ(next.second, value2);
     ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
-    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey2);
+    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey3);
     checkChecksum(iterator);
 
     ASSERT_TRUE(iterator.more());
     EXPECT_EQ(iterator.nextWithDeferredValue(), key3);
     EXPECT_EQ(iterator.getDeferredValue(), value3);
     ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
-    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey3);
+    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey4);
     checkChecksum(iterator);
 
     ASSERT_TRUE(iterator.more());
     EXPECT_EQ(iterator.nextWithDeferredValue(), key4);
     EXPECT_EQ(iterator.getDeferredValue(), value4);
     ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
-    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey4);
+    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey5);
     checkChecksum(iterator);
 
     ASSERT_TRUE(iterator.more());
@@ -175,14 +175,14 @@ TEST(ContainerIteratorTest, Iterate) {
     EXPECT_EQ(next.first, key5);
     EXPECT_EQ(next.second, value5);
     ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
-    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey5);
+    EXPECT_EQ(*iterator.getRange().getCurrent(), iterator.getRange().getEnd());
     checkChecksum(iterator);
 
     EXPECT_FALSE(iterator.more());
 
-    // After exhaustion, getRange() reports the last key consumed.
+    // After exhaustion, getRange() reports the end of the range.
     ASSERT_TRUE(iterator.getRange().getCurrent().has_value());
-    EXPECT_EQ(*iterator.getRange().getCurrent(), containerKey5);
+    EXPECT_EQ(*iterator.getRange().getCurrent(), iterator.getRange().getEnd());
     EXPECT_EQ(*iterator.getRange().getCurrentChecksum(), prevChecksum);
 
     // Construct an iterator starting at key 4.
@@ -203,14 +203,14 @@ TEST(ContainerIteratorTest, Iterate) {
     EXPECT_EQ(positionedIterator.nextWithDeferredValue(), key4);
     EXPECT_EQ(positionedIterator.getDeferredValue(), value4);
     ASSERT_TRUE(positionedIterator.getRange().getCurrent().has_value());
-    EXPECT_EQ(*positionedIterator.getRange().getCurrent(), containerKey4);
+    EXPECT_EQ(*positionedIterator.getRange().getCurrent(), containerKey5);
     checkChecksum(positionedIterator);
 
     ASSERT_TRUE(positionedIterator.more());
     EXPECT_EQ(positionedIterator.nextWithDeferredValue(), key5);
     EXPECT_EQ(positionedIterator.getDeferredValue(), value5);
     ASSERT_TRUE(positionedIterator.getRange().getCurrent().has_value());
-    EXPECT_EQ(*positionedIterator.getRange().getCurrent(), containerKey5);
+    EXPECT_EQ(*positionedIterator.getRange().getCurrent(), positionedIterator.getRange().getEnd());
     checkChecksum(positionedIterator);
 }
 
@@ -1030,6 +1030,194 @@ TEST_F(SortedContainerWriterTest, GetSortedIteratorReadsRange) {
         EXPECT_EQ(gotV, v);
     }
     EXPECT_FALSE(iter->more());
+}
+
+TEST_F(SortedContainerWriterTest, ReconstructPartiallyConsumedIterator) {
+    auto opCtx = makeOperationContext();
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+    auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord);
+    ASSERT(replCoordMock);
+    replCoordMock->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container;
+    container.setIdent(std::make_shared<Ident>("get_sorted_iterator_resume_partial"));
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    SorterContainerStats stats(&this->sorterTracker);
+
+    using KV = std::pair<IntWrapper, IntWrapper>;
+    using Settings = Iterator<IntWrapper, IntWrapper>::Settings;
+
+    ContainerBasedStorage<IntWrapper, IntWrapper> storage(
+        *opCtx, ru, container, stats, /*currKey=*/1, boost::none, sorter::kLatestChecksumVersion);
+
+    std::vector<KV> entries = {{10, 1}, {20, 2}, {30, 3}, {40, 4}, {50, 5}};
+    SortOptions opts;
+    auto writer = storage.makeWriter(opts, Settings{});
+    for (auto& [k, v] : entries) {
+        writer->addAlreadySorted(k, v);
+    }
+    auto firstIter = writer->done();
+
+    // Drain the first three entries from the original iterator, then get its range.
+    for (size_t i = 0; i < 3; ++i) {
+        ASSERT_TRUE(firstIter->more());
+        auto [gotK, gotV] = firstIter->next();
+        EXPECT_EQ(gotK, entries[i].first);
+        EXPECT_EQ(gotV, entries[i].second);
+    }
+    auto range = firstIter->getRange();
+    ASSERT_TRUE(range.getCurrent().has_value());
+    ASSERT_TRUE(range.getCurrentChecksum().has_value());
+
+    // Reconstruct an iterator from the persisted range and read the remaining entries.
+    auto reconstructed = storage.getSortedIterator(range, Settings{});
+    auto reconstructedRange = reconstructed->getRange();
+    ASSERT_TRUE(reconstructedRange.getCurrent().has_value());
+    EXPECT_EQ(*reconstructedRange.getCurrent(), *range.getCurrent());
+    ASSERT_TRUE(reconstructedRange.getCurrentChecksum().has_value());
+    EXPECT_EQ(*reconstructedRange.getCurrentChecksum(), *range.getCurrentChecksum());
+    for (size_t i = 3; i < entries.size(); ++i) {
+        ASSERT_TRUE(reconstructed->more());
+        auto [gotK, gotV] = reconstructed->next();
+        EXPECT_EQ(gotK, entries[i].first);
+        EXPECT_EQ(gotV, entries[i].second);
+    }
+    EXPECT_FALSE(reconstructed->more());
+}
+
+TEST_F(SortedContainerWriterTest, MergeIteratorReconstructsAllKeysAcrossRanges) {
+    auto opCtx = makeOperationContext();
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+    auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord);
+    ASSERT(replCoordMock);
+    replCoordMock->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container;
+    container.setIdent(std::make_shared<Ident>("merge_iterator_resume"));
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    SorterContainerStats stats(&this->sorterTracker);
+
+    using KV = std::pair<IntWrapper, IntWrapper>;
+    using Settings = Iterator<IntWrapper, IntWrapper>::Settings;
+
+    ContainerBasedStorage<IntWrapper, IntWrapper> storage(
+        *opCtx, ru, container, stats, /*currKey=*/1, boost::none, sorter::kLatestChecksumVersion);
+
+    // Three sorted ranges chosen so the merge interleaves all three (no range is fully drained
+    // before another starts) at the time we persist mid-merge.
+    SortOptions opts;
+    std::vector<std::vector<KV>> ranges = {
+        {{10, 100}, {40, 400}, {70, 700}, {90, 900}},
+        {{20, 200}, {50, 500}, {80, 800}},
+        {{30, 300}, {60, 600}},
+    };
+    std::vector<KV> allKeysSorted;
+    for (auto&& r : ranges) {
+        for (auto& kv : r) {
+            allKeysSorted.push_back(kv);
+        }
+    }
+    std::sort(allKeysSorted.begin(), allKeysSorted.end(), [](const KV& a, const KV& b) {
+        return IWComparator(ASC)(a.first, b.first) < 0;
+    });
+
+    // Build the iterators for each range and remember them so we can call getRange() on the
+    // underlying iterators after the merge has consumed some keys.
+    std::vector<std::shared_ptr<Iterator<IntWrapper, IntWrapper>>> iters;
+    int64_t nextContainerKey = 1;
+    for (auto&& rangeData : ranges) {
+        storage.updateCurrKey(nextContainerKey);
+        auto writer = storage.makeWriter(opts, Settings{});
+        for (auto& [k, v] : rangeData) {
+            writer->addAlreadySorted(k, v);
+        }
+        nextContainerKey += static_cast<int64_t>(rangeData.size());
+        iters.push_back(std::shared_ptr<Iterator<IntWrapper, IntWrapper>>(writer->done()));
+    }
+
+    auto firstMerge =
+        sorter::merge<IntWrapper, IntWrapper>(std::span{iters}, opts, IWComparator(ASC));
+
+    // Drain the first four keys -- 10, 20, 30, 40. All three ranges have contributed at least one
+    // key by this point, but none are exhausted.
+    constexpr size_t kKeysDrained = 4;
+    for (size_t i = 0; i < kKeysDrained; ++i) {
+        ASSERT_TRUE(firstMerge->more());
+        auto [gotK, gotV] = firstMerge->next();
+        EXPECT_EQ(gotK, allKeysSorted[i].first);
+        EXPECT_EQ(gotV, allKeysSorted[i].second);
+    }
+
+    std::vector<SorterRange> persistedRanges;
+    persistedRanges.reserve(iters.size());
+    for (auto& it : iters) {
+        persistedRanges.push_back(it->getRange());
+    }
+
+    // Reconstruct fresh iterators from the persisted ranges and merge them again. Every key
+    // not yet emitted should appear in order, with no duplicates and no losses.
+    std::vector<std::shared_ptr<Iterator<IntWrapper, IntWrapper>>> resumedIters;
+    for (auto& range : persistedRanges) {
+        resumedIters.push_back(storage.getSortedIterator(range, Settings{}));
+    }
+    auto resumedMerge =
+        sorter::merge<IntWrapper, IntWrapper>(std::span{resumedIters}, opts, IWComparator(ASC));
+
+    for (size_t i = kKeysDrained; i < allKeysSorted.size(); ++i) {
+        ASSERT_TRUE(resumedMerge->more()) << "resumed merge ran out at index " << i << "; expected "
+                                          << allKeysSorted[i].first.toString() << " next";
+        auto [gotK, gotV] = resumedMerge->next();
+        EXPECT_EQ(gotK, allKeysSorted[i].first);
+        EXPECT_EQ(gotV, allKeysSorted[i].second);
+    }
+    EXPECT_FALSE(resumedMerge->more());
+}
+
+TEST_F(SortedContainerWriterTest, ReconstructPartiallyExhaustedIterator) {
+    auto opCtx = makeOperationContext();
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+    auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(replCoord);
+    ASSERT(replCoordMock);
+    replCoordMock->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container;
+    container.setIdent(std::make_shared<Ident>("get_sorted_iterator_resume_exhausted"));
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    SorterContainerStats stats(&this->sorterTracker);
+
+    using KV = std::pair<IntWrapper, IntWrapper>;
+    using Settings = Iterator<IntWrapper, IntWrapper>::Settings;
+
+    ContainerBasedStorage<IntWrapper, IntWrapper> storage(
+        *opCtx, ru, container, stats, /*currKey=*/1, boost::none, sorter::kLatestChecksumVersion);
+
+    std::vector<KV> entries = {{10, 1}, {20, 2}, {30, 3}};
+    SortOptions opts;
+    auto writer = storage.makeWriter(opts, Settings{});
+    for (auto& [k, v] : entries) {
+        writer->addAlreadySorted(k, v);
+    }
+    auto firstIter = writer->done();
+
+    for (auto& [k, v] : entries) {
+        ASSERT_TRUE(firstIter->more());
+        auto [gotK, gotV] = firstIter->next();
+        EXPECT_EQ(gotK, k);
+        EXPECT_EQ(gotV, v);
+    }
+    ASSERT_FALSE(firstIter->more());
+
+    auto range = firstIter->getRange();
+    ASSERT_TRUE(range.getCurrent().has_value());
+    EXPECT_EQ(*range.getCurrent(), range.getEnd());
+
+    auto reconstructed = storage.getSortedIterator(range, Settings{});
+    auto reconstructedRange = reconstructed->getRange();
+    ASSERT_TRUE(reconstructedRange.getCurrent().has_value());
+    EXPECT_EQ(*reconstructedRange.getCurrent(), *range.getCurrent());
+    ASSERT_TRUE(reconstructedRange.getCurrentChecksum().has_value());
+    EXPECT_EQ(*reconstructedRange.getCurrentChecksum(), *range.getCurrentChecksum());
+    EXPECT_FALSE(reconstructed->more());
 }
 
 }  // namespace
