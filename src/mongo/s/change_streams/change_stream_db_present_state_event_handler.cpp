@@ -145,9 +145,6 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
 
     // Validate status and other fields of historical placement result.
     change_streams::assertHistoricalPlacementStatusOK(placement);
-
-    // TODO SERVER-115212: adjust the invariants checked here if it turns out to be necessary when
-    // running more exhaustive tests.
     change_streams::assertHistoricalPlacementHasNoSegment(placement);
 
     change_streams::updateActiveShardCursors(clusterTime + 1, shards, readerCtx);

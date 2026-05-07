@@ -97,9 +97,6 @@ ShardTargeterDecision AllDatabasesShardTargeterStateEventHandler::handlePlacemen
 
     // Validate status and other fields of historical placement result.
     change_streams::assertHistoricalPlacementStatusOK(placement);
-
-    // TODO SERVER-115212: adjust the invariants checked here if it turns out to be necessary
-    // when running more exhaustive tests.
     change_streams::assertHistoricalPlacementHasNoSegment(placement);
 
     bool isDatabaseCreatedEvent = std::holds_alternative<DatabaseCreatedControlEvent>(event);
