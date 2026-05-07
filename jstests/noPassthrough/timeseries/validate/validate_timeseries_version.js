@@ -21,6 +21,11 @@ describe("Validate Timeseries version Tests", function () {
         this.conn = MongoRunner.runMongod();
         this.db = this.conn.getDB(dbName);
         this.db.getCollection(collName).drop();
+
+        // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+        assert.commandWorked(
+            this.conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+        );
     });
 
     beforeEach(function () {

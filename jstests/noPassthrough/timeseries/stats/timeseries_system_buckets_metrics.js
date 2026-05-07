@@ -19,6 +19,7 @@ const timeField = "my_time";
 const metaField = "my_meta";
 
 const timeseriesRawDoc = {
+    "_id": ObjectId("67cc72e03dc19da48a654135"),
     "control": {
         "version": 2,
         "min": {

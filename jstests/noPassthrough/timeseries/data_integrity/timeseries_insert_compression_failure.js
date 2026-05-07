@@ -36,6 +36,11 @@ const runTest = function (ordered) {
     const timeFieldName = "t";
     const metaFieldName = "m";
 
+    // Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+    assert.commandWorked(
+        conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}),
+    );
+
     assert.commandWorked(
         db.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
     );

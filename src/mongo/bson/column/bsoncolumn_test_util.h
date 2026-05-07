@@ -40,4 +40,9 @@ namespace mongo::bsoncolumn {
 bool areSBEBinariesEqual(sbe::bsoncolumn::SBEColumnMaterializer::Element& actual,
                          sbe::bsoncolumn::SBEColumnMaterializer::Element& expected);
 
+/**
+ * Helper to return min and max elements from a vector of elements.
+ */
+std::pair<BSONElement, BSONElement> expectedMinMax(std::vector<BSONElement>& elems);
+
 }  // namespace mongo::bsoncolumn

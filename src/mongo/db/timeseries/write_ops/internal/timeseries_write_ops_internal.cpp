@@ -233,6 +233,11 @@ TimeseriesSingleWriteResult performTimeseriesInsertFromBatch(
     if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(batch->bucketKey.metadata)) {
         return {status->first, status->second};
     }
+
+    // The schema validation configured in the bucket collection is intended for direct
+    // operations by end users and is not applicable here.
+    DisableDocumentValidationForInternalOp disableDocumentValidation{opCtx};
+
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performInserts(
             opCtx,
@@ -254,6 +259,10 @@ TimeseriesSingleWriteResult performTimeseriesUpdate(
     if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(metadata)) {
         return {status->first, status->second};
     }
+
+    // The schema validation configured in the bucket collection is intended for direct
+    // operations by end users and is not applicable here.
+    DisableDocumentValidationForInternalOp disableDocumentValidation{opCtx};
 
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performUpdates(
@@ -306,9 +315,7 @@ void compressUncompressedBucketOnReopen(OperationContext* opCtx,
 
     mongo::write_ops::UpdateCommandRequest compressionOp(nss, {update});
     mongo::write_ops::WriteCommandRequestBase base;
-    // The schema validation configured in the bucket collection is intended for direct
-    // operations by end users and is not applicable here.
-    base.setBypassDocumentValidation(true);
+
     // Timeseries compression operation is not a user operation and should not use a
     // statement id from any user op. Set to Uninitialized to bypass.
     base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});

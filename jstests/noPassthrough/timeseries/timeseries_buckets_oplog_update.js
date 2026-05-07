@@ -27,10 +27,10 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t"}}));
 
     const insertDocFull = {
-        "_id": ObjectId("64d3c7004c83948224c45ddf"),
+        "_id": ObjectId("64d3c6104c83948224c45ddf"),
         "control": {
             "version": 1,
-            "min": {"_id": ObjectId("64d24b52469e18af504e506e"), "t": ISODate("2023-08-09T17:04:00Z")},
+            "min": {"_id": ObjectId("64d24b52469e18af504e506e"), "t": ISODate("2023-08-09T17:00:00Z")},
             "max": {"_id": ObjectId("64d24b52469e18af504e506f"), "t": ISODate("2023-08-09T17:05:42.238Z")},
         },
         "data": {

@@ -58,11 +58,20 @@ coll.insertMany(
     })),
     {ordered: false},
 );
+
+// Allow setting an inconsistent state to the bucket so we can test that validate can detect it
+assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: true}));
+
+// Write the incorrect control.count
 getTimeseriesCollForRawOps(db, coll).updateOne(
     {"meta.sensorId": 2, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
     {"$set": {"control.count": 10}},
     getRawOperationSpec(db),
 );
+
+// Disable allowing inconsistent state on buckets
+assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, timeseriesDisableStrictBucketValidator: false}));
+
 res = coll.validate();
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);

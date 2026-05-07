@@ -522,9 +522,13 @@ public:
         BSONColumn column(buffer, size);
 
         BSONColumnBuilder reference;
+        size_t cnt = 0;
         for (auto&& elem : column) {
             reference.append(elem);
+            ++cnt;
         }
+
+        ASSERT_EQ(bsoncolumn::count(buffer, size), cnt);
 
         BSONColumnBuilder<> reopen(buffer, size);
         [[maybe_unused]] auto diff = reference.intermediate();
@@ -719,6 +723,30 @@ public:
                                              intermediate.length);
             }
         }
+
+        // Verify min, max & minmax
+        {
+            BSONColumn col(columnBinary);
+            std::vector<BSONElement> elems;
+            for (auto&& elem : col) {
+                elems.push_back(elem);
+            }
+
+            // Compute expected min/max.
+            auto [expectedMin, expectedMax] = bsoncolumn::expectedMinMax(elems);
+            boost::intrusive_ptr allocator{new BSONElementStorage()};
+
+            // Verify optimized min, max and minmax expressions against expected values.
+            BSONElement minElem = min<BSONElementMaterializer>(columnBinary, allocator);
+            ASSERT_TRUE(minElem.binaryEqualValues(expectedMin));
+
+            BSONElement maxElem = max<BSONElementMaterializer>(columnBinary, allocator);
+            ASSERT_TRUE(maxElem.binaryEqualValues(expectedMax));
+
+            auto [minmaxMin, minmaxMax] = minmax<BSONElementMaterializer>(columnBinary, allocator);
+            ASSERT_TRUE(minmaxMin.binaryEqualValues(expectedMin));
+            ASSERT_TRUE(minmaxMax.binaryEqualValues(expectedMax));
+        }
     }
 
     static void verifyDecompressionInterleaved(const std::vector<BSONElement>& input,
@@ -908,6 +936,7 @@ public:
             ASSERT_EQ(col.size(), expected.size());
             ASSERT_EQ(std::distance(col.begin(), col.end()), expected.size());
             ASSERT_EQ(col.size(), expected.size());
+            ASSERT_EQ(bsoncolumn::count(columnBinary), expected.size());
 
             auto it = col.begin();
             for (auto elem : expected) {
@@ -3053,6 +3082,32 @@ TEST_F(BSONColumnTest, DoubleRle) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, MixedIntegralCanonicalTypes) {
+    // This test is mixing types of the same canonical type and verifies that everything works as
+    // expected, including the min, max and minmax expressions.
+    auto int64Ten = createElementInt64(10);
+    auto doubleFive = createElementDouble(5.0);
+    auto doubleTwo = createElementDouble(2.0);
+    auto int64Twenty = createElementInt64(20);
+
+    cb.append(int64Ten);
+    cb.append(doubleFive);
+    cb.append(doubleTwo);
+    cb.append(int64Twenty);
+    auto binData = cb.finalize();
+
+    BufBuilder expected;
+    appendLiteral(expected, int64Ten);
+    appendLiteral(expected, doubleFive);
+    appendSimple8bControl(expected, 0b1001, 0b0000);
+    appendSimple8bBlocks64(expected, {deltaDouble(doubleTwo, doubleFive, 1.0)}, 1);
+    appendLiteral(expected, int64Twenty);
+    appendEOO(expected);
+
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {int64Ten, doubleFive, doubleTwo, int64Twenty});
 }
 
 TEST_F(BSONColumnTest, Decimal128Base) {

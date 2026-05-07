@@ -37,6 +37,14 @@ MONGO_MOD_PUBLIC;
 namespace mongo::bsoncolumn {
 
 /**
+ * Return total number of elements stored in this BSONColumn, count includes missing elements.
+ *
+ * Throws for invalid BSONColumn binaries, but may not throw for all types of invalid BSON.
+ */
+size_t count(const char* buffer, size_t size);
+size_t count(BSONBinData bin);
+
+/**
  * Return first non-missing element stored in this BSONColumn
  */
 template <class CMaterializer>

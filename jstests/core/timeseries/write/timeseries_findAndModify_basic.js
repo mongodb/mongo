@@ -34,17 +34,6 @@ toInsert.forEach((doc) => coll.insertOne(doc));
     assert.eq(1, coll.find({t2: {$exists: true}}).toArray().length);
 }
 
-// Test findAndModify rawData update queries.
-{
-    const doc = getTimeseriesCollForRawOps(coll).findAndModify({
-        query: {},
-        update: {$set: {"control.max._id": 100}},
-        ...kRawOperationSpec,
-    });
-    assert.eq(1, getTimeseriesCollForRawOps(coll).find({"control.max._id": 100}).rawData().toArray().length);
-    assert.eq(numDocs - 1, coll.find({_id: {$gt: 0}}).toArray().length);
-}
-
 // Test findAndModify delete queries.
 {
     const doc = coll.findAndModify({query: {t2: {$exists: true}}, remove: true});

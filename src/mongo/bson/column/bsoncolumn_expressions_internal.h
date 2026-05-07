@@ -259,15 +259,15 @@ public:
             }
         }
 
+        _storeValue();
         _working = CMaterializer::template materialize<T>(*_allocator, val);
         _type = val.type();
-        _storeValue();
     }
 
     void appendPreallocated(const BSONElement& val) {
+        _storeValue();
         _working = CMaterializer::materializePreallocated(val);
         _type = val.type();
-        _storeValue();
     }
 
     // We do not need to keep track of missing or last as that will not affect comparison
@@ -632,10 +632,10 @@ public:
             }
         }
 
+        store();
         _minForType = CMaterializer::template materialize<T>(*_allocator, val);
         _maxForType = _minForType;
         _type = val.type();
-        store();
     }
 
     void store() {
@@ -680,10 +680,10 @@ public:
     }
 
     void appendPreallocated(const BSONElement& val) {
+        store();
         _minForType = CMaterializer::materializePreallocated(val);
         _maxForType = _minForType;
         _type = val.type();
-        store();
     }
 
     // Does not update _last, should not be repeated by appendLast()

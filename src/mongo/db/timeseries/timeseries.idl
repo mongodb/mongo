@@ -180,6 +180,22 @@ server_parameters:
         validator: {gte: 1}
         redact: false
 
+    "timeseriesDisableStrictBucketValidator":
+        description: "Disable the strict bucket validator for timeseries collection and use the legacy schema validator instead."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: "gTimeseriesDisableStrictBucketValidator"
+        default: false
+        redact: false
+
+    "timeseriesLessStrictBucketValidator":
+        description: "Make the timeseries bucket validator for timeseries collection less strict."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: "gTimeseriesLessStrictBucketValidator"
+        default: false
+        redact: false
+
 enums:
     BucketGranularity:
         description:
