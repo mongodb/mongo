@@ -642,7 +642,7 @@ public:
         std::shared_ptr<SSLManagerInterface> manager = nullptr;
         if (SSLManagerCoordinator::get() &&
             (manager = SSLManagerCoordinator::get()->getSSLManager())) {
-            _loadTlsCertificates(manager->getSSLConfiguration());
+            _loadTlsCertificates(manager->getSSLConfiguration(), *manager);
         }
         _prunerService.start(_svcCtx, _pool);
     }
@@ -657,9 +657,10 @@ public:
     }
 
 #ifdef MONGO_CONFIG_SSL
-    Status rotateCertificates(const SSLConfiguration& sslConfig) try {
+    Status rotateCertificates(const SSLConfiguration& sslConfig,
+                              const SSLManagerInterface& sslManager) try {
         LOGV2_DEBUG(9886801, 3, "Rotating certificates used for creating gRPC channels");
-        _loadTlsCertificates(sslConfig);
+        _loadTlsCertificates(sslConfig, sslManager);
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -714,7 +715,8 @@ private:
     }
 
 #ifdef MONGO_CONFIG_SSL
-    void _loadTlsCertificates(const SSLConfiguration& sslConfig) {
+    void _loadTlsCertificates(const SSLConfiguration& sslConfig,
+                              const SSLManagerInterface& manager) {
         auto cache = [&]() -> boost::optional<TLSCache> {
             if (!_options.tlsCAFile && !_options.tlsCertificateKeyFile) {
                 return boost::none;
@@ -722,7 +724,20 @@ private:
 
             std::vector<::grpc::experimental::IdentityKeyCertPair> certKeyPairs;
             if (_options.tlsCertificateKeyFile) {
-                auto sslPair = util::parsePEMKeyFile(_options.tlsCertificateKeyFile.get());
+                ::grpc::SslServerCredentialsOptions::PemKeyCertPair sslPair;
+
+                auto certificateKeyFileContents =
+                    uassertStatusOK(ssl_util::readPEMFile(_options.tlsCertificateKeyFile.get()));
+                sslPair.cert_chain = certificateKeyFileContents;
+                auto swDecrypted =
+                    manager.decryptPEMKey(certificateKeyFileContents,
+                                          _options.tlsCertificatePassword.value_or(StringData{}));
+                if (swDecrypted == ErrorCodes::NotImplemented) {
+                    sslPair.private_key = certificateKeyFileContents;
+                } else {
+                    sslPair.private_key = uassertStatusOK(std::move(swDecrypted));
+                }
+
                 certKeyPairs.push_back(
                     {std::move(sslPair.private_key), std::move(sslPair.cert_chain)});
             }
@@ -843,8 +858,9 @@ void GRPCClient::appendStats(GRPCConnectionStats& stats) const {
 }
 
 #ifdef MONGO_CONFIG_SSL
-Status GRPCClient::rotateCertificates(const SSLConfiguration& config) {
-    return static_cast<StubFactoryImpl&>(*_stubFactory).rotateCertificates(config);
+Status GRPCClient::rotateCertificates(const SSLConfiguration& config,
+                                      const SSLManagerInterface& sslManager) {
+    return static_cast<StubFactoryImpl&>(*_stubFactory).rotateCertificates(config, sslManager);
 }
 #endif
 

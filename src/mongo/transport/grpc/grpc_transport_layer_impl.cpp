@@ -203,8 +203,10 @@ Status GRPCTransportLayerImpl::setup() {
             }
             if (!sslGlobalParams.sslClusterFile.empty()) {
                 _clientOptions.tlsCertificateKeyFile = sslGlobalParams.sslClusterFile;
+                _clientOptions.tlsCertificatePassword = sslGlobalParams.sslClusterPassword;
             } else if (!sslGlobalParams.sslPEMKeyFile.empty()) {
                 _clientOptions.tlsCertificateKeyFile = sslGlobalParams.sslPEMKeyFile;
+                _clientOptions.tlsCertificatePassword = sslGlobalParams.sslPEMKeyPassword;
             }
             _clientOptions.tlsAllowInvalidHostnames = sslGlobalParams.sslAllowInvalidHostnames;
             _clientOptions.tlsAllowInvalidCertificates =
@@ -444,7 +446,8 @@ Status GRPCTransportLayerImpl::rotateCertificates(std::shared_ptr<SSLManagerInte
     }
 
     if (_defaultClient) {
-        if (auto status = _defaultClient->rotateCertificates(manager->getSSLConfiguration());
+        if (auto status =
+                _defaultClient->rotateCertificates(manager->getSSLConfiguration(), *manager);
             !status.isOK()) {
             LOGV2_DEBUG(
                 9886803, 1, "Failed to rotate egress gRPC TLS certificates", "error"_attr = status);
@@ -456,7 +459,7 @@ Status GRPCTransportLayerImpl::rotateCertificates(std::shared_ptr<SSLManagerInte
         std::lock_guard lk(_mutex);
         for (auto&& clientEntry : _clients) {
             if (auto c = clientEntry.client.lock()) {
-                if (auto status = c->rotateCertificates(manager->getSSLConfiguration());
+                if (auto status = c->rotateCertificates(manager->getSSLConfiguration(), *manager);
                     !status.isOK()) {
                     LOGV2_DEBUG(10026100,
                                 1,

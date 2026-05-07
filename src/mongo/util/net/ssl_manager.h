@@ -405,6 +405,17 @@ public:
      * SSL connecctions.
      */
     virtual SSLInformationToLog getSSLInformationToLog() const = 0;
+
+    /**
+     * Decrypt the raw contents of a PEM key file which was encrypted with `password`. Only
+     * implemented for the OpenSSL variant; other implementations return NotImplemented.
+     * TODO SERVER-126149: Replace/remove this function.
+     */
+    virtual StatusWith<std::string> decryptPEMKey(StringData pemContents,
+                                                  StringData password) const {
+        return Status(ErrorCodes::NotImplemented,
+                      "decryptPEMKey is not supported on this platform");
+    }
 };
 
 /**

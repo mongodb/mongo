@@ -17,6 +17,7 @@ export var TRUSTED_SERVER_CERT = getX509Path("trusted-server.pem");
 export var CA_CERT = getX509Path("ca.pem");
 export var TRUSTED_CA_CERT = getX509Path("trusted-ca.pem");
 export var CLIENT_CERT = getX509Path("client.pem");
+export var CLIENT_PASSWORD_PROTECTED_CERT = getX509Path("client_password_protected.pem");
 export var TRUSTED_CLIENT_CERT = getX509Path("trusted-client.pem");
 export var DH_PARAM = "jstests/libs/8k-prime.dhparam";
 export var CLUSTER_CERT = getX509Path("cluster_cert.pem");

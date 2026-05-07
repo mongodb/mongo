@@ -280,6 +280,31 @@ TEST_F(GRPCTransportLayerTest, setupIngressWithoutTLSShouldFail) {
     ASSERT_EQ(ErrorCodes::InvalidOptions, tl->setup());
 }
 
+TEST_F(GRPCTransportLayerTest, startupEgressWithClusterPassword) {
+    sslGlobalParams.sslClusterPassword = "qwerty";
+    sslGlobalParams.sslClusterFile = "jstests/libs/password_protected.pem";
+    createAndStartupTL(false, true);
+}
+
+TEST_F(GRPCTransportLayerTest, startupEgressWithPEMKeyPassword) {
+    sslGlobalParams.sslPEMKeyPassword = "qwerty";
+    sslGlobalParams.sslPEMKeyFile = "jstests/libs/password_protected.pem";
+    createAndStartupTL(false, true);
+}
+
+TEST_F(GRPCTransportLayerTest, startupEgressWithIncorrectSSLPasswordShouldFail) {
+    sslGlobalParams.sslPEMKeyPassword = "wrong!";
+    sslGlobalParams.sslPEMKeyFile = "jstests/libs/password_protected.pem";
+
+    auto options = CommandServiceTestFixtures::makeTLOptions();
+    options.enableIngress = false;
+    options.enableEgress = true;
+    auto tl = makeTL(makeNoopRPCHandler(), std::move(options));
+    ASSERT_OK(tl->setup());
+    ASSERT_EQ(ErrorCodes::InvalidSSLConfiguration, tl->start());
+    tl->shutdown();
+}
+
 using GRPCTransportLayerTestDeathTest = GRPCTransportLayerTest;
 DEATH_TEST_F(GRPCTransportLayerTestDeathTest,
              setupWithPortConflictShouldFail,
@@ -929,7 +954,9 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest,
             SSLConfiguration newConfig{};
             newConfig.serverCertificateExpirationDate =
                 Date_t::fromDurationSinceEpoch(Milliseconds(1234));
-            ASSERT_EQ(client->rotateCertificates(newConfig), ErrorCodes::InvalidSSLConfiguration);
+            ASSERT_EQ(client->rotateCertificates(newConfig,
+                                                 *(SSLManagerCoordinator::get()->getSSLManager())),
+                      ErrorCodes::InvalidSSLConfiguration);
 
             // Make sure we can still connect with the initial certs used before the bad
             // rotation.
@@ -999,7 +1026,8 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, ClientUsesOldCertsUntilRotate) 
 
             SSLConfiguration newConfig{};
             newConfig.serverCertificateExpirationDate = Date_t::fromMillisSinceEpoch(1234);
-            ASSERT_OK(client->rotateCertificates(newConfig));
+            ASSERT_OK(client->rotateCertificates(newConfig,
+                                                 *(SSLManagerCoordinator::get()->getSSLManager())));
             auto swSession =
                 client
                     ->connect(addr, reactor, CommandServiceTestFixtures::kDefaultConnectTimeout, {})

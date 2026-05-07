@@ -90,7 +90,8 @@ public:
     virtual void appendStats(GRPCConnectionStats& stats) const = 0;
 
 #ifdef MONGO_CONFIG_SSL
-    virtual Status rotateCertificates(const SSLConfiguration& sslConfig) = 0;
+    virtual Status rotateCertificates(const SSLConfiguration& sslConfig,
+                                      const SSLManagerInterface& sslManager) = 0;
 #endif
 
     struct ConnectOptions {
@@ -270,6 +271,7 @@ public:
     struct Options {
         boost::optional<StringData> tlsCAFile;
         boost::optional<StringData> tlsCertificateKeyFile;
+        boost::optional<StringData> tlsCertificatePassword;
         bool tlsAllowInvalidCertificates = false;
         bool tlsAllowInvalidHostnames = false;
     };
@@ -283,7 +285,8 @@ public:
     void shutdown() override;
     void appendStats(GRPCConnectionStats& stats) const override;
 #ifdef MONGO_CONFIG_SSL
-    Status rotateCertificates(const SSLConfiguration& sslConfig) override;
+    Status rotateCertificates(const SSLConfiguration& sslConfig,
+                              const SSLManagerInterface& sslManager) override;
 #endif
 
     void dropConnections(const Status& status) override;

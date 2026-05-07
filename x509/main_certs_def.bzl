@@ -532,6 +532,34 @@ certs_def = json.encode({
             },
         },
         {
+            "name": "client_password_protected.pem",
+            "description": "Server cerificate using an encrypted private key.",
+            "Subject": {
+                "OU": "KernelUser",
+                "CN": "client",
+            },
+            "keyfile": "pkcs1_encrypted_key.pem",
+            "passphrase": "qwerty",
+            "Issuer": "ca.pem",
+            "extensions": {
+                "basicConstraints": {
+                    "CA": False,
+                },
+                "subjectKeyIdentifier": "hash",
+                "keyUsage": [
+                    "digitalSignature",
+                    "keyEncipherment",
+                ],
+                "extendedKeyUsage": [
+                    "clientAuth",
+                ],
+                "subjectAltName": {
+                    "DNS": "localhost",
+                    "IP": "127.0.0.1",
+                },
+            },
+        },
+        {
             "name": "password_protected.pem",
             "description": "Server cerificate using an encrypted private key.",
             "Subject": {

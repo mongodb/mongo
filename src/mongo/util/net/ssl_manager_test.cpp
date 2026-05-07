@@ -1150,6 +1150,84 @@ TEST(SSLManager, WindowsReusableBufferOps) {
 
 #endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
 
+// Test decryptPEMKey
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+TEST(SSLManager, OpenSSLDecryptBadPEMKey) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslPEMKeyFile = "jstests/libs/server.pem";
+    params.sslCAFile = "jstests/libs/ca.pem";
+
+    std::shared_ptr<SSLManagerInterface> manager =
+        SSLManagerInterface::create(params, true /* isSSLServer */);
+
+    auto sw = manager->decryptPEMKey("badPEMContents"_sd, "password"_sd);
+    ASSERT_NOT_OK(sw.getStatus());
+    ASSERT_EQ(sw.getStatus().code(), ErrorCodes::InvalidSSLConfiguration);
+}
+
+TEST(SSLManager, OpenSSLDecryptPEMKeyEmbeddedNullInPasswordNotAllowed) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslPEMKeyFile = "jstests/libs/server.pem";
+    params.sslCAFile = "jstests/libs/ca.pem";
+
+    std::shared_ptr<SSLManagerInterface> manager =
+        SSLManagerInterface::create(params, true /* isSSLServer */);
+
+    ASSERT_THROWS_CODE(
+        manager->decryptPEMKey("whatever"_sd, "password\0extrastuff"_sd), DBException, 9527900);
+}
+
+TEST(SSLManager, OpenSSLDecryptPEMKeyPasswordWithoutNulTermination) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslPEMKeyFile = "jstests/libs/server.pem";
+    params.sslCAFile = "jstests/libs/ca.pem";
+
+    auto pemContents = loadFile("jstests/libs/password_protected.pem");
+    auto fullStr = "qwerty_extra_bytes"_sd;
+    StringData password = fullStr.substr(0, 6);  // no null termination
+
+    std::shared_ptr<SSLManagerInterface> manager =
+        SSLManagerInterface::create(params, true /* isSSLServer */);
+
+    ASSERT_OK(manager->decryptPEMKey(pemContents, password));
+}
+
+TEST(SSLManager, OpenSSLDecryptPEMKeyEmptyPasswordShouldFail) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslPEMKeyFile = "jstests/libs/server.pem";
+    params.sslCAFile = "jstests/libs/ca.pem";
+
+    auto pemContents = loadFile("jstests/libs/password_protected.pem");
+    auto password = ""_sd;
+
+    std::shared_ptr<SSLManagerInterface> manager =
+        SSLManagerInterface::create(params, true /* isSSLServer */);
+
+    auto sw = manager->decryptPEMKey(pemContents, password);
+    ASSERT_NOT_OK(sw.getStatus());
+    ASSERT_EQ(sw.getStatus().code(), ErrorCodes::InvalidSSLConfiguration);
+}
+
+#else
+TEST(SSLManager, NonOpenSSLDecryptPEMKeyNotImplemented) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslPEMKeyFile = "jstests/libs/server.pem";
+    params.sslCAFile = "jstests/libs/ca.pem";
+
+    std::shared_ptr<SSLManagerInterface> manager =
+        SSLManagerInterface::create(params, true /* isSSLServer */);
+
+    auto sw = manager->decryptPEMKey("pemContents"_sd, "password"_sd);
+    ASSERT_NOT_OK(sw.getStatus());
+    ASSERT_EQ(sw.getStatus().code(), ErrorCodes::NotImplemented);
+}
+#endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+
 #ifdef MONGO_CONFIG_SSL
 
 TEST(SSLManager, CheckCertificateInTransientManager) {

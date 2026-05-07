@@ -161,6 +161,9 @@ constexpr std::uint8_t ffdhe3072_g = 0x02;
 
 using UniqueBIO = std::unique_ptr<BIO, OpenSSLDeleter<decltype(::BIO_free), ::BIO_free>>;
 
+using UniqueEVP_PKEY =
+    std::unique_ptr<EVP_PKEY, OpenSSLDeleter<decltype(::EVP_PKEY_free), ::EVP_PKEY_free>>;
+
 #ifdef MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW
 using UniqueEC_KEY =
     std::unique_ptr<EC_KEY, OpenSSLDeleter<decltype(::EC_KEY_free), ::EC_KEY_free>>;
@@ -1326,6 +1329,8 @@ public:
     Future<void> ocspClientVerification(SSL* ssl, const ExecutorPtr& reactor);
 
     SSLInformationToLog getSSLInformationToLog() const final;
+
+    StatusWith<std::string> decryptPEMKey(StringData pemContents, StringData password) const final;
 
     std::shared_ptr<OCSPStaplingContext> getOcspStaplingContext() {
         std::lock_guard<std::mutex> guard(_sharedResponseMutex);
@@ -3815,6 +3820,48 @@ SSLInformationToLog SSLManagerOpenSSL::getSSLInformationToLog() const {
     }
 
     return info;
+}
+
+StatusWith<std::string> SSLManagerOpenSSL::decryptPEMKey(StringData pemContents,
+                                                         StringData password) const {
+    str::uassertNoEmbeddedNulBytes(password);
+
+    UniqueBIO inBIO(::BIO_new_mem_buf(pemContents.data(), pemContents.size()));
+    if (!inBIO) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      fmt::format("Failed to allocate inBIO object. error: {}",
+                                  getSSLErrorMessage(ERR_get_error())));
+    }
+
+    // If `cb` is NULL, `PEM_read_bio_PrivateKey` interprets `u` as a NUL-terminated string
+    // containing the password. Calling `toString()` is necessary as `password` does not have to be
+    // NUL-terminated.
+    std::string passwordStr{password};
+    void* userdata = static_cast<void*>(passwordStr.data());
+    UniqueEVP_PKEY pkey(::PEM_read_bio_PrivateKey(inBIO.get(), nullptr, nullptr, userdata));
+    if (!pkey) {
+        return Status(
+            ErrorCodes::InvalidSSLConfiguration,
+            fmt::format("Failed to read PEM key: {}", getSSLErrorMessage(ERR_get_error())));
+    }
+
+    UniqueBIO outBIO(BIO_new(BIO_s_mem()));
+    if (!outBIO) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      fmt::format("Failed to allocate outBIO object. error: {}",
+                                  getSSLErrorMessage(ERR_get_error())));
+    }
+
+    if (PEM_write_bio_PrivateKey(outBIO.get(), pkey.get(), nullptr, nullptr, 0, nullptr, nullptr) !=
+        1) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      fmt::format("Failed to serialize decrypted PEM key: {}",
+                                  getSSLErrorMessage(ERR_get_error())));
+    }
+
+    char* data = nullptr;
+    long len = BIO_get_mem_data(outBIO.get(), &data);
+    return std::string(data, len);
 }
 
 }  // namespace mongo

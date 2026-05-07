@@ -224,6 +224,18 @@ certs:
         - {role: backup, db: admin}
         - {role: readAnyDatabase, db: admin}
 
+  - name: "client_password_protected.pem"
+    description: Client certificate using an encrypted private key.
+    Subject: {OU: "KernelUser", CN: "client"}
+    Issuer: "ca.pem"
+    passphrase: "qwerty"
+    pkcs1: true
+    extensions:
+      basicConstraints: {CA: false}
+      subjectKeyIdentifier: hash
+      keyUsage: [digitalSignature, keyEncipherment]
+      extendedKeyUsage: [clientAuth]
+
   - name: "cluster_cert.pem"
     description: Alternate cert for use in intra-cluster communication.
     Subject: {CN: "clustertest"}

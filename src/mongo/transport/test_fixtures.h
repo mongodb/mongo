@@ -297,7 +297,7 @@ inline std::unique_ptr<TempCertificatesDir> copyCertsToTempDir(std::string caFil
 };
 
 /**
- * RAII type that caches the sslGlobalParams sslCAFile, sslPEMKeyFile, and sslMode on construction,
+ * RAII type that caches the included sslGlobalParams on construction,
  * and restores them to the cached values on destruction.
  */
 class SSLGlobalParamsGuard {
@@ -305,18 +305,27 @@ public:
     SSLGlobalParamsGuard() {
         _sslCAFile = sslGlobalParams.sslCAFile;
         _sslPEMKeyFile = sslGlobalParams.sslPEMKeyFile;
+        _sslPEMKeyPassword = sslGlobalParams.sslPEMKeyPassword;
+        _sslClusterFile = sslGlobalParams.sslClusterFile;
+        _sslClusterPassword = sslGlobalParams.sslClusterPassword;
         _sslMode = sslGlobalParams.sslMode.load();
     }
 
     ~SSLGlobalParamsGuard() {
         sslGlobalParams.sslCAFile = _sslCAFile;
         sslGlobalParams.sslPEMKeyFile = _sslPEMKeyFile;
+        sslGlobalParams.sslPEMKeyPassword = _sslPEMKeyPassword;
+        sslGlobalParams.sslClusterFile = _sslClusterFile;
+        sslGlobalParams.sslClusterPassword = _sslClusterPassword;
         sslGlobalParams.sslMode.store(_sslMode);
     }
 
 private:
     std::string _sslCAFile;
     std::string _sslPEMKeyFile;
+    std::string _sslPEMKeyPassword;
+    std::string _sslClusterFile;
+    std::string _sslClusterPassword;
     int _sslMode;
 };
 

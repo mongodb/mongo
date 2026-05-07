@@ -256,6 +256,65 @@ TEST_F(GRPCClientTest, GRPCClientConnectWithInvalidCertificate) {
         CommandServiceTestFixtures::makeEchoHandler(), clientThreadBody, std::move(options));
 }
 
+TEST_F(GRPCClientTest, GRPCClientConnectWithEncryptedCertificate) {
+    auto options = CommandServiceTestFixtures::makeServerOptions();
+
+    auto clientThreadBody = [&](auto& server, auto& monitor) {
+        GRPCClient::Options options;
+        options.tlsCAFile = "jstests/libs/ca.pem";
+        options.tlsCertificateKeyFile = "jstests/libs/client_password_protected.pem";
+        options.tlsCertificatePassword = "qwerty";
+
+        auto client = makeClient(std::move(options));
+        client->start();
+
+        auto session = client
+                           ->connect(server.getListeningAddresses().at(0),
+                                     getReactor(),
+                                     CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                     {})
+                           .get();
+        assertEchoSucceeds(*session);
+        ASSERT_OK(session->finish());
+    };
+
+    CommandServiceTestFixtures::runWithServer(
+        CommandServiceTestFixtures::makeEchoHandler(), clientThreadBody, std::move(options));
+}
+
+TEST_F(GRPCClientTest, GRPCClientConnectWithIncorrectCertificatePasswordShouldFail) {
+    auto options = CommandServiceTestFixtures::makeServerOptions();
+
+    auto clientThreadBody = [&](auto& server, auto& monitor) {
+        GRPCClient::Options options;
+        options.tlsCAFile = "jstests/libs/ca.pem";
+        options.tlsCertificateKeyFile = "jstests/libs/client_password_protected.pem";
+        options.tlsCertificatePassword = "wrong!";
+
+        auto client = makeClient(std::move(options));
+        ASSERT_THROWS_CODE(client->start(), DBException, ErrorCodes::InvalidSSLConfiguration);
+    };
+
+    CommandServiceTestFixtures::runWithServer(
+        CommandServiceTestFixtures::makeEchoHandler(), clientThreadBody, std::move(options));
+}
+
+TEST_F(GRPCClientTest, GRPCClientConnectMissingCertificatePasswordShouldFail) {
+    auto options = CommandServiceTestFixtures::makeServerOptions();
+
+    auto clientThreadBody = [&](auto& server, auto& monitor) {
+        GRPCClient::Options options;
+        options.tlsCAFile = "jstests/libs/ca.pem";
+        options.tlsCertificateKeyFile = "jstests/libs/client_password_protected.pem";
+
+        auto client = makeClient(std::move(options));
+        ASSERT_THROWS_CODE(client->start(), DBException, ErrorCodes::InvalidSSLConfiguration);
+    };
+
+    CommandServiceTestFixtures::runWithServer(
+        CommandServiceTestFixtures::makeEchoHandler(), clientThreadBody, std::move(options));
+}
+
 TEST_F(GRPCClientTest, GRPCClientConnectNoClientCertificate) {
     auto options = CommandServiceTestFixtures::makeServerOptions();
     options.tlsAllowConnectionsWithoutCertificates = true;
