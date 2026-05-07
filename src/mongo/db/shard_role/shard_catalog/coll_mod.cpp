@@ -204,6 +204,11 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
     }
 
     if (cmr.getCappedSize() || cmr.getCappedMax()) {
+        if (isView) {
+            return getNotSupportedOnViewError(cmr.getCappedSize() ? CollMod::kCappedSizeFieldName
+                                                                  : CollMod::kCappedMaxFieldName);
+        }
+        invariant(coll);
         if (!coll->isCapped()) {
             return {ErrorCodes::InvalidOptions, "Collection must be capped."};
         } else if (coll->ns().isOplog()) {

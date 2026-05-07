@@ -48,6 +48,7 @@
 #include "mongo/db/shard_role/shard_catalog/backwards_compatible_collection_options_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/storage/mdb_catalog.h"
@@ -547,6 +548,33 @@ TEST_F(CollModTest, CollModSetting_ReplicatedRecordIds_ToFalse_WhenProviderRequi
 
     // Confirm it still have replicated record Ids
     ASSERT_TRUE(getCollectionOptions(opCtx.get(), nss).recordIdsReplicated);
+}
+
+// Regression test for SERVER-124967: collMod must not allow cappedSize/cappedMax on a view.
+TEST_F(CollModTest, CollModCappedSizeOnViewReturnsInvalidOptions) {
+    auto opCtx = makeOpCtx();
+    NamespaceString backingNss = NamespaceString::createNamespaceString_forTest("test.backingColl");
+    NamespaceString viewNss = NamespaceString::createNamespaceString_forTest("test.myView");
+
+    // Create a backing collection and a view on top of it.
+    uassertStatusOK(createCollection(opCtx.get(), CreateCommand(backingNss)));
+    CollectionOptions viewOptions;
+    viewOptions.viewOn = std::string{backingNss.coll()};
+    uassertStatusOK(createCollection(opCtx.get(), viewNss, viewOptions, boost::none));
+
+    BSONObjBuilder result;
+
+    // collMod with cappedSize on a view must fail gracefully.
+    CollMod cappedSizeCmd(viewNss);
+    cappedSizeCmd.setCappedSize(1024LL);
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              processCollModCommand(opCtx.get(), viewNss, cappedSizeCmd, nullptr, &result).code());
+
+    // Same for cappedMax.
+    CollMod cappedMaxCmd(viewNss);
+    cappedMaxCmd.setCappedMax(100LL);
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              processCollModCommand(opCtx.get(), viewNss, cappedMaxCmd, nullptr, &result).code());
 }
 
 }  // namespace
