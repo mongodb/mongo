@@ -54,9 +54,8 @@ namespace mongo::otel::metrics {
  * Observable base for all scalar metrics (Counter, Gauge, UpDownCounter), parameterized only on
  * the value type T and not on attribute types. This allows MetricsService to store instances in the
  * OwnedMetric variant without knowing the attribute types. Provides values() for OTEL callbacks and
- * BSON serialization via Metric. MetricsService uses the three tag subclasses (ObservableCounter,
- * ObservableGauge, ObservableUpDownCounter) as the stored variant type so the visitor can create
- * the right OTEL instrument.
+ * BSON serialization via Metric. MetricsService uses the tag subclasses as the stored variant type
+ * so the visitor can create the right OTEL instrument.
  */
 template <typename T>
 class ObservableScalarMetric : public Metric {
@@ -93,34 +92,58 @@ public:
     ~ObservableUpDownCounter() override = default;
 };
 
+/** Tag base stored in MetricsService's OwnedMetric for min-gauge instruments. */
+template <typename T>
+class ObservableMinGauge : public virtual ObservableScalarMetric<T> {
+public:
+    ~ObservableMinGauge() override = default;
+};
+
+/** Tag base stored in MetricsService's OwnedMetric for max-gauge instruments. */
+template <typename T>
+class ObservableMaxGauge : public virtual ObservableScalarMetric<T> {
+public:
+    ~ObservableMaxGauge() override = default;
+};
+
 /**
- * Single lock-free implementation for Counter, Gauge, and UpDownCounter with attribute support.
- * All three share the same per-attribute-combination storage. The difference in semantics is
- * enforced by the interfaces:
+ * Single lock-free implementation for Counter, Gauge, UpDownCounter, MinGauge, and MaxGauge with
+ * attribute support. All share the same per-attribute-combination storage. The difference in
+ * semantics is enforced by the interfaces:
  *   - Counter: add() validates nonnegative (via the Counter non-virtual wrapper → doAdd).
  *   - UpDownCounter: add() accepts any delta (virtual dispatch directly to this impl).
  *   - Gauge: set() stores the value (storeRelaxed instead of fetchAndAdd).
+ *   - MinGauge: setIfLess() check-and-set-loops to store the minimum observed value.
+ *   - MaxGauge: setIfGreater() check-and-set-loops to store the maximum observed value.
  *
- * MetricsService stores this as ObservableCounter<T>, ObservableGauge<T>, or
- * ObservableUpDownCounter<T> depending on which instrument type was requested. The shared virtual
- * base ObservableScalarMetric<T> provides values() and is inherited once.
+ * MetricsService stores this as ObservableCounter<T>, ObservableGauge<T>,
+ * ObservableUpDownCounter<T>, ObservableMinGauge<T>, or ObservableMaxGauge<T> depending on which
+ * instrument type was requested. The shared virtual base ObservableScalarMetric<T> provides
+ * values() and is inherited once.
  *
- * Callers should always hold a typed interface reference (Counter<T>&, Gauge<T>&, or
- * UpDownCounter<T>&) rather than a ScalarMetricImpl reference directly, both for semantic clarity
- * and to avoid name-lookup ambiguity between the inherited add() overloads.
+ * Callers should always hold a typed interface reference (Counter<T>&, Gauge<T>&,
+ * UpDownCounter<T>&, MinGauge<T>&, or MaxGauge<T>&) rather than a ScalarMetricImpl reference
+ * directly, both for semantic clarity and to avoid name-lookup ambiguity between the inherited
+ * add() overloads.
  */
 template <typename T, typename... AttributeTs>
 class ScalarMetricImpl : public Counter<T, AttributeTs...>,
-                         public Gauge<T, AttributeTs...>,
+                         public MinGauge<T, AttributeTs...>,
+                         public MaxGauge<T, AttributeTs...>,
                          public UpDownCounter<T, AttributeTs...>,
                          public ObservableCounter<T>,
                          public ObservableGauge<T>,
-                         public ObservableUpDownCounter<T> {
+                         public ObservableUpDownCounter<T>,
+                         public ObservableMinGauge<T>,
+                         public ObservableMaxGauge<T> {
 public:
     using Attributes = typename Counter<T, AttributeTs...>::Attributes;
 
     explicit ScalarMetricImpl(const AttributeDefinition<AttributeTs>&... defs);
     explicit ScalarMetricImpl(ReportingPolicy globalReportingPolicy,
+                              const AttributeDefinition<AttributeTs>&... defs);
+    explicit ScalarMetricImpl(T initialValue,
+                              ReportingPolicy globalReportingPolicy,
                               const AttributeDefinition<AttributeTs>&... defs);
     ~ScalarMetricImpl() override = default;
 
@@ -144,14 +167,22 @@ protected:
     // Satisfies UpDownCounter<T, AttributeTs...>::add(). No validation.
     void add(T value, const Attributes& attributes) override;
 
+    // Satisfies MinGauge<T, AttributeTs...>::setIfLess(). check-and-set-loops to store minimum.
+    void setIfLess(T value, const Attributes& attributes) override;
+
+    // Satisfies MaxGauge<T, AttributeTs...>::setIfGreater(). check-and-set-loops to store maximum.
+    void setIfGreater(T value, const Attributes& attributes) override;
+
 private:
     struct MetricData {
-        explicit MetricData(ReportingPolicy policy) : reportingPolicy{policy} {}
-        Atomic<T> value{0};
+        explicit MetricData(T initialValue, ReportingPolicy policy)
+            : value{initialValue}, reportingPolicy{policy} {}
+        Atomic<T> value;
         Atomic<ReportingPolicy> reportingPolicy;
         Atomic<bool> everNonZero{false};
     };
 
+    const T _initialValue;
     std::array<std::string, sizeof...(AttributeTs)> _attributeNames;
     OwnedAttributeValueLists<AttributeTs...> _ownedValueLists;
     AttributesMap<Attributes, std::unique_ptr<MetricData>> _metrics;
@@ -164,18 +195,28 @@ private:
 template <typename T, typename... AttributeTs>
 ScalarMetricImpl<T, AttributeTs...>::ScalarMetricImpl(
     const AttributeDefinition<AttributeTs>&... defs)
-    : ScalarMetricImpl(sizeof...(AttributeTs) == 0 ? ReportingPolicy::kUnconditionally
+    : ScalarMetricImpl(/*initialValue=*/0,
+                       sizeof...(AttributeTs) == 0 ? ReportingPolicy::kUnconditionally
                                                    : ReportingPolicy::kIfCurrentlyNonZero,
                        defs...) {}
 
 template <typename T, typename... AttributeTs>
 ScalarMetricImpl<T, AttributeTs...>::ScalarMetricImpl(
     ReportingPolicy globalReportingPolicy, const AttributeDefinition<AttributeTs>&... defs)
-    : _attributeNames{defs.name...}, _ownedValueLists(makeOwnedAttributeValueLists(defs...)) {
+    : ScalarMetricImpl(/*initialValue=*/0, globalReportingPolicy, defs...) {}
+
+template <typename T, typename... AttributeTs>
+ScalarMetricImpl<T, AttributeTs...>::ScalarMetricImpl(
+    T initialValue,
+    ReportingPolicy globalReportingPolicy,
+    const AttributeDefinition<AttributeTs>&... defs)
+    : _initialValue(initialValue),
+      _attributeNames{defs.name...},
+      _ownedValueLists(makeOwnedAttributeValueLists(defs...)) {
     // The Attributes tuples produced by safeMakeAttributeTuples contain view values (StringData,
     // span) that point into _ownedValueLists, so the keys inserted into _metrics remain valid.
     for (Attributes t : safeMakeAttributeTuples(_ownedValueLists))
-        _metrics[t] = std::make_unique<MetricData>(globalReportingPolicy);
+        _metrics[t] = std::make_unique<MetricData>(initialValue, globalReportingPolicy);
 
     massert(ErrorCodes::BadValue,
             "Attribute values list cannot be empty",
@@ -225,6 +266,28 @@ void ScalarMetricImpl<T, AttributeTs...>::set(T value, const Attributes& attribu
 }
 
 template <typename T, typename... AttributeTs>
+void ScalarMetricImpl<T, AttributeTs...>::setIfLess(T value, const Attributes& attributes) {
+    auto it = _metrics.find(attributes);
+    massert(ErrorCodes::BadValue,
+            "Called setIfLess using undeclared set of attributes",
+            it != _metrics.end());
+    T old = it->second->value.load();
+    while (value < old && !it->second->value.compareAndSwap(&old, value)) {
+    }
+}
+
+template <typename T, typename... AttributeTs>
+void ScalarMetricImpl<T, AttributeTs...>::setIfGreater(T value, const Attributes& attributes) {
+    auto it = _metrics.find(attributes);
+    massert(ErrorCodes::BadValue,
+            "Called setIfGreater using undeclared set of attributes",
+            it != _metrics.end());
+    T old = it->second->value.load();
+    while (value > old && !it->second->value.compareAndSwap(&old, value)) {
+    }
+}
+
+template <typename T, typename... AttributeTs>
 BSONObj ScalarMetricImpl<T, AttributeTs...>::serializeToBson(const std::string& key) const {
     T total = 0;
     for (const auto& [attributes, data] : _metrics) {
@@ -238,7 +301,7 @@ template <typename T, typename... AttributeTs>
 void ScalarMetricImpl<T, AttributeTs...>::reset(opentelemetry::metrics::Meter* meter) {
     invariant(!meter);
     for (const auto& [attributes, data] : _metrics) {
-        data->value.storeRelaxed(0);
+        data->value.storeRelaxed(_initialValue);
         data->everNonZero.storeRelaxed(false);
     }
 }

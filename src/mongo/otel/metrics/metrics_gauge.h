@@ -29,17 +29,9 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/otel/metrics/metrics_attributes.h"
 #include "mongo/otel/metrics/metrics_metric.h"
-#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
-
-#include <limits>
-
-#ifdef MONGO_CONFIG_OTEL
-#include <opentelemetry/metrics/meter.h>
-#endif
 
 namespace mongo::otel::metrics {
 
@@ -83,11 +75,26 @@ protected:
  * the minimum of an observed quantity over time (e.g. the minimum available memory across a set of
  * nodes). Initialized to numeric_limits<T>::max() so the first observation always wins.
  */
-template <typename T>
-class MONGO_MOD_PUBLIC MinGauge : public virtual Gauge<T>, public virtual Metric {
+template <typename T, AttributeType... AttributeTs>
+class MONGO_MOD_PUBLIC MinGauge : public virtual Gauge<T, AttributeTs...> {
 public:
-    virtual void setIfLess(T value) = 0;
+    using Attributes = std::tuple<AttributeTs...>;
+    virtual void setIfLess(T value, const Attributes& attributes) = 0;
     virtual AttributesAndValues<T> values() const = 0;
+};
+
+/** Specialization when there are no attributes, adding a convenience setIfLess(T) overload. */
+template <typename T>
+class MONGO_MOD_PUBLIC MinGauge<T> : public virtual Gauge<T> {
+public:
+    using Attributes = std::tuple<>;
+    void setIfLess(T value) {
+        setIfLess(value, {});
+    }
+    virtual AttributesAndValues<T> values() const = 0;
+
+protected:
+    virtual void setIfLess(T value, const std::tuple<>&) = 0;
 };
 
 /**
@@ -95,84 +102,26 @@ public:
  * tracking the maximum of an observed quantity over time (e.g. peak memory usage). Initialized to
  * numeric_limits<T>::lowest() so the first observation always wins.
  */
-template <typename T>
-class MONGO_MOD_PUBLIC MaxGauge : public virtual Gauge<T>, public virtual Metric {
+template <typename T, AttributeType... AttributeTs>
+class MONGO_MOD_PUBLIC MaxGauge : public virtual Gauge<T, AttributeTs...> {
 public:
-    virtual void setIfGreater(T value) = 0;
+    using Attributes = std::tuple<AttributeTs...>;
+    virtual void setIfGreater(T value, const Attributes& attributes) = 0;
     virtual AttributesAndValues<T> values() const = 0;
 };
 
-// A single lock-free implementation used for MinGauge and MaxGauge. The initialValue controls
-// semantics: numeric_limits<T>::max() for min-tracking gauges, numeric_limits<T>::lowest() for
-// max-tracking gauges.
+/** Specialization when there are no attributes, adding a convenience setIfGreater(T) overload. */
 template <typename T>
-class GaugeImpl : public MinGauge<T>, public MaxGauge<T> {
+class MONGO_MOD_PUBLIC MaxGauge<T> : public virtual Gauge<T> {
 public:
-    explicit GaugeImpl(T initialValue = T{0}) : _initialValue(initialValue), _value(initialValue) {}
+    using Attributes = std::tuple<>;
+    void setIfGreater(T value) {
+        setIfGreater(value, {});
+    }
+    virtual AttributesAndValues<T> values() const = 0;
 
-    using Gauge<T>::set;
-    void set(T value, const std::tuple<>&) override;
-
-    void setReportingPolicy(const std::tuple<>&, ReportingPolicy) override {}
-
-    void setIfLess(T value) override;
-
-    void setIfGreater(T value) override;
-
-    AttributesAndValues<T> values() const override;
-
-    BSONObj serializeToBson(const std::string& key) const override;
-
-#ifdef MONGO_CONFIG_OTEL
-    void reset(opentelemetry::metrics::Meter* meter) override;
-#endif  // MONGO_CONFIG_OTEL
-
-private:
-    const T _initialValue;
-    Atomic<T> _value;
+protected:
+    virtual void setIfGreater(T value, const std::tuple<>&) = 0;
 };
-
-///////////////////////////////////////////////////////////////////////////////
-// Implementation details
-///////////////////////////////////////////////////////////////////////////////
-
-template <typename T>
-void GaugeImpl<T>::set(T value, const std::tuple<>&) {
-    _value.storeRelaxed(value);
-}
-
-template <typename T>
-void GaugeImpl<T>::setIfLess(T value) {
-    T old = _value.load();
-    while (value < old && !_value.compareAndSwap(&old, value)) {
-    }
-}
-
-template <typename T>
-void GaugeImpl<T>::setIfGreater(T value) {
-    T old = _value.load();
-    while (value > old && !_value.compareAndSwap(&old, value)) {
-    }
-}
-
-template <typename T>
-AttributesAndValues<T> GaugeImpl<T>::values() const {
-    // TODO SERVER-121408: Return per-attribute values once attribute support is added.
-    return {{.attributes = AttributesKeyValueIterable(std::vector<AttributeNameAndValue>{}),
-             .value = _value.loadRelaxed()}};
-}
-
-template <typename T>
-BSONObj GaugeImpl<T>::serializeToBson(const std::string& key) const {
-    return BSON(key << _value.loadRelaxed());
-}
-
-#ifdef MONGO_CONFIG_OTEL
-template <typename T>
-void GaugeImpl<T>::reset(opentelemetry::metrics::Meter* meter) {
-    invariant(!meter);
-    _value.store(_initialValue);
-}
-#endif  // MONGO_CONFIG_OTEL
 
 }  // namespace mongo::otel::metrics

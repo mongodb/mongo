@@ -48,6 +48,7 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/modules.h"
 
+#include <limits>
 #include <memory>
 #include <typeindex>
 #include <vector>
@@ -229,50 +230,70 @@ public:
     /**
      * Creates a min gauge that atomically tracks the minimum value observed via setIfLess(). The
      * function will throw an exception if the gauge would collide with a different metric (i.e.,
-     * same name but different type or other parameters).
+     * same name but different type or other parameters). Note that this will take storage
+     * proportional to all possible attribute combinations, and will throw an exception if there are
+     * too many.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    MinGauge<int64_t>& createInt64MinGauge(MetricName name,
-                                           std::string description,
-                                           MetricUnit unit,
-                                           const GaugeOptions& = {});
+    template <AttributeType... AttributeTs>
+    MinGauge<int64_t, AttributeTs...>& createInt64MinGauge(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const GaugeOptions& = {});
 
     /**
      * Creates a min gauge that atomically tracks the minimum value observed via setIfLess(). The
      * function will throw an exception if the gauge would collide with a different metric (i.e.,
-     * same name but different type or other parameters).
+     * same name but different type or other parameters). Note that this will take storage
+     * proportional to all possible attribute combinations, and will throw an exception if there are
+     * too many.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    MinGauge<double>& createDoubleMinGauge(MetricName name,
-                                           std::string description,
-                                           MetricUnit unit,
-                                           const GaugeOptions& = {});
+    template <AttributeType... AttributeTs>
+    MinGauge<double, AttributeTs...>& createDoubleMinGauge(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const GaugeOptions& = {});
 
     /**
      * Creates a max gauge that atomically tracks the maximum value observed via setIfGreater(). The
      * function will throw an exception if the gauge would collide with a different metric (i.e.,
-     * same name but different type or other parameters).
+     * same name but different type or other parameters). Note that this will take storage
+     * proportional to all possible attribute combinations, and will throw an exception if there are
+     * too many.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    MaxGauge<int64_t>& createInt64MaxGauge(MetricName name,
-                                           std::string description,
-                                           MetricUnit unit,
-                                           const GaugeOptions& = {});
+    template <AttributeType... AttributeTs>
+    MaxGauge<int64_t, AttributeTs...>& createInt64MaxGauge(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const GaugeOptions& = {});
 
     /**
      * Creates a max gauge that atomically tracks the maximum value observed via setIfGreater(). The
      * function will throw an exception if the gauge would collide with a different metric (i.e.,
-     * same name but different type or other parameters).
+     * same name but different type or other parameters). Note that this will take storage
+     * proportional to all possible attribute combinations, and will throw an exception if there are
+     * too many.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    MaxGauge<double>& createDoubleMaxGauge(MetricName name,
-                                           std::string description,
-                                           MetricUnit unit,
-                                           const GaugeOptions& = {});
+    template <AttributeType... AttributeTs>
+    MaxGauge<double, AttributeTs...>& createDoubleMaxGauge(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const GaugeOptions& = {});
 
     /**
      * Creates an int64_t histogram with the provided parameters. The function will throw an
@@ -378,24 +399,14 @@ private:
         const AttributeDefinition<AttributeTs>&... defs,
         const ScalarMetricOptions& options);
 
-    template <typename T>
-    MinGauge<T>& createMinGauge(MetricName name,
-                                std::string description,
-                                MetricUnit unit,
-                                const GaugeOptions& options);
-
-    template <typename T>
-    MaxGauge<T>& createMaxGauge(MetricName name,
-                                std::string description,
-                                MetricUnit unit,
-                                const GaugeOptions& options);
-
-    template <template <typename> class GaugeTpl, typename T>
-    GaugeTpl<T>& createGaugeBase(MetricName name,
-                                 std::string description,
-                                 MetricUnit unit,
-                                 const GaugeOptions& options,
-                                 T initialValue);
+    template <template <typename> class ObservableT, typename T, AttributeType... AttributeTs>
+    ScalarMetricImpl<T, AttributeTs...>& _createMinMaxGauge(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        T initialValue,
+        const AttributeDefinition<AttributeTs>&... defs,
+        const GaugeOptions& options);
 
     template <typename T, AttributeType... AttributeTs>
     Histogram<T, AttributeTs...>& _createHistogram(MetricName name,
@@ -456,10 +467,10 @@ private:
                                      std::unique_ptr<ObservableUpDownCounter<double>>,
                                      std::unique_ptr<ObservableGauge<int64_t>>,
                                      std::unique_ptr<ObservableGauge<double>>,
-                                     std::unique_ptr<MinGauge<int64_t>>,
-                                     std::unique_ptr<MinGauge<double>>,
-                                     std::unique_ptr<MaxGauge<int64_t>>,
-                                     std::unique_ptr<MaxGauge<double>>,
+                                     std::unique_ptr<ObservableMinGauge<int64_t>>,
+                                     std::unique_ptr<ObservableMinGauge<double>>,
+                                     std::unique_ptr<ObservableMaxGauge<int64_t>>,
+                                     std::unique_ptr<ObservableMaxGauge<double>>,
                                      std::unique_ptr<HistogramBase<int64_t>>,
                                      std::unique_ptr<HistogramBase<double>>>;
 
@@ -483,10 +494,10 @@ private:
         void operator()(std::unique_ptr<ObservableUpDownCounter<double>>& upDownCounter);
         void operator()(std::unique_ptr<ObservableGauge<int64_t>>& gauge);
         void operator()(std::unique_ptr<ObservableGauge<double>>& gauge);
-        void operator()(std::unique_ptr<MinGauge<int64_t>>& gauge);
-        void operator()(std::unique_ptr<MinGauge<double>>& gauge);
-        void operator()(std::unique_ptr<MaxGauge<int64_t>>& gauge);
-        void operator()(std::unique_ptr<MaxGauge<double>>& gauge);
+        void operator()(std::unique_ptr<ObservableMinGauge<int64_t>>& gauge);
+        void operator()(std::unique_ptr<ObservableMinGauge<double>>& gauge);
+        void operator()(std::unique_ptr<ObservableMaxGauge<int64_t>>& gauge);
+        void operator()(std::unique_ptr<ObservableMaxGauge<double>>& gauge);
         void operator()(std::unique_ptr<HistogramBase<double>>& histogram);
         void operator()(std::unique_ptr<HistogramBase<int64_t>>& histogram);
     };
@@ -792,6 +803,58 @@ makeObservableInstrument<ObservableGauge<double>>(opentelemetry::metrics::MeterP
                                       description,
                                       toStdStringViewForInterop(toString(unit)));
 }
+
+template <>
+MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+makeObservableInstrument<ObservableMinGauge<int64_t>>(
+    opentelemetry::metrics::MeterProvider& provider,
+    std::string name,
+    std::string description,
+    MetricUnit unit) {
+    return provider.GetMeter(std::string{MetricsService::kMeterName})
+        ->CreateInt64ObservableGauge(toStdStringViewForInterop(name),
+                                     description,
+                                     toStdStringViewForInterop(toString(unit)));
+}
+
+template <>
+MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+makeObservableInstrument<ObservableMinGauge<double>>(
+    opentelemetry::metrics::MeterProvider& provider,
+    std::string name,
+    std::string description,
+    MetricUnit unit) {
+    return provider.GetMeter(std::string{MetricsService::kMeterName})
+        ->CreateDoubleObservableGauge(toStdStringViewForInterop(name),
+                                      description,
+                                      toStdStringViewForInterop(toString(unit)));
+}
+
+template <>
+MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+makeObservableInstrument<ObservableMaxGauge<int64_t>>(
+    opentelemetry::metrics::MeterProvider& provider,
+    std::string name,
+    std::string description,
+    MetricUnit unit) {
+    return provider.GetMeter(std::string{MetricsService::kMeterName})
+        ->CreateInt64ObservableGauge(toStdStringViewForInterop(name),
+                                     description,
+                                     toStdStringViewForInterop(toString(unit)));
+}
+
+template <>
+MONGO_MOD_FILE_PRIVATE inline std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+makeObservableInstrument<ObservableMaxGauge<double>>(
+    opentelemetry::metrics::MeterProvider& provider,
+    std::string name,
+    std::string description,
+    MetricUnit unit) {
+    return provider.GetMeter(std::string{MetricsService::kMeterName})
+        ->CreateDoubleObservableGauge(toStdStringViewForInterop(name),
+                                      description,
+                                      toStdStringViewForInterop(toString(unit)));
+}
 }  // namespace metrics_service_detail
 
 template <template <typename> class MetricT, typename T>
@@ -853,5 +916,97 @@ Gauge<double, AttributeTs...>& MetricsService::createDoubleGauge(
     const GaugeOptions& options) {
     return _createScalarMetric<ObservableGauge, double, AttributeTs...>(
         name, std::move(description), unit, defs..., options);
+}
+
+template <template <typename> class ObservableT, typename T, AttributeType... AttributeTs>
+ScalarMetricImpl<T, AttributeTs...>& MetricsService::_createMinMaxGauge(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    T initialValue,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const GaugeOptions& options) {
+    MetricIdentifier identifier{
+        .description = description,
+        .unit = unit,
+        .serverStatusOptions = options.serverStatusOptions,
+        .histogramBucketBoundaries = boost::none,
+        .attributeDefinitions = {makeComparableAttributeDefinition(defs)...}};
+    return _createMetric<ScalarMetricImpl<T, AttributeTs...>, ObservableT<T>, GaugeOptions>(
+        name,
+        options,
+        std::move(identifier),
+        /* makeInstrument= */
+        [&](WithLock, const std::string&) {
+            return std::make_unique<ScalarMetricImpl<T, AttributeTs...>>(
+                initialValue, ReportingPolicy::kUnconditionally, defs...);
+        },
+#ifdef MONGO_CONFIG_OTEL
+        /* addObservable= */
+        [this, desc = std::move(description), unit](
+            WithLock lock,
+            const std::string& nameStr,
+            ScalarMetricImpl<T, AttributeTs...>* ptr) mutable {
+            _addObservable(lock, nameStr, static_cast<ObservableT<T>*>(ptr), std::move(desc), unit);
+        }
+#else
+        /* addObservable= */
+        [](WithLock, const std::string&, ScalarMetricImpl<T, AttributeTs...>*) {}
+#endif  // MONGO_CONFIG_OTEL
+    );
+}
+
+template <AttributeType... AttributeTs>
+MinGauge<int64_t, AttributeTs...>& MetricsService::createInt64MinGauge(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const GaugeOptions& options) {
+    return _createMinMaxGauge<ObservableMinGauge, int64_t, AttributeTs...>(
+        name, std::move(description), unit, std::numeric_limits<int64_t>::max(), defs..., options);
+}
+
+template <AttributeType... AttributeTs>
+MinGauge<double, AttributeTs...>& MetricsService::createDoubleMinGauge(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const GaugeOptions& options) {
+    return _createMinMaxGauge<ObservableMinGauge, double, AttributeTs...>(
+        name, std::move(description), unit, std::numeric_limits<double>::max(), defs..., options);
+}
+
+template <AttributeType... AttributeTs>
+MaxGauge<int64_t, AttributeTs...>& MetricsService::createInt64MaxGauge(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const GaugeOptions& options) {
+    return _createMinMaxGauge<ObservableMaxGauge, int64_t, AttributeTs...>(
+        name,
+        std::move(description),
+        unit,
+        std::numeric_limits<int64_t>::lowest(),
+        defs...,
+        options);
+}
+
+template <AttributeType... AttributeTs>
+MaxGauge<double, AttributeTs...>& MetricsService::createDoubleMaxGauge(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    const AttributeDefinition<AttributeTs>&... defs,
+    const GaugeOptions& options) {
+    return _createMinMaxGauge<ObservableMaxGauge, double, AttributeTs...>(
+        name,
+        std::move(description),
+        unit,
+        std::numeric_limits<double>::lowest(),
+        defs...,
+        options);
 }
 }  // namespace mongo::otel::metrics

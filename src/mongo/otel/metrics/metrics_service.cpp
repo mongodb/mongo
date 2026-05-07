@@ -152,35 +152,39 @@ void MetricsService::OwnedMetricVisitor::operator()(
     newObservableInstruments.push_back(observable);
 }
 
-void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<MinGauge<int64_t>>& gauge) {
+void MetricsService::OwnedMetricVisitor::operator()(
+    std::unique_ptr<ObservableMinGauge<int64_t>>& gauge) {
     gauge->reset();
-    auto observable =
-        makeObservableInstrument<ObservableGauge<int64_t>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<MinGauge, int64_t>, gauge.get());
+    auto observable = makeObservableInstrument<ObservableMinGauge<int64_t>>(
+        provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<ObservableMinGauge, int64_t>, gauge.get());
     newObservableInstruments.push_back(observable);
 }
 
-void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<MinGauge<double>>& gauge) {
+void MetricsService::OwnedMetricVisitor::operator()(
+    std::unique_ptr<ObservableMinGauge<double>>& gauge) {
     gauge->reset();
-    auto observable =
-        makeObservableInstrument<ObservableGauge<double>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<MinGauge, double>, gauge.get());
+    auto observable = makeObservableInstrument<ObservableMinGauge<double>>(
+        provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<ObservableMinGauge, double>, gauge.get());
     newObservableInstruments.push_back(observable);
 }
 
-void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<MaxGauge<int64_t>>& gauge) {
+void MetricsService::OwnedMetricVisitor::operator()(
+    std::unique_ptr<ObservableMaxGauge<int64_t>>& gauge) {
     gauge->reset();
-    auto observable =
-        makeObservableInstrument<ObservableGauge<int64_t>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<MaxGauge, int64_t>, gauge.get());
+    auto observable = makeObservableInstrument<ObservableMaxGauge<int64_t>>(
+        provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<ObservableMaxGauge, int64_t>, gauge.get());
     newObservableInstruments.push_back(observable);
 }
 
-void MetricsService::OwnedMetricVisitor::operator()(std::unique_ptr<MaxGauge<double>>& gauge) {
+void MetricsService::OwnedMetricVisitor::operator()(
+    std::unique_ptr<ObservableMaxGauge<double>>& gauge) {
     gauge->reset();
-    auto observable =
-        makeObservableInstrument<ObservableGauge<double>>(provider, name, id.description, id.unit);
-    observable->AddCallback(observableCallback<MaxGauge, double>, gauge.get());
+    auto observable = makeObservableInstrument<ObservableMaxGauge<double>>(
+        provider, name, id.description, id.unit);
+    observable->AddCallback(observableCallback<ObservableMaxGauge, double>, gauge.get());
     newObservableInstruments.push_back(observable);
 }
 
@@ -258,91 +262,6 @@ void MetricsService::_registerServerStatusTree(
         std::make_unique<OtelMetricServerStatusAdapter>(metricPtr));
 }
 
-template <template <typename> class GaugeTpl, typename T>
-GaugeTpl<T>& MetricsService::createGaugeBase(MetricName name,
-                                             std::string description,
-                                             MetricUnit unit,
-                                             const GaugeOptions& options,
-                                             T initialValue) {
-    MetricIdentifier identifier{.description = description,
-                                .unit = unit,
-                                .serverStatusOptions = options.serverStatusOptions,
-                                .histogramBucketBoundaries = boost::none};
-    return _createMetric<GaugeTpl<T>, GaugeTpl<T>, GaugeOptions>(
-        name,
-        options,
-        std::move(identifier),
-        /* makeInstrument= */
-        [initialValue](WithLock, const std::string&) -> std::unique_ptr<GaugeTpl<T>> {
-            return std::make_unique<GaugeImpl<T>>(initialValue);
-        },
-#ifdef MONGO_CONFIG_OTEL
-        /* addObservable= */
-        [this, description, unit](
-            WithLock lock, const std::string& nameStr, GaugeTpl<T>* gauge_ptr) {
-            (void)lock;
-            auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
-            auto observableGauge =
-                metrics_service_detail::makeObservableInstrument<ObservableGauge<T>>(
-                    *provider, nameStr, description, unit);
-            tassert(ErrorCodes::InternalError,
-                    fmt::format("Could not create observable gauge for metric: {}", nameStr),
-                    observableGauge != nullptr);
-            observableGauge->AddCallback(metrics_service_detail::observableCallback<GaugeTpl, T>,
-                                         gauge_ptr);
-            _observableInstruments.push_back(std::move(observableGauge));
-        }
-#else
-        [](WithLock, const std::string&, GaugeTpl<T>*) {}
-#endif
-    );
-}
-
-template <typename T>
-MinGauge<T>& MetricsService::createMinGauge(MetricName name,
-                                            std::string description,
-                                            MetricUnit unit,
-                                            const GaugeOptions& options) {
-    return createGaugeBase<MinGauge, T>(
-        name, description, unit, options, std::numeric_limits<T>::max());
-}
-
-MinGauge<int64_t>& MetricsService::createInt64MinGauge(MetricName name,
-                                                       std::string description,
-                                                       MetricUnit unit,
-                                                       const GaugeOptions& options) {
-    return createMinGauge<int64_t>(name, description, unit, options);
-}
-
-MinGauge<double>& MetricsService::createDoubleMinGauge(MetricName name,
-                                                       std::string description,
-                                                       MetricUnit unit,
-                                                       const GaugeOptions& options) {
-    return createMinGauge<double>(name, description, unit, options);
-}
-
-template <typename T>
-MaxGauge<T>& MetricsService::createMaxGauge(MetricName name,
-                                            std::string description,
-                                            MetricUnit unit,
-                                            const GaugeOptions& options) {
-    return createGaugeBase<MaxGauge, T>(
-        name, description, unit, options, std::numeric_limits<T>::lowest());
-}
-
-MaxGauge<int64_t>& MetricsService::createInt64MaxGauge(MetricName name,
-                                                       std::string description,
-                                                       MetricUnit unit,
-                                                       const GaugeOptions& options) {
-    return createMaxGauge<int64_t>(name, description, unit, options);
-}
-
-MaxGauge<double>& MetricsService::createDoubleMaxGauge(MetricName name,
-                                                       std::string description,
-                                                       MetricUnit unit,
-                                                       const GaugeOptions& options) {
-    return createMaxGauge<double>(name, description, unit, options);
-}
 
 std::vector<std::string> MetricsService::getAttributeNamesForTests(MetricName name) const {
     std::lock_guard lock(_mutex);

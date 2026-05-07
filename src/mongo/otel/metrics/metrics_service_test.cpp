@@ -1602,6 +1602,128 @@ TEST_F(CreateDoubleMaxGaugeTest, RecordsMaximumValue) {
     }
 }
 
+using CreateInt64MinGaugeWithAttributesTest = MetricsServiceTest;
+
+TEST_F(CreateInt64MinGaugeWithAttributesTest, RecordsMinimumValuePerAttribute) {
+    MinGauge<int64_t, bool>& gauge = metricsService.createInt64MinGauge<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}});
+
+    OtelMetricsCapturer metricsCapturer(metricsService);
+
+    gauge.setIfLess(10, {true});
+    gauge.setIfLess(20, {false});
+    gauge.setIfLess(5, {true});
+    gauge.setIfLess(15, {false});
+    gauge.setIfLess(8, {true});
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1, std::tuple{true}), 5);
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1, std::tuple{false}), 15);
+    }
+}
+
+TEST_F(CreateInt64MinGaugeWithAttributesTest, SameMetricReturnedWhenAttributeDefinitionsMatch) {
+    MinGauge<int64_t, bool>& g1 = metricsService.createInt64MinGauge<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}});
+    MinGauge<int64_t, bool>& g2 = metricsService.createInt64MinGauge<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}});
+    EXPECT_EQ(&g1, &g2);
+}
+
+using CreateDoubleMinGaugeWithAttributesTest = MetricsServiceTest;
+
+TEST_F(CreateDoubleMinGaugeWithAttributesTest, RecordsMinimumValuePerAttribute) {
+    MinGauge<double, bool>& gauge = metricsService.createDoubleMinGauge<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}});
+
+    OtelMetricsCapturer metricsCapturer(metricsService);
+
+    gauge.setIfLess(10.5, {true});
+    gauge.setIfLess(20.5, {false});
+    gauge.setIfLess(3.14, {true});
+    gauge.setIfLess(15.5, {false});
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1, std::tuple{true}),
+                         3.14);
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1, std::tuple{false}),
+                         15.5);
+    }
+}
+
+using CreateInt64MaxGaugeWithAttributesTest = MetricsServiceTest;
+
+TEST_F(CreateInt64MaxGaugeWithAttributesTest, RecordsMaximumValuePerAttribute) {
+    MaxGauge<int64_t, bool>& gauge = metricsService.createInt64MaxGauge<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}});
+
+    OtelMetricsCapturer metricsCapturer(metricsService);
+
+    gauge.setIfGreater(5, {true});
+    gauge.setIfGreater(3, {false});
+    gauge.setIfGreater(10, {true});
+    gauge.setIfGreater(7, {false});
+    gauge.setIfGreater(8, {true});
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1, std::tuple{true}), 10);
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1, std::tuple{false}), 7);
+    }
+}
+
+TEST_F(CreateInt64MaxGaugeWithAttributesTest, SameMetricReturnedWhenAttributeDefinitionsMatch) {
+    MaxGauge<int64_t, bool>& g1 = metricsService.createInt64MaxGauge<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}});
+    MaxGauge<int64_t, bool>& g2 = metricsService.createInt64MaxGauge<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}});
+    EXPECT_EQ(&g1, &g2);
+}
+
+using CreateDoubleMaxGaugeWithAttributesTest = MetricsServiceTest;
+
+TEST_F(CreateDoubleMaxGaugeWithAttributesTest, RecordsMaximumValuePerAttribute) {
+    MaxGauge<double, bool>& gauge = metricsService.createDoubleMaxGauge<bool>(
+        MetricNames::kTest1,
+        "description",
+        MetricUnit::kSeconds,
+        AttributeDefinition<bool>{.name = "is_primary", .values = {true, false}});
+
+    OtelMetricsCapturer metricsCapturer(metricsService);
+
+    gauge.setIfGreater(3.14, {true});
+    gauge.setIfGreater(1.0, {false});
+    gauge.setIfGreater(10.5, {true});
+    gauge.setIfGreater(5.5, {false});
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1, std::tuple{true}),
+                         10.5);
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1, std::tuple{false}),
+                         5.5);
+    }
+}
+
 using CreateHistogramWithAttributesValidationTest = MetricsServiceTest;
 
 TEST_F(CreateHistogramWithAttributesValidationTest,
