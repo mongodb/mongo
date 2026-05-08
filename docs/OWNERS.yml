@@ -3,6 +3,9 @@ filters:
   - "building.md":
     approvers:
       - 10gen/devprod-build
+  - "change_stream_events.md":
+    approvers:
+      - 10gen/query-execution-change-streams
   - "change_streams.md":
     approvers:
       - 10gen/query-execution-change-streams
