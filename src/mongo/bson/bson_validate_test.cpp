@@ -1252,6 +1252,79 @@ TEST(BSONValidateColumn, BSONColumnInterleavedNestedInterleaved) {
     ASSERT_EQ(validateBSONColumn(buffer.buf(), buffer.len()), ErrorCodes::NonConformantBSON);
 }
 
+// Returns the raw bytes of a BSONColumn binary whose sole element is a nested binData/Column
+// literal. Both nested-column tests use this payload; one validates it directly, the other
+// wraps it inside a BSON document.
+std::vector<char> makeNestedColumnBinary() {
+    const char innerColumn[] = {'\0'};
+    BufBuilder buf;
+    buf.appendChar(stdx::to_underlying(BSONType::binData));
+    buf.appendChar('\0');
+    buf.appendNum(static_cast<int32_t>(sizeof(innerColumn)));
+    buf.appendChar(static_cast<char>(BinDataType::Column));
+    buf.appendBuf(innerColumn, sizeof(innerColumn));
+    buf.appendChar('\0');
+    return {buf.buf(), buf.buf() + buf.len()};
+}
+
+TEST(BSONValidateColumn, BSONColumnNestedColumnLiteralRejected) {
+    // Manually construct a BSONColumn binary containing a binData/Column literal.
+    // The builder already rejects this; here we test that the validator also catches it in
+    // all validation modes when the binary is crafted directly.
+    auto binary = makeNestedColumnBinary();
+    ASSERT_EQ(validateBSONColumn(binary.data(), binary.size()).code(),
+              ErrorCodes::NonConformantBSON);
+}
+
+TEST(BSONValidateColumn, BSONColumnNestedInBSONDocRejectedAllModes) {
+    // Wrap a BSONColumn binary (that itself contains a nested Column literal) inside a regular
+    // BSON document. All validation modes should reject it via _validateSpecial, which wraps the
+    // inner NonConformantBSON as NonConformantBSON in the outer BSON document context.
+    auto innerBuf = makeNestedColumnBinary();
+
+    BSONObjBuilder outerBuilder;
+    outerBuilder.appendBinData("col"_sd, innerBuf.size(), BinDataType::Column, innerBuf.data());
+    BSONObj outerObj = outerBuilder.obj();
+
+    for (auto mode : {BSONValidateModeEnum::kDefault,
+                      BSONValidateModeEnum::kExtended,
+                      BSONValidateModeEnum::kFull}) {
+        auto status = validateBSON(outerObj, mode, mongo::V2_Column);
+        ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON)
+            << "Expected rejection in mode " << static_cast<int>(mode);
+    }
+}
+
+// Returns raw BSONColumn bytes: an interleaved start with the given reference object, then EOO.
+std::vector<char> makeInterleavedColumnWithRef(BSONObj ref) {
+    BufBuilder buf;
+    buf.appendChar(bsoncolumn::kInterleavedStartControlByteLegacy);
+    buf.appendBuf(ref.objdata(), ref.objsize());
+    buf.appendChar('\0');
+    return {buf.buf(), buf.buf() + buf.len()};
+}
+
+TEST(BSONValidateColumn, BSONColumnNestedColumnInInterleavedRefRejected) {
+    // An interleaved reference object with a top-level binData/Column field must be rejected.
+    const char innerCol[] = {'\0'};
+    BSONObjBuilder refBuilder;
+    refBuilder.appendBinData("a", sizeof(innerCol), BinDataType::Column, innerCol);
+    auto binary = makeInterleavedColumnWithRef(refBuilder.obj());
+    ASSERT_EQ(validateBSONColumn(binary.data(), binary.size()).code(),
+              ErrorCodes::NonConformantBSON);
+}
+
+TEST(BSONValidateColumn, BSONColumnNestedColumnInInterleavedRefNestedRejected) {
+    // A binData/Column field buried inside a sub-object of the reference must also be rejected.
+    const char innerCol[] = {'\0'};
+    BSONObjBuilder innerBuilder;
+    innerBuilder.appendBinData("a", sizeof(innerCol), BinDataType::Column, innerCol);
+    BSONObj ref = BSON("x" << innerBuilder.obj());
+    auto binary = makeInterleavedColumnWithRef(ref);
+    ASSERT_EQ(validateBSONColumn(binary.data(), binary.size()).code(),
+              ErrorCodes::NonConformantBSON);
+}
+
 TEST(BSONValidateColumn, BSONColumnNoOverflowBlocksShort) {
     BSONColumnBuilder cb;
     for (int i = 0; i < 100; ++i)
