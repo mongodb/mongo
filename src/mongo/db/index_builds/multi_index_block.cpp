@@ -201,7 +201,6 @@ using OnSpillFn = sorter::ContainerBasedSpiller<key_string::Value,
 
 std::shared_ptr<sorter::Spiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
 makeSpiller(OperationContext* opCtx,
-            const CollectionPtr& collection,
             const IndexCatalogEntry* entry,
             const boost::optional<IndexStateInfo>& stateInfo,
             SorterFileStats& fileStats,
@@ -210,7 +209,6 @@ makeSpiller(OperationContext* opCtx,
             ContainerWriteBehavior containerWriteBehavior,
             OnSpillFn onSpill = nullptr) {
     if (containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
-        invariant(!stateInfo);
         return std::make_shared<sorter::ContainerBasedSpiller<key_string::Value,
                                                               mongo::NullValue,
                                                               BtreeExternalSortComparison>>(
@@ -548,26 +546,29 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (auto status = index.real->initializeAsEmpty(); !status.isOK())
                 return status;
 
-            // TODO SERVER-117551 Make initiateBulk happen for primary-driven and non-primary-driven
-            // at the same call site.
-            if (_containerWriteBehavior == ContainerWriteBehavior::kDoNotReplicate) {
-                index.bulk =
-                    index.real->initiateBulk(opCtx,
-                                             collection.get(),
-                                             indexCatalogEntry,
-                                             makeSpiller(opCtx,
-                                                         collection.get(),
-                                                         indexCatalogEntry,
-                                                         stateInfo,
-                                                         index.real->getSorterFileStats(),
-                                                         index.real->getSorterContainerStats(),
-                                                         collection->ns().dbName(),
-                                                         _containerWriteBehavior),
-                                             eachIndexBuildMaxMemoryUsageBytes,
-                                             stateInfo,
-                                             collection->ns().dbName(),
-                                             _containerWriteBehavior);
+            OnSpillFn onSpill;
+            if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
+                onSpill = [this, opCtx] {
+                    if (_isResumable) {
+                        _writeStateToContainer(opCtx);
+                    }
+                };
             }
+            index.bulk = index.real->initiateBulk(opCtx,
+                                                  collection.get(),
+                                                  indexCatalogEntry,
+                                                  makeSpiller(opCtx,
+                                                              indexCatalogEntry,
+                                                              stateInfo,
+                                                              index.real->getSorterFileStats(),
+                                                              index.real->getSorterContainerStats(),
+                                                              collection->ns().dbName(),
+                                                              _containerWriteBehavior,
+                                                              std::move(onSpill)),
+                                                  eachIndexBuildMaxMemoryUsageBytes,
+                                                  stateInfo,
+                                                  collection->ns().dbName(),
+                                                  _containerWriteBehavior);
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
 
@@ -786,7 +787,6 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                 collection->getCollectionPtr(),
                 indexCatalogEntry,
                 makeSpiller(opCtx,
-                            collection->getCollectionPtr(),
                             indexCatalogEntry,
                             /*stateInfo=*/boost::none,
                             index.real->getSorterFileStats(),
@@ -816,35 +816,6 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         timer.reset();
 
         try {
-            // TODO SERVER-117551 Make initiateBulk happen for primary-driven and non-primary-driven
-            // at the same call site.
-            if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
-                for (auto& index : _indexes) {
-                    auto indexCatalogEntry =
-                        index.block->getEntry(opCtx, collection->getCollectionPtr());
-                    index.bulk = index.real->initiateBulk(
-                        opCtx,
-                        collection->getCollectionPtr(),
-                        indexCatalogEntry,
-                        makeSpiller(opCtx,
-                                    collection->getCollectionPtr(),
-                                    indexCatalogEntry,
-                                    /*stateInfo=*/boost::none,
-                                    index.real->getSorterFileStats(),
-                                    index.real->getSorterContainerStats(),
-                                    collection->nss().dbName(),
-                                    _containerWriteBehavior,
-                                    [this, opCtx] {
-                                        if (_isResumable) {
-                                            _writeStateToContainer(opCtx);
-                                        }
-                                    }),
-                        getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
-                        /*stateInfo=*/boost::none,
-                        collection->nss().dbName(),
-                        _containerWriteBehavior);
-                }
-            }
             // Resumable index builds can only be resumed prior to the oplog recovery phase of
             // startup. When restarting the collection scan, any saved index build progress is lost.
             _doCollectionScan(opCtx,
@@ -1281,9 +1252,8 @@ Status MultiIndexBlock::drainBackgroundWrites(
         CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, _collectionUUID.value()));
     coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, coll));
 
-    const bool hasBulkLoader = !_indexes.empty() && _indexes.front().bulk;
     if (firstDrain && _containerWriteBehavior == ContainerWriteBehavior::kReplicate &&
-        _isResumable && hasBulkLoader) {
+        _isResumable && _lastRecordIdInserted.has_value()) {
         _writeStateToContainer(opCtx);
     }
 
