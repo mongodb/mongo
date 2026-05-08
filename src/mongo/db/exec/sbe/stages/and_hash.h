@@ -140,6 +140,7 @@ private:
     // Key used to probe inside the hash table.
     value::MaterializedRow _probeKey;
 
+    bool _outerOpened{false};
     bool _innerOpened{false};
 
     boost::optional<TableType> _ht;

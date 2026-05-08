@@ -148,6 +148,7 @@ void HashJoinStage::open(bool reOpen) {
 
     _commonStats.opens++;
     innerChild()->open(reOpen);
+    _innerOpened = true;
 
     _joinImpl->reset();
 
@@ -173,6 +174,7 @@ void HashJoinStage::open(bool reOpen) {
     _joinImpl->finishBuild();
 
     innerChild()->close();
+    _innerOpened = false;
     outerChild()->open(reOpen);
     _outerOpened = true;
 
@@ -246,6 +248,10 @@ void HashJoinStage::close() {
     }
 
     trackClose();
+    if (_innerOpened) {
+        innerChild()->close();
+        _innerOpened = false;
+    }
     if (_outerOpened) {
         outerChild()->close();
         _outerOpened = false;

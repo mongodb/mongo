@@ -152,6 +152,7 @@ void AndHashStage::open(bool reOpen) {
     _commonStats.opens++;
     _memoryTracker.value().set(0);
     _children[0]->open(reOpen);
+    _outerOpened = true;
     // Insert the outer side into the hash table.
     while (_children[0]->getNext() == PlanState::ADVANCED) {
         value::MaterializedRow key{_inOuterKeyAccessors.size()};
@@ -178,6 +179,7 @@ void AndHashStage::open(bool reOpen) {
     }
 
     _children[0]->close();
+    _outerOpened = false;
 
     _children[1]->open(reOpen);
     _innerOpened = true;
@@ -227,6 +229,10 @@ void AndHashStage::close() {
     if (_innerOpened) {
         _children[1]->close();
         _innerOpened = false;
+    }
+    if (_outerOpened) {
+        _children[0]->close();
+        _outerOpened = false;
     }
     _ht = boost::none;
     _memoryTracker.value().set(0);
