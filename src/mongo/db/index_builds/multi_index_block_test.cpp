@@ -59,6 +59,8 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+#include <variant>
+
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
@@ -1436,44 +1438,58 @@ TEST_F(MultiIndexBlockTest, AbortWithNoCommitTimestampDropsImmediately) {
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 }
 
-// OpObserver that records integer-keyed onContainerInsert/onContainerUpdate calls so tests can
-// verify that _writeStateToContainer went through the container_write path (which
-// fires the observer).
+// OpObserver that records onContainerInsert/onContainerUpdate calls so tests can verify that
+// _writeStateToContainer went through the container_write path (which fires the observer).
 class ResumeStateContainerInsertObserver : public OpObserverNoop {
 public:
-    using OpObserverNoop::onContainerInsert;
-    using OpObserverNoop::onContainerUpdate;
-
     void onContainerInsert(OperationContext*,
                            StringData ident,
                            int64_t key,
                            std::span<const char> value) override {
-        intInserts.push_back({std::string{ident}, key, std::string{value.begin(), value.end()}});
+        inserts.push_back({std::string{ident}, key, std::string{value.begin(), value.end()}});
+    }
+
+    void onContainerInsert(OperationContext*,
+                           StringData ident,
+                           std::span<const char> key,
+                           std::span<const char> value) override {
+        inserts.push_back({std::string{ident},
+                           std::string{key.begin(), key.end()},
+                           std::string{value.begin(), value.end()}});
     }
 
     void onContainerUpdate(OperationContext*,
                            StringData ident,
                            int64_t key,
                            std::span<const char> value) override {
-        intUpdates.push_back({std::string{ident}, key, std::string{value.begin(), value.end()}});
+        updates.push_back({std::string{ident}, key, std::string{value.begin(), value.end()}});
+    }
+
+    void onContainerUpdate(OperationContext*,
+                           StringData ident,
+                           std::span<const char> key,
+                           std::span<const char> value) override {
+        updates.push_back({std::string{ident},
+                           std::string{key.begin(), key.end()},
+                           std::string{value.begin(), value.end()}});
     }
 
     struct Op {
         std::string ident;
-        int64_t key;
+        std::variant<int64_t, std::string> key;
         std::string value;
     };
-    std::vector<Op> intInserts;
-    std::vector<Op> intUpdates;
+    std::vector<Op> inserts;
+    std::vector<Op> updates;
 
     size_t countInsertsForIdent(StringData ident) const {
         return std::count_if(
-            intInserts.begin(), intInserts.end(), [&](const Op& op) { return op.ident == ident; });
+            inserts.begin(), inserts.end(), [&](const Op& op) { return op.ident == ident; });
     }
 
     size_t countUpdatesForIdent(StringData ident) const {
         return std::count_if(
-            intUpdates.begin(), intUpdates.end(), [&](const Op& op) { return op.ident == ident; });
+            updates.begin(), updates.end(), [&](const Op& op) { return op.ident == ident; });
     }
 };
 
@@ -1591,10 +1607,10 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateUsesContainerWrites) {
 
     // The observer's buffered BSONObj parses to the same buildUUID we read from the ident.
     auto resumeIt =
-        std::find_if(observer.intInserts.begin(), observer.intInserts.end(), [&](const auto& ins) {
+        std::find_if(observer.inserts.begin(), observer.inserts.end(), [&](const auto& ins) {
             return ins.ident == handle.indexBuildIdent;
         });
-    ASSERT_NOT_EQUALS(resumeIt, observer.intInserts.end());
+    ASSERT_NOT_EQUALS(resumeIt, observer.inserts.end());
     EXPECT_EQ(
         handle.buildUUID,
         ResumeIndexInfo::parse(BSONObj(resumeIt->value.data()), IDLParserContext("ResumeIndexInfo"))
@@ -1764,7 +1780,7 @@ TEST_F(MultiIndexBlockTest, HybridBuildDoesNotUseContainerWrites) {
     indexer->persistResumeState(operationContext(), coll.get());
 
     // Hybrid builds use the regular RecordStore path, so the OpObserver sees no container ops.
-    ASSERT_EQUALS(0U, observer.intInserts.size());
+    ASSERT_EQUALS(0U, observer.inserts.size());
 
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
@@ -2063,14 +2079,14 @@ TEST_F(MultiIndexBlockTest, LoadWritesResumeStatePeriodicallyForPrimaryDrivenBui
     // load phase (kBulkLoad), proving the writes really come from this code path and not from
     // init / collection-scan.
     std::vector<ResumeIndexInfo> persistedStates;
-    for (const auto& op : observer.intInserts) {
+    for (const auto& op : observer.inserts) {
         if (op.ident == indexBuildIdent) {
             BSONObj obj(op.value.data());
             persistedStates.push_back(
                 ResumeIndexInfo::parse(obj, IDLParserContext("ResumeIndexInfo")));
         }
     }
-    for (const auto& op : observer.intUpdates) {
+    for (const auto& op : observer.updates) {
         if (op.ident == indexBuildIdent) {
             BSONObj obj(op.value.data());
             persistedStates.push_back(
