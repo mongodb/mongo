@@ -95,7 +95,7 @@ TEST_P(SizeCountStoreTest, ReadWriteRoundTripNewEntry) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
     const UUID uuid = UUID::gen();
-    const SizeCountStore::Entry entry(Timestamp(10, 1), 42, 7);
+    const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
 
     test_helpers::insertSizeCountEntry(operationContext(), store, uuid, entry);
 
@@ -108,11 +108,12 @@ TEST_P(SizeCountStoreTest, WriteUpdateExistingEntry) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
     const UUID uuid = UUID::gen();
-    const SizeCountStore::Entry initialEntry(Timestamp(10, 1), 42, 7);
+    const SizeCountStore::Entry initialEntry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
     test_helpers::insertSizeCountEntry(operationContext(), store, uuid, initialEntry);
 
-    const SizeCountStore::Entry updatedEntry(
-        initialEntry.timestamp + 1, initialEntry.size - 2, initialEntry.count - 1);
+    const SizeCountStore::Entry updatedEntry{.timestamp = initialEntry.timestamp + 1,
+                                             .size = initialEntry.size - 2,
+                                             .count = initialEntry.count - 1};
     ASSERT_NE(initialEntry, updatedEntry);
 
     test_helpers::insertSizeCountEntry(operationContext(), store, uuid, updatedEntry);
@@ -126,8 +127,8 @@ TEST_P(SizeCountStoreTest, ReadWriteTwoEntries) {
     auto& store = *storePtr;
     const UUID uuid0 = UUID::gen();
     const UUID uuid1 = UUID::gen();
-    const SizeCountStore::Entry entry0(Timestamp(10, 1), 42, 7);
-    const SizeCountStore::Entry entry1(Timestamp(20, 2), 100, 3);
+    const SizeCountStore::Entry entry0{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
+    const SizeCountStore::Entry entry1{.timestamp = Timestamp(20, 2), .size = 100, .count = 3};
 
     test_helpers::insertSizeCountEntry(operationContext(), store, uuid0, entry0);
     test_helpers::insertSizeCountEntry(operationContext(), store, uuid1, entry1);
@@ -146,14 +147,14 @@ TEST_P(SizeCountStoreTest, WriteUpdateToOneOfTwoEntries) {
     auto& store = *storePtr;
     const UUID uuid0 = UUID::gen();
     const UUID uuid1 = UUID::gen();
-    const SizeCountStore::Entry entry0(Timestamp(10, 1), 42, 7);
-    const SizeCountStore::Entry entry1(Timestamp(20, 2), 100, 3);
+    const SizeCountStore::Entry entry0{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
+    const SizeCountStore::Entry entry1{.timestamp = Timestamp(20, 2), .size = 100, .count = 3};
 
     test_helpers::insertSizeCountEntry(operationContext(), store, uuid0, entry0);
     test_helpers::insertSizeCountEntry(operationContext(), store, uuid1, entry1);
 
-    const SizeCountStore::Entry updatedEntry0(
-        entry0.timestamp + 1, entry0.size + 10, entry0.count + 2);
+    const SizeCountStore::Entry updatedEntry0{
+        .timestamp = entry0.timestamp + 1, .size = entry0.size + 10, .count = entry0.count + 2};
     test_helpers::insertSizeCountEntry(operationContext(), store, uuid0, updatedEntry0);
 
     const auto result0 = store.read(operationContext(), uuid0);
@@ -169,7 +170,7 @@ TEST_P(SizeCountStoreTest, InsertAddsEntry) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
     const UUID uuid = UUID::gen();
-    const SizeCountStore::Entry entry(Timestamp(10, 1), 42, 7);
+    const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
 
     auto opCtx = operationContext();
     WriteUnitOfWork wuow{opCtx};
@@ -185,7 +186,7 @@ TEST_P(SizeCountStoreTest, DoubleInsertFails) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
     const UUID uuid = UUID::gen();
-    const SizeCountStore::Entry entry(Timestamp(10, 1), 42, 7);
+    const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
 
     auto opCtx = operationContext();
     {
@@ -208,7 +209,7 @@ TEST_P(SizeCountStoreTest, RemoveRemovesEntry) {
     auto storePtr = makeStore();
     auto& store = *storePtr;
     const UUID uuid = UUID::gen();
-    const SizeCountStore::Entry entry(Timestamp(10, 1), 42, 7);
+    const SizeCountStore::Entry entry{.timestamp = Timestamp(10, 1), .size = 42, .count = 7};
 
     auto opCtx = operationContext();
 

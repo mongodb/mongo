@@ -76,9 +76,9 @@ void persistCheckpoint(OperationContext* opCtx,
             case DDLState::kCreated: {
                 sizeCountStore.insert(opCtx,
                                       uuid,
-                                      SizeCountStore::Entry(checkpoint.validAsOf,
-                                                            entry.sizeCount.size,
-                                                            entry.sizeCount.count));
+                                      SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
+                                                            .size = entry.sizeCount.size,
+                                                            .count = entry.sizeCount.count});
                 break;
             }
             case DDLState::kDropped: {
@@ -89,9 +89,9 @@ void persistCheckpoint(OperationContext* opCtx,
             case DDLState::kNone: {
                 sizeCountStore.write(opCtx,
                                      uuid,
-                                     SizeCountStore::Entry(checkpoint.validAsOf,
-                                                           entry.sizeCount.size,
-                                                           entry.sizeCount.count));
+                                     SizeCountStore::Entry{.timestamp = checkpoint.validAsOf,
+                                                           .size = entry.sizeCount.size,
+                                                           .count = entry.sizeCount.count});
                 break;
             }
             default:

@@ -148,14 +148,16 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogData) {
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
 
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       collA.uuid,
-                                       SizeCountStore::Entry(Timestamp::min(), 5, 1));
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       collB.uuid,
-                                       SizeCountStore::Entry(Timestamp::min(), 6, 2));
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 5, .count = 1});
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collB.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 6, .count = 2});
 
     manager->initializeMetadata(operationContext());
 
@@ -179,14 +181,16 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogAfterTimestamp) 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
 
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       collA.uuid,
-                                       SizeCountStore::Entry(Timestamp::min(), 5, 1));
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       collB.uuid,
-                                       SizeCountStore::Entry(Timestamp::min(), 6, 2));
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 5, .count = 1});
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collB.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 6, .count = 2});
 
     test_helpers::insertSizeCountTimestamp(
         operationContext(), sizeCountTimestampStore, Timestamp(3, 3));
@@ -222,14 +226,16 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, StoreAndOplogData) {
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
 
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       collA.uuid,
-                                       SizeCountStore::Entry(Timestamp::min(), 5, 1));
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       collB.uuid,
-                                       SizeCountStore::Entry(Timestamp::min(), 6, 2));
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 5, .count = 1});
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collB.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 6, .count = 2});
 
     test_helpers::writeToOplog(
         operationContext(),
@@ -258,10 +264,11 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, SkipsDroppedCollections
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
 
     // Insert a size/count for a UUID that has no corresponding collection in the catalog.
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       UUID::gen(),
-                                       SizeCountStore::Entry(Timestamp::min(), 999, 99));
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        UUID::gen(),
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 999, .count = 99});
 
     // Initialization should skip the size/count entry without failing.
     manager->initializeMetadata(operationContext());
@@ -279,10 +286,11 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataTrack
     ASSERT(oplogColl);
     const UUID oplogUuid = oplogColl->uuid();
 
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       oplogUuid,
-                                       SizeCountStore::Entry(Timestamp::min(), 500, 50));
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        oplogUuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 500, .count = 50});
 
     const repl::OplogEntry entry1 = test_helpers::makeOplogEntry(
         Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10);
@@ -374,10 +382,11 @@ TEST_F(ReplicatedFastCountManagerCommitTest, CommitUpdatesRecordStoreSizeCount) 
 using ReplicatedFastCountManagerFindLatestTest = ReplicatedFastCountManagerTest;
 
 TEST_F(ReplicatedFastCountManagerFindLatestTest, FindLatestCombinesStoredValuesWithOplogDeltas) {
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       collA.uuid,
-                                       SizeCountStore::Entry(Timestamp::min(), 5, 1));
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 5, .count = 1});
     test_helpers::insertSizeCountTimestamp(
         operationContext(), sizeCountTimestampStore, Timestamp::min());
 
@@ -400,10 +409,11 @@ TEST_F(ReplicatedFastCountManagerFindLatestTest, FindLatestCombinesStoredValuesW
 }
 
 TEST_F(ReplicatedFastCountManagerFindLatestTest, FindLatestReturnsStoredValuesWhenNoOplogDeltas) {
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       collA.uuid,
-                                       SizeCountStore::Entry(Timestamp::min(), 42, 7));
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 42, .count = 7});
     test_helpers::insertSizeCountTimestamp(
         operationContext(), sizeCountTimestampStore, Timestamp::min());
 
@@ -413,14 +423,16 @@ TEST_F(ReplicatedFastCountManagerFindLatestTest, FindLatestReturnsStoredValuesWh
 }
 
 TEST_F(ReplicatedFastCountManagerFindLatestTest, FindLatestFiltersToRequestedUuid) {
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       collA.uuid,
-                                       SizeCountStore::Entry(Timestamp::min(), 5, 1));
-    test_helpers::insertSizeCountEntry(operationContext(),
-                                       sizeCountStore,
-                                       collB.uuid,
-                                       SizeCountStore::Entry(Timestamp::min(), 100, 10));
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 5, .count = 1});
+    test_helpers::insertSizeCountEntry(
+        operationContext(),
+        sizeCountStore,
+        collB.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 100, .count = 10});
     test_helpers::insertSizeCountTimestamp(
         operationContext(), sizeCountTimestampStore, Timestamp::min());
 

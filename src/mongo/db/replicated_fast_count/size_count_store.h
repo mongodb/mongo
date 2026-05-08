@@ -81,16 +81,6 @@ public:
         int64_t size{0};
         int64_t count{0};
         bool operator==(const Entry&) const = default;
-
-        Entry(Timestamp timestamp, int64_t size, int64_t count)
-            : timestamp(timestamp), size(size), count(count) {}
-
-        Entry(std::span<const char> value) {
-            BSONObj data(value.data());
-            timestamp = data.getField(kValidAsOfKey).timestamp();
-            size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
-            count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
-        }
     };
 
     SizeCountStore() = default;
@@ -100,6 +90,11 @@ public:
     SizeCountStore& operator=(SizeCountStore&&) = default;
     SizeCountStore(const SizeCountStore&) = delete;
     SizeCountStore& operator=(const SizeCountStore&) = delete;
+
+    /**
+     * Decodes a container value produced by a previous write into an Entry.
+     */
+    static Entry parseContainerValue(std::span<const char> value);
 
     /**
      * Returns the persisted size, count, and timestamp for the collection with `uuid`.

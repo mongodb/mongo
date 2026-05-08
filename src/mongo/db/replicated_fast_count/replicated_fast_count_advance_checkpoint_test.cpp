@@ -96,7 +96,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, InitialCheckpoint) {
 
     advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
 
-    const SizeCountStore::Entry expectedEntry(ts1, 10, 1);
+    const SizeCountStore::Entry expectedEntry{.timestamp = ts1, .size = 10, .count = 1};
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -126,7 +126,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, AdvancesExistingSizeCountAndTim
     // Setup collection size count tracking: `collA` with 3 documents and a total of 100 bytes.
     {
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore.write(opCtx, collA.uuid, SizeCountStore::Entry(Timestamp(1, 1), 100, 3));
+        sizeCountStore.write(
+            opCtx,
+            collA.uuid,
+            SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
         timestampStore.write(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
@@ -143,7 +146,8 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, AdvancesExistingSizeCountAndTim
 
     advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
 
-    const SizeCountStore::Entry expectedEntry(Timestamp(1, 3), 100 + 60, 3 + 2);
+    const SizeCountStore::Entry expectedEntry{
+        .timestamp = Timestamp(1, 3), .size = 100 + 60, .count = 3 + 2};
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -161,7 +165,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, NoReplicatedSizeCountInOplogFor
     // `collA` size and count starts out being tracked.
     {
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore.write(opCtx, collA.uuid, SizeCountStore::Entry(Timestamp(1, 1), 100, 3));
+        sizeCountStore.write(
+            opCtx,
+            collA.uuid,
+            SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
         timestampStore.write(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
@@ -173,7 +180,8 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, NoReplicatedSizeCountInOplogFor
 
     // Without replicated size count information tracked by the oplog entries, the SizeCountStore
     // entry for `collA` remains unchanged.
-    const SizeCountStore::Entry expectedEntry(Timestamp(1, 1), 100, 3);
+    const SizeCountStore::Entry expectedEntry{
+        .timestamp = Timestamp(1, 1), .size = 100, .count = 3};
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -193,7 +201,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TimestampUpdatedForSum0SizeCoun
     // Setup collection size count tracking: `collA` with 3 documents and a total of 100 bytes.
     {
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore.write(opCtx, collA.uuid, SizeCountStore::Entry(Timestamp(1, 1), 100, 3));
+        sizeCountStore.write(
+            opCtx,
+            collA.uuid,
+            SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
         timestampStore.write(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
@@ -211,7 +222,8 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TimestampUpdatedForSum0SizeCoun
     advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
 
     // Net 0 change from the original size and count for `collA`.
-    const SizeCountStore::Entry expectedEntry(Timestamp(1, 3), 100, 3);
+    const SizeCountStore::Entry expectedEntry{
+        .timestamp = Timestamp(1, 3), .size = 100, .count = 3};
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -238,12 +250,14 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TrackTwoUserCollections) {
     const Timestamp largestValidAsOf = Timestamp(1, 3);
     advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
 
-    const SizeCountStore::Entry expectedSizeCountCollA(largestValidAsOf, 50, 1);
+    const SizeCountStore::Entry expectedSizeCountCollA{
+        .timestamp = largestValidAsOf, .size = 50, .count = 1};
     const auto entryCollA = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entryCollA.has_value());
     EXPECT_EQ(expectedSizeCountCollA, *entryCollA);
 
-    const SizeCountStore::Entry expectedSizeCountCollB(largestValidAsOf, 40, 1);
+    const SizeCountStore::Entry expectedSizeCountCollB{
+        .timestamp = largestValidAsOf, .size = 40, .count = 1};
     const auto entryCollB = sizeCountStore.read(opCtx, collB.uuid);
     ASSERT_TRUE(entryCollB.has_value());
     EXPECT_EQ(expectedSizeCountCollB, *entryCollB);
@@ -258,7 +272,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
     // Setup collection size count tracking: `collA` with 3 documents and a total of 100 bytes.
     {
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore.write(opCtx, collA.uuid, SizeCountStore::Entry(Timestamp(1, 1), 100, 3));
+        sizeCountStore.write(
+            opCtx,
+            collA.uuid,
+            SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 3});
         timestampStore.write(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
@@ -273,13 +290,15 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 
     // The `collA` entry should be unchanged - since there were no updates to its size count in the
     // last checkpoint.
-    const SizeCountStore::Entry expectedCollAEntry(Timestamp(1, 1), 100, 3);
+    const SizeCountStore::Entry expectedCollAEntry{
+        .timestamp = Timestamp(1, 1), .size = 100, .count = 3};
     const auto collAEntry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(collAEntry.has_value());
     EXPECT_EQ(expectedCollAEntry, *collAEntry);
 
     // The checkpoint created a size count store entry for `collB`.
-    const SizeCountStore::Entry expectedCollBEntry(Timestamp(1, 3), 10, 1);
+    const SizeCountStore::Entry expectedCollBEntry{
+        .timestamp = Timestamp(1, 3), .size = 10, .count = 1};
     const auto collBEntry = sizeCountStore.read(opCtx, collB.uuid);
     ASSERT_TRUE(collBEntry.has_value());
     EXPECT_EQ(expectedCollBEntry, *collBEntry);
@@ -421,7 +440,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CreateAndInsertSameCheckpoint) 
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest, DropCollectionRemovesEntry) {
     {
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore.write(opCtx, collA.uuid, SizeCountStore::Entry(Timestamp(1, 1), 100, 5));
+        sizeCountStore.write(
+            opCtx,
+            collA.uuid,
+            SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 5});
         timestampStore.write(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
@@ -457,7 +479,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 
     // Initialize the size count store with a stale value.
     test_helpers::insertSizeCountEntry(
-        opCtx, sizeCountStore, collA.uuid, SizeCountStore::Entry(Timestamp(1, 1), 100, 50));
+        opCtx,
+        sizeCountStore,
+        collA.uuid,
+        SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 50});
 
     // Within the same checkpoint window, drop the collection, create the collection with
     // fromMigrate: true, then insert.
@@ -552,7 +577,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeAppliesNegativeDel
     // Setup collection size count tracking: `collA` with 5 documents and 200 bytes.
     {
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore.write(opCtx, collA.uuid, SizeCountStore::Entry(Timestamp(1, 1), 200, 5));
+        sizeCountStore.write(
+            opCtx,
+            collA.uuid,
+            SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 200, .count = 5});
         timestampStore.write(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
@@ -565,7 +593,8 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeAppliesNegativeDel
 
     advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
 
-    const SizeCountStore::Entry expectedEntry(Timestamp(1, 2), 200 - 120, 5 - 3);
+    const SizeCountStore::Entry expectedEntry{
+        .timestamp = Timestamp(1, 2), .size = 200 - 120, .count = 5 - 3};
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -592,7 +621,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, InsertThenTruncateRangeAccumula
     advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
 
     // Net: size = 50+50-30 = 70, count = 1+1-1 = 1.
-    const SizeCountStore::Entry expectedEntry(Timestamp(1, 3), 70, 1);
+    const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 3), .size = 70, .count = 1};
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -602,7 +631,10 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, InsertThenTruncateRangeAccumula
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeOnlyAffectsTargetCollection) {
     {
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore.write(opCtx, collA.uuid, SizeCountStore::Entry(Timestamp(1, 1), 100, 4));
+        sizeCountStore.write(
+            opCtx,
+            collA.uuid,
+            SizeCountStore::Entry{.timestamp = Timestamp(1, 1), .size = 100, .count = 4});
         timestampStore.write(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
@@ -614,13 +646,15 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeOnlyAffectsTargetC
     advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
 
     // collA's entry is unchanged.
-    const SizeCountStore::Entry expectedCollAEntry(Timestamp(1, 1), 100, 4);
+    const SizeCountStore::Entry expectedCollAEntry{
+        .timestamp = Timestamp(1, 1), .size = 100, .count = 4};
     const auto collAEntry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(collAEntry.has_value());
     EXPECT_EQ(expectedCollAEntry, *collAEntry);
 
     // collB gets a new entry from the truncateRange.
-    const SizeCountStore::Entry expectedCollBEntry(Timestamp(1, 2), -80, -2);
+    const SizeCountStore::Entry expectedCollBEntry{
+        .timestamp = Timestamp(1, 2), .size = -80, .count = -2};
     const auto collBEntry = sizeCountStore.read(opCtx, collB.uuid);
     ASSERT_TRUE(collBEntry.has_value());
     EXPECT_EQ(expectedCollBEntry, *collBEntry);
@@ -660,7 +694,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, MixedOpsWithTruncateRangeAccumu
     advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
 
     // Net: size = 40+60+50-10-40-60 = 40, count = 1+1+1+0-1-2 = 0
-    const SizeCountStore::Entry expectedEntry(Timestamp(1, 6), 40, 0);
+    const SizeCountStore::Entry expectedEntry{.timestamp = Timestamp(1, 6), .size = 40, .count = 0};
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -692,7 +726,8 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeInsideApplyOps) {
 
     advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
 
-    const SizeCountStore::Entry expectedEntry(ts1, -bytesDeleted, -docsDeleted);
+    const SizeCountStore::Entry expectedEntry{
+        .timestamp = ts1, .size = -bytesDeleted, .count = -docsDeleted};
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -728,7 +763,8 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeInsideNestedApplyO
 
     advanceCheckpoint(opCtx, sizeCountStore, timestampStore);
 
-    const SizeCountStore::Entry expectedEntry(ts1, -bytesDeleted, -docsDeleted);
+    const SizeCountStore::Entry expectedEntry{
+        .timestamp = ts1, .size = -bytesDeleted, .count = -docsDeleted};
     const auto entry = sizeCountStore.read(opCtx, collA.uuid);
     ASSERT_TRUE(entry.has_value());
     EXPECT_EQ(expectedEntry, *entry);
@@ -846,10 +882,11 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogTruncationUpdatesOplogFast
 
     {
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore.write(
-            opCtx,
-            oplogUuid,
-            SizeCountStore::Entry{Timestamp(1, 1), oplogStartingSize, oplogStartingCount});
+        sizeCountStore.write(opCtx,
+                             oplogUuid,
+                             SizeCountStore::Entry{.timestamp = Timestamp(1, 1),
+                                                   .size = oplogStartingSize,
+                                                   .count = oplogStartingCount});
         timestampStore.write(opCtx, Timestamp(1, 1));
         wuow.commit();
     }
@@ -882,10 +919,11 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 
     {
         WriteUnitOfWork wuow(opCtx);
-        sizeCountStore.write(
-            opCtx,
-            oplogUuid,
-            SizeCountStore::Entry{Timestamp(1, 1), oplogStartingSize, oplogStartingCount});
+        sizeCountStore.write(opCtx,
+                             oplogUuid,
+                             SizeCountStore::Entry{.timestamp = Timestamp(1, 1),
+                                                   .size = oplogStartingSize,
+                                                   .count = oplogStartingCount});
         timestampStore.write(opCtx, Timestamp(1, 1));
         wuow.commit();
     }

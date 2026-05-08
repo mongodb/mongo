@@ -41,7 +41,7 @@ CollectionSizeCount readLatest(OperationContext* opCtx,
                                boost::optional<UUID> oplogUuid) {
     const auto entry =
         sizeCountStore.read(opCtx, uuid)
-            .value_or(SizeCountStore::Entry(Timestamp::min(), /*size=*/0, /*count=*/0));
+            .value_or(SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 0, .count = 0});
     // We default to Timestamp::min() when the timestamp store does not yet contain a timestamp.
     const Timestamp timestamp = timestampStore.read(opCtx).value_or(Timestamp::min());
 

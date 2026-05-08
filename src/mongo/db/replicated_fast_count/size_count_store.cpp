@@ -87,6 +87,13 @@ boost::optional<CollectionOrViewAcquisition> acquireFastCountCollectionForWrite(
     return boost::none;
 }
 
+SizeCountStore::Entry SizeCountStore::parseContainerValue(std::span<const char> value) {
+    BSONObj data(value.data());
+    return Entry{.timestamp = data.getField(kValidAsOfKey).timestamp(),
+                 .size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long(),
+                 .count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long()};
+}
+
 boost::optional<SizeCountStore::Entry> CollectionSizeCountStore::read(OperationContext* opCtx,
                                                                       UUID uuid) const {
     const auto acquisition = acquireFastCountCollectionForRead(opCtx);
@@ -107,9 +114,10 @@ boost::optional<SizeCountStore::Entry> CollectionSizeCountStore::read(OperationC
     }
 
     const BSONObj& data = document.value();
-    return SizeCountStore::Entry(data.getField(kValidAsOfKey).timestamp(),
-                                 data.getField(kMetadataKey).Obj().getField(kSizeKey).Long(),
-                                 data.getField(kMetadataKey).Obj().getField(kCountKey).Long());
+    return SizeCountStore::Entry{
+        .timestamp = data.getField(kValidAsOfKey).timestamp(),
+        .size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long(),
+        .count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long()};
 }
 
 void CollectionSizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entry) {
@@ -204,7 +212,7 @@ boost::optional<SizeCountStore::Entry> ContainerSizeCountStore::read(OperationCo
     if (!result) {
         return boost::none;
     }
-    return SizeCountStore::Entry(*result);
+    return SizeCountStore::parseContainerValue(*result);
 }
 
 void ContainerSizeCountStore::write(OperationContext* opCtx, UUID uuid, const Entry& entry) {
