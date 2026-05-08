@@ -72,7 +72,6 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
@@ -1328,13 +1327,14 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
     }
 
     if (fn->filter) {
-        SbExpr filterExpr = generateFilter(
-            _state,
-            fn->filter.get(),
-            resultSlot,
-            outputs,
-            /*isFilterOverIxscan*/ false,
-            /*canUsePathArrayness*/ feature_flags::gFeatureFlagPathArrayness.isEnabled());
+        SbExpr filterExpr =
+            generateFilter(_state,
+                           fn->filter.get(),
+                           resultSlot,
+                           outputs,
+                           /*isFilterOverIxscan*/ false,
+                           /*canUsePathArrayness*/
+                           _state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness());
         if (!filterExpr.isNull()) {
             stage = b.makeFilter(std::move(stage), std::move(filterExpr));
         }

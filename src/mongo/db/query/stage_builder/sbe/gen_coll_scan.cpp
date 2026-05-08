@@ -38,7 +38,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
@@ -196,7 +195,7 @@ std::pair<SbStage, PlanStageSlots> generateClusteredCollScan(
         resultSlot,
         outputs,
         /*isFilterOverIxscan*/ false,
-        /*canUsePathArrayness*/ feature_flags::gFeatureFlagPathArrayness.isEnabled());
+        /*canUsePathArrayness*/ state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness());
     if (!filterExpr.isNull()) {
         stage = b.makeFilter(std::move(stage), std::move(filterExpr));
     }
@@ -259,13 +258,14 @@ std::pair<SbStage, PlanStageSlots> generateGenericCollScan(StageBuilderState& st
                 "Unexpected stopApplyingFilterAfterFirstMatch flag in non-oplog scan",
                 !csn->stopApplyingFilterAfterFirstMatch);
 
-        auto filterExpr = generateFilter(
-            state,
-            csn->filter.get(),
-            resultSlot,
-            outputs,
-            /*isFilterOverIxscan*/ false,
-            /*canUsePathArrayness*/ feature_flags::gFeatureFlagPathArrayness.isEnabled());
+        auto filterExpr =
+            generateFilter(state,
+                           csn->filter.get(),
+                           resultSlot,
+                           outputs,
+                           /*isFilterOverIxscan*/ false,
+                           /*canUsePathArrayness*/
+                           state.expCtx->getQueryKnobConfiguration().getEnablePathArrayness());
         if (!filterExpr.isNull()) {
             stage = b.makeFilter(std::move(stage), std::move(filterExpr));
         }
