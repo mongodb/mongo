@@ -183,7 +183,7 @@ SessionCatalog::SessionToKill SessionCatalog::checkOutSessionForKill(OperationCo
 }
 
 void SessionCatalog::scanSession(const LogicalSessionId& lsid,
-                                 const ScanSessionsCallbackFn& workerFn,
+                                 const ScanSessionsCallbackFn& perSessionScanFn,
                                  ScanSessionCreateSession createSession) {
     std::lock_guard lg(_mutex);
 
@@ -196,13 +196,18 @@ void SessionCatalog::scanSession(const LogicalSessionId& lsid,
         invariant(session);
 
         ObservableSession osession(lg, sri, session);
-        workerFn(osession);
+        perSessionScanFn(osession);
         invariant(!osession._markedForReap, "Cannot reap a session via 'scanSession'");
     }
 }
 
-void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
-                                  const ScanSessionsCallbackFn& workerFn) {
+std::vector<SessionCatalog::KillToken> SessionCatalog::killSessions(
+    const SessionKiller::Matcher& matcher,
+    ErrorCodes::Error reason,
+    const KillSessionsPredicateFn& shouldKill,
+    const ScanSessionsReadOnlyCallbackFn& perSessionScanFn) {
+    std::vector<KillToken> killTokens;
+
     std::lock_guard lg(_mutex);
 
     LOGV2_DEBUG(21976, 2, "Scanning sessions", "sessionCount"_attr = _sessions.size());
@@ -210,29 +215,62 @@ void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
     for (auto& [parentLsid, sri] : _sessions) {
         if (matcher.match(parentLsid)) {
             ObservableSession osession(lg, sri.get(), &sri->parentSession);
+            if (perSessionScanFn) {
+                perSessionScanFn(osession);
+            }
+            if (!shouldKill || shouldKill(osession)) {
+                killTokens.emplace_back(osession.kill(reason));
+            }
+        }
+
+        for (auto& [childLsid, session] : sri->childSessions) {
+            if (matcher.match(childLsid)) {
+                ObservableSession osession(lg, sri.get(), &session);
+                if (perSessionScanFn) {
+                    perSessionScanFn(osession);
+                }
+                if (!shouldKill || shouldKill(osession)) {
+                    killTokens.emplace_back(osession.kill(reason));
+                }
+            }
+        }
+    }
+
+    return killTokens;
+}
+
+LogicalSessionIdSet SessionCatalog::findExpiredParentSessions(Date_t threshold) const {
+    LogicalSessionIdSet result;
+
+    std::lock_guard lg(_mutex);
+
+    for (const auto& [parentLsid, sri] : _sessions) {
+        if (sri->lastCheckout < threshold) {
+            result.insert(parentLsid);
+        }
+    }
+
+    return result;
+}
+
+void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
+                                  const ScanSessionsReadOnlyCallbackFn& workerFn) {
+    std::lock_guard lg(_mutex);
+
+    LOGV2_DEBUG(6685000, 2, "Scanning sessions", "sessionCount"_attr = _sessions.size());
+
+    for (auto& [parentLsid, sri] : _sessions) {
+        if (matcher.match(parentLsid)) {
+            ObservableSession osession(lg, sri.get(), &sri->parentSession);
             workerFn(osession);
-            invariant(!osession._markedForReap, "Cannot reap a session via 'scanSessions'");
         }
 
         for (auto& [childLsid, session] : sri->childSessions) {
             if (matcher.match(childLsid)) {
                 ObservableSession osession(lg, sri.get(), &session);
                 workerFn(osession);
-                invariant(!osession._markedForReap, "Cannot reap a session via 'scanSessions'");
             }
         }
-    }
-}
-
-void SessionCatalog::scanParentSessions(const ScanSessionsCallbackFn& workerFn) {
-    std::lock_guard lg(_mutex);
-
-    LOGV2_DEBUG(6685000, 2, "Scanning sessions", "sessionCount"_attr = _sessions.size());
-
-    for (auto& [parentLsid, sri] : _sessions) {
-        ObservableSession osession(lg, sri.get(), &sri->parentSession);
-        workerFn(osession);
-        invariant(!osession._markedForReap, "Cannot reap a session via 'scanSessions'");
     }
 }
 

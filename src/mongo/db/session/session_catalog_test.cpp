@@ -734,21 +734,6 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenChildSessionIs
     runTest(true /* hangAfterIncrementingNumWaitingToCheckOut */);
 }
 
-DEATH_TEST_F(SessionCatalogTestWithDefaultOpCtxDeathTest,
-             ScanSessionsDoesNotSupportReaping,
-             "Cannot reap a session via 'scanSessions'") {
-    {
-        auto lsid = makeLogicalSessionIdForTest();
-        _opCtx->setLogicalSessionId(lsid);
-        OperationContextSession ocs(_opCtx);
-    }
-
-    SessionKiller::Matcher matcherAllSessions(
-        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx)});
-    catalog()->scanSessions(matcherAllSessions, [](ObservableSession& session) {
-        session.markForReap(ObservableSession::ReapMode::kNonExclusive);
-    });
-}
 
 TEST_F(SessionCatalogTest, KillSessionWhenSessionIsNotCheckedOut) {
     auto runTest = [&](const LogicalSessionId& lsid) {
@@ -1518,13 +1503,12 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
 
     // Kill the first and the third sessions
     {
-        std::vector<SessionCatalog::KillToken> firstAndThirdTokens;
-        catalog()->scanSessions(
+        auto firstAndThirdTokens = catalog()->killSessions(
             SessionKiller::Matcher(
                 KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx)}),
-            [&lsids, &firstAndThirdTokens](const ObservableSession& session) {
-                if (session.getSessionId() == lsids[0] || session.getSessionId() == lsids[2])
-                    firstAndThirdTokens.emplace_back(session.kill(ErrorCodes::ExceededTimeLimit));
+            ErrorCodes::ExceededTimeLimit,
+            [&lsids](const ObservableSession& session) {
+                return session.getSessionId() == lsids[0] || session.getSessionId() == lsids[2];
             });
         ASSERT_EQ(2U, firstAndThirdTokens.size());
         for (auto& killToken : firstAndThirdTokens) {
@@ -1537,14 +1521,13 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
 
     // Kill the second session
     {
-        std::vector<SessionCatalog::KillToken> secondToken;
-        catalog()->scanSessions(
-            SessionKiller::Matcher(
-                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx)}),
-            [&lsids, &secondToken](const ObservableSession& session) {
-                if (session.getSessionId() == lsids[1])
-                    secondToken.emplace_back(session.kill(ErrorCodes::ExceededTimeLimit));
-            });
+        auto secondToken =
+            catalog()->killSessions(SessionKiller::Matcher(KillAllSessionsByPatternSet{
+                                        makeKillAllSessionsByPattern(_opCtx)}),
+                                    ErrorCodes::ExceededTimeLimit,
+                                    [&lsids](const ObservableSession& session) {
+                                        return session.getSessionId() == lsids[1];
+                                    });
         ASSERT_EQ(1U, secondToken.size());
         for (auto& killToken : secondToken) {
             auto unusedSheckedOutSessionForKill(
@@ -1659,6 +1642,164 @@ TEST_F(SessionCatalogTest, CheckOutForKillTimeout) {
     runTest(makeLogicalSessionIdForTest());
     runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     runTest(makeLogicalSessionIdWithTxnUUIDForTest());
+}
+
+TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsKillsAllMatchingSessions) {
+    // Create 3 parent sessions.
+    auto lsid0 = makeLogicalSessionIdForTest();
+    auto lsid1 = makeLogicalSessionIdForTest();
+    auto lsid2 = makeLogicalSessionIdForTest();
+    for (const auto& lsid : {lsid0, lsid1, lsid2}) {
+        createSession(lsid);
+    }
+
+    // Kill all sessions with no predicate.
+    SessionKiller::Matcher matcher(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx)});
+    auto killTokens = catalog()->killSessions(matcher);
+    ASSERT_EQ(3U, killTokens.size());
+
+    for (auto& killToken : killTokens) {
+        auto sessionForKill = catalog()->checkOutSessionForKill(_opCtx, std::move(killToken));
+    }
+}
+
+TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsWithPredicate) {
+    auto lsid0 = makeLogicalSessionIdForTest();
+    auto lsid1 = makeLogicalSessionIdForTest();
+    auto lsid2 = makeLogicalSessionIdForTest();
+    for (const auto& lsid : {lsid0, lsid1, lsid2}) {
+        createSession(lsid);
+    }
+
+    // Kill only lsid1.
+    SessionKiller::Matcher matcher(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx)});
+    auto killTokens = catalog()->killSessions(
+        matcher, ErrorCodes::Interrupted, [&](const ObservableSession& session) {
+            return session.getSessionId() == lsid1;
+        });
+    ASSERT_EQ(1U, killTokens.size());
+    ASSERT_EQ(lsid1, killTokens[0].lsidToKill);
+
+    auto sessionForKill = catalog()->checkOutSessionForKill(_opCtx, std::move(killTokens[0]));
+}
+
+TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsWithScanFn) {
+    auto lsid0 = makeLogicalSessionIdForTest();
+    auto lsid1 = makeLogicalSessionIdForTest();
+    for (const auto& lsid : {lsid0, lsid1}) {
+        createSession(lsid);
+    }
+
+    // Kill all sessions and collect their IDs via the scan function.
+    std::vector<LogicalSessionId> scannedLsids;
+    SessionKiller::Matcher matcher(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx)});
+    auto killTokens = catalog()->killSessions(
+        matcher, ErrorCodes::Interrupted, nullptr, [&](const ObservableSession& session) {
+            scannedLsids.push_back(session.getSessionId());
+        });
+
+    ASSERT_EQ(2U, killTokens.size());
+    ASSERT_EQ(2U, scannedLsids.size());
+
+    for (auto& killToken : killTokens) {
+        auto sessionForKill = catalog()->checkOutSessionForKill(_opCtx, std::move(killToken));
+    }
+}
+
+TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsKillsChildSessions) {
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid);
+    for (const auto& lsid : {parentLsid, childLsid}) {
+        createSession(lsid);
+    }
+
+    // Kill only sessions matching the parent pattern — should match both parent and child.
+    SessionKiller::Matcher matcher(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx, parentLsid)});
+    auto killTokens = catalog()->killSessions(matcher);
+    ASSERT_EQ(2U, killTokens.size());
+
+    for (auto& killToken : killTokens) {
+        auto sessionForKill = catalog()->checkOutSessionForKill(_opCtx, std::move(killToken));
+    }
+}
+
+TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsWithPredicateAndScanFn) {
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid);
+    for (const auto& lsid : {parentLsid, childLsid}) {
+        createSession(lsid);
+    }
+
+    // Kill only the parent, but scan both.
+    std::vector<LogicalSessionId> scannedLsids;
+    SessionKiller::Matcher matcher(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx, parentLsid)});
+    auto killTokens = catalog()->killSessions(
+        matcher,
+        ErrorCodes::Interrupted,
+        [&](const ObservableSession& session) { return session.getSessionId() == parentLsid; },
+        [&](const ObservableSession& session) { scannedLsids.push_back(session.getSessionId()); });
+
+    // Both sessions scanned, but only the parent killed.
+    ASSERT_EQ(2U, scannedLsids.size());
+    ASSERT_EQ(1U, killTokens.size());
+    ASSERT_EQ(parentLsid, killTokens[0].lsidToKill);
+
+    auto sessionForKill = catalog()->checkOutSessionForKill(_opCtx, std::move(killTokens[0]));
+}
+
+TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsReturnsEmptyWhenNoMatch) {
+    createSession(makeLogicalSessionIdForTest());
+
+    // Use a matcher that matches a specific session that doesn't exist.
+    auto nonExistentLsid = makeLogicalSessionIdForTest();
+    SessionKiller::Matcher matcher(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(_opCtx, nonExistentLsid)});
+    auto killTokens = catalog()->killSessions(matcher);
+    ASSERT_EQ(0U, killTokens.size());
+}
+
+TEST_F(SessionCatalogTest, FindExpiredParentSessionsReturnsExpiredSessions) {
+    auto lsid0 = makeLogicalSessionIdForTest();
+    auto lsid1 = makeLogicalSessionIdForTest();
+    auto lsid2 = makeLogicalSessionIdForTest();
+
+    // Create sessions — they all get lastCheckout = Date_t::now() on creation.
+    for (const auto& lsid : {lsid0, lsid1, lsid2}) {
+        createSession(lsid);
+    }
+
+    // All sessions were just checked out, so a future threshold should find all of them.
+    auto expired = catalog()->findExpiredParentSessions(Date_t::max());
+    ASSERT_EQ(3U, expired.size());
+    ASSERT(expired.count(lsid0));
+    ASSERT(expired.count(lsid1));
+    ASSERT(expired.count(lsid2));
+}
+
+TEST_F(SessionCatalogTest, FindExpiredParentSessionsReturnsEmptyForFutureCheckouts) {
+    createSession(makeLogicalSessionIdForTest());
+
+    // A threshold in the past should find nothing since all sessions were recently checked out.
+    auto expired = catalog()->findExpiredParentSessions(Date_t{});
+    ASSERT_EQ(0U, expired.size());
+}
+
+TEST_F(SessionCatalogTest, FindExpiredParentSessionsSkipsChildSessions) {
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid);
+    createSession(parentLsid);
+    createSession(childLsid);
+
+    // findExpiredParentSessions only returns parent session IDs.
+    auto expired = catalog()->findExpiredParentSessions(Date_t::max());
+    ASSERT_EQ(1U, expired.size());
+    ASSERT(expired.count(parentLsid));
+    ASSERT(!expired.count(childLsid));
 }
 
 // TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.

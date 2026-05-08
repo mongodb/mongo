@@ -186,17 +186,19 @@ MongoDSessionCatalogTransactionInterfaceImpl::makeChildSessionWorkerFnForReap(
     };
 }
 
-MongoDSessionCatalogTransactionInterface::ScanSessionsCallbackFn
-MongoDSessionCatalogTransactionInterfaceImpl::makeSessionWorkerFnForStepUp(
-    std::vector<SessionCatalog::KillToken>* sessionKillTokens,
-    std::vector<OperationSessionInfo>* sessionsToReacquireLocks) {
-    return [sessionKillTokens, sessionsToReacquireLocks](ObservableSession& session) {
+MongoDSessionCatalogTransactionInterface::KillSessionsPredicateFn
+MongoDSessionCatalogTransactionInterfaceImpl::makeKillPredicateForStepUp() {
+    return [](const ObservableSession& session) {
         const auto txnParticipant = TransactionParticipant::get(session);
-        if (!txnParticipant.transactionIsOpen()) {
-            sessionKillTokens->emplace_back(
-                session.kill(ErrorCodes::InterruptedDueToReplStateChange));
-        }
+        return !txnParticipant.transactionIsOpen();
+    };
+}
 
+MongoDSessionCatalogTransactionInterface::ScanSessionsReadOnlyCallbackFn
+MongoDSessionCatalogTransactionInterfaceImpl::makeScanFnForStepUp(
+    std::vector<OperationSessionInfo>* sessionsToReacquireLocks) {
+    return [sessionsToReacquireLocks](const ObservableSession& session) {
+        const auto txnParticipant = TransactionParticipant::get(session);
         if (txnParticipant.transactionIsPrepared()) {
             const auto txnNumberAndRetryCounter =
                 txnParticipant.getActiveTxnNumberAndRetryCounter();

@@ -287,15 +287,6 @@ Status waitForSigningKeys(OperationContext* opCtx) {
  * 4. Send abortTransaction.
  */
 void implicitlyAbortAllTransactions(OperationContext* opCtx) {
-    struct AbortTransactionDetails {
-    public:
-        AbortTransactionDetails(LogicalSessionId _lsid, SessionCatalog::KillToken _killToken)
-            : lsid(std::move(_lsid)), killToken(std::move(_killToken)) {}
-
-        LogicalSessionId lsid;
-        SessionCatalog::KillToken killToken;
-    };
-
     const auto catalog = SessionCatalog::get(opCtx);
 
     catalog->setDisallowNewTransactions();
@@ -305,11 +296,7 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
 
     const auto abortDeadline = opCtx->fastClockSource().now() + Seconds(15);
 
-    std::vector<AbortTransactionDetails> toKill;
-    catalog->scanSessions(matcherAllSessions, [&](const ObservableSession& session) {
-        toKill.emplace_back(session.getSessionId(),
-                            session.kill(ErrorCodes::InterruptedAtShutdown));
-    });
+    auto killTokens = catalog->killSessions(matcherAllSessions, ErrorCodes::InterruptedAtShutdown);
 
     // TODO(SERVER-111754): Please revisit if this thread could be made killable.
     auto newClient = opCtx->getServiceContext()->getService()->makeClient(
@@ -321,13 +308,13 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
     Status shutDownStatus(ErrorCodes::InterruptedAtShutdown,
                           "aborting transactions due to shutdown");
 
-    for (auto& killDetails : toKill) {
+    for (auto& killToken : killTokens) {
         auto uniqueNewOpCtx = cc().makeOperationContext();
         auto newOpCtx = uniqueNewOpCtx.get();
 
         newOpCtx->setDeadlineByDate(abortDeadline, ErrorCodes::ExceededTimeLimit);
 
-        OperationContextSession sessionCtx(newOpCtx, std::move(killDetails.killToken));
+        OperationContextSession sessionCtx(newOpCtx, std::move(killToken));
 
         auto session = OperationContextSession::get(newOpCtx);
         {
