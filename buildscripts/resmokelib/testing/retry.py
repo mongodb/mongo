@@ -43,6 +43,11 @@ retryable_code_names = [
 
 
 def is_retryable_error(exc, retryable_error_codes):
+    # Guard against non-PyMongoError exceptions: has_error_label() only exists on
+    # PyMongoError, so calling it on e.g. AssertionError or ServerFailure would raise
+    # AttributeError. Return False immediately for anything that isn't a pymongo error.
+    if not isinstance(exc, PyMongoError):
+        return False
     if isinstance(exc, ConnectionFailure):
         return True
     if exc.has_error_label("RetryableWriteError"):
