@@ -110,7 +110,6 @@ public:
         }
     }
 
-
     static boost::intrusive_ptr<ExpressionContext> makeContext(const CollatorInterface* collator,
                                                                OperationContext* opCtx) {
         return make_intrusive<ExpressionContextForTest>(
@@ -451,5 +450,79 @@ TEST_F(MatchExpressionHasherTest, Text) {
     assertEquivalent(text1, text2);
     assertNotEquivalent(text1, text3);
     assertNotEquivalent(text1, text4);
+}
+
+TEST_F(MatchExpressionHasherTest, InternalSchemaAllElemMatchFromIndex) {
+    constexpr StringData json =
+        "{'a.b': {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}";
+    constexpr StringData jsonWithDifferentChild =
+        "{'a.b': {$_internalSchemaAllElemMatchFromIndex: [2, {b: {$eq: 5}}]}}";
+
+    assertNotEquivalent(fromjson(json), fromjson(jsonWithDifferentChild));
+    assertEquivalent(fromjson(json), fromjson(json));
+}
+
+TEST_F(MatchExpressionHasherTest, InternalSchemaAllowedPropertiesMatchExpression) {
+    constexpr StringData json = R"(
+        {
+            "$_internalSchemaAllowedProperties": {
+                "properties": ["a"],
+                "namePlaceholder": "i",
+                "patternProperties": [
+                { "regex": /a/, "expression": { "i": { "$type": "string" } } }
+                ],
+                "otherwise": { "i": { "$type": "number" } }
+            }
+        }
+        )";
+    constexpr StringData jsonWithDifferentProp = R"(
+        {
+            "$_internalSchemaAllowedProperties": {
+                "properties": ["a"],
+                "namePlaceholder": "i",
+                "patternProperties": [
+                { "regex": /a/, "expression": { "i": { "$type": "number" } } }
+                ],
+                "otherwise": { "i": { "$type": "number" } }
+            }
+        }
+        )";
+    constexpr StringData jsonWithDifferentOtherwise = R"(
+        {
+            "$_internalSchemaAllowedProperties": {
+                "properties": ["a"],
+                "namePlaceholder": "i",
+                "patternProperties": [
+                { "regex": /a/, "expression": { "i": { "$type": "string" } } }
+                ],
+                "otherwise": { "i": { "$type": "string" } }
+            }
+        }
+        )";
+
+    assertNotEquivalent(fromjson(json), fromjson(jsonWithDifferentProp));
+    assertNotEquivalent(fromjson(json), fromjson(jsonWithDifferentOtherwise));
+    assertEquivalent(fromjson(json), fromjson(json));
+}
+
+TEST_F(MatchExpressionHasherTest, InternalSchemaMatchArrayIndexMatchExpression) {
+    constexpr StringData json =
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 0, namePlaceholder: 'i', expression: {i: {$type: 'number'}}}}}";
+    constexpr StringData jsonWithDifferentChild =
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 0, namePlaceholder: 'i', expression: {i: {$type: 'string'}}}}}";
+
+    assertNotEquivalent(fromjson(json), fromjson(jsonWithDifferentChild));
+    assertEquivalent(fromjson(json), fromjson(json));
+}
+
+TEST_F(MatchExpressionHasherTest, InternalSchemaObjectMatchExpression) {
+    constexpr StringData json = "{a: {$_internalSchemaObjectMatch: {c: {$eq: 3}}}}";
+    constexpr StringData jsonWithDifferentChild =
+        "{a: {$_internalSchemaObjectMatch: {c: {$gt: 3}}}}";
+
+    assertNotEquivalent(fromjson(json), fromjson(jsonWithDifferentChild));
+    assertEquivalent(fromjson(json), fromjson(json));
 }
 }  // namespace mongo
