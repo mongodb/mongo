@@ -6,6 +6,11 @@
  * This test relies on the DBHash checker to run at the end to ensure that the primaries and
  * secondaries have the same data. For that reason it's important that this test not drop
  * intermediate collections.
+ *
+ * @tags: [
+ *    # Only run this test on nodes that include the fix for SERVER-124369.
+ *    requires_fcv_90,
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -71,7 +76,10 @@ function checkOplogEntry(node, expectedOplogEntryType, expectedId) {
         }
     } else if (expectedOplogEntryType === kExpectReplacementEntry) {
         assert.eq(oplogEntry.op, "u");
-        assert.eq(oplogEntry.o.hasOwnProperty("$v"), false, oplogEntry);
+
+        // A replacement-style update should be identifiable either by the presence of an '_id'
+        // field or the absence of a '$v' field.
+        assert(oplogEntry.o.hasOwnProperty("_id") || !oplogEntry.o.hasOwnProperty("$v"), oplogEntry);
     } else if (expectedOplogEntryType == kExpectNoUpdateEntry) {
         assert.eq(oplogEntry.op, "i");
         assert.eq(oplogEntry.o._id, expectedId);
@@ -334,7 +342,25 @@ testUpdateReplicates({
     expectedOplogEntry: kExpectDeltaEntry,
 });
 
-// Don't drop any collections. At the end we want the DBHash checker will make sure there's no
-// corruption.
+// Verify that a replacement document containing '$v' and 'diff' fields does not get interpreted as
+// a delta oplog entry (see SERVER-124369).
+id = generateId();
+testUpdateReplicates({
+    preImage: {_id: id, x: "foo", subObj: {a: 1, b: 2}},
+    pipeline: [{$replaceRoot: {newRoot: {$literal: {_id: id, x: kMediumLengthStr, "$v": 2, diff: {foo: "bar"}}}}}],
+    postImage: {_id: id, x: kMediumLengthStr, "$v": 2, diff: {foo: "bar"}},
+    expectedOplogEntry: kExpectReplacementEntry,
+});
+
+// Verify that a replacement document containing '$v' and 'diff' fields does not get interpreted as
+// a delta oplog entry, even when the user-specified replacement does not explicitly set _id (see
+// SERVER-124369).
+id = generateId();
+testUpdateReplicates({
+    preImage: {_id: id, x: "foo", subObj: {a: 1, b: 2}},
+    pipeline: [{$replaceRoot: {newRoot: {$literal: {x: kMediumLengthStr, "$v": 2, diff: {foo: "bar"}}}}}],
+    postImage: {_id: id, x: kMediumLengthStr, "$v": 2, diff: {foo: "bar"}},
+    expectedOplogEntry: kExpectReplacementEntry,
+});
 
 rst.stopSet();

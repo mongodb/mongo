@@ -51,3 +51,6 @@ filters:
   - "*change_stream*":
     approvers:
       - 10gen/query-execution-change-streams
+  - "v2_delta_oplog_entries.js":
+    approvers:
+      - 10gen/query-execution

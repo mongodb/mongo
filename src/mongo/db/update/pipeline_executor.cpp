@@ -134,10 +134,13 @@ UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParam
         if (applyParams.logMode == ApplyParams::LogMode::kGenerateOplogEntry) {
             // We're allowed to generate $v: 2 log entries. The $v:2 has certain meta-fields like
             // '$v', 'diff'. So we pad some additional byte while computing diff.
-            const auto diff = doc_diff::computeOplogDiff(
-                originalDoc, transformedDoc, update_oplog_entry::kSizeOfDeltaOplogEntryMetadata);
-            if (diff) {
+            if (auto diff =
+                    doc_diff::computeOplogDiff(originalDoc,
+                                               transformedDoc,
+                                               update_oplog_entry::kSizeOfDeltaOplogEntryMetadata);
+                diff) {
                 ret.oplogEntry = update_oplog_entry::makeDeltaOplogEntry(*diff);
+                ret.diff = std::move(diff);
                 return ret;
             }
         }

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/update/document_diff_calculator.h"
@@ -95,14 +96,14 @@ protected:
         if (!_indexData) {
             return false;
         }
-        auto diff = update_oplog_entry::extractDiffFromOplogEntry(logEntry);
-        if (!diff) {
+        auto diffElem = logEntry[update_oplog_entry::kDiffObjectFieldName];
+        if (diffElem.type() != BSONType::object) {
             return false;
         }
 
         mongo::doc_diff::IndexUpdateIdentifier updateIdentifier{1 /*numIndexes*/};
         updateIdentifier.addIndex(0 /*indexCounter*/, *_indexData);
-        return updateIdentifier.determineAffectedIndexes(*diff).any();
+        return updateIdentifier.determineAffectedIndexes(diffElem.embeddedObject()).any();
     }
 
     bool getIndexAffectedFromLogEntry() {

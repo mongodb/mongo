@@ -29,12 +29,15 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/modules.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -117,7 +120,16 @@ public:
         // The oplog entry to log. This is only populated if the operation is not considered a
         // noop and if the 'logMode' provided in ApplyParams indicates that an oplog entry should
         // be generated.
+        //
+        // When populated, 'oplogEntry' is owned BSON.
         BSONObj oplogEntry;
+
+        // The diff used to produce the oplog entry, if the oplog entry is a $v:2 delta entry.
+        // Populated whenever oplogEntry is a delta entry.
+        //
+        // NOTE: 'diff' may be a view into BSON owned by 'oplogEntry' and should only be treated as
+        // valid so long as 'oplogEntry' is valid.
+        boost::optional<BSONObj> diff;
     };
 
 

@@ -130,14 +130,8 @@ Status AuthorizationBackendMock::updateOne(OperationContext* opCtx,
         const bool validateForStorage = false;
         const FieldRefSet emptyImmutablePaths;
         const bool isInsert = false;
-        BSONObj logObj;
-        status = driver.update(opCtx,
-                               StringData(),
-                               &document,
-                               validateForStorage,
-                               emptyImmutablePaths,
-                               isInsert,
-                               &logObj);
+        status = driver.update(
+            opCtx, StringData(), &document, validateForStorage, emptyImmutablePaths, isInsert);
         if (!status.isOK())
             return status;
         BSONObj newObj = document.getObject().copy();

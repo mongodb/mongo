@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/update/update_executor.h"
 #include "mongo/db/update/update_node.h"
 #include "mongo/db/update/update_object_node.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/v2_log_builder.h"
 #include "mongo/util/modules.h"
 
@@ -58,6 +60,10 @@ public:
         invariant(ret.oplogEntry.isEmpty());
         if (auto logBuilder = updateNodeApplyParams.logBuilder) {
             ret.oplogEntry = logBuilder->serialize();
+            if (auto diff = ret.oplogEntry[update_oplog_entry::kDiffObjectFieldName];
+                diff.isABSONObj()) {
+                ret.diff = diff.embeddedObject();
+            }
         }
 
         return ret;

@@ -628,7 +628,7 @@ stitch_support_v1_update_apply(stitch_support_v1_update* const update,
                                                     false /* validateForStorage */,
                                                     immutablePaths,
                                                     false /* isInsert */,
-                                                    nullptr /* logOpRec*/,
+                                                    nullptr /* updateRecord */,
                                                     &docWasModified,
                                                     &modifiedPaths));
 
@@ -675,7 +675,7 @@ uint8_t* MONGO_API_CALL stitch_support_v1_update_upsert(stitch_support_v1_update
                                                     false /* validateForStorage */,
                                                     immutablePaths,
                                                     true /* isInsert */,
-                                                    nullptr /* logOpRec */,
+                                                    nullptr /* updateRecord */,
                                                     &docWasModified,
                                                     nullptr /* modifiedPaths */));
 

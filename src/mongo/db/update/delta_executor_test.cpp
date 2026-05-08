@@ -41,6 +41,8 @@
 
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -56,9 +58,8 @@ namespace {
  * entry in the indexData vector, a return value of 3 (1+2) indicates that both first and second
  * entry in the idnexDaa vector are affected by the modification.
  */
-unsigned long getIndexAffectedFromLogEntry(std::vector<const UpdateIndexData*> indexData,
-                                           BSONObj logEntry) {
-    auto diff = update_oplog_entry::extractDiffFromOplogEntry(logEntry);
+unsigned long getIndexAffectedFromDiff(std::vector<const UpdateIndexData*> indexData,
+                                       boost::optional<BSONObj> diff) {
     if (!diff) {
         return (unsigned long)-1;
     }
@@ -94,7 +95,7 @@ TEST(DeltaExecutorTest, Delete) {
                            mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(), BSONObj());
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
 
     {
@@ -106,7 +107,7 @@ TEST(DeltaExecutorTest, Delete) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {}}}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // When the index path is a prefix of a path in the diff.
@@ -117,7 +118,7 @@ TEST(DeltaExecutorTest, Delete) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {}, c: 1}}}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // With common parent, but path diverges.
@@ -128,7 +129,7 @@ TEST(DeltaExecutorTest, Delete) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: 1}}}}"));
-        ASSERT_EQ(0, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(0, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
 }
 
@@ -148,7 +149,7 @@ TEST(DeltaExecutorTest, Update) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: false, f2: false, f3: false}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // When a path in the diff is same as index path.
@@ -159,7 +160,7 @@ TEST(DeltaExecutorTest, Update) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: false, c: false, p: false}}}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // When the index path is a prefix of a path in the diff.
@@ -170,7 +171,7 @@ TEST(DeltaExecutorTest, Update) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: false}, c: 1}}}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // With common parent, but path diverges.
@@ -181,7 +182,7 @@ TEST(DeltaExecutorTest, Update) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: 1}, c: false}}}"));
-        ASSERT_EQ(0, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(0, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
 }
 
@@ -202,7 +203,7 @@ TEST(DeltaExecutorTest, Insert) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: false, f2: false, f3: false}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // When a path in the diff is same as index path.
@@ -213,7 +214,7 @@ TEST(DeltaExecutorTest, Insert) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {p: false, c: false, b: false}}}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // When the index path is a prefix of a path in the diff.
@@ -224,7 +225,7 @@ TEST(DeltaExecutorTest, Insert) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: {e: 1, d: 2}}}}}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // With common parent, but path diverges.
@@ -235,7 +236,7 @@ TEST(DeltaExecutorTest, Insert) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: 1}, c: 2}}}"));
-        ASSERT_EQ(0, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(0, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
 }
 
@@ -256,7 +257,7 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesTopLevel) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{'0': false, '1': false, '2': false}"));
-        ASSERT_EQ(1, getIndexAffectedFromLogEntry({&indexData}, result.oplogEntry));
+        ASSERT_EQ(1, getIndexAffectedFromDiff({&indexData}, result.diff));
     }
     {
         auto doc = mutablebson::Document(preImage);
@@ -266,7 +267,7 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesTopLevel) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{'0': false, '2': false}"));
-        ASSERT_EQ(0, getIndexAffectedFromLogEntry({&indexData}, result.oplogEntry));
+        ASSERT_EQ(0, getIndexAffectedFromDiff({&indexData}, result.diff));
     }
 }
 
@@ -287,7 +288,7 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesNested) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{a: {'0': false, '1': false, '2': false}}"));
-        ASSERT_EQ(1, getIndexAffectedFromLogEntry({&indexData}, result.oplogEntry));
+        ASSERT_EQ(1, getIndexAffectedFromDiff({&indexData}, result.diff));
     }
     {
         auto doc = mutablebson::Document(preImage);
@@ -297,7 +298,7 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesNested) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{a: {'0': false, '2': false}}"));
-        ASSERT_EQ(1, getIndexAffectedFromLogEntry({&indexData}, result.oplogEntry));
+        ASSERT_EQ(1, getIndexAffectedFromDiff({&indexData}, result.diff));
     }
 }
 
@@ -318,7 +319,7 @@ TEST(DeltaExecutorTest, ArraysInIndexPath) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1}, c: 1}}]}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // When the index path is a prefix of a path in the diff and also involves numeric
@@ -330,7 +331,7 @@ TEST(DeltaExecutorTest, ArraysInIndexPath) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1, d: 1}, c: 1}}, 1]}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // When inserting a sub-object into array, and the sub-object diverges from the index path.
@@ -341,7 +342,7 @@ TEST(DeltaExecutorTest, ArraysInIndexPath) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1}, c: 1}}, 1, {b:1}]}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // When a common array path element is updated, but the paths diverge at the last element.
@@ -352,7 +353,7 @@ TEST(DeltaExecutorTest, ArraysInIndexPath) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1}}}, 1]}"));
-        ASSERT_EQ(0, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(0, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
 }
 
@@ -374,7 +375,7 @@ TEST(DeltaExecutorTest, ArraysAfterIndexPath) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: [{c: 1}]}}}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // Updating a sub-array element.
@@ -385,7 +386,7 @@ TEST(DeltaExecutorTest, ArraysAfterIndexPath) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: [{c: 2}, 2]}}}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
     {
         // Updating an array element.
@@ -396,7 +397,7 @@ TEST(DeltaExecutorTest, ArraysAfterIndexPath) {
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: [1, 2]}}}"));
-        ASSERT_EQ(2, getIndexAffectedFromLogEntry({&indexData1, &indexData2}, result.oplogEntry));
+        ASSERT_EQ(2, getIndexAffectedFromDiff({&indexData1, &indexData2}, result.diff));
     }
 }
 

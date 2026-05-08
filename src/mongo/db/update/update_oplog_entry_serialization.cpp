@@ -79,18 +79,6 @@ BSONObj makeReplacementOplogEntry(const BSONObj& replacement) {
     return builder.obj();
 }
 
-boost::optional<BSONObj> extractDiffFromOplogEntry(const BSONObj& opLog) {
-    auto version = opLog["$v"];
-    if (version.ok() &&
-        version.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
-        auto diff = opLog[kDiffObjectFieldName];
-        if (diff.type() == BSONType::object) {
-            return diff.embeddedObject();
-        }
-    }
-    return {};
-}
-
 namespace {
 BSONElement extractNewValueForFieldFromV2Entry(const BSONObj& oField, StringData fieldName) {
     auto diffField = oField[kDiffObjectFieldName];

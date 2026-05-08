@@ -124,10 +124,6 @@ PlanStage::StageState UpsertStage::doWork(WorkingSetID* out) {
     // If the update resulted in EOF without matching anything, we must insert a new document.
     invariant(updateState == PlanStage::IS_EOF && !isEOF());
 
-    // Since this is an insert, we will be logging it as such in the oplog. We don't need the
-    // driver's help to build the oplog record.
-    _params.driver->setLogOp(false);
-
     // Generate the new document to be inserted.
     auto newObj = _produceNewDocumentForInsert();
 

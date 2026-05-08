@@ -275,7 +275,7 @@ Status UpdateDriver::update(OperationContext* opCtx,
                             bool validateForStorage,
                             const FieldRefSet& immutablePaths,
                             bool isInsert,
-                            BSONObj* logOpRec,
+                            DocumentUpdateRecord* updateRecord,
                             bool* docWasModified,
                             FieldRefSetWithStorage* modifiedPaths) {
     // TODO SERVER-123161: assert that update() is called at most once in a !_multi case.
@@ -297,7 +297,7 @@ Status UpdateDriver::update(OperationContext* opCtx,
         applyParams.validateForStorage = false;
     }
 
-    if (_logOp && logOpRec) {
+    if (updateRecord) {
         applyParams.logMode = ApplyParams::LogMode::kGenerateOplogEntry;
 
         if (MONGO_unlikely(hangAfterPipelineUpdateFCVCheck.shouldFail()) &&
@@ -313,8 +313,9 @@ Status UpdateDriver::update(OperationContext* opCtx,
         *docWasModified = !applyResult.noop;
     }
 
-    if (_logOp && logOpRec && !applyResult.noop) {
-        *logOpRec = applyResult.oplogEntry;
+    if (updateRecord && !applyResult.noop) {
+        updateRecord->oplogEntry = applyResult.oplogEntry;
+        updateRecord->diff = applyResult.diff;
     }
 
     _containsDotsAndDollarsField =

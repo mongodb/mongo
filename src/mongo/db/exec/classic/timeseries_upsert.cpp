@@ -112,9 +112,7 @@ PlanStage::StageState TimeseriesUpsertStage::doWork(WorkingSetID* out) {
         return updateState;
     }
 
-    // Since this is an insert, we will be logging it as such in the oplog. We don't need the
-    // driver's help to build the oplog record. We also set the 'nUpserted' stats counter here.
-    _params.updateDriver->setLogOp(false);
+    // Track this operation as an upserted measurement.
     _specificStats.nMeasurementsUpserted = 1;
 
     // Generate the new document to be inserted.

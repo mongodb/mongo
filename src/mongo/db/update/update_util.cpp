@@ -57,7 +57,6 @@
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
@@ -124,7 +123,6 @@ void generateNewDocumentFromSuppliedDoc(OperationContext* opCtx,
     replacementDriver.parse(
         write_ops::UpdateModification(suppliedDoc, write_ops::UpdateModification::ReplacementTag{}),
         {});
-    replacementDriver.setLogOp(false);
     replacementDriver.setBypassEmptyTsReplacement(
         static_cast<bool>(request->getBypassEmptyTsReplacement()));
 
@@ -431,7 +429,7 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
             matchedField = matchDetails.elemMatchKey();
     }
 
-    BSONObj logObj;
+    DocumentUpdateRecord updateRecord;
     bool docWasModified = false;
     status = driver->update(opCtx,
                             matchedField,
@@ -439,7 +437,7 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
                             isUserInitiatedWrite,
                             immutablePaths,
                             false, /* isInsert */
-                            &logObj,
+                            &updateRecord,
                             &docWasModified);
     uassertStatusOK(status);
 
@@ -470,7 +468,7 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
 
     // Prepare to modify the document
     CollectionUpdateArgs args{oldObjValue};
-    args.update = logObj;
+    args.update = updateRecord.oplogEntry;
     if (isUserInitiatedWrite) {
         const auto& collDesc = collection.getShardingDescription();
         args.criteria = collDesc.extractDocumentKey(oldObj.value());
@@ -512,7 +510,6 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
                 scfu.checkUpdateChangesShardKeyFields(opCtx, doc, boost::none /* newObj */, oldObj);
             }
 
-            auto diff = update_oplog_entry::extractDiffFromOplogEntry(logObj);
             WriteUnitOfWork wunit(opCtx);
             newObj = uassertStatusOK(collection_internal::updateDocumentWithDamages(
                 opCtx,
@@ -521,7 +518,8 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
                 oldObj,
                 source,
                 damages,
-                diff.has_value() ? &*diff : collection_internal::kUpdateAllIndexes,
+                updateRecord.diff.has_value() ? &*updateRecord.diff
+                                              : collection_internal::kUpdateAllIndexes,
                 &indexesAffected,
                 &CurOp::get(opCtx)->debug(),
                 &args,
@@ -555,7 +553,7 @@ std::pair<BSONObj, bool> transformDocument(OperationContext* opCtx,
                 scfu.checkUpdateChangesShardKeyFields(opCtx, doc, newObj, oldObj);
             }
 
-            auto diff = update_oplog_entry::extractDiffFromOplogEntry(logObj);
+            const auto& diff = updateRecord.diff;
             WriteUnitOfWork wunit(opCtx);
             collection_internal::updateDocument(
                 opCtx,

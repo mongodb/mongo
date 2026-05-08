@@ -124,7 +124,6 @@ Status parseQuery(boost::intrusive_ptr<ExpressionContext> expCtx, ParsedUpdate& 
  */
 void parseUpdate(boost::intrusive_ptr<ExpressionContext> expCtx, ParsedUpdate& parsedUpdate) {
     parsedUpdate.driver->setCollator(expCtx->getCollator());
-    parsedUpdate.driver->setLogOp(true);
     parsedUpdate.driver->setFromOplogApplication(parsedUpdate.request->isFromOplogApplication());
 
     auto source = parsedUpdate.request->source();
