@@ -459,7 +459,8 @@ int32_t computeDamageOnArray(const BSONObj& preImageRoot,
         }
     }
 
-    invariant(!resizeVal || *resizeVal == idx);
+    uassert(
+        12495900, "array diff update index exceeds resize value", !resizeVal || *resizeVal == idx);
 
     // Updates the bytes of total size.
     DataView(bufBuilder->buf() + sizeBytesPos)
@@ -670,7 +671,9 @@ private:
             }
         }
 
-        invariant(!resizeVal || *resizeVal == idx);
+        uassert(12495901,
+                "array diff update index exceeds resize value",
+                !resizeVal || *resizeVal == idx);
     }
 
     bool _mustCheckExistenceForInsertOperations = true;
