@@ -1063,8 +1063,7 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorAndParticipants(
 
                        // Wait for all participants to acknowledge the operation reached an
                        // unrecoverable error.
-                       return future_util::withCancellation(
-                           _awaitAllParticipantShardsDone(executor), _ctHolder->getStepdownToken());
+                       return _awaitAllParticipantShardsDone(executor);
                    });
            })
         .onTransientError([](const Status& retryStatus) {
