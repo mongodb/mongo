@@ -64,7 +64,8 @@ public:
                         std::uint32_t recursionLevel,
                         ModifyResult modifyResult,
                         bool validateForStorage,
-                        bool* containsDotsAndDollarsField) const final;
+                        bool* containsDotsAndDollarsField,
+                        bool fromOplogApplication) const final;
 
     std::unique_ptr<UpdateNode> clone() const final {
         return std::make_unique<PopNode>(*this);

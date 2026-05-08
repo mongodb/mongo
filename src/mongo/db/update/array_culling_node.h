@@ -60,7 +60,8 @@ public:
                         std::uint32_t recursionLevel,
                         ModifyResult modifyResult,
                         bool validateForStorage,
-                        bool* containsDotsAndDollarsField) const final;
+                        bool* containsDotsAndDollarsField,
+                        bool fromOplogApplication) const final;
 
     void setCollator(const CollatorInterface* collator) final {
         _matcher->setCollator(collator);

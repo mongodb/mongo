@@ -129,7 +129,8 @@ UpdateExecutor::ApplyResult ObjectReplaceExecutor::applyReplacementUpdate(
         storage_validation::scanDocument(applyParams.element.getDocument(),
                                          allowTopLevelDollarPrefixedFields,
                                          applyParams.validateForStorage,
-                                         &ret.containsDotsAndDollarsField);
+                                         &ret.containsDotsAndDollarsField,
+                                         applyParams.fromOplogApplication);
     }
 
     // Check immutable paths.
