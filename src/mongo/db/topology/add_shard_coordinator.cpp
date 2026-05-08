@@ -217,7 +217,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kEnterCriticalSection,
             [this, _ = shared_from_this()](auto* opCtx) {
-                return feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                return feature_flags::gAuthoritativeShardsDDL.isEnabled(
                     VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
             },
@@ -316,7 +316,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                             .commandStatus);
                 }
 
-                if (feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
                         VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     const auto dbs = _doc.getPreExistingDatabasesOnPromotion();
@@ -359,7 +359,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kExitCriticalSection,
             [this, _ = shared_from_this()](auto* opCtx) {
-                return feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+                return feature_flags::gAuthoritativeShardsDDL.isEnabled(
                     VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
             },

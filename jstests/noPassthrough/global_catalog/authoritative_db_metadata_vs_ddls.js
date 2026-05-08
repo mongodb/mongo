@@ -4,8 +4,8 @@
  * collection.
  *
  * @tags: [
- *   featureFlagShardAuthoritativeDbMetadataCRUD,
- *   featureFlagShardAuthoritativeDbMetadataDDL,
+ *   featureFlagAuthoritativeShardsCRUD,
+ *   featureFlagAuthoritativeShardsDDL,
  * ]
  */
 

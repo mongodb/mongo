@@ -39,10 +39,10 @@ assert.commandWorked(db.foo.insert({"x": 50, "a": 6}));
 assert.commandWorked(db.foo.insert({"x": 100, "a": 8}));
 assert.commandWorked(db.foo.insert({"x": 150, "a": 20}));
 
-if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataCRUD")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
     assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
 }
-if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "ShardAuthoritativeDbMetadataCRUD")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) {
     assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: kDbName}));
 }
 

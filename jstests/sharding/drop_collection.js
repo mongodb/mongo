@@ -47,7 +47,7 @@ function assertCollectionDropped(ns, uuid = null) {
         );
     }
 
-    // TODO (SERVER-123313): When ShardAuthoritativeCollMetadata is enabled, the authoritative
+    // TODO (SERVER-123313): When AuthoritativeShardsDDL is enabled, the authoritative
     // DropCollection and DropDatabase DDL commands do not clean up config.cache collection entries,
     // unlike their non-authoritative counterparts. This is by design: the authoritative CRUD path
     // does not use these collections, so they are expected not to exist after a drop.
@@ -58,7 +58,7 @@ function assertCollectionDropped(ns, uuid = null) {
     //
     // Once all DDLs are fully authoritative, this escape can be removed, as config.cache
     // collections will no longer be created after a drop.
-    const isAuthoritativeCollMetadata = FeatureFlagUtil.isPresentAndEnabled(st.s, "ShardAuthoritativeCollMetadata");
+    const isAuthoritativeCollMetadata = FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsDDL");
     if (!isAuthoritativeCollMetadata) {
         // Verify that persisted cached metadata was removed as part of the dropCollection
         const chunksCollName = "cache.chunks." + ns;

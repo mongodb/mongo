@@ -162,7 +162,7 @@ public:
                                            std::make_move_iterator(indexInconsistencies.end()));
                 }
 
-                if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+                if (feature_flags::gAuthoritativeShardsCRUD.isEnabled(
                         VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                     !nss.isConfigDB()) {

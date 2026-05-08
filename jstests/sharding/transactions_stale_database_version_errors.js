@@ -23,7 +23,7 @@ const st = new ShardingTest({
 
 // Helper function to check if authoritative database shards feature is enabled.
 function isAuthoritativeShardsEnabled() {
-    return FeatureFlagUtil.isPresentAndEnabled(st.s.getDB("admin"), "ShardAuthoritativeDbMetadataCRUD");
+    return FeatureFlagUtil.isPresentAndEnabled(st.s.getDB("admin"), "AuthoritativeShardsCRUD");
 }
 
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);

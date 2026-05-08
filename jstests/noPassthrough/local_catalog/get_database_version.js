@@ -2,8 +2,8 @@
  * Test getDatabaseVersion command after the effects of database DDLs.
  *
  * @tags: [
- *     featureFlagShardAuthoritativeDbMetadataCRUD,
- *     featureFlagShardAuthoritativeDbMetadataDDL,
+ *     featureFlagAuthoritativeShardsCRUD,
+ *     featureFlagAuthoritativeShardsDDL,
  * ]
  */
 

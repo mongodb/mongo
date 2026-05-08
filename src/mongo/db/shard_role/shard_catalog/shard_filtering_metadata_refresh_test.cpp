@@ -191,8 +191,7 @@ protected:
 };
 
 TEST_F(AuthoritativeRefreshFixture, UntrackedIsCorrectlyRecoveredFromDisk) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto untrackedNss =
@@ -214,8 +213,7 @@ TEST_F(AuthoritativeRefreshFixture, UntrackedIsCorrectlyRecoveredFromDisk) {
 }
 
 TEST_F(AuthoritativeRefreshFixture, NoChunkVersionTriggersRecoveryFromDisk) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -236,8 +234,7 @@ TEST_F(AuthoritativeRefreshFixture, NoChunkVersionTriggersRecoveryFromDisk) {
 }
 
 TEST_F(AuthoritativeRefreshFixture, ChunkVersionMatchReturnsEarly) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -264,8 +261,7 @@ TEST_F(AuthoritativeRefreshFixture, ChunkVersionMatchReturnsEarly) {
 
 TEST_F(AuthoritativeRefreshFixture,
        UntrackedRouterVersionWithKnownTrackedMetadataSkipsSecondDiskRecovery) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -293,8 +289,7 @@ TEST_F(AuthoritativeRefreshFixture,
 
 TEST_F(AuthoritativeRefreshFixture,
        IgnoredReceivedVersionResolvesAfterRecoveryWithoutPostRecoveryWait) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -321,8 +316,7 @@ TEST_F(AuthoritativeRefreshFixture,
 }
 
 TEST_F(AuthoritativeRefreshFixture, HigherRouterVersionTriggersRecoveryThenConfigTimeWait) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -350,8 +344,7 @@ TEST_F(AuthoritativeRefreshFixture, HigherRouterVersionTriggersRecoveryThenConfi
 }
 
 TEST_F(AuthoritativeRefreshFixture, ConfigTimeReachedWithEmptyCSRTriggersFullRecovery) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -377,8 +370,7 @@ TEST_F(AuthoritativeRefreshFixture, ConfigTimeReachedWithEmptyCSRTriggersFullRec
 }
 
 TEST_F(AuthoritativeRefreshFixture, NonAuthoritativeTransitionDuringRecoveryReturnsEarly) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     auto dummyVersion = ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1, 0});
@@ -420,8 +412,7 @@ TEST_F(AuthoritativeRefreshFixture, NonAuthoritativeTransitionDuringRecoveryRetu
 }
 
 TEST_F(AuthoritativeRefreshFixture, CriticalSectionBlocksRecoveryThenProceeds) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -464,8 +455,7 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionBlocksRecoveryThenProceeds) {
 }
 
 TEST_F(AuthoritativeRefreshFixture, RecoveryCreatesExactlyOneRecoverer) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -491,8 +481,7 @@ TEST_F(AuthoritativeRefreshFixture, RecoveryCreatesExactlyOneRecoverer) {
 }
 
 TEST_F(AuthoritativeRefreshFixture, RecovererCleanedUpAfterRecovery) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 3, kMyShardName);
@@ -512,8 +501,7 @@ TEST_F(AuthoritativeRefreshFixture, RecovererCleanedUpAfterRecovery) {
 }
 
 TEST_F(AuthoritativeRefreshFixture, ThreeConcurrentCallersAllSucceed) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 10, kMyShardName);
@@ -557,8 +545,7 @@ TEST_F(AuthoritativeRefreshFixture, ThreeConcurrentCallersAllSucceed) {
 }
 
 TEST_F(AuthoritativeRefreshFixture, RecoveryWithSingleChunkVerifiesExactMetadata) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 1, kMyShardName);
@@ -581,8 +568,7 @@ TEST_F(AuthoritativeRefreshFixture, RecoveryWithSingleChunkVerifiesExactMetadata
 }
 
 TEST_F(AuthoritativeRefreshFixture, RecoveryWithManyChunksVerifiesVersionSorting) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 100, kMyShardName);
@@ -605,8 +591,7 @@ TEST_F(AuthoritativeRefreshFixture, RecoveryWithManyChunksVerifiesVersionSorting
 
 TEST_F(AuthoritativeRefreshFixture,
        RecoveryWithChunksOnDifferentShardReportsUntrackedForThisShard) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     // All chunks belong to "otherShard", not kMyShardName.
@@ -631,8 +616,7 @@ TEST_F(AuthoritativeRefreshFixture,
 }
 
 TEST_F(AuthoritativeRefreshFixture, PartialRangeDiskCatalogRecoversWithoutChunkMetadata) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const UUID uuid = UUID::gen();
@@ -679,8 +663,7 @@ TEST_F(AuthoritativeRefreshFixture, PartialRangeDiskCatalogRecoversWithoutChunkM
 }
 
 TEST_F(AuthoritativeRefreshFixture, SequentialCallsAreIdempotent) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -718,8 +701,7 @@ TEST_F(AuthoritativeRefreshFixture, SequentialCallsAreIdempotent) {
 }
 
 TEST_F(AuthoritativeRefreshFixture, RecoveredVersionMatchSkipsRecoveryLoopOnNextCall) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -754,8 +736,7 @@ TEST_F(AuthoritativeRefreshFixture, RecoveredVersionMatchSkipsRecoveryLoopOnNext
 }
 
 TEST_F(AuthoritativeRefreshFixture, OngoingRecoverySatisfiesVersionSkipsDiskRecovery) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -815,8 +796,7 @@ TEST_F(AuthoritativeRefreshFixture, OngoingRecoverySatisfiesVersionSkipsDiskReco
 }
 
 TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -866,8 +846,7 @@ TEST_F(AuthoritativeRefreshFixture, ReRecoveryAfterMetadataCleared) {
 }
 
 TEST_F(AuthoritativeRefreshFixture, CriticalSectionExitedWithExternalMetadataSkipsDiskRecovery) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
@@ -922,8 +901,7 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionExitedWithExternalMetadataSki
 }
 
 TEST_F(AuthoritativeRefreshFixture, UnownedRecoveryAcceptsTrackedWithNoChunksVersion) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
@@ -958,8 +936,7 @@ TEST_F(AuthoritativeRefreshFixture, UnownedRecoveryAcceptsTrackedWithNoChunksVer
 }
 
 TEST_F(AuthoritativeRefreshFixture, UnownedShardVersionCheckAcceptsTrackedWithNoChunksVersion) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
@@ -989,8 +966,7 @@ TEST_F(AuthoritativeRefreshFixture, UnownedShardVersionCheckAcceptsTrackedWithNo
 }
 
 TEST_F(AuthoritativeRefreshFixture, UnownedShardVersionCheckRejectsTrackedVersionWithChunks) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
@@ -1015,8 +991,7 @@ TEST_F(AuthoritativeRefreshFixture, UnownedShardVersionCheckRejectsTrackedVersio
 }
 
 TEST_F(AuthoritativeRefreshFixture, TrackedCollectionWithNoChunksOnDiskRecoveredCorrectly) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     const UUID uuid = UUID::gen();
@@ -1092,8 +1067,7 @@ void setDbPrimaryShardForTest(OperationContext* opCtx,
 // Non-primary shard, transient primary window (set+clear) keeps the primary at `boost::none` but
 // bumps the counter by two: only the counter catches the ABA. Converges to kUnowned after retry.
 TEST_F(AuthoritativeRefreshFixture, TransientPrimaryAbaForcesModeBRetry) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
@@ -1125,8 +1099,7 @@ TEST_F(AuthoritativeRefreshFixture, TransientPrimaryAbaForcesModeBRetry) {
 // Stable DB primary baseline: no mid-flight mutation, no retry. Converges to kUntracked with
 // exactly 1 Mode A + 1 Mode B recoverer.
 TEST_F(AuthoritativeRefreshFixture, DbPrimaryShardInstallsUntrackedOnEmptyDisk) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
@@ -1154,8 +1127,7 @@ TEST_F(AuthoritativeRefreshFixture, DbPrimaryShardInstallsUntrackedOnEmptyDisk) 
 // shard the new primary. Caught by the simple pre/post compare. Converges to kUntracked after
 // retry.
 TEST_F(AuthoritativeRefreshFixture, PrimaryChangeDuringRecoveryForcesModeBRetry) {
-    RAIIServerParameterControllerForTest featureFlag("featureFlagShardAuthoritativeCollMetadata",
-                                                     true);
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();
 
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);

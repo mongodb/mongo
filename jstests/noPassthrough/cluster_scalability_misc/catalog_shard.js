@@ -38,7 +38,7 @@ function basicCRUD(conn) {
 }
 
 function flushRoutingAndDBCacheUpdates(conn) {
-    if (!FeatureFlagUtil.isPresentAndEnabled(conn, "ShardAuthoritativeDbMetadataCRUD")) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(conn, "AuthoritativeShardsCRUD")) {
         assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: dbName}));
         assert.commandWorked(conn.adminCommand({_flushDatabaseCacheUpdates: "notRealDB"}));
     }

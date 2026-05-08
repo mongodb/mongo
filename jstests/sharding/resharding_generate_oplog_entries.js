@@ -64,10 +64,10 @@ function simulateResharding() {
 
     jsTestLog("Flushing routing table updates");
 
-    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataCRUD")) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
         assert.commandWorked(st.shard0.adminCommand({_flushDatabaseCacheUpdates: dbName}));
     }
-    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "ShardAuthoritativeDbMetadataCRUD")) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "AuthoritativeShardsCRUD")) {
         assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: dbName}));
     }
 

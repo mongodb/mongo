@@ -5,8 +5,8 @@
  * TODO (SERVER-98118): Remove this test.
  *
  * @tags: [
- *   featureFlagShardAuthoritativeDbMetadataCRUD,
- *   featureFlagShardAuthoritativeDbMetadataDDL,
+ *   featureFlagAuthoritativeShardsCRUD,
+ *   featureFlagAuthoritativeShardsDDL,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -21,12 +21,10 @@ const describeOrSkip = (() => {
 
         const db = st.s.getDB("admin");
         if (
-            FeatureFlagUtil.isPresentAndEnabled(db, "ShardAuthoritativeDbMetadataDDL") ||
-            FeatureFlagUtil.isPresentAndEnabled(db, "ShardAuthoritativeDbMetadataCRUD")
+            FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardsDDL") ||
+            FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardsCRUD")
         ) {
-            jsTest.log.info(
-                "Skipping test because ShardAuthoritativeDbMetadata feature flags are already enabled in lastLTS",
-            );
+            jsTest.log.info("Skipping test because AuthoritativeShards feature flags are already enabled in lastLTS");
             return describe.skip;
         }
     } finally {
@@ -62,13 +60,13 @@ describeOrSkip("FCV lifecycle for authoritative database metadata", function () 
         const db = mongos.getDB(kDbName);
         assert.eq(
             enabled,
-            FeatureFlagUtil.isPresentAndEnabled(db, "ShardAuthoritativeDbMetadataDDL"),
-            `ShardAuthoritativeDbMetadataDDL flag should be ${enabled}`,
+            FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardsDDL"),
+            `AuthoritativeShardsDDL flag should be ${enabled}`,
         );
         assert.eq(
             enabled,
-            FeatureFlagUtil.isPresentAndEnabled(db, "ShardAuthoritativeDbMetadataCRUD"),
-            `ShardAuthoritativeDbMetadataCRUD flag should be ${enabled}`,
+            FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardsCRUD"),
+            `AuthoritativeShardsCRUD flag should be ${enabled}`,
         );
     }
 

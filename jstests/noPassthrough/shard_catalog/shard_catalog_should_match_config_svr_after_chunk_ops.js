@@ -3,7 +3,7 @@
  * shard's filtering metadata for the collection matches what the config server recorded.
  *
  * @tags: [
- *   featureFlagShardAuthoritativeCollMetadata,
+ *   featureFlagAuthoritativeShardsDDL,
  *   does_not_support_stepdowns,
  * ]
  */

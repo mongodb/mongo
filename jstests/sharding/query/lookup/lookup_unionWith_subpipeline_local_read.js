@@ -555,10 +555,7 @@ assertAggResultAndRouting(
 // TODO SERVER-98118 remove this test case.
 // For the authoritative shards, the secondaries will wait internally when they are yet to
 // catch up. This causes them to be always up to date.
-const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB("admin"),
-    "ShardAuthoritativeDbMetadataCRUD",
-);
+const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(st.s.getDB("admin"), "AuthoritativeShardsCRUD");
 if (!isAuthoritativeShardEnabled) {
     // Test $lookup when it is routed to a secondary which is not yet aware of the foreign
     // collection.

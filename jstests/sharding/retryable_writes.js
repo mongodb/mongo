@@ -134,7 +134,7 @@ function handleSessionsCollection(mainConn, priConn, configConn) {
         // When shard authoritative collection metadata is enabled, the create coordinator commits
         // metadata to the shard catalog via a retryable write (_shardsvrCommitCreateCollection
         // Metadata), adding another write to config.transactions on the shard.
-        if (FeatureFlagUtil.isPresentAndEnabled(priConn, "ShardAuthoritativeCollMetadata")) {
+        if (FeatureFlagUtil.isPresentAndEnabled(priConn, "AuthoritativeShardsDDL")) {
             extraCollectionWrites += 1;
         }
     }

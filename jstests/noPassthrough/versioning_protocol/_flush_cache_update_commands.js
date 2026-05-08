@@ -17,7 +17,7 @@ function checkTimestampConsistencyInPersistentMetadata(dbName, nss, dbTimestampI
     function getDbMetadata() {
         const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
             st.s.getDB("admin"),
-            "ShardAuthoritativeDbMetadataDDL",
+            "AuthoritativeShardsDDL",
         );
         if (!isAuthoritativeShardEnabled) {
             st.shard0.adminCommand({_flushDatabaseCacheUpdates: dbName, syncFromConfig: true});

@@ -113,11 +113,11 @@ public:
                 // get rid of this code before it hits production. The reason we take the DDL lock
                 // here is to respect the acquisition order DDL Lock -> FCV Lock, and avoid
                 // deadlocks. This is a pessimization, and thus we only do this if
-                // ShardAuthoritativeDbMetadataDDL is active in this binary.
+                // AuthoritativeShardsDDL is active in this binary.
                 // (Ignore FCV check): We need to know if the feature flag is active in any version.
                 // TODO (SERVER-102647): Remove this code.
                 boost::optional<DDLLockManager::ScopedBaseDDLLock> ddlLock;
-                if (feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabledAndIgnoreFCVUnsafe()) {
+                if (feature_flags::gAuthoritativeShardsDDL.isEnabledAndIgnoreFCVUnsafe()) {
                     ddlLock.emplace(
                         opCtx,
                         shard_role_details::getLocker(opCtx),
@@ -149,8 +149,7 @@ public:
                     // to guarantee that all in-flight legacy commands are drained after
                     // transitioning to kUpgrading during FCV upgrade.
                     // TODO (SERVER-102647): unconditionally exit the FixedFCVRegion here
-                    if (!feature_flags::gShardAuthoritativeDbMetadataDDL
-                             .isEnabledAndIgnoreFCVUnsafe()) {
+                    if (!feature_flags::gAuthoritativeShardsDDL.isEnabledAndIgnoreFCVUnsafe()) {
                         fixedFcvRegion.reset();
                     }
 

@@ -86,7 +86,7 @@ feature_flags:
             Feature flag for enabling the sharding DDL coordinator for database creation.
 
             (Enable on transitional FCV): This DDL coordinator is needed during the transition
-            phase of authoritative databases (featureFlagShardAuthoritativeDbMetadataDDL).
+            phase of authoritative databases (featureFlagAuthoritativeShardsDDL).
             If this feature flag is disabled by a FCV downgrade, all instances of this DDL
             coordinator are drained when finalizing the downgrade.
         cpp_varname: feature_flags::gCreateDatabaseDDLCoordinator
@@ -124,25 +124,25 @@ feature_flags:
         version: 8.2
         fcv_gated: true
     # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
-    featureFlagShardAuthoritativeDbMetadataCRUD:
+    featureFlagAuthoritativeShardsCRUD:
         description:
-            "Feature flag to enable the authoritative model to read database metadata from
-            stored shard-local information"
-        cpp_varname: feature_flags::gShardAuthoritativeDbMetadataCRUD
+            "Feature flag to enable the authoritative model to read database and collection
+            metadata from stored shard-local information"
+        cpp_varname: feature_flags::gAuthoritativeShardsCRUD
         default: false
         fcv_gated: true
     # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
-    featureFlagShardAuthoritativeDbMetadataDDL:
+    featureFlagAuthoritativeShardsDDL:
         description: >
             Feature flag to enable the authoritative model to store shard-local information
-            for database metadata.
+            for database and collection metadata.
 
-            (Enable on transitional FCV): Enables cloning and writing of authoritative database
+            (Enable on transitional FCV): Enables cloning and writing of authoritative database and collection
             metadata in shards during the transition phase, so that once the FCV is fully upgraded,
-            operations can start reading from it (via featureFlagShardAuthoritativeDbMetadataCRUD).
+            operations can start reading from it (via featureFlagAuthoritativeShardsCRUD).
             If this feature flag is disabled by a FCV downgrade, all DDL coordinators checking
             this flag are drained when finalizing the downgrade.
-        cpp_varname: feature_flags::gShardAuthoritativeDbMetadataDDL
+        cpp_varname: feature_flags::gAuthoritativeShardsDDL
         default: false
         fcv_gated: true
         enable_on_transitional_fcv_UNSAFE: true

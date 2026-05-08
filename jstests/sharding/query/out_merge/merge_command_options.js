@@ -52,7 +52,7 @@ profilerHasNumMatchingEntriesOrThrow({
     numExpectedMatches: 1,
 });
 
-if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "ShardAuthoritativeDbMetadataCRUD")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShardsCRUD")) {
     // Force a refresh on rs0. This is necessary because MongoS will get StaleDbVersion upon sending
     // the agg request below, causing it to retry the agg command from the top and thus send
     // listIndexes to the primary shard twice.

@@ -333,7 +333,7 @@ public:
                     auto extraInfo = status.extraInfo<StaleDbRoutingVersion>();
                     tassert(9980500, "StaleDbVersion must have extraInfo", extraInfo);
 
-                    if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+                    if (feature_flags::gAuthoritativeShardsCRUD.isEnabled(
                             VersionContext::getDecoration(opCtx),
                             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                         // If versionWanted exists:

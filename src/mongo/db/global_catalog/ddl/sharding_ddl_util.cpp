@@ -969,13 +969,13 @@ void commitCreateCollectionMetadataToShardCatalog(
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
     const VersionContext& vCtx, const ServerGlobalParams::FCVSnapshot& snapshot) {
     const bool isAuthoritativeDDLEnabled =
-        feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(vCtx, snapshot);
+        feature_flags::gAuthoritativeShardsDDL.isEnabled(vCtx, snapshot);
     const bool isAuthoritativeCRUDEnabled =
-        feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(vCtx, snapshot);
+        feature_flags::gAuthoritativeShardsCRUD.isEnabled(vCtx, snapshot);
 
     tassert(10162502,
-            "shardAuthoritativeDbMetadataCRUD should not be enabled if "
-            "shardAuthoritativeDbMetadataDDL is disabled",
+            "AuthoritativeShardsCRUD should not be enabled if "
+            "AuthoritativeShardsDDL is disabled",
             isAuthoritativeDDLEnabled || !isAuthoritativeCRUDEnabled);
 
     if (!isAuthoritativeDDLEnabled) {

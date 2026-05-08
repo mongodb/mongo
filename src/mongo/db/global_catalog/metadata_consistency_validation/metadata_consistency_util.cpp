@@ -636,7 +636,7 @@ void checkCollectionMetadataInShardCatalog(
                                 kInMemoryShardCatalogSourceScope,
                                 inconsistencies);
 
-    if (!feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+    if (!feature_flags::gAuthoritativeShardsCRUD.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return;
@@ -1928,8 +1928,8 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistency(
 
     FixedFCVRegion fixedFcvRegion(opCtx);
 
-    if (!feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
-            VersionContext::getDecoration(opCtx), fixedFcvRegion->acquireFCVSnapshot())) {
+    if (!feature_flags::gAuthoritativeShardsCRUD.isEnabled(VersionContext::getDecoration(opCtx),
+                                                           fixedFcvRegion->acquireFCVSnapshot())) {
         return {};
     }
 

@@ -619,7 +619,7 @@ void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationConte
 }
 
 void ShardingRecoveryService::_recoverDatabaseShardingState(OperationContext* opCtx) {
-    if (!feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabled(
+    if (!feature_flags::gAuthoritativeShardsDDL.isEnabled(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return;

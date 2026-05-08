@@ -1137,9 +1137,9 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 })();
 
 (function testFindingInconsistenciesWithDbPrimaryShardWithUnknownDbMetadata() {
-    if (FeatureFlagUtil.isPresentAndEnabled(st.s, "ShardAuthoritativeDbMetadataDDL")) {
+    if (FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsDDL")) {
         jsTestLog(
-            "Skipping test since featureFlagShardAuthoritativeDbMetadataDDL is enabled and do " +
+            "Skipping test since featureFlagAuthoritativeShardsDDL is enabled and do " +
                 "not refresh database metadata.",
         );
         return;

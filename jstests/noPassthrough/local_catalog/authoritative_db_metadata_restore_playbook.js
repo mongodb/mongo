@@ -5,8 +5,8 @@
  * because the restarted node relies on the replica set config persisted to disk to know that it
  * is initialized as part of a replica set and should run for election.
  * @tags: [
- *   featureFlagShardAuthoritativeDbMetadataCRUD,
- *   featureFlagShardAuthoritativeDbMetadataDDL,
+ *   featureFlagAuthoritativeShardsCRUD,
+ *   featureFlagAuthoritativeShardsDDL,
  *   requires_persistence,
  * ]
  */

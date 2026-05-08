@@ -119,7 +119,7 @@ function runCommentParamTest({
     // Force a refresh on the shards. This is necessary because MongoS could get StaleDbVersion
     // error upon sending an agg request, causing it to retry the agg command from the top and
     // resulting in more profiler entries than what is expected.
-    if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "ShardAuthoritativeDbMetadataCRUD")) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.rs0.getPrimary(), "AuthoritativeShardsCRUD")) {
         assert.commandWorked(
             st.rs0.getPrimary().getDB(testDB.getName()).adminCommand({
                 _flushDatabaseCacheUpdates: testDB.getName(),
@@ -127,7 +127,7 @@ function runCommentParamTest({
             }),
         );
     }
-    if (!FeatureFlagUtil.isPresentAndEnabled(st.rs1.getPrimary(), "ShardAuthoritativeDbMetadataCRUD")) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(st.rs1.getPrimary(), "AuthoritativeShardsCRUD")) {
         assert.commandWorked(
             st.rs1.getPrimary().getDB(testDB.getName()).adminCommand({
                 _flushDatabaseCacheUpdates: testDB.getName(),

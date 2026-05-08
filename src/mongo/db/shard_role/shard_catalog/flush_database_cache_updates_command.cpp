@@ -173,10 +173,10 @@ public:
                     "refreshed",
                     !dbName.isAdminDB() && !dbName.isConfigDB());
 
-            if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+            if (feature_flags::gAuthoritativeShardsCRUD.isEnabled(
                     VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                // When the `ShardAuthoritativeDbMetadataCRUD` feature flag is enabled, this method
+                // When the `AuthoritativeShardsCRUD` feature flag is enabled, this method
                 // should no longer be used, as nodes start relying on the `config.shard.catalog`
                 // authoritative collections rather than the config server (primary node) or
                 // contacting the primary to replicate filtering metadata in the `config.cache`

@@ -1450,7 +1450,7 @@ const st = new ShardingTest({
 
 // Helper function to check if authoritative database shards feature is enabled.
 function isAuthoritativeShardsEnabled(conn) {
-    return FeatureFlagUtil.isPresentAndEnabled(conn, "ShardAuthoritativeDbMetadataCRUD");
+    return FeatureFlagUtil.isPresentAndEnabled(conn, "AuthoritativeShardsCRUD");
 }
 
 const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemovedSinceLastLTS, isMongodTest) => {

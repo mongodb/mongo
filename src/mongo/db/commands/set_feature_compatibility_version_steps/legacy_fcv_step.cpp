@@ -642,8 +642,8 @@ private:
 
         // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
         if (role && role->has(ClusterRole::ConfigServer) &&
-            feature_flags::gShardAuthoritativeDbMetadataDDL
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion) &&
+            feature_flags::gAuthoritativeShardsDDL.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+                requestedVersion, originalVersion) &&
             !serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
                  .isUpgradingOrDowngrading()) {
             // Drop the authoritative database collection before transitioning to kUpgrading
@@ -1142,7 +1142,7 @@ private:
         const bool isConfigsvr = role && role->has(ClusterRole::ConfigServer);
         // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
         if (isConfigsvr &&
-            !feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabledOnVersion(requestedVersion)) {
+            !feature_flags::gAuthoritativeShardsDDL.isEnabledOnVersion(requestedVersion)) {
             // Dropping the authoritative collections (config.shard.catalog.databases) as the final
             // step of the downgrade ensures that no leftover data remains. This guarantees a clean
             // downgrade and makes it safe to upgrade again.

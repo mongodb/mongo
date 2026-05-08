@@ -357,7 +357,7 @@ Status FilteringMetadataCache::onCollectionPlacementVersionMismatch(
     boost::optional<ChunkVersion> chunkVersionReceived) noexcept {
     try {
         auto shouldUseAuthoritativePath = [&] {
-            if (!feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+            if (!feature_flags::gAuthoritativeShardsCRUD.isEnabled(
                     VersionContext::getDecoration(opCtx),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
                 return false;
@@ -459,7 +459,7 @@ Status FilteringMetadataCache::onDbVersionMismatch(
     while (true) {
         try {
             auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-            if (feature_flags::gShardAuthoritativeDbMetadataCRUD.isEnabled(
+            if (feature_flags::gAuthoritativeShardsCRUD.isEnabled(
                     VersionContext::getDecoration(opCtx), fcvSnapshot)) {
                 _onDbVersionMismatchAuthoritative(opCtx, dbName, clientDbVersion);
             } else {

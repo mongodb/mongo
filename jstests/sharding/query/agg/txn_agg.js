@@ -36,7 +36,7 @@ let sessionDB = session.getDatabase("test");
 let sessionColl = sessionDB.getCollection("user");
 let sessionUnsharded = sessionDB.getCollection("foo");
 
-if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataCRUD")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(st.shard0, "AuthoritativeShardsCRUD")) {
     // Transactions do not internally retry on StaleDbVersion errors, so we ensure the primary
     // shard's cached databaseVersion is fresh before running commands through mongos on the
     // unsharded collections.

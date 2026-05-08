@@ -211,7 +211,7 @@ export function flushRoutersAndRefreshShardMetadata(st, {ns, dbNames = []} = {},
             assert.commandWorked(rs.test.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
         }
 
-        if (!FeatureFlagUtil.isPresentAndEnabled(rs.test.getPrimary(), "ShardAuthoritativeDbMetadataCRUD")) {
+        if (!FeatureFlagUtil.isPresentAndEnabled(rs.test.getPrimary(), "AuthoritativeShardsCRUD")) {
             dbNames.forEach((dbName) => {
                 assert.commandWorked(rs.test.getPrimary().adminCommand({_flushDatabaseCacheUpdates: dbName}));
             });

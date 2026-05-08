@@ -14,8 +14,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 1, config: 1});
 
 // TODO (SERVER-124050): Investigate failure in this test when authoritative shards are enabled.
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, "ShardAuthoritativeCollMetadata")) {
-    jsTestLog("Skipping test because featureFlagShardAuthoritativeCollMetadata is enabled");
+if (FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsCRUD")) {
+    jsTestLog("Skipping test because featureFlagAuthoritativeShardsCRUD is enabled");
     st.stop();
     quit();
 }

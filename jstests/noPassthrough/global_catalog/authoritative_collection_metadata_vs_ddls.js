@@ -5,7 +5,7 @@
  * no inconsistencies after each DDL.
  *
  * @tags: [
- *   featureFlagShardAuthoritativeCollMetadata,
+ *   featureFlagAuthoritativeShardsDDL,
  * ]
  */
 

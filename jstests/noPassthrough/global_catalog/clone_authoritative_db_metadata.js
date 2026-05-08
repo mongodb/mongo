@@ -8,8 +8,8 @@
  * upgrade procedure.
  *
  * @tags: [
- *     featureFlagShardAuthoritativeDbMetadataCRUD,
- *     featureFlagShardAuthoritativeDbMetadataDDL,
+ *     featureFlagAuthoritativeShardsCRUD,
+ *     featureFlagAuthoritativeShardsDDL,
  * ]
  */
 

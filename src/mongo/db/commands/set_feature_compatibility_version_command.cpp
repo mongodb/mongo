@@ -802,7 +802,7 @@ private:
                         });
             } else {
                 // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
-                if (feature_flags::gShardAuthoritativeDbMetadataDDL
+                if (feature_flags::gAuthoritativeShardsDDL
                         .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
                                                                       originalVersion)) {
                     // Since we have a feature flag changing value in kUpgrading, we need to drain
@@ -944,9 +944,8 @@ private:
         // Run the authoritative clone phase on ALL shards (including the config
         // server if it's also a shard).
         if (role && role->has(ClusterRole::ConfigServer)) {
-            if (feature_flags::gShardAuthoritativeDbMetadataDDL
-                    .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
-                                                                  originalVersion)) {
+            if (feature_flags::gAuthoritativeShardsDDL.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+                    requestedVersion, originalVersion)) {
                 cloneAuthoritativeDatabaseMetadataOnShards(opCtx);
             }
         }
