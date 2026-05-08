@@ -129,7 +129,11 @@ void MeasurementMap::insertOne(const std::vector<BSONElement>& oneMeasurementDat
 
     for (const auto& elem : oneMeasurementDataFields) {
         StringData key = elem.fieldNameStringData();
-        fieldsSeen.insert(key);
+
+        uassert(12602102,
+                "Measurements with duplicate field names cannot be stored in timeseries "
+                "collections",
+                fieldsSeen.insert(key).second);
 
         auto builderIt = _builders.find(key);
         if (builderIt == _builders.end()) {
