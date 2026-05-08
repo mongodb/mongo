@@ -19,7 +19,9 @@
 \* are not specified. This allows movePrimary to happen with a transaction active on the namespaces in
 \* the database. The upside of this is that the model is kept simpler while allowing exploration of
 \* states equivalent to those that can happen in reality, but in practice would require 2 or more
-\* databases to cause an anomaly (e.g. SERVER-82353).
+\* databases to cause an anomaly (e.g. SERVER-82353). The lack of database locks also means we can't 
+\* reliably model the tracking of per-transaction created databases, because it requires operations 
+\* like createCollection and movePrimary to synchronize through the DDL locks.
 \*
 \* The ShardVersion is only partially modelled to consider the timestamp field, referred to as
 \* 'collectionGen' in this spec. Similarly the DatabaseVersion only considers the timestamp field,
@@ -58,12 +60,9 @@ ASSUME TXN_STMTS \in 2..100
 Max(S) == CHOOSE x \in S : \A y \in S : x >= y
 IsInjective(f) == \A a,b \in DOMAIN f : f[a] = f[b] => a = b
 
-\* Database names for tracking created databases
-DatabaseNames == {"db"}
-
 \* Transaction Runtime Context - sent with all requests, but placementConflictTime is only
 \* populated on startTransaction (set to -1 otherwise)
-TxnRuntimeContext == [startTransaction: BOOLEAN, placementConflictTime: Int, createdDatabases: SUBSET DatabaseNames]
+TxnRuntimeContext == [startTransaction: BOOLEAN, placementConflictTime: Int]
 
 DroppedNamespaceUUID == 0
 Stmts == 1..TXN_STMTS
@@ -94,7 +93,7 @@ UnknownCollectionCacheMetadata == [type |-> UNKNOWN, collectionGen |-> Untracked
 NoDatabaseVersion == 0
 DatabaseMetadataFormat == [primaryShard: Shards, dbVersion: Nat]
 
-EmptyTxnResources == [snapshot |-> <<>>, locks |-> [n \in NameSpaces |-> FALSE], placementConflictTime |-> -1, createdDatabases |-> {}]
+EmptyTxnResources == [snapshot |-> <<>>, locks |-> [n \in NameSpaces |-> FALSE], placementConflictTime |-> -1]
 
 (* Global and networking variables *)
 VARIABLE databaseMetadata   \* Authoritative metadata source for the database (single).
@@ -110,16 +109,13 @@ VARIABLE rCompletedStmt         \* Router statements acknowledged by the shard.
 VARIABLE rPlacementConflictTime \* Per-transaction, immutable timestamp that the router forwards
                                 \* with the first statement (startTransaction). Used to detect
                                 \* generation anomalies for tracked namespaces.
-VARIABLE rCreatedDatabases      \* Per-transaction, set of databases created during the transaction.
-
 (* Shard variables *)
-VARIABLE shardTxnResources  \* Per-shard, data+catalog snapshot, locks held, placement conflict time
-                            \* and created databases list for each transaction.
+VARIABLE shardTxnResources  \* Per-shard, data+catalog snapshot, locks held and placement conflict time.
 VARIABLE shardData          \* Per-namespace, set of keys held on each shard.
 VARIABLE shardNamespaceUUID \* Per-namespace, UUID on each shard.
 
 global_vars == << databaseMetadata, collectionMetadata, log, response, clusterTime, nextUUID >>
-router_vars == << rDatabaseCache, rCollectionCache, rCompletedStmt, rPlacementConflictTime, rCreatedDatabases >>
+router_vars == << rDatabaseCache, rCollectionCache, rCompletedStmt, rPlacementConflictTime >>
 shard_vars == << shardTxnResources, shardData, shardNamespaceUUID >>
 vars == << global_vars, router_vars, shard_vars >>
 
@@ -135,7 +131,6 @@ Init == (* Global and networking *)
         /\ rCollectionCache = [ n \in NameSpaces |-> UnknownCollectionCacheMetadata ]
         /\ rCompletedStmt = [ t \in Txns |-> 0 ]
         /\ rPlacementConflictTime = [t \in Txns |-> -1]
-        /\ rCreatedDatabases = [t \in Txns |-> {}]
         (* Shard *)
         /\ shardTxnResources = [s \in Shards |-> [ t \in Txns |-> EmptyTxnResources]]
         /\ shardData = [ n \in NameSpaces |-> [ s \in Shards |-> {}]]
@@ -180,11 +175,9 @@ TxnStmtLogEntries(t, ns, isStartTransaction) ==
         dbVersion == IF collectionGen # UntrackedCollectionGen THEN NoDatabaseVersion ELSE rDatabaseCache.dbVersion
         \* Create transaction runtime context for all requests
         \* startTransaction and placementConflictTime are only set on first statement
-        \* createdDatabases is always included and kept up-to-date
         txnCtx == [
             startTransaction |-> isStartTransaction,
-            placementConflictTime |-> IF isStartTransaction THEN rPlacementConflictTime'[t] ELSE -1,
-            createdDatabases |-> rCreatedDatabases'[t]
+            placementConflictTime |-> IF isStartTransaction THEN rPlacementConflictTime'[t] ELSE -1
         ]
     IN  [
         reqEntries |-> {CreateReqEntry(s, ns, dbVersion, collectionGen, txnCtx): s \in owningShards}
@@ -203,8 +196,6 @@ RouterSendTxnStmt ( t, ns ) ==
             THEN rPlacementConflictTime' = [rPlacementConflictTime EXCEPT ![t] = clusterTime]
             ELSE UNCHANGED rPlacementConflictTime
         /\ rCollectionCache' = [rCollectionCache EXCEPT ![ns] = IF @.type = UNKNOWN THEN RouterCacheLookup(ns) ELSE @]
-        \* Track if this transaction creates the database (when cache refresh reveals a new db)
-        /\ rCreatedDatabases' = [rCreatedDatabases EXCEPT ![t] = @ \union {"db"}]
         /\ log' = [log EXCEPT ![t] = Append(log[t], TxnStmtLogEntries(t, ns, isStartTransaction))]
     /\  UNCHANGED << databaseMetadata, collectionMetadata, response, clusterTime, nextUUID,
             rDatabaseCache, rCompletedStmt, shard_vars >>
@@ -228,7 +219,7 @@ RouterHandleAbort ( t, stm ) ==
             \/  UNCHANGED << rDatabaseCache, rCollectionCache >>
     /\ rCompletedStmt' = [rCompletedStmt EXCEPT ![t] = TXN_STMTS]
     /\ shardTxnResources' = ClearResourcesForTxn(t)
-    /\ UNCHANGED << global_vars, rPlacementConflictTime, rCreatedDatabases, shardData, shardNamespaceUUID >>
+    /\ UNCHANGED << global_vars, rPlacementConflictTime, shardData, shardNamespaceUUID >>
 
 \* Action: router processes an OK response from a shard. This action may imply the transaction
 \* is committed, in which case it is used as a shortcut to free the shards' resources for the
@@ -248,15 +239,13 @@ RouterHandleOK ( t, stm ) ==
         THEN shardTxnResources' = ClearResourcesForTxn(t)
         ELSE UNCHANGED shardTxnResources
     /\ UNCHANGED << global_vars, rDatabaseCache, rCollectionCache, rPlacementConflictTime,
-        rCreatedDatabases, shardData, shardNamespaceUUID >>
+        shardData, shardNamespaceUUID >>
 
 GetSnapshotForNs(snap, ns) == [uuid |-> snap.uuid[ns], data|->snap.data[ns]]
 
-DatabaseMetadataCheck(self, req, placementConflictTime, createdDatabases) ==
+DatabaseMetadataCheck(self, req, placementConflictTime) ==
     IF req.dbVersion # databaseMetadata.dbVersion THEN STALE_DB_VERSION
-    \* Skip placementConflictTime check if database was created by this transaction
-    ELSE IF "db" \notin createdDatabases /\ placementConflictTime # -1
-            /\ placementConflictTime < databaseMetadata.dbVersion
+    ELSE IF placementConflictTime # -1 /\ placementConflictTime < databaseMetadata.dbVersion
          THEN SNAPSHOT_INCOMPATIBLE
     ELSE OK
 
@@ -288,9 +277,9 @@ ResponseFromSnapshot(self, ns, status, txnSnapshot) ==
         status |-> status,
         snapshot |-> IF status # OK THEN {} ELSE GetSnapshotForNs(txnSnapshot, ns) ]
 
-MetadataCheck(self, t, req, txnSnapshot, placementConflictTime, createdDatabases) ==
+MetadataCheck(self, t, req, txnSnapshot, placementConflictTime) ==
     LET
-        databaseVersionStatus == DatabaseMetadataCheck(self, req, placementConflictTime, createdDatabases)
+        databaseVersionStatus == DatabaseMetadataCheck(self, req, placementConflictTime)
         shardVersionStatus == ShardingMetadataCheck(req, placementConflictTime)
         localStatus == LocalMetadataCheck(self, req, txnSnapshot)
     IN
@@ -315,13 +304,10 @@ ShardResponse( self, t ) ==
                 \* Store placementConflictTime only from first statement (when startTransaction is TRUE)
                 ![self][t].placementConflictTime = IF @ = -1 /\ req.txnRuntimeContext.startTransaction
                                                     THEN req.txnRuntimeContext.placementConflictTime
-                                                    ELSE @,
-                \* Always update createdDatabases list from every statement
-                ![self][t].createdDatabases = req.txnRuntimeContext.createdDatabases]
+                                                    ELSE @]
             /\  LET txnSnapshot == shardTxnResources'[self][t].snapshot
                     placementConflictTime == shardTxnResources'[self][t].placementConflictTime
-                    createdDatabases == shardTxnResources'[self][t].createdDatabases
-                    rspStatus == MetadataCheck(self, t, req, txnSnapshot, placementConflictTime, createdDatabases)
+                    rspStatus == MetadataCheck(self, t, req, txnSnapshot, placementConflictTime)
                 IN  response' = [response EXCEPT ![t][stmt] = @ \union {ResponseFromSnapshot(self, req.ns, rspStatus, txnSnapshot)}]
     /\ UNCHANGED << databaseMetadata, collectionMetadata, log, clusterTime, nextUUID, router_vars,
         shardData, shardNamespaceUUID >>
@@ -483,7 +469,6 @@ TypeOK ==
             /\ \A req \in log[t][i].reqEntries :
                 /\ req.txnRuntimeContext.startTransaction \in BOOLEAN
                 /\ req.txnRuntimeContext.placementConflictTime \in Int
-                /\ req.txnRuntimeContext.createdDatabases \subseteq DatabaseNames
                 \* Consistency check: startTransaction=TRUE implies placementConflictTime is set
                 /\ req.txnRuntimeContext.startTransaction => req.txnRuntimeContext.placementConflictTime # -1
     /\  collectionMetadata \in [ NameSpaces -> CollectionMetadataFormat ]

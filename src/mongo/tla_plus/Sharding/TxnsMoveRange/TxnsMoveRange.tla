@@ -40,24 +40,20 @@ MIGRATION_TS_DOMAIN == INIT_MIGRATION_TS..INIT_MIGRATION_TS+MIGRATIONS
 Stmts == 1..TXN_STMTS
 Status == {staleRouter, snapshotIncompatible, ok}
 
-\* Database names for tracking created databases
-DatabaseNames == {"db"}
-
 \* Transaction Runtime Context - sent with all requests, but placementConflictTime is only
 \* populated on startTransaction (set to -1 otherwise)
 TxnRuntimeContext == [
     startTransaction: BOOLEAN,
-    placementConflictTime: Int,
-    createdDatabases: SUBSET DatabaseNames
+    placementConflictTime: Int
 ]
 
-\* Shard transaction resources - stores placementConflictTime and createdDatabases directly
-EmptyTxnResources == [placementConflictTime |-> -1, createdDatabases |-> {}]
+\* Shard transaction resources - stores placementConflictTime
+EmptyTxnResources == [placementConflictTime |-> -1]
 
 \* A router request.
 \* 's' is the target shard. 'ns' is the target namespace. 'k' is the query predicate (a key match).
 \* 'v' is the placement version.
-\* 'txnRuntimeContext' contains startTransaction, placementConflictTime and createdDatabases.
+\* 'txnRuntimeContext' contains startTransaction and placementConflictTime.
 \* 'startTransaction' indicates if this is the first statement.
 ReqEntry == [s: Shards, ns: NameSpaces, k: Keys, v: 0..MIGRATIONS, txnRuntimeContext: TxnRuntimeContext]
 
@@ -88,20 +84,19 @@ VARIABLE rCachedVersions        \* The version associated with the cached routin
 VARIABLE rCompletedStmt         \* Router statements acknowledged by the shard.
 VARIABLE rPlacementConflictTime \* Per-transaction, immutable timestamp that the router forwards
                                 \* with the first statement only. Used to detect the data placement anomaly.
-VARIABLE rCreatedDatabases      \* Per-transaction, set of databases created (for this spec: always empty)
 
 (* Shard variables *)
 VARIABLE shardLastMigrationTs   \* The timestamp of the last committed incoming range migration.
 VARIABLE shardSnapshotted       \* Whether the shard has established a snapshot for a transaction.
 VARIABLE shardSnaspshot         \* The transaction's storage snapshot on the shard.
 VARIABLE shardLocked            \* Per-namespace intent lock. Serializes with range migrations.
-VARIABLE shardTxnResources      \* Per-transaction placementConflictTime and createdDatabases stored on shard
+VARIABLE shardTxnResources      \* Per-transaction placementConflictTime stored on shard
 
 vars == <<ranges, versions, request, response, shardLocked, rCachedVersions, rCachedRanges,
-          rPlacementConflictTime, rCreatedDatabases, rCompletedStmt, shardLastMigrationTs,
+          rPlacementConflictTime, rCompletedStmt, shardLastMigrationTs,
           shardSnapshotted, shardSnaspshot, shardTxnResources, migrations>>
 \* Variables grouped by writer.
-router_vars == <<rCachedRanges, rCachedVersions, rPlacementConflictTime, rCreatedDatabases, rCompletedStmt, request>>
+router_vars == <<rCachedRanges, rCachedVersions, rPlacementConflictTime, rCompletedStmt, request>>
 shard_vars == <<shardSnapshotted, shardSnaspshot, shardTxnResources, response>>
 migration_vars== <<shardLastMigrationTs, ranges, versions, migrations>>
 
@@ -115,7 +110,6 @@ Init == (* Global and networking *)
         /\ rCachedVersions = [n \in NameSpaces |-> [s \in Shards |-> 0]]
         /\ rCachedRanges = [n \in NameSpaces |-> ranges[n]]
         /\ rPlacementConflictTime = [t \in Txns |-> -1]
-        /\ rCreatedDatabases = [t \in Txns |-> {}]
         /\ rCompletedStmt = [t \in Txns |-> 0]
         (* Shard *)
         /\ shardSnapshotted = [self \in Shards |-> [t \in Txns |-> FALSE]]
@@ -154,11 +148,9 @@ RouterSendTxnStmt(t, ns, k) ==
         /\ LET s == rCachedRanges[ns][k]
                \* Create transaction runtime context for all requests
                \* startTransaction and placementConflictTime are only set on first statement
-               \* createdDatabases is always included and kept up-to-date
                txnCtx == [
                    startTransaction |-> isStartTransaction,
-                   placementConflictTime |-> IF isStartTransaction THEN rPlacementConflictTime'[t] ELSE -1,
-                   createdDatabases |-> rCreatedDatabases[t]
+                   placementConflictTime |-> IF isStartTransaction THEN rPlacementConflictTime'[t] ELSE -1
                ]
            IN
             /\ request' = [request EXCEPT ![t] = Append(request[t],
@@ -166,7 +158,7 @@ RouterSendTxnStmt(t, ns, k) ==
                                                                   rCachedVersions[ns][s],
                                                                   txnCtx))]
     /\ UNCHANGED <<shard_vars, migration_vars, rCompletedStmt, rCachedRanges, rCachedVersions,
-                   shardLocked, rCreatedDatabases>>
+                   shardLocked>>
 
 \* Action: router processes a non-ok response from a shard.
 RouterHandleAbort(t, stm) ==
@@ -186,7 +178,7 @@ RouterHandleAbort(t, stm) ==
     /\ shardLocked' = Unlock(t) \* Avoid a ShardAbortTxn action to spare state space.
     /\ shardTxnResources' = ClearShardTxnResources(t)
     /\ UNCHANGED <<shardSnapshotted, shardSnaspshot, response, migration_vars, request,
-                   rPlacementConflictTime, rCreatedDatabases>>
+                   rPlacementConflictTime>>
 
 \* Action: router processes an ok response from a shard.
 RouterHandleOk(t, stm) ==
@@ -200,7 +192,7 @@ RouterHandleOk(t, stm) ==
             /\ shardTxnResources' = ClearShardTxnResources(t)
        ELSE UNCHANGED <<shardLocked, shardTxnResources>>
     /\ UNCHANGED <<shardSnapshotted, shardSnaspshot, response, migration_vars, rCachedVersions,
-                   rCachedRanges, rPlacementConflictTime, rCreatedDatabases, request>>
+                   rCachedRanges, rPlacementConflictTime, request>>
 
 \* Action: shard responds to a statement forwarded by the router.
 ShardRespond(t, self) ==
@@ -219,9 +211,7 @@ ShardRespond(t, self) ==
             \* Store placementConflictTime only from first statement (when startTransaction is TRUE)
             ![self][t].placementConflictTime = IF @ = -1 /\ req.txnRuntimeContext.startTransaction
                                                 THEN req.txnRuntimeContext.placementConflictTime
-                                                ELSE @,
-            \* Always update createdDatabases list from every statement
-            ![self][t].createdDatabases = req.txnRuntimeContext.createdDatabases]
+                                                ELSE @]
         \* Use stored placementConflictTime for metadata checks
         /\ LET placementConflictTime == shardTxnResources'[self][t].placementConflictTime
            IN
@@ -288,14 +278,13 @@ TypeOK ==
         /\ request[t][i].v \in 0..MIGRATIONS
         /\ request[t][i].txnRuntimeContext.startTransaction \in BOOLEAN
         /\ request[t][i].txnRuntimeContext.placementConflictTime \in Int
-        /\ request[t][i].txnRuntimeContext.createdDatabases \subseteq DatabaseNames
         \* Consistency check: startTransaction=TRUE implies placementConflictTime is set
         /\ request[t][i].txnRuntimeContext.startTransaction => request[t][i].txnRuntimeContext.placementConflictTime # -1
     /\ ranges \in [NameSpaces -> [Keys -> Shards]]
     /\ versions \in [Shards -> [NameSpaces -> 0..MIGRATIONS]]
     /\ rCachedVersions \in [NameSpaces -> [Shards -> -1..MIGRATIONS]]
     /\ shardLastMigrationTs \in [Shards -> [NameSpaces -> MIGRATION_TS_DOMAIN]]
-    /\ shardTxnResources \in [Shards -> [Txns -> [placementConflictTime: Int, createdDatabases: SUBSET DatabaseNames]]]
+    /\ shardTxnResources \in [Shards -> [Txns -> [placementConflictTime: Int]]]
 
 (**************************************************************************************************)
 (* Miscellaneous properties for exploring/understanding the spec.                                 *)
