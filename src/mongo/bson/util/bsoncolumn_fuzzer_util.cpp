@@ -357,9 +357,12 @@ bool createFuzzedElement(const char*& ptr,
         case BinData: {
             READ_BYTE(ptr, end, binDataTypeMagnitude, );
             binDataTypeMagnitude %= 10;
-            BinDataType binDataType = binDataTypeMagnitude <= 8
+            // Skip BinDataType::Column (7): it cannot be appended to a BSONColumnBuilder.
+            // Values 0-6 map directly; 7-8 shift up by one (to 8-9); 9 maps to bdtCustom.
+            BinDataType binDataType = binDataTypeMagnitude < 7
                 ? static_cast<BinDataType>(binDataTypeMagnitude)
-                : BinDataType::bdtCustom;
+                : binDataTypeMagnitude <= 8 ? static_cast<BinDataType>(binDataTypeMagnitude + 1)
+                                            : BinDataType::bdtCustom;
             if (!generateBuf(ptr, end, &buf[0], len))
                 return false;
             result = createElementBinData(binDataType, &buf[0], len, elementMemory);

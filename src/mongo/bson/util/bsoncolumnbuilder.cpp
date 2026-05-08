@@ -164,6 +164,18 @@ bool _containsScalars(const BSONObj& reference) {
     return false;
 }
 
+// Throws if elem is, or contains, a binData element with Column subtype.
+void _validateNoNestedBSONColumn(const BSONElement& elem) {
+    uassert(12506300,
+            "Timeseries collections cannot store BSONColumn data",
+            !elem.isBinData(BinDataType::Column));
+    if (elem.type() == BSONType::Object || elem.type() == BSONType::Array) {
+        for (const auto& sub : elem.Obj()) {
+            _validateNoNestedBSONColumn(sub);
+        }
+    }
+}
+
 // Internal recursion function for traverseLockStep(). See documentation for traverseLockStep.
 template <typename ElementFunc>
 std::pair<BSONObj::iterator, bool> _traverseLockStep(const BSONObj& reference,
@@ -1020,7 +1032,9 @@ BSONColumnBuilder<Allocator>& BSONColumnBuilder<Allocator>::append(BSONElement e
         return skip();
     }
 
-    if ((type != Object && type != Array) || elem.Obj().isEmpty()) {
+    _validateNoNestedBSONColumn(elem);
+
+    if ((type != BSONType::Object && type != BSONType::Array) || elem.Obj().isEmpty()) {
         // Flush previous sub-object compression when non-object is appended
         if (std::holds_alternative<typename InternalState::Interleaved>(_is.state)) {
             _flushSubObjMode();
@@ -1035,12 +1049,18 @@ BSONColumnBuilder<Allocator>& BSONColumnBuilder<Allocator>::append(BSONElement e
 
 template <class Allocator>
 BSONColumnBuilder<Allocator>& BSONColumnBuilder<Allocator>::append(const BSONObj& obj) {
-    return _appendObj({obj, Object});
+    for (const auto& elem : obj) {
+        _validateNoNestedBSONColumn(elem);
+    }
+    return _appendObj({obj, BSONType::Object});
 }
 
 template <class Allocator>
 BSONColumnBuilder<Allocator>& BSONColumnBuilder<Allocator>::append(const BSONArray& arr) {
-    return _appendObj({arr, Array});
+    for (const auto& elem : arr) {
+        _validateNoNestedBSONColumn(elem);
+    }
+    return _appendObj({arr, BSONType::Array});
 }
 
 template <class Allocator>
