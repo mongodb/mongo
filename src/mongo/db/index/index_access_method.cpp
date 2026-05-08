@@ -1037,6 +1037,12 @@ private:
 
     std::unique_ptr<Sorter> _sorter;
     ContainerWriteBehavior _containerWriteBehavior;
+    // We start out with container::ExistingKeyPolicy::reject because it's not safe to write blindly
+    // unless we know for certain that we're inserting something that is definitely not already in
+    // the table; secondaries make their own decisions of whether to apply their writes blindly or
+    // not. Once we're past any keys that already exist in the table, we can switch to
+    // container::ExistingKeyPolicy::overwrite as a performance optimization.
+    container::ExistingKeyPolicy _containerExistingKeyPolicy = container::ExistingKeyPolicy::reject;
 };
 
 BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* entry,
@@ -1258,7 +1264,6 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
             for (auto&& key : batch) {
                 _addKeyForCommit(opCtx, ru, *collection, key);
-                keysInsertedCounter.add(1);
             }
             wunit.commit();
         });
@@ -1406,12 +1411,23 @@ void BulkBuilderImpl::_addKeyForCommit(OperationContext* opCtx,
                                        const CollectionPtr& coll,
                                        const key_string::View& key) {
     if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
-        uassertStatusOK(container_write::insert(opCtx,
-                                                ru,
-                                                _iam->getSortedDataInterface()->getContainer(),
-                                                key.getKeyAndRecordIdView(),
-                                                key.getTypeBitsView(),
-                                                container::ExistingKeyPolicy::overwrite));
+        auto status = container_write::insert(opCtx,
+                                              ru,
+                                              _iam->getSortedDataInterface()->getContainer(),
+                                              key.getKeyAndRecordIdView(),
+                                              key.getTypeBitsView(),
+                                              _containerExistingKeyPolicy);
+        if (status == ErrorCodes::KeyExists) {
+            // The key was already inserted by a previous bulk builder on this same container.
+            return;
+        } else if (_containerExistingKeyPolicy == container::ExistingKeyPolicy::reject &&
+                   status.isOK()) {
+            // We've reached the end of any keys previously inserted. From this point forward, we
+            // can assume that the keys we're inserting do not already exist in the container.
+            _containerExistingKeyPolicy = container::ExistingKeyPolicy::overwrite;
+        }
+        uassertStatusOK(status);
+        keysInsertedCounter.add(1);
         return;
     }
 
@@ -1419,6 +1435,7 @@ void BulkBuilderImpl::_addKeyForCommit(OperationContext* opCtx,
         _builder = _iam->getSortedDataInterface()->makeBulkBuilder(opCtx, ru);
     }
     _builder->addKey(ru, key);
+    keysInsertedCounter.add(1);
 }
 
 std::unique_ptr<BulkBuilderImpl::Sorter> BulkBuilderImpl::_makeSorter(

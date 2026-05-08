@@ -30,8 +30,10 @@
 #include "mongo/db/index_builds/multi_index_block.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index_builds/multi_index_block_gen.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/namespace_string.h"
@@ -1556,6 +1558,105 @@ KReplicateBuildHandle setUpKReplicatePrimaryDrivenBuild(OperationContext* opCtx,
     ASSERT_OK(indexer->insertAllDocumentsInCollection(opCtx, nss));
 
     return {buildUUID, std::move(indexBuildInfo), ident::generateNewIndexBuildIdent(buildUUID)};
+}
+
+TEST_F(MultiIndexBlockTest, CommitToleratesKeysAlreadyInContainer) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto& observer = installResumeStateContainerObserver(operationContext());
+
+    auto indexer = getIndexer();
+    indexer->setBuildUUID(UUID::gen());
+    indexer->setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer->setIsResumable(true);
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
+        wuow.commit();
+    }
+
+    auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    ASSERT_OK(indexer->init(operationContext(),
+                            coll,
+                            {indexBuildInfo},
+                            MultiIndexBlock::kNoopOnInitFn,
+                            MultiIndexBlock::InitMode::SteadyState,
+                            boost::none));
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    auto* indexEntry = autoColl->getIndexCatalog()->findIndexByName(
+        operationContext(), "a_1", IndexCatalog::InclusionPolicy::kUnfinished);
+    ASSERT(indexEntry);
+    auto* iam = indexEntry->accessMethod()->asSortedData();
+    ASSERT(iam);
+
+    auto record = autoColl->getCursor(operationContext())->next();
+    ASSERT(record);
+    auto recordId = record->id;
+
+    auto& containerPool = PreallocatedContainerPool::get(operationContext());
+    SharedBufferFragmentBuilder pooledBuilder{1024};
+    KeyStringSet keys;
+    KeyStringSet multikeyMetadataKeys;
+    auto multikeyPaths = containerPool.multikeyPaths();
+    iam->getKeys(operationContext(),
+                 *autoColl,
+                 indexEntry,
+                 pooledBuilder,
+                 BSON("_id" << 0 << "a" << 1),
+                 InsertDeleteOptions::ConstraintEnforcementMode::kEnforceConstraints,
+                 SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                 &keys,
+                 &multikeyMetadataKeys,
+                 multikeyPaths.get(),
+                 recordId);
+    ASSERT_EQ(keys.size(), 1);
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(container_write::insert(operationContext(),
+                                          *shard_role_details::getRecoveryUnit(operationContext()),
+                                          iam->getSortedDataInterface()->getContainer(),
+                                          keys.begin()->getView(),
+                                          keys.begin()->getTypeBitsView(),
+                                          container::ExistingKeyPolicy::overwrite));
+        wuow.commit();
+    }
+
+    auto insertsBefore = observer.countInsertsForIdent(indexBuildInfo.indexIdent);
+    EXPECT_GT(insertsBefore, 0);
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(indexer->commit(operationContext(),
+                                  coll.getWritableCollection(operationContext()),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
+                                  MultiIndexBlock::kNoopOnCommitFn));
+        wuow.commit();
+    }
+
+    // The commit should have skipped the key that was previously inserted.
+    EXPECT_EQ(observer.countInsertsForIdent(indexBuildInfo.indexIdent), insertsBefore);
 }
 
 // persistResumeState for a primary-driven build with kReplicate goes through the container_write
