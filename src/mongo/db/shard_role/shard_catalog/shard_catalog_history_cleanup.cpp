@@ -58,7 +58,7 @@ StorageEngine::TimestampMonitor::TimestampListener kShardCatalogHistoryCleanupTi
 
         auto shardId = shardingState->shardId();
 
-        // TODO(SERVER-125471): Handle leftover collections after chunk cleanup
+        // TODO(SERVER-126200): Remove reference to ChunklessPlaceholder.
         PersistentTaskStore<ChunkType> chunkStore{
             NamespaceString::kConfigShardCatalogChunksNamespace};
         try {
