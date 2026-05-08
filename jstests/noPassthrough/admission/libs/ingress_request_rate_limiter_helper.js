@@ -60,59 +60,12 @@ export function authenticateConnection(conn) {
 }
 
 /**
- * Returns a new authenticated non-exempt connection to host.
- */
-export function makeAuthConn(host) {
-    const conn = new Mongo(host);
-    authenticateConnection(conn);
-    return conn;
-}
-
-/**
- * Returns a new authenticated exempt connection to host.
- */
-export function makeExemptConn(host) {
-    const conn = new Mongo(`mongodb://${host}/?appName=${kRateLimiterExemptAppName}`);
-    authenticateConnection(conn);
-    return conn;
-}
-
-/**
  * Returns the stats for the ingress request rate limiter.
  */
 export function getRateLimiterStats(exemptConn) {
     const db = exemptConn.getDB("admin");
     const status = db.serverStatus();
     return status.network.ingressRequestRateLimiter;
-}
-
-/**
- * Measures ingress queue stats around an operation and returns the stat deltas.
- */
-export function measureQueueStats(exemptConn, operationFn) {
-    const before = getRateLimiterStats(exemptConn);
-    operationFn();
-    const after = getRateLimiterStats(exemptConn);
-
-    return {
-        addedToQueue: after.addedToQueue - before.addedToQueue,
-        removedFromQueue: after.removedFromQueue - before.removedFromQueue,
-        interruptedInQueue: after.interruptedInQueue - before.interruptedInQueue,
-        rejectedAdmissions: after.rejectedAdmissions - before.rejectedAdmissions,
-    };
-}
-
-/**
- * Runs the supplied function with the ingress request rate limiter disabled, restoring it
- * afterwards.
- */
-export function withRateLimitingDisabled(exemptConn, fn) {
-    assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 0}));
-    try {
-        fn();
-    } finally {
-        assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 1}));
-    }
 }
 
 /**

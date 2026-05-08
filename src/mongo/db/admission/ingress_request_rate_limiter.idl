@@ -28,7 +28,7 @@
 
 global:
     mod_visibility: public
-    cpp_namespace: "mongo::admission"
+    cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/admission/ingress_request_rate_limiter.h"
         - "mongo/db/server_options.h"
@@ -86,18 +86,4 @@ server_parameters:
             name: "IngressRequestRateLimiterAppExemptions"
             # Expects the payload to be an instance of `ApplicationExemptionListParameters`
             override_set: true
-        redact: false
-
-    ingressRequestAdmissionMaxQueueDepth:
-        description: >-
-            The maximum number of requests that may be queued waiting for an admission token when
-            the ingress request rate limit is exceeded. Requests that arrive when the queue is at
-            capacity are rejected immediately. A value of 0 disables queueing (requests are always
-            rejected immediately when the rate limit is exceeded).
-        set_at: [startup, runtime]
-        cpp_varname: gIngressRequestAdmissionMaxQueueDepth
-        cpp_vartype: Atomic<long long>
-        on_update: IngressRequestRateLimiter::onUpdateAdmissionMaxQueueDepth
-        default: 0
-        validator: {gte: 0}
         redact: false

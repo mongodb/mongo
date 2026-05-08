@@ -91,7 +91,7 @@ public:
     void appendIngressRequestRateLimiterStats(BSONObjBuilder* b, ServiceContext* service) const {
         auto ingressRequestRateLimiterBuilder =
             BSONObjBuilder{b->subobjStart("ingressRequestRateLimiter")};
-        const auto& ingressRequestRateLimiter = admission::IngressRequestRateLimiter::get(service);
+        const auto& ingressRequestRateLimiter = IngressRequestRateLimiter::get(service);
         ingressRequestRateLimiter.appendStats(&ingressRequestRateLimiterBuilder);
         ingressRequestRateLimiterBuilder.done();
     }

@@ -487,16 +487,13 @@ private:
     };
 
     struct IterationFrame {
-        explicit IterationFrame(const Impl& impl) : client(impl.client()), metrics{} {
+        explicit IterationFrame(const Impl& impl) : metrics{} {
             metrics.start();
         }
         ~IterationFrame() {
             metrics.finish();
-            // Clean up any stale deferred admission token on error paths or at end of iteration.
-            admission::IngressRequestRateLimiter::clearDeferredAdmissionToken(client);
         }
 
-        Client* client;
         metrics_detail::Metrics metrics;
     };
 
@@ -756,12 +753,11 @@ void SessionWorkflow::Impl::_sendResponse() {
 }
 
 Status SessionWorkflow::Impl::_rateLimit() const {
-    if (!gFeatureFlagIngressRateLimiting.isEnabled() ||
-        !admission::gIngressRequestRateLimiterEnabled.load()) {
+    if (!gFeatureFlagIngressRateLimiting.isEnabled() || !gIngressRequestRateLimiterEnabled.load()) {
         return Status::OK();
     }
 
-    auto& admissionRateLimiter = admission::IngressRequestRateLimiter::get(_serviceContext);
+    auto& admissionRateLimiter = IngressRequestRateLimiter::get(_serviceContext);
     return admissionRateLimiter.admitRequest(client());
 }
 

@@ -39,8 +39,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/admission/ingress_request_rate_limiter.h"
-#include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/cluster_umc_error_with_write_concern_error_info.h"
 #include "mongo/db/client.h"
@@ -403,7 +401,6 @@ public:
 
 private:
     Status _setup();
-    void _maybeWaitForAdmission();
 
     ParseAndRunCommand* const _parc;
 
@@ -612,24 +609,6 @@ void ParseAndRunCommand::_parseCommand() {
     }
 }
 
-void ParseAndRunCommand::RunInvocation::_maybeWaitForAdmission() {
-    const auto opCtx = _parc->_rec->getOpCtx();
-    if (!gFeatureFlagIngressRateLimiting.isEnabled()) {
-        return;
-    }
-
-    // Deferred admission must run after maxTimeMS is applied to the opCtx so that queued requests
-    // respect the deadline.
-    // NOTE: All cluster commands are subject to admission control at this time.
-    const auto isProcessInternalCommand = isProcessInternalClient(*opCtx->getClient());
-    // TODO(SERVER-125863): Integrate whether the cluster command is subject to admission control
-    // here once we audit the list.
-    const bool exemptFromIngressRateLimit =
-        isProcessInternalCommand || !admission::gIngressRequestRateLimiterEnabled.load();
-    uassertStatusOK(
-        admission::IngressRequestRateLimiter::waitForAdmission(opCtx, exemptFromIngressRateLimit));
-}
-
 bool isInternalClient(OperationContext* opCtx) {
     return opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
 }
@@ -652,8 +631,6 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         }
         opCtx->setUsesDefaultMaxTimeMS(usesDefaultMaxTimeMS);
     }
-
-    _maybeWaitForAdmission();
 
     if (MONGO_unlikely(
             hangBeforeCheckingMongosShutdownInterrupt.shouldFail([&](const BSONObj& data) {
@@ -1164,7 +1141,6 @@ void ParseAndRunCommand::RunInvocation::run() {
 void ParseAndRunCommand::run() {
     try {
         _parseCommand();
-
         RunInvocation runner(this);
         runner.run();
     } catch (const DBException& ex) {

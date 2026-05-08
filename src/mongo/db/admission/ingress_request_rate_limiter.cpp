@@ -44,7 +44,6 @@
 
 
 namespace mongo {
-namespace admission {
 
 namespace {
 
@@ -54,9 +53,7 @@ VersionedValue<CIDRList> ingressRequestRateLimiterIPExemptions;
 VersionedValue<std::vector<std::string>> ingressRequestRateLimiterAppExemptions;
 
 const auto getIngressRequestRateLimiter =
-    ServiceContext::declareDecoration<boost::optional<admission::IngressRequestRateLimiter>>();
-const auto getDeferredAdmissionToken =
-    Client::declareDecoration<boost::optional<admission::RateLimiter::DeferredToken>>();
+    ServiceContext::declareDecoration<boost::optional<IngressRequestRateLimiter>>();
 
 const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
     "InitIngressRequestRateLimiter",
@@ -175,7 +172,7 @@ Status IngressRequestRateLimiterAppExemptions::setFromString(StringData str,
 IngressRequestRateLimiter::IngressRequestRateLimiter()
     : _rateLimiter{static_cast<double>(gIngressRequestRateLimiterRatePerSec.load()),
                    gIngressRequestRateLimiterBurstCapacitySecs.load(),
-                   gIngressRequestAdmissionMaxQueueDepth.load(),
+                   0,
                    "ingressRequestRateLimiter"} {
     if (const auto scopedFp = ingressRequestRateLimiterFractionalRateOverride.scoped();
         MONGO_unlikely(scopedFp.isActive())) {
@@ -195,57 +192,13 @@ Status IngressRequestRateLimiter::admitRequest(Client* client) {
         return Status::OK();
     }
 
-    auto tokenResult = _rateLimiter.acquireToken();
-    if (MONGO_likely(tokenResult.isOK())) {
-        if (!tokenResult.getValue().isReady()) {
-            // The rate limiter issued a non-ready DeferredToken, store it on the client to resolve
-            // later in the request pipeline.
-            dassert(!getDeferredAdmissionToken(client).has_value(),
-                    "Client already has a deferred admission token");
-            getDeferredAdmissionToken(client).emplace(std::move(tokenResult.getValue()));
-        }
-
-        // The rate limiter's DeferredToken is ready now, the token was already consumed and stats
-        // were recorded. Dropping the DeferredToken here is intentional, the destructor is a no-op
-        // for ready DeferredTokens.
-        return Status::OK();
-    }
-
-    if (tokenResult.getStatus() == RateLimiter::kRejectedErrorCode) {
+    auto rateLimitResult = _rateLimiter.tryAcquireToken();
+    if (MONGO_unlikely(rateLimitResult == admission::RateLimiter::kRejectedErrorCode)) {
         return Status{ErrorCodes::IngressRequestRateLimitExceeded,
                       "Request rejected: ingress request rate limit exceeded"};
     }
-    return tokenResult.getStatus();
-}
 
-Status IngressRequestRateLimiter::waitForAdmission(OperationContext* opCtx,
-                                                   bool isExemptFromAdmissionControl) {
-    auto deferredToken = std::exchange(getDeferredAdmissionToken(opCtx->getClient()), boost::none);
-    if (!deferredToken) {
-        return Status::OK();
-    }
-
-    if (isExemptFromAdmissionControl) {
-        std::move(*deferredToken).recordExemption();
-        return Status::OK();
-    }
-
-    return std::move(*deferredToken).get(opCtx);
-}
-
-void IngressRequestRateLimiter::clearDeferredAdmissionToken(Client* client) {
-    getDeferredAdmissionToken(client) = boost::none;
-}
-
-void IngressRequestRateLimiter::setDeferredAdmissionToken_forTest(
-    Client* client, RateLimiter::DeferredToken deferredToken) {
-    invariant(!getDeferredAdmissionToken(client).has_value(),
-              "Client already has a deferred admission token");
-    getDeferredAdmissionToken(client).emplace(std::move(deferredToken));
-}
-
-bool IngressRequestRateLimiter::hasDeferredAdmissionToken_forTest(Client* client) {
-    return getDeferredAdmissionToken(client).has_value();
+    return rateLimitResult;
 }
 
 // This function is only for testing, but the _forTest name append makes the module linter
@@ -287,22 +240,18 @@ Status IngressRequestRateLimiter::onUpdateAdmissionBurstCapacitySecs(double burs
     return Status::OK();
 }
 
-void IngressRequestRateLimiter::updateMaxQueueDepth(std::int64_t maxQueueDepth) {
-    _rateLimiter.setMaxQueueDepth(maxQueueDepth);
-}
-
-Status IngressRequestRateLimiter::onUpdateAdmissionMaxQueueDepth(std::int64_t maxQueueDepth) {
-    if (auto client = Client::getCurrent()) {
-        getIngressRequestRateLimiter(client->getServiceContext())
-            ->updateMaxQueueDepth(maxQueueDepth);
-    }
-
-    return Status::OK();
-}
-
 void IngressRequestRateLimiter::appendStats(BSONObjBuilder* bob) const {
-    _rateLimiter.appendStats(bob);
+    // First we get the stats in a separate object in order to not mutate bob
+    auto rateLimiterBob = BSONObjBuilder{};
+    _rateLimiter.appendStats(&rateLimiterBob);
+    auto const rateLimiterStats = rateLimiterBob.obj();
+
+    // Then we copy elements one by one to avoid coping queueing stats
+    bob->append(rateLimiterStats.getField("rejectedAdmissions"));
+    bob->append(rateLimiterStats.getField("successfulAdmissions"));
+    bob->append(rateLimiterStats.getField("exemptedAdmissions"));
+    bob->append(rateLimiterStats.getField("attemptedAdmissions"));
+    bob->append(rateLimiterStats.getField("totalAvailableTokens"));
 }
 
-}  // namespace admission
 }  // namespace mongo
