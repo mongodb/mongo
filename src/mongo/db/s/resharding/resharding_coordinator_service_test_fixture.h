@@ -121,7 +121,8 @@ public:
             coordinatorDoc.getDonorShards(), coordinatorDoc.getRecipientShards(), initialChunks};
     }
 
-    bool searchIndexExistsForCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    bool searchIndexExistsForCollection(OperationContext* opCtx,
+                                        const NamespaceString& nss) override {
         if (_searchIndexResults.empty()) {
             return _searchIndexDefaultResult;
         }
