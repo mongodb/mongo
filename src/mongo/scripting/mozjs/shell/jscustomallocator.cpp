@@ -70,11 +70,18 @@ namespace sm {
 
 namespace {
 /**
- * These two variables track the total number of bytes handed out, and the
+ * These variables track the total number of bytes handed out, and the
  * maximum number of bytes we will consider handing out. They are set by
  * MozJSImplScope on start up.
+ *
+ * IMPORTANT: This tracking is accurate as long as all the allocations for a single scope are run
+ * from the same thread. We enforce this via js::DisableExtraThreads(). However if this changed and
+ * mozjs GC background threads were allowed to run, deallocations could be issued from a different
+ * thread than the thread that made the allocation, causing these counters to become inaccurate on
+ * the main scope thread.
  */
 thread_local size_t malloc_bytes = 0;
+thread_local size_t mmap_bytes = 0;
 thread_local size_t max_bytes = 0;
 
 // Allow disabling mmap tracking as a fallback in case counted memory goes too high
@@ -102,11 +109,15 @@ size_t get_malloc_bytes() {
 }
 
 size_t get_mmap_bytes() {
-    return track_mmap_bytes ? js::gc::GetProfilerMemoryCounts().bytes : 0;
+    return track_mmap_bytes ? mmap_bytes : 0;
 }
 
 void reset(size_t bytes, bool track_mmap) {
     malloc_bytes = 0;
+
+    MOZ_ASSERT(mmap_bytes == 0, "Expected mmap_bytes to be 0 during runtime initialization");
+    mmap_bytes = 0;
+
     max_bytes = bytes;
     track_mmap_bytes = track_mmap;
 }
@@ -122,12 +133,18 @@ void signal_oom() {
     }
 }
 
-void check_oom_on_mmap_allocation(size_t bytes) {
-    // called after an mmap allocation to check whether an oom signal is required
-    // if track_mmap_bytes is disabled we fall back to legacy logic and completely bypass this path
+/**
+ * Called after an mmap allocation to update memory bookkeeping and check whether an oom signal is
+ * required. If track_mmap_bytes is disabled we fall back to legacy logic and completely bypass this
+ * path
+ */
+void record_mmap_alloc(size_t bytes) {
+    mmap_bytes += bytes;
+
     size_t mb = get_max_bytes();
     size_t tb = get_total_bytes();
-    if (track_mmap_bytes && mb > 0 && get_total_bytes() + bytes > mb) {
+
+    if (track_mmap_bytes && mb > 0 && tb > mb) {
         LOGV2(10920001,
               "Out of memory on MozJS mmap allocation",
               "bytes"_attr = bytes,
@@ -135,6 +152,11 @@ void check_oom_on_mmap_allocation(size_t bytes) {
               "maxBytes"_attr = mb);
         signal_oom();
     }
+}
+
+void record_mmap_free(size_t bytes) {
+    MOZ_ASSERT(bytes <= mmap_bytes, "Freed mmap byte count exceeds tracked allocated bytes");
+    mmap_bytes -= std::min(mmap_bytes, bytes);
 }
 
 size_t get_current(void* ptr);

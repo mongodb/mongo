@@ -387,6 +387,8 @@ void MozJSImplScope::_gcCallback(JSContext* rt,
                "phase"_attr = (status == JSGC_BEGIN ? "prologue" : "epilogue"),
                "reason"_attr = ExplainGCReason(reason),
                "total"_attr = mongo::sm::get_total_bytes(),
+               "malloc"_attr = mongo::sm::get_malloc_bytes(),
+               "mmap"_attr = mongo::sm::get_mmap_bytes(),
                "limit"_attr = mongo::sm::get_max_bytes(),
                "gc total"_attr = js::GetGCHeapUsage(rt),
                "gc bytes"_attr = JS_GetGCParameter(rt, JSGC_BYTES),
@@ -549,6 +551,15 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
         // The memory limit is in megabytes
         JS_SetGCParametersBasedOnAvailableMemory(_context.get(), engine->getJSHeapLimitMB());
     }
+}
+
+MozJSImplScope::MozRuntime::~MozRuntime() {
+    // Explicitly destroy the context before checking mmap_bytes. This should run JS_DestroyContext
+    // and the shutdown GC that unmaps all GC chunks. After context destructs all GC chunks should
+    // be unmapped and mmap_bytes should be 0.
+    _context.reset();
+    MOZ_ASSERT(mongo::sm::get_mmap_bytes() == 0,
+               "Expected all GC memory to be unmapped by MozRuntime shutdown");
 }
 
 MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> jsHeapLimitMB)

@@ -10,10 +10,10 @@ NAME=spidermonkey
 
 VERSION="140.9.0esr"
 LIB_GIT_BRANCH=spidermonkey-esr140.9-cpp-only
-LIB_GIT_REVISION=06ac22a94df3a53a8959a1ef10f8fcda99a1867e
+LIB_GIT_REVISION=dd4a007275927572d0b10857d3f11b28550d0095
 LIB_GIT_REPO=git@github.com:mongodb-forks/spidermonkey.git
-# If a local spidermonkey repo exists, this is much faster than fetching from git:
-# LIB_GIT_REPO=/home/ubuntu/spidermonkey/.git
+# If a local spidermonkey repo exists, this can be faster than fetching from github:
+# LIB_GIT_REPO=file:///home/ubuntu/spidermonkey/.git
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/mozjs
 
@@ -23,9 +23,8 @@ LIB_GIT_DIR=$(mktemp -d /tmp/import-spidermonkey.XXXXXX)
 trap "rm -rf $LIB_GIT_DIR" EXIT
 
 git clone \
-  --branch "$LIB_GIT_BRANCH" \
+  --revision "$LIB_GIT_REVISION" \
   --depth 1 \
-  --single-branch \
   "$LIB_GIT_REPO" \
   "$LIB_GIT_DIR"
 

@@ -149,7 +149,7 @@
         },
         {
           "name": "import_script_path",
-          "value": "src/third_party/mozjs/get-sources.sh"
+          "value": "src/third_party/mozjs/scripts/import.sh"
         }
       ]
     },
