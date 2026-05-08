@@ -67,7 +67,8 @@ void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                std::uint32_t recursionLevel,
                                ModifyResult modifyResult,
                                bool validateForStorage,
-                               bool* containsDotsAndDollarsField) const {
+                               bool* containsDotsAndDollarsField,
+                               bool fromOplogApplication) const {
     invariant(modifyResult.type == ModifyResult::kNormalUpdate);
 
     // We only need to check the left and right sibling to see if the removed element was part of a
@@ -82,7 +83,8 @@ void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                          false, /* allowTopLevelDollarPrefixedFields */
                                          validateForStorage,
                                          false, /* isEmbeddedInIdField */
-                                         containsDotsAndDollarsField);
+                                         containsDotsAndDollarsField,
+                                         fromOplogApplication);
     }
 
     if (rightSibling.ok()) {
@@ -92,7 +94,8 @@ void UnsetNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                          false, /* allowTopLevelDollarPrefixedFields */
                                          validateForStorage,
                                          false, /* isEmbeddedInIdField */
-                                         containsDotsAndDollarsField);
+                                         containsDotsAndDollarsField,
+                                         fromOplogApplication);
     }
 }
 

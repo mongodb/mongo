@@ -154,7 +154,8 @@ protected:
                                 std::uint32_t recursionLevel,
                                 ModifyResult modifyResult,
                                 bool validateForStorage,
-                                bool* containsDotsAndDollarsField) const;
+                                bool* containsDotsAndDollarsField,
+                                bool fromOplogApplication) const;
 
     /**
      * ModifierNode::apply() calls this method after validation to create an oplog entry for the

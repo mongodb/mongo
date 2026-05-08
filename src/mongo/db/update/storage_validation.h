@@ -56,7 +56,8 @@ namespace storage_validation {
 MONGO_MOD_PUBLIC void scanDocument(const mutablebson::Document& doc,
                                    bool allowTopLevelDollarPrefixes,
                                    bool shouldValidate,
-                                   bool* containsDotsAndDollarsField);
+                                   bool* containsDotsAndDollarsField,
+                                   bool fromOplogApplication);
 
 /**
  * Validates that the MutableBSON element 'elem' is acceptable for storage in a collection and
@@ -75,6 +76,9 @@ MONGO_MOD_PUBLIC void scanDocument(const mutablebson::Document& doc,
  *
  * 'isEmbeddedInIdField' is set to true if the element is embedded inside an _id field. This allows
  * to reject $-prefixed fields at all levels under an _id field.
+ *
+ * 'fromOplogApplication' is true if the caller is applying an oplog update from an external
+ * source, which enables validation of BSONColumn binary data.
  */
 void scanDocument(mutablebson::ConstElement elem,
                   bool deep,
@@ -82,7 +86,8 @@ void scanDocument(mutablebson::ConstElement elem,
                   bool allowTopLevelDollarPrefixes,
                   bool shouldValidate,
                   bool isEmbeddedInIdField,
-                  bool* containsDotsAndDollarsField);
+                  bool* containsDotsAndDollarsField,
+                  bool fromOplogApplication);
 
 }  // namespace storage_validation
 

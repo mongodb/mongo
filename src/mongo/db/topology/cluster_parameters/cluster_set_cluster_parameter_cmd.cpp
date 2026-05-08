@@ -106,7 +106,7 @@ public:
             {
                 bool ignore;
                 mutablebson::Document mutableUpdate(request().getCommandParameter());
-                storage_validation::scanDocument(mutableUpdate, false, true, &ignore);
+                storage_validation::scanDocument(mutableUpdate, false, true, &ignore, false);
             }
 
             setClusterParameterImplRouter(opCtx,
