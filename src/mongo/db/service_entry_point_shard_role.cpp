@@ -40,6 +40,7 @@
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
+#include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/admission/ticketing/admission_context.h"
 #include "mongo/db/admission/ticketing/ticketholder.h"
 #include "mongo/db/api_parameters.h"
@@ -1832,16 +1833,6 @@ void ExecCommandDatabase::_initiateCommand() {
 
     failIngressRequestRateLimiting.executeIf(
         [&](const BSONObj& data) {
-            // TODO(SERVER-114130): Remove error label override when moving to the ingress
-            // request rate limiter.
-            BSONArrayBuilder arrayBuilder;
-            arrayBuilder.append(ErrorLabel::kSystemOverloadedError);
-            arrayBuilder.append(ErrorLabel::kRetryableError);
-            arrayBuilder.append(ErrorLabel::kNoWritesPerformed);
-            auto& errorLabels = errorLabelsOverride(opCtx);
-            invariant(!errorLabels);
-            errorLabels.emplace(arrayBuilder.arr());
-
             // We simulate a request being rejected by the rate limiter.
             uasserted(ErrorCodes::IngressRequestRateLimitExceeded,
                       "Rejection from the 'failIngressRequestRateLimiting' fail point");
@@ -1875,12 +1866,19 @@ void ExecCommandDatabase::_initiateCommand() {
 
             // Respect the ingressRequestRateLimiterApplicationExemptions list so that internal
             // clients are exempt from the failpoint.
-            if (IngressRequestRateLimiter::isAppNameExempted(opCtx->getClient())) {
+            if (admission::IngressRequestRateLimiter::isAppNameExempted(opCtx->getClient())) {
                 return false;
             }
 
             return true;
         });
+
+    if (gFeatureFlagIngressRateLimiting.isEnabled()) {
+        const bool exemptFromIngressRateLimit =
+            isExemptFromAdmissionControl || !admission::gIngressRequestRateLimiterEnabled.load();
+        uassertStatusOK(admission::IngressRequestRateLimiter::waitForAdmission(
+            opCtx, exemptFromIngressRateLimit));
+    }
 
     if (gIngressAdmissionControlEnabled.load()) {
         // The way ingress admission works, one ticket should cover all the work for the operation.

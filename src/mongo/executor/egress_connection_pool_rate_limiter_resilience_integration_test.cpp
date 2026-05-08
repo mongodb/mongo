@@ -96,12 +96,16 @@ public:
             getServer(), DatabaseName::kAdmin, std::move(cmd), BSONObj(), nullptr, timeout);
     }
 
-    void enableRateLimiter(int maxQueueDepth) {
+    void enableRateLimiter(int maxQueueDepth, double burstCapacitySecs = 1.0) {
+        // TODO(SERVER-125073): Remove `ingressRequestRateLimiterEnabled:false` once we resolve how
+        // to hang specific rate limiters.
         runSetupCommandSync(
             DatabaseName::kAdmin,
             BSON("setParameter" << 1 << "ingressConnectionEstablishmentRateLimiterEnabled" << true
+                                << "ingressRequestRateLimiterEnabled" << false
                                 << "ingressConnectionEstablishmentRatePerSec" << 1
-                                << "ingressConnectionEstablishmentBurstCapacitySecs" << 1
+                                << "ingressConnectionEstablishmentBurstCapacitySecs"
+                                << burstCapacitySecs
                                 << "ingressConnectionEstablishmentMaxQueueDepth" << maxQueueDepth));
     }
 
@@ -220,6 +224,15 @@ public:
             getFactory(),
             getServer(),
             [](const ConnectionStatsPer& s) { return s.inUse + s.available + s.leased >= 1; },
+            [](const GRPCConnectionStats&) { return false; },
+            context);
+    }
+
+    void assertPoolHasNoEstablishedConnection(StringData context) {
+        assertConnectionStats(
+            getFactory(),
+            getServer(),
+            [](const ConnectionStatsPer& s) { return s.inUse + s.available + s.leased == 0; },
             [](const GRPCConnectionStats&) { return false; },
             context);
     }
@@ -442,8 +455,12 @@ TEST_F(EgressPoolRateLimiterResilienceTest, RejectionWithNoEstablishedConnection
     auto baseline = getRateLimiterStats();
     auto baselineRejected = baseline.isEmpty() ? 0 : baseline["rejected"].numberLong();
 
-    enableRateLimiter(/*maxQueueDepth=*/1);
+    // Keep initial token balance below one token so the first request cannot race through and
+    // establish a connection before rejections propagate.
+    enableRateLimiter(/*maxQueueDepth=*/1, /*burstCapacitySecs=*/0.1);
     auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
+    assertPoolHasNoEstablishedConnection(
+        "Pool must have zero established connections before no-established rejection test");
 
     auto futures = sendPings(6, Seconds{30});
 
@@ -467,8 +484,11 @@ TEST_F(EgressPoolRateLimiterResilienceTest, TimeoutWithNoEstablishedConnection) 
     auto baselineInterrupted =
         baseline.isEmpty() ? 0 : baseline["interruptedDueToClientDisconnect"].numberLong();
 
-    enableRateLimiter(/*maxQueueDepth=*/10);
+    // Keep initial token balance below one token so requests have to queue in this test.
+    enableRateLimiter(/*maxQueueDepth=*/10, /*burstCapacitySecs=*/0.1);
     auto hangFP = configureFailPoint("hangInRateLimiter", BSONObj());
+    assertPoolHasNoEstablishedConnection(
+        "Pool must have zero established connections before no-established timeout test");
 
     auto futures = sendPings(3, Seconds{30});
 

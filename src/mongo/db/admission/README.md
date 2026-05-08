@@ -198,6 +198,11 @@ The rate limiter is controlled by the following server parameters:
 - `ingressRequestRateLimiterExemptions` (document, default: {}): A document containing a list of
   CIDR ranges to be exempted from ingress request rate limiting. Acceptable values here follow the
   same format as the `maxIncomingConnectionsOverride`.
+- `ingressRequestRateLimiterApplicationExemptions` (document, default: `{appNames: []}`): A document
+  containing application/driver names exempt from ingress request rate limiting.
+- `ingressRequestAdmissionMaxQueueDepth` (int64, default: 0): Maximum number of requests that may
+  queue waiting for a token. A value of 0 disables queueing, so requests that exceed rate+burst are
+  rejected immediately.
 
 ## Admission Token Acquisition
 
@@ -215,10 +220,31 @@ circumstances:
 Because token acquisition currently only takes place in the `SessionWorkflow`, all internal requests
 are not subject to rate limiting.
 
-If the thread is not considered exempt, it will attempt to acquire a token from the rate limiter. If
-it is able to do so, it proceeds as normal. Otherwise, the request is rejected with an error labeled
-with `SystemOverloaded`. Clients will observe this label and interpret the server as being
-overloaded, modifying their routing and retry logic accordingly.
+If the thread is not considered exempt, it attempts to acquire a token from the rate limiter. If a
+token is immediately available, the request proceeds as normal. If not, behavior depends on
+`ingressRequestAdmissionMaxQueueDepth`:
+
+- If queueing is disabled (`0`) or the queue is full, the request is rejected with an error labeled
+  `SystemOverloaded`. Clients will observe this label and interpret the server as being overloaded,
+  modifying their routing and retry logic accordingly.
+- If queueing is enabled and capacity exists, the request reserves a queue position and later blocks
+  in service entry point until that reserved position becomes valid (or until interruption).
+
+### Admission Token Exemption
+
+Token acquisition happens in two stages. `SessionWorkflow` calls `admitRequest` immediately after
+reading the message, before an `OperationContext` exists. The service entry point later calls
+`waitForAdmission` once the command has been parsed and the exemption signal is known
+(`isExemptFromAdmissionControl`). Because that signal is unavailable at the first stage, the
+rate-limiter-level exemption can only rescue requests that successfully reserved a queue slot:
+
+- Rate exceeded, queueing disabled: rejected at `admitRequest`.
+- Rate exceeded, queue full: rejected at `admitRequest`.
+- Rate exceeded, queue has room: queued at `admitRequest`, then exempted at `waitForAdmission`.
+
+This asymmetry is intentional. Determining exemption status from `admitRequest` would require
+constructing or partially evaluating the command before deciding to reject, which would make
+rejections more expensive.
 
 ## Metrics
 
@@ -232,6 +258,12 @@ The following `serverStatus` metrics are emitted by the `IngressRequestRateLimit
 - `rejectedAdmissions`: the total number of requests that were rejected by the rate limiter.
 - `exemptedAdmissions`: the total number of requests that bypassed the rate limiter due to one of
   the conditions described above.
+- `addedToQueue`: the total number of requests that entered the ingress request rate limiter queue.
+- `removedFromQueue`: the total number of requests removed from the ingress request rate limiter
+  queue (admitted, interrupted, or exempted after queue reservation).
+- `interruptedInQueue`: the number of queued requests interrupted before admission.
+- `averageTimeQueuedMicros`: moving average queue wait time for successfully admitted queued
+  requests.
 - `totalAvailableTokens`: the current capacity of the underlying token bucket.
 
 # Data-Node Ingress Admission Control
