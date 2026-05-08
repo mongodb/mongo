@@ -355,6 +355,9 @@ void WiredTigerRecoveryUnit::preallocateSnapshot(const OpenSnapshotOptions& opti
 
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     invariant(_isActive(), toString(_getState()));
+    if (!_readAtTimestamp.isNull()) {
+        _lastReadTimestampFromClosedTxn = _readAtTimestamp;
+    }
 
     if (TestingProctor::instance().isEnabled() && shouldGatherWriteContextForDebugging() &&
         commit) {
@@ -543,6 +546,10 @@ Status WiredTigerRecoveryUnit::majorityCommittedSnapshotAvailable() const {
     return Status::OK();
 }
 
+boost::optional<Timestamp> WiredTigerRecoveryUnit::getLastUsedReadTimestamp() const {
+    return _lastReadTimestampFromClosedTxn;
+}
+
 boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp() {
     // After a ReadSource has been set on this RecoveryUnit, callers expect that this method returns
     // the read timestamp that will be used for current or future transactions. Because callers use
@@ -589,7 +596,7 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
             invariant(!_readAtTimestamp.isNull());
             return _readAtTimestamp;
 
-        // The follow ReadSources returned values in the first switch block.
+        // The following ReadSources returned values in the first switch block.
         case ReadSource::kNoTimestamp:
         case ReadSource::kProvided:
             MONGO_UNREACHABLE;
@@ -606,6 +613,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     tassert(10775300,
             "Must be using snapshot isolation to open a WT transaction",
             _isolation == Isolation::snapshot);
+
+    _lastReadTimestampFromClosedTxn = boost::none;
 
     ensureSnapshot();
     _ensureSession();

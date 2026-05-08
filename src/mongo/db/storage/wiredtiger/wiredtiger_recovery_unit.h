@@ -97,6 +97,8 @@ public:
 
     Status majorityCommittedSnapshotAvailable() const override;
 
+    boost::optional<Timestamp> getLastUsedReadTimestamp() const override;
+
     boost::optional<Timestamp> getPointInTimeReadTimestamp() override;
 
     Status setTimestamp(Timestamp timestamp) override;
@@ -329,6 +331,7 @@ private:
     Timestamp _rollbackTimestamp;
     boost::optional<Timestamp> _lastTimestampSet;
     Timestamp _readAtTimestamp;
+    boost::optional<Timestamp> _lastReadTimestampFromClosedTxn;
     UntimestampedWriteAssertionLevel _untimestampedWriteAssertionLevel =
         UntimestampedWriteAssertionLevel::kEnforce;
     std::unique_ptr<Timer> _timer;

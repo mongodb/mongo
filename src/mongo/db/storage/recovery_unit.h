@@ -321,6 +321,13 @@ public:
     }
 
     /**
+     * Returns the Timestamp that was used by the previous transaction, or none.
+     */
+    virtual boost::optional<Timestamp> getLastUsedReadTimestamp() const {
+        return boost::none;
+    }
+
+    /**
      * Returns the Timestamp being used by this recovery unit or boost::none if not reading from
      * a point in time. Any point in time returned will reflect one of the following:
      *  - when using ReadSource::kProvided, the timestamp provided.
