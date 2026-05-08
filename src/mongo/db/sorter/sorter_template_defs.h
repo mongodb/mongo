@@ -616,11 +616,7 @@ public:
         : MergeableSorter<Key, Value, Comparator>(
               opts, storageIdentifier, comp, std::move(spiller), settings) {
         invariant(this->_spiller != nullptr);
-
-        auto path = this->_spiller->getSpillDir() / storageIdentifier;
-        uassert(16815,
-                str::stream() << "Unexpected empty file: " << path.string(),
-                ranges.empty() || boost::filesystem::file_size(path) != 0);
+        uassert(ErrorCodes::BadValue, "Cannot resume sorter from empty ranges", !ranges.empty());
 
         this->_iters.reserve(ranges.size());
         std::transform(ranges.begin(),

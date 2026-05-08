@@ -1426,7 +1426,7 @@ std::unique_ptr<BulkBuilderImpl::Sorter> BulkBuilderImpl::_makeSorter(
     const SortOptions& opts,
     const boost::optional<std::vector<SorterRange>>& ranges) const {
     boost::filesystem::path tmpPath = storageGlobalParams.dbpath + "/_tmp";
-    return ranges
+    return ranges && !ranges->empty()
         ? Sorter::makeFromExistingRanges(std::string{spiller->getStorage().getStorageIdentifier()},
                                          *ranges,
                                          opts,

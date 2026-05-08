@@ -231,7 +231,8 @@ makeSpiller(OperationContext* opCtx,
         sorter::FileBasedSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>;
     boost::filesystem::path tmpPath = storageGlobalParams.dbpath + "/_tmp";
     auto fileName = stateInfo ? stateInfo->getStorageIdentifier() : boost::none;
-    return fileName
+    auto ranges = stateInfo ? stateInfo->getRanges() : boost::none;
+    return fileName && ranges && !ranges->empty()
         ? std::make_shared<FileBasedSpiller>(
               std::make_shared<sorter::File>(tmpPath / std::string{*fileName}, &fileStats),
               tmpPath,

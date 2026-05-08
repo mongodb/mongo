@@ -227,7 +227,6 @@ class MakeFromExistingRangesTypedTestBase : public MakeFromExistingRangesFixture
 public:
     static_assert(test::StorageTraits<Traits>);
     static constexpr bool kHasFileStats = Traits::kHasFileStats;
-    static constexpr int kEmptyStorageErrorCode = Traits::kEmptyStorageErrorCode;
     static constexpr int kCorruptedStorageErrorCode = Traits::kCorruptedStorageErrorCode;
 
 protected:
@@ -340,26 +339,20 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSpiller, "this->_spiller != nu
 }
 }  // namespace
 
-TYPED_TEST(MakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
+TYPED_TEST(FileBasedMakeFromExistingRangesTest, MissingFileOnResume) {
     auto storageIdentifier = "unused_sorter_storage";
     unittest::TempDir spillDir = makeSpillDir();
     SorterTracker sorterTracker;
     auto opts = SortOptions().Tracker(&sorterTracker);
-    auto sorter = IWSorter::template makeFromExistingRanges<IWComparator>(
-        storageIdentifier,
-        {},
-        opts,
-        IWComparator(ASC),
-        this->storage().makeSpillerForResume(
-            opts, spillDir.path(), sorter::kLatestChecksumVersion, storageIdentifier),
-        /*settings=*/{});
-
-    ASSERT_EQ(0, sorter->stats().spilledRanges());
-
-    auto iter = sorter->done();
-    ASSERT_EQ(0, sorter->stats().numSorted());
-
-    ASSERT_FALSE(iter->more());
+    ASSERT_THROWS(IWSorter::template makeFromExistingRanges<IWComparator>(
+                      storageIdentifier,
+                      {},
+                      opts,
+                      IWComparator(ASC),
+                      this->storage().makeSpillerForResume(
+                          opts, spillDir.path(), sorter::kLatestChecksumVersion, storageIdentifier),
+                      /*settings=*/{}),
+                  std::exception);
 }
 
 TYPED_TEST(FileBasedMakeFromExistingRangesTest, MissingStorage) {
@@ -399,7 +392,7 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, EmptyStorage) {
                 opts, spillDir.path(), sorter::kLatestChecksumVersion, storageIdentifier),
             /*settings=*/{}),
         DBException,
-        TestFixture::kEmptyStorageErrorCode);
+        16815);
 }
 
 TYPED_TEST(FileBasedMakeFromExistingRangesTest, CorruptedStorage) {

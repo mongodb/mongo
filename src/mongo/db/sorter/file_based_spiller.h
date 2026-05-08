@@ -43,6 +43,7 @@
 
 #include <snappy.h>
 
+#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/optional.hpp>
 
@@ -516,7 +517,11 @@ public:
               std::make_unique<FileBasedStorage<Key, Value>>(file, dbName, checksumVersion),
               minAvailableDiskBytesToSpill),
           _fileStats(file->getFileStats()),
-          _spillDir(spillDir) {}
+          _spillDir(spillDir) {
+        uassert(16815,
+                str::stream() << "Unexpected empty file: " << file->path().string(),
+                boost::filesystem::file_size(file->path()) != 0);
+    }
 
     void mergeSpills(const SortOptions& opts,
                      const Settings& settings,

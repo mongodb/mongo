@@ -98,7 +98,6 @@ concept StorageTraits = requires(Traits& traits,
                                  const SorterChecksumVersion checksumVersion,
                                  SpillStorageState& spillState) {
     { Traits::kHasFileStats } -> std::convertible_to<bool>;
-    { Traits::kEmptyStorageErrorCode } -> std::convertible_to<int>;
     { Traits::kCorruptedStorageErrorCode } -> std::convertible_to<int>;
     {
         traits.makeSpiller(opts, spillDir, checksumVersion)
@@ -109,7 +108,6 @@ concept StorageTraits = requires(Traits& traits,
     {
         traits.makeWriter(opts, spillDir)
     } -> std::same_as<std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>>>;
-    { traits.makeEmptyStorage(spillDir) } -> std::same_as<std::string>;
     { traits.makeCorruptedStorage(spillDir) } -> std::same_as<std::string>;
     { traits.makeSpillState(spillDir) } -> std::same_as<SpillStorageState>;
     { traits.corruptSpillState(spillState) } -> std::same_as<void>;
@@ -119,7 +117,6 @@ concept StorageTraits = requires(Traits& traits,
 template <typename K = IntWrapper, typename V = IntWrapper, typename C = IWComparator>
 struct FileTraits {
     static constexpr bool kHasFileStats = true;
-    static constexpr int kEmptyStorageErrorCode = 16815;
     static constexpr int kCorruptedStorageErrorCode = 16817;
 
     static std::shared_ptr<Spiller<K, V, C>> makeSpiller(
@@ -195,7 +192,6 @@ struct FileTraits {
 template <typename K = IntWrapper, typename V = IntWrapper, typename C = IWComparator>
 struct ContainerTraits {
     static constexpr bool kHasFileStats = false;
-    static constexpr int kEmptyStorageErrorCode = 0;
     static constexpr int kCorruptedStorageErrorCode = 0;
 
     explicit ContainerTraits(ServiceContext::UniqueOperationContext opCtx)
@@ -267,11 +263,6 @@ struct ContainerTraits {
             _nextKey,
             sorter::kLatestChecksumVersion,
             settings);
-    }
-
-    // TODO SERVER-120078
-    static std::string makeEmptyStorage(const boost::filesystem::path& spillDir) {
-        MONGO_UNIMPLEMENTED;
     }
 
     static std::string makeCorruptedStorage(const boost::filesystem::path& spillDir) {
