@@ -45,12 +45,11 @@ namespace mongo::repl {
  * Dispatches `onOpTime` notifications to registered observers on a dedicated background thread.
  * The thread is started lazily on the first `addObserver` call and is stopped by `shutdown()`.
  *
- * Coalescing: this dispatcher may skip intermediate opTime values when multiple `notify()` calls
- * arrive faster than the background thread can drain them. This is intentional. Guaranteeing
- * delivery of every opTime would require `notify()` to block until the background thread
- * acknowledges each call, introducing back-pressure onto callers that may hold critical locks.
- * Observers are guaranteed to observe the most recently applied opTime eventually, but not
- * necessarily every intermediate value.
+ * Coalescing and rate-limiting: `notify()` wakes the background thread at most once per
+ * wall-clock second (derived from the opTime seconds field). Both the pending-timestamp store and
+ * the wakeup are skipped for calls within the same second, so the common path is read-only and
+ * causes no cache-line invalidations. Observers must tolerate skipped intermediate values and are
+ * only guaranteed to observe the most recently applied opTime for each second, eventually.
  *
  * Thread-safety:
  * - `notify()` is entirely lock-free and safe to call while holding any external lock.
@@ -88,9 +87,20 @@ public:
     /**
      * Signals the dispatcher that the opTime has advanced. This is cheap and lock-free. Safe to
      * call while holding any external lock (e.g. the ReplicationCoordinator mutex).
+     *
+     * Wakeups are rate-limited to at most once per wall-clock second (derived from the opTime
+     * seconds field, which advances with real time). Both `_pendingTs` and the wakeup are skipped
+     * entirely within a second, keeping the common path read-only on the shared cache line.
      */
     void notify(WithLock, const Timestamp& ts) {
+        // getSecs() is a free bitshift on the already-in-hand value — no extra clock syscall.
+        // Skip everything when still inside the same wall-clock second: the common path touches
+        // only _lastNotifiedSecs (read-only), avoiding cache-line write-invalidation traffic
+        // across cores on every primary write.
+        if (Timestamp(_pendingTs.loadRelaxed()).getSecs() == ts.getSecs())
+            return;
         _pendingTs.storeRelaxed(ts.asULL());
+
         _event.fetchAndAdd(1);
         _event.notifyAll();
     }
