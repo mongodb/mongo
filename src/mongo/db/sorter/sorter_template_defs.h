@@ -491,7 +491,7 @@ protected:
      */
     void _mergeSpills(std::size_t numTargetedSpills, std::size_t maxSpillsPerMerge) {
         if (numTargetedSpills == 0) {
-            numTargetedSpills = 1;
+            return;
         }
 
         if (this->_iters.size() > numTargetedSpills) {
@@ -558,7 +558,9 @@ protected:
             return;
         }
         _bufferSize = this->_spiller->getStorage().getBufferSize();
-        invariant(_bufferSize > 0);
+        if (_bufferSize == 0) {
+            return;
+        }
         _spillsNumToRespectMemoryLimits =
             std::max(this->_opts.maxMemoryUsageBytes / _bufferSize, static_cast<std::size_t>(2));
     }
