@@ -640,6 +640,13 @@ public:
     static bool hasExclusiveAccessToCollection(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
+     * Returns whether the 'collection' is the writable collection for the current operation
+     * context. A nullptr is considered a dropped or renamed away collection, and return false as
+     * those are not writable anymore.
+     */
+    static bool isWritableCollection(OperationContext* opCtx, const Collection* collection);
+
+    /**
      * Returns HistoricalCatalogIdTracker for historical namespace/uuid mappings to catalogId based
      * on timestamp.
      */

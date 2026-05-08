@@ -436,27 +436,7 @@ void CollectionImpl::_initCommon(OperationContext* opCtx) {
 
 void CollectionImpl::_setMetadata(
     OperationContext* opCtx, std::shared_ptr<durable_catalog::CatalogEntryMetaData>&& metadata) {
-    if (metadata->options.timeseries) {
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-
-        // If present, reuse the storageEngine options to work around the issue described in
-        // SERVER-91194.
-        metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData =
-            storageEngine->getFlagFromStorageOptions(
-                metadata->options.storageEngine,
-                backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData);
-        if (metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData.has_value()) {
-            metadata->timeseriesBucketsMayHaveMixedSchemaData =
-                *metadata->_durableTimeseriesBucketsMayHaveMixedSchemaData;
-        }
-
-        // If present, reuse storageEngine options to work around the issue described in
-        // SERVER-91193
-        metadata->_durableTimeseriesBucketingParametersHaveChanged =
-            storageEngine->getFlagFromStorageOptions(
-                metadata->options.storageEngine,
-                backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged);
-    }
+    durable_catalog::sanitizeTimeseriesOptions(opCtx, *metadata);
     _metadata = std::move(metadata);
 }
 
@@ -1701,11 +1681,7 @@ bool CollectionImpl::isIndexMultikey(OperationContext* opCtx,
     return index.multikey;
 }
 
-bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
-                                        StringData indexName,
-                                        const MultikeyPaths& multikeyPaths,
-                                        int indexOffset) const {
-
+int CollectionImpl::_getIndexOffsetForMultikeyUpdate(StringData indexName, int indexOffset) const {
     int offset = indexOffset;
     if (offset < 0) {
         offset = _metadata->findIndexOffset(indexName);
@@ -1725,56 +1701,100 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
                                 << " ; actual : " << _metadata->findIndexOffset(indexName));
     }
 
-    auto setMultikey = [offset,
-                        multikeyPaths](const durable_catalog::CatalogEntryMetaData& metadata) {
-        auto* index = &metadata.indexes[offset];
-        std::lock_guard lock(index->multikeyMutex);
+    return offset;
+}
 
-        auto tracksPathLevelMultikeyInfo = !index->multikeyPaths.empty();
-        if (!tracksPathLevelMultikeyInfo) {
-            invariant(multikeyPaths.empty());
+bool CollectionImpl::_setIndexIsMultikeyInMetadata(
+    const durable_catalog::CatalogEntryMetaData& metadata,
+    int offset,
+    const MultikeyPaths& multikeyPaths) const {
+    auto& index = metadata.indexes[offset];
+    std::lock_guard lock(index.multikeyMutex);
 
-            if (index->multikey) {
-                // The index is already set as multikey and we aren't tracking path-level
-                // multikey information for it. We return false to indicate that the index
-                // metadata is unchanged.
-                return false;
-            }
-            index->multikey = true;
-            return true;
-        }
+    auto tracksPathLevelMultikeyInfo = !index.multikeyPaths.empty();
+    if (!tracksPathLevelMultikeyInfo) {
+        invariant(multikeyPaths.empty());
 
-        // We are tracking path-level multikey information for this index.
-        invariant(!multikeyPaths.empty());
-        invariant(multikeyPaths.size() == index->multikeyPaths.size());
-
-        index->multikey = true;
-
-        bool newPathIsMultikey = false;
-        bool somePathIsMultikey = false;
-
-        // Store new path components that cause this index to be multikey in catalog's
-        // index metadata.
-        for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-            auto& indexMultikeyComponents = index->multikeyPaths[i];
-            for (const auto multikeyComponent : multikeyPaths[i]) {
-                auto result = indexMultikeyComponents.insert(multikeyComponent);
-                newPathIsMultikey = newPathIsMultikey || result.second;
-                somePathIsMultikey = true;
-            }
-        }
-
-        // If all of the sets in the multikey paths vector were empty, then no component
-        // of any indexed field caused the index to be multikey. setIndexIsMultikey()
-        // therefore shouldn't have been called.
-        invariant(somePathIsMultikey);
-
-        if (!newPathIsMultikey) {
-            // We return false to indicate that the index metadata is unchanged.
+        if (index.multikey) {
+            // The index is already set as multikey and we aren't tracking path-level multikey
+            // information for it. We return false to indicate that the index metadata is unchanged.
             return false;
         }
+        index.multikey = true;
         return true;
-    };
+    }
+
+    // We are tracking path-level multikey information for this index.
+    invariant(!multikeyPaths.empty());
+    invariant(multikeyPaths.size() == index.multikeyPaths.size());
+
+    index.multikey = true;
+
+    bool newPathIsMultikey = false;
+    bool somePathIsMultikey = false;
+
+    // Store new path components that cause this index to be multikey in catalog's index metadata.
+    for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+        auto& indexMultikeyComponents = index.multikeyPaths[i];
+        for (const auto multikeyComponent : multikeyPaths[i]) {
+            auto result = indexMultikeyComponents.insert(multikeyComponent);
+            newPathIsMultikey = newPathIsMultikey || result.second;
+            somePathIsMultikey = true;
+        }
+    }
+
+    // If all of the sets in the multikey paths vector were empty, then no component of any indexed
+    // field caused the index to be multikey. setIndexIsMultikey() therefore shouldn't have been
+    // called.
+    invariant(somePathIsMultikey);
+
+    if (!newPathIsMultikey) {
+        // We return false to indicate that the index metadata is unchanged.
+        return false;
+    }
+    return true;
+}
+
+bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
+                                        StringData indexName,
+                                        const MultikeyPaths& multikeyPaths,
+                                        int indexOffset) const {
+    if (CollectionCatalog::isWritableCollection(opCtx, this)) {
+        // Scenarios this covers:
+        // 1. Multi-document transaction that exclusively owns this collection (created in this WUOW
+        // under MODE_IX).
+        // 2. DDL operation that exclusively owns this collection (e.g. createIndexes, collMod)
+        // under MODE_X and has a writable copy.
+        //
+        // The collection has a writable clone already installed in
+        // CollectionCatalog::_pendingCommitNamespaces by the DDL that created it. Mutate that
+        // writable directly so the pending Collection is consistent with the durable catalog at
+        // preCommit, instead of deferring the in-memory update to onCommit.
+        //
+        // Scenarios NOT covered:
+        // 1. Other paths with exclusive access (e.g. foreground validate-repair under MODE_X) which
+        // do NOT have a writable clone installed, but still attempt to set multikey information.
+
+        // We rely on the correctness of the CollectionCatalog. If there is a writable collection,
+        // then it must have been returned during collection acquisition. If this is the writable
+        // collection, it is safe to cast.
+        auto writable = const_cast<CollectionImpl*>(this);
+        return writable->_setIndexIsMultikeyWithExclusiveAccess(
+            opCtx, indexName, multikeyPaths, indexOffset);
+    }
+
+    return _setIndexIsMultikeyWithSharedAccess(opCtx, indexName, multikeyPaths, indexOffset);
+}
+
+bool CollectionImpl::_setIndexIsMultikeyWithSharedAccess(OperationContext* opCtx,
+                                                         StringData indexName,
+                                                         const MultikeyPaths& multikeyPaths,
+                                                         int indexOffset) const {
+    const auto offset = _getIndexOffsetForMultikeyUpdate(indexName, indexOffset);
+    auto setMultikey =
+        [this, offset, multikeyPaths](const durable_catalog::CatalogEntryMetaData& metadata) {
+            return _setIndexIsMultikeyInMetadata(metadata, offset, multikeyPaths);
+        };
 
     // Make a copy that is safe to read without locks that we insert in the durable catalog, we only
     // update the stored metadata on successful commit. The pending update is stored as a decoration
@@ -1874,6 +1894,21 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
             uncommittedMultikeys->erase(this);
         });
 
+    return true;
+}
+
+bool CollectionImpl::_setIndexIsMultikeyWithExclusiveAccess(OperationContext* opCtx,
+                                                            StringData indexName,
+                                                            const MultikeyPaths& multikeyPaths,
+                                                            int indexOffset) {
+    const auto offset = _getIndexOffsetForMultikeyUpdate(indexName, indexOffset);
+    auto metadata = _copyMetadataForWrite(opCtx);
+    if (!_setIndexIsMultikeyInMetadata(*metadata, offset, multikeyPaths)) {
+        return false;
+    }
+
+    durable_catalog::putMetaData(opCtx, getCatalogId(), *metadata, MDBCatalog::get(opCtx));
+    _metadata = std::move(metadata);
     return true;
 }
 
@@ -2024,6 +2059,10 @@ void CollectionImpl::replaceMetadata(OperationContext* opCtx,
 
 bool CollectionImpl::isMetadataEqual(const BSONObj& otherMetadata) const {
     return !_metadata->toBSON().woCompare(otherMetadata);
+}
+
+std::shared_ptr<const durable_catalog::CatalogEntryMetaData> CollectionImpl::getMetadata() const {
+    return _metadata;
 }
 
 std::shared_ptr<durable_catalog::CatalogEntryMetaData> CollectionImpl::_copyMetadataForWrite(

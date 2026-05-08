@@ -94,7 +94,7 @@ MONGO_MOD_NEEDS_REPLACEMENT boost::optional<CatalogEntry> parseCatalogEntry(
  */
 MONGO_MOD_NEEDS_REPLACEMENT void putMetaData(OperationContext* opCtx,
                                              const RecordId& catalogId,
-                                             durable_catalog::CatalogEntryMetaData& md,
+                                             const durable_catalog::CatalogEntryMetaData& md,
                                              MDBCatalog* mdbCatalog,
                                              boost::optional<BSONObj> indexIdents = boost::none);
 
@@ -185,6 +185,9 @@ MONGO_MOD_PRIVATE bool isIndexPresent(OperationContext* opCtx,
                                       const RecordId& catalogId,
                                       StringData indexName,
                                       const MDBCatalog* mdbCatalog);
+
+MONGO_MOD_NEEDS_REPLACEMENT void sanitizeTimeseriesOptions(
+    OperationContext* opCtx, durable_catalog::CatalogEntryMetaData& metadata);
 
 /**
  * Holds functions for internal use from within the 'durable_catalog'. Exposed externally for

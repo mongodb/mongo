@@ -452,6 +452,11 @@ public:
         return false;
     }
 
+    std::shared_ptr<const durable_catalog::CatalogEntryMetaData> getMetadata() const final {
+        unimplementedTasserted();
+        return nullptr;
+    }
+
     bool needsCappedLock() const final {
         unimplementedTasserted();
         return false;

@@ -536,6 +536,64 @@ public:
                 }
             }
 
+            if constexpr (kDebugBuild) {
+                // Verify that collection instances installed as commit pending by THIS operation
+                // reflect what THIS operation is committing to storage. Scoped to entries owned by
+                // the current opCtx because catalog._pendingCommitNamespaces also contains entries
+                // from concurrent operations that hold different locks and may legitimately have
+                // not yet synchronized their pending Collection clone with the durable catalog.
+
+                std::set<NamespaceString> affectedNamespaces;
+                for (auto&& entry : entries) {
+                    if (!UncommittedCatalogUpdates::isTwoPhaseCommitEntry(entry)) {
+                        continue;
+                    }
+
+                    affectedNamespaces.insert(entry.nss);
+                    if (!entry.renameTo.isEmpty()) {
+                        affectedNamespaces.insert(entry.renameTo);
+                    }
+                }
+
+                for (const auto& nss : affectedNamespaces) {
+                    auto pendingEntry = catalog._pendingCommitNamespaces.find(nss);
+                    invariant(pendingEntry);
+
+                    const auto collection = pendingEntry->collection;
+                    if (!collection) {
+                        const auto droppedColl =
+                            catalog._lookupCollectionByNamespaceNoFindInstantiated(nss);
+                        if (droppedColl->getCatalogId().isNull()) {
+                            // Virtual collections and collection mocks don't have catalogId.
+                            continue;
+                        }
+                        const auto catalogEntry = durable_catalog::getParsedCatalogEntry(
+                            opCtx, droppedColl->getCatalogId(), MDBCatalog::get(opCtx));
+                        // Either dropped or renamed.
+                        invariant(!catalogEntry ||
+                                  (catalogEntry->metadata->nss != nss &&
+                                   catalogEntry->metadata->options.uuid == droppedColl->uuid()));
+                        // Durable check for rename should happen in the other branch.
+                    } else {
+                        if (collection->getCatalogId().isNull()) {
+                            // Virtual collections and collection mocks don't have catalogId.
+                            continue;
+                        }
+
+                        const auto catalogEntry = durable_catalog::getParsedCatalogEntry(
+                            opCtx, collection->getCatalogId(), MDBCatalog::get(opCtx));
+                        invariant(catalogEntry);
+                        if (!collection->isMetadataEqual(catalogEntry->metadata->toBSON())) {
+                            LOGV2_FATAL(12539100,
+                                        "Pending-commit collection metadata must match durable "
+                                        "catalog at preCommit",
+                                        "cached"_attr = collection->getMetadata()->toBSON(),
+                                        "storage"_attr = catalogEntry->metadata->toBSON());
+                        }
+                    }
+                }
+            }
+
             // Mark that we've successfully run preCommit, this allows rollback to clean up the
             // collections marked as pending commit. We need to make sure we do not clean anything
             // up for other transactions.
@@ -2840,6 +2898,15 @@ bool CollectionCatalog::hasExclusiveAccessToCollection(OperationContext* opCtx,
     return shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X) ||
         (uncommittedCatalogUpdates.isCreatedCollection(opCtx, nss) &&
          shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
+}
+
+bool CollectionCatalog::isWritableCollection(OperationContext* opCtx,
+                                             const Collection* collection) {
+    if (!collection) {
+        return false;
+    }
+    auto lookupResult = UncommittedCatalogUpdates::lookupCollection(opCtx, collection->uuid());
+    return lookupResult.found && lookupResult.collection.get() == collection;
 }
 
 const Collection* CollectionCatalog::_lookupSystemViews(OperationContext* opCtx,

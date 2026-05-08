@@ -49,15 +49,12 @@ public:
                    const NamespaceString& nss,
                    std::unique_ptr<IndexCatalog> indexCatalog)
         : _uuid(uuid), _nss(nss), _indexCatalog(std::move(indexCatalog)) {}
-    CollectionMock(const NamespaceString& nss, RecordId catalogId)
-        : _nss(nss), _catalogId(std::move(catalogId)) {}
     ~CollectionMock() override = default;
 
     std::shared_ptr<Collection> clone() const override {
         std::unique_ptr<IndexCatalog> indexCatalogCopy =
             _indexCatalog ? _indexCatalog->clone() : nullptr;
         auto copy = std::make_shared<CollectionMock>(_uuid, _nss, std::move(indexCatalogCopy));
-        copy->_catalogId = _catalogId;
         copy->_committed = _committed;
         copy->_options = _options;
         return copy;
@@ -79,11 +76,10 @@ public:
     }
 
     RecordId getCatalogId() const override {
-        return _catalogId;
-    }
-
-    void setCatalogId(RecordId catalogId) {
-        _catalogId = std::move(catalogId);
+        // It is intentionally not possible to have a valid CatalogId for a CollectionMock, as it
+        // represents the location of the Collection's metadata in the durable catalog, and
+        // CollectionMocks are not persisted to disk.
+        return RecordId{};
     }
 
     const NamespaceString& ns() const override {
@@ -478,6 +474,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    std::shared_ptr<const durable_catalog::CatalogEntryMetaData> getMetadata() const override {
+        MONGO_UNREACHABLE;
+    }
+
     bool needsCappedLock() const override {
         MONGO_UNREACHABLE;
     }
@@ -489,7 +489,6 @@ public:
 private:
     UUID _uuid = UUID::gen();
     NamespaceString _nss;
-    RecordId _catalogId{0};
     clonable_ptr<IndexCatalog> _indexCatalog;
     bool _committed = true;
     CollectionOptions _options;

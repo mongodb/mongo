@@ -38,6 +38,7 @@
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/shard_role/shard_catalog/backwards_compatible_collection_options_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_record_store_options.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -162,7 +163,7 @@ boost::optional<CatalogEntry> getParsedCatalogEntry(OperationContext* opCtx,
 
 void putMetaData(OperationContext* opCtx,
                  const RecordId& catalogId,
-                 durable_catalog::CatalogEntryMetaData& md,
+                 const durable_catalog::CatalogEntryMetaData& md,
                  MDBCatalog* mdbCatalog,
                  boost::optional<BSONObj> indexIdents) {
     auto cursor = mdbCatalog->getCursor(opCtx);
@@ -316,6 +317,7 @@ StatusWith<std::unique_ptr<RecordStore>> createCollection(
     auto recordStoreOptions = getRecordStoreOptions(nss, collectionOptions, recordIdsReplicated);
     durable_catalog::CatalogEntryMetaData md =
         internal::createMetaDataForNewCollection(nss, collectionOptions, recordIdsReplicated);
+    sanitizeTimeseriesOptions(opCtx, md);
 
     auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
@@ -536,6 +538,32 @@ boost::optional<CatalogEntry> parseCatalogEntry(const RecordId& catalogId, const
     BSONElement idxIdent = obj["idxIdent"];
     BSONObj idxIdentObj = idxIdent.eoo() ? BSONObj() : idxIdent.Obj().getOwned();
     return CatalogEntry{catalogId, obj["ident"].String(), idxIdentObj, parseMetaData(obj["md"])};
+}
+
+void sanitizeTimeseriesOptions(OperationContext* opCtx,
+                               durable_catalog::CatalogEntryMetaData& metadata) {
+    if (!metadata.options.timeseries) {
+        return;
+    }
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
+    // If present, reuse the storageEngine options to work around the issue described in
+    // SERVER-91194.
+    metadata._durableTimeseriesBucketsMayHaveMixedSchemaData =
+        storageEngine->getFlagFromStorageOptions(
+            metadata.options.storageEngine,
+            backwards_compatible_collection_options::kTimeseriesBucketsMayHaveMixedSchemaData);
+    if (metadata._durableTimeseriesBucketsMayHaveMixedSchemaData.has_value()) {
+        metadata.timeseriesBucketsMayHaveMixedSchemaData =
+            metadata._durableTimeseriesBucketsMayHaveMixedSchemaData;
+    }
+
+    // If present, reuse storageEngine options to work around the issue described in SERVER-91193.
+    metadata._durableTimeseriesBucketingParametersHaveChanged =
+        storageEngine->getFlagFromStorageOptions(
+            metadata.options.storageEngine,
+            backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged);
 }
 
 }  // namespace mongo::durable_catalog

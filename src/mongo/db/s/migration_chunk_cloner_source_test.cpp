@@ -475,6 +475,10 @@ public:
         return _coll->isMetadataEqual(otherMetadata);
     }
 
+    std::shared_ptr<const durable_catalog::CatalogEntryMetaData> getMetadata() const override {
+        return _coll->getMetadata();
+    }
+
     bool needsCappedLock() const override {
         return _coll->needsCappedLock();
     }

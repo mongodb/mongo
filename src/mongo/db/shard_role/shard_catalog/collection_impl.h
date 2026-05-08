@@ -402,6 +402,8 @@ public:
 
     bool isMetadataEqual(const BSONObj& otherMetadata) const final;
 
+    std::shared_ptr<const durable_catalog::CatalogEntryMetaData> getMetadata() const final;
+
     bool needsCappedLock() const final;
 
     bool isCappedAndNeedsDelete(OperationContext* opCtx) const final;
@@ -413,6 +415,34 @@ private:
      */
     template <typename Func>
     void _writeMetadata(OperationContext* opCtx, Func func);
+
+    int _getIndexOffsetForMultikeyUpdate(StringData indexName, int indexOffset) const;
+
+    bool _setIndexIsMultikeyInMetadata(const durable_catalog::CatalogEntryMetaData& metadata,
+                                       int offset,
+                                       const MultikeyPaths& multikeyPaths) const;
+
+    /**
+     * Sets the index identified by 'indexName' to be multikey when the caller holds shared access
+     * to the collection (MODE_IX). This mutates the shared collection instance without going
+     * through the usual copy-on-write path for metadata updates, using a dedicated concurrency
+     * control mechanism for multikey metadata updates.
+     */
+    bool _setIndexIsMultikeyWithSharedAccess(OperationContext* opCtx,
+                                             StringData indexName,
+                                             const MultikeyPaths& multikeyPaths,
+                                             int indexOffset) const;
+
+    /**
+     * Sets the index identified by 'indexName' to be multikey when the caller exclusively owns
+     * this collection in the current WUOW (i.e. newly created in this WUOW or held under MODE_X).
+     * This bypasses the UncommittedMultikey decoration / onCommit deferral and persists the
+     * metadata atomically as part of the transaction.
+     */
+    bool _setIndexIsMultikeyWithExclusiveAccess(OperationContext* opCtx,
+                                                StringData indexName,
+                                                const MultikeyPaths& multikeyPaths,
+                                                int indexOffset);
 
     /**
      * Creates a mutable copy of the current metadata, including uncommitted multikey changes if

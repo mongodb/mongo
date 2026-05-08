@@ -648,6 +648,8 @@ public:
 
     virtual bool isMetadataEqual(const BSONObj& otherMetadata) const = 0;
 
+    virtual std::shared_ptr<const durable_catalog::CatalogEntryMetaData> getMetadata() const = 0;
+
     /**
      * Specifies whether writes to this collection should X-lock the metadata resource. It is only
      * set for replicated, non-clustered capped collections. Such collections require writes to be
