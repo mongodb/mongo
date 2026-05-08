@@ -144,5 +144,47 @@ TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextWithMetaField) {
                                          "metric: 1}}, key: {m: 1, t: 1, metric: 1}}")));
 }
 
+TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextSkipsFailedConversionWithoutPausing) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto timeseriesOptions = TimeseriesIndexConversionOptions{"t"};
+    auto convertIndexStatsStage = std::make_unique<exec::agg::InternalConvertBucketIndexStatsStage>(
+        DocumentSourceInternalConvertBucketIndexStats::kStageName, expCtx, timeseriesOptions);
+
+    // First document has a key that cannot be converted to time-series format (will produce an
+    // empty result from makeTimeseriesIndexStats). Second document is a valid index stats entry.
+    auto stage = exec::agg::MockStage::createForTest(
+        {"{spec: {name: 'unconvertibleIndex', key: {a: 1}}}",
+         "{spec: {name: 'validIndex', key: {'control.min.t': 1, 'control.max.t': 1, "
+         "'control.min.metric': 1, 'control.max.metric': 1}}}"},
+        expCtx);
+    exec::agg::MockStage::setSource_forTest(convertIndexStatsStage, stage.get());
+
+    // The unconvertible document should be silently skipped (not returned as PauseExecution).
+    auto next = convertIndexStatsStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(
+        next.getDocument(),
+        Document(fromjson(
+            "{spec: {name: 'validIndex', key: {t: 1, metric: 1}}, key: {t: 1, metric: 1}}")));
+
+    // Should be EOF now.
+    ASSERT_TRUE(convertIndexStatsStage->getNext().isEOF());
+}
+
+TEST_F(InternalConvertBucketIndexStatsTest, TestGetNextSkipsAllFailedConversions) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto timeseriesOptions = TimeseriesIndexConversionOptions{"t"};
+    auto convertIndexStatsStage = std::make_unique<exec::agg::InternalConvertBucketIndexStatsStage>(
+        DocumentSourceInternalConvertBucketIndexStats::kStageName, expCtx, timeseriesOptions);
+
+    // All documents fail conversion.
+    auto stage = exec::agg::MockStage::createForTest(
+        {"{spec: {name: 'idx1', key: {a: 1}}}", "{spec: {name: 'idx2', key: {b: 1}}}"}, expCtx);
+    exec::agg::MockStage::setSource_forTest(convertIndexStatsStage, stage.get());
+
+    // Should skip both unconvertible documents and return EOF.
+    ASSERT_TRUE(convertIndexStatsStage->getNext().isEOF());
+}
+
 }  // namespace
 }  // namespace mongo
