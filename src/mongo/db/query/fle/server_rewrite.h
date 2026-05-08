@@ -77,7 +77,8 @@ BSONObj rewriteQuery(OperationContext* opCtx,
                      const EncryptionInformation& info,
                      BSONObj filter,
                      GetTxnCallback getTransaction,
-                     EncryptedCollScanModeAllowed mode);
+                     EncryptedCollScanModeAllowed mode,
+                     const EncryptedFieldConfig& validatedEfc);
 
 /**
  * Process a find command with encryptionInformation in-place, rewriting the filter condition so

@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
@@ -75,6 +76,19 @@ public:
     std::unique_ptr<FLEStatusSection> instance;
 
     bool oldDiagnosticsFlag;
+
+    static EncryptedFieldConfig buildTestEncryptedFieldConfig(int64_t contention) {
+        EncryptedFieldConfig efc;
+        std::vector<EncryptedField> fields;
+        const auto keyId = UUID::gen();
+        fields.emplace_back(keyId, "path");
+        auto qtc = QueryTypeConfig::parse(fromjson(R"({"queryType": "equality"})"));
+        qtc.setContention(contention);
+        fields.back().setQueries(
+            std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig>(std::move(qtc)));
+        efc.setFields(std::move(fields));
+        return efc;
+    }
 };
 
 TEST_F(FLEStatsTest, NoopStats) {
@@ -196,8 +210,11 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
     IndexTypeCounters expected;
     assertCounters(expected);
 
+    // Use a single NSS; index type stats are EFC-driven and NSS is irrelevant here.
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+
     auto efc1 = buildConfig({{"unindexed", 4}, {"equality", 2}, {"multiPreview", 3}});
-    instance->updateIndexTypeStatsOnRegisterCollection(efc1);
+    instance->updateStatsOnRegisterCollection(nss, efc1);
     expected.unindexed++;
     expected.equality++;
     expected.suffixPreview++;
@@ -205,51 +222,288 @@ TEST_F(FLEStatsTest, IndexTypeStats) {
     assertCounters(expected);
 
     auto efc2 = buildConfig({{"range", 3}, {"rangePreview", 1}, {"substringPreview", 2}});
-    instance->updateIndexTypeStatsOnRegisterCollection(efc2);
+    instance->updateStatsOnRegisterCollection(nss, efc2);
     expected.range++;
     expected.rangePreview++;
     expected.substringPreview++;
     assertCounters(expected);
 
     auto efc3 = buildConfig({{"suffixPreview", 1}, {"multi", 1}});
-    instance->updateIndexTypeStatsOnRegisterCollection(efc3);
+    instance->updateStatsOnRegisterCollection(nss, efc3);
     expected.suffixPreview++;
     expected.suffix++;
     expected.prefix++;
     assertCounters(expected);
 
-    instance->updateIndexTypeStatsOnDeregisterCollection(efc2);
+    instance->updateStatsOnDeregisterCollection(nss, efc2);
     expected.range--;
     expected.rangePreview--;
     expected.substringPreview--;
     assertCounters(expected);
 
-    instance->updateIndexTypeStatsOnRegisterCollection(efc3);
+    instance->updateStatsOnRegisterCollection(nss, efc3);
     expected.suffixPreview++;
     expected.suffix++;
     expected.prefix++;
     assertCounters(expected);
 
-    instance->updateIndexTypeStatsOnDeregisterCollection(efc3);
+    instance->updateStatsOnDeregisterCollection(nss, efc3);
     expected.suffixPreview--;
     expected.suffix--;
     expected.prefix--;
     assertCounters(expected);
 
-    instance->updateIndexTypeStatsOnDeregisterCollection(efc1);
+    instance->updateStatsOnDeregisterCollection(nss, efc1);
     expected.unindexed--;
     expected.equality--;
     expected.suffixPreview--;
     expected.prefixPreview--;
     assertCounters(expected);
 
-    instance->updateIndexTypeStatsOnDeregisterCollection(efc3);
+    instance->updateStatsOnDeregisterCollection(nss, efc3);
     expected.suffixPreview--;
     expected.suffix--;
     expected.prefix--;
     assertCounters(expected);
 }
 
+// --- RateLimitedCounter tests ---
+
+TEST_F(FLEStatsTest, RateLimitedCounterZeroCooldown) {
+    RateLimitedCounter counter(Milliseconds{0}, tickSource.get());
+    ASSERT_TRUE(counter.increment());
+    ASSERT_EQ(1, counter.getCount());
+    ASSERT_TRUE(counter.increment());
+    ASSERT_EQ(2, counter.getCount());
+}
+
+TEST_F(FLEStatsTest, RateLimitedCounterNonZeroCooldown) {
+    RateLimitedCounter counter(Milliseconds{100}, tickSource.get());
+    // First increment always succeeds
+    ASSERT_TRUE(counter.increment());
+    ASSERT_EQ(1, counter.getCount());
+
+    // Cooldown blocks subsequent increments.
+    ASSERT_FALSE(counter.increment());
+    ASSERT_EQ(1, counter.getCount());
+
+    // Increment succeeds after cooldown.
+    tickSource->advance(Milliseconds{100});
+    ASSERT_TRUE(counter.increment());
+    ASSERT_EQ(2, counter.getCount());
+
+    // Blocked again immediately after.
+    ASSERT_FALSE(counter.increment());
+    ASSERT_EQ(2, counter.getCount());
+}
+
+TEST_F(FLEStatsTest, RateLimitedCounterForceIncrement) {
+    RateLimitedCounter counter(Milliseconds{10000}, tickSource.get());
+    // First increment always succeeds
+    ASSERT_TRUE(counter.increment());
+    ASSERT_EQ(1, counter.getCount());
+
+    // Next increment is blocked by cooldown.
+    ASSERT_FALSE(counter.increment());
+    ASSERT_EQ(1, counter.getCount());
+
+    // forceIncrement bypasses the cooldown entirely.
+    counter.forceIncrement(5);
+    ASSERT_EQ(6, counter.getCount());
+    counter.forceIncrement();
+    ASSERT_EQ(7, counter.getCount());
+}
+
+// --- FLEPerCollectionStats tests ---
+
+TEST_F(FLEStatsTest, FLEPerCollectionStatsAccumulate) {
+    FLEPerCollectionStats a(Milliseconds{0}, tickSource.get());
+    FLEPerCollectionStats b(Milliseconds{0}, tickSource.get());
+
+    a.insertOpCounter.fetchAndAddRelaxed(1);
+    a.findOpCounter.forceIncrement(2);
+    a.updateOpCounter.forceIncrement(3);
+    a.deleteOpCounter.forceIncrement(4);
+
+    b.insertOpCounter.fetchAndAddRelaxed(5);
+    b.findOpCounter.forceIncrement(6);
+    b.updateOpCounter.forceIncrement(7);
+    b.deleteOpCounter.forceIncrement(8);
+
+    a += b;
+
+    ASSERT_EQ(6, a.insertOpCounter.loadRelaxed());
+    ASSERT_EQ(8, a.findOpCounter.getCount());
+    ASSERT_EQ(10, a.updateOpCounter.getCount());
+    ASSERT_EQ(12, a.deleteOpCounter.getCount());
+}
+
+TEST_F(FLEStatsTest, FLEPerCollectionStatsSerialize) {
+    FLEPerCollectionStats stats(Milliseconds{0}, tickSource.get());
+    stats.insertOpCounter.fetchAndAddRelaxed(10);
+    stats.findOpCounter.forceIncrement(20);
+    stats.updateOpCounter.forceIncrement(30);
+    stats.deleteOpCounter.forceIncrement(40);
+
+    BSONObjBuilder builder;
+    stats.serialize(&builder);
+    auto obj = builder.obj();
+
+    ASSERT_EQ(10, obj["inserts"].Long());
+    ASSERT_EQ(20, obj["finds"].Long());
+    ASSERT_EQ(30, obj["updates"].Long());
+    ASSERT_EQ(40, obj["deletes"].Long());
+}
+
+// --- FLEStatusSection operation counter tests ---
+
+TEST_F(FLEStatsTest, OperationCountersSectionIsPresent) {
+    auto obj = instance->generateSection(opCtx, BSONElement());
+    ASSERT_TRUE(obj.hasField("operationCounters"));
+    auto counters = obj["operationCounters"].Obj();
+    ASSERT_EQ(0, counters["inserts"].Long());
+    ASSERT_EQ(0, counters["finds"].Long());
+    ASSERT_EQ(0, counters["updates"].Long());
+    ASSERT_EQ(0, counters["deletes"].Long());
+}
+
+TEST_F(FLEStatsTest, IncrementInsertCountAlwaysIncrements) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const auto efc = buildTestEncryptedFieldConfig(1);  // contention doesn't matter
+
+    instance->incrementInsertCount(nss, efc);
+    instance->incrementInsertCount(nss, efc);
+    instance->incrementInsertCount(nss, efc);
+
+    auto obj = instance->generateSection(opCtx, BSONElement());
+    ASSERT_EQ(3, obj["operationCounters"].Obj()["inserts"].Long());
+}
+
+TEST_F(FLEStatsTest, IncrementFindUpdateDeleteCount) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const auto efc = buildTestEncryptedFieldConfig(1);
+
+    instance->incrementFindCount(nss, efc);
+    instance->incrementFindCount(nss, efc);
+    instance->incrementUpdateCount(nss, efc);
+    instance->incrementDeleteCount(nss, efc);
+    instance->incrementDeleteCount(nss, efc);
+
+    auto obj = instance->generateSection(opCtx, BSONElement());
+    auto counters = obj["operationCounters"].Obj();
+    ASSERT_EQ(1, counters["finds"].Long());
+    ASSERT_EQ(1, counters["updates"].Long());
+    ASSERT_EQ(1, counters["deletes"].Long());
+}
+
+TEST_F(FLEStatsTest, IncrementFindUpdateDeleteCountRateLimited) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const auto efc = buildTestEncryptedFieldConfig(1);
+    const auto delay = FLEStatusSection::calculateOpCounterIncrementCooldownValue(efc);
+
+    auto validateCounters =
+        [this](long long expectedFinds, long long expectedUpdates, long long expectedDeletes) {
+            auto obj = instance->generateSection(opCtx, BSONElement());
+            auto counters = obj["operationCounters"].Obj();
+            ASSERT_EQ(counters["finds"].Long(), expectedFinds);
+            ASSERT_EQ(counters["updates"].Long(), expectedUpdates);
+            ASSERT_EQ(counters["deletes"].Long(), expectedDeletes);
+        };
+
+    // First increments always succeed.
+    instance->incrementFindCount(nss, efc);
+    instance->incrementUpdateCount(nss, efc);
+    instance->incrementDeleteCount(nss, efc);
+    validateCounters(1, 1, 1);
+
+    // Increments immediately after don't register.
+    instance->incrementFindCount(nss, efc);
+    instance->incrementUpdateCount(nss, efc);
+    instance->incrementDeleteCount(nss, efc);
+    validateCounters(1, 1, 1);
+
+    // Increments just before the period ends don't register
+    tickSource->advance(delay - Milliseconds(1));
+    instance->incrementFindCount(nss, efc);
+    instance->incrementUpdateCount(nss, efc);
+    instance->incrementDeleteCount(nss, efc);
+    validateCounters(1, 1, 1);
+
+    // Increments at the period end register
+    tickSource->advance(Milliseconds(1));
+    instance->incrementFindCount(nss, efc);
+    instance->incrementUpdateCount(nss, efc);
+    instance->incrementDeleteCount(nss, efc);
+    validateCounters(2, 2, 2);
+}
+
+TEST_F(FLEStatsTest, OperationCountersPersistAfterDeregister) {
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const auto efc = buildTestEncryptedFieldConfig(1);
+
+    instance->incrementInsertCount(nss, efc);
+    instance->incrementInsertCount(nss, efc);
+    instance->incrementFindCount(nss, efc);
+    instance->incrementUpdateCount(nss, efc);
+    instance->incrementDeleteCount(nss, efc);
+
+    // Deregister moves per-collection stats into _deletedCollStats.
+    instance->updateStatsOnDeregisterCollection(nss, efc);
+
+    auto obj = instance->generateSection(opCtx, BSONElement());
+    auto counters = obj["operationCounters"].Obj();
+    ASSERT_EQ(2, counters["inserts"].Long());
+    ASSERT_EQ(1, counters["finds"].Long());
+    ASSERT_EQ(1, counters["updates"].Long());
+    ASSERT_EQ(1, counters["deletes"].Long());
+}
+
+TEST_F(FLEStatsTest, OperationCountersAggregateMultipleCollections) {
+    const auto nss1 = NamespaceString::createNamespaceString_forTest("test.coll1");
+    const auto nss2 = NamespaceString::createNamespaceString_forTest("test.coll2");
+    const auto nss3 = NamespaceString::createNamespaceString_forTest("test.coll3");
+    const auto efc = buildTestEncryptedFieldConfig(1);
+
+    instance->incrementInsertCount(nss1, efc);
+    instance->incrementInsertCount(nss1, efc);
+    instance->incrementUpdateCount(nss1, efc);
+
+    instance->incrementInsertCount(nss2, efc);
+    instance->incrementDeleteCount(nss2, efc);
+    instance->incrementFindCount(nss2, efc);
+
+    instance->incrementInsertCount(nss3, efc);
+    instance->incrementUpdateCount(nss3, efc);
+    instance->incrementFindCount(nss3, efc);
+    // remove nss3 and merge its stats into _deletedCollStats
+    instance->updateStatsOnDeregisterCollection(nss3, efc);
+
+    auto obj = instance->generateSection(opCtx, BSONElement());
+    auto counters = obj["operationCounters"].Obj();
+    ASSERT_EQ(4, counters["inserts"].Long());
+    ASSERT_EQ(2, counters["finds"].Long());
+    ASSERT_EQ(2, counters["updates"].Long());
+    ASSERT_EQ(1, counters["deletes"].Long());
+}
+
+TEST_F(FLEStatsTest, CalculateOpCounterIncrementCooldownValueTest) {
+    // expect the durations returned by calculateOpCounterIncrementCooldownValue()
+    // is in the range [106969, 111218] milliseconds for contention factor values 0 through 100
+    auto min = FLEStatusSection::calculateOpCounterIncrementCooldownValue(
+        buildTestEncryptedFieldConfig(0));
+    auto max = FLEStatusSection::calculateOpCounterIncrementCooldownValue(
+        buildTestEncryptedFieldConfig(100));
+    ASSERT_EQ(Milliseconds(106969), min);
+    ASSERT_EQ(Milliseconds(111218), max);
+
+    auto last = min;
+    for (int64_t cf = 1; cf < 100; cf++) {
+        auto current = FLEStatusSection::calculateOpCounterIncrementCooldownValue(
+            buildTestEncryptedFieldConfig(cf));
+        ASSERT_GT(current, last);
+        last = current;
+    }
+}
 
 }  // namespace
 }  // namespace mongo

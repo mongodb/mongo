@@ -2782,11 +2782,11 @@ void CollectionCatalog::Stats::adjustOnCollectionRegistration(const Collection& 
                 auto encryptedFieldConfig =
                     coll.getCollectionOptions().encryptedFieldConfig.value();
                 if (op == Stats::kRegister) {
-                    FLEStatusSection::get().updateIndexTypeStatsOnRegisterCollection(
-                        encryptedFieldConfig);
+                    FLEStatusSection::get().updateStatsOnRegisterCollection(nss,
+                                                                            encryptedFieldConfig);
                 } else {
-                    FLEStatusSection::get().updateIndexTypeStatsOnDeregisterCollection(
-                        encryptedFieldConfig);
+                    FLEStatusSection::get().updateStatsOnDeregisterCollection(nss,
+                                                                              encryptedFieldConfig);
                 }
             }
             if (isCSFLE1Validator(coll.getValidatorDoc())) {

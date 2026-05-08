@@ -720,7 +720,7 @@ void FleCrudTest::doSingleUpdateWithUpdateDoc(int id,
                       .runtimeConstants(updateRequest.getLegacyRuntimeConstants())
                       .letParameters(updateRequest.getLet())
                       .build();
-    processUpdate(_queryImpl.get(), expCtx, updateRequest);
+    processUpdate(_queryImpl.get(), expCtx, updateRequest, efc);
 }
 
 void FleCrudTest::doSingleDelete(int id, Fle2AlgorithmInt alg) {
@@ -745,7 +745,7 @@ void FleCrudTest::doSingleDelete(int id, Fle2AlgorithmInt alg) {
                       .runtimeConstants(deleteRequest.getLegacyRuntimeConstants())
                       .letParameters(deleteRequest.getLet())
                       .build();
-    processDelete(_queryImpl.get(), expCtx, deleteRequest);
+    processDelete(_queryImpl.get(), expCtx, deleteRequest, efc);
 }
 
 void FleCrudTest::doFindAndModify(write_ops::FindAndModifyCommandRequest& request,

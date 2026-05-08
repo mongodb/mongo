@@ -503,7 +503,7 @@ BSONObj processFLEWriteExplainD(OperationContext* opCtx,
                                 const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
                                 const boost::optional<BSONObj>& letParameters,
                                 const BSONObj& query) {
-
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, info);
     auto expCtx = ExpressionContextBuilder{}
                       .opCtx(opCtx)
                       .collator(fle::collatorFromBSON(opCtx, collation))
@@ -517,7 +517,8 @@ BSONObj processFLEWriteExplainD(OperationContext* opCtx,
                              info,
                              query,
                              &getTransactionWithRetriesForMongoD,
-                             fle::EncryptedCollScanModeAllowed::kAllow);
+                             fle::EncryptedCollScanModeAllowed::kAllow,
+                             efc);
 }
 
 std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>

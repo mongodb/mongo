@@ -439,7 +439,8 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
  */
 write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
                                             boost::intrusive_ptr<ExpressionContext> expCtx,
-                                            const write_ops::DeleteCommandRequest& deleteRequest);
+                                            const write_ops::DeleteCommandRequest& deleteRequest,
+                                            const EncryptedFieldConfig& efc);
 
 /**
  * Process a FLE Update with the query interface
@@ -448,7 +449,8 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
  */
 write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
                                             boost::intrusive_ptr<ExpressionContext> expCtx,
-                                            const write_ops::UpdateCommandRequest& updateRequest);
+                                            const write_ops::UpdateCommandRequest& updateRequest,
+                                            const EncryptedFieldConfig& efc);
 
 /**
  * Process a FLE Find And Modify with the query interface

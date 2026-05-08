@@ -36,6 +36,7 @@
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/timer.h"
@@ -69,6 +70,52 @@ static void accumulateStats(FLEIndexTypeStats& left, const FLEIndexTypeStats& ri
 }  // namespace FLEStatsUtil
 
 /**
+ * Thread-safe counter that only increments if a cooldown period has passed since the last
+ * increment.
+ */
+class RateLimitedCounter {
+public:
+    RateLimitedCounter(Milliseconds cooldown, TickSource* tickSource);
+
+    // Try to increment the counter by 1.
+    // Returns true on successful increment, or false if too early.
+    bool increment();
+
+    // Returns the current counter value.
+    long long getCount() const {
+        return _count.loadRelaxed();
+    }
+
+    // Increment the counter by the given amount regardless of the cooldown period.
+    void forceIncrement(long long amount = 1) {
+        _count.fetchAndAddRelaxed(amount);
+    }
+
+private:
+    TickSource* _tickSource;
+    const TickSource::Tick _ticksPerPeriod;
+    AtomicWord<long long> _count{0};
+    Atomic<TickSource::Tick> _lastUpdate{0};
+};
+
+/**
+ * Tracks and reports operation statistics about individual FLE2 collections.
+ */
+class FLEPerCollectionStats {
+public:
+    FLEPerCollectionStats(Milliseconds cooldown, TickSource* tickSource);
+
+    FLEPerCollectionStats& operator+=(const FLEPerCollectionStats& rhs);
+
+    void serialize(BSONObjBuilder* builder) const;
+
+    AtomicWord<long long> insertOpCounter = 0;
+    RateLimitedCounter findOpCounter;
+    RateLimitedCounter updateOpCounter;
+    RateLimitedCounter deleteOpCounter;
+};
+
+/**
  * Tracks and reports statistics about the server-side Queryable Encryption integration.
  */
 class FLEStatusSection : public ServerStatusSection {
@@ -78,6 +125,8 @@ public:
 
     // Return the global status section Singleton
     static FLEStatusSection& get();
+
+    static Milliseconds calculateOpCounterIncrementCooldownValue(const EncryptedFieldConfig& efc);
 
     // Report FLE metrics at all times
     bool includeByDefault() const final {
@@ -123,12 +172,23 @@ public:
 
     EmuBinaryTracker makeEmuBinaryTracker();
 
-    void updateIndexTypeStatsOnRegisterCollection(const EncryptedFieldConfig& efc);
-    void updateIndexTypeStatsOnDeregisterCollection(const EncryptedFieldConfig& efc);
+    void updateStatsOnRegisterCollection(const NamespaceString& nss,
+                                         const EncryptedFieldConfig& efc);
+    void updateStatsOnDeregisterCollection(const NamespaceString& nss,
+                                           const EncryptedFieldConfig& efc);
     void clearIndexTypeStats();
+
+    void incrementInsertCount(const NamespaceString& nss, const EncryptedFieldConfig& efc);
+    void incrementFindCount(const NamespaceString& nss, const EncryptedFieldConfig& efc);
+    void incrementUpdateCount(const NamespaceString& nss, const EncryptedFieldConfig& efc);
+    void incrementDeleteCount(const NamespaceString& nss, const EncryptedFieldConfig& efc);
 
 private:
     void updateIndexTypeStats(const EncryptedFieldConfig& efc, bool subtract);
+
+    std::shared_ptr<FLEPerCollectionStats> registerCollectionStats(const NamespaceString& nss,
+                                                                   const EncryptedFieldConfig& efc);
+    void deregisterCollectionStats(const NamespaceString& nss);
 
     TickSource* _tickSource;
 
@@ -140,6 +200,12 @@ private:
     // Queryable Encryption index types, and how many collections use unindexed encryption.
     mutable std::mutex _indexTypeMutex;
     FLEIndexTypeStats _indexTypeStats;
+
+    // Holds operation counters for each active FLE2 collection.
+    ConcurrentSharedValuesMap<NamespaceString, FLEPerCollectionStats> _collStatsMap;
+
+    // Holds operation counters for deleted FLE2 collections.
+    FLEPerCollectionStats _deletedCollStats;
 };
 
 }  // namespace MONGO_MOD_PUBLIC mongo
