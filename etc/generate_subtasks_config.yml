@@ -46,6 +46,7 @@ build_variant_large_distro_exceptions:
   - macos-debug-suggested
   - rhel70
   - rhel8
+  - rhel8-asan
   - rhel8-debug-asan
   - rhel8-debug-asan-all-feature-flags
   - rhel8-debug-asan-sbe-engine
