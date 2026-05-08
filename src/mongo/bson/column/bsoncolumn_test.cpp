@@ -4226,6 +4226,34 @@ TEST_F(BSONColumnTest, BinDataLargerThan16WithNonZeroDelta) {
     }
 }
 
+TEST_F(BSONColumnTest, BinDataColumnSubtypeRejectedByBuilder) {
+    // Appending a binData element with Column subtype must be rejected by the builder.
+    std::vector<uint8_t> payload{'\0'};  // minimal column binary (EOO terminator)
+    auto columnElem = createElementBinData(BinDataType::Column, payload);
+    ASSERT_THROWS_CODE(cb.append(columnElem), DBException, 12506300);
+}
+
+TEST_F(BSONColumnTest, BinDataColumnSubtypeInObjectRejectedByBuilder) {
+    // Appending an object that contains a binData/Column field must be rejected.
+    std::vector<uint8_t> payload{'\0'};
+    BSONObjBuilder outer;
+    outer.appendBinData("col"_sd, payload.size(), BinDataType::Column, payload.data());
+    BSONObj obj = outer.obj();
+
+    ASSERT_THROWS_CODE(cb.append(obj.firstElement()), DBException, 12506300);
+    ASSERT_THROWS_CODE(cb.append(obj), DBException, 12506300);
+}
+
+TEST_F(BSONColumnTest, BinDataColumnSubtypeNestedInArrayRejectedByBuilder) {
+    // Appending an array that contains a binData/Column element must be rejected.
+    std::vector<uint8_t> payload{'\0'};
+    BSONArrayBuilder arr;
+    arr.appendBinData(payload.size(), BinDataType::Column, payload.data());
+    BSONArray bsonArr = arr.arr();
+
+    ASSERT_THROWS_CODE(cb.append(bsonArr), DBException, 12506300);
+}
+
 TEST_F(BSONColumnTest, EmptyStringAfterUnencodable) {
     std::vector<BSONElement> elems = {createElementString("\0"_sd), createElementString(""_sd)};
 
