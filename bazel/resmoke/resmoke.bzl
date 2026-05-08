@@ -212,11 +212,8 @@ def resmoke_suite_test(
     }) + select({
         "//bazel/resmoke:installed_dist_test_enabled": [
             "--installDir=dist-test/bin",
-            "--mongoVersionFile=$(location //:.resmoke_mongo_version.yml)",
         ],
-        "//conditions:default": [
-            "--mongoVersionFile=$(location //bazel/resmoke:resmoke_mongo_version)",
-        ],
+        "//conditions:default": [],
     })
 
     deps_path = ":".join(["$(location %s)" % dep for dep in deps])
@@ -224,6 +221,7 @@ def resmoke_suite_test(
     default_data = [
         generated_config,
         python_imports_target,
+        "//bazel/resmoke:resmoke_mongo_version",
         "//bazel/resmoke:on_feature_flags",
         "//bazel/resmoke:off_feature_flags",
         "//bazel/resmoke:unreleased_ifr_flags",
@@ -264,8 +262,8 @@ def resmoke_suite_test(
         name = name,
         srcs = [resmoke_shim],
         data = merged_data + select({
-            "//bazel/resmoke:installed_dist_test_enabled": ["//:installed-dist-test", "//:.resmoke_mongo_version.yml"],
-            "//conditions:default": ["//bazel/resmoke:resmoke_mongo_version"],
+            "//bazel/resmoke:installed_dist_test_enabled": ["//:installed-dist-test"],
+            "//conditions:default": [],
         }),
         deps = [
             resmoke,
@@ -284,6 +282,7 @@ def resmoke_suite_test(
             "--archiveLimitMb=500",
             "--testTimeout=$(RESMOKE_TEST_TIMEOUT)",
             "--historicTestRuntimes=$(location :%s)" % historic_runtimes,
+            "--mongoVersionFile=$(location //bazel/resmoke:resmoke_mongo_version)",
         ] + [
             "--multiversionDir=$(location %s)" % native.package_relative_label(dep)
             for dep in multiversion_deps

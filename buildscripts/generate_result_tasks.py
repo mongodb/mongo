@@ -52,10 +52,21 @@ def _bazel_binary() -> str:
     return os.environ.get("BAZEL_BINARY", "bazel")
 
 
-def make_results_task(target: str) -> Task:
+def make_results_task(
+    target: str,
+    resmoke_disable_rbe: bool = False,
+    generate_burn_in_targets: bool = False,
+) -> Task:
+    if resmoke_disable_rbe:
+        results_func = "gather local test results"
+    else:
+        results_func = "fetch remote test results"
+    execute_params: dict = {"targets": target, "result_task": True}
+    if generate_burn_in_targets:
+        execute_params["generate_burn_in_targets"] = True
     commands = [
-        FunctionCall("execute resmoke tests via bazel", {"targets": target, "result_task": True}),
-        FunctionCall("fetch remote test results", {"test_label": target}),
+        FunctionCall("execute resmoke tests via bazel", execute_params),
+        FunctionCall(results_func, {"test_label": target}),
     ]
 
     task = Task(target, commands).as_dict()
@@ -67,25 +78,39 @@ def make_results_task(target: str) -> Task:
     return task
 
 
-def make_task_group(
-    name: str,
-    variant: str,
-    targets,
-    resmoke_task: Optional[str] = "resmoke_tests",
-) -> TaskGroup:
-    task_group = TaskGroup(
-        name=f"{name}_results_{variant}",
-        tasks=[],
-        max_hosts=len(targets),
-        setup_group_can_fail_task=True,
-        setup_group=[
-            FunctionCall("git get project and add git tag"),
-            FunctionCall("set task expansion macros"),
-            FunctionCall("f_expansions_write"),
-            FunctionCall("set up venv"),
-            FunctionCall("configure evergreen api credentials"),
-            FunctionCall("set up credentials"),
-            FunctionCall("get engflow creds"),
+def _make_setup_group(resmoke_task: str, resmoke_disable_rbe: bool) -> list:
+    common = [
+        FunctionCall("git get project and add git tag"),
+        FunctionCall("set task expansion macros"),
+        FunctionCall("f_expansions_write"),
+        FunctionCall("set up venv"),
+        FunctionCall("configure evergreen api credentials"),
+        FunctionCall("set up credentials"),
+        FunctionCall("get engflow creds"),
+    ]
+    if resmoke_disable_rbe:
+        # Download and extract the pre-built dist-test binaries into src/ so that
+        # //bazel/resmoke:installed_dist_test_enabled can glob dist-test/** from the workspace root.
+        return common + [
+            BuiltInCommand(
+                "s3.get",
+                {
+                    "aws_key": "${aws_key_new}",
+                    "aws_secret": "${aws_secret}",
+                    "remote_file": "${mongo_binaries}",
+                    "bucket": "mciuploads",
+                    "local_file": "mongo-binaries.tgz",
+                },
+            ),
+            BuiltInCommand(
+                "shell.exec",
+                {
+                    "script": "tar -xf mongo-binaries.tgz -C src",
+                },
+            ),
+        ]
+    else:
+        return common + [
             BuiltInCommand(
                 "s3.get",
                 {
@@ -110,7 +135,22 @@ def make_task_group(
                     "optional": True,
                 },
             ),
-        ],
+        ]
+
+
+def make_task_group(
+    name: str,
+    variant: str,
+    targets,
+    resmoke_task: Optional[str] = "resmoke_tests",
+    resmoke_disable_rbe: bool = False,
+) -> TaskGroup:
+    task_group = TaskGroup(
+        name=f"{name}_results_{variant}",
+        tasks=[],
+        max_hosts=len(targets),
+        setup_group_can_fail_task=True,
+        setup_group=_make_setup_group(resmoke_task, resmoke_disable_rbe),
         # Between tasks, remove the test logs and outputs. The tasks share hosts and leaving them
         # can cause the task to include test logs from other bazel targets.
         setup_task=[BuiltInCommand("shell.exec", {"script": "rm -rf build/ results/ report.json"})],
@@ -533,6 +573,7 @@ def main(outfile: Annotated[str, typer.Option()]):
     expansions = read_config_file("../expansions.yml")
     project_name = expansions.get("project", MASTER_PROJECT_NAME)
     evg_config_path = get_evergreen_config_path(project_name)
+    resmoke_disable_rbe = expansions.get("resmoke_disable_rbe", "") == "true"
 
     print(f"Parsing Evergreen configuration from {evg_config_path}...", file=sys.stderr)
     # Pre-warm the @cache-decorated resolvers so their bazel-run + YAML costs
@@ -563,7 +604,9 @@ def main(outfile: Annotated[str, typer.Option()]):
             continue
         targets_all.update(targets)
 
-        task_group = make_task_group("resmoke_tests", variant.name, targets).as_dict()
+        task_group = make_task_group(
+            "resmoke_tests", variant.name, targets, resmoke_disable_rbe=resmoke_disable_rbe
+        ).as_dict()
         task_group["tasks"] = targets
         project["task_groups"].append(task_group)
 
@@ -573,18 +616,28 @@ def main(outfile: Annotated[str, typer.Option()]):
         # Set an explicitly depends_on in the task group's reference to override it.
         # The task that generated the task is used as a no-op dependency, as a workaround for not
         # being able to set an empty depends_on. Remove with SERVER-119809.
-        build_variant["tasks"] = {
-            "name": task_group["name"],
-            "activate": False,
-            "depends_on": {
+        depends_on = [
+            {
                 "name": "bazel_result_tasks_gen",
                 "variant": "generate-tasks-for-version",
                 "omit_generated_tasks": True,
             },
+        ]
+        if resmoke_disable_rbe:
+            # archive_dist_test may live on a separate compile variant; resolve it per-variant here
+            # because Evergreen does not expand ${compile_variant} in depends_on.variant.
+            compile_variant = variant.expansion("compile_variant") or variant.name
+            depends_on.append({"name": "archive_dist_test", "variant": compile_variant})
+        build_variant["tasks"] = {
+            "name": task_group["name"],
+            "activate": False,
+            "depends_on": depends_on,
         }
         project["buildvariants"].append(build_variant)
 
-    project["tasks"] = [make_results_task(target) for target in targets_all]
+    project["tasks"] = [
+        make_results_task(target, resmoke_disable_rbe=resmoke_disable_rbe) for target in targets_all
+    ]
 
     with open(outfile, "w") as f:
         f.write(json.dumps(project, indent=4))

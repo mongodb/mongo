@@ -122,20 +122,23 @@ class ResmokeShimContext:
         self.resource_monitor = None
 
     def create_short_symlinks(self):
-        """Create short symlinks in the original tmpdir to avoid long path issues."""
-        original_tmpdir = tempfile.gettempdir()
+        """Create short symlinks in /tmp to avoid long path issues."""
+        if os.path.isdir("/tmp") and os.access("/tmp", os.W_OK):
+            short_root = "/tmp"
+        else:
+            short_root = tempfile.gettempdir()
 
         # Create a short symlink to TEST_TMPDIR
         test_tempdir = os.environ.get("TEST_TMPDIR")
         if test_tempdir:
-            self.tmpdir_symlink = os.path.join(original_tmpdir, f"resmoke_tmp_{uuid.uuid1()}")
+            self.tmpdir_symlink = os.path.join(short_root, f"resmoke_tmp_{uuid.uuid1()}")
             os.symlink(test_tempdir, self.tmpdir_symlink)
             self.links.append(self.tmpdir_symlink)
 
         # Create a short symlink to TEST_UNDECLARED_OUTPUTS_DIR
         undeclared_outputs_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
         if undeclared_outputs_dir:
-            self.outputs_symlink = os.path.join(original_tmpdir, f"resmoke_out_{uuid.uuid1()}")
+            self.outputs_symlink = os.path.join(short_root, f"resmoke_out_{uuid.uuid1()}")
             os.symlink(undeclared_outputs_dir, self.outputs_symlink)
             self.links.append(self.outputs_symlink)
 
@@ -246,6 +249,9 @@ if __name__ == "__main__":
 
     outputs_dir = ctx.outputs_symlink if ctx.outputs_symlink else undeclared_output_dir
 
+    otel_dir = os.path.join(outputs_dir, "build", "metrics")
+    os.makedirs(otel_dir, exist_ok=True)
+    resmoke_args.append(f"--otelCollectorDir={otel_dir}")
     resmoke_args.append(f"--taskWorkDir={outputs_dir}")
     resmoke_args.append(f"--reportFile={os.path.join(outputs_dir, 'report.json')}")
     os.chdir(outputs_dir)

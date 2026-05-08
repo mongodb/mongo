@@ -11,6 +11,9 @@
 # * ${test_label} - The resmoke bazel target to get results for, like //buildscripts/resmokeconfig:core
 # * ${workdir} - The Evergreen workdir to use for test log and OTel trace ingestion.
 
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+. "$DIR/bazel_test_results_shutils.sh"
+
 # Enumerates test results for each execution of ${test_label}. Shards/retries are individual executions with their own results.
 function enumerate_test_results() {
     jq --raw-output --compact-output --arg test_label "${test_label}" 'select(.testResult.testActionOutput != null) |
@@ -91,186 +94,12 @@ function unzip_outputs() {
     fi
 }
 
-# Symlinks test logs from a test result into Evergreen's log ingestion folder.
-function symlink_test_logs() {
-    local build_dir='test.outputs/build/TestLogs'
-
-    if [[ ! -d "$build_dir" ]]; then
-        return
-    fi
-
-    find "$build_dir" -type f | while read -r file; do
-        # Get the relative path from the build directory
-        rel_path="${file#$build_dir/}"
-        target_path="${workdir}/build/TestLogs/${rel_path}"
-        target_dir=$(dirname "$target_path")
-
-        mkdir -p "$target_dir"
-
-        abs_file=$(realpath "$file")
-        ln -sf "$abs_file" "$target_path"
-    done
-}
-
-# Displays a formatted summary of test results.
-function display_test_summary() {
-    echo "================================================================================"
-    echo "Test Results Summary"
-    echo "================================================================================"
-    echo "Target: ${test_label}"
-    echo "Total Shards: ${#shard_names[@]}"
-    echo "--------------------------------------------------------------------------------"
-
-    # Create a sorted list of indices based on shard names
-    local sorted_indices=()
-    for i in "${!shard_names[@]}"; do
-        sorted_indices+=("$i")
-    done
-
-    # Sort indices by extracting and comparing shard numbers
-    IFS=$'\n' sorted_indices=($(
-        for i in "${sorted_indices[@]}"; do
-            local shard_num=$(echo "${shard_names[$i]}" | grep -oP 'shard_\K\d+$')
-            echo "$shard_num $i"
-        done | sort -n | cut -d' ' -f2
-    ))
-
-    for i in "${sorted_indices[@]}"; do
-        local shard="${shard_names[$i]}"
-        local status="${shard_statuses[$i]}"
-        local test_counts="${shard_test_counts[$i]}"
-
-        # Format status with color indicators
-        case "$status" in
-        "PASSED")
-            echo "  ✓ $shard: PASSED ($test_counts tests passed)"
-            ;;
-        "FAILED")
-            if [[ "$test_counts" == "0/0" ]]; then
-                echo "  ✗ $shard: FAILED (no report generated)"
-            else
-                echo "  ✗ $shard: FAILED ($test_counts tests passed)"
-            fi
-            ;;
-        "TIMEOUT")
-            echo "  ⏱ $shard: TIMEOUT"
-            ;;
-        "NO_REPORT")
-            echo "  ✗ $shard: NO REPORT (no tests may have been run)"
-            ;;
-        esac
-    done
-
-    echo "================================================================================"
-    echo ""
-}
-
-# Combine all resmoke telemetry and place it where Evergreen expects it: ${workdir}/build/OTelTraces.
-# Metrics are batched into line-separated JSON files no greater than 4MB each. Evergreen processes
-# fewer files faster, but hits message size limitations if they are too large.
-function combine_metrics() {
-    local output_dir="${workdir}/build/OTelTraces"
-    mkdir -p "$output_dir"
-
-    local max_size=$((4 * 1024 * 1024)) # 4MB in bytes
-    local file_counter=0
-    local current_size=0
-    local current_output="${output_dir}/metrics.json"
-
-    # Create initial empty file
-    >"$current_output"
-
-    find "${workdir}/results" -wholename '*metrics/metrics*.json' -type f -print0 | while IFS= read -r -d '' file; do
-        local file_size=$(stat -c%s "$file")
-        local newline_size=1
-
-        # Check if adding this file would exceed the limit
-        if ((current_size + file_size + newline_size > max_size && current_size > 0)); then
-            # Start a new file
-            ((file_counter++))
-            current_output="${output_dir}/metrics_${file_counter}.json"
-            current_size=0
-            >"$current_output"
-        fi
-
-        # Append the file content
-        cat "$file" >>"$current_output"
-        echo "" >>"$current_output" # Adds a single newline after each file's content
-
-        # Update current size
-        current_size=$((current_size + file_size + newline_size))
-    done
-}
-
-# Combines all Resmoke test report JSONs into a single JSON.
-function combine_reports() {
-    local report_files=$(find "${workdir}" -name 'report*.json' -type f 2>/dev/null)
-
-    if [[ -z "$report_files" ]]; then
-        echo 'No report.json files found'
-        return
-    fi
-
-    local combined_report=$(echo "$report_files" | xargs jq -s '
-        {
-            results: map(.results // []) | add,
-            failures: (map(.results // []) | add | map(select(.status == "fail" or .status == "timeout")) | length)
-        }
-    ')
-
-    local combined_report_file="${workdir}/report.json"
-    echo "$combined_report" >"$combined_report_file"
-
-    local total_tests=$(echo "$combined_report" | jq '.results | length')
-    local failures=$(echo "$combined_report" | jq '.failures')
-
-    echo ""
-    echo "Combined Report: ${total_tests} tests, ${failures} failures"
-    echo "Report written to: $combined_report_file"
-}
-
 # Writes a user-friendly bazel invocation for re-running this test target.
 function write_bazel_invocation() {
     # Escape special characters in the label for the second sed expression.
     local test_label_escaped=$(echo "$test_label" | sed 's/[][\/\.\*^$]/\\&/g')
     mkdir -p "${workdir}/src/"
     sed "s/\S*\$/${test_label_escaped}/" ${workdir}/resmoke-tests-bazel-invocation.txt | tail -n 1 >"${workdir}/bazel-invocation.txt"
-}
-
-# Writes a YAML file indicating that test failures exist.
-function write_test_failures_expansion() {
-    local output_file="${workdir}/results/test_failures_exist.yml"
-    mkdir -p "$(dirname "$output_file")"
-    echo "test_failures_exist: true" >"$output_file"
-}
-
-# Print the contents of all *test.log files with headers per shard.
-function print_executor_logs() {
-    local log_files=$(find "${workdir}/results" -name '*test.log' -type f 2>/dev/null)
-
-    if [[ -z "$log_files" ]]; then
-        return
-    fi
-
-    # Sort log files by shard number
-    local sorted_log_files=$(echo "$log_files" | while IFS= read -r log_file; do
-        # Extract shard number from path (e.g., /workdir/results/foo/bar/shard_1/test.log -> 1)
-        local shard_num=$(echo "$log_file" | grep -oP 'shard_\K\d+(?=/)')
-        echo "$shard_num $log_file"
-    done | sort -n | cut -d' ' -f2-)
-
-    while IFS= read -r log_file; do
-        # Extract shard name from path (e.g., /workdir/results/foo/bar/shard_1/test.log -> foo/bar/shard_1)
-        local shard_path=$(echo "$log_file" | sed "s|${workdir}/results/||" | sed 's|/[^/]*$||')
-
-        echo "================================================================================"
-        echo "Shard $shard_path log:"
-        echo "================================================================================"
-        cat "$log_file"
-        echo ""
-        echo "================================================================================"
-        echo ""
-    done <<<"$sorted_log_files"
 }
 
 # Resolves a file path from a list of candidate locations. Returns the first existing file path found.
@@ -340,48 +169,21 @@ while IFS= read -r test_result; do
         is_timeout_flag=1
         is_failure_flag=1
         fail_task=1
-        write_test_failures_expansion
+        bazel_test_results::write_test_failures_expansion
     elif is_failure "$test_result"; then
         is_failure_flag=1
         fail_task=1
-        write_test_failures_expansion
+        bazel_test_results::write_test_failures_expansion
     fi
 
     download_outputs "$test_result" "$is_failure_flag"
     unzip_outputs "$is_failure_flag"
-    symlink_test_logs
+    bazel_test_results::symlink_test_logs
 
-    # Record shard information
-    shard_names+=("$target_prefix")
-    # Check if any report*.json files exist
-    if compgen -G "test.outputs/report*.json" >/dev/null; then
-        # Extract test counts from the report
-        report_file=$(compgen -G "test.outputs/report*.json" | head -n 1)
-        total_tests=$(jq '.results | length' "$report_file" 2>/dev/null || echo "0")
-        failed_tests=$(jq '.results | map(select(.status == "fail" or .status == "timeout")) | length' "$report_file" 2>/dev/null || echo "0")
-        passed_tests=$(jq '.results | map(select(.status == "pass")) | length' "$report_file" 2>/dev/null || echo "0")
-
-        shard_test_counts+=("$passed_tests/$total_tests")
-
-        if [[ "$is_timeout_flag" -eq 1 ]]; then
-            shard_statuses+=("TIMEOUT")
-        elif [[ "$is_failure_flag" -eq 1 ]]; then
-            if [[ "$total_tests" -eq 0 ]]; then
-                shard_statuses+=("NO_REPORT")
-            else
-                shard_statuses+=("FAILED")
-            fi
-        else
-            shard_statuses+=("PASSED")
-        fi
-    else
-        # No report file found - check if we have bazel-level status information
-        if [[ "$is_timeout_flag" -eq 1 ]]; then
-            shard_statuses+=("TIMEOUT")
-            shard_test_counts+=("0/0")
-        else
-            shard_statuses+=("NO_REPORT")
-            shard_test_counts+=("0/0")
+    if ! bazel_test_results::record_shard_status \
+        "$target_prefix" "$is_failure_flag" "$is_timeout_flag" \
+        shard_names shard_statuses shard_test_counts; then
+        if [[ "$is_timeout_flag" -ne 1 ]]; then
             missing_report=1
         fi
     fi
@@ -396,13 +198,13 @@ if [[ "$result_count" -eq 0 ]]; then
     exit 1
 fi
 
-print_executor_logs
+bazel_test_results::print_executor_logs
 
-display_test_summary
+bazel_test_results::display_test_summary shard_names shard_statuses shard_test_counts
 
-combine_metrics
+bazel_test_results::combine_metrics
 
-failures=$(combine_reports)
+failures=$(bazel_test_results::combine_reports)
 
 write_bazel_invocation
 
@@ -410,7 +212,7 @@ write_bazel_invocation
 for status in "${shard_statuses[@]}"; do
     if [[ "$status" == "TIMEOUT" || "$status" == "NO_REPORT" ]]; then
         echo "Error: One or more shards had TIMEOUT or NO_REPORT status. Not all tests ran or were reported." >&2
-        write_test_failures_expansion
+        bazel_test_results::write_test_failures_expansion
         exit 1
     fi
 done
@@ -426,7 +228,7 @@ for status in "${shard_statuses[@]}"; do
 done
 
 if [[ "$has_test_failures" -eq 1 ]]; then
-    write_test_failures_expansion
+    bazel_test_results::write_test_failures_expansion
 fi
 
 exit 0

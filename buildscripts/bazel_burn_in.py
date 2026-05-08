@@ -48,6 +48,7 @@ from buildscripts.burn_in_tests import (
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
 from buildscripts.generate_result_tasks import make_results_task, make_task_group
 from buildscripts.util import buildozer_utils as buildozer
+from buildscripts.util.read_config import read_config_file
 
 BAZEL_BURN_IN_TESTS = r"resmoke_tests_burn_in_*"
 
@@ -298,6 +299,9 @@ def generate_tasks(
 ):
     os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
 
+    expansions = read_config_file("../expansions.yml")
+    resmoke_disable_rbe = expansions.get("resmoke_disable_rbe", "") == "true"
+
     targets = query_targets_to_burn_in(origin_rev, test_changed_files)
 
     evg_conf = parse_evergreen_file("etc/evergreen.yml")
@@ -340,6 +344,7 @@ def generate_tasks(
                     variant.name,
                     targets,
                     f"resmoke_tests_burn_in_{variant.name}",
+                    resmoke_disable_rbe=resmoke_disable_rbe,
                 )
                 result_tasks[results_task_group.name] = burn_in_targets_to_run
                 build_variant.add_task_group(results_task_group)
@@ -354,9 +359,12 @@ def generate_tasks(
                 shrub_project.add_build_variant(build_variant)
 
     project = shrub_project.as_dict()
-    tasks = [make_results_task(target) for target in targets_all] + [
-        task.as_dict() for task in resmoke_tests_tasks
-    ]
+    tasks = [
+        make_results_task(
+            target, resmoke_disable_rbe=resmoke_disable_rbe, generate_burn_in_targets=True
+        )
+        for target in targets_all
+    ] + [task.as_dict() for task in resmoke_tests_tasks]
     project["tasks"] = tasks
 
     for variant in project.get("buildvariants", []):
@@ -367,9 +375,15 @@ def generate_tasks(
             # these are not a dependency for the `resmoke_tests` task or the results tasks added here.
             # Set an explicitly depends_on in the task group's reference to override it. Remove with SERVER-119809.
             if task["name"] in result_tasks:
-                task["depends_on"] = {
-                    "name": f"resmoke_tests_burn_in_{variant['name']}",
-                }
+                depends_on = [{"name": f"resmoke_tests_burn_in_{variant['name']}"}]
+                if resmoke_disable_rbe:
+                    # archive_dist_test may live on a separate compile variant; resolve it
+                    # per-variant here because Evergreen does not expand ${compile_variant}
+                    # in depends_on.variant.
+                    evg_variant = evg_conf.get_variant(variant["name"])
+                    compile_variant = evg_variant.expansion("compile_variant") or variant["name"]
+                    depends_on.append({"name": "archive_dist_test", "variant": compile_variant})
+                task["depends_on"] = depends_on
             else:
                 task["depends_on"] = {
                     "name": "version_burn_in_gen",

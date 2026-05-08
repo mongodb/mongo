@@ -13,6 +13,9 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # Result tasks re-invoke this script to conditionally re-execute the test. The test should
 # execute unless the task was activated by the resmoke_tests task that already ran all tests.
 exit_early_if_result_task() {
+    if [[ "${resmoke_disable_rbe}" == "true" ]]; then
+        return # Local exec: result tasks must always run bazel test themselves.
+    fi
     if [[ -f "src/build_events.json" && "$activated_by" == "mongodb-mongo-ci-user" ]]; then
         echo "Tests were executed by the resmoke_tests task, test results will be fetched from their remote execution."
         exit 0
@@ -56,8 +59,12 @@ build_ci_flags() {
     export compile_variant="${compile_variant}"
     export version_id="${version_id}"
 
-    if [[ "${evergreen_remote_exec}" == "on" ]]; then
+    if [[ "${evergreen_remote_exec}" == "on" && "${resmoke_disable_rbe}" != "true" ]]; then
         ci_flags="--config=remote_test ${ci_flags}"
+    fi
+
+    if [[ "${resmoke_disable_rbe}" == "true" ]]; then
+        ci_flags+=" --//bazel/resmoke:installed_dist_test"
     fi
 
     if [ "${should_shuffle}" = true ]; then
@@ -112,8 +119,20 @@ maybe_generate_burn_in_targets() {
 
 # Fetches then tests with retries. Leaves the result in the global RET.
 run_fetch_and_test() {
+    local fetch_attempts=3
+    local test_attempts=2
+    if [[ "${resmoke_disable_rbe}" == "true" ]]; then
+        # Local exec runs a full suite serially on a single host; retrying would just
+        # repeat hours of work. Cap to a single attempt and extend the bazel-level
+        # timeout well beyond the remote-exec default so the run can finish.
+        fetch_attempts=1
+        test_attempts=1
+        build_timeout_seconds=14400
+        export build_timeout_seconds
+    fi
+
     export RETRY_ON_FAIL=1
-    bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
+    bazel_evergreen_shutils::retry_bazel_cmd $fetch_attempts "$BAZEL_BINARY" \
         fetch ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} ${targets}
     RET=$?
 
@@ -122,7 +141,7 @@ run_fetch_and_test() {
     fi
 
     export RETRY_ON_FAIL=0
-    bazel_evergreen_shutils::retry_bazel_cmd 2 "$BAZEL_BINARY" \
+    bazel_evergreen_shutils::retry_bazel_cmd $test_attempts "$BAZEL_BINARY" \
         test ${ci_flags} ${bazel_args} ${bazel_compile_flags} ${task_compile_flags} ${patch_compile_flags} --build_event_json_file=build_events.json ${targets}
     RET=$?
 
@@ -152,7 +171,11 @@ activate_result_tasks() {
         return
     fi
     echo "Activating result task group..."
-    python buildscripts/evergreen_activate_result_tasks.py --expansion-file ../expansions.yml --build-events-file build_events.json
+    local extra_args=""
+    if [[ "${resmoke_disable_rbe}" != "true" ]]; then
+        extra_args="--build-events-file build_events.json"
+    fi
+    python buildscripts/evergreen_activate_result_tasks.py --expansion-file ../expansions.yml ${extra_args}
 }
 
 main() {
@@ -177,6 +200,12 @@ main() {
     save_invocation
 
     maybe_generate_burn_in_targets
+
+    if [[ "${resmoke_disable_rbe}" == "true" && -z "$result_task" ]]; then
+        # Local exec runner: skip bazel entirely; each result task will run its own bazel test.
+        activate_result_tasks
+        exit 0
+    fi
 
     set +o errexit
     run_fetch_and_test
