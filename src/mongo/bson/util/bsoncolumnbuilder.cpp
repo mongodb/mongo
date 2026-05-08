@@ -102,6 +102,18 @@ bool _hasEmptyObj(const BSONObj& obj) {
     return _traverseUntilEmptyObj(obj, [](const BSONElement&, const BSONElement&) {});
 }
 
+// Throws if elem is, or contains, a binData element with Column subtype.
+void _validateNoNestedBSONColumn(const BSONElement& elem) {
+    uassert(12506300,
+            "Timeseries collections cannot store BSONColumn data",
+            !elem.isBinData(BinDataType::Column));
+    if (elem.type() == Object || elem.type() == Array) {
+        for (const auto& sub : elem.Obj()) {
+            _validateNoNestedBSONColumn(sub);
+        }
+    }
+}
+
 // Internal recursion function for traverseLockStep(). See documentation for traverseLockStep.
 template <typename ElementFunc>
 std::pair<BSONObj::iterator, bool> _traverseLockStep(const BSONObj& reference,
@@ -306,6 +318,8 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         return skip();
     }
 
+    _validateNoNestedBSONColumn(elem);
+
     if ((type != Object && type != Array) || elem.Obj().isEmpty()) {
         // Flush previous sub-object compression when non-object is appended
         if (_is.mode != Mode::kRegular) {
@@ -319,9 +333,15 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
 }
 
 BSONColumnBuilder& BSONColumnBuilder::append(const BSONObj& obj) {
+    for (const auto& elem : obj) {
+        _validateNoNestedBSONColumn(elem);
+    }
     return _appendObj({obj, Object});
 }
 BSONColumnBuilder& BSONColumnBuilder::append(const BSONArray& arr) {
+    for (const auto& elem : arr) {
+        _validateNoNestedBSONColumn(elem);
+    }
     return _appendObj({arr, Array});
 }
 

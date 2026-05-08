@@ -60,6 +60,9 @@ public:
      * EOO is treated as 'skip'.
      *
      * Throws InvalidBSONType if MinKey or MaxKey is appended.
+     *
+     * Throws if a BSONColumn (binData subtype Column) element is appended directly or as a field
+     * nested inside an object or array. BSONColumn data cannot be nested inside BSONColumn data.
      */
     BSONColumnBuilder& append(BSONElement elem);
 

@@ -2581,6 +2581,96 @@ TEST_F(BSONColumnTest, RepeatInvalidString) {
     verifyDecompression(binData, {elem, elemInvalid, elemInvalid});
 }
 
+TEST_F(BSONColumnTest, BinDataColumnSubtypeRejectedByBuilder) {
+    // Appending a binData element with Column subtype must be rejected by the builder.
+    BSONColumnBuilder cb;
+    std::vector<uint8_t> payload{'\0'};  // minimal column binary (EOO terminator)
+    auto columnElem = createElementBinData(BinDataType::Column, payload);
+    ASSERT_THROWS_CODE(cb.append(columnElem), DBException, 12506300);
+}
+
+TEST_F(BSONColumnTest, BinDataColumnSubtypeInObjectRejectedByBuilder) {
+    // Appending an object that contains a binData/Column field must be rejected.
+    BSONColumnBuilder cb;
+    std::vector<uint8_t> payload{'\0'};
+    BSONObjBuilder outer;
+    outer.appendBinData("col"_sd, payload.size(), BinDataType::Column, payload.data());
+    BSONObj obj = outer.obj();
+
+    ASSERT_THROWS_CODE(cb.append(obj.firstElement()), DBException, 12506300);
+    ASSERT_THROWS_CODE(cb.append(obj), DBException, 12506300);
+}
+
+TEST_F(BSONColumnTest, BinDataColumnSubtypeNestedInArrayRejectedByBuilder) {
+    // Appending an array that contains a binData/Column element must be rejected.
+    BSONColumnBuilder cb;
+    std::vector<uint8_t> payload{'\0'};
+    BSONArrayBuilder arr;
+    arr.appendBinData(payload.size(), BinDataType::Column, payload.data());
+    BSONArray bsonArr = arr.arr();
+
+    ASSERT_THROWS_CODE(cb.append(bsonArr), DBException, 12506300);
+}
+
+TEST_F(BSONColumnTest, EmptyStringAfterUnencodable) {
+    BSONColumnBuilder cb;
+    std::vector<BSONElement> elems = {createElementString("\0"_sd), createElementString(""_sd)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems[0]);
+    appendLiteral(expected, elems[1]);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, UnencodableStringWithZeroDelta) {
+    BSONColumnBuilder cb;
+    std::vector<BSONElement> elems = {createElementString("\0"_sd), createElementString("\0"_sd)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems[0]);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, uint128_t(0));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, EmptyStringAfterUnencodableDelta) {
+    BSONColumnBuilder cb;
+    std::vector<BSONElement> elems = {
+        createElementString("\0"_sd), createElementString("\0"_sd), createElementString(""_sd)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems[0]);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, uint128_t(0));
+    appendLiteral(expected, elems[2]);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+
 TEST_F(BSONColumnTest, StringMultiType) {
     BSONColumnBuilder cb;
     // Add decimals first
