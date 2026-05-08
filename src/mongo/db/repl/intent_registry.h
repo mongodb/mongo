@@ -247,6 +247,12 @@ private:
         ServiceContext* svcCtx;
         uint64_t opId;
         boost::optional<LogicalSessionId> lsid;
+        // Captured at registration time so _killOperationsByIntent and _waitForDrain can log
+        // the client description without dereferencing the Client pointer after its _desc member
+        // may have been freed (Client data members are destroyed before Decorable<Client> base
+        // runs ClientIntentCleanup, leaving a window where the token is still in the map but
+        // client->desc() would access freed memory).
+        std::string clientDesc;
     };
 
     struct tokenMap {

@@ -47,14 +47,15 @@ namespace rss {
 namespace consensus {
 
 // Decoration on Client. When a client is destroyed (e.g., connection closed) while its stashed
-// WUOW still holds write-intent tokens, deregisters all tokens for that client before the client
-// pointer is freed. This prevents _killOperationsByIntent from dereferencing a dangling client.
+// WUOW still holds write-intent tokens, removes those tokens before the Client's memory is freed.
+// This ensures _killOperationsByIntent cannot call ClientLock on a deleted object.
 //
-// Safety: deregisterTokensForClient acquires tokenMap.lock without holding ClientLock. When
-// _killOperationsByIntent holds tokenMap.lock and calls ClientLock(client), this cleanup is
-// blocked until the lock is released — at which point the client is still alive. Once this
-// cleanup acquires the lock and removes the tokens, _killOperationsByIntent will no longer find
-// entries for this client.
+// Limitation: C++ destroys Client's own data members (including _desc) before running
+// Decorable<Client> base-class destructors, so this decoration's destructor runs after _desc is
+// already freed. There is therefore a window where a token still exists in the map but
+// client->desc() would touch freed memory. TokenMapEntry::clientDesc stores the description at
+// registration time so that all logging in _killOperationsByIntent and _waitForDrain uses the
+// snapshot value rather than dereferencing the Client after its destruction has begun.
 class ClientIntentCleanup {
 public:
     void init(IntentRegistry* registry, Client* client) {
@@ -229,7 +230,8 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
                               opCtx->getClient(),
                               opCtx->getServiceContext(),
                               opCtx->getOpID(),
-                              opCtx->getLogicalSessionId()}});
+                              opCtx->getLogicalSessionId(),
+                              opCtx->getClient()->desc()}});
     }
 
     return token;
@@ -503,44 +505,34 @@ void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent,
     auto& tokenMap = _tokenMaps[(size_t)intent];
     std::lock_guard<std::mutex> lock(tokenMap.lock);
     for (auto& [token, entry] : tokenMap.map) {
-        auto* client = entry.client;
-        auto* svcCtx = entry.svcCtx;
-
-        if (interruption == InterruptionType::StepDown && !client->canKillOperationInStepdown()) {
-            LOGV2(10336502,
-                  "Skipping killing intent for stepdown due to unkillable client",
-                  "name"_attr = client->desc(),
-                  "registered_token"_attr = token);
-            continue;
-        }
-
-        ClientLock clientLock(client);
-
-        auto* currentOpCtx = client->getOperationContext();
-        if (!currentOpCtx) {
-            // No active opCtx — token belongs to a stashed WUOW or a normal WUOW whose opCtx
-            // was temporarily released. Skip it; the postInterruptionCallback will abort stashed
-            // transactions, causing their WUOWs to deregister via the normal path.
+        // Atomically look up and lock the client by opId rather than dereferencing the stored
+        // Client* directly. This is safe even if the client is undergoing destruction: once
+        // Client::~Client() begins, the opId lease is no longer active and getLockedClient
+        // returns an empty lock. It also handles the stashed-WUOW case (original opCtx replaced
+        // on the client) because the opId check inside getLockedClient will not match.
+        ClientLock clientLock = entry.svcCtx->getLockedClient(static_cast<OperationId>(entry.opId));
+        if (!clientLock) {
+            // Client is gone, being destroyed, or is now running a different operation.
+            // The postInterruptionCallback will abort any stashed transactions.
             LOGV2(12436506,
-                  "Skipping intent token: client has no active opCtx",
-                  "name"_attr = client->desc(),
+                  "Skipping intent token: client or matching opCtx no longer active",
+                  "name"_attr = entry.clientDesc,
                   "registered_token"_attr = token,
                   "registered_opId"_attr = entry.opId);
             continue;
         }
 
-        // If the opId differs, the original opCtx was destroyed while the WUOW was stashed in
-        // the session (e.g., a multi-document transaction between statements). The current opCtx
-        // is an unrelated new operation on the same client — killing it would cause collateral
-        // damage without releasing the stashed WUOW. Skip it; the postInterruptionCallback will
-        // abort the stashed transaction via killSessionsAbortUnpreparedTransactions.
-        if (currentOpCtx->getOpID() != entry.opId) {
-            LOGV2(12436507,
-                  "Skipping token: current opCtx differs from registrant (stashed WUOW)",
-                  "name"_attr = client->desc(),
-                  "registered_token"_attr = token,
-                  "registered_opId"_attr = entry.opId,
-                  "current_opId"_attr = currentOpCtx->getOpID());
+        if (interruption == InterruptionType::StepDown &&
+            !clientLock->canKillOperationInStepdown()) {
+            LOGV2(10336502,
+                  "Skipping killing intent for stepdown due to unkillable client",
+                  "name"_attr = entry.clientDesc,
+                  "registered_token"_attr = token);
+            continue;
+        }
+
+        auto* currentOpCtx = clientLock->getOperationContext();
+        if (!currentOpCtx) {
             continue;
         }
 
@@ -548,7 +540,7 @@ void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent,
         if (currentOpCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
             LOGV2(10336500,
                   "Skipping killing intent due to UninterruptibleLockGuard",
-                  "name"_attr = client->desc(),
+                  "name"_attr = entry.clientDesc,
                   "registered_token"_attr = token);
             continue;
         }
@@ -558,15 +550,16 @@ void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent,
         }
 
         if (interruption == InterruptionType::Shutdown) {
-            svcCtx->killOperation(clientLock, currentOpCtx, ErrorCodes::InterruptedAtShutdown);
+            entry.svcCtx->killOperation(
+                clientLock, currentOpCtx, ErrorCodes::InterruptedAtShutdown);
         } else {
-            svcCtx->killOperation(
+            entry.svcCtx->killOperation(
                 clientLock, currentOpCtx, ErrorCodes::InterruptedDueToReplStateChange);
         }
         _totalOpsKilled += 1;
         LOGV2(9795400,
               "Repl state change interrupted a thread.",
-              "name"_attr = client->desc(),
+              "name"_attr = entry.clientDesc,
               "registered token"_attr = token,
               "killcode"_attr = currentOpCtx->getKillStatus());
     }
@@ -587,7 +580,7 @@ void IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
             LOGV2(9795402,
                   "Registered token:",
                   "token_id"_attr = token,
-                  "client"_attr = entry.client->desc());
+                  "client"_attr = entry.clientDesc);
         }
         LOGV2_FATAL_CONTINUE(9795404,
                              "Timeout while waiting on intent queue to drain, printing stack "
