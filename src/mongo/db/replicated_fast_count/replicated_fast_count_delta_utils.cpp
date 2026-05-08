@@ -262,11 +262,45 @@ bool operationsOnFastCountCollections(const NamespaceString& nss,
     return false;
 }
 
+// Unpacks MultiOpSizeMetadata from a commitTransaction entry and records per-collection deltas.
+int extractSizeCountDeltasForCommitTxn(const repl::OplogEntry& entry,
+                                       const boost::optional<UUID>& uuidFilter,
+                                       SizeCountDeltas& sizeCountDeltasOut) {
+    tassert(12406401,
+            "extractSizeCountDeltasForCommitTxn called on non-commitTransaction entry",
+            entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction);
+    const auto& sizeMd = entry.getSizeMetadata();
+    if (!sizeMd) {
+        return 0;
+    }
+    tassert(12406405,
+            "commitTransaction entry must not carry SingleOpSizeMetadata",
+            std::holds_alternative<std::vector<MultiOpSizeMetadata>>(sizeMd.value()));
+
+    const auto& multiMd = std::get<std::vector<MultiOpSizeMetadata>>(sizeMd.value());
+    int processed = 0;
+    for (const auto& meta : multiMd) {
+        if (uuidFilter && meta.getUuid() != *uuidFilter) {
+            continue;
+        }
+        recordCollectionSizeCountDelta(
+            meta.getUuid(),
+            CollectionSizeCount{.size = meta.getSz(), .count = meta.getCt()},
+            sizeCountDeltasOut);
+        ++processed;
+    }
+    return processed;
+}
+
 // Processes a single oplog entry and accumulates its size/count contribution into
-// 'sizeCountDeltasOut'. Handles applyOps (including nested), truncateRange, and CRUD operations.
+// 'sizeCountDeltasOut'. Handles applyOps (including nested), truncateRange, commitTransaction, and
+// CRUD operations.
 int processOplogEntry(const repl::OplogEntry& entry,
                       const boost::optional<UUID>& uuidFilter,
                       SizeCountDeltas& sizeCountDeltasOut) {
+    if (entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction) {
+        return extractSizeCountDeltasForCommitTxn(entry, uuidFilter, sizeCountDeltasOut);
+    }
     if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
         return extractSizeCountDeltasForApplyOps(entry, uuidFilter, sizeCountDeltasOut);
     }
@@ -305,6 +339,142 @@ int processOplogEntry(const repl::OplogEntry& entry,
 
     return 0;
 }
+
+void mergeDeltas(const SizeCountDeltas& src, SizeCountDeltas& dst) {
+    for (const auto& [uuid, delta] : src) {
+        tassert(12406403,
+                "Unexpected kDropped state in mergeDeltas: drops are not permitted in "
+                "multi-document transactions",
+                delta.state != DDLState::kDropped);
+        if (delta.state == DDLState::kCreated) {
+            recordCollectionCreate(uuid, dst);
+            if (delta.sizeCount.size != 0 || delta.sizeCount.count != 0) {
+                recordCollectionSizeCountDelta(uuid, delta.sizeCount, dst);
+            }
+        } else {
+            recordCollectionSizeCountDelta(uuid, delta.sizeCount, dst);
+        }
+    }
+}
+
+// Holds the state of a chained applyOps sequence spanning multiple oplog entries.
+struct TxnChainState {
+    SizeCountDeltas deltas;
+    // The opTime of the last entry processed in this chain. The next entry in the chain must have
+    // prevOpTime == lastOpTime.
+    repl::OpTime lastOpTime;
+};
+
+// Caches the size and count deltas for a series of chained applyOps for a single transaction.
+class TxnDeltaBuffer {
+public:
+    // Handles the entry if it belongs to a chained transaction.
+    // Returns the number of inner entries processed, or boost::none if this entry is not a
+    // chained-txn entry and the caller should handle it instead.
+    boost::optional<int> tryConsume(const repl::OplogEntry& entry,
+                                    const boost::optional<UUID>& uuidFilter,
+                                    SizeCountDeltas& globalResult) {
+        if (entry.getCommandType() != repl::OplogEntry::CommandType::kApplyOps) {
+            if (_isTrackingActiveChain()) {
+                // Non-transactional entry: if a chain is active, it was orphaned — the primary
+                // reserved opTimes for the chain but was killed before writing the terminal
+                // applyOps.
+                LOGV2_DEBUG(
+                    12406400,
+                    1,
+                    "Discarding accumulated size and count for partial transaction chain; "
+                    "encountered oplog entry that is not the terminal applyOps for the active "
+                    "chain",
+                    "lastOpTime"_attr = _txnChainState->lastOpTime,
+                    "entry"_attr = redact(entry.toBSONForLogging()),
+                    "entryTxnNumber"_attr = entry.getTxnNumber(),
+                    "entryLsid"_attr = entry.getSessionId());
+                _clearTxnChainState();
+            }
+            return boost::none;
+        }
+
+        if (_hasActiveChainConflict(entry)) {
+            // applyOps from a different chain: discard the active chain's state before
+            // falling through so the entry is processed with a clean slate.
+            LOGV2_DEBUG(12406402,
+                        1,
+                        "Discarding accumulated size and count for partial transaction chain; "
+                        "encountered applyOps from a different chain",
+                        "lastOpTime"_attr = _txnChainState->lastOpTime,
+                        "entryPrevOpTime"_attr = entry.getPrevWriteOpTimeInTransaction(),
+                        "entry"_attr = redact(entry.toBSONForLogging()));
+            _clearTxnChainState();
+        }
+
+        if (entry.shouldPrepare()) {
+            // Wait until the `commitTransaction` oplog entry to include the transaction's aggregate
+            // into the running total.
+            _clearTxnChainState();
+            return 0;
+        }
+
+        if (entry.isPartialTransaction()) {
+            if (!_isTrackingActiveChain()) {
+                _txnChainState = TxnChainState{.lastOpTime = entry.getOpTime()};
+            } else {
+                _txnChainState->lastOpTime = entry.getOpTime();
+            }
+            return processOplogEntry(entry, uuidFilter, _txnChainState->deltas);
+        }
+
+        if (!_isTrackingActiveChain()) {
+            // The entry is an `applyOps`, but not part of a chained `applyOps` for an active
+            // transaction.
+            return boost::none;
+        }
+
+        // Terminal `applyOps` for the open chain.
+        int n = processOplogEntry(entry, uuidFilter, _txnChainState->deltas);
+        mergeDeltas(_txnChainState->deltas, globalResult);
+        _clearTxnChainState();
+        return n;
+    }
+
+private:
+    // Returns true if there is an actively tracked chain but 'entry' does not belong to it.
+    // Chain membership is determined solely by prevOpTime linkage: the entry must carry a
+    // prevOpTime equal to the last tracked opTime.
+    bool _hasActiveChainConflict(const repl::OplogEntry& entry) const {
+        if (!_txnChainState.has_value()) {
+            return false;
+        }
+        auto prevOpTime = entry.getPrevWriteOpTimeInTransaction();
+        return !prevOpTime || *prevOpTime != _txnChainState->lastOpTime;
+    }
+
+    bool _isTrackingActiveChain() const {
+        return _txnChainState.has_value();
+    }
+
+    void _clearTxnChainState() {
+        _txnChainState = boost::none;
+    }
+
+    boost::optional<TxnChainState> _txnChainState;
+};
+
+// Accumulates size count deltas scanned from the oplog, upholding visibility rules so that
+// chained transaction deltas are not visible until the transaction commits.
+class DeltaAccumulator {
+public:
+    int consume(const repl::OplogEntry& oplogEntry,
+                const boost::optional<UUID>& uuidFilter,
+                SizeCountDeltas& globalResult) {
+        if (auto n = _txnBuffer.tryConsume(oplogEntry, uuidFilter, globalResult)) {
+            return *n;
+        }
+        return processOplogEntry(oplogEntry, uuidFilter, globalResult);
+    }
+
+private:
+    TxnDeltaBuffer _txnBuffer;
+};
 
 }  // namespace
 
@@ -375,11 +545,11 @@ OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCurso
                                                 bool isCheckpoint,
                                                 const boost::optional<UUID>& oplogUuid) {
     OplogScanResult result;
+    DeltaAccumulator deltaAccumulator;
     RecordId seekRid =
         massertStatusOK(record_id_helpers::keyForOptime(seekAfterTS, KeyFormat::Long));
 
     const bool trackOplog = oplogUuid.has_value();
-
     for (auto rec = oplogCursor.seek(seekRid, SeekableRecordCursor::BoundInclusion::kExclude); rec;
          rec = oplogCursor.next()) {
 
@@ -400,7 +570,7 @@ OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCurso
             continue;
         }
         result.lastTimestamp = entry.getTimestamp();
-        int numSizeCountEntries = processOplogEntry(entry, uuidFilter, result.deltas);
+        int numSizeCountEntries = deltaAccumulator.consume(entry, uuidFilter, result.deltas);
         if (isCheckpoint) {
             recordCheckpointOplogEntryProcessed();
             recordCheckpointSizeCountEntryProcessed(numSizeCountEntries);

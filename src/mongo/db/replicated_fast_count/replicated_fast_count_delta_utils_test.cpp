@@ -36,6 +36,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/replicated_fast_count/durable_size_metadata_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
@@ -47,6 +48,7 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/death_test.h"
 
 namespace mongo::replicated_fast_count {
 namespace {
@@ -1054,26 +1056,33 @@ private:
 class AggregateSizeCountFromOplogTest : public CatalogTestFixture {
 protected:
     /**
-     * Describes one inner CRUD op to synthesize inside an applyOps oplog entry.
+     * Describes one inner op to synthesize inside an applyOps oplog entry.
+     * For CRUD ops (kInsert/kUpdate/kDelete), set sizeDelta and includeSizeMetadata.
+     * For DDL ops (kCommand), set commandObj to the command document (e.g. BSON("create" << coll)).
      */
     struct InnerOpSpec {
         test_helpers::NsAndUUID coll;
         repl::OpTypeEnum opType;
-        int32_t sizeDelta;
+        int32_t sizeDelta = 0;
         bool includeSizeMetadata = true;
+        boost::optional<BSONObj> commandObj;
     };
 
     /**
-     * Constructs a synthetic applyOps oplog entry at 'ts' whose inner ops are described by
-     * 'innerOps'. Each inner op carries its own UUID so the aggregation code can attribute deltas
-     * per-collection.
+     * Builds the BSON array of inner operations for an applyOps entry.
      */
-    repl::OplogEntry makeApplyOpsOplogEntry(const Timestamp ts,
-                                            const std::vector<InnerOpSpec>& innerOps) {
-        const NamespaceString adminCmdNss = NamespaceString::kAdminCommandNamespace;
-
+    BSONArray buildApplyOpsInnerOpsArray(const std::vector<InnerOpSpec>& innerOps) const {
         BSONArrayBuilder innerOpsArray;
         for (const auto& spec : innerOps) {
+            if (spec.opType == repl::OpTypeEnum::kCommand) {
+                BSONObjBuilder opBuilder;
+                opBuilder.append("op", "c");
+                opBuilder.append("ns", spec.coll.nss.getCommandNS().ns_forTest());
+                spec.coll.uuid.appendToBuilder(&opBuilder, "ui");
+                opBuilder.append("o", spec.commandObj.value_or(BSONObj()));
+                innerOpsArray.append(opBuilder.obj());
+                continue;
+            }
             StringData opStr;
             switch (spec.opType) {
                 case repl::OpTypeEnum::kInsert:
@@ -1099,18 +1108,29 @@ protected:
             }
             innerOpsArray.append(opBuilder.obj());
         }
+        return innerOpsArray.arr();
+    }
 
+    /**
+     * Constructs a synthetic applyOps oplog entry at 'ts' whose inner ops are described by
+     * 'innerOps'. Each inner op carries its own UUID so the aggregation code can attribute deltas
+     * per-collection.
+     */
+    repl::OplogEntry makeApplyOpsOplogEntry(const Timestamp ts,
+                                            const std::vector<InnerOpSpec>& innerOps) {
+        const NamespaceString adminCmdNss = NamespaceString::kAdminCommandNamespace;
+        BSONArray innerOpsArray = buildApplyOpsInnerOpsArray(innerOps);
         return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
             .opTime = repl::OpTime(ts, 1),
             .opType = repl::OpTypeEnum::kCommand,
             .nss = adminCmdNss,
-            .oField = BSON("applyOps" << innerOpsArray.arr()),
+            .oField = BSON("applyOps" << innerOpsArray),
             .wallClockTime = Date_t::now(),
         }};
     }
 
     /**
-     * Bundles information about a user "collection" needed for CRUD oplog entries.
+     * Shared collection fixtures for synthesizing oplog entries in test scenarios.
      */
     test_helpers::NsAndUUID collA = {
         .nss = NamespaceString::createNamespaceString_forTest("agg_size_count_from_oplog", "collA"),
@@ -1559,6 +1579,439 @@ TEST_F(AggregateSizeCountFromOplogTest, AggregateOplogWithNoSizeMetadata) {
 
     const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
     EXPECT_TRUE(result.deltas.empty());
+}
+
+class AggregateSizeCountFromOplogTxnVisibilityTest : public AggregateSizeCountFromOplogTest {
+protected:
+    static constexpr int64_t kTestTerm = 1;
+
+    repl::OpTime opTimeAt(const Timestamp ts) const {
+        return repl::OpTime(ts, kTestTerm);
+    }
+
+    struct ApplyOpsTxnFields {
+        bool prepared{false};
+        bool isPartialTxn{false};
+        // prevOpTime = boost::none means standalone (not part of any chain).
+        // prevOpTime = repl::OpTime{} (null optime) means first entry in a chain.
+        // prevOpTime = non-null optime means continuation of a chain.
+        boost::optional<repl::OpTime> prevOpTime;
+    };
+
+    repl::OplogEntry makeApplyOpsOplogEntry(const Timestamp ts,
+                                            const std::vector<InnerOpSpec>& innerOps,
+                                            const ApplyOpsTxnFields& txnFields) {
+        const NamespaceString adminCmdNss = NamespaceString::kAdminCommandNamespace;
+        BSONArray innerOpsArray = buildApplyOpsInnerOpsArray(innerOps);
+
+        BSONObjBuilder oBuilder;
+        oBuilder.append("applyOps", innerOpsArray);
+        if (txnFields.prepared) {
+            oBuilder.append("prepare", true);
+        }
+        if (txnFields.isPartialTxn) {
+            oBuilder.append("partialTxn", true);
+        }
+
+        return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = opTimeAt(ts),
+            .opType = repl::OpTypeEnum::kCommand,
+            .nss = adminCmdNss,
+            .oField = oBuilder.obj(),
+            .wallClockTime = Date_t::now(),
+            .prevWriteOpTimeInTransaction = txnFields.prevOpTime,
+        }};
+    }
+
+    repl::OplogEntry makeCommitTxnOplogEntry(
+        const Timestamp ts,
+        std::vector<MultiOpSizeMetadata> sizeMetadata,
+        boost::optional<repl::OpTime> prevOpTime = boost::none) {
+        const NamespaceString adminCmdNss = NamespaceString::kAdminCommandNamespace;
+        return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = opTimeAt(ts),
+            .opType = repl::OpTypeEnum::kCommand,
+            .nss = adminCmdNss,
+            .oField = BSON("commitTransaction" << 1),
+            .sizeMetadata = repl::OplogEntrySizeMetadata{std::move(sizeMetadata)},
+            .wallClockTime = Date_t::now(),
+            .prevWriteOpTimeInTransaction = prevOpTime,
+        }};
+    }
+
+    repl::OplogEntry makeAbortTxnOplogEntry(
+        const Timestamp ts, boost::optional<repl::OpTime> prevOpTime = boost::none) {
+        const NamespaceString adminCmdNss = NamespaceString::kAdminCommandNamespace;
+        return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+            .opTime = opTimeAt(ts),
+            .opType = repl::OpTypeEnum::kCommand,
+            .nss = adminCmdNss,
+            .oField = BSON("abortTransaction" << 1),
+            .wallClockTime = Date_t::now(),
+            .prevWriteOpTimeInTransaction = prevOpTime,
+        }};
+    }
+};
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnBasicVisibilityNoCommit) {
+    const Timestamp ts2{2, 2};
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts2,
+            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta*/ 50, /*includeSizeMetadata=*/true},
+             {collB, repl::OpTypeEnum::kInsert, /*sizeDelta*/ 25, /*includeSizeMetadata=*/true}},
+            ApplyOpsTxnFields{.prepared = true}),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+    EXPECT_TRUE(result.deltas.empty());
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnBasicVisibilityWithCommit) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{2, 2};
+
+    MultiOpSizeMetadata metaA;
+    metaA.setUuid(collA.uuid);
+    metaA.setSz(50);
+    metaA.setCt(1);
+
+    MultiOpSizeMetadata metaB;
+    metaB.setUuid(collB.uuid);
+    metaB.setSz(25);
+    metaB.setCt(1);
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(ts1,
+                               {{collA,
+                                 repl::OpTypeEnum::kInsert,
+                                 /*sizeDelta*/ 50,
+                                 /*includeSizeMetadata=*/true},
+                                {collB,
+                                 repl::OpTypeEnum::kInsert,
+                                 /*sizeDelta*/ 25,
+                                 /*includeSizeMetadata=*/true}},
+                               ApplyOpsTxnFields{.prepared = true, .prevOpTime = repl::OpTime{}}),
+        makeCommitTxnOplogEntry(ts2, {metaA, metaB}, opTimeAt(ts1)),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    EXPECT_EQ(aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min()).deltas.size(), 2u);
+    assertExpectedAggregateDelta(
+        {.delta = CollectionSizeCount{.size = 50, .count = 1}, .lastTimestamp = ts2},
+        collA.uuid,
+        Timestamp::min(),
+        oplogCursor);
+    assertExpectedAggregateDelta(
+        {.delta = CollectionSizeCount{.size = 25, .count = 1}, .lastTimestamp = ts2},
+        collB.uuid,
+        Timestamp::min(),
+        oplogCursor);
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, NotPreparedChainAccountedForAtTerminalEntry) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts1,
+            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        makeApplyOpsOplogEntry(
+            ts2,
+            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/200}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = opTimeAt(ts1)}),
+        makeApplyOpsOplogEntry(ts3,
+                               {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/50}},
+                               ApplyOpsTxnFields{.prevOpTime = opTimeAt(ts2)}),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
+              (CollectionSizeCount{.size = 350, .count = 3}));
+    EXPECT_EQ(result.lastTimestamp, ts3);
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
+       NonTxnEntryInterleavedInOpenChainDropsChainDeltas) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts1,
+            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        test_helpers::makeOplogEntry(ts2, collB, repl::OpTypeEnum::kInsert, /*sizeDelta=*/70),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    // collA's partial chain (100 bytes) is discarded when the non-txn entry interrupts it.
+    EXPECT_FALSE(result.deltas.contains(collA.uuid));
+    // collB's regular insert is still counted normally.
+    ASSERT_TRUE(result.deltas.contains(collB.uuid));
+    EXPECT_EQ(result.deltas.at(collB.uuid).sizeCount,
+              (CollectionSizeCount{.size = 70, .count = 1}));
+}
+
+using AggregateSizeCountFromOplogTxnVisibilityDeathTest =
+    AggregateSizeCountFromOplogTxnVisibilityTest;
+
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PartialTxnOpenAtEndOfLogIsDiscarded) {
+    // Verifies that an in-flight partial chain that reaches end-of-cursor without a terminal
+    // entry contributes nothing to the result (the commit has not appeared within the scanned
+    // oplog range).
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts1,
+            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        makeApplyOpsOplogEntry(
+            ts2,
+            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/200}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = opTimeAt(ts1)}),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    EXPECT_FALSE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.lastTimestamp, ts2);
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
+       MultiEntryPreparedTxnUsesCommitSizeMetadataNotPartialAccumulation) {
+    // Verifies that for a prepared transaction with multiple partial applyOps entries, the
+    // accumulated partial-chain state is discarded at the prepare and the commitTransaction's
+    // size metadata is the authoritative source of truth. In production the commit metadata
+    // will always equal the sum of the partial entries; the discrepancy here is intentional to
+    // confirm the discard behavior under test rather than an accident of matching values.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+    const Timestamp ts4{1, 4};
+
+    MultiOpSizeMetadata commitMeta;
+    commitMeta.setUuid(collA.uuid);
+    commitMeta.setSz(300);
+    commitMeta.setCt(3);
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts1,
+            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        makeApplyOpsOplogEntry(
+            ts2,
+            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/150}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = opTimeAt(ts1)}),
+        makeApplyOpsOplogEntry(ts3,
+                               {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/50}},
+                               ApplyOpsTxnFields{.prepared = true, .prevOpTime = opTimeAt(ts2)}),
+        makeCommitTxnOplogEntry(ts4, {commitMeta}, opTimeAt(ts3)),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    // The commit's size metadata (300 bytes, 3 docs) is used, not the sum of the partial
+    // entries (100+150 = 250 bytes) or the prepared applyOps (50 bytes).
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
+              (CollectionSizeCount{.size = 300, .count = 3}));
+    EXPECT_EQ(result.lastTimestamp, ts4);
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, PreparedTxnFollowedByAbortProducesNoDeltas) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(ts1,
+                               {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100}},
+                               ApplyOpsTxnFields{.prepared = true, .prevOpTime = repl::OpTime{}}),
+        makeAbortTxnOplogEntry(ts2, opTimeAt(ts1)),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    EXPECT_TRUE(result.deltas.empty());
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
+       PartialChainFollowedByAbortWithoutPrepareProducesNoDeltas) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts1,
+            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        makeApplyOpsOplogEntry(
+            ts2,
+            {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/150}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = opTimeAt(ts1)}),
+        makeAbortTxnOplogEntry(ts3, opTimeAt(ts2)),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    EXPECT_TRUE(result.deltas.empty());
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
+       ChainedTxnWithCreateThenInsertHasKCreatedState) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts1,
+            {{.coll = collA,
+              .opType = repl::OpTypeEnum::kCommand,
+              .includeSizeMetadata = false,
+              .commandObj = BSON("create" << collA.nss.coll())}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        makeApplyOpsOplogEntry(ts2,
+                               {{collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/100}},
+                               ApplyOpsTxnFields{.prevOpTime = opTimeAt(ts1)}),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
+              (CollectionSizeCount{.size = 100, .count = 1}));
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, ChainedTxnWithCreateThenDropCancelsOut) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts1,
+            {{.coll = collA,
+              .opType = repl::OpTypeEnum::kCommand,
+              .includeSizeMetadata = false,
+              .commandObj = BSON("create" << collA.nss.coll())}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        makeApplyOpsOplogEntry(ts2,
+                               {{.coll = collA,
+                                 .opType = repl::OpTypeEnum::kCommand,
+                                 .includeSizeMetadata = false,
+                                 .commandObj = BSON("drop" << collA.nss.coll())}},
+                               ApplyOpsTxnFields{.prevOpTime = opTimeAt(ts1)}),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    // A create followed by a drop within the same transaction chain cancels out.
+    EXPECT_FALSE(result.deltas.contains(collA.uuid));
+}
+
+DEATH_TEST_F(AggregateSizeCountFromOplogTxnVisibilityDeathTest,
+             ChainedTxnDropAssertsInMergeDeltas,
+             "12406403") {
+    // Drops are disallowed in multi document transactions. Verifies that chained transaction
+    // parsing throws if there is a drop within a transaction as the code is not written to support
+    // such an operation.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+
+    std::list<repl::OplogEntry> entries{
+        // Non-txn insert establishes collA in the global result with kNone state.
+        test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/50),
+        makeApplyOpsOplogEntry(
+            ts2,
+            {{.coll = collA,
+              .opType = repl::OpTypeEnum::kCommand,
+              .includeSizeMetadata = false,
+              .commandObj = BSON("drop" << collA.nss.coll())}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        makeApplyOpsOplogEntry(ts3,
+                               {{collB, repl::OpTypeEnum::kInsert, /*sizeDelta=*/30}},
+                               ApplyOpsTxnFields{.prevOpTime = opTimeAt(ts2)}),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest,
+       NoSessionPartialTxnChainAccountedForAtTerminalEntry) {
+    // Verifies that large batched operations (partialTxn: true, no lsid/txnNumber) are tracked
+    // via prevOpTime linkage and only become visible at the terminal entry.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts1,
+            {{collA, repl::OpTypeEnum::kDelete, /*sizeDelta=*/-100}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        makeApplyOpsOplogEntry(
+            ts2,
+            {{collA, repl::OpTypeEnum::kDelete, /*sizeDelta=*/-150}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = opTimeAt(ts1)}),
+        makeApplyOpsOplogEntry(ts3,
+                               {{collA, repl::OpTypeEnum::kDelete, /*sizeDelta=*/-50}},
+                               ApplyOpsTxnFields{.prevOpTime = opTimeAt(ts2)}),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount,
+              (CollectionSizeCount{.size = -300, .count = -3}));
+    EXPECT_EQ(result.lastTimestamp, ts3);
+}
+
+TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, NoSessionPartialTxnOpenAtEndOfLogIsDiscarded) {
+    // Verifies that an in-flight no-session batched chain that reaches end-of-cursor without a
+    // terminal entry contributes nothing to the result.
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+
+    std::list<repl::OplogEntry> entries{
+        makeApplyOpsOplogEntry(
+            ts1,
+            {{collA, repl::OpTypeEnum::kDelete, /*sizeDelta=*/-100}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = repl::OpTime{}}),
+        makeApplyOpsOplogEntry(
+            ts2,
+            {{collA, repl::OpTypeEnum::kDelete, /*sizeDelta=*/-150}},
+            ApplyOpsTxnFields{.isPartialTxn = true, .prevOpTime = opTimeAt(ts1)}),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    EXPECT_FALSE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.lastTimestamp, ts2);
 }
 
 }  // namespace
