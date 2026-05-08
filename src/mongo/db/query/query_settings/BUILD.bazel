@@ -135,3 +135,35 @@ mongo_cc_benchmark(
         "//src/mongo/util:processinfo",
     ],
 )
+
+mongo_cc_library(
+    name = "query_knob_overrides",
+    srcs = ["query_knob_overrides.cpp"],
+    hdrs = ["query_knob_overrides.h"],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query:query_knob_registry",
+    ],
+)
+
+idl_generator(
+    name = "query_knob_overrides_test_gen",
+    src = "query_knob_overrides_test.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_knob_overrides_test",
+    srcs = [
+        "query_knob_overrides_test.cpp",
+        ":query_knob_overrides_test_gen",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":query_knob_overrides",
+        "//src/mongo/db/query:query_knob_registry",
+        "//src/mongo/unittest",
+    ],
+)

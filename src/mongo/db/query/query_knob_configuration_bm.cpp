@@ -67,7 +67,7 @@ struct OneOverride {
     }
 };
 
-// TODO(SERVER-123182): Add MaxOverride once QuerySettingsKnobOverlay lands.
+// TODO(SERVER-123182): Add MaxOverride once QuerySettingsKnobOverrides lands.
 
 // ---------------------------------------------------------------------------
 // Workload policies — control what runs in the hot loop.
