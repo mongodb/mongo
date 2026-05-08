@@ -55,6 +55,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
@@ -181,6 +182,7 @@ public:
     static constexpr auto kMaxThreads = 100;
     static constexpr auto kServerCertificateKeyFile = "jstests/libs/server_SAN.pem";
     static constexpr auto kClientCertificateKeyFile = "jstests/libs/client.pem";
+    static constexpr auto kClientCertificatePassword = "";
     static constexpr auto kClientSelfSignedCertificateKeyFile =
         "jstests/libs/client-self-signed.pem";
     static constexpr auto kCAFile = "jstests/libs/ca.pem";
@@ -426,6 +428,7 @@ public:
             options.emplace();
             options->tlsCAFile = kCAFile;
             options->tlsCertificateKeyFile = kClientCertificateKeyFile;
+            options->tlsCertificatePassword = kClientCertificatePassword;
         }
 
         ::grpc::SslCredentialsOptions sslOps;

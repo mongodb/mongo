@@ -61,7 +61,8 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    Status rotateCertificates(const SSLConfiguration& sslConfig) override {
+    Status rotateCertificates(const SSLConfiguration& sslConfig,
+                              const SSLManagerInterface& sslManager) override {
         MONGO_UNIMPLEMENTED;
     }
 
