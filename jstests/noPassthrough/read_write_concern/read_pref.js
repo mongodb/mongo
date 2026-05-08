@@ -191,6 +191,20 @@ let doTest = function () {
         getExplain("primary");
     });
 
+    // Restart all stopped nodes so the replica set has a primary again. Without this, the
+    // checks/hooks run by st.stop() may fail to reach the primary. All stopped nodes must be
+    // restarted (not just enough for a majority) because stepUp() internally calls
+    // awaitNodesAgreeOnPrimary(this.nodes), which polls every member; any unreachable node
+    // causes it to time out. Capture the primary's index first because restart() replaces
+    // rst.nodes[i] with a new connection object.
+    // Use stepUp() explicitly because ReplSetTest sets electionTimeoutMillis to 24h to suppress
+    // spurious elections, so no automatic election fires after the restart.
+    const primaryNodeIdx = replTest.getNodeId(primaryNode);
+    for (let x = 0; x < NODES - 1; x++) {
+        replTest.restart(x);
+    }
+    replTest.stepUp(replTest.nodes[primaryNodeIdx], {awaitReplicationBeforeStepUp: false});
+
     st.stop(stopOpts);
 };
 
