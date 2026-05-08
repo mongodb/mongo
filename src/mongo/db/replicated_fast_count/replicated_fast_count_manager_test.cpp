@@ -34,6 +34,7 @@
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::replicated_fast_count {
@@ -95,16 +96,26 @@ TEST_F(ReplicatedFastCountManagerNoCollectionsTest, InitializeMetadataDoesNothin
 
 using ReplicatedFastCountManagerInitializeMetadataTest = ReplicatedFastCountManagerTest;
 
+const RecordStore* getRecordStoreForUuid(OperationContext* opCtx, const UUID& uuid) {
+    const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
+    const Collection* collection = catalog->lookupCollectionByUUID(opCtx, uuid);
+    invariant(collection);
+    return collection->getRecordStore();
+}
+
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataNoData) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
 
     manager->initializeMetadata(operationContext());
-
-    EXPECT_EQ(manager->find(UUID::gen()), CollectionSizeCount(0, 0));
 }
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoStoreData) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
 
     test_helpers::writeToOplog(
         operationContext(),
@@ -118,19 +129,24 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoStoreData) {
     manager->initializeMetadata(operationContext());
 
     {
-
-        const CollectionSizeCount result = CollectionSizeCount{.size = 10, .count = 1};
-        EXPECT_EQ(manager->find(collA.uuid), result);
+        const RecordStore* recordStore = getRecordStoreForUuid(operationContext(), collA.uuid);
+        EXPECT_EQ(recordStore->accurateNumRecords(), 1);
+        EXPECT_EQ(recordStore->accurateDataSize(), 10);
     }
     {
-
-        const CollectionSizeCount result = CollectionSizeCount{.size = 100, .count = 1};
-        EXPECT_EQ(manager->find(collB.uuid), result);
+        const RecordStore* recordStore = getRecordStoreForUuid(operationContext(), collB.uuid);
+        EXPECT_EQ(recordStore->accurateNumRecords(), 1);
+        EXPECT_EQ(recordStore->accurateDataSize(), 100);
     }
 }
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogData) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
 
     test_helpers::insertSizeCountEntry(operationContext(),
                                        sizeCountStore,
@@ -144,19 +160,24 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogData) {
     manager->initializeMetadata(operationContext());
 
     {
-
-        const CollectionSizeCount result = CollectionSizeCount{.size = 5, .count = 1};
-        EXPECT_EQ(manager->find(collA.uuid), result);
+        const RecordStore* recordStore = getRecordStoreForUuid(operationContext(), collA.uuid);
+        EXPECT_EQ(recordStore->accurateNumRecords(), 1);
+        EXPECT_EQ(recordStore->accurateDataSize(), 5);
     }
     {
-
-        const CollectionSizeCount result = CollectionSizeCount{.size = 6, .count = 2};
-        EXPECT_EQ(manager->find(collB.uuid), result);
+        const RecordStore* recordStore = getRecordStoreForUuid(operationContext(), collB.uuid);
+        EXPECT_EQ(recordStore->accurateNumRecords(), 2);
+        EXPECT_EQ(recordStore->accurateDataSize(), 6);
     }
 }
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogAfterTimestamp) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
 
     test_helpers::insertSizeCountEntry(operationContext(),
                                        sizeCountStore,
@@ -182,20 +203,24 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogAfterTimestamp) 
     manager->initializeMetadata(operationContext());
 
     {
-
-        const CollectionSizeCount result = CollectionSizeCount{.size = 5, .count = 1};
-        EXPECT_EQ(manager->find(collA.uuid), result);
+        const RecordStore* recordStore = getRecordStoreForUuid(operationContext(), collA.uuid);
+        EXPECT_EQ(recordStore->accurateNumRecords(), 1);
+        EXPECT_EQ(recordStore->accurateDataSize(), 5);
     }
     {
-
-        const CollectionSizeCount result = CollectionSizeCount{.size = 6, .count = 2};
-        EXPECT_EQ(manager->find(collB.uuid), result);
+        const RecordStore* recordStore = getRecordStoreForUuid(operationContext(), collB.uuid);
+        EXPECT_EQ(recordStore->accurateNumRecords(), 2);
+        EXPECT_EQ(recordStore->accurateDataSize(), 6);
     }
 }
 
-
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, StoreAndOplogData) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
 
     test_helpers::insertSizeCountEntry(operationContext(),
                                        sizeCountStore,
@@ -218,15 +243,132 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, StoreAndOplogData) {
     manager->initializeMetadata(operationContext());
 
     {
-
-        const CollectionSizeCount result = CollectionSizeCount{.size = 5 + 10, .count = 1 + 1};
-        EXPECT_EQ(manager->find(collA.uuid), result);
+        const RecordStore* recordStore = getRecordStoreForUuid(operationContext(), collA.uuid);
+        EXPECT_EQ(recordStore->accurateNumRecords(), 1 + 1);
+        EXPECT_EQ(recordStore->accurateDataSize(), 5 + 10);
     }
     {
-
-        const CollectionSizeCount result = CollectionSizeCount{.size = 6 + 100, .count = 2 + 1};
-        EXPECT_EQ(manager->find(collB.uuid), result);
+        const RecordStore* recordStore = getRecordStoreForUuid(operationContext(), collB.uuid);
+        EXPECT_EQ(recordStore->accurateNumRecords(), 2 + 1);
+        EXPECT_EQ(recordStore->accurateDataSize(), 6 + 100);
     }
+}
+
+TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, SkipsDroppedCollections) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    // Insert a size/count for a UUID that has no corresponding collection in the catalog.
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       sizeCountStore,
+                                       UUID::gen(),
+                                       SizeCountStore::Entry(Timestamp::min(), 999, 99));
+
+    // Initialization should skip the size/count entry without failing.
+    manager->initializeMetadata(operationContext());
+}
+
+TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataTracksOplogSizeCount) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
+
+    const auto catalog = CollectionCatalog::latest(operationContext()->getServiceContext());
+    const Collection* oplogColl = catalog->lookupCollectionByNamespace(
+        operationContext(), NamespaceString::kRsOplogNamespace);
+    ASSERT(oplogColl);
+    const UUID oplogUuid = oplogColl->uuid();
+
+    test_helpers::insertSizeCountEntry(operationContext(),
+                                       sizeCountStore,
+                                       oplogUuid,
+                                       SizeCountStore::Entry(Timestamp::min(), 500, 50));
+
+    const repl::OplogEntry entry1 = test_helpers::makeOplogEntry(
+        Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10);
+    const repl::OplogEntry entry2 = test_helpers::makeOplogEntry(
+        Timestamp(2, 2), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20);
+
+    const int64_t oplogSizeDelta =
+        entry1.getEntry().toBSON().objsize() + entry2.getEntry().toBSON().objsize();
+
+    test_helpers::writeToOplog(operationContext(), entry1);
+    test_helpers::writeToOplog(operationContext(), entry2);
+
+    manager->initializeMetadata(operationContext());
+
+    const RecordStore* oplogRecordStore = getRecordStoreForUuid(operationContext(), oplogUuid);
+    EXPECT_EQ(oplogRecordStore->accurateNumRecords(), 50 + 2);
+    EXPECT_EQ(oplogRecordStore->accurateDataSize(), 500 + oplogSizeDelta);
+}
+
+using ReplicatedFastCountManagerCommitTest = ReplicatedFastCountManagerTest;
+
+TEST_F(ReplicatedFastCountManagerCommitTest, CommitNothing) {
+    manager->commit(
+        operationContext(), boost::container::flat_map<UUID, CollectionSizeCount>{}, boost::none);
+}
+
+TEST_F(ReplicatedFastCountManagerCommitTest, CollectionNotFoundDoesNothing) {
+    manager->commit(operationContext(),
+                    boost::container::flat_map<UUID, CollectionSizeCount>{
+                        {collA.uuid, CollectionSizeCount{.size = 42, .count = 2}}},
+                    boost::none);
+}
+
+TEST_F(ReplicatedFastCountManagerCommitTest, CommitZeros) {
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
+
+    const RecordStore* recordStoreA = getRecordStoreForUuid(operationContext(), collA.uuid);
+
+    EXPECT_EQ(recordStoreA->accurateDataSize(), 0);
+    EXPECT_EQ(recordStoreA->accurateNumRecords(), 0);
+
+    manager->commit(operationContext(),
+                    boost::container::flat_map<UUID, CollectionSizeCount>{
+                        {collA.uuid, CollectionSizeCount{.size = 0, .count = 0}}},
+                    boost::none);
+
+    EXPECT_EQ(recordStoreA->accurateDataSize(), 0);
+    EXPECT_EQ(recordStoreA->accurateNumRecords(), 0);
+}
+
+TEST_F(ReplicatedFastCountManagerCommitTest, CommitUpdatesRecordStoreSizeCount) {
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collB.nss, CollectionOptions{.uuid = collB.uuid}));
+
+    const RecordStore* recordStoreA = getRecordStoreForUuid(operationContext(), collA.uuid);
+    const RecordStore* recordStoreB = getRecordStoreForUuid(operationContext(), collB.uuid);
+
+    EXPECT_EQ(recordStoreA->accurateDataSize(), 0);
+    EXPECT_EQ(recordStoreA->accurateNumRecords(), 0);
+    EXPECT_EQ(recordStoreB->accurateDataSize(), 0);
+    EXPECT_EQ(recordStoreB->accurateNumRecords(), 0);
+
+    manager->commit(operationContext(),
+                    boost::container::flat_map<UUID, CollectionSizeCount>{
+                        {collA.uuid, CollectionSizeCount{.size = 42, .count = 2}},
+                        {collB.uuid, CollectionSizeCount{.size = 111, .count = 17}}},
+                    boost::none);
+
+    EXPECT_EQ(recordStoreA->accurateDataSize(), 42);
+    EXPECT_EQ(recordStoreA->accurateNumRecords(), 2);
+    EXPECT_EQ(recordStoreB->accurateDataSize(), 111);
+    EXPECT_EQ(recordStoreB->accurateNumRecords(), 17);
+
+    manager->commit(operationContext(),
+                    boost::container::flat_map<UUID, CollectionSizeCount>{
+                        {collA.uuid, CollectionSizeCount{.size = -10, .count = -3}},
+                        {collB.uuid, CollectionSizeCount{.size = -11, .count = -4}}},
+                    boost::none);
+
+    EXPECT_EQ(recordStoreA->accurateDataSize(), 42 - 10);
+    EXPECT_EQ(recordStoreA->accurateNumRecords(), 2 - 3);
+    EXPECT_EQ(recordStoreB->accurateDataSize(), 111 - 11);
+    EXPECT_EQ(recordStoreB->accurateNumRecords(), 17 - 4);
 }
 
 using ReplicatedFastCountManagerFindLatestTest = ReplicatedFastCountManagerTest;

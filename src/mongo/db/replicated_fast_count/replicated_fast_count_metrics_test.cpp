@@ -244,7 +244,7 @@ TEST_F(ReplicatedFastCountManagerMetricsTest, WriteTimeMsTotalIncrementsAfterFlu
     const UUID uuid = UUID::gen();
     boost::container::flat_map<UUID, CollectionSizeCount> changes;
     changes[uuid] = {/*count=*/1, /*size=*/100};
-    _fastCountManager->commit(changes, /*commitTime=*/boost::none);
+    _fastCountManager->commit(operationContext(), changes, /*commitTime=*/boost::none);
     _fastCountManager->flushSync(operationContext());
 
     // writeTimeMsTotal is the time spent inside the WriteUnitOfWork; it may be 0ms on a fast

@@ -32,9 +32,11 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_advance_checkpoint.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_read.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
@@ -65,7 +67,8 @@ void ReplicatedFastCountManager::initializeFastCountCommitFn() {
     setFastCountCommitFn([](OperationContext* opCtx,
                             const boost::container::flat_map<UUID, CollectionSizeCount>& changes,
                             boost::optional<Timestamp> commitTime) {
-        getReplicatedFastCountManager(opCtx->getServiceContext()).commit(changes, commitTime);
+        getReplicatedFastCountManager(opCtx->getServiceContext())
+            .commit(opCtx, changes, commitTime);
     });
 }
 
@@ -129,8 +132,10 @@ void ReplicatedFastCountManager::shutdown(OperationContext* opCtx) {
 }
 
 void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
-    // Initialize the in-memory map by loading all persisted collection size/count information. The
-    // block scope is required to avoid a lock cycle fassert when reading the oplog below.
+    // Accumulates size/count values per collection UUID. Entries may be inserted by the fast count
+    // collection scan and/or the oplog scan.
+    absl::flat_hash_map<UUID, CollectionSizeCount> accumulator;
+
     {
         const auto acquisition = acquireFastCountCollectionForRead(opCtx);
         if (!acquisition.has_value()) {
@@ -142,23 +147,15 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
         const Date_t loadStartTime = Date_t::now();
         int numRecordsScanned = 0;
 
-        std::lock_guard lock(_metadataMutex);
-        // initializeMetadata() is called after oplog replay. During oplog replay, _metadata may be
-        // updated as changes are committed. To avoid double counting, we erase all existing entries
-        // before re-initializing them.
-        _metadata.erase(_metadata.begin(), _metadata.end());
-
         auto cursor = acquisition->getCollectionPtr()->getCursor(opCtx);
         while (auto record = cursor->next()) {
             const UUID uuid = _UUIDForKey(record->id);
             const BSONObj data = record->data.releaseToBson();
 
-            ++numRecordsScanned;
+            accumulator[uuid].size += data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
+            accumulator[uuid].count += data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
 
-            StoredSizeCount& entry = _metadata[uuid];
-            entry.sizeCount.count = data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
-            entry.sizeCount.size = data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
-            entry.validAsOf = data.getField(kValidAsOfKey).timestamp();
+            ++numRecordsScanned;
         }
 
         LOGV2(
@@ -166,14 +163,6 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
             "ReplicatedFastCountManager persisted collection size/count information read complete",
             "numRecordsScanned"_attr = numRecordsScanned,
             "duration"_attr = Date_t::now() - loadStartTime);
-    }
-
-    // Seed the in-memory checkpoint timestamp from disk so the `oplog_lag_secs` gauge has a real
-    // baseline on warm restart. Without this, the gauge would stay at 0 until the first post-boot
-    // checkpoint flush (primary) or the first oplog-applied write to the timestamp store
-    // (secondary).
-    if (const auto persistedCheckpoint = _timestampStore->read(opCtx)) {
-        recordCheckpointAdvanced(*persistedCheckpoint);
     }
 
     const Date_t oplogScanStartTime = Date_t::now();
@@ -194,8 +183,8 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
     }();
 
     for (const auto& [uuid, delta] : scanResult.deltas) {
-        _metadata[uuid].sizeCount.count += delta.sizeCount.count;
-        _metadata[uuid].sizeCount.size += delta.sizeCount.size;
+        accumulator[uuid].count += delta.sizeCount.count;
+        accumulator[uuid].size += delta.sizeCount.size;
     }
 
     LOGV2(12554001,
@@ -203,11 +192,70 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
           "seekAfterTimestamp"_attr = seekAfterTimestamp,
           "metadataEntriesUpdated"_attr = scanResult.deltas.size(),
           "duration"_attr = Date_t::now() - oplogScanStartTime);
+
+    const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
+    int numInitialized = 0;
+    for (const auto& dbName : catalog->getAllDbNames()) {
+        for (const auto& coll : catalog->range(dbName)) {
+            if (!isReplicatedFastCountEligible(coll->ns())) {
+                continue;
+            }
+
+            if (auto it = accumulator.find(coll->uuid()); it != accumulator.end()) {
+                coll->getRecordStore()->setAccurateSizeCount(it->second.size, it->second.count);
+            } else {
+                // The oplog collection can have a different UUID on every node. When this happens,
+                // the accumulator will not contain an entry for this node's oplog UUID because the
+                // UUID will not be tracked in the fast count store or the oplog.
+                if (coll->ns() != NamespaceString::kRsOplogNamespace) {
+                    // TODO(SERVER-126350): Investigate why this log is sometimes emitted.
+                    LOGV2_WARNING(
+                        12580001,
+                        "Replicated fast count eligible namespace found in the collection "
+                        "catalog but not tracked in the metadata store or the oplog",
+                        "nss"_attr = coll->ns().toStringForErrorMsg(),
+                        "uuid"_attr = coll->uuid());
+                }
+            }
+
+            ++numInitialized;
+        }
+    }
+
+    LOGV2(12580000,
+          "Initialized RecordStore replicated size counts from fast count metadata",
+          "numCollectionsInitialized"_attr = numInitialized,
+          "numEntriesInAccumulator"_attr = accumulator.size());
+
+    // Seed the in-memory checkpoint timestamp from disk so the `oplog_lag_secs` gauge has a real
+    // baseline on warm restart. Without this, the gauge would stay at 0 until the first post-boot
+    // checkpoint flush (primary) or the first oplog-applied write to the timestamp store
+    // (secondary).
+    if (const auto persistedCheckpoint = _timestampStore->read(opCtx)) {
+        recordCheckpointAdvanced(*persistedCheckpoint);
+    }
 }
 
 void ReplicatedFastCountManager::commit(
+    OperationContext* opCtx,
     const boost::container::flat_map<UUID, CollectionSizeCount>& changes,
     boost::optional<Timestamp> commitTime) {
+    const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
+    for (const auto& [uuid, delta] : changes) {
+        if (delta.count == 0 && delta.size == 0) {
+            continue;
+        }
+        const Collection* collection = catalog->lookupCollectionByUUID(opCtx, uuid);
+        // In a single WUOW, if the collection size/count is changed and then the collection is
+        // dropped, the collection will be removed from the catalog before we attempt to write these
+        // uncommitted size/count changes. So, we necessarily skip updating the collection's record
+        // store.
+        if (!collection) {
+            continue;
+        }
+        collection->getRecordStore()->adjustAccurateSizeCount(delta.size, delta.count);
+    }
+
     std::lock_guard lock(_metadataMutex);
     for (const auto& [uuid, metadata] : changes) {
         // Ignore changes that don't need to be flushed. Count and size can both be zero if two or

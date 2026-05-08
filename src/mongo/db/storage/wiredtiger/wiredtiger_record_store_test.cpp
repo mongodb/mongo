@@ -1054,5 +1054,59 @@ TEST(WiredTigerRecordStoreTest, EnforceTableCreateExclusiveDifferentConfiguratio
     ASSERT_EQ(EEXIST, createRes);
 }
 
+TEST(WiredTigerRecordStoreTest, AccurateSizeCountDefaultsToZero) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    EXPECT_EQ(rs->accurateNumRecords(), 0);
+    EXPECT_EQ(rs->accurateDataSize(), 0);
+}
+
+TEST(WiredTigerRecordStoreTest, SetAccurateSizeCount) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    rs->setAccurateSizeCount(/*size=*/42, /*count=*/1024);
+    EXPECT_EQ(rs->accurateDataSize(), 42);
+    EXPECT_EQ(rs->accurateNumRecords(), 1024);
+
+    // Overwrite with new values.
+    rs->setAccurateSizeCount(/*size=*/100, /*count=*/5000);
+    EXPECT_EQ(rs->accurateDataSize(), 100);
+    EXPECT_EQ(rs->accurateNumRecords(), 5000);
+}
+
+TEST(WiredTigerRecordStoreTest, AdjustAccurateSizeCount) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    rs->setAccurateSizeCount(/*size=*/10, /*count=*/500);
+    rs->adjustAccurateSizeCount(/*sizeDelta=*/5, /*countDelta=*/200);
+    EXPECT_EQ(rs->accurateDataSize(), 10 + 5);
+    EXPECT_EQ(rs->accurateNumRecords(), 500 + 200);
+
+    // Negative adjustments.
+    rs->adjustAccurateSizeCount(/*sizeDelta=*/-3, /*countDelta=*/-100);
+    EXPECT_EQ(rs->accurateDataSize(), 10 + 5 - 3);
+    EXPECT_EQ(rs->accurateNumRecords(), 500 + 200 - 100);
+}
+
+TEST(WiredTigerRecordStoreTest, AccurateSizeCountIndependentOfLegacy) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+
+    rs->setAccurateSizeCount(/*size=*/42, /*count=*/1024);
+
+    // Set legacy size and count.
+    rs->setSize(/*numRecords=*/24, /*dataSize=*/512);
+
+    // The legacy numRecords/dataSize should be independent.
+    EXPECT_EQ(rs->numRecords(), 24);
+    EXPECT_EQ(rs->dataSize(), 512);
+
+    EXPECT_EQ(rs->accurateDataSize(), 42);
+    EXPECT_EQ(rs->accurateNumRecords(), 1024);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -159,6 +159,22 @@ public:
         _data->dataSize = dataSize;
     }
 
+    int64_t accurateNumRecords() const override {
+        return 0;
+    }
+
+    int64_t accurateDataSize() const override {
+        return 0;
+    }
+
+    void setAccurateSizeCount(int64_t, int64_t) override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    void adjustAccurateSizeCount(int64_t, int64_t) override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     RecordId getLargestKey(OperationContext* opCtx, RecoveryUnit& ru) const final {
         std::lock_guard<std::recursive_mutex> lock(_data->mutex);
         return RecordId(_data->nextId - 1);

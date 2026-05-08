@@ -109,6 +109,22 @@ public:
         // Do nothing.
     }
 
+    int64_t accurateNumRecords() const override {
+        return 0;
+    }
+
+    int64_t accurateDataSize() const override {
+        return 0;
+    }
+
+    void setAccurateSizeCount(int64_t, int64_t) override {
+        // Do nothing.
+    }
+
+    void adjustAccurateSizeCount(int64_t, int64_t) override {
+        // Do nothing.
+    }
+
     virtual bool isCapped() const {
         // Record stores for capped collections should inherit from 'DevNullRecordStore::Capped',
         // which overrides this to true.

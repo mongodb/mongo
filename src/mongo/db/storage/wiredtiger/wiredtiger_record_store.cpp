@@ -1363,6 +1363,24 @@ void WiredTigerRecordStore::setSize(long long numRecords, long long dataSize) {
     _sizeStorer->flush(syncToDisk);
 }
 
+int64_t WiredTigerRecordStore::accurateNumRecords() const {
+    return _accurateNumRecords.load();
+}
+
+int64_t WiredTigerRecordStore::accurateDataSize() const {
+    return _accurateDataSize.load();
+}
+
+void WiredTigerRecordStore::setAccurateSizeCount(int64_t size, int64_t count) {
+    _accurateDataSize.store(size);
+    _accurateNumRecords.store(count);
+}
+
+void WiredTigerRecordStore::adjustAccurateSizeCount(int64_t sizeDelta, int64_t countDelta) {
+    _accurateDataSize.addAndFetch(sizeDelta);
+    _accurateNumRecords.addAndFetch(countDelta);
+}
+
 std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::getCursor(OperationContext* opCtx,
                                                                        RecoveryUnit& ru,
                                                                        bool forward) const {

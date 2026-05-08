@@ -421,6 +421,28 @@ public:
     virtual void setSize(long long numRecords, long long dataSize) = 0;
 
     /**
+     * Returns the accurate number of records in the `RecordStore`.
+     */
+    virtual int64_t accurateNumRecords() const = 0;
+
+    /**
+     * Returns the accurate uncompressed data size of the `RecordStore` in bytes.
+     */
+    virtual int64_t accurateDataSize() const = 0;
+
+    /**
+     * Overrides the accurate size and count of the `RecordStore` with the provided values.
+     */
+    virtual void setAccurateSizeCount(int64_t size, int64_t count) = 0;
+
+    /**
+     * Increments the accurate size and count of the `RecordStore` with the provided values.
+     *
+     * Negative values are allowed.
+     */
+    virtual void adjustAccurateSizeCount(int64_t sizeDelta, int64_t countDelta) = 0;
+
+    /**
      * @param extraInfo - optional more debug info
      * @param level - optional, level of debug info to put in (higher is more)
      * @return total estimate size (in bytes) on stable storage

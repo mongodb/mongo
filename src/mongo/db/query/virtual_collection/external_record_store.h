@@ -110,6 +110,22 @@ public:
         // Do nothing.
     }
 
+    int64_t accurateNumRecords() const override {
+        return 0;
+    }
+
+    int64_t accurateDataSize() const override {
+        return 0;
+    }
+
+    void setAccurateSizeCount(int64_t, int64_t) override {
+        unimplementedTasserted();
+    }
+
+    void adjustAccurateSizeCount(int64_t, int64_t) override {
+        unimplementedTasserted();
+    }
+
     int64_t storageSize(RecoveryUnit&, BSONObjBuilder*, int) const final {
         return 0LL;
     }

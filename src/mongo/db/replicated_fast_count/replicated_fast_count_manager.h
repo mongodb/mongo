@@ -136,21 +136,28 @@ public:
     void shutdown(OperationContext* opCtx);
 
     /**
-     * Initializes the in-memory collection size/count information stored in the
-     * ReplicatedFastCountManager.
+     * Initializes the in-memory collection size/count information stored in each collection's
+     * `RecordStore`.
      *
      * This function combines the persisted size/count for each collection with any additional
      * size/count updates in the oplog since the last checkpoint.
      *
-     * Should be called once per startup. If no replicated size/count store exists, this function
-     * does nothing.
+     * Should be called once per startup, after oplog recovery and `CollectionCatalog`
+     * initialization. If no replicated size/count store exists, this function does nothing.
      */
     void initializeMetadata(OperationContext* opCtx);
 
     /**
-     * Records committed changes to the size and count for the collections in 'changes'.
+     * Adjusts each collection's `RecordStore` by the corresponding delta in `changes`.
+     *
+     * This function updates the in-memory representation of each collection's size and count only.
+     * It does not write anything to disk.
+     *
+     * Any UUID in `changes` not found in the collection catalog is skipped.
      */
-    void commit(const boost::container::flat_map<UUID, CollectionSizeCount>& changes,
+    // TODO(SERVER-126141): Remove this commitTime parameter.
+    void commit(OperationContext* opCtx,
+                const boost::container::flat_map<UUID, CollectionSizeCount>& changes,
                 boost::optional<Timestamp> commitTime);
 
     /**

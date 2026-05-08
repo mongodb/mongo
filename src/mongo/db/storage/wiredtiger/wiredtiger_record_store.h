@@ -257,6 +257,11 @@ public:
      */
     void setSize(long long numRecords, long long dataSize) override;
 
+    int64_t accurateNumRecords() const override;
+    int64_t accurateDataSize() const override;
+    void setAccurateSizeCount(int64_t size, int64_t count) override;
+    void adjustAccurateSizeCount(int64_t sizeDelta, int64_t countDelta) override;
+
     RecordStore::RecordStoreContainer getContainer() override;
 
 protected:
@@ -404,6 +409,12 @@ protected:
     std::shared_ptr<WiredTigerSizeStorer::SizeInfo> _sizeInfo;
     bool _tracksSizeAdjustments;
     WiredTigerKVEngineBase* _kvEngine;  // not owned.
+
+    // Accurate size and count, maintained separately from the legacy SizeInfo-based counters.
+    // These counters are populated in ReplicatedFastCountManager::initializeMetadata() during
+    // startup and updated on each WriteUnitOfWork commit.
+    Atomic<int64_t> _accurateDataSize{0};
+    Atomic<int64_t> _accurateNumRecords{0};
 
 private:
     std::variant<WiredTigerIntegerKeyedContainer, WiredTigerStringKeyedContainer> _makeContainer(
