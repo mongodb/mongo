@@ -1,12 +1,13 @@
-load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files", "mongo_js_library")
+load("@aspect_rules_js//js:defs.bzl", "js_library")
 
-package(default_visibility = ["//visibility:public"])
-
-mongo_js_library(
+js_library(
     name = "all_javascript_files",
     srcs = glob([
         "*.js",
     ]),
+    target_compatible_with = select({
+        "//bazel/config:ppc_or_s390x": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
 )
-
-all_subpackage_javascript_files()
