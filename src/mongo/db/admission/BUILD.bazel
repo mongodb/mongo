@@ -138,6 +138,20 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "flow_control_rate_limiter",
+    srcs = [
+        "flow_control_rate_limiter.cpp",
+    ],
+    deps = [
+        ":flow_control_parameters",
+        ":rate_limiter",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/shard_role/lock_manager:flow_control_ticketholder",
+    ],
+)
+
 idl_generator(
     name = "flow_control_parameters_gen",
     src = "flow_control_parameters.idl",
@@ -160,6 +174,7 @@ mongo_cc_library(
     ],
     deps = [
         ":flow_control_parameters",
+        ":flow_control_rate_limiter",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/commands/server_status:server_status_core",
@@ -208,5 +223,18 @@ mongo_cc_unit_test(
     deps = [
         ":rate_limiter",
         "//src/mongo/db:service_context_test_fixture",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "flow_control_rate_limiter_test",
+    srcs = [
+        "flow_control_rate_limiter_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":flow_control_rate_limiter",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/unittest",
     ],
 )

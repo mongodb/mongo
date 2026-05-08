@@ -144,3 +144,29 @@ server_parameters:
         default: 1000
         validator: {gte: 100, lte: 5000}
         redact: false
+
+    flowControlUseRateLimiter:
+        description: "If true, enforce flow control ticket grants with the rate limiter instead of the legacy ticketholder."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<bool>"
+        cpp_varname: "gFlowControlUseRateLimiter"
+        default: false
+        redact: false
+
+    flowControlRateLimiterBurstCapacitySecs:
+        description: "Seconds of unused flow control rate that can accumulate as burst capacity when using the rate limiter."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<double>"
+        cpp_varname: "gFlowControlRateLimiterBurstCapacitySecs"
+        default: 0.5
+        validator: {gt: 0.0}
+        redact: false
+
+    flowControlRateLimiterMaxQueueDepth:
+        description: "Maximum number of threads that can block waiting for a flow control rate limiter token. Requests exceeding this depth are rejected immediately with RateLimitExceeded."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<long long>"
+        cpp_varname: "gFlowControlRateLimiterMaxQueueDepth"
+        default: 1000000
+        validator: {gt: 0}
+        redact: false

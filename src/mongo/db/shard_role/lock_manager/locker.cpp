@@ -31,6 +31,8 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/admission/execution_control/ticketing_system.h"
+#include "mongo/db/admission/flow_control_parameters_gen.h"
+#include "mongo/db/admission/flow_control_rate_limiter.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/lock_manager/dump_lock_manager.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager.h"
@@ -290,7 +292,11 @@ void Locker::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode) {
                         "Operation attempted to acquire an execution ticket after indicating that "
                         "it should not");
         }
-        ticketholder->getTicket(opCtx, &_flowControlStats);
+        if (gFlowControlUseRateLimiter.load()) {
+            FlowControlRateLimiter::get(opCtx)->acquireTicket(opCtx, &_flowControlStats);
+        } else {
+            ticketholder->getTicket(opCtx, &_flowControlStats);
+        }
     }
 }
 

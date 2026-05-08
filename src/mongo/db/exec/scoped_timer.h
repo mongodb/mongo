@@ -143,6 +143,7 @@ private:
     X(shutDownExpiredDocumentRemover)           \
     X(shutDownOplogCapMaintainer)               \
     X(shutDownStorageEngine)                    \
+    X(shutDownFlowControl)                      \
     X(shutDownFTDC)                             \
     X(shutDownOCSP)                             \
     X(shutDownOtelMetrics)                      \

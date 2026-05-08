@@ -1978,6 +1978,15 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                                                         true /* memLeakAllowed */);
     }
 
+    // Stop flow control before service lifecycle storage-access shutdown so the periodic job does
+    // not overlap it.
+    {
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::shutDownFlowControl,
+                                       &shutdownTimeElapsedBuilder);
+        FlowControl::shutdown(serviceContext);
+    }
+
     // Depending on the underlying implementation, there may be some state that needs to be shut
     // down after the replication subsystem and the storage engine.
     auto& serviceLifecycle =
@@ -2046,7 +2055,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     SessionKiller::shutdown(serviceContext->getService());
 #endif
 
-    FlowControl::shutdown(serviceContext);
 #ifdef MONGO_CONFIG_SSL
     {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),

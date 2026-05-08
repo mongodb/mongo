@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/flow_control.h"
 #include "mongo/db/admission/flow_control_parameters_gen.h"
+#include "mongo/db/admission/flow_control_rate_limiter.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/flow_control_ticketholder.h"
@@ -236,10 +237,17 @@ FlowControl::FlowControl(ServiceContext* service,
     // cause a slow start on start up.
     FlowControlTicketholder::set(service, std::make_unique<FlowControlTicketholder>(kMaxTickets));
 
+    FlowControlRateLimiter::set(service, std::make_unique<FlowControlRateLimiter>());
+
     _jobAnchor = service->getPeriodicRunner()->makeJob(
         {"FlowControlRefresher",
          [this](Client* client) {
-             FlowControlTicketholder::get(client->getServiceContext())->refreshTo(getNumTickets());
+             auto numTickets = getNumTickets();
+             auto* svc = client->getServiceContext();
+             FlowControlTicketholder::get(svc)->refreshTo(numTickets);
+             if (gFlowControlUseRateLimiter.load()) {
+                 FlowControlRateLimiter::get(svc)->updateRate(numTickets);
+             }
          },
          Milliseconds(gFlowControlPollIntervalMs.load()),
          true /*isKillableByStepdown*/});
@@ -315,6 +323,9 @@ BSONObj FlowControl::generateSection(OperationContext* opCtx,
     // Most of these values are only computed and meaningful when flow control is enabled.
     bob.append("enabled", gFlowControlEnabled.loadRelaxed());
     bob.append("targetRateLimit", _lastTargetTicketsPermitted.loadRelaxed());
+    // When flowControlUseRateLimiter is enabled, writes bypass the ticketholder so this counter
+    // stops accumulating. Per-operation wait time is still tracked via CurOp; rate limiter
+    // aggregate stats are reported in the "rateLimiter" sub-document below.
     bob.append("timeAcquiringMicros",
                FlowControlTicketholder::get(opCtx)->totalTimeAcquiringMicros());
     // Ensure sufficient significant figures of locksPerOp are reported in FTDC, which stores data
@@ -324,6 +335,14 @@ BSONObj FlowControl::generateSection(OperationContext* opCtx,
     bob.append("isLagged", _isLagged.loadRelaxed());
     bob.append("isLaggedCount", _isLaggedCount.loadRelaxed());
     bob.append("isLaggedTimeMicros", _isLaggedTimeMicros.loadRelaxed());
+
+    auto* rateLimiter = FlowControlRateLimiter::get(opCtx);
+    if (rateLimiter) {
+        BSONObjBuilder rlBob(bob.subobjStart("rateLimiter"));
+        rateLimiter->appendStats(&rlBob);
+        rlBob.append("queued", static_cast<long long>(rateLimiter->queued()));
+        rlBob.doneFast();
+    }
 
     return bob.obj();
 }
