@@ -31,6 +31,7 @@ from git import Commit, Repo
 from buildscripts.sbom.sbom_utils import (
     add_component_dependsOn,
     add_component_property,
+    check_components_and_dependencies,
     check_metadata_sbom,
     convert_sbom_to_public,
     read_sbom_json_file,
@@ -531,6 +532,18 @@ def main() -> None:
 
     print_banner("Pre-Processing Endor Labs SBOM")
 
+    ## deduplicate components by bom-ref ##
+    seen_bom_refs: set[str] = set()
+    unique_components = []
+    for component in endor_bom["components"]:
+        bom_ref = component.get("bom-ref", "")
+        if bom_ref in seen_bom_refs:
+            logger.info("ENDOR SBOM PRE-PROCESS: removing duplicate bom-ref %s", bom_ref)
+        else:
+            seen_bom_refs.add(bom_ref)
+            unique_components.append(component)
+    endor_bom["components"] = unique_components
+
     ## remove uneeded components ##
     # [list]endor_components_remove is defined in config.py
 
@@ -584,6 +597,7 @@ def main() -> None:
 
     if os.path.exists(sbom_metadata_path):
         meta_bom = read_sbom_json_file(sbom_metadata_path)
+        check_components_and_dependencies(meta_bom, sbom_metadata_path)
     else:
         logger.error("No SBOM metadata file at '%s'. This is fatal.", sbom_metadata_path)
         sys.exit(1)
@@ -1130,6 +1144,7 @@ def main() -> None:
                     )
                     license_entry["license"]["id"] = new
 
+    check_components_and_dependencies(meta_bom, sbom_out_internal_path)
     write_sbom_json_file(meta_bom, sbom_out_internal_path)
 
     # Load the previous public SBOM to track its serialNumber/version independently

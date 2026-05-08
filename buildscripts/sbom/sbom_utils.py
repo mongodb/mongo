@@ -113,6 +113,29 @@ def check_metadata_sbom(meta_bom: dict) -> None:
                 )
 
 
+def check_components_and_dependencies(sbom: dict, label: str = "") -> None:
+    """Warn if .components[].bom-ref and .dependencies[].ref are not in one-to-one correspondence."""
+    prefix = f"{label}: " if label else ""
+    component_refs = {c["bom-ref"] for c in sbom.get("components", [])}
+    dependency_refs = {d["ref"] for d in sbom.get("dependencies", [])}
+
+    in_components_not_deps = component_refs - dependency_refs
+    in_deps_not_components = dependency_refs - component_refs
+
+    if in_components_not_deps:
+        logger.warning(
+            "%sCOMPONENTS/DEPENDENCIES MISMATCH: components with no matching dependency ref: %s",
+            prefix,
+            sorted(in_components_not_deps),
+        )
+    if in_deps_not_components:
+        logger.warning(
+            "%sCOMPONENTS/DEPENDENCIES MISMATCH: dependency refs with no matching component: %s",
+            prefix,
+            sorted(in_deps_not_components),
+        )
+
+
 def convert_sbom_to_public(sbom_dict: dict):
     """Remove internal-only properties and components from SBOM"""
 

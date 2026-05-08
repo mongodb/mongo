@@ -40,8 +40,10 @@ for component in components_remove:
 
 # List of folders in src/third_party to exclude from SBOM generation warnings
 third_party_folders_remove = [
-    "src/third_party/scripts",  # this folder contains scripts related to the import process, but does not contain SBOM components itself
-    "src/third_party/private",  # this is not a real third-party folder, but rather a place for MongoDB to store private forks of third-party code. The actual SBOM components in this folder are still included.
+    # this folder contains scripts related to the import process, but does not contain SBOM components itself
+    "src/third_party/scripts",
+    # this is not a real third-party folder, but rather a place for MongoDB to store private forks of third-party code. The actual SBOM components in this folder are still included.
+    "src/third_party/private",
     "src/third_party/boringssl_replacement",  # this is an alias folder
     "src/third_party/wasmtime",  # currently no targets depend on this
 ]
