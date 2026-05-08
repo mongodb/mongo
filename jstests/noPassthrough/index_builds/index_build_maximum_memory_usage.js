@@ -4,6 +4,9 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
+// Index builds allow lower memory limits when testing diagnostics are enabled.
+TestData.testingDiagnosticsEnabled = false;
+
 const replSet = new ReplSetTest({
     nodes: 1,
 });

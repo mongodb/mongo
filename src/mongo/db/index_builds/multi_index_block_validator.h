@@ -34,6 +34,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 #include <cmath>
 
@@ -65,7 +66,8 @@ inline Status validateMaxIndexBuildMemoryUsageMegabytesSetting(const double& lim
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "maxIndexBuildMemoryUsageMegabytes must be a positive value");
-    } else {
+    } else if (!TestingProctor::instance().isInitialized() ||
+               !TestingProctor::instance().isEnabled()) {
         // Byte-based value.
         if (limit < kMinIndexBuildMemSizeLimitMB) {
             return Status(ErrorCodes::BadValue,
