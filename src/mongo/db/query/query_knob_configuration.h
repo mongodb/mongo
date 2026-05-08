@@ -51,7 +51,7 @@ public:
     QueryKnobConfiguration(const query_settings::QuerySettings& querySettings);
 
     /**
-     * Read a knob value from the snapshot via its descriptor.
+     * Read a knob value from the snapshot. T is deduced from the descriptor.
      */
     template <typename T>
     T get(const QueryKnob<T>& knob) const {
@@ -130,40 +130,6 @@ public:
     bool getEnablePipelineOptimizationAdditionalTestingRules() const;
 
 private:
-    QueryPlanRankerModeEnum _planRankerMode;
-    QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum
-        _planRankingStrategyForAutomaticQueryPlanRankerMode;
-    SamplingConfidenceIntervalEnum _samplingConfidenceInterval;
-    SamplingCEMethodEnum _samplingCEMethod;
-    int64_t _numChunksForChunkBasedSampling;
-    double _samplingMarginOfError;
-    size_t _planEvaluationMaxResults;
-    size_t _plannerMaxIndexedSolutions;
-    double _planEvaluationCollFraction;
-    double _planTotalEvaluationCollFraction;
-    size_t _maxScansToExplodeValue;
-    bool _useMultiplannerForSingleSolutions;
-
-    // Join-ordering values.
-    bool _isJoinOrderingEnabled;
-    int64_t _randomJoinOrderSeed;
-    JoinReorderModeEnum _joinReorderMode;
-    JoinPlanTreeShapeEnum _joinPlanTreeShape;
-    ForcedJoinMethodEnum _joinMethod;
-    int64_t _maxNodesInJoinGraph;
-    int64_t _maxEdgesInJoinGraph;
-    int64_t _maxNumberNodesConsideredForImplicitEdges;
-    bool _enableJoinEnumerationHJOrderPruning;
-    int64_t _internalJoinPlanSamplingSize;
-    bool _internalJoinEnumerateCollScanPlans;
-    size_t _minAllPlansEnumerationSubsetLevel;
-    size_t _maxAllPlansEnumerationSubsetLevel;
-    bool _enableJoinOptimizationUseIndexUniqueness;
-    SamplingCEMethodEnum _joinSamplingCEMethod;
-
-    bool _enablePathArrayness;
-    bool _enablePipelineOptimizationAdditionalTestingRules;
-
     QueryKnobSnapshot _snapshot;
 };
 }  // namespace mongo

@@ -30,6 +30,7 @@
 #include "mongo/db/query/query_knob_configuration.h"
 
 #include "mongo/db/query/query_knob_descriptors_execution.h"
+#include "mongo/db/query/query_knob_descriptors_optimization.h"
 #include "mongo/db/query/query_knob_registry.h"
 #include "mongo/db/query/query_knob_snapshot.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
@@ -64,151 +65,91 @@ QueryKnobSnapshot makeQueryKnobSnapshot(const query_settings::QuerySettings& que
 }  // namespace
 
 QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettings& querySettings)
-    : _snapshot(makeQueryKnobSnapshot(querySettings)) {
-    _planRankerMode = ServerParameterSet::getNodeParameterSet()
-                          ->get<QueryPlanRankerMode>("internalQueryCBRCEMode")
-                          ->_data.get();
-
-    _planRankingStrategyForAutomaticQueryPlanRankerMode =
-        ServerParameterSet::getNodeParameterSet()
-            ->get<QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode>(
-                "automaticCEPlanRankingStrategy")
-            ->_data.get();
-
-    _samplingConfidenceInterval =
-        ServerParameterSet::getNodeParameterSet()
-            ->get<SamplingConfidenceInterval>("samplingConfidenceInterval")
-            ->_data.get();
-
-    _samplingCEMethod = ServerParameterSet::getNodeParameterSet()
-                            ->get<CBRSamplingCEMethod>("internalQuerySamplingCEMethod")
-                            ->_data.get();
-
-    _numChunksForChunkBasedSampling = internalQueryNumChunksForChunkBasedSampling.load();
-    _samplingMarginOfError = samplingMarginOfError.load();
-
-    _planEvaluationMaxResults = internalQueryPlanEvaluationMaxResults.loadRelaxed();
-    _plannerMaxIndexedSolutions = internalQueryPlannerMaxIndexedSolutions.loadRelaxed();
-    _planEvaluationCollFraction = internalQueryPlanEvaluationCollFraction.load();
-    _planTotalEvaluationCollFraction = internalQueryPlanTotalEvaluationCollFraction.load();
-    _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
-    _useMultiplannerForSingleSolutions =
-        internalQueryPlannerUseMultiplannerForSingleSolutions.loadRelaxed();
-
-    _isJoinOrderingEnabled = internalEnableJoinOptimization.load();
-    _randomJoinOrderSeed = internalRandomJoinOrderSeed.load();
-    _joinReorderMode = ServerParameterSet::getNodeParameterSet()
-                           ->get<JoinReorderMode>("internalJoinReorderMode")
-                           ->_data.get();
-    _joinPlanTreeShape = ServerParameterSet::getNodeParameterSet()
-                             ->get<JoinPlanTreeShape>("internalJoinPlanTreeShape")
-                             ->_data.get();
-    _maxNodesInJoinGraph = internalMaxNodesInJoinGraph.load();
-    _maxEdgesInJoinGraph = internalMaxEdgesInJoinGraph.load();
-    _maxNumberNodesConsideredForImplicitEdges =
-        internalMaxNumberNodesConsideredForImplicitEdges.load();
-    _enableJoinEnumerationHJOrderPruning = internalEnableJoinEnumerationHJOrderPruning.load();
-    _enableJoinOptimizationUseIndexUniqueness =
-        internalEnableJoinOptimizationUseIndexUniqueness.load();
-    _joinMethod = ServerParameterSet::getNodeParameterSet()
-                      ->get<ForcedJoinMethod>("internalJoinMethod")
-                      ->_data.get();
-    _enablePathArrayness = internalEnablePathArrayness.loadRelaxed();
-    _enablePipelineOptimizationAdditionalTestingRules =
-        internalEnablePipelineOptimizationAdditionalTestingRules.loadRelaxed();
-    _internalJoinPlanSamplingSize = internalJoinPlanSamplingSize.loadRelaxed();
-    _internalJoinEnumerateCollScanPlans = internalJoinEnumerateCollScanPlans.loadRelaxed();
-    _minAllPlansEnumerationSubsetLevel = internalMinAllPlansEnumerationSubsetLevel.loadRelaxed();
-    _maxAllPlansEnumerationSubsetLevel = internalMaxAllPlansEnumerationSubsetLevel.loadRelaxed();
-    _joinSamplingCEMethod =
-        ServerParameterSet::getNodeParameterSet()
-            ->get<JoinSamplingCEMethod>("internalJoinOptimizationSamplingCEMethod")
-            ->_data.get();
-}
+    : _snapshot(makeQueryKnobSnapshot(querySettings)) {}
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
     return get(query_knobs::kQueryFrameworkControl);
 }
 
 QueryPlanRankerModeEnum QueryKnobConfiguration::getPlanRankerMode() const {
-    return _planRankerMode;
+    return get(query_knobs::kPlanRankerMode);
 }
 
 QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum
 QueryKnobConfiguration::getPlanRankingStrategyForAutomaticQueryPlanRankerMode() const {
-    return _planRankingStrategyForAutomaticQueryPlanRankerMode;
+    return get(query_knobs::kPlanRankingStrategyForAutomaticQueryPlanRankerMode);
 }
 
 SamplingConfidenceIntervalEnum QueryKnobConfiguration::getConfidenceInterval() const {
-    return _samplingConfidenceInterval;
+    return get(query_knobs::kSamplingConfidenceInterval);
 }
 
 SamplingCEMethodEnum QueryKnobConfiguration::getInternalQuerySamplingCEMethod() const {
-    return _samplingCEMethod;
+    return get(query_knobs::kSamplingCEMethod);
 }
 
 size_t QueryKnobConfiguration::getRandomJoinOrderSeed() const {
-    return _randomJoinOrderSeed;
+    return static_cast<size_t>(get(query_knobs::kRandomJoinOrderSeed));
 }
 
 bool QueryKnobConfiguration::isJoinOrderingEnabled() const {
-    return _isJoinOrderingEnabled;
+    return get(query_knobs::kEnableJoinOptimization);
 }
 
 JoinReorderModeEnum QueryKnobConfiguration::getJoinReorderMode() const {
-    return _joinReorderMode;
+    return get(query_knobs::kJoinReorderMode);
 }
 
 JoinPlanTreeShapeEnum QueryKnobConfiguration::getJoinPlanTreeShape() const {
-    return _joinPlanTreeShape;
+    return get(query_knobs::kJoinPlanTreeShape);
 }
 
 size_t QueryKnobConfiguration::getMaxNodesInJoinGraph() const {
-    return _maxNodesInJoinGraph;
+    return static_cast<size_t>(get(query_knobs::kMaxNodesInJoinGraph));
 }
 
 size_t QueryKnobConfiguration::getMaxEdgesInJoinGraph() const {
-    return _maxEdgesInJoinGraph;
+    return static_cast<size_t>(get(query_knobs::kMaxEdgesInJoinGraph));
 }
 
 size_t QueryKnobConfiguration::getMaxNumberNodesConsideredForImplicitEdges() const {
-    return _maxNumberNodesConsideredForImplicitEdges;
+    return static_cast<size_t>(get(query_knobs::kMaxNumberNodesConsideredForImplicitEdges));
 }
 
 bool QueryKnobConfiguration::getEnableJoinEnumerationHJOrderPruning() const {
-    return _enableJoinEnumerationHJOrderPruning;
+    return get(query_knobs::kEnableJoinEnumerationHJOrderPruning);
 }
 
 ForcedJoinMethodEnum QueryKnobConfiguration::getJoinMethod() const {
-    return _joinMethod;
+    return get(query_knobs::kJoinMethod);
 }
 
 size_t QueryKnobConfiguration::getInternalJoinPlanSamplingSize() const {
-    return _internalJoinPlanSamplingSize;
+    return static_cast<size_t>(get(query_knobs::kJoinPlanSamplingSize));
 }
 
 bool QueryKnobConfiguration::getInternalJoinEnumerateCollScanPlans() const {
-    return _internalJoinEnumerateCollScanPlans;
+    return get(query_knobs::kJoinEnumerateCollScanPlans);
 }
 
 size_t QueryKnobConfiguration::getInternalMinAllPlansEnumerationSubsetLevel() const {
-    return _minAllPlansEnumerationSubsetLevel;
+    return static_cast<size_t>(get(query_knobs::kMinAllPlansEnumerationSubsetLevel));
 }
 
 size_t QueryKnobConfiguration::getInternalMaxAllPlansEnumerationSubsetLevel() const {
-    return _maxAllPlansEnumerationSubsetLevel;
+    return static_cast<size_t>(get(query_knobs::kMaxAllPlansEnumerationSubsetLevel));
 }
 
 bool QueryKnobConfiguration::getEnableJoinOptimizationUseIndexUniqueness() const {
-    return _enableJoinOptimizationUseIndexUniqueness;
+    return get(query_knobs::kEnableJoinOptimizationUseIndexUniqueness);
 }
 
 double QueryKnobConfiguration::getSamplingMarginOfError() const {
-    return _samplingMarginOfError;
+    return get(query_knobs::kSamplingMarginOfError);
 }
 
 int64_t QueryKnobConfiguration::getNumChunksForChunkBasedSampling() const {
-    return _numChunksForChunkBasedSampling;
+    return get(query_knobs::kNumChunksForChunkBasedSampling);
 }
 
 SbeHashAggIncreasedSpillingModeEnum QueryKnobConfiguration::getSbeHashAggIncreasedSpillingMode()
@@ -235,23 +176,23 @@ bool QueryKnobConfiguration::isForceClassicEngineEnabled() const {
 }
 
 size_t QueryKnobConfiguration::getPlanEvaluationMaxResultsForOp() const {
-    return _planEvaluationMaxResults;
+    return static_cast<size_t>(get(query_knobs::kPlanEvaluationMaxResults));
 }
 
 size_t QueryKnobConfiguration::getPlannerMaxIndexedSolutions() const {
-    return _plannerMaxIndexedSolutions;
+    return static_cast<size_t>(get(query_knobs::kPlannerMaxIndexedSolutions));
 }
 
 double QueryKnobConfiguration::getPlanEvaluationCollFraction() const {
-    return _planEvaluationCollFraction;
+    return get(query_knobs::kPlanEvaluationCollFraction);
 }
 
 double QueryKnobConfiguration::getPlanTotalEvaluationCollFraction() const {
-    return _planTotalEvaluationCollFraction;
+    return get(query_knobs::kPlanTotalEvaluationCollFraction);
 }
 
 size_t QueryKnobConfiguration::getMaxScansToExplodeForOp() const {
-    return _maxScansToExplodeValue;
+    return static_cast<size_t>(get(query_knobs::kMaxScansToExplode));
 }
 
 bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() const {
@@ -274,7 +215,7 @@ bool QueryKnobConfiguration::getMeasureQueryExecutionTimeInNanoseconds() const {
 }
 
 bool QueryKnobConfiguration::getUseMultiplannerForSingleSolutions() const {
-    return _useMultiplannerForSingleSolutions;
+    return get(query_knobs::kPlannerUseMultiplannerForSingleSolutions);
 }
 
 int64_t QueryKnobConfiguration::getMaxGroupAccumulatorsInSbe() const {
@@ -282,15 +223,15 @@ int64_t QueryKnobConfiguration::getMaxGroupAccumulatorsInSbe() const {
 }
 
 bool QueryKnobConfiguration::getEnablePathArrayness() const {
-    return _enablePathArrayness;
+    return get(query_knobs::kEnablePathArrayness);
 }
 
 bool QueryKnobConfiguration::getEnablePipelineOptimizationAdditionalTestingRules() const {
-    return _enablePipelineOptimizationAdditionalTestingRules;
+    return get(query_knobs::kEnablePipelineOptimizationAdditionalTestingRules);
 }
 
 SamplingCEMethodEnum QueryKnobConfiguration::getInternalJoinOptimizationSamplingCEMethod() const {
-    return _joinSamplingCEMethod;
+    return get(query_knobs::kJoinSamplingCEMethod);
 }
 
 }  // namespace mongo

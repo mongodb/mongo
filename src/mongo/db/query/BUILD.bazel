@@ -305,6 +305,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "query_knob_descriptors_execution.h",
+        "query_knob_descriptors_optimization.h",
     ],
     deps = [
         ":on_parameter_change_updaters",

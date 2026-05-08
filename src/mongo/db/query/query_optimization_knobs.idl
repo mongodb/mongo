@@ -150,6 +150,9 @@ server_parameters:
             gte: 0.0
             lte: 1.0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: planEvaluationCollFraction
 
     internalQueryPlanTotalEvaluationCollFraction:
         description: >-
@@ -162,6 +165,9 @@ server_parameters:
         validator:
             gte: 0.0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: planTotalEvaluationCollFraction
 
     internalQueryPlanEvaluationMaxResults:
         description: "Stop working plans once a plan returns this many results."
@@ -173,6 +179,9 @@ server_parameters:
             gte: 0
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
+        annotations:
+            query_knob:
+                wire_name: planEvaluationMaxResults
 
     internalQuerySBEPlanEvaluationMaxMemoryBytes:
         description: >-
@@ -413,6 +422,9 @@ server_parameters:
             gte: 0
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerMaxIndexedSolutions
 
     internalQueryEnumerationPreferLockstepOrEnumeration:
         description: >-
@@ -479,6 +491,9 @@ server_parameters:
             gte: 0
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxScansToExplode
 
     internalQueryPlannerGenerateCoveredWholeIndexScans:
         description: >-
@@ -500,6 +515,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: plannerUseMultiplannerForSingleSolutions
 
     internalQueryIgnoreUnknownJSONSchemaKeywords:
         description: "Ignore unknown JSON Schema keywords."
@@ -526,6 +544,9 @@ server_parameters:
         default: false
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enableJoinOptimization
 
     internalQueryExplainJoinCostComponents:
         description: >-
@@ -547,6 +568,9 @@ server_parameters:
         default:
             expr: JoinReorderModeEnum::kBottomUp
         redact: false
+        annotations:
+            query_knob:
+                wire_name: joinReorderMode
 
     internalJoinPlanTreeShape:
         description: "Picks which tree shape to use for bottom-up join enumeration (when enabled)."
@@ -557,6 +581,9 @@ server_parameters:
         default:
             expr: JoinPlanTreeShapeEnum::kZigZag
         redact: false
+        annotations:
+            query_knob:
+                wire_name: joinPlanTreeShape
 
     internalMaxNodesInJoinGraph:
         description: >-
@@ -572,6 +599,9 @@ server_parameters:
             gt: 1
             lte: 64
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxNodesInJoinGraph
 
     internalMaxEdgesInJoinGraph:
         description: >-
@@ -586,6 +616,9 @@ server_parameters:
             gt: 0
             lte: 4096
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxEdgesInJoinGraph
 
     internalMaxNumberNodesConsideredForImplicitEdges:
         description: >-
@@ -599,6 +632,9 @@ server_parameters:
             gte: 0
             lte: 10
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxNumberNodesConsideredForImplicitEdges
 
     internalQueryMaxPipelineRewrites:
         description: "Maximum number of pipeline rewrite rules to apply"
@@ -619,6 +655,9 @@ server_parameters:
         default: 44
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
+        annotations:
+            query_knob:
+                wire_name: randomJoinOrderSeed
 
     internalEnableJoinEnumerationHJOrderPruning:
         description: "Whether or not to prune un-promising HJ orders during join plan enumeration"
@@ -627,6 +666,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enableJoinEnumerationHJOrderPruning
 
     internalEnableJoinOptimizationUseIndexUniqueness:
         description: "Whether or not to use index uniqueness metadata during join optimization"
@@ -635,6 +677,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enableJoinOptimizationUseIndexUniqueness
 
     internalJoinMethod:
         description: >-
@@ -647,6 +692,9 @@ server_parameters:
         default:
             expr: ForcedJoinMethodEnum::kAny
         redact: false
+        annotations:
+            query_knob:
+                wire_name: joinMethod
 
     internalQueryEnableCSTParser:
         description: "If true, use the grammar-based parser and CST to parse queries."
@@ -744,6 +792,9 @@ server_parameters:
         default:
             expr: QueryPlanRankerModeEnum::kAutomaticCE
         redact: false
+        annotations:
+            query_knob:
+                wire_name: planRankerMode
 
     automaticCEPlanRankingStrategy:
         description: "Controls the plan ranking strategy to use when automaticCE is selected as internalQueryCBRCEMode"
@@ -754,6 +805,9 @@ server_parameters:
         default:
             expr: QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::kCBRForNoMultiplanningResults
         redact: false
+        annotations:
+            query_knob:
+                wire_name: automaticCEPlanRankingStrategy
 
     samplingConfidenceInterval:
         description: >-
@@ -766,6 +820,9 @@ server_parameters:
         default:
             expr: SamplingConfidenceIntervalEnum::k95
         redact: false
+        annotations:
+            query_knob:
+                wire_name: samplingConfidenceInterval
 
     samplingMarginOfError:
         description: >-
@@ -781,6 +838,9 @@ server_parameters:
             gte: 1.0
             lte: 10.0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: samplingMarginOfError
 
     internalQuerySamplingCEMethod:
         description: >-
@@ -793,6 +853,9 @@ server_parameters:
         default:
             expr: SamplingCEMethodEnum::kChunk
         redact: false
+        annotations:
+            query_knob:
+                wire_name: samplingCEMethod
 
     # TODO SERVER-63949: Consolidate CBRSamplingCEMethod and JoinSamplingCEMethod.
     internalJoinOptimizationSamplingCEMethod:
@@ -804,6 +867,9 @@ server_parameters:
         default:
             expr: SamplingCEMethodEnum::kRandom
         redact: false
+        annotations:
+            query_knob:
+                wire_name: joinOptimizationSamplingCEMethod
 
     internalQueryNumChunksForChunkBasedSampling:
         description: >-
@@ -820,6 +886,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: numChunksForChunkBasedSampling
 
     internalQuerySamplingBySequentialScan:
         description:
@@ -841,6 +910,9 @@ server_parameters:
         validator:
             gt: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: joinPlanSamplingSize
 
     internalJoinEnumerateCollScanPlans:
         description:
@@ -851,6 +923,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: joinEnumerateCollScanPlans
 
     internalMinAllPlansEnumerationSubsetLevel:
         description: >-
@@ -866,6 +941,9 @@ server_parameters:
             gte: 0
             lte: 64
         redact: false
+        annotations:
+            query_knob:
+                wire_name: minAllPlansEnumerationSubsetLevel
 
     internalMaxAllPlansEnumerationSubsetLevel:
         description: >-
@@ -881,6 +959,9 @@ server_parameters:
             gte: 0
             lte: 64
         redact: false
+        annotations:
+            query_knob:
+                wire_name: maxAllPlansEnumerationSubsetLevel
 
     internalQueryNumWorksPerPlanForMPEstimation:
         description: >-
@@ -945,6 +1026,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enablePipelineOptimizationAdditionalTestingRules
 
     internalEnablePathArrayness:
         description: "Whether or not to use PathArrayness when applying optimizations"
@@ -953,6 +1037,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: enablePathArrayness
 
     internalQueryPlannerPushdownFilterToIxscanForSort:
         description: >-

@@ -139,6 +139,9 @@ filters:
   - "query_knob_*":
     approvers:
       - 10gen/query-optimization
+  - "query_knob_descriptors_optimization.h":
+    approvers:
+      - 10gen/query-optimization
   - "query_knob_descriptors_execution.h":
     approvers:
       - 10gen/query-execution
