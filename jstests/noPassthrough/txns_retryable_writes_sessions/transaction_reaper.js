@@ -1,5 +1,4 @@
 // @tags: [
-//   requires_replicated_fast_count_recovery,
 //   requires_replication,
 //   requires_sharding,
 // ]

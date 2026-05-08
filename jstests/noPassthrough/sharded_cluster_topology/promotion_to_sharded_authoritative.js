@@ -5,7 +5,6 @@
  *   config_shard_incompatible,
  *   featureFlagShardAuthoritativeDbMetadataDDL,
  *   featureFlagShardAuthoritativeDbMetadataCRUD,
- *   requires_replicated_fast_count_recovery,
  *   # This test restarts the server and requires that data persists across restarts.
  *   requires_persistence,
  * ]

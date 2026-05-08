@@ -9,7 +9,6 @@
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   requires_replicated_fast_count_recovery,
  *   requires_sharding,
  * ]
  */
