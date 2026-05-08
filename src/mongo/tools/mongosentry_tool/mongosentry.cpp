@@ -120,7 +120,7 @@ int mongosentry_main(int argc, char** argv) {
     // Extract --port from argv before passing remaining args to the global initializers, since
     // --port is not registered as a global option in mongosentry. This is done because this binary
     // only has the port as an option and so linking the server global params or adding a separate
-    // idl was unneccesary.
+    // idl was unnecessary.
     int port = -1;
     std::vector<std::string> initArgs{argv[0]};
 
