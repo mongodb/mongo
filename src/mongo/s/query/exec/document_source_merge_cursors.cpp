@@ -166,12 +166,34 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
     uassert(17026,
             "$mergeCursors stage expected an object as argument",
             elem.type() == BSONType::object);
-    auto armParams = AsyncResultsMergerParams::parseOwned(
-        elem.embeddedObject().getOwned(),
-        IDLParserContext(kStageName,
-                         auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
-                         expCtx->getNamespaceString().tenantId(),
-                         SerializationContext::stateDefault()));
+
+    auto armParams = [&]() {
+        // Check if the stage definition contains the 'recordRemoteOpWaitTime' field.
+        // The 'recordRemoteOpWaitTime' field has no meaning since version 6.2 and has been removed
+        // from the IDL for 9.0. The field is still present in the BSON serialization output of
+        // '$mergeCursors' stages in versions < 9.0.
+        // In order to safely parse the stage definition from both older versions, check if the
+        // field is present and remove it if necessary. The field will not be present in stage
+        // definitions created by 9.0 or higher, so the necessity to rewrite here should be rare.
+        // TODO SERVER-126134: remove the check and the write once 9.0 is last LTS.
+        constexpr StringData kRecordRemoteOpWaitTimeFieldName = "recordRemoteOpWaitTime"_sd;
+        BSONObj toParse;
+        if (elem.embeddedObject().hasElement(kRecordRemoteOpWaitTimeFieldName)) {
+            // 'recordRemoteOpWaitTime' is present, so remove it before parsing the stage
+            // definition.
+            toParse = elem.embeddedObject().removeField(kRecordRemoteOpWaitTimeFieldName);
+        } else {
+            // 'recordRemoteOpWaitTime' is not present, so use the provided stage definition as is
+            // for parsing.
+            toParse = elem.embeddedObject().getOwned();
+        }
+        return AsyncResultsMergerParams::parseOwned(
+            std::move(toParse),
+            IDLParserContext(kStageName,
+                             auth::ValidatedTenancyScope::get(expCtx->getOperationContext()),
+                             expCtx->getNamespaceString().tenantId(),
+                             SerializationContext::stateDefault()));
+    }();
     return new DocumentSourceMergeCursors(expCtx, std::move(armParams));
 }
 
