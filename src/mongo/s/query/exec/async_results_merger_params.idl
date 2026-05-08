@@ -115,6 +115,14 @@ structs:
                 default: false
                 description: If set, error responses are ignored.
                 query_shape: parameter
+            recordRemoteOpWaitTime:
+                type: bool
+                default: false
+                query_shape: parameter
+                description: >-
+                    This parameter is not used anymore but should stay for a while for backward
+                    compatibility.
+                    TODO SERVER-73120 Remove this parameter when releasing 8.0.
             requestQueryStatsFromRemotes:
                 type: bool
                 default: false
