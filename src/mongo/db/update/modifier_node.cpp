@@ -213,7 +213,8 @@ UpdateExecutor::ApplyResult ModifierNode::applyToExistingElement(
                    recursionLevel,
                    updateResult,
                    applyParams.validateForStorage,
-                   &applyResult.containsDotsAndDollarsField);
+                   &applyResult.containsDotsAndDollarsField,
+                   applyParams.fromOplogApplication);
 
     if (auto logBuilder = updateNodeApplyParams.logBuilder) {
         logUpdate(logBuilder,
@@ -270,7 +271,8 @@ UpdateExecutor::ApplyResult ModifierNode::applyToNonexistentElement(
                        recursionLevel,
                        ModifyResult::kCreated,
                        applyParams.validateForStorage,
-                       &applyResult.containsDotsAndDollarsField);
+                       &applyResult.containsDotsAndDollarsField,
+                       applyParams.fromOplogApplication);
 
         for (auto immutablePath = applyParams.immutablePaths.begin();
              immutablePath != applyParams.immutablePaths.end();
@@ -367,7 +369,8 @@ void ModifierNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                   std::uint32_t recursionLevel,
                                   ModifyResult modifyResult,
                                   const bool validateForStorage,
-                                  bool* containsDotsAndDollarsField) const {
+                                  bool* containsDotsAndDollarsField,
+                                  const bool fromOplogApplication) const {
     const bool doRecursiveCheck = true;
 
     storage_validation::scanDocument(updatedElement,
@@ -376,7 +379,8 @@ void ModifierNode::validateUpdate(mutablebson::ConstElement updatedElement,
                                      false, /* allowTopLevelDollarPrefixedFields */
                                      validateForStorage,
                                      false, /* isEmbeddedInIdField */
-                                     containsDotsAndDollarsField);
+                                     containsDotsAndDollarsField,
+                                     fromOplogApplication);
 }
 
 void ModifierNode::logUpdate(LogBuilderInterface* logBuilder,

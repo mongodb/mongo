@@ -483,6 +483,8 @@ error_codes:
 
     - {code: 363, name: RetryableTransactionInProgress}
 
+    - {code: 364, name: InvalidBSONColumn, categories: [ValidationError]}
+
     - {code: 365, name: TemporarilyUnavailable}
 
     - {code: 366, name: WouldChangeOwningShardDeletedNoDocument}

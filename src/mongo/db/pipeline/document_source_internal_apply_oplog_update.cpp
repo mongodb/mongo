@@ -93,7 +93,7 @@ DocumentSource::GetNextResult DocumentSourceInternalApplyOplogUpdate::doGetNext(
     uassertStatusOK(_updateDriver.update(pExpCtx->opCtx,
                                          StringData(),
                                          &doc,
-                                         false /* validateForStorage */,
+                                         true /* validateForStorage */,
                                          FieldRefSet(),
                                          false /* isInsert */));
 

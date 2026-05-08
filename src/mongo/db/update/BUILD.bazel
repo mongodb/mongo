@@ -45,6 +45,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
         "//src/mongo/bson/mutable:mutable_bson",
         "//src/mongo/db:common",
         "//src/mongo/db:query_expressions",

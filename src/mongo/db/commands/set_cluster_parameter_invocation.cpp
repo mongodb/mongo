@@ -220,7 +220,7 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     {
         bool ignore;
         mutablebson::Document mutableUpdate(update);
-        storage_validation::scanDocument(mutableUpdate, false, true, &ignore);
+        storage_validation::scanDocument(mutableUpdate, false, true, &ignore, false);
     }
 
     BSONObj query = queryBuilder.obj();
