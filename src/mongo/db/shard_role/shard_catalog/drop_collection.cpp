@@ -143,11 +143,12 @@ void warnEncryptedCollectionsIfNeeded(OperationContext* opCtx, const CollectionP
 
 Status _dropView(OperationContext* opCtx,
                  Database* db,
-                 const NamespaceString& collectionName,
+                 const ViewAcquisition& viewAcquisition,
                  DropReply* reply) {
-    invariant(db);
+    const auto& collectionName = viewAcquisition.nss();
 
-    auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, collectionName);
+    const auto& view = viewAcquisition.getViewDefinition();
+    invariant(db);
 
     if (MONGO_unlikely(hangDuringDropCollection.shouldFail())) {
         LOGV2(20330,
@@ -173,7 +174,7 @@ Status _dropView(OperationContext* opCtx,
     WriteUnitOfWork wunit(opCtx);
 
     audit::logDropView(
-        opCtx->getClient(), collectionName, view->viewOn(), view->pipeline(), ErrorCodes::OK);
+        opCtx->getClient(), collectionName, view.viewOn(), view.pipeline(), ErrorCodes::OK);
 
     Status status = db->dropView(opCtx, collectionName);
     if (!status.isOK()) {
@@ -351,7 +352,7 @@ Status _dropCollection(OperationContext* opCtx,
             if (locks.target.isView()) {
                 // We need a MODE_X lock to drop a view. This is to prevent a concurrent create
                 // collection on the same namespace that will reserve an OpTime before this drop.
-                return _dropView(opCtx, db, nss, reply);
+                return _dropView(opCtx, db, locks.target.getView(), reply);
             }
 
             if (!locks.target.collectionExists()) {
@@ -381,7 +382,7 @@ Status _dropCollection(OperationContext* opCtx,
                 // a concurrent create collection on the same namespace that will
                 // reserve an OpTime before this drop.
                 if (locks.timeseriesView.has_value()) {
-                    auto status = _dropView(opCtx, db, locks.timeseriesView->nss(), reply);
+                    auto status = _dropView(opCtx, db, locks.timeseriesView.value(), reply);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -540,7 +541,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
                 opCtx,
                 {CollectionOrViewAcquisitionRequest::fromOpCtx(
                     opCtx, collectionName, AcquisitionPrerequisites::kWrite)});
-            return _dropView(opCtx, db, collectionName, &unusedReply);
+            return _dropView(opCtx, db, ddlAcq.at(collectionName).getView(), &unusedReply);
         } else {
             return _dropCollectionForApplyOps(
                 opCtx, db, collectionName, dropOpTime, systemCollectionMode, &unusedReply);
