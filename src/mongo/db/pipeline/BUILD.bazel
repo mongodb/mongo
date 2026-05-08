@@ -347,18 +347,6 @@ mongo_cc_library(
     ],
 )
 
-# TODO(SERVER-124043): Possibly remove this library.
-mongo_cc_library(
-    name = "lite_parsed_pipeline_validation",
-    srcs = [
-        "lite_parsed_pipeline_metadata_validation.cpp",
-    ],
-    deps = [
-        ":lite_parsed_document_source",
-        "//src/mongo/db/shard_role",
-    ],
-)
-
 mongo_cc_library(
     name = "pipeline",
     srcs = [
@@ -431,6 +419,7 @@ mongo_cc_library(
         "hybrid_search_pipeline_builder.cpp",
         "lite_parsed_graph_lookup.cpp",
         "lite_parsed_lookup.cpp",
+        "lite_parsed_pipeline_metadata_validation.cpp",
         "lite_parsed_rank_fusion.cpp",
         "lite_parsed_score_fusion.cpp",
         "lite_parsed_union_with.cpp",
@@ -541,7 +530,6 @@ mongo_cc_library(
         ":granularity_rounder",
         ":lite_parsed_desugarer",
         ":lite_parsed_document_source",
-        ":lite_parsed_pipeline_validation",
         "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db:curop_failpoint_helpers",
