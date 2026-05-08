@@ -79,4 +79,20 @@ DEATH_TEST(SBEVMBytecodeValidationDeathTest,
     interpreter.run(&code);
 }
 
+DEATH_TEST(SBEVMBytecodeValidationDeathTest,
+           JmpOobReadPastInstrsEnd,
+           "SBE VM bytecode pointer should not exceed bytecode end") {
+    sbe::vm::CodeFragment code;
+    auto& instrs = code.instrs();
+    constexpr size_t kJmpSize = sizeof(sbe::vm::Instruction) + sizeof(int);
+    instrs.resize(kJmpSize, 0);
+    sbe::vm::Instruction jmpInstr;
+    jmpInstr.tag = sbe::vm::Instruction::jmp;
+    sbe::vm::writeToMemory(instrs.data(), jmpInstr);
+    int jumpOffset = 1;
+    sbe::vm::writeToMemory(instrs.data() + sizeof(sbe::vm::Instruction), jumpOffset);
+    sbe::vm::ByteCode interpreter;
+    interpreter.run(&code);
+}
+
 }  // namespace mongo

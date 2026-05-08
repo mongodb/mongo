@@ -399,12 +399,15 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 #if USE_THREADED_INTERPRETER
     Instruction i;
 #define INSTRUCTION(name) do_##name:
-#define DISPATCH()                              \
-    if (pcPointer == pcEnd) {                   \
-        return;                                 \
-    }                                           \
-    i = readFromMemory<Instruction>(pcPointer); \
-    pcPointer += sizeof(i);                     \
+#define DISPATCH()                                                        \
+    if (pcPointer >= pcEnd) {                                             \
+        tassert(12113600,                                                 \
+                "SBE VM bytecode pointer should not exceed bytecode end", \
+                pcPointer == pcEnd);                                      \
+        return;                                                           \
+    }                                                                     \
+    i = readFromMemory<Instruction>(pcPointer);                           \
+    pcPointer += sizeof(i);                                               \
     goto* dispatchTable[i.tag]
     DISPATCH();
 #else
