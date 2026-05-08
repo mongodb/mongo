@@ -303,8 +303,12 @@ mongo_cc_library(
         "sbe_hashAgg_increased_spilling_mode.cpp",
         "transform_hoist_policy.cpp",
     ],
+    hdrs = [
+        "query_knob_descriptors_execution.h",
+    ],
     deps = [
         ":on_parameter_change_updaters",
+        ":query_knob",
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
@@ -317,6 +321,7 @@ mongo_cc_library(
         "query_knob_configuration.cpp",
     ],
     deps = [
+        ":query_knob_registry",
         ":query_knobs",
     ],
 )

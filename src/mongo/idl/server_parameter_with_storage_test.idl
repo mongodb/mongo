@@ -132,7 +132,7 @@ server_parameters:
         default: 7
         redact: false
         annotations:
-            query_knob:
+            mock_query_knob:
                 wire_name: intAnnotatedWire
                 applicability: [queryShape]
                 fcv:

@@ -445,6 +445,9 @@ server_parameters:
         default:
             expr: SbeHashAggIncreasedSpillingModeEnum::kInDebug
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeHashAggIncreasedSpillingMode
 
     internalQuerySlotBasedExecutionDisableLookupPushdown:
         description: "If true, the system will not push down $lookup to the SBE execution engine."
@@ -454,6 +457,9 @@ server_parameters:
         default: false
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeDisableLookupPushdown
 
     internalQuerySlotBasedExecutionDisableLookupUnwindPushdown:
         description: "If true, the system will not push down $lookup with absorbed $unwind to the SBE execution engine."
@@ -472,6 +478,9 @@ server_parameters:
         default: false
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeDisableGroupPushdown
 
     internalQueryAppendIdToSetWindowFieldsSort:
         description: >-
@@ -550,6 +559,9 @@ server_parameters:
         default:
             expr: QueryFrameworkControlEnum::kTrySbeRestricted
         redact: false
+        annotations:
+            query_knob:
+                wire_name: queryFrameworkControl
 
     internalQueryDisableSingleFieldExpressExecutor:
         description: "Knob to control whether single-field equalities (other than IDHACK) can use the express executor."
@@ -624,6 +636,9 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+        annotations:
+            query_knob:
+                wire_name: measureQueryExecutionTimeInNanoseconds
 
     minAllocationToShardsPollPeriodSecs:
         description: >-
@@ -832,6 +847,9 @@ server_parameters:
         default: false
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeDisableTimeSeriesPushdown
 
     internalQuerySpillingMaxWaitTimeout:
         description: >-
@@ -855,6 +873,9 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: spillingMinAvailableDiskSpaceBytes
 
     internalQueryFindCommandBatchSize:
         description: "The batch size used for find commands as a default if none is specified."
@@ -974,6 +995,9 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+        annotations:
+            query_knob:
+                wire_name: sbeMaxGroupAccumulators
 
     internalQueryEnableWriteConflictBackoffWithoutTicket:
         description: >-

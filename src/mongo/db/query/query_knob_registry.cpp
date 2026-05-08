@@ -126,6 +126,10 @@ const QueryKnobRegistry::Entry& QueryKnobRegistry::entry(QueryKnobId id) const {
     return _entries[id.value];
 }
 
+std::span<const QueryKnobRegistry::Entry> QueryKnobRegistry::entries() const {
+    return {_entries.cbegin(), _entries.cend()};
+}
+
 size_t QueryKnobRegistry::knobCount() const {
     return _entries.size();
 }

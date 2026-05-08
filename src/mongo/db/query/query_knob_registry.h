@@ -36,6 +36,7 @@
 #include "mongo/util/version/releases.h"
 
 #include <cstddef>
+#include <span>
 #include <vector>
 
 #include <boost/optional.hpp>
@@ -79,6 +80,7 @@ public:
     boost::optional<QueryKnobId> getKnobIdForName(StringData wireName) const;
 
     const Entry& entry(QueryKnobId id) const;
+    std::span<const Entry> entries() const;
 
     size_t knobCount() const;
     size_t knobsExposedToQuerySettingsCount() const;

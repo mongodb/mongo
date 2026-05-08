@@ -29,22 +29,42 @@
 
 #include "mongo/db/query/query_knob_configuration.h"
 
+#include "mongo/db/query/query_knob_descriptors_execution.h"
+#include "mongo/db/query/query_knob_registry.h"
+#include "mongo/db/query/query_knob_snapshot.h"
+#include "mongo/db/query/query_settings/query_settings_gen.h"
+
 namespace mongo {
 
-QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettings& querySettings) {
-    _sbeDisableGroupPushdownValue =
-        internalQuerySlotBasedExecutionDisableGroupPushdown.loadRelaxed();
-    _sbeDisableLookupPushdownValue =
-        internalQuerySlotBasedExecutionDisableLookupPushdown.loadRelaxed();
-    _sbeDisableTimeSeriesValue =
-        internalQuerySlotBasedExecutionDisableTimeSeriesPushdown.loadRelaxed();
+namespace {
 
-    _queryFrameworkControlValue = querySettings.getQueryFramework().value_or_eval([]() {
-        return ServerParameterSet::getNodeParameterSet()
-            ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-            ->_data.get();
-    });
+/**
+ * Returns a new snapshot initialized from the current global knob values, with any supported
+ * per-query QuerySettings overrides applied on top.
+ */
+QueryKnobSnapshot makeQueryKnobSnapshot(const query_settings::QuerySettings& querySettings) {
+    auto&& registry = QueryKnobRegistry::instance();
+    QueryKnobSnapshotBuilder builder(registry.knobCount());
 
+    // Load the global knob values.
+    for (auto&& entry : registry.entries()) {
+        const auto& knob = entry.knob;
+        builder.set(knob.id, knob.readGlobal(), KnobSource::kDefault);
+    }
+
+    // Apply query settings overrides if needed.
+    if (auto queryFramework = querySettings.getQueryFramework()) {
+        QueryKnobValue queryFrameworkValue(static_cast<int>(*queryFramework));
+        builder.set(query_knobs::kQueryFrameworkControl.id,
+                    std::move(queryFrameworkValue),
+                    KnobSource::kQuerySettings);
+    }
+    return std::move(builder).build();
+}
+}  // namespace
+
+QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettings& querySettings)
+    : _snapshot(makeQueryKnobSnapshot(querySettings)) {
     _planRankerMode = ServerParameterSet::getNodeParameterSet()
                           ->get<QueryPlanRankerMode>("internalQueryCBRCEMode")
                           ->_data.get();
@@ -67,21 +87,11 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _numChunksForChunkBasedSampling = internalQueryNumChunksForChunkBasedSampling.load();
     _samplingMarginOfError = samplingMarginOfError.load();
 
-    _sbeHashAggIncreasedSpillingMode =
-        ServerParameterSet::getNodeParameterSet()
-            ->get<SbeHashAggIncreasedSpillingMode>(
-                "internalQuerySlotBasedExecutionHashAggIncreasedSpilling")
-            ->_data.get();
-
     _planEvaluationMaxResults = internalQueryPlanEvaluationMaxResults.loadRelaxed();
     _plannerMaxIndexedSolutions = internalQueryPlannerMaxIndexedSolutions.loadRelaxed();
     _planEvaluationCollFraction = internalQueryPlanEvaluationCollFraction.load();
     _planTotalEvaluationCollFraction = internalQueryPlanTotalEvaluationCollFraction.load();
     _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
-    _internalQuerySpillingMinAvailableDiskSpaceBytes =
-        static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed());
-    _measureQueryExecutionTimeInNanoseconds =
-        internalMeasureQueryExecutionTimeInNanoseconds.loadRelaxed();
     _useMultiplannerForSingleSolutions =
         internalQueryPlannerUseMultiplannerForSingleSolutions.loadRelaxed();
 
@@ -97,7 +107,6 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _maxEdgesInJoinGraph = internalMaxEdgesInJoinGraph.load();
     _maxNumberNodesConsideredForImplicitEdges =
         internalMaxNumberNodesConsideredForImplicitEdges.load();
-    _internalMaxGroupAccumulatorsInSbe = gInternalMaxGroupAccumulatorsInSbe.loadRelaxed();
     _enableJoinEnumerationHJOrderPruning = internalEnableJoinEnumerationHJOrderPruning.load();
     _enableJoinOptimizationUseIndexUniqueness =
         internalEnableJoinOptimizationUseIndexUniqueness.load();
@@ -118,7 +127,7 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
 }
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
-    return _queryFrameworkControlValue;
+    return get(query_knobs::kQueryFrameworkControl);
 }
 
 QueryPlanRankerModeEnum QueryKnobConfiguration::getPlanRankerMode() const {
@@ -204,24 +213,25 @@ int64_t QueryKnobConfiguration::getNumChunksForChunkBasedSampling() const {
 
 SbeHashAggIncreasedSpillingModeEnum QueryKnobConfiguration::getSbeHashAggIncreasedSpillingMode()
     const {
-    return _sbeHashAggIncreasedSpillingMode;
+    return get(query_knobs::kSbeHashAggIncreasedSpillingMode);
 }
 
 
 bool QueryKnobConfiguration::getSbeDisableGroupPushdownForOp() const {
-    return _sbeDisableGroupPushdownValue;
+    return get(query_knobs::kSbeDisableGroupPushdown);
 }
 
 bool QueryKnobConfiguration::getSbeDisableLookupPushdownForOp() const {
-    return _sbeDisableLookupPushdownValue;
+    return get(query_knobs::kSbeDisableLookupPushdown);
 }
 
 bool QueryKnobConfiguration::getSbeDisableTimeSeriesForOp() const {
-    return _sbeDisableTimeSeriesValue;
+    return get(query_knobs::kSbeDisableTimeSeriesPushdown);
 }
 
 bool QueryKnobConfiguration::isForceClassicEngineEnabled() const {
-    return _queryFrameworkControlValue == QueryFrameworkControlEnum::kForceClassicEngine;
+    return get(query_knobs::kQueryFrameworkControl) ==
+        QueryFrameworkControlEnum::kForceClassicEngine;
 }
 
 size_t QueryKnobConfiguration::getPlanEvaluationMaxResultsForOp() const {
@@ -245,7 +255,7 @@ size_t QueryKnobConfiguration::getMaxScansToExplodeForOp() const {
 }
 
 bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() const {
-    switch (_queryFrameworkControlValue) {
+    switch (get(query_knobs::kQueryFrameworkControl)) {
         case QueryFrameworkControlEnum::kForceClassicEngine:
         case QueryFrameworkControlEnum::kTrySbeRestricted:
             return false;
@@ -256,11 +266,11 @@ bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() const {
 }
 
 int64_t QueryKnobConfiguration::getInternalQuerySpillingMinAvailableDiskSpaceBytes() const {
-    return _internalQuerySpillingMinAvailableDiskSpaceBytes;
+    return get(query_knobs::kSpillingMinAvailableDiskSpaceBytes);
 }
 
 bool QueryKnobConfiguration::getMeasureQueryExecutionTimeInNanoseconds() const {
-    return _measureQueryExecutionTimeInNanoseconds;
+    return get(query_knobs::kMeasureQueryExecutionTimeInNanoseconds);
 }
 
 bool QueryKnobConfiguration::getUseMultiplannerForSingleSolutions() const {
@@ -268,7 +278,7 @@ bool QueryKnobConfiguration::getUseMultiplannerForSingleSolutions() const {
 }
 
 int64_t QueryKnobConfiguration::getMaxGroupAccumulatorsInSbe() const {
-    return _internalMaxGroupAccumulatorsInSbe;
+    return get(query_knobs::kMaxGroupAccumulatorsInSbe);
 }
 
 bool QueryKnobConfiguration::getEnablePathArrayness() const {

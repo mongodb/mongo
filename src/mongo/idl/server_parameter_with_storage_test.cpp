@@ -302,9 +302,9 @@ TEST(IDLServerParameterWithStorage, annotationsAccessible) {
     auto* sp = getNodeServerParameter("storageIntAnnotated");
     ASSERT_BSONOBJ_EQ(
         sp->annotations(),
-        BSON("query_knob" << BSON("wire_name" << "intAnnotatedWire"
-                                              << "applicability" << BSON_ARRAY("queryShape")
-                                              << "fcv" << BSON("min" << "9.0"))));
+        BSON("mock_query_knob" << BSON("wire_name" << "intAnnotatedWire"
+                                                   << "applicability" << BSON_ARRAY("queryShape")
+                                                   << "fcv" << BSON("min" << "9.0"))));
 }
 
 TEST(IDLServerParameterWithStorage, noAnnotationsReturnsEmpty) {
