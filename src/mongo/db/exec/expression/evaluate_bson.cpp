@@ -58,7 +58,7 @@ Value evaluate(const ExpressionBsonSize& expr, const Document& root, Variables* 
                           << typeName(arg.getType()),
             arg.getType() == BSONType::object);
 
-    return Value(arg.getDocument().toBson().objsize());
+    return Value(arg.getDocument().toBson<BSONObj::LargeSizeTrait>().objsize());
 }
 
 Value evaluatePath(const FieldPath& fieldPath, size_t index, const Document& input) {

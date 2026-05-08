@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
@@ -40,6 +41,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -89,6 +91,38 @@ TEST_F(SBEBsonSizeTest, ComputesSizeForSbeObject) {
 
     ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
     ASSERT_EQUALS(value::bitcastTo<int32_t>(val), 54);
+}
+
+TEST_F(SBEBsonSizeTest, ComputesSizeForLargeSbeObject) {
+    value::ViewOfValueAccessor slotAccessor;
+    auto argSlot = bindAccessor(&slotAccessor);
+    auto bsonSizeExpr =
+        sbe::makeE<sbe::EFunction>(EFn::kBsonSize, sbe::makeEs(makeE<EVariable>(argSlot)));
+    auto compiledExpr = compileExpression(*bsonSizeExpr);
+
+    // Four 9MiB strings make an SBE object that serializes to more than 16MiB of BSON.
+    constexpr size_t longStringLength = 9 * 1024 * 1024;
+    static_assert(4 * longStringLength > BSONObjMaxUserSize);
+
+    auto [tagStr1, valStr1] = value::makeNewString(std::string(longStringLength, 'A'));
+    auto [tagStr2, valStr2] = value::makeNewString(std::string(longStringLength, 'B'));
+    auto [tagStr3, valStr3] = value::makeNewString(std::string(longStringLength, 'C'));
+    auto [tagStr4, valStr4] = value::makeNewString(std::string(longStringLength, 'D'));
+    auto [tagObj, valObj] = value::makeNewObject();
+    auto obj = value::getObjectView(valObj);
+    obj->push_back("a", tagStr1, valStr1);
+    obj->push_back("b", tagStr2, valStr2);
+    obj->push_back("c", tagStr3, valStr3);
+    obj->push_back("d", tagStr4, valStr4);
+    value::ValueGuard argGuard(tagObj, valObj);
+
+    slotAccessor.reset(value::TypeTags::Object, valObj);
+    auto [tag, val] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(tag, val);
+
+    // Must not throw BSONObjectTooLarge for objects larger than 16MiB.
+    ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
+    ASSERT_GT(value::bitcastTo<int32_t>(val), static_cast<int32_t>(BSONObjMaxUserSize));
 }
 
 TEST_F(SBEBsonSizeTest, ReturnsNothingForNonObject) {

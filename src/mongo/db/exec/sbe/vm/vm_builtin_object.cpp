@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
@@ -275,7 +276,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBsonSize(ArityTy
     if (tagOperand == value::TypeTags::Object) {
         BSONObjBuilder objBuilder;
         bson::convertToBsonObj(objBuilder, value::getObjectView(valOperand));
-        int32_t sz = objBuilder.done().objsize();
+        int32_t sz = objBuilder.done<BSONObj::LargeSizeTrait>().objsize();
         return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(sz)};
     } else if (tagOperand == value::TypeTags::bsonObject) {
         auto beginObj = value::getRawPointerView(valOperand);

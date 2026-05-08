@@ -29,6 +29,8 @@
 
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -39,6 +41,28 @@
 
 namespace mongo {
 namespace expression_evaluation_test {
+
+TEST(ExpressionBsonSize, WorksOnDocumentLargerThan16MB) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    const BSONObj obj = BSON("$bsonSize" << "$$ROOT");
+    auto expression = Expression::parseExpression(&expCtx, obj, vps);
+
+    // Four 9MB strings make a document exceeding the 16MiB BSON size limit.
+    constexpr size_t longStringLength = 9 * 1024 * 1024;
+    static_assert(4 * longStringLength > BSONObjMaxUserSize);
+    MutableDocument md;
+    md.addField("a", Value(std::string(longStringLength, 'A')));
+    md.addField("b", Value(std::string(longStringLength, 'B')));
+    md.addField("c", Value(std::string(longStringLength, 'C')));
+    md.addField("d", Value(std::string(longStringLength, 'D')));
+    Document largeDoc = md.freeze();
+
+    // Must not throw BSONObjectTooLarge for intermediate documents larger than 16MiB.
+    Value result = expression->evaluate(largeDoc, &expCtx.variables);
+    ASSERT_EQ(result.getType(), BSONType::numberInt);
+    ASSERT_GT(result.getInt(), static_cast<int>(BSONObjMaxUserSize));
+}
 
 TEST(ExpressionInternalFindAllValuesAtPath, PreservesSimpleArray) {
     auto expCtx = ExpressionContextForTest{};
