@@ -11,6 +11,60 @@ import validate_compile_commands as validator
 
 
 class ValidateCompileCommandsTest(unittest.TestCase):
+    def test_validate_clang_tidy_setup_skips_unsupported_platforms(self):
+        with tempfile.TemporaryDirectory() as workspace_dir:
+            with mock.patch.object(
+                validator, "_mongo_tidy_checks_supported_platform", return_value=False
+            ):
+                validator._validate_clang_tidy_setup(workspace_dir)
+
+    def test_validate_clang_tidy_setup_accepts_expected_files(self):
+        with tempfile.TemporaryDirectory() as workspace_dir:
+            plugin_dir = os.path.join(workspace_dir, "bazel-bin", "src", "mongo", "tools")
+            os.makedirs(plugin_dir, exist_ok=True)
+            plugin_path = os.path.join(plugin_dir, "libmongo_tidy_checks.so")
+            with open(os.path.join(workspace_dir, ".clang-tidy"), "w", encoding="utf-8") as f:
+                f.write("Checks: '*'\n")
+            with open(plugin_path, "w", encoding="utf-8") as f:
+                f.write("plugin")
+            with open(
+                os.path.join(workspace_dir, ".mongo_checks_module_path"), "w", encoding="utf-8"
+            ) as f:
+                f.write(plugin_path)
+
+            with mock.patch.object(
+                validator, "_mongo_tidy_checks_supported_platform", return_value=True
+            ):
+                validator._validate_clang_tidy_setup(workspace_dir)
+
+    def test_validate_clang_tidy_setup_rejects_missing_config(self):
+        with tempfile.TemporaryDirectory() as workspace_dir:
+            with mock.patch.object(
+                validator, "_mongo_tidy_checks_supported_platform", return_value=True
+            ):
+                with self.assertRaisesRegex(ValueError, r"Expected '\.clang-tidy' to exist"):
+                    validator._validate_clang_tidy_setup(workspace_dir)
+
+    def test_validate_clang_tidy_setup_rejects_missing_plugin(self):
+        with tempfile.TemporaryDirectory() as workspace_dir:
+            missing_plugin_path = os.path.join(
+                workspace_dir, "bazel-bin", "src", "mongo", "tools", "libmongo_tidy_checks.so"
+            )
+            with open(os.path.join(workspace_dir, ".clang-tidy"), "w", encoding="utf-8") as f:
+                f.write("Checks: '*'\n")
+            with open(
+                os.path.join(workspace_dir, ".mongo_checks_module_path"), "w", encoding="utf-8"
+            ) as f:
+                f.write(missing_plugin_path)
+
+            with mock.patch.object(
+                validator, "_mongo_tidy_checks_supported_platform", return_value=True
+            ):
+                with self.assertRaisesRegex(
+                    ValueError, r"The mongo_tidy_checks plugin file recorded"
+                ):
+                    validator._validate_clang_tidy_setup(workspace_dir)
+
     def test_accepts_standard_arguments_entry(self):
         validator._validate_compiledb_entry(
             {

@@ -15,6 +15,7 @@ sys.path.append(str(REPO_ROOT))
 from bazel.wrapper_hook.compiledb import (
     clear_compiledb_posthook_state,
     generate_compiledb,
+    prepare_compiledb_posthook_args,
 )
 from bazel.wrapper_hook.lint import run_rules_lint
 from bazel.wrapper_hook.wrapper_debug import wrapper_debug
@@ -163,6 +164,7 @@ def test_runner_interface(
     plus_starts = ("+", ":+", "//:+")
     skip_plus_interface = True
     compiledb_target = False
+    compiledb_config = False
     setup_clang_tidy = False
     clang_tidy = False
     lint_target = False
@@ -235,6 +237,8 @@ def test_runner_interface(
             val = config_value
             if val in {"opt", "dbg", "fastbuild", "dbg_aubsan", "dbg_tsan"}:
                 config_mode = val
+            if val in ("compiledb", "compiledb-aspect"):
+                compiledb_config = True
             if val == "clang-tidy":
                 clang_tidy = True
         if arg.startswith(plus_starts):
@@ -307,6 +311,29 @@ def test_runner_interface(
             ["run", "lint"]
             + ([f"--config={config_mode}"] if config_mode else [])
             + ["--", "ALL_PASSING"]
+        )
+
+    if compiledb_config and not compiledb_target and current_bazel_command == "build":
+        parsed_build_flags, parsed_build_targets, parsed_target_pattern_file = (
+            _parse_targets_and_flags(args[command_index + 1 :], {}, [], [])
+        )
+
+        posthook_targets = list(parsed_build_targets)
+        if parsed_target_pattern_file and os.path.isfile(parsed_target_pattern_file):
+            with open(parsed_target_pattern_file, "r", encoding="utf-8") as f:
+                posthook_targets.extend(line.strip() for line in f if line.strip())
+
+        return prepare_compiledb_posthook_args(
+            bazel_bin=args[0],
+            startup_args=startup_args,
+            command=current_bazel_command,
+            build_flags=parsed_build_flags,
+            build_targets=parsed_build_targets,
+            persistent_compdb=persistent_compdb,
+            enterprise=enterprise,
+            atlas=atlas,
+            compiledb_targets=posthook_targets or None,
+            setup_clang_tidy=False,
         )
 
     if skip_plus_interface and not autocomplete_query:

@@ -67,6 +67,8 @@ printf ' %q' "${build_compiledb_command[@]}"
 echo
 "${build_compiledb_command[@]}"
 
+echo "Setting up clang-tidy IDE files"
+"$BAZEL_BINARY" $bazel_cache run $build_config //:setup_clang_tidy
 compiledb_output_base="$("$BAZEL_BINARY" $bazel_cache info output_base)"
 repo_python=""
 python_candidates=(

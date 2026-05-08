@@ -414,26 +414,35 @@ class Tests(unittest.TestCase):
 
         args = ["wrapper_hook", "build", "--config=compiledb", "//src/mongo/base:error_codes"]
         generate_calls = []
+        prepare_calls = []
 
         def fake_generate_compiledb(*call_args, **call_kwargs):
             generate_calls.append((call_args, call_kwargs))
 
+        def fake_prepare_posthook(*call_args, **call_kwargs):
+            prepare_calls.append((call_args, call_kwargs))
+            return ["build", "--config=compiledb", "//src/mongo/base:error_codes"]
+
         original_generate_compiledb = plus_interface.generate_compiledb
+        original_prepare_posthook = plus_interface.prepare_compiledb_posthook_args
         original_wrapper_config_mode_file = plus_interface.WRAPPER_CONFIG_MODE_FILE
         with tempfile.TemporaryDirectory() as tempdir:
             wrapper_config_mode_file = os.path.join(tempdir, "mongo_wrapper_config_mode")
             with open(wrapper_config_mode_file, "w", encoding="utf-8") as file_handle:
                 file_handle.write("dbg")
             plus_interface.generate_compiledb = fake_generate_compiledb
+            plus_interface.prepare_compiledb_posthook_args = fake_prepare_posthook
             plus_interface.WRAPPER_CONFIG_MODE_FILE = wrapper_config_mode_file
             try:
                 result = test_runner_interface(args, False, buildozer_output)
             finally:
                 plus_interface.generate_compiledb = original_generate_compiledb
+                plus_interface.prepare_compiledb_posthook_args = original_prepare_posthook
                 plus_interface.WRAPPER_CONFIG_MODE_FILE = original_wrapper_config_mode_file
 
         assert result == ["build", "--config=compiledb", "//src/mongo/base:error_codes"]
         assert len(generate_calls) == 0
+        assert len(prepare_calls) == 1
 
     def test_config_separate_compiledb_runs_normally(self):
         def buildozer_output(autocomplete_query):
@@ -441,22 +450,35 @@ class Tests(unittest.TestCase):
 
         args = ["wrapper_hook", "build", "--config", "compiledb", "//src/mongo/base:error_codes"]
         generate_calls = []
+        prepare_calls = []
 
         def fake_generate_compiledb(*call_args, **call_kwargs):
             generate_calls.append((call_args, call_kwargs))
 
+        def fake_prepare_posthook(*call_args, **call_kwargs):
+            prepare_calls.append((call_args, call_kwargs))
+            return [
+                "build",
+                "--config",
+                "compiledb",
+                "//src/mongo/base:error_codes",
+            ]
+
         original_generate_compiledb = plus_interface.generate_compiledb
+        original_prepare_posthook = plus_interface.prepare_compiledb_posthook_args
         original_wrapper_config_mode_file = plus_interface.WRAPPER_CONFIG_MODE_FILE
         with tempfile.TemporaryDirectory() as tempdir:
             wrapper_config_mode_file = os.path.join(tempdir, "mongo_wrapper_config_mode")
             with open(wrapper_config_mode_file, "w", encoding="utf-8") as file_handle:
                 file_handle.write("dbg")
             plus_interface.generate_compiledb = fake_generate_compiledb
+            plus_interface.prepare_compiledb_posthook_args = fake_prepare_posthook
             plus_interface.WRAPPER_CONFIG_MODE_FILE = wrapper_config_mode_file
             try:
                 result = test_runner_interface(args, False, buildozer_output)
             finally:
                 plus_interface.generate_compiledb = original_generate_compiledb
+                plus_interface.prepare_compiledb_posthook_args = original_prepare_posthook
                 plus_interface.WRAPPER_CONFIG_MODE_FILE = original_wrapper_config_mode_file
 
         assert result == [
@@ -466,6 +488,7 @@ class Tests(unittest.TestCase):
             "//src/mongo/base:error_codes",
         ]
         assert len(generate_calls) == 0
+        assert len(prepare_calls) == 1
 
     def test_config_separate_compiledb_runs_normally_with_plain_target(self):
         def buildozer_output(autocomplete_query):
@@ -473,22 +496,35 @@ class Tests(unittest.TestCase):
 
         args = ["wrapper_hook", "build", "--config", "compiledb", "install-dist-test"]
         generate_calls = []
+        prepare_calls = []
 
         def fake_generate_compiledb(*call_args, **call_kwargs):
             generate_calls.append((call_args, call_kwargs))
 
+        def fake_prepare_posthook(*call_args, **call_kwargs):
+            prepare_calls.append((call_args, call_kwargs))
+            return [
+                "build",
+                "--config",
+                "compiledb",
+                "install-dist-test",
+            ]
+
         original_generate_compiledb = plus_interface.generate_compiledb
+        original_prepare_posthook = plus_interface.prepare_compiledb_posthook_args
         original_wrapper_config_mode_file = plus_interface.WRAPPER_CONFIG_MODE_FILE
         with tempfile.TemporaryDirectory() as tempdir:
             wrapper_config_mode_file = os.path.join(tempdir, "mongo_wrapper_config_mode")
             with open(wrapper_config_mode_file, "w", encoding="utf-8") as file_handle:
                 file_handle.write("dbg")
             plus_interface.generate_compiledb = fake_generate_compiledb
+            plus_interface.prepare_compiledb_posthook_args = fake_prepare_posthook
             plus_interface.WRAPPER_CONFIG_MODE_FILE = wrapper_config_mode_file
             try:
                 result = test_runner_interface(args, False, buildozer_output)
             finally:
                 plus_interface.generate_compiledb = original_generate_compiledb
+                plus_interface.prepare_compiledb_posthook_args = original_prepare_posthook
                 plus_interface.WRAPPER_CONFIG_MODE_FILE = original_wrapper_config_mode_file
 
         assert result == [
@@ -498,6 +534,7 @@ class Tests(unittest.TestCase):
             "install-dist-test",
         ]
         assert len(generate_calls) == 0
+        assert len(prepare_calls) == 1
 
     def test_config_separate_compiledb_runs_normally_with_target_before_config(self):
         def buildozer_output(autocomplete_query):
@@ -505,22 +542,35 @@ class Tests(unittest.TestCase):
 
         args = ["wrapper_hook", "build", "install-dist-test", "--config", "compiledb"]
         generate_calls = []
+        prepare_calls = []
 
         def fake_generate_compiledb(*call_args, **call_kwargs):
             generate_calls.append((call_args, call_kwargs))
 
+        def fake_prepare_posthook(*call_args, **call_kwargs):
+            prepare_calls.append((call_args, call_kwargs))
+            return [
+                "build",
+                "install-dist-test",
+                "--config",
+                "compiledb",
+            ]
+
         original_generate_compiledb = plus_interface.generate_compiledb
+        original_prepare_posthook = plus_interface.prepare_compiledb_posthook_args
         original_wrapper_config_mode_file = plus_interface.WRAPPER_CONFIG_MODE_FILE
         with tempfile.TemporaryDirectory() as tempdir:
             wrapper_config_mode_file = os.path.join(tempdir, "mongo_wrapper_config_mode")
             with open(wrapper_config_mode_file, "w", encoding="utf-8") as file_handle:
                 file_handle.write("dbg")
             plus_interface.generate_compiledb = fake_generate_compiledb
+            plus_interface.prepare_compiledb_posthook_args = fake_prepare_posthook
             plus_interface.WRAPPER_CONFIG_MODE_FILE = wrapper_config_mode_file
             try:
                 result = test_runner_interface(args, False, buildozer_output)
             finally:
                 plus_interface.generate_compiledb = original_generate_compiledb
+                plus_interface.prepare_compiledb_posthook_args = original_prepare_posthook
                 plus_interface.WRAPPER_CONFIG_MODE_FILE = original_wrapper_config_mode_file
 
         assert result == [
@@ -530,6 +580,7 @@ class Tests(unittest.TestCase):
             "compiledb",
         ]
         assert len(generate_calls) == 0
+        assert len(prepare_calls) == 1
 
 
 if __name__ == "__main__":
