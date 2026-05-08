@@ -262,6 +262,25 @@ TEST(LiteParsedPipelineTest, NestedLookupSubpipelineGetParseNssIsForeignCollecti
     ASSERT_EQ(subPipelines[0].getOriginalParseNss(), kForeignNss);
 }
 
+TEST(LiteParsedPipelineTest, NestedMergeSubpipelineGetParseNssIsTargetCollection) {
+    // The whenMatched update pipeline runs against the target collection, so its parse nss should
+    // be the target namespace - matching the convention $lookup/$unionWith already follow.
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$merge" << BSON("into" << "targetCollection"
+                                     << "whenMatched"
+                                     << BSON_ARRAY(BSON("$addFields" << BSON("x" << 1))))),
+    };
+    LiteParsedPipeline pipeline(kTestNss, pipelineStages);
+    const NamespaceString kTargetNss =
+        NamespaceString::createNamespaceString_forTest(kTestNss.dbName(), "targetCollection");
+
+    ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
+
+    const auto& subPipelines = pipeline.getStages()[0]->getSubPipelines();
+    ASSERT_EQ(subPipelines.size(), 1U);
+    ASSERT_EQ(subPipelines[0].getOriginalParseNss(), kTargetNss);
+}
+
 TEST(LiteParsedPipelineTest, HandleViewPreservesParseNss) {
     std::vector<BSONObj> userStages = {BSON("$match" << BSON("x" << 1))};
     LiteParsedPipeline pipeline(kTestNss, userStages);

@@ -205,7 +205,10 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
         tassert(11282975, "$merge spec is missing the whenMatched pipeline", pipeline);
         auto subpipelineParseOptions = options;
         subpipelineParseOptions.makeSubpipelineOwned = true;
-        liteParsedPipeline = LiteParsedPipeline(nss, *pipeline, false, subpipelineParseOptions);
+        // The whenMatched pipeline runs against documents in the target collection, so parse it
+        // with targetNss to match the convention used by $lookup and $unionWith.
+        liteParsedPipeline =
+            LiteParsedPipeline(targetNss, *pipeline, false, subpipelineParseOptions);
     }
     return std::make_unique<DocumentSourceMerge::LiteParsed>(
         spec, std::move(targetNss), whenMatched, whenNotMatched, std::move(liteParsedPipeline));
