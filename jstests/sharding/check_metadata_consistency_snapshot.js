@@ -22,7 +22,7 @@ jsTest.log.info("Run checkMetadataConsistency");
 assert.commandWorked(db.adminCommand({checkMetadataConsistency: 1}));
 
 for (const node of st.configRS.nodes) {
-    assert.commandWorked(node.getDB("config").setProfilingLevel(0, {slowms: 0}));
+    assert.commandWorked(node.getDB("config").setProfilingLevel(0, {slowms: 100}));
 }
 
 jsTest.log.info("Checking logs for snapshot read concern");
