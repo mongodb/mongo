@@ -117,7 +117,7 @@ export PATH="$TOOLS_DIR/bin:$PATH"
 export LANG=C.UTF-8
 cd "$ASPIO_DIR"
 log "Running Maven build..."
-mvn clean package -DskipTests
+mvn clean package -U -DskipTests
 
 mkdir -p "$OUTPUT_DIR"
 cp "$ASPIO_DIR/target/aspio.jar" "$OUTPUT_DIR/aspio.jar"
