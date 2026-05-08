@@ -41,13 +41,13 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
-#include "mongo/db/s/primary_only_service_helpers/cancel_state.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_change_streams_monitor.h"
 #include "mongo/db/s/resharding/resharding_data_replication.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
+#include "mongo/db/s/resharding/resharding_participant_cancel_state.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -519,7 +519,7 @@ private:
     mutable std::mutex _mutex;
 
     // Manages abort state and provides cancellation tokens for async operations.
-    primary_only_service_helpers::CancelState _cancelState;
+    ReshardingParticipantCancelState _cancelState;
 
     std::unique_ptr<ReshardingDataReplicationInterface> _dataReplication;
     std::shared_ptr<ReshardingChangeStreamsMonitor> _changeStreamsMonitor;

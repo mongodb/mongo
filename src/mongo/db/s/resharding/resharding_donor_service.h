@@ -41,11 +41,11 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
-#include "mongo/db/s/primary_only_service_helpers/cancel_state.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/resharding_change_streams_monitor.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_participant_cancel_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -397,7 +397,7 @@ private:
 
     // Manages abort state and provides cancellation tokens for async operations. Initialized in
     // _initCancelState().
-    std::unique_ptr<primary_only_service_helpers::CancelState> _cancelState;
+    std::unique_ptr<ReshardingParticipantCancelState> _cancelState;
 
     // The identifier associated to the recoverable critical section.
     const BSONObj _critSecReason;

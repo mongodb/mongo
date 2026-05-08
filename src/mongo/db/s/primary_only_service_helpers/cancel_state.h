@@ -63,7 +63,7 @@ namespace primary_only_service_helpers {
  * - abort()               cancels _abortOrStepdownSource only
  * - stepdown              cancels both _stepdownSource and _abortOrStepdownSource
  */
-class CancelState {
+class MONGO_MOD_OPEN CancelState {
 public:
     CancelState(boost::optional<CancellationToken> stepdownToken = boost::none);
     void attachStepdownToken(const CancellationToken& stepdownToken);

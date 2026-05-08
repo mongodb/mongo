@@ -985,6 +985,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_donor_service_test.cpp",
         "//src/mongo/db/s/resharding:resharding_future_util_test.cpp",
         "//src/mongo/db/s/resharding:resharding_metrics_test.cpp",
+        "//src/mongo/db/s/resharding:resharding_participant_cancel_state_test.cpp",
     ],
     tags = [
         "mongo_unittest_fourth_group",
