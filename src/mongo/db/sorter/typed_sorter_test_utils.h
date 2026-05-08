@@ -52,6 +52,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -98,17 +99,16 @@ concept StorageTraits = requires(Traits& traits,
                                  const SorterChecksumVersion checksumVersion,
                                  SpillStorageState& spillState) {
     { Traits::kHasFileStats } -> std::convertible_to<bool>;
-    { Traits::kCorruptedStorageErrorCode } -> std::convertible_to<int>;
     {
         traits.makeSpiller(opts, spillDir, checksumVersion)
     } -> std::same_as<std::shared_ptr<Spiller<IntWrapper, IntWrapper, IWComparator>>>;
     {
-        traits.makeSpillerForResume(opts, spillDir, checksumVersion, storageIdentifier)
+        traits.makeSpillerForResume(
+            opts, spillDir, checksumVersion, storageIdentifier, spillState.ranges)
     } -> std::same_as<std::shared_ptr<Spiller<IntWrapper, IntWrapper, IWComparator>>>;
     {
         traits.makeWriter(opts, spillDir)
     } -> std::same_as<std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>>>;
-    { traits.makeCorruptedStorage(spillDir) } -> std::same_as<std::string>;
     { traits.makeSpillState(spillDir) } -> std::same_as<SpillStorageState>;
     { traits.corruptSpillState(spillState) } -> std::same_as<void>;
     { traits.iteratorSizeBytes() } -> std::same_as<std::size_t>;
@@ -133,7 +133,8 @@ struct FileTraits {
         const SortOptions& opts,
         const boost::filesystem::path& spillDir,
         const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion,
-        const std::string& storageIdentifier = "") {
+        const std::string& storageIdentifier = "",
+        const std::vector<SorterRange>& = {}) {
         return std::shared_ptr<Spiller<IntWrapper, IntWrapper, IWComparator>>(makeFileSpiller(
             opts, spillDir, /*fileStats=*/nullptr, checksumVersion, storageIdentifier));
     }
@@ -192,7 +193,7 @@ struct FileTraits {
 template <typename K = IntWrapper, typename V = IntWrapper, typename C = IWComparator>
 struct ContainerTraits {
     static constexpr bool kHasFileStats = false;
-    static constexpr int kCorruptedStorageErrorCode = 0;
+    static constexpr int64_t kInsertionBatchSize = 1000;
 
     explicit ContainerTraits(ServiceContext::UniqueOperationContext opCtx)
         : _opCtx(std::move(opCtx)), _containerStats(&_tracker) {
@@ -207,44 +208,32 @@ struct ContainerTraits {
         const SortOptions& opts,
         const boost::filesystem::path& spillDir,
         const SorterChecksumVersion checksumVersion = sorter::kLatestChecksumVersion) {
-        using ContainerSpiller = ContainerBasedSpiller<K, V, C>;
-        struct SpillerOwner {
-            std::shared_ptr<RecordStore> table;
-            ContainerSpiller spiller;
-        };
-
         auto table = _makeInternalRecordStore();
         auto& container =
             std::get<std::reference_wrapper<IntegerKeyedContainer>>(table->getContainer()).get();
-        const auto insertionBatchSize = 1000;
-
-        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
-        auto owner = std::make_shared<SpillerOwner>(SpillerOwner{
-            .table = std::move(table),
-            .spiller = ContainerSpiller(
-                *_opCtx,
-                ru,
-                container,
-                _containerStats,
-                boost::none,
-                checksumVersion,
-                [] {},
-                insertionBatchSize,
-                std::numeric_limits<int64_t>::max(),
-                testSpillingMinAvailableDiskSpaceBytes),
-        });
-        return std::shared_ptr<Spiller<K, V, C>>(owner, &owner->spiller);
+        auto ident = container.ident()->getIdent();
+        auto result = _buildSpillerFromTable<K, V, C>(table, container, checksumVersion);
+        _recordStores[ident] = std::move(table);
+        return result;
     }
 
     // The helpers below are fixed to <IntWrapper, IntWrapper, IWComparator>; they only make
     // sense on the default instantiation.
-    // TODO SERVER-120078: implement a real resume by scanning the container for the max key.
     std::shared_ptr<Spiller<IntWrapper, IntWrapper, IWComparator>> makeSpillerForResume(
         const SortOptions& opts,
         const boost::filesystem::path& spillDir,
         const SorterChecksumVersion checksumVersion,
-        const std::string& /*storageIdentifier*/) {
-        return makeSpiller(opts, spillDir, checksumVersion);
+        const std::string& storageIdentifier,
+        const std::vector<SorterRange>& ranges) {
+        auto it = _recordStores.find(storageIdentifier);
+        invariant(it != _recordStores.end());
+        auto& table = it->second;
+        auto& container =
+            std::get<std::reference_wrapper<IntegerKeyedContainer>>(table->getContainer()).get();
+        invariant(!ranges.empty());
+        const int64_t nextKey = ranges.back().getEnd();
+        return _buildSpillerFromTable<IntWrapper, IntWrapper, IWComparator>(
+            table, container, checksumVersion, nextKey);
     }
 
     std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> makeWriter(
@@ -265,23 +254,61 @@ struct ContainerTraits {
             settings);
     }
 
-    static std::string makeCorruptedStorage(const boost::filesystem::path& spillDir) {
-        MONGO_UNIMPLEMENTED;
-    }
-
-    static SpillStorageState makeSpillState(const boost::filesystem::path& spillDir) {
-        MONGO_UNIMPLEMENTED;
+    SpillStorageState makeSpillState(const boost::filesystem::path& spillDir) {
+        SpillStorageState ret;
+        ret.opts = SortOptions().MaxMemoryUsageBytes(1);
+        auto sorter =
+            IWSorter::make(ret.opts, ret.comp, makeSpiller(ret.opts, spillDir), /*settings=*/{});
+        for (int i = 0; i < 10; ++i)
+            sorter->add(i, -i);
+        auto state = sorter->persistDataForShutdown();
+        ret.storageIdentifier = std::move(state.storageIdentifier);
+        ret.ranges = std::move(state.ranges);
+        return ret;
     }
 
     static void corruptSpillState(SpillStorageState& state) {
-        MONGO_UNIMPLEMENTED;
+        auto& range = state.ranges[0];
+        range.setChecksum(range.getChecksum() ^ 1);
     }
 
     static std::size_t iteratorSizeBytes() {
-        MONGO_UNIMPLEMENTED;
+        return sizeof(ContainerIterator<IntWrapper, IntWrapper>);
     }
 
 private:
+    // Keeps the RecordStore alive for as long as the spiller holds a reference to it.
+    template <typename K2, typename V2, typename C2>
+    struct SpillerOwner {
+        std::shared_ptr<RecordStore> table;
+        ContainerBasedSpiller<K2, V2, C2> spiller;
+    };
+
+    template <typename K2, typename V2, typename C2>
+    std::shared_ptr<Spiller<K2, V2, C2>> _buildSpillerFromTable(
+        std::shared_ptr<RecordStore> table,
+        IntegerKeyedContainer& container,
+        SorterChecksumVersion checksumVersion,
+        int64_t startingKey = 1) {
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+        auto owner = std::make_shared<SpillerOwner<K2, V2, C2>>(SpillerOwner<K2, V2, C2>{
+            .table = std::move(table),
+            .spiller = ContainerBasedSpiller<K2, V2, C2>(
+                *_opCtx,
+                ru,
+                container,
+                _containerStats,
+                boost::none,
+                checksumVersion,
+                [] {},
+                kInsertionBatchSize,
+                std::numeric_limits<int64_t>::max(),
+                testSpillingMinAvailableDiskSpaceBytes,
+                startingKey),
+        });
+        return std::shared_ptr<Spiller<K2, V2, C2>>(owner, &owner->spiller);
+    }
+
     std::shared_ptr<RecordStore> _makeInternalRecordStore() {
         auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         ASSERT(storageEngine);
@@ -298,6 +325,7 @@ private:
     SorterContainerStats _containerStats;
     std::shared_ptr<RecordStore> _writerTable;
     int64_t _nextKey = 1;
+    std::unordered_map<std::string, std::shared_ptr<RecordStore>> _recordStores;
 };
 
 }  // namespace mongo::sorter::test
