@@ -4,7 +4,7 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {ChangeStreamTest, validateChangeStreamHistoryLostException} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
@@ -111,6 +111,9 @@ ChangeStreamTest.assertChangeStreamThrowsCode({
     collName: testColl.getName(),
     pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
     expectedCode: ErrorCodes.ChangeStreamHistoryLost,
+    validateExceptionDetails: validateChangeStreamHistoryLostException(
+        decodeResumeToken(resumeTokenFromFirstUpdate).clusterTime,
+    ),
 });
 
 ChangeStreamTest.assertChangeStreamThrowsCode({
@@ -118,6 +121,7 @@ ChangeStreamTest.assertChangeStreamThrowsCode({
     collName: testColl.getName(),
     pipeline: [{$changeStream: {startAtOperationTime: resumeTimeFirstUpdate}}],
     expectedCode: ErrorCodes.ChangeStreamHistoryLost,
+    validateExceptionDetails: validateChangeStreamHistoryLostException(resumeTimeFirstUpdate),
 });
 
 // We also can't start a stream from the "dawn of time" any more, since the first entry in the
@@ -127,6 +131,7 @@ ChangeStreamTest.assertChangeStreamThrowsCode({
     collName: testColl.getName(),
     pipeline: [{$changeStream: {startAtOperationTime: Timestamp(1, 1)}}],
     expectedCode: ErrorCodes.ChangeStreamHistoryLost,
+    validateExceptionDetails: validateChangeStreamHistoryLostException(Timestamp(1, 1)),
 });
 
 cst.cleanUp();

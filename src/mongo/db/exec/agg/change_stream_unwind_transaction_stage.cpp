@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -377,9 +378,10 @@ ChangeStreamUnwindTransactionStage::TransactionOpIterator::_lookUpOplogEntryByOp
         return iterator->next(opCtx);
     } catch (ExceptionFor<ErrorCodes::IncompleteTransactionHistory>& ex) {
         ex.addContext(
-            "Oplog no longer has history necessary for $changeStream to observe operations "
-            "from a "
-            "committed transaction.");
+            str::stream()
+            << "Oplog no longer has history necessary for $changeStream to observe operations "
+               "from a committed transaction (lookupTime: "
+            << lookupTime.getTimestamp() << ")");
         uasserted(ErrorCodes::ChangeStreamHistoryLost, ex.reason());
     }
 }
@@ -395,9 +397,10 @@ void ChangeStreamUnwindTransactionStage::TransactionOpIterator::_collectAllOpTim
         }
     } catch (ExceptionFor<ErrorCodes::IncompleteTransactionHistory>& ex) {
         ex.addContext(
-            "Oplog no longer has history necessary for $changeStream to observe operations "
-            "from a "
-            "committed transaction.");
+            str::stream()
+            << "Oplog no longer has history necessary for $changeStream to observe operations "
+               "from a committed transaction (firstOpTime: "
+            << firstOpTime.getTimestamp() << ")");
         uasserted(ErrorCodes::ChangeStreamHistoryLost, ex.reason());
     }
 }

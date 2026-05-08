@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -79,10 +80,14 @@ GetNextResult ChangeStreamCheckResumabilityStage::doGetNext() {
             } catch (const ExceptionFor<ErrorCodes::OplogQueryMinTsMissing>& ex) {
                 LOGV2_ERROR(6663107,
                             "Resume of change stream was not possible",
+                            "resumeTimestamp"_attr = _tokenFromClient.clusterTime,
                             "reason"_attr = ex.reason());
-                uasserted(ErrorCodes::ChangeStreamHistoryLost,
-                          "Resume of change stream was not possible, as the resume point may no "
-                          "longer be in the oplog.");
+                uasserted(
+                    ErrorCodes::ChangeStreamHistoryLost,
+                    str::stream()
+                        << "Resume of change stream was not possible, as the resume point may no "
+                           "longer be in the oplog (resumeTimestamp: "
+                        << _tokenFromClient.clusterTime << ")");
             }
         }();
 

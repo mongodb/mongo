@@ -4,7 +4,7 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {ChangeStreamTest, validateChangeStreamHistoryLostException} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
@@ -21,6 +21,23 @@ const st = new ShardingTest({
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
+
+// Workaround required to make the test work in multiversion setup.
+const changeStreamHistoryLostExceptionMessageValidatorFactory = () => {
+    const isMultiversion =
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
+    const is90OrHigher = MongoRunner.compareBinVersions(lastLTSFCV, "9.0") >= 0;
+    if (!isMultiversion || is90OrHigher) {
+        // If all servers are guaranteed to run 9.0 or higher, use the actual exception message
+        // validation function from the library.
+        return validateChangeStreamHistoryLostException;
+    }
+
+    // In multiversion tests, we cannot rely on the exception message to be as desired, so instead
+    // perform a no-op validation.
+    return () => {};
+};
+const validateExceptionMessage = changeStreamHistoryLostExceptionMessageValidatorFactory();
 
 let cst = new ChangeStreamTest(mongosDB);
 
@@ -117,6 +134,9 @@ function testResume(mongosColl, collToWatch) {
         collName: collToWatch,
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard1}}],
         expectedCode: ErrorCodes.ChangeStreamHistoryLost,
+        validateExceptionDetails: validateExceptionMessage(
+            decodeResumeToken(resumeTokenFromFirstUpdateOnShard1).clusterTime,
+        ),
     });
 
     ChangeStreamTest.assertChangeStreamThrowsCode({
@@ -124,6 +144,7 @@ function testResume(mongosColl, collToWatch) {
         collName: collToWatch,
         pipeline: [{$changeStream: {startAtOperationTime: resumeTimeFirstUpdate}}],
         expectedCode: ErrorCodes.ChangeStreamHistoryLost,
+        validateExceptionDetails: validateExceptionMessage(resumeTimeFirstUpdate),
     });
 
     // Test that the change stream can't resume if the resume token *is* present in the oplog,
@@ -136,6 +157,9 @@ function testResume(mongosColl, collToWatch) {
         collName: collToWatch,
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard0}}],
         expectedCode: ErrorCodes.ChangeStreamHistoryLost,
+        validateExceptionDetails: validateExceptionMessage(
+            decodeResumeToken(resumeTokenFromFirstUpdateOnShard0).clusterTime,
+        ),
     });
 
     // Drop the collection.

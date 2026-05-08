@@ -28,6 +28,31 @@ export function watchModeToString(watchMode) {
 }
 
 /**
+ * Validates if a 'ChangeStreamHistoryLost' exception contains the expected stable message parts,
+ * including the specified timestamp.
+ */
+export function validateChangeStreamHistoryLostException(expectedTimestamp) {
+    return (error) => {
+        assert(error instanceof Error, `Got unexpected error type: ${tojson(error)}`);
+
+        // Validate error message prefix.
+        assert(
+            error.message.includes("Resume of change stream was not possible"),
+            `Got unexpected error message prefix for ChangeStreamHistoryLost exception`,
+            {error},
+        );
+
+        // Validate that expected timestamp is included in the error message.
+        const expectedTimestampString = tojson(expectedTimestamp);
+        assert(
+            error.message.includes(expectedTimestampString),
+            `Got unexpected error message timestamp for ChangeStreamHistoryLost exception`,
+            {error, expectedTimestampString},
+        );
+    };
+}
+
+/**
  * Returns a truncated json object if the size of 'jsonObj' is greater than 'maxErrorSizeBytes'.
  */
 export function tojsonMaybeTruncate(jsonObj) {
@@ -750,12 +775,16 @@ export function ChangeStreamTest(_db, options) {
  * 'doNotModifyInPassthroughs' is 'true' and the test is running in a $changeStream upconversion
  * passthrough, then this stream will not be modified and will run as though no passthrough were
  * active.
+ * The optional `validateExceptionDetails` can be used to verify a caught exception with code equal
+ * to `expectedCode` in more detail. If set, it is expected to be a callback function that receives
+ * the caught exception.
  */
 ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrowsCode({
     db,
     collName,
     pipeline,
     expectedCode,
+    validateExceptionDetails,
     doNotModifyInPassthroughs,
 }) {
     try {
@@ -777,6 +806,9 @@ ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrow
         });
     } catch (error) {
         assert.eq(error.code, expectedCode, `Caught unexpected error: ${tojsonMaybeTruncate(error)}`);
+        if (typeof validateExceptionDetails === "function") {
+            validateExceptionDetails(error);
+        }
         return true;
     }
     assert(false, "expected this to be unreachable");
