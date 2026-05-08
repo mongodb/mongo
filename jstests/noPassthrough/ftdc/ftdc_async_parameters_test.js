@@ -72,19 +72,18 @@ function testSampleTimeout() {
     let logMatcher = /Collection timed out on collector/;
     assert(logMatcher.test(mongoOutput));
 
-    // Disable the failpoint to stop FTDC from timing out. It's still possible that the next
-    // collection can timeout if the time it takes to run the server code after the failpoint puts
-    // the collection over the timeout threshold. This is why we get the next sample before clearing
-    // logs and making the assertion.
+    // Disable the failpoint. In-flight async collections may still time out across multiple cycles
+    // as the thread pool drains. Wait until we observe a complete sample with no timeouts.
     fp.off();
-    getNextSample(adminDb);
-
-    // By this point, we can safely clear the logs and check that the next sample completed with no
-    // timeouts.
-    clearRawMongoProgramOutput();
-    getNextSample(adminDb);
-    const moreMongoOutput = rawMongoProgramOutput(".*");
-    assert(!logMatcher.test(moreMongoOutput));
+    assert.soon(
+        () => {
+            clearRawMongoProgramOutput();
+            getNextSample(adminDb);
+            return !logMatcher.test(rawMongoProgramOutput(".*"));
+        },
+        "FTDC did not stop timing out after failpoint was disabled",
+        30 * 1000,
+    );
 }
 
 function testMinThreads() {
