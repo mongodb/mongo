@@ -297,14 +297,14 @@ private:
                 *_opCtx,
                 ru,
                 container,
+                startingKey,
                 _containerStats,
                 boost::none,
                 checksumVersion,
                 [] {},
                 kInsertionBatchSize,
                 std::numeric_limits<int64_t>::max(),
-                testSpillingMinAvailableDiskSpaceBytes,
-                startingKey),
+                testSpillingMinAvailableDiskSpaceBytes),
         });
         return std::shared_ptr<Spiller<K2, V2, C2>>(owner, &owner->spiller);
     }

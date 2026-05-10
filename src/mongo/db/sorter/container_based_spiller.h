@@ -412,14 +412,14 @@ public:
     ContainerBasedSpiller(OperationContext& opCtx,
                           RecoveryUnit& ru,
                           IntegerKeyedContainer& container,
+                          int64_t startingKey,
                           SorterContainerStats& stats,
                           boost::optional<DatabaseName> dbName,
                           SorterChecksumVersion checksumVersion,
                           OnSpillFn onSpill,
                           int64_t batchSize,
                           int64_t batchBytes,
-                          int64_t minAvailableDiskBytesToSpill,
-                          int64_t startingKey = 1)
+                          int64_t minAvailableDiskBytesToSpill)
         : SpillerBase<Key, Value, Comparator>(
               std::make_unique<ContainerBasedStorage<Key, Value>>(
                   opCtx, ru, container, stats, startingKey, std::move(dbName), checksumVersion),
@@ -430,6 +430,28 @@ public:
           _batchSize(batchSize),
           _batchBytes(batchBytes),
           _current(startingKey) {}
+
+    ContainerBasedSpiller(OperationContext& opCtx,
+                          RecoveryUnit& ru,
+                          IntegerKeyedContainer& container,
+                          SorterContainerStats& stats,
+                          boost::optional<DatabaseName> dbName,
+                          SorterChecksumVersion checksumVersion,
+                          OnSpillFn onSpill,
+                          int64_t batchSize,
+                          int64_t batchBytes,
+                          int64_t minAvailableDiskBytesToSpill)
+        : ContainerBasedSpiller(opCtx,
+                                ru,
+                                container,
+                                /*startingKey=*/1,
+                                stats,
+                                std::move(dbName),
+                                checksumVersion,
+                                std::move(onSpill),
+                                batchSize,
+                                batchBytes,
+                                minAvailableDiskBytesToSpill) {}
 
     void mergeSpills(const SortOptions& opts,
                      const SpillerBase<Key, Value, Comparator>::Settings& settings,

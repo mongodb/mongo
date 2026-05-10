@@ -972,14 +972,14 @@ TEST_P(ContainerBasedSpillerTest, SpillerWithStartingKeyPreservesExistingEntries
             *opCtx,
             ru,
             container,
+            startingKey,
             stats,
             boost::none,
             sorter::kLatestChecksumVersion,
             [] {},
             batchSize(),
             batchBytes(),
-            testSpillingMinAvailableDiskSpaceBytes,
-            startingKey};
+            testSpillingMinAvailableDiskSpaceBytes};
     };
 
     std::vector<std::pair<IntWrapper, IntWrapper>> batch1{{10, -10}, {20, -20}, {30, -30}};
