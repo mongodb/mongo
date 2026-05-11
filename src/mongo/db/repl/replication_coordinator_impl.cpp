@@ -59,7 +59,6 @@
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/mongod_options_storage_gen.h"
-#include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
@@ -95,7 +94,6 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
-#include "mongo/db/rss/disable_snapshotting_fail_point.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -5147,6 +5145,8 @@ OpTime ReplicationCoordinatorImpl::_recalculateStableOpTime(WithLock lk) {
     return stableOpTime;
 }
 
+MONGO_FAIL_POINT_DEFINE(disableSnapshotting);
+
 void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     // Don't update the stable optime if we are in initial sync. We advance the oldest timestamp
     // continually to the lastApplied optime during initial sync oplog application, so if we learned
@@ -5701,7 +5701,7 @@ bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(WithLock lk,
         invariant(newCommittedSnapshot.getTimestamp() >= _currentCommittedSnapshot->getTimestamp());
         invariant(newCommittedSnapshot >= *_currentCommittedSnapshot);
     }
-    if (MONGO_unlikely(mongo::disableSnapshotting.shouldFail()))
+    if (MONGO_unlikely(disableSnapshotting.shouldFail()))
         return false;
     _currentCommittedSnapshot = newCommittedSnapshot;
     _currentCommittedSnapshotCond.notify_all();

@@ -208,37 +208,6 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, SetReadSource) {
     ASSERT_EQ(Timestamp(1, 1), ru1->getPointInTimeReadTimestamp());
 }
 
-TEST_F(WiredTigerRecoveryUnitTestFixture, CanReadLastUsedReadTimestamp) {
-    OperationContext* opCtx1 = clientAndCtx1.second.get();
-    std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx1, "a.b"));
-
-    const Timestamp ts1{1, 1};
-    RecordId rid;
-    {
-        StorageWriteTransaction txn(*ru1);
-        const std::string str = "test";
-        StatusWith<RecordId> res = rs->insertRecord(
-            opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), str.c_str(), str.size() + 1, ts1);
-        ASSERT_OK(res);
-        txn.commit();
-        rid = res.getValue();
-    }
-
-    // Before any read transaction with a timestamp has closed, getLastUsedReadTimestamp is none.
-    ASSERT_EQ(boost::none, ru1->getLastUsedReadTimestamp());
-
-    const Timestamp ts2{2, 2};
-
-    // Open a read transaction at ts2.
-    ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, ts2);
-    RecordData unused;
-    rs->findRecord(opCtx1, *shard_role_details::getRecoveryUnit(opCtx1), rid, &unused);
-
-    // Closing the transaction should capture the read timestamp.
-    ru1->abandonSnapshot();
-    ASSERT_EQ(ts2, ru1->getLastUsedReadTimestamp());
-}
-
 TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
     OperationContext* opCtx1 = clientAndCtx1.second.get();
     OperationContext* opCtx2 = clientAndCtx2.second.get();
