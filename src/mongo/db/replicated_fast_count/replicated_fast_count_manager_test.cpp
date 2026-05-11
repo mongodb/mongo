@@ -111,6 +111,8 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataNoDat
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoStoreData) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    RAIIServerParameterControllerForTest featureFlagDurability(
+        "featureFlagReplicatedFastCountDurability", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
@@ -220,6 +222,8 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, NoOplogAfterTimestamp) 
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, StoreAndOplogData) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    RAIIServerParameterControllerForTest featureFlagDurability(
+        "featureFlagReplicatedFastCountDurability", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
@@ -276,6 +280,8 @@ TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, SkipsDroppedCollections
 
 TEST_F(ReplicatedFastCountManagerInitializeMetadataTest, InitializeMetadataTracksOplogSizeCount) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+    RAIIServerParameterControllerForTest featureFlagDurability(
+        "featureFlagReplicatedFastCountDurability", true);
 
     ASSERT_OK(storageInterface()->createCollection(
         operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
