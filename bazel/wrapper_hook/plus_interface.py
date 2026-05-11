@@ -43,7 +43,12 @@ def get_buildozer_output(autocomplete_query):
             install_bazel(bazel_bin_dir)
 
     p = subprocess.run(
-        [buildozer, "print label srcs", "//src/...:%mongo_cc_unit_test"],
+        [
+            buildozer,
+            "print label srcs",
+            "//src/...:%mongo_cc_unit_test",
+            "//src/...:%mongo_cc_fuzztest",
+        ],
         capture_output=True,
         text=True,
     )
