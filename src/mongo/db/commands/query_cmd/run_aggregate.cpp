@@ -184,8 +184,9 @@ bool checkRetryableWriteAlreadyApplied(const AggExState& aggExState,
     CursorResponseBuilder::Options options;
     options.isInitialResponse = true;
     CursorResponseBuilder responseBuilder(result, options);
+    const auto& includeMetricsOption = aggReq.getIncludeMetrics();
     const bool includeQueryStatsMetrics = aggReq.getIncludeQueryStatsMetrics().value_or(false) ||
-        aggReq.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats();
+        (includeMetricsOption && includeMetricsOption->getQueryStats());
     boost::optional<CursorMetrics> metrics =
         includeQueryStatsMetrics ? boost::make_optional(CursorMetrics{}) : boost::none;
     responseBuilder.setWasStatementExecuted(true);
@@ -491,8 +492,9 @@ boost::optional<ClientCursorPin> executeSingleExecUntilFirstBatch(
     collectQueryStats(aggExState, expCtx, execs[0].get(), maybePinnedCursor.get_ptr());
 
     const auto& aggReq = aggExState.getRequest();
+    const auto& includeMetricsOption = aggReq.getIncludeMetrics();
     const bool includeQueryStatsMetrics = aggReq.getIncludeQueryStatsMetrics().value_or(false) ||
-        aggReq.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats();
+        (includeMetricsOption && includeMetricsOption->getQueryStats());
     boost::optional<CursorMetrics> metrics = includeQueryStatsMetrics
         ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
         : boost::none;
@@ -952,8 +954,9 @@ void computeShapeAndRegisterQueryStats(const AggExState& aggExState,
         },
         aggExState.hasChangeStream());
 
+    const auto& includeMetricsOption = aggReq.getIncludeMetrics();
     if (aggReq.getIncludeQueryStatsMetrics().value_or(false) ||
-        aggReq.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats()) {
+        (includeMetricsOption && includeMetricsOption->getQueryStats())) {
         CurOp::get(aggExState.getOpCtx())->debug().getQueryStatsInfo().metricsRequested = true;
     }
 }

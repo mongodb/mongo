@@ -235,8 +235,9 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
                 collOrViewAcquisition.getCollectionType());
         });
 
+        const auto& includeMetricsOption = findReq.getIncludeMetrics();
         if (findReq.getIncludeQueryStatsMetrics().value_or(false) ||
-            findReq.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats()) {
+            (includeMetricsOption && includeMetricsOption->getQueryStats())) {
             CurOp::get(opCtx)->debug().getQueryStatsInfo().metricsRequested = true;
         }
     }
@@ -666,8 +667,9 @@ public:
                 uassertStatusOK(replCoord->updateTerm(opCtx, *term));
             }
 
+            const auto& includeMetricsOption = cmdRequest->getIncludeMetrics();
             const bool includeMetrics = cmdRequest->getIncludeQueryStatsMetrics().value_or(false) ||
-                cmdRequest->getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats();
+                (includeMetricsOption && includeMetricsOption->getQueryStats());
 
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.

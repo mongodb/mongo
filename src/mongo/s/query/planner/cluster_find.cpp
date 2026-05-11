@@ -220,9 +220,10 @@ BSONObj makeFindCommandForShards(OperationContext* opCtx,
         // We'll set includeQueryStatsMetrics if our configuration (e.g., feature flag, sample
         // rate) dictates we should gather metrics, or the user sent the flag to us.
         const auto& origFindReq = query.getFindCommandRequest();
+        const auto& includeMetricsOption = origFindReq.getIncludeMetrics();
         const bool origIncludeQueryStats =
             origFindReq.getIncludeQueryStatsMetrics().value_or(false) ||
-            origFindReq.getIncludeMetrics().value_or(IncludeMetrics{}).getQueryStats();
+            (includeMetricsOption && includeMetricsOption->getQueryStats());
         if (origIncludeQueryStats || requestQueryStatsFromRemotes) {
             findCommand.setIncludeQueryStatsMetrics(true);
         }
