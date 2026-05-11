@@ -391,7 +391,7 @@ public:
         return BSONObj();
     }
 
-    virtual std::unique_ptr<LogicalAggStage> bind(
+    virtual std::unique_ptr<LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const = 0;
 
     virtual std::unique_ptr<AggStageAstNode> clone() const = 0;
@@ -478,7 +478,7 @@ private:
         });
     }
 
-    static ::MongoExtensionStatus* _extBind(
+    static ::MongoExtensionStatus* _extPromote(
         const ::MongoExtensionAggStageAstNode* astNode,
         const ::MongoExtensionCatalogContext* catalogContext,
         ::MongoExtensionLogicalAggStage** logicalStage) noexcept {
@@ -486,7 +486,7 @@ private:
             sdk_tassert(
                 11647801, "Provided catalog context was invalid!", catalogContext != nullptr);
             auto logicalStagePtr =
-                static_cast<const ExtensionAggStageAstNodeAdapter*>(astNode)->getImpl().bind(
+                static_cast<const ExtensionAggStageAstNodeAdapter*>(astNode)->getImpl().promote(
                     *catalogContext);
 
             *logicalStage = new ExtensionLogicalAggStageAdapter(std::move(logicalStagePtr));
@@ -540,7 +540,7 @@ private:
         .destroy = &_extDestroy,
         .get_name = &_extGetName,
         .get_properties = &_extGetProperties,
-        .bind = &_extBind,
+        .promote = &_extPromote,
         .clone = &_extClone,
         .get_first_stage_view_application_policy = &_extGetFirstStageViewApplicationPolicy,
         .bind_view_info = &_extBindViewInfo};

@@ -91,9 +91,10 @@ private:
  * ::MongoExtensionAggStageAstNode interface and layout as dictated by the public API.
  * Any polymorphic behavior must be deferred to and implemented by the AggStageAstNode.
  *
- * WARNING: Do not use the HostAggStageAstNodeAdapter vtable function `bind`. It is
- * unimplemented. Future work will enable a HostAggStageAstNodeAdapter to bind directly into a
- * host-implemented LiteParsedExpandedDocumentSource and thus provide an implementation for `bind`.
+ * WARNING: Do not use the HostAggStageAstNodeAdapter vtable function `promote`. It is
+ * unimplemented. Future work will enable a HostAggStageAstNodeAdapter to promote directly into a
+ * host-implemented LiteParsedExpandedDocumentSource and thus provide an implementation for
+ * `promote`.
  */
 class HostAggStageAstNodeAdapter final : public ::MongoExtensionAggStageAstNode {
 public:
@@ -165,13 +166,13 @@ private:
         });
     }
 
-    static ::MongoExtensionStatus* _hostBind(
+    static ::MongoExtensionStatus* _hostPromote(
         const ::MongoExtensionAggStageAstNode* astNode,
         const ::MongoExtensionCatalogContext* catalogContext,
         ::MongoExtensionLogicalAggStage** logicalStage) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(11133600,
-                      "_hostBind should not be called. Ensure that astNode is "
+                      "_hostPromote should not be called. Ensure that astNode is "
                       "extension-allocated, not host-allocated.");
         });
     }
@@ -217,7 +218,7 @@ private:
         .destroy = &_hostDestroy,
         .get_name = &_hostGetName,
         .get_properties = &_hostGetProperties,
-        .bind = &_hostBind,
+        .promote = &_hostPromote,
         .clone = &_hostClone,
         .get_first_stage_view_application_policy = &_hostGetFirstStageViewApplicationPolicy,
         .bind_view_info = &_hostBindViewInfo};

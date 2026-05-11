@@ -52,7 +52,7 @@ class NoOpExtensionAstNode : public sdk::AggStageAstNode {
 public:
     NoOpExtensionAstNode() : sdk::AggStageAstNode("$noOp") {}
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         MONGO_UNIMPLEMENTED;
     }
@@ -117,9 +117,9 @@ DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsGetPropertie
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsBind, "11113700") {
+DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsPromote, "11113700") {
     auto vtable = host::HostAggStageAstNodeAdapter::getVTable();
-    vtable.bind = nullptr;
+    vtable.promote = nullptr;
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
@@ -145,12 +145,12 @@ DEATH_TEST(HostAstNodeTestDeathTest, HostGetPropertiesUnimplemented, "11347801")
     handle.get()->vtable->get_properties(noOpAstNode, buf);
 }
 
-DEATH_TEST(HostAstNodeTestDeathTest, HostBindUnimplemented, "11133600") {
+DEATH_TEST(HostAstNodeTestDeathTest, HostPromoteUnimplemented, "11133600") {
     auto noOpAstNode = new host::HostAggStageAstNodeAdapter(NoOpHostAstNode::make({}));
     auto handle = AggStageAstNodeHandle{noOpAstNode};
 
     ::MongoExtensionLogicalAggStage** bind = nullptr;
-    handle.get()->vtable->bind(noOpAstNode, nullptr, bind);
+    handle.get()->vtable->promote(noOpAstNode, nullptr, bind);
 }
 
 TEST(HostAstNodeCloneTest, CloneHostAllocatedAstNodePreservesSpec) {

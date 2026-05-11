@@ -54,7 +54,7 @@ public:
         sdk_uasserted(11507700, message);
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<DisallowViewLogicalStage>(getName(), _arguments);
     }

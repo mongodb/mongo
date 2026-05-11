@@ -175,7 +175,7 @@ public:
         return MongoExtensionFirstStageViewApplicationPolicy::kDoNothing;
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<AddViewNameLogicalStage>(getName(), _arguments, _viewName);
     }
@@ -209,7 +209,7 @@ public:
         return MongoExtensionFirstStageViewApplicationPolicy::kDoNothing;
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<DoNothingViewPolicyLogicalStage>(getName(), _arguments);
     }

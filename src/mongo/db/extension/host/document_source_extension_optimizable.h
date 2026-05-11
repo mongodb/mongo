@@ -549,7 +549,7 @@ protected:
                       "DocumentSourceExtensionOptimizable received invalid expression context",
                       expCtx.get() != nullptr);
               auto catalogContext = CatalogContext(*expCtx);
-              return astNode->bind(catalogContext.getAsBoundaryType());
+              return astNode->promote(catalogContext.getAsBoundaryType());
           }()),
           _ownedRewriteRules(_buildOwnedRewriteRules(
               _stageName, UnownedLogicalAggStageHandle(_logicalStage.get()))) {}

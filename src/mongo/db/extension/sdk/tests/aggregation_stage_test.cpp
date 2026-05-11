@@ -286,7 +286,7 @@ TEST_F(AggStageTest, TransformAstNodeTest) {
         NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
         SerializationContext());
     const auto catalogContext = mongo::extension::host::CatalogContext(*expCtx);
-    [[maybe_unused]] auto logicalStageHandle = handle->bind(catalogContext.getAsBoundaryType());
+    [[maybe_unused]] auto logicalStageHandle = handle->promote(catalogContext.getAsBoundaryType());
 }
 
 TEST_F(AggStageTest, TransformAstNodeWithDefaultGetPropertiesSucceeds) {
@@ -1611,7 +1611,7 @@ public:
         return _properties;
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override{MONGO_UNIMPLEMENTED}
 
     std::unique_ptr<sdk::AggStageAstNode> clone() const override {
@@ -1685,7 +1685,7 @@ public:
     ConfigurableViewPolicyExtensionAstNode(MongoExtensionFirstStageViewApplicationPolicy viewPolicy)
         : sdk::AggStageAstNode("$configurableViewPolicy"), _viewPolicy(viewPolicy) {}
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         MONGO_UNIMPLEMENTED;
     }
@@ -1712,7 +1712,7 @@ class ViewInfoBindingExtensionAstNode : public sdk::AggStageAstNode {
 public:
     ViewInfoBindingExtensionAstNode() : sdk::AggStageAstNode("$viewInfoBinding") {}
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         MONGO_UNIMPLEMENTED;
     }

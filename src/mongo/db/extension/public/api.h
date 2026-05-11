@@ -668,14 +668,16 @@ typedef struct MongoExtensionAggStageAstNodeVTable {
 
     /**
      * Populates `logicalStage` with the stage's runtime implementation of the optimization
-     * interface, ownership of which is transferred to the caller. This step should be called after
-     * validating `astNode` and is used when converting into an optimizable stage.
+     * interface, ownership of which is transferred to the caller. Promotes the AstNode (post-expand
+     * representation) to a LogicalStage using the catalog context. Naming follows the lifecycle
+     * vocabulary: parse → expand → promote → compile.
+     *
      * Note: catalogContext's contents must be copied by the extension into an owned copy in order
-     * for the values to persist beyond bind()'s scope.
+     * for the values to persist beyond promote()'s scope.
      */
-    MongoExtensionStatus* (*bind)(const MongoExtensionAggStageAstNode* astNode,
-                                  const MongoExtensionCatalogContext* catalogContext,
-                                  MongoExtensionLogicalAggStage** logicalStage);
+    MongoExtensionStatus* (*promote)(const MongoExtensionAggStageAstNode* astNode,
+                                     const MongoExtensionCatalogContext* catalogContext,
+                                     MongoExtensionLogicalAggStage** logicalStage);
 
     /**
      * Clones the AST node. Ownership of the output pointer is transferred to the caller.

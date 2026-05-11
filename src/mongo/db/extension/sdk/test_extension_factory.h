@@ -90,7 +90,7 @@ protected:
 };
 
 /**
- * Default AggStageAstNode implementation for a stage that binds to type 'LogicalStageType'.
+ * Default AggStageAstNode implementation for a stage that promotes to type 'LogicalStageType'.
  */
 template <typename LogicalStageType>
 class TestAstNode : public sdk::AggStageAstNode {
@@ -98,7 +98,7 @@ public:
     TestAstNode(std::string_view stageName, const mongo::BSONObj& arguments)
         : sdk::AggStageAstNode(stageName), _arguments(arguments.getOwned()) {}
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<LogicalStageType>(getName(), _arguments);
     };
@@ -212,7 +212,7 @@ namespace sdk = mongo::extension::sdk;
     };
 /*
  * Defines a default AstNode class implementation with the name <ExtensionName>AstNode. This class
- * will bind() to <ExtensionName>LogicalStage (which must also exist).
+ * will promote() to <ExtensionName>LogicalStage (which must also exist).
  */
 #define DEFAULT_AST_NODE(ExtensionName)                                                     \
     class ExtensionName##AstNode : public sdk::TestAstNode<ExtensionName##LogicalStage> {   \

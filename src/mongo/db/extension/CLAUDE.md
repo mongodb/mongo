@@ -92,8 +92,9 @@ Extension stages go through these phases, each modeled by a C API type:
    Owns stage name and `parse()`. Lives for entire extension lifetime.
 2. **ParseNode** (`MongoExtensionAggStageParseNode`) - Validates syntax, generates query shapes,
    **expands** (desugars) into resolved nodes.
-3. **AstNode** (`MongoExtensionAggStageAstNode`) - Post-expansion. Provides static properties, binds
-   to catalog context (namespace, UUID, explain verbosity).
+3. **AstNode** (`MongoExtensionAggStageAstNode`) - Post-expansion. Provides static properties,
+   promotes to LogicalStage using catalog context (namespace, UUID, explain verbosity). Lifecycle
+   verb: `parse → expand → promote → compile`.
 4. **LogicalStage** (`MongoExtensionLogicalAggStage`) - Bound to instance context. Serialization,
    explain, optimization, distributed plan logic. Compiles to executable.
 5. **ExecutableStage** (`MongoExtensionExecAggStage`) - Runtime: `open()`, `getNext()`, `reopen()`,

@@ -164,7 +164,7 @@ public:
         }
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<ValidateViewPipelineLogicalStage>(
             getName(), _arguments, _storedViewPipeline);

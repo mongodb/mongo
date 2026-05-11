@@ -196,9 +196,9 @@ DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTableFailsGetName, "11217601")
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTableBind, "11113700") {
+DEATH_TEST(AstNodeVTableDeathTest, InvalidAstNodeVTablePromote, "11113700") {
     auto vtable = sdk::ExtensionAggStageAstNodeAdapter::getVTable();
-    vtable.bind = nullptr;
+    vtable.promote = nullptr;
     AggStageAstNodeAPI::assertVTableConstraints(vtable);
 }
 

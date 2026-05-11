@@ -384,7 +384,7 @@ static constexpr std::string_view kLeafDName = "$leafD";
 class LeafAAstNode : public sdk::AggStageAstNode {
 public:
     LeafAAstNode() : sdk::AggStageAstNode(kLeafAName) {}
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<TransformLogicalAggStage>();
     }
@@ -396,7 +396,7 @@ public:
 class LeafBAstNode : public sdk::AggStageAstNode {
 public:
     LeafBAstNode() : sdk::AggStageAstNode(kLeafBName) {}
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<TransformLogicalAggStage>();
     }
@@ -408,7 +408,7 @@ public:
 class LeafCAstNode : public sdk::AggStageAstNode {
 public:
     LeafCAstNode() : sdk::AggStageAstNode(kLeafCName) {}
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<TransformLogicalAggStage>();
     }
@@ -420,7 +420,7 @@ public:
 class LeafDAstNode : public sdk::AggStageAstNode {
 public:
     LeafDAstNode() : sdk::AggStageAstNode(kLeafDName) {}
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<TransformLogicalAggStage>();
     }
@@ -695,7 +695,7 @@ public:
         --alive;
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<TransformLogicalAggStage>();
     }

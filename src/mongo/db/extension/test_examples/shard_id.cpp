@@ -40,7 +40,7 @@ namespace sdk = mongo::extension::sdk;
 using namespace mongo;
 
 /**
- * Test extension that defines $testShardId. It reads catalogContext.shardId in bind(),
+ * Test extension that defines $testShardId. It reads catalogContext.shardId in promote(),
  * propagates the value through LogicalStage to ExecStage, and appends a "shardId" string
  * field to each output document.
  *
@@ -128,7 +128,7 @@ public:
     ShardIdAstNode(std::string_view stageName, const BSONObj& arguments)
         : sdk::AggStageAstNode(stageName), _arguments(arguments.getOwned()) {}
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         std::string shardId(extension::byteViewAsStringView(catalogContext.shardId));
         bool runOnRouter =

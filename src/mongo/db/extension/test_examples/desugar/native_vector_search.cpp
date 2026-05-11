@@ -176,7 +176,7 @@ public:
     MetricsAstNode(const std::string& algorithm)
         : sdk::AggStageAstNode(kMetricsStageName), _algorithm(algorithm) {}
 
-    std::unique_ptr<sdk::LogicalAggStage> bind(
+    std::unique_ptr<sdk::LogicalAggStage> promote(
         const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<MetricsLogicalStage>(_algorithm);
     }

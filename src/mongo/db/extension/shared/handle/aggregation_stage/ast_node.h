@@ -74,7 +74,7 @@ public:
      * On failure, the error triggers an assertion.
      *
      */
-    LogicalAggStageHandle bind(const ::MongoExtensionCatalogContext& catalogContext) const;
+    LogicalAggStageHandle promote(const ::MongoExtensionCatalogContext& catalogContext) const;
 
     /**
      * Clones this AST node into an identical AST node.
@@ -101,7 +101,7 @@ public:
         tassert(11217601, "AggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
         tassert(
             11347800, "AggStageAstNode 'get_properties' is null", vtable.get_properties != nullptr);
-        tassert(11113700, "AggStageAstNode 'bind' is null", vtable.bind != nullptr);
+        tassert(11113700, "AggStageAstNode 'promote' is null", vtable.promote != nullptr);
         tassert(11565501, "AggStageAstNode 'clone' is null", vtable.clone != nullptr);
         tassert(11507400,
                 "AggStageAstNode 'get_first_stage_view_application_policy` is null",
