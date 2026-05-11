@@ -566,7 +566,6 @@ struct __wt_connection_stats {
     int64_t eviction_queue_not_empty;
     int64_t eviction_dhandle_complete_walk;
     int64_t eviction_server_push_pages_failed_when_flaging;
-    int64_t eviction_server_race_reconfigure_disagg;
     int64_t eviction_server_skip_intl_page_non_aggressive;
     int64_t eviction_server_skip_pages_already_in_urgent_queue;
     int64_t cache_eviction_blocked_prefetched;

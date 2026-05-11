@@ -410,7 +410,6 @@ conn_stats = [
     EvictStat('eviction_server_evict_attempt', 'evict page attempts by eviction server'),
     EvictStat('eviction_server_evict_fail', 'evict page failures by eviction server'),
     EvictStat('eviction_server_push_pages_failed_when_flaging', 'eviction server push pages to queue failed because of racing with setting flag'),
-    EvictStat('eviction_server_race_reconfigure_disagg', 'eviction server races with the reconfigure API call in disagg'),
     # Note eviction_server_evict_attempt - eviction_server_evict_fail = evict page successes by eviction server.
     EvictStat('eviction_server_skip_checkpointing_trees', 'eviction server skips trees that are being checkpointed'),
     EvictStat('eviction_server_skip_dirty_pages_during_checkpoint', 'eviction server skips dirty pages during a running checkpoint'),
