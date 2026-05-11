@@ -30,6 +30,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -128,6 +129,28 @@ void recordCollectionSizeCountDelta(const UUID& uuid,
         // Entry exists, so update as needed.
         it->second.sizeCount = it->second.sizeCount + sizeCountDelta;
     }
+}
+
+void recordCollectionImport(const UUID& uuid,
+                            const ImportCollectionOplogEntry& importEntry,
+                            SizeCountDeltas& sizeCountDeltasOut) {
+
+    const CollectionSizeCount importedSizeCount{.size = importEntry.getDataSize(),
+                                                .count = importEntry.getNumRecords()};
+
+    auto it = sizeCountDeltasOut.find(uuid);
+    if (it == sizeCountDeltasOut.end()) {
+        sizeCountDeltasOut.emplace(uuid, SizeCountDelta{importedSizeCount, DDLState::kCreated});
+        return;
+    }
+
+    // We expect to only see a pre-existing entry for this UUID if we had previously dropped it and
+    // then received an importCollection entry for that same uuid.
+    massert(12601900,
+            "Encountered writes to a collection before it was imported",
+            it->second.state == DDLState::kDropped);
+
+    it->second = SizeCountDelta{importedSizeCount, DDLState::kDroppedAndRecreated};
 }
 
 void recordCollectionCreate(const UUID& uuid, SizeCountDeltas& sizeCountDeltasOut) {
@@ -262,6 +285,20 @@ bool operationsOnFastCountCollections(const NamespaceString& nss,
     return false;
 }
 
+boost::optional<UUID> getUUIDFromOplogEntry(const repl::OplogEntry& oplogEntry) {
+    if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kImportCollection) {
+        const auto catalogEntry =
+            mongo::ImportCollectionOplogEntry::parse(oplogEntry.getObject(),
+                                                     IDLParserContext("importCollectionOplogEntry"))
+                .getCatalogEntry();
+        return invariant(UUID::parse(catalogEntry["md"]["options"]["uuid"]),
+                         str::stream()
+                             << "Oplog entry is unexpectedly missing import collection UUID: "
+                             << redact(oplogEntry.toBSONForLogging()));
+    }
+    return oplogEntry.getUuid();
+}
+
 // Unpacks MultiOpSizeMetadata from a commitTransaction entry and records per-collection deltas.
 int extractSizeCountDeltasForCommitTxn(const repl::OplogEntry& entry,
                                        const boost::optional<UUID>& uuidFilter,
@@ -305,12 +342,21 @@ int processOplogEntry(const repl::OplogEntry& entry,
         return extractSizeCountDeltasForApplyOps(entry, uuidFilter, sizeCountDeltasOut);
     }
 
-    const auto& entryUuid = entry.getUuid();
+    const auto& entryUuid = getUUIDFromOplogEntry(entry);
     if (uuidFilter && entryUuid != uuidFilter) {
         return 0;
     }
 
     switch (entry.getCommandType()) {
+        case repl::OplogEntry::CommandType::kImportCollection: {
+            const auto importEntry = mongo::ImportCollectionOplogEntry::parse(
+                entry.getObject(), IDLParserContext("importCollectionOplogEntry"));
+            if (importEntry.getDryRun()) {
+                return 0;
+            }
+            recordCollectionImport(*entryUuid, importEntry, sizeCountDeltasOut);
+            return 1;
+        }
         case repl::OplogEntry::CommandType::kTruncateRange: {
             const auto delta = extractSizeCountDeltaForTruncateRange(entry);
             // Truncation returns an estimate on the number of records and bytes that were removed.

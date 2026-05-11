@@ -355,6 +355,13 @@ repl::OplogEntry makeCreateOplogEntry(Timestamp ts, NsAndUUID userColl);
 repl::OplogEntry makeDropOplogEntry(Timestamp ts, NsAndUUID userColl);
 
 /**
+ * Generates an importCollection command oplog entry for 'userColl' with the inputted 'numRecords',
+ * 'dataSize', and 'dryRun' values.
+ */
+repl::OplogEntry makeImportCollectionOplogEntry(
+    Timestamp ts, NsAndUUID userColl, int64_t numRecords, int64_t dataSize, bool dryRun = false);
+
+/**
  * Inserts `oplogEntry` into the oplog collection.
  */
 void writeToOplog(OperationContext* opCtx, const repl::OplogEntry& oplogEntry);

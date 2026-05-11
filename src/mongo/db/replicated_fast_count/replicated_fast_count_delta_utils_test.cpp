@@ -2047,5 +2047,175 @@ TEST_F(AggregateSizeCountFromOplogTxnVisibilityTest, NoSessionPartialTxnOpenAtEn
     EXPECT_EQ(result.lastTimestamp, ts2);
 }
 
+TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionCreatesEntry) {
+    const Timestamp ts1{1, 1};
+    const int64_t numRecords = 100;
+    const int64_t dataSize = 5000;
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeImportCollectionOplogEntry(ts1, collA, numRecords, dataSize)};
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, numRecords);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, dataSize);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, DryRunImportCollectionIsIgnored) {
+    const Timestamp ts1{1, 1};
+    const int64_t numRecords = 100;
+    const int64_t dataSize = 5000;
+    std::list<repl::OplogEntry> entries{test_helpers::makeImportCollectionOplogEntry(
+        ts1, collA, numRecords, dataSize, /*dryRun=*/true)};
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    EXPECT_FALSE(result.deltas.contains(collA.uuid));
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionAndInsert) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+
+    const int64_t importedNumRecords = 50;
+    const int64_t importedDataSize = 2000;
+
+    const int64_t sizeDelta1 = 100;
+    const int64_t sizeDelta2 = 200;
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeImportCollectionOplogEntry(
+            ts1, collA, importedNumRecords, importedDataSize),
+        test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, sizeDelta1),
+        test_helpers::makeOplogEntry(ts3, collA, repl::OpTypeEnum::kInsert, sizeDelta2),
+    };
+
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, importedNumRecords + 1 + 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size,
+              importedDataSize + sizeDelta1 + sizeDelta2);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionInsertAndDrop) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+    const Timestamp ts4{1, 4};
+
+    const int64_t importedNumRecords = 50;
+    const int64_t importedDataSize = 2000;
+
+    const int64_t sizeDelta1 = 100;
+
+    const int64_t sizeDelta2 = 200;
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeImportCollectionOplogEntry(
+            ts1, collA, importedNumRecords, importedDataSize),
+        test_helpers::makeOplogEntry(ts2, collA, repl::OpTypeEnum::kInsert, sizeDelta1),
+        test_helpers::makeOplogEntry(ts3, collA, repl::OpTypeEnum::kInsert, sizeDelta2),
+        test_helpers::makeDropOplogEntry(ts4, collA),
+    };
+
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_FALSE(result.deltas.contains(collA.uuid));
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionFilterWithMatchingUUID) {
+    const Timestamp ts1{1, 1};
+    const int64_t numRecords = 100;
+    const int64_t dataSize = 5000;
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeImportCollectionOplogEntry(ts1, collA, numRecords, dataSize)};
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min(), collA.uuid);
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kCreated);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, numRecords);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, dataSize);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionFilteredByNonMatchingUUID) {
+    const Timestamp ts1{1, 1};
+    const int64_t numRecords = 100;
+    const int64_t dataSize = 5000;
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeImportCollectionOplogEntry(ts1, collA, numRecords, dataSize)};
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min(), collB.uuid);
+
+    EXPECT_FALSE(result.deltas.contains(collA.uuid));
+    EXPECT_FALSE(result.deltas.contains(collB.uuid));
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, DropThenImportCollection) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const int64_t numRecords = 100;
+    const int64_t dataSize = 5000;
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeDropOplogEntry(ts1, collA),
+        test_helpers::makeImportCollectionOplogEntry(ts2, collA, numRecords, dataSize),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDroppedAndRecreated);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, numRecords);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, dataSize);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, DropThenImportCollectionThenInserts) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const Timestamp ts3{1, 3};
+    const int64_t numRecords = 50;
+    const int64_t dataSize = 2000;
+    const int64_t sizeDelta = 100;
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeDropOplogEntry(ts1, collA),
+        test_helpers::makeImportCollectionOplogEntry(ts2, collA, numRecords, dataSize),
+        test_helpers::makeOplogEntry(ts3, collA, repl::OpTypeEnum::kInsert, sizeDelta),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
+
+    ASSERT_TRUE(result.deltas.contains(collA.uuid));
+    EXPECT_EQ(result.deltas.at(collA.uuid).state, DDLState::kDroppedAndRecreated);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, numRecords + 1);
+    EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, dataSize + sizeDelta);
+}
+
+TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionWithPreExistingWritesFails) {
+    const Timestamp ts1{1, 1};
+    const Timestamp ts2{1, 2};
+    const int64_t sizeDelta = 50;
+    const int64_t numRecords = 1;
+    const int64_t dataSize = 100;
+    std::list<repl::OplogEntry> entries{
+        test_helpers::makeOplogEntry(ts1, collA, repl::OpTypeEnum::kInsert, sizeDelta),
+        test_helpers::makeImportCollectionOplogEntry(ts2, collA, numRecords, dataSize),
+    };
+    OplogCursorMock oplogCursor(std::move(entries));
+
+    ASSERT_THROWS_CODE(
+        aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min()), DBException, 12601900);
+}
 }  // namespace
 }  // namespace mongo::replicated_fast_count

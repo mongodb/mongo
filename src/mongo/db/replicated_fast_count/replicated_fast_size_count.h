@@ -79,8 +79,6 @@ enum class DDLState {
     /**
      * Indicates the collection has been dropped and then created again with the same UUID.
      *
-     * This state is reachable during shard migration. See recordCollectionCreateFromMigrate() for
-     * more information.
      */
     kDroppedAndRecreated,
 

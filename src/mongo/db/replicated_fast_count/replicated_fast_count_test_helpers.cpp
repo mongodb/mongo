@@ -31,6 +31,7 @@
 
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
@@ -609,6 +610,23 @@ repl::OplogEntry makeDropOplogEntry(Timestamp ts, NsAndUUID userColl) {
         .nss = userColl.nss.getCommandNS(),
         .uuid = userColl.uuid,
         .oField = BSON("drop" << userColl.nss.coll()),
+        .wallClockTime = Date_t::now(),
+    }};
+}
+
+repl::OplogEntry makeImportCollectionOplogEntry(
+    Timestamp ts, NsAndUUID userColl, int64_t numRecords, int64_t dataSize, bool dryRun) {
+
+    const BSONObj catalogEntry = BSON("md" << BSON("options" << BSON("uuid" << userColl.uuid)));
+
+    ImportCollectionOplogEntry importEntry(
+        userColl.nss, UUID::gen(), numRecords, dataSize, catalogEntry, BSONObj{}, dryRun);
+
+    return repl::DurableOplogEntry{repl::DurableOplogEntryParams{
+        .opTime = repl::OpTime(ts, 1),
+        .opType = repl::OpTypeEnum::kCommand,
+        .nss = userColl.nss.getCommandNS(),
+        .oField = importEntry.toBSON(),
         .wallClockTime = Date_t::now(),
     }};
 }
