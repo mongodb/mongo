@@ -88,7 +88,6 @@ protected:
         };
 
         int currentBufSize = 0;
-        // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
         FileBasedStorage<IntWrapper, IntWrapper> sorterStorage(makeFile(),
                                                                /*dbName=*/boost::none,
                                                                sorter::kLatestChecksumVersion);
