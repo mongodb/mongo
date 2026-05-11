@@ -5,6 +5,7 @@ import glob
 import gzip
 import json
 import os
+import posixpath
 import re
 import shutil
 import subprocess
@@ -23,10 +24,7 @@ from retry import retry
 
 from buildscripts.create_rbe_sysroot import create_rbe_sysroot
 from buildscripts.resmokelib.hang_analyzer.dumper import Dumper
-from buildscripts.resmokelib.setup_multiversion.download import (
-    DownloadError,
-    download_from_s3_with_requests,
-)
+from buildscripts.resmokelib.setup_multiversion.download import DownloadError
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import (
     SetupMultiversion,
     _DownloadOptions,
@@ -37,6 +35,10 @@ from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
 from buildscripts.resmokelib.utils.otel_thread_pool_executor import OtelThreadPoolExecutor
 from buildscripts.resmokelib.utils.otel_utils import get_default_current_span
 from buildscripts.resmokelib.utils.runtime_recorder import compare_start_time
+from buildscripts.util.download_utils import (
+    download_from_s3_with_requests,
+    extract_s3_bucket_key,
+)
 from evergreen.task import Artifact, Task
 
 _DEBUG_FILE_BASE_NAMES = ["mongo", "mongod", "mongos"]
@@ -199,7 +201,8 @@ def download_core_dumps(
     os.makedirs(core_dumps_dir, exist_ok=True)
     current_span = get_default_current_span()
     for artifact in core_dump_artifacts:
-        file_name = artifact.url.split("/")[-1]
+        _, key = extract_s3_bucket_key(artifact.url)
+        file_name = posixpath.basename(key)
         extracted_name, _ = os.path.splitext(file_name)
         extract_path = os.path.join(core_dumps_dir, extracted_name)
 
@@ -240,7 +243,7 @@ def download_core_dumps(
                     root_logger.info(f"Downloading core dump: {file_name}")
                     if os.path.exists(file_name):
                         os.remove(file_name)
-                    urllib.request.urlretrieve(artifact.url, file_name)
+                    download_from_s3_with_requests(artifact.url, file_name, raise_on_error=True)
                     root_logger.info(f"Extracting core dump: {file_name}")
                     if os.path.exists(extract_path):
                         os.remove(extract_path)

@@ -367,9 +367,9 @@ class TestResmokeCoreAnalysisTaskGenerator(unittest.TestCase):
 
         # Mock task artifacts
         mock_artifact1 = MagicMock()
-        mock_artifact1.name = "Core Dump 1 (dump_mongod.12345.core.gz)"
+        mock_artifact1.name = "Core Dump dump_mongod.12345.core.gz"
         mock_artifact2 = MagicMock()
-        mock_artifact2.name = "Core Dump 2 (dump_mongos.67890.core.gz)"
+        mock_artifact2.name = "Core Dump dump_mongos.67890.core.gz"
 
         mock_task = MagicMock()
         mock_task.artifacts = [mock_artifact1, mock_artifact2]

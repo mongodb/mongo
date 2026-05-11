@@ -237,7 +237,7 @@ class ResmokeCoreAnalysisTaskGenerator(CoreAnalysisTaskGenerator):
         dumpers = dumper.get_dumpers(None, None)
 
         for artifact in task_info.artifacts:
-            regex = re.search(r"Core Dump [0-9]+ \((.*)\.gz\)", artifact.name)
+            regex = re.search(r"Core Dump (.*?)\.gz", artifact.name)
             if not regex:
                 continue
 
