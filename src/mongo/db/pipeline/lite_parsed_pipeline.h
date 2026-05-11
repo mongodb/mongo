@@ -52,7 +52,6 @@
 
 namespace mongo {
 
-// TODO SERVER-123689 Remove these or write investigation comment.
 class CollectionRoutingInfo;
 class CollectionOrViewAcquisition;
 
