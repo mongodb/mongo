@@ -159,6 +159,7 @@ const allCommands = {
     _shardsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _shardsvrSetClusterParameter: {skip: isAnInternalCommand},
     _shardsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},
+    _shardsvrSplitChunk: {skip: isAnInternalCommand},
     _shardsvrValidateShardKeyCandidate: {skip: isAnInternalCommand},
     _shardsvrCollMod: {skip: isAnInternalCommand},
     _shardsvrCollModParticipant: {skip: isAnInternalCommand},
@@ -1602,7 +1603,6 @@ const allCommands = {
         isAdminCommand: true,
         isShardedOnly: true,
     },
-    splitChunk: {skip: isAnInternalCommand},
     splitVector: {skip: isAnInternalCommand},
     startRecordingTraffic: {
         skip: "Renamed to startTrafficRecording",

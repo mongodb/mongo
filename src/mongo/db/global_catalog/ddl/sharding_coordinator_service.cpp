@@ -56,6 +56,7 @@
 #include "mongo/db/global_catalog/ddl/rename_collection_coordinator.h"
 #include "mongo/db/global_catalog/ddl/set_allow_migrations_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
+#include "mongo/db/global_catalog/ddl/split_chunk_coordinator.h"
 #include "mongo/db/global_catalog/ddl/timeseries_upgrade_downgrade_coordinator.h"
 #include "mongo/db/global_catalog/ddl/untrack_unsplittable_collection_coordinator.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -133,6 +134,7 @@ constexpr std::pair<CoordinatorTypeEnum,
         {CoordinatorTypeEnum::kTimeseriesUpgradeDowngrade,
          typedInstance<TimeseriesUpgradeDowngradeCoordinator>},
         {CoordinatorTypeEnum::kMergeChunks, typedInstance<MergeChunksCoordinator>},
+        {CoordinatorTypeEnum::kSplitChunk, typedInstance<SplitChunkCoordinator>},
         {CoordinatorTypeEnum::kTestCoordinator, noInstance},
     };
 

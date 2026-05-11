@@ -500,6 +500,33 @@ structs:
                 type: safeInt64
                 description: "Maximum number of documents in the capped collection"
 
+    ShardsvrSplitChunkRequest:
+        description: "_shardsvrSplitChunk command parameters"
+        strict: false
+        fields:
+            keyPattern:
+                type: object_owned
+                description: "The shard key pattern for the collection."
+            min:
+                type: object_owned
+                description: "The min bound of the chunk range to split."
+            max:
+                type: object_owned
+                description: "The max bound of the chunk range to split."
+            splitKeys:
+                type: array<object>
+                description: "The split points for the chunk."
+            from:
+                type: string
+                description: "The shard name."
+            epoch:
+                type: objectid
+                description: "The expected collection epoch."
+            timestamp:
+                type: timestamp
+                optional: true
+                description: "The expected collection timestamp."
+
 commands:
     _shardsvrCreateCollection:
         command_name: _shardsvrCreateCollection
@@ -895,6 +922,18 @@ commands:
         api_version: ""
         chained_structs:
             ShardsvrConvertToCappedRequest: ShardsvrConvertToCappedRequest
+
+    _shardsvrSplitChunk:
+        command_name: _shardsvrSplitChunk
+        command_alias: splitChunk
+        cpp_name: ShardsvrSplitChunk
+        description: "The internal split command for a shard."
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        chained_structs:
+            ShardsvrSplitChunkRequest: ShardsvrSplitChunkRequest
 
     # TODO (SERVER-116499): Remove this command once 9.0 becomes last LTS.
     _shardsvrUpgradeDowngradeViewlessTimeseries:

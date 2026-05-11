@@ -51,7 +51,13 @@ export var ChunkHelper = (function () {
 
     function splitChunkAt(db, collName, middle) {
         let cmd = {split: db[collName].getFullName(), middle: middle};
-        return runCommandWithRetries(db, cmd, (res) => res.code === ErrorCodes.LockBusy);
+        // TODO (SERVER-125033): Accept ConflictingOperationInProgress until multiple split chunk
+        // commands can instantiate concurrent coordinators.
+        return runCommandWithRetries(
+            db,
+            cmd,
+            (res) => res.code === ErrorCodes.LockBusy || res.code === ErrorCodes.ConflictingOperationInProgress,
+        );
     }
 
     function splitChunkAtPoint(db, collName, splitPoint) {
@@ -60,7 +66,13 @@ export var ChunkHelper = (function () {
 
     function splitChunkWithBounds(db, collName, bounds) {
         let cmd = {split: db[collName].getFullName(), bounds: bounds};
-        return runCommandWithRetries(db, cmd, (res) => res.code === ErrorCodes.LockBusy);
+        // TODO (SERVER-125033): Accept ConflictingOperationInProgress until multiple split chunk
+        // commands can instantiate concurrent coordinators.
+        return runCommandWithRetries(
+            db,
+            cmd,
+            (res) => res.code === ErrorCodes.LockBusy || res.code === ErrorCodes.ConflictingOperationInProgress,
+        );
     }
 
     function moveChunk(db, collName, bounds, toShard, waitForDelete, secondaryThrottle) {

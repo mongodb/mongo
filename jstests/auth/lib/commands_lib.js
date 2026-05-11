@@ -7330,8 +7330,16 @@ export const authCommandsLib = {
             ],
         },
         {
-            testname: "splitChunk",
-            command: {splitChunk: "test.x"},
+            testname: "_shardsvrSplitChunk",
+            command: {
+                _shardsvrSplitChunk: "test.x",
+                keyPattern: {a: 1},
+                min: {a: MinKey},
+                max: {a: MaxKey},
+                splitKeys: [{a: 0}],
+                from: "shard0000",
+                epoch: ObjectId(),
+            },
             skipSharded: true,
             testcases: [
                 {

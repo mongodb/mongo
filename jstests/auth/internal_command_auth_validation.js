@@ -833,6 +833,18 @@ const internalCommandsMap = {
             phase: "complete",
         },
     },
+    _shardsvrSplitChunk: {
+        testname: "_shardsvrSplitChunk",
+        command: {
+            _shardsvrSplitChunk: "test.x",
+            keyPattern: {x: 1},
+            min: {x: MinKey},
+            max: {x: MaxKey},
+            splitKeys: [{x: 0}],
+            from: "shard0000",
+            epoch: ObjectId(),
+        },
+    },
     _shardsvrValidateShardKeyCandidate: {
         testname: "_shardsvrValidateShardKeyCandidate",
         command: {_shardsvrValidateShardKeyCandidate: "x.y", key: {a: 1}},

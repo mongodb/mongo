@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,44 +29,36 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/util/modules.h"
-
-#include <string>
-#include <vector>
-
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/global_catalog/ddl/chunk_operation_sharding_coordinator.h"
+#include "mongo/db/global_catalog/ddl/split_chunk_coordinator_document_gen.h"
+#include "mongo/db/s/active_migrations_registry.h"
 
 namespace mongo {
 
-class BSONObj;
+class SplitChunkCoordinator final
+    : public ChunkOperationShardingCoordinator<SplitChunkCoordinatorDocument> {
+public:
+    SplitChunkCoordinator(ShardingCoordinatorService* service, const BSONObj& initialStateDoc);
 
-class ChunkRange;
-class NamespaceString;
-class OperationContext;
-class ScopedSplitMergeChunk;
+    void checkIfOptionsConflict(const BSONObj& doc) const final;
 
-/**
- * Attempts to split a chunk with the specified parameters. If the split fails, then the StatusWith
- * object returned will contain a Status with an ErrorCode regarding the cause of failure. If the
- * split succeeds, then the StatusWith object returned will contain Status::Ok().
- * Will update the shard's filtering metadata.
- *
- * The caller must hold the ActiveMigrationsRegistry split/merge lock for this chunk range and pass
- * it as scopedSplitMergeChunk to prove exclusive ownership. The lock must remain live for the
- * duration of the call.
- */
-Status splitChunk(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const BSONObj& keyPatternObj,
-                  const ChunkRange& chunkRange,
-                  std::vector<BSONObj>&& splitPoints,
-                  const std::string& shardName,
-                  const OID& expectedCollectionEpoch,
-                  const boost::optional<Timestamp>& expectedCollectionTimestamp,
-                  const ScopedSplitMergeChunk& scopedSplitMergeChunk);
+    void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
+
+protected:
+    bool isInCriticalSection(Phase phase) const override;
+
+private:
+    ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,
+                                            std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                            const CancellationToken& token) override;
+
+    void _releaseLocks(OperationContext* opCtx) override;
+
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken& token) noexcept override;
+
+    const ShardsvrSplitChunkRequest _request;
+    boost::optional<ScopedSplitMergeChunk> _scopedSplitMergeChunk;
+};
 
 }  // namespace mongo

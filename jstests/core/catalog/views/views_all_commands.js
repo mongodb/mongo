@@ -222,6 +222,7 @@ let viewsCommandTests = {
     _shardsvrRunSearchIndexCommand: {skip: isAnInternalCommand},
     _shardsvrSetClusterParameter: {skip: isAnInternalCommand},
     _shardsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},
+    _shardsvrSplitChunk: {skip: isAnInternalCommand},
     _shardsvrUpgradeDowngradeViewlessTimeseries: {skip: isAnInternalCommand},
     _shardsvrTimeseriesUpgradeDowngradePrepare: {skip: isAnInternalCommand},
     _shardsvrTimeseriesUpgradeDowngradeCommit: {skip: isAnInternalCommand},
@@ -763,19 +764,7 @@ let viewsCommandTests = {
         isAdminCommand: true,
     },
     splitChunk: {
-        command: {
-            splitChunk: "test.view",
-            from: "shard0000",
-            min: {x: MinKey},
-            max: {x: 0},
-            keyPattern: {x: 1},
-            splitKeys: [{x: -2}, {x: -1}],
-            shardVersion: {t: Timestamp(1, 2), e: ObjectId(), v: Timestamp(1, 1)},
-        },
-        skipSharded: true,
-        expectFailure: true,
-        expectedErrorCode: ErrorCodes.ShardingStateNotInitialized,
-        isAdminCommand: true,
+        skip: isDeprecated,
     },
     splitVector: {
         command: {

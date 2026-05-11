@@ -2,6 +2,10 @@
  * Specifies for each command whether it is expected to send a databaseVersion, and verifies that
  * the commands match the specification.
  *
+ * Each command is executed against two different scenarios: after movePrimary, and after
+ * dropDatabase + recreate on a different primary shard; to verify that the command behaves correctly
+ * when run with a stale dbVersion.
+ *
  * Each command must have exactly one corresponding test defined. Each defined test case must
  * correspond to an existing command. The allowable fields for the test cases are as follows:
  *
@@ -912,7 +916,19 @@ const allTestCases = {
         shardCollection: {skip: "does not forward command to primary shard"},
         shardDrainingStatus: {skip: "not on a user database"},
         shutdown: {skip: "does not forward command to primary shard"},
-        split: {skip: "does not forward command to primary shard"},
+        split: {
+            run: {
+                sendsDbVersion: false,
+                runsAgainstAdminDb: true,
+                command: function (dbName, collName) {
+                    return {
+                        split: dbName + "." + collName,
+                        middle: {_id: 0},
+                    };
+                },
+                expectedFailureCode: ErrorCodes.NamespaceNotSharded,
+            },
+        },
         splitVector: {skip: "does not forward command to primary shard"},
         getTrafficRecordingStatus: {skip: "executes locally on targeted node"},
         startRecordingTraffic: {skip: "Renamed to startTrafficRecording"},
@@ -1213,6 +1229,23 @@ const allTestCases = {
         _shardsvrSetAllowMigrations: {skip: "TODO"},
         _shardsvrSetClusterParameter: {skip: "TODO"},
         _shardsvrSetUserWriteBlockMode: {skip: "TODO"},
+        _shardsvrSplitChunk: {
+            run: {
+                runsAgainstAdminDb: true,
+                command: function (dbName, collName) {
+                    return {
+                        _shardsvrSplitChunk: dbName + "." + collName,
+                        keyPattern: {_id: 1},
+                        min: {_id: MinKey},
+                        max: {_id: MaxKey},
+                        splitKeys: [{_id: 0}],
+                        from: "shard0",
+                        epoch: ObjectId(),
+                    };
+                },
+                expectedFailureCode: ErrorCodes.StaleConfig,
+            },
+        },
         _shardsvrUpgradeDowngradeViewlessTimeseries: {skip: "internal command"},
         _shardsvrTimeseriesUpgradeDowngradePrepare: {skip: "internal command"},
         _shardsvrTimeseriesUpgradeDowngradeCommit: {skip: "internal command"},
@@ -1397,7 +1430,7 @@ const allTestCases = {
         shardingState: {skip: "TODO"},
         shutdown: {skip: "TODO"},
         sleep: {skip: "TODO"},
-        splitChunk: {skip: "TODO"},
+        splitChunk: {skip: "is deprecated", conditional: true},
         splitVector: {skip: "TODO"},
         startSession: {skip: "TODO"},
         startTrafficRecording: {skip: "TODO"},

@@ -1,0 +1,11 @@
+version: 2.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "*merge*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "*split*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl

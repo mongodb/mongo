@@ -660,6 +660,8 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:shardsvr_untrack_unsplittable_collection_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_upgrade_downgrade_viewless_timeseries_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_validate_shard_key_candidate.cpp",
+        "//src/mongo/db/global_catalog/ddl:split_chunk_coordinator.cpp",
+        "//src/mongo/db/global_catalog/ddl:split_chunk_coordinator_document_gen",
         "//src/mongo/db/global_catalog/ddl:timeseries_upgrade_downgrade_coordinator.cpp",
         "//src/mongo/db/global_catalog/ddl:timeseries_upgrade_downgrade_coordinator_document_gen",
         "//src/mongo/db/global_catalog/ddl:untrack_unsplittable_collection_coordinator.cpp",

@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_catalog/ddl/merge_chunks_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
+#include "mongo/db/global_catalog/ddl/split_chunk_coordinator.h"
 #include "mongo/db/global_catalog/ddl/test_chunk_operation_sharding_coordinator_document_gen.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
@@ -121,6 +122,26 @@ protected:
         return doc;
     }
 
+    SplitChunkCoordinatorDocument makeSplitChunkCoordinatorDoc(std::vector<BSONObj> splitKeys,
+                                                               OID epoch) {
+        SplitChunkCoordinatorDocument doc;
+        ShardsvrSplitChunkRequest req;
+        req.setKeyPattern(BSON("x" << 1));
+        req.setMin(BSON("x" << 0));
+        req.setMax(BSON("x" << 100));
+        req.setSplitKeys(std::move(splitKeys));
+        req.setFrom("shard0000");
+        req.setEpoch(epoch);
+        ShardingCoordinatorMetadata metadata{
+            {NamespaceString::createNamespaceString_forTest("test.split"),
+             CoordinatorTypeEnum::kSplitChunk}};
+        ForwardableOperationMetadata forwardableOpMetadata(_opCtx);
+        metadata.setForwardableOpMetadata(forwardableOpMetadata);
+        doc.setShardingCoordinatorMetadata(std::move(metadata));
+        doc.setShardsvrSplitChunkRequest(req);
+        return doc;
+    }
+
     class TestChunkOperationShardingCoordinator
         : public ChunkOperationShardingCoordinator<TestChunkOperationShardingCoordinatorDocument> {
     public:
@@ -192,6 +213,22 @@ TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictS
         ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
 }
 
+TEST_F(ChunkOperationShardingCoordinatorTest, SplitChunkCheckIfOptionsConflictSameParams) {
+    auto epoch = OID::gen();
+    std::vector<BSONObj> splitKeys = {BSON("x" << 50)};
+    auto coordinatorDoc = makeSplitChunkCoordinatorDoc(splitKeys, epoch);
+
+    auto coordinator = std::make_shared<SplitChunkCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Same parameters — should not throw.
+    ASSERT_DOES_NOT_THROW(coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON()));
+
+    // Satisfy destructor invariants by resolving internal promises.
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
 TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictDifferentBounds) {
     auto epoch = OID::gen();
     std::vector<BSONObj> bounds = {BSON("a" << 1), BSON("a" << 10)};
@@ -203,6 +240,26 @@ TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictD
     // Different bounds — should throw.
     std::vector<BSONObj> differentBounds = {BSON("a" << 5), BSON("a" << 20)};
     auto otherDoc = makeMergeChunksCoordinatorDoc(differentBounds, epoch);
+
+    ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, SplitChunkCheckIfOptionsConflictDifferentSplitKeys) {
+    auto epoch = OID::gen();
+    std::vector<BSONObj> splitKeys = {BSON("x" << 50)};
+    auto coordinatorDoc = makeSplitChunkCoordinatorDoc(splitKeys, epoch);
+
+    auto coordinator = std::make_shared<SplitChunkCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Different split keys — should throw.
+    std::vector<BSONObj> differentSplitKeys = {BSON("x" << 60)};
+    auto otherDoc = makeSplitChunkCoordinatorDoc(differentSplitKeys, epoch);
 
     ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
                        DBException,
@@ -227,6 +284,26 @@ TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictD
     ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
                        DBException,
                        ErrorCodes::ConflictingOperationInProgress);
+
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, SplitChunkAppendCommandInfoIncludesRequestFields) {
+    auto epoch = OID::gen();
+    std::vector<BSONObj> splitKeys = {BSON("x" << 50), BSON("x" << 75)};
+    auto coordinatorDoc = makeSplitChunkCoordinatorDoc(splitKeys, epoch);
+
+    auto coordinator = std::make_shared<SplitChunkCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    BSONObjBuilder cmdInfoBuilder;
+    coordinator->appendCommandInfo(&cmdInfoBuilder);
+    auto cmdInfo = cmdInfoBuilder.obj();
+    ASSERT_BSONOBJ_EQ(cmdInfo.getObjectField("min"), BSON("x" << 0));
+    ASSERT_BSONOBJ_EQ(cmdInfo.getObjectField("max"), BSON("x" << 100));
+    ASSERT_EQ(cmdInfo.getStringField("from"), "shard0000");
+    ASSERT_EQ(cmdInfo.getField("splitKeys").Array().size(), 2u);
 
     static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
         ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});

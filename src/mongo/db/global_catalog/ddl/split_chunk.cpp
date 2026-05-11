@@ -157,10 +157,8 @@ Status splitChunk(OperationContext* opCtx,
                   std::vector<BSONObj>&& splitPoints,
                   const std::string& shardName,
                   const OID& expectedCollectionEpoch,
-                  const boost::optional<Timestamp>& expectedCollectionTimestamp) {
-    auto scopedSplitOrMergeChunk(uassertStatusOK(
-        ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(opCtx, nss, chunkRange)));
-
+                  const boost::optional<Timestamp>& expectedCollectionTimestamp,
+                  const ScopedSplitMergeChunk&) {
     // If the shard key is hashed, then we must make sure that the split points are of supported
     // data types.
     const auto hashedField = ShardKeyPattern::extractHashedField(keyPatternObj);

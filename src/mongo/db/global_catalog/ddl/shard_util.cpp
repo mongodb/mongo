@@ -41,6 +41,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
@@ -182,18 +183,17 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
         return {ErrorCodes::CannotSplit, msg};
     }
 
-    BSONObjBuilder cmd;
-    cmd.append("splitChunk",
-               NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
-    cmd.append("from", shardId.toString());
-    cmd.append("keyPattern", shardKeyPattern.toBSON());
-    cmd.append("epoch", epoch);
-    cmd.append("timestamp", timestamp);
+    ShardsvrSplitChunk req(nss);
+    req.setDbName(DatabaseName::kAdmin);
+    req.setKeyPattern(shardKeyPattern.toBSON());
+    req.setMin(chunkRange.getMin());
+    req.setMax(chunkRange.getMax());
+    req.setSplitKeys({splitPointsBeginIt, splitPointsEndIt});
+    req.setFrom(shardId.toString());
+    req.setEpoch(epoch);
+    req.setTimestamp(timestamp);
 
-    chunkRange.serialize(&cmd);
-    cmd.append("splitKeys", splitPointsBeginIt, splitPointsEndIt);
-
-    BSONObj cmdObj = cmd.obj();
+    BSONObj cmdObj = req.toBSON();
 
     Status status{ErrorCodes::InternalError, "Uninitialized value"};
     BSONObj cmdResponse;

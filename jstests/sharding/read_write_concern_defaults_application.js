@@ -212,6 +212,7 @@ let testCases = {
     _shardsvrSetAllowMigrations: {skip: "internal command"},
     _shardsvrSetClusterParameter: {skip: "internal command"},
     _shardsvrSetUserWriteBlockMode: {skip: "internal command"},
+    _shardsvrSplitChunk: {skip: "internal command"},
     _shardsvrValidateShardKeyCandidate: {skip: "internal command"},
     _shardsvrCollMod: {skip: "internal command"},
     _shardsvrCollModParticipant: {skip: "internal command"},
