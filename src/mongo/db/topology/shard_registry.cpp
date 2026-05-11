@@ -359,12 +359,9 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
 }
 
 void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
-    if (MONGO_unlikely(serverGlobalParams.configOnly)) {
-        return;
-    }
-
     // startupPeriodicReloader() must be called only once
     invariant(!_executor);
+    invariant(!serverGlobalParams.configOnly);
 
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(opCtx->getServiceContext()));

@@ -257,7 +257,8 @@ public:
 
     /**
      * Startup the periodic reloader of the ShardRegistry.
-     * Can be called only after ShardRegistry::init()
+     * Can be called only after ShardRegistry::init() and if the server is not running with
+     * --configOnly.
      */
     void startupPeriodicReloader(OperationContext* opCtx);
 
