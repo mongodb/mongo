@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 #
 # Public Domain 2014-present MongoDB, Inc.

@@ -1568,6 +1568,39 @@ __conn_cleanup_chunk_cache(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __conn_startup_cleanup_and_verify --
+ *     Perform cleanup and verification that must run after recovery and worker startup.
+ */
+static int
+__conn_startup_cleanup_and_verify(WT_CONNECTION_IMPL *conn, bool verify_meta)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session = NULL;
+
+    WT_ERR(
+      __wt_open_internal_session(conn, "startup-cleanup-and-verify", verify_meta, 0, 0, &session));
+
+    if (verify_meta) {
+        /* Database verification must happen as the first step before any potential changes. */
+        WT_ERR(__wt_verify_disagg_database_size(session));
+
+        /*
+         * If the user wants to verify WiredTiger metadata, verify the history store now that the
+         * metadata table may have been salvaged and eviction has been started and recovery run.
+         */
+        WT_ERR(__wt_hs_verify(session));
+    }
+
+    /* The chunk cache metadata table may exist on upgrade. Discard it. */
+    WT_ERR(__conn_cleanup_chunk_cache(session));
+
+err:
+    if (session != NULL)
+        WT_TRET(__wt_session_close_internal(session));
+    return (ret);
+}
+
+/*
  * __conn_chunk_cache_check --
  *     Check for deprecated chunk cache configuration. If chunk_cache is enabled, return an error.
  *     If chunk_cache is present but disabled, issue a deprecation warning.
@@ -3161,7 +3194,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
     WT_SESSION *wt_session;
-    WT_SESSION_IMPL *chunk_cache_cleanup_session, *session, *verify_session;
+    WT_SESSION_IMPL *session;
     bool config_base_set, try_salvage, verify_meta;
     const char *enc_cfg[] = {NULL, NULL}, *merge_cfg;
     char version[64];
@@ -3174,7 +3207,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     *connectionp = NULL;
 
     conn = NULL;
-    session = verify_session = NULL;
+    session = NULL;
     merge_cfg = NULL;
     try_salvage = false;
     WT_NOT_READ(config_base_set, false);
@@ -3620,32 +3653,17 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     /* Start the worker threads, run recovery, and initialize the disaggregated storage. */
     WT_ERR(__wti_connection_workers(session, cfg));
 
-    /* The chunk cache metadata table may exist on upgrade. Discard it. */
-    WT_ERR(__wt_open_internal_session(
-      conn, "chunk-cache-cleanup", false, 0, 0, &chunk_cache_cleanup_session));
-    ret = __conn_cleanup_chunk_cache(chunk_cache_cleanup_session);
-    WT_TRET(__wt_session_close_internal(chunk_cache_cleanup_session));
-    WT_ERR(ret);
+    /*
+     * The default session should not open data handles after this point: since it can be shared
+     * between threads, relying on session->dhandle is not safe.
+     */
+    F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 
     /*
-     * If the user wants to verify WiredTiger metadata, verify the history store now that the
-     * metadata table may have been salvaged and eviction has been started and recovery run.
+     * Finish startup cleanup and run verification that depends on completed recovery and
+     * disaggregated storage initialization.
      */
-    if (verify_meta) {
-        WT_ERR(__wt_open_internal_session(conn, "verify hs", false, 0, 0, &verify_session));
-        ret = __wt_hs_verify(verify_session);
-        WT_TRET(__wt_session_close_internal(verify_session));
-        WT_ERR(ret);
-    }
-
-    /*
-     * Verify the disaggregated database size. This must happen after __wti_connection_workers,
-     * which is where disaggregated storage is initialized. The earlier metadata verify (above) does
-     * not need to wait because it only verifies the local metadata file, which is not a shared
-     * table and has no dependency on disagg initialization.
-     */
-    if (verify_meta)
-        WT_ERR(__wt_verify_disagg_database_size(session));
+    WT_ERR(__conn_startup_cleanup_and_verify(conn, verify_meta));
 
     /*
      * The hash array sizes needed to be set up very early. Set them in the statistics here. Setting
@@ -3653,12 +3671,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
      */
     WT_STAT_CONN_SET(session, buckets, conn->hash_size);
     WT_STAT_CONN_SET(session, buckets_dh, conn->dh_hash_size);
-
-    /*
-     * The default session should not open data handles after this point: since it can be shared
-     * between threads, relying on session->dhandle is not safe.
-     */
-    F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 
     F_SET_ATOMIC_32(conn, WT_CONN_READY);
     F_CLR_ATOMIC_32(conn, WT_CONN_MINIMAL);

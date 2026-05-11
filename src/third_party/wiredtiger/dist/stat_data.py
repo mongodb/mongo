@@ -533,6 +533,7 @@ conn_stats = [
     CheckpointStat('checkpoint_state', 'progress state', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_stop_stress_active', 'stop timing stress active', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_sync', 'number of files synced'),
+    CheckpointStat('checkpoint_sync_rec_pct', 'the percentage of checkpoint sync time spent in reconciliation across all threads', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_time_max', 'max time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_time_min', 'min time (msecs)', 'no_clear,no_scale'),
     CheckpointStat('checkpoint_time_recent', 'most recent time (msecs)', 'no_clear,no_scale'),

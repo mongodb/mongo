@@ -66,6 +66,10 @@ struct __wt_ckpt_connection {
     WTI_CKPT_TIMER prepare;
     WTI_CKPT_TIMER scrub;
 
+    /* Per-checkpoint reconciliation time accumulators (clock ticks, across all files). */
+    wt_shared uint64_t reconcile_time_ticks;
+    wt_shared uint64_t sync_time_ticks;
+
     /* Clock value of most recent checkpoint. */
     wt_shared uint64_t most_recent;
 
@@ -187,7 +191,8 @@ struct __wt_checkpoint_page_to_reconcile {
     uint32_t reconcile_flags;
     uint32_t release_flags;
 
-    int result; /* Result - will be filled out later. */
+    int result;              /* Result - will be filled out later. */
+    uint64_t reconcile_time; /* Time spent in reconciliation. */
 };
 
 /*
@@ -228,6 +233,15 @@ struct __wt_checkpoint_reconcile_threads {
     (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_CHECKPOINT_RECONCILE_THREADS) && \
       (S2C(session))->ckpt_reconcile_threads->num_threads > 1)
 
+/*
+ * WT_PARALLEL_CHECKPOINTS_NUM_THREADS --
+ *     Get the number of threads for parallel checkpoints (return 1 for the single-threaded mode).
+ */
+#define WT_PARALLEL_CHECKPOINTS_NUM_THREADS(session)                                      \
+    (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_CHECKPOINT_RECONCILE_THREADS) ? \
+        (S2C(session))->ckpt_reconcile_threads->num_threads :                             \
+        1)
+
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
 extern bool __wt_checkpoint_verbose_timer_started(WT_SESSION_IMPL *session)
@@ -240,7 +254,7 @@ extern int __wt_checkpoint_file(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_checkpoint_parallel_finish(WT_SESSION_IMPL *session)
+extern int __wt_checkpoint_parallel_finish(WT_SESSION_IMPL *session, uint64_t *reconcile_timep)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_checkpoint_parallel_push_work(
   WT_SESSION_IMPL *session, WT_REF *ref, uint32_t reconcile_flags, uint32_t release_flags)
@@ -261,6 +275,8 @@ extern void __wt_checkpoint_handle_stats(
   WT_SESSION_IMPL *session, uint64_t gathering_handles_time_us);
 extern void __wt_checkpoint_handle_stats_clear(WT_SESSION_IMPL *session);
 extern void __wt_checkpoint_progress_stats(WT_SESSION_IMPL *session, uint64_t write_bytes);
+extern void __wt_checkpoint_rec_time_stats(
+  WT_SESSION_IMPL *session, uint64_t reconcile_time_ticks, uint64_t sync_time_ticks);
 extern void __wt_checkpoint_reset_stats(WT_CONNECTION_IMPL *conn);
 extern void __wt_checkpoint_signal(WT_SESSION_IMPL *session, wt_off_t logsize);
 extern void __wt_checkpoint_snapshot_clear(WT_CKPT_SNAPSHOT *snapshot);

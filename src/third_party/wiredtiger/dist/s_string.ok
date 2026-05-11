@@ -218,6 +218,7 @@ GetLastError
 GetModuleHandleExW
 GetProcAddress
 Getters
+Gh
 Github
 Golomb
 HANDLEOPS
@@ -270,6 +271,7 @@ LOGREC
 LOGSCAN
 LOGSLOT
 LRU
+LSAN
 LSB
 LSBs
 LSM

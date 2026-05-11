@@ -1,5 +1,6 @@
 /*-
- * Copyright (c) 2025-present MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -60,6 +61,20 @@ __wt_checkpoint_handle_stats(WT_SESSION_IMPL *session, uint64_t gathering_handle
 }
 
 /*
+ * __wt_checkpoint_rec_time_stats --
+ *     Accumulate per-file reconciliation and sync wall-clock time into the per-checkpoint totals.
+ */
+void
+__wt_checkpoint_rec_time_stats(
+  WT_SESSION_IMPL *session, uint64_t reconcile_time_ticks, uint64_t sync_time_ticks)
+{
+    WT_CKPT_CONNECTION *ckpt = &S2C(session)->ckpt;
+
+    (void)__wt_atomic_add_uint64(&ckpt->reconcile_time_ticks, reconcile_time_ticks);
+    (void)__wt_atomic_add_uint64(&ckpt->sync_time_ticks, sync_time_ticks);
+}
+
+/*
  * __wt_checkpoint_timer_stats --
  *     Update timer-related stats.
  */
@@ -67,7 +82,7 @@ void
 __wt_checkpoint_timer_stats(WT_SESSION_IMPL *session)
 {
     WT_CKPT_CONNECTION *ckpt = &S2C(session)->ckpt;
-    uint64_t min;
+    uint64_t min, rec_ticks, total_ticks;
 
     WT_STAT_CONN_SET(
       session, checkpoint_scrub_max, __wt_atomic_load_uint64_relaxed(&ckpt->scrub.max));
@@ -98,6 +113,11 @@ __wt_checkpoint_timer_stats(WT_SESSION_IMPL *session)
       session, checkpoint_time_recent, __wt_atomic_load_uint64_relaxed(&ckpt->ckpt_api.recent));
     WT_STAT_CONN_SET(
       session, checkpoint_time_total, __wt_atomic_load_uint64_relaxed(&ckpt->ckpt_api.total));
+
+    rec_ticks = __wt_atomic_load_uint64_relaxed(&ckpt->reconcile_time_ticks);
+    total_ticks = __wt_atomic_load_uint64_relaxed(&ckpt->sync_time_ticks);
+    WT_STAT_CONN_SET(
+      session, checkpoint_sync_rec_pct, total_ticks > 0 ? (rec_ticks * 100) / total_ticks : 0);
 }
 
 /*

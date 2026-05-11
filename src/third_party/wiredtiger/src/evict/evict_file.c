@@ -83,12 +83,13 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page)) {
             /*
              * When setting the reconciliation flags, remember to not enable history store eviction
-             * for the history store file itself. Also metadata file doesn't have any associated
-             * history.
+             * for the history store file itself. Also metadata file and disaggregated shared
+             * metadata don't have any associated history.
              */
             rec_flags = WT_REC_EVICT | WT_REC_EVICT_CALL_CLOSING | WT_REC_CLEAN_AFTER_REC |
               WT_REC_VISIBLE_NO_SNAPSHOT;
-            if (!WT_IS_HS(btree->dhandle) && !WT_IS_METADATA(dhandle))
+            if (!WT_IS_HS(btree->dhandle) && !WT_IS_METADATA(dhandle) &&
+              !WT_IS_DISAGG_META(dhandle))
                 rec_flags |= WT_REC_HS;
             WT_ERR(__wt_reconcile(session, ref, NULL, rec_flags));
         }

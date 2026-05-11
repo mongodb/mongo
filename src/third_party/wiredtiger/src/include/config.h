@@ -243,6 +243,7 @@ extern const char __WT_CONFIG_CHOICE_eviction[];
 extern const char __WT_CONFIG_CHOICE_eviction_check[];
 extern const char __WT_CONFIG_CHOICE_extension[];
 extern const char __WT_CONFIG_CHOICE_fail[];
+extern const char __WT_CONFIG_CHOICE_failpoint_disagg_checkpoint_queue_drain[];
 extern const char __WT_CONFIG_CHOICE_failpoint_eviction_split[];
 extern const char __WT_CONFIG_CHOICE_failpoint_history_store_delete_key_from_ts[];
 extern const char __WT_CONFIG_CHOICE_failpoint_rec_before_wrapup[];

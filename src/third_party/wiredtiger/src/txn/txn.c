@@ -1099,6 +1099,13 @@ __txn_resolve_prepared_update_chain(
     if (!commit) {
         /* As updating timestamp might not be an atomic operation, we will manage using state. */
         __wt_atomic_store_uint8_v_relaxed(&upd->prepare_state, WT_PREPARE_LOCKED);
+        /*
+         * A release store would only prevent prior writes from being reordered after it; it would
+         * not prevent the subsequent timestamp writes from being reordered before it on
+         * weakly-ordered architectures. The explicit release barrier ensures this prepare state
+         * write is ordered before any timestamp field is modified, so a concurrent reader can never
+         * observe updated timestamps while the prepare state appears unchanged.
+         */
         WT_RELEASE_BARRIER();
         if (F_ISSET(txn_time_point, WT_TXN_TIME_POINT_HAS_TS_ROLLBACK))
             __wt_atomic_store_uint64_relaxed(
@@ -2632,9 +2639,6 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
          * disaggregated storage and the node still consider itself the leader. If it is not the
          * real leader, the storage layer services should return an error as it is not allowed to
          * write.
-         *
-         * FIXME-WT-14739: we should be able to do shutdown checkpoint for followers as well when we
-         * are able to skip the shared tables in checkpoint.
          */
         if (!skip_checkpoint && (!conn_is_disagg || conn->layered_table_manager.leader)) {
             WT_TRET(__wt_open_internal_session(conn, "close_ckpt", true, 0, 0, &s));

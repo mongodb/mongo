@@ -116,7 +116,7 @@ class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
     # Assert the single truncate log line emitted with the concrete bounded range.
     def assert_trunc_log(self, start, stop):
         self.captureout.checkAdditionalPattern(self,
-            f'insert entry into truncate list on table {self.uri}: '
+            f'inserting entry into truncate list on table {self.uri}: '
             f'start={self.key_str(start)} stop={self.key_str(stop)}')
         self.cleanStdout()
 

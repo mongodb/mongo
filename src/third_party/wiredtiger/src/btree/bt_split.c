@@ -1560,61 +1560,92 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
          * we may still fail. If we fail, we will append them back to their original update chains.
          * Truncate before we restore them to ensure the size of the page is correct.
          */
-        if (supd->onpage_upd != NULL) {
+        if (WT_TIME_WINDOW_HAS_START_PREPARE(&supd->tw)) {
             /*
              * If we have written a prepared update, we need to retain the next update that is not a
              * tombstone. Otherwise, we don't have anything to write in the next reconciliation if
              * the prepared update is reverted. If the next value update is a modify, we need to
              * retain all the older updates until a full value is found.
              */
-            if (WT_TIME_WINDOW_HAS_START_PREPARE(&supd->tw)) {
-                for (tmp = supd->onpage_upd->next; tmp != NULL; tmp = tmp->next) {
-                    /*
-                     * We can get away not using an ordered read here as we can simply skip aborted
-                     * updates.
-                     */
-                    WT_READ_ONCE(txnid, tmp->txnid);
-                    if (txnid == WT_TXN_ABORTED)
-                        continue;
-
-                    /* Skip the update from the same prepared transaction */
-                    if (txnid == supd->tw.start_txn)
-                        continue;
-
-                    if (tmp->type == WT_UPDATE_STANDARD)
-                        break;
-                }
-
-                if (tmp != NULL) {
-                    supd->free_upds = tmp->next;
-                    tmp->next = NULL;
-                }
-            } else if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&supd->tw)) {
+            WT_ASSERT(session, supd->onpage_upd != NULL);
+            for (tmp = supd->onpage_upd->next; tmp != NULL; tmp = tmp->next) {
                 /*
-                 * If we write a prepared tombstone, we still need to retain the update it deletes
-                 * on the update chain. Otherwise, if the prepared update is aborted, we will have
-                 * nothing to write in the next reconciliation. If the update is a modify, we need
-                 * to retain all the older updates until a full value is found.
+                 * We can get away not using an ordered read here as we can simply skip aborted
+                 * updates.
                  */
-                for (tmp = supd->onpage_upd; tmp != NULL; tmp = tmp->next) {
-                    if (tmp->txnid == WT_TXN_ABORTED)
-                        continue;
+                WT_READ_ONCE(txnid, tmp->txnid);
+                if (txnid == WT_TXN_ABORTED)
+                    continue;
 
-                    if (WT_UPDATE_DATA_VALUE(tmp))
+                /* Skip the update from the same prepared transaction */
+                if (txnid == supd->tw.start_txn)
+                    continue;
+
+                if (tmp->type == WT_UPDATE_STANDARD)
+                    break;
+            }
+
+            if (tmp != NULL) {
+                supd->free_upds = tmp->next;
+                tmp->next = NULL;
+            }
+        } else if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&supd->tw)) {
+            WT_ASSERT(session, supd->onpage_upd != NULL);
+            /*
+             * If we write a prepared tombstone, we still need to retain the update it deletes on
+             * the update chain. Otherwise, if the prepared update is aborted, we will have nothing
+             * to write in the next reconciliation. If the update is a modify, we need to retain all
+             * the older updates until a full value is found.
+             */
+            for (tmp = supd->onpage_upd; tmp != NULL; tmp = tmp->next) {
+                if (tmp->txnid == WT_TXN_ABORTED)
+                    continue;
+
+                if (WT_UPDATE_DATA_VALUE(tmp))
+                    break;
+            }
+
+            if (tmp != NULL) {
+                supd->free_upds = tmp->next;
+                tmp->next = NULL;
+            }
+        } else {
+            bool retain_tombstone = false;
+            /*
+             * For non-prepared case, free the on-page value and the on-page tombstone if there is
+             * one.
+             */
+            tmp = supd->onpage_tombstone != NULL ? supd->onpage_tombstone : supd->onpage_upd;
+
+            /*
+             * If an unresolved prepared update sits in front of an on-page tombstone that we wrote
+             * without a paired on-page value, retain the tombstone in the chain so the prepared
+             * update keeps a rollback fallback. When the prepared update is later written to disk
+             * as a prepare cell, the rollback path needs an older committed state to fall back to;
+             * with no on-page value behind the tombstone, that fallback comes from the on-disk cell
+             * preserved by row reconciliation for keys that still have an unresolved prepared value
+             * on the chain.
+             */
+            if (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
+              supd->onpage_tombstone != NULL && supd->onpage_upd == NULL) {
+                for (WT_UPDATE *scan = upd; scan != NULL && scan != supd->onpage_tombstone;
+                     scan = scan->next) {
+                    if (scan->prepared_id != WT_PREPARED_ID_NONE) {
+                        retain_tombstone = true;
                         break;
+                    }
                 }
+            }
 
-                if (tmp != NULL) {
-                    supd->free_upds = tmp->next;
-                    tmp->next = NULL;
-                }
-            } else {
+            if (retain_tombstone) {
                 /*
-                 * For non-prepared case, free the on-page value and the on-page tombstone if there
-                 * is one.
+                 * Sever after the on-page tombstone to free the on-page upd (and any intermediate
+                 * aborted updates between the tombstone and the on-page upd). The tombstone stays
+                 * attached behind the prepared update.
                  */
-                tmp = supd->onpage_tombstone != NULL ? supd->onpage_tombstone : supd->onpage_upd;
-
+                supd->free_upds = supd->onpage_tombstone->next;
+                supd->onpage_tombstone->next = NULL;
+            } else if (tmp != NULL) {
                 /*
                  * We have decided to restore this update chain so it must have newer updates than
                  * the onpage value on it or we write a prepared update to disk.
@@ -1630,18 +1661,22 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
                     ;
                 WT_ASSERT(session, prev_onpage->next == tmp);
 #ifdef HAVE_DIAGNOSTIC
-                /*
-                 * During update restore eviction we remove anything older than the on-page update,
-                 * including the on-page update. However it is possible a tombstone is also written
-                 * as the stop time of the on-page value. To handle this we also need to remove the
-                 * tombstone from the update chain.
-                 *
-                 * This assertion checks that there aren't any unexpected updates between that
-                 * tombstone and the subsequent value which both make up the on-page value.
-                 */
-                for (; tmp != NULL && tmp != supd->onpage_upd; tmp = tmp->next)
-                    WT_ASSERT(
-                      session, tmp == supd->onpage_tombstone || tmp->txnid == WT_TXN_ABORTED);
+                if (supd->onpage_upd == NULL)
+                    WT_ASSERT(session,
+                      tmp == supd->onpage_tombstone && __wt_txn_upd_visible_all(session, tmp));
+                else
+                    /*
+                     * During update restore eviction we remove anything older than the on-page
+                     * update, including the on-page update. However it is possible a tombstone is
+                     * also written as the stop time of the on-page value. To handle this we also
+                     * need to remove the tombstone from the update chain.
+                     *
+                     * This assertion checks that there aren't any unexpected updates between that
+                     * tombstone and the subsequent value which both make up the on-page value.
+                     */
+                    for (; tmp != NULL && tmp != supd->onpage_upd; tmp = tmp->next)
+                        WT_ASSERT(
+                          session, tmp == supd->onpage_tombstone || tmp->txnid == WT_TXN_ABORTED);
 #endif
                 supd->free_upds = prev_onpage->next;
                 prev_onpage->next = NULL;

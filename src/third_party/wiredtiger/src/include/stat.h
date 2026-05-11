@@ -860,6 +860,7 @@ struct __wt_connection_stats {
     int64_t checkpoint_scrub_recent;
     int64_t checkpoint_scrub_total;
     int64_t checkpoint_stop_stress_active;
+    int64_t checkpoint_sync_rec_pct;
     int64_t checkpoint_tree_duration;
     int64_t checkpoints_total_failed;
     int64_t checkpoints_total_succeed;

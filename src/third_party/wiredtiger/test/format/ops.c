@@ -684,9 +684,15 @@ prepare_transaction(TINFO *tinfo)
     ++tinfo->prepare;
 
     prepared_id = __wt_atomic_add_uint64_v(&g.prepared_id, 1);
-    if (GV(RUNS_PREDICTABLE_REPLAY))
+    if (GV(RUNS_PREDICTABLE_REPLAY)) {
         ts = replay_prepare_ts(tinfo);
-    else
+        /*
+         * WT_TS_NONE signals that there is no valid prepare timestamp for this transaction (e.g.,
+         * the lane's last commit is too close to the current replay_ts). Skip prepare.
+         */
+        if (ts == WT_TS_NONE)
+            return (ENOTSUP);
+    } else
         /*
          * Prepare timestamps must be less than or equal to the eventual commit timestamp but larger
          * than the current stable timestamp. Increase the global value to ensure it is larger than
@@ -1400,11 +1406,14 @@ skip_operation:
          * timestamped world, which means we're in a snapshot-isolation transaction by definition.
          */
         if (GV(OPS_PREPARE) && mmrand(&tinfo->data_rnd, 1, 10) == 1) {
-            if ((ret = prepare_transaction(tinfo)) != 0) {
-                testutil_assert(ret == WT_ROLLBACK);
+            ret = prepare_transaction(tinfo);
+            if (ret == WT_ROLLBACK)
                 goto rollback;
+            else if (ret != ENOTSUP) {
+                testutil_assert(ret == 0);
+                prepared = true;
             }
-            prepared = true;
+            /* ENOTSUP: prepare was skipped (no valid timestamp), treat as unprepared. */
         }
 
         /*

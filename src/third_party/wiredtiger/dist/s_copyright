@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Only run when building a release
-test -z "$WT_RELEASE_BUILD" && exit 0
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 setup_trap
 cd_top
@@ -12,7 +10,6 @@ c1=dist/__wt.copyright.1
 c2=dist/__wt.copyright.2
 c3=dist/__wt.copyright.3
 c4=dist/__wt.copyright.4
-c5=dist/__wt.copyright.5
 RET=0
 
 check()
@@ -27,12 +24,12 @@ check()
     test -f $1 || return 0
 
     # Check for a correct copyright header.
-    { sed -e 2,5p -e 6q -e d $1 | diff -q - $c1 > /dev/null; } && return 0
-    { sed -e 2,4p -e 5q -e d $1 | diff -q - $c2 > /dev/null; } && return 0
+    { sed -e 1,5p -e 6q -e d $1 | diff -q - $c1 > /dev/null; } && return 0
+    { sed -e 1,25p -e 26q -e d $1 | diff -q - $c2 > /dev/null; } && return 0
     { sed -e 3,6p -e 7q -e d $1 | diff -q - $c3 > /dev/null; } && return 0
-    { sed -e 3,5p -e 6q -e d $1 | diff -q - $c4 > /dev/null; } && return 0
-    { sed -e 1,3p -e 4q -e d $1 | diff -q - $c4 > /dev/null; } && return 0
-    { sed -e 2,7p -e 8q -e d $1 | diff -q - $c5 > /dev/null; } && return 0
+    { sed -e 3,26p -e 27q -e d $1 | diff -q - $c4 > /dev/null; } && return 0
+    { sed -e 1,24p -e 25q -e d $1 | diff -q - $c4 > /dev/null; } && return 0
+    { sed -e 5,28p -e 29q -e d $1 | diff -q - $c4 > /dev/null; } && return 0
     echo "$1: copyright information is incorrect"
     RET=1
 }
@@ -46,24 +43,47 @@ if is_recursive_mode; then
 fi
 
 # Remove these files only in the main invocation.
-setup_trap 'rm -f $c1 $c2 $c3 $c4 $c5'
+setup_trap 'rm -f $c1 $c2 $c3 $c4'
 
 year='present'
 
 cat > $c1 <<ENDOFTEXT
+/*-
  * Copyright (c) 2014-$year MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
- *    All rights reserved.
+ *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
 ENDOFTEXT
 
 # Copyright for files WiredTiger does not own.
 cat > $c2 <<ENDOFTEXT
+/*-
  * Public Domain 2014-$year MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
 ENDOFTEXT
 
 cat > $c3 <<ENDOFTEXT
@@ -79,19 +99,30 @@ cat > $c4 <<ENDOFTEXT
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
+#
+# Anyone is free to copy, modify, publish, use, compile, sell, or
+# distribute this software, either in source code form or as a compiled
+# binary, for any purpose, commercial or non-commercial, and by any
+# means.
+#
+# In jurisdictions that recognize copyright laws, the author or authors
+# of this software dedicate any and all copyright interest in the
+# software to the public domain. We make this dedication for the benefit
+# of the public at large and to the detriment of our heirs and
+# successors. We intend this dedication to be an overt act of
+# relinquishment in perpetuity of all present and future rights to this
+# software under copyright law.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
 ENDOFTEXT
 
-cat > $c5 <<ENDOFTEXT
- * Copyright (c) 2014-$year MongoDB, Inc.
- * Copyright (c) 2008-2014 WiredTiger, Inc.
- *    All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
-ENDOFTEXT
-
-# Parallel execution: if it's the main onvocation of the script, collect the file names
+# Parallel execution: if it's the main invocation of the script, collect the file names
 # to process and run them in subprocesses.
 
 # Search for files, skipping some well-known 3rd party directories.
@@ -106,6 +137,8 @@ find [a-z]* -name '*.[ch]' \
     -e '/checksum\/zseries\//d' \
     -e '/\/3rdparty\//d' \
     -e '/\/node_modules\//d' \
+    -e '/^tools\/wt-mcp\/\.venv\//d' \
+    -e '/^venv\//d' \
     -e '/dist\/__/d' \
     -e 's/^\.\///' |
     do_in_parallel || RET=1

@@ -36,14 +36,24 @@ from wtscenario import make_scenarios
 # Test that update and modify operations are durable across crash and recovery.
 # Additionally test that checkpoint inserts content into the history store.
 class test_hs01(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=200MB,statistics=(all)'
     format_values = [
         ('column', dict(key_format='r')),
         ('row_integer', dict(key_format='i')),
         ('row_string', dict(key_format='S'))
     ]
+    precise_checkpoint_values = [
+        ('precise_checkpoint', dict(precise_checkpoint=True)),
+        ('fuzzy_checkpoint', dict(precise_checkpoint=False)),
+    ]
     value_format='u'
-    scenarios = make_scenarios(format_values)
+    scenarios = make_scenarios(format_values, precise_checkpoint_values)
+
+    @property
+    def conn_config(self):
+        config = 'cache_size=200MB,statistics=(all)'
+        if self.precise_checkpoint:
+            config += ',precise_checkpoint=true'
+        return config
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -99,6 +109,11 @@ class test_hs01(wttest.WiredTigerTestCase):
         conn.close()
 
     def test_hs(self):
+        # disagg skips recovery RTS; without precise_checkpoint the stable btree checkpoint
+        # writes unstable updates to disk, so durable_check would return the wrong value.
+        if self.runningHook('disagg') and not self.precise_checkpoint:
+            self.skipTest('disagg mode requires precise_checkpoint for durable_check')
+
         # Create a small table.
         uri = "table:test_hs01"
         ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
@@ -118,6 +133,9 @@ class test_hs01(wttest.WiredTigerTestCase):
             cursor.set_value(bigvalue)
             self.assertEqual(cursor.insert(), 0)
         cursor.close()
+        # precise_checkpoint requires stable_timestamp to be set before any checkpoint.
+        # All writes above are no-timestamp so stable=1 is safe here.
+        self.conn.set_timestamp('stable_timestamp=1')
         self.session.checkpoint()
 
         # Scenario: 1
@@ -171,11 +189,16 @@ class test_hs01(wttest.WiredTigerTestCase):
         self.large_updates(self.session, uri, bigvalue4, ds, nrows, timestamp=True)
 
         self.session.checkpoint()
-        # Check if the (nrows-1) modifications were moved to history store from data store.
-        # The stats was already set at: (nrows-1)*3 (previous hs stats)
-        # Total: (nrows-1)*4
         hs_writes = self.get_stat(stat.conn.cache_hs_insert)
-        self.assertEqual(hs_writes, (nrows-1) * 4)
+        if self.precise_checkpoint:
+            # Unstable updates (bigvalue4, ts > stable=1) stay in memory; no new HS inserts.
+            # Count stays at (nrows-1)*3 from the previous scenario.
+            self.assertEqual(hs_writes, (nrows-1) * 3)
+        else:
+            # Unstable updates are moved to HS to preserve them for readers at stable_timestamp.
+            # The stats was already set at: (nrows-1)*3 (previous hs stats)
+            # Total: (nrows-1)*4
+            self.assertEqual(hs_writes, (nrows-1) * 4)
 
         # Check to see data can be see only till the stable_timestamp.
         self.durable_check(bigvalue3, uri, ds)

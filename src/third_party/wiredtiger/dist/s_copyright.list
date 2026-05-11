@@ -1,4 +1,15 @@
 skip    bench/workgen/workgen/workgen.py
+skip    ext/compressors/iaa/iaacodec/include/IAACompressionCodecDeflate.h
+skip    ext/compressors/iaa/iaacodec/include/iaaInterface-c.h
+skip    ext/compressors/iaa/iaacodec/src/IAACompressionCodecDeflate.cpp
+skip    ext/compressors/iaa/iaacodec/src/iaaInterface-c.cpp
+skip    oss/apple/ulock.h
+skip    src/include/extern_darwin.h
+skip    src/include/extern_linux.h
+skip    src/include/str_inline.h
+skip    test/format/format_config.h
+skip    test/format/format_config_def.c
+skip    tools/voidstar/include/instrumentation.h
 skip    bench/workgen/workgen_wrap.cpp
 skip    cmake/install/wiredtiger.pc.in
 skip    dist/api_config.py

@@ -193,6 +193,7 @@ __checkpoint_parallel_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     WT_CHECKPOINT_PAGE_TO_RECONCILE *entry;
     WT_CHECKPOINT_RECONCILE_THREADS *ckpt_threads;
     WT_DECL_RET;
+    uint64_t time_rec_start;
     bool signalled;
 
     ckpt_threads = S2C(session)->ckpt_reconcile_threads;
@@ -223,11 +224,16 @@ __checkpoint_parallel_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
         __wt_txn_import_snapshot(session, entry->snapshot);
         session->isolation = session->txn->isolation = entry->isolation;
 
-        /* It's not an error if we make no progress. */
+        /* Reconcile the page. */
+        time_rec_start = __wt_clock(session);
         WT_WITH_DHANDLE(session, entry->dhandle,
           ret = __wt_reconcile(session, entry->ref, NULL, entry->reconcile_flags));
+
+        /* Update the reconciliation time and the statistics. */
+        entry->reconcile_time = __wt_clock(session) - time_rec_start;
         if (ret == 0)
             WT_STAT_CONN_INCR(session, checkpoint_parallel_pages_reconciled);
+
         WT_ERR(ret);
 
 err:
@@ -360,7 +366,7 @@ __wt_checkpoint_parallel_thread_destroy(WT_SESSION_IMPL *session)
     /*
      * Process the done queue to release the relevant pages and free the queue entries.
      */
-    ret = __wt_checkpoint_parallel_finish(session);
+    ret = __wt_checkpoint_parallel_finish(session, NULL);
     if (ret != 0) {
         __wt_verbose_warning(session, WT_VERB_CHECKPOINT,
           "Checkpoint page reconciliation failed: %s", __wt_strerror(session, ret, NULL, 0));
@@ -391,12 +397,12 @@ __wt_checkpoint_parallel_thread_destroy(WT_SESSION_IMPL *session)
  *     resources.
  */
 int
-__wt_checkpoint_parallel_finish(WT_SESSION_IMPL *session)
+__wt_checkpoint_parallel_finish(WT_SESSION_IMPL *session, uint64_t *reconcile_timep)
 {
     WT_CHECKPOINT_PAGE_TO_RECONCILE *entry;
     WT_CHECKPOINT_RECONCILE_THREADS *ckpt_threads;
     WT_DECL_RET;
-    uint64_t done_popped, work_pushed;
+    uint64_t done_popped, reconcile_time, work_pushed;
 
     if (!WT_PARALLEL_CHECKPOINTS_ENABLED(session))
         return (0);
@@ -409,6 +415,7 @@ __wt_checkpoint_parallel_finish(WT_SESSION_IMPL *session)
     work_pushed = __wt_atomic_load_uint64_acquire(&ckpt_threads->work_pushed);
 
     done_popped = 0;
+    reconcile_time = 0;
     while (work_pushed > done_popped) {
         WT_RET(__wt_semaphore_wait(session, &ckpt_threads->done_sem));
 
@@ -422,8 +429,12 @@ __wt_checkpoint_parallel_finish(WT_SESSION_IMPL *session)
 
         WT_TRET(entry->result);
         WT_TRET(__wt_page_release(session, entry->ref, entry->release_flags));
+        reconcile_time += entry->reconcile_time;
         __checkpoint_parallel_free(session, entry);
     }
+
+    if (reconcile_timep != NULL)
+        *reconcile_timep = reconcile_time;
 
     WT_ASSERT_ALWAYS(session,
       __checkpoint_parallel_done_queue_empty(session) &&

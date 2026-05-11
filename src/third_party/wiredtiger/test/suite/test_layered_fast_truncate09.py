@@ -30,19 +30,19 @@ import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
-# test_layered_fast_truncate07.py
+# test_layered_fast_truncate09.py
 #   Follower truncate-list visibility coverage.
 @disagg_test_class
-class test_layered_fast_truncate07(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate09(wttest.WiredTigerTestCase):
 
     conn_config = 'disaggregated=(role="leader"),'
 
     uris = [
-        ('layered', dict(uri='layered:test_layered_fast_truncate07')),
-        ('table', dict(uri='table:test_layered_fast_truncate07')),
+        ('layered', dict(uri='layered:test_layered_fast_truncate09')),
+        ('table', dict(uri='table:test_layered_fast_truncate09')),
     ]
 
-    disagg_storages = gen_disagg_storages('test_layered_fast_truncate07', disagg_only=True)
+    disagg_storages = gen_disagg_storages('test_layered_fast_truncate09', disagg_only=True)
     scenarios = make_scenarios(disagg_storages, uris)
 
     nitems = 1000

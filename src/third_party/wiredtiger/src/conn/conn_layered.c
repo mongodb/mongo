@@ -499,8 +499,7 @@ __disagg_finalize_checkpoint_meta(WT_SESSION_IMPL *session,
     conn->txn_global.last_ckpt_timestamp = metadata->checkpoint_timestamp;
 
     /* Set the database size. */
-    if (ckpt_meta->has_database_size)
-        __wt_disagg_set_database_size(session, ckpt_meta->database_size);
+    __wt_disagg_set_database_size(session, ckpt_meta->database_size);
 
     /* Remember the root config of the last checkpoint. */
     __wt_free(session, conn->disaggregated_storage.last_checkpoint_root);
@@ -732,18 +731,9 @@ __disagg_pick_up_checkpoint_meta(
         __wt_verbose_warning(session, WT_VERB_DISAGGREGATED_STORAGE, "%s\"%s\"",
           "Missing metadata_checksum from metadata: ", meta_str);
 
-    /* Extract the database size, if it exists. */
-    WT_ERR_NOTFOUND_OK(__wt_config_getones(session, meta_str, "database_size", &cval), true);
-    if (WT_CHECK_AND_RESET(ret, 0) && cval.len != 0) {
-        /*
-         * FIXME-WT-16562 Checkpoint size tech debt cleanup. Disagg checkpoint metadata may be
-         * received without database_size. For now we treat this field as optional to avoid crashing
-         * when size information is missing. Once checkpoint size support is fully established, this
-         * fallback path should be removed and database_size made mandatory.
-         */
-        ckpt_meta.has_database_size = true;
-        ckpt_meta.database_size = (uint64_t)cval.val;
-    }
+    /* Extract the database size. */
+    WT_ERR(__wt_config_getones(session, meta_str, "database_size", &cval));
+    ckpt_meta.database_size = (uint64_t)cval.val;
     /* Parse and validate version and compatible_version fields. */
     WT_ERR(__disagg_check_meta_version(session, meta_str, &ckpt_meta));
 
@@ -1080,6 +1070,13 @@ __wt_disagg_shared_metadata_queue_process(WT_SESSION_IMPL *session)
               __shared_metadata_op_to_string(entry->metadata_op));
             entry->deferred = false;
             continue;
+        }
+
+        /* Failpoint: inject error to test panic handling during queue processing. */
+        if (FLD_ISSET(conn->timing_stress_flags,
+              WT_TIMING_STRESS_FAILPOINT_DISAGG_CHECKPOINT_QUEUE_DRAIN)) {
+            ret = __wt_set_return(session, WT_ERROR);
+            goto err;
         }
 
         WT_ERR(__disagg_shared_metadata_op(session, entry));

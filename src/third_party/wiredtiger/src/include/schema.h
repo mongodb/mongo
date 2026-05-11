@@ -80,6 +80,8 @@ struct __wt_truncate {
     wt_timestamp_t prepare_ts; /* Not currently supported. */
     uint64_t prepare_id;       /* Not currently supported. */
 
+    wt_shared bool committed; /* Whether the truncate entry has been committed. */
+
     WT_ITEM start_key;
     WT_ITEM stop_key;
 
@@ -114,7 +116,11 @@ struct __wt_layered_table {
      */
     TAILQ_HEAD(__truncate_table_list_qh, __wt_truncate) truncateqh;
 
-    WT_RWLOCK truncate_lock; /* Protects truncate list membership and entry visibility metadata. */
+    /*
+     * Protects truncate list membership (insert/remove/clear). Per-entry visibility is synchronized
+     * lock-free via WT_TRUNCATE.committed.
+     */
+    WT_RWLOCK truncate_lock;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LAYERED_TABLE_OPEN 0x1u

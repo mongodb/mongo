@@ -501,7 +501,8 @@ __clayered_adjust_state(WT_CURSOR_LAYERED *clayered, bool iteration, bool *state
 {
     WT_CONNECTION_IMPL *conn;
     WT_SESSION_IMPL *session;
-    uint64_t last_checkpoint_meta_lsn, snapshot_gen;
+    WT_TXN_SHARED *txn_shared;
+    uint64_t last_checkpoint_meta_lsn;
     bool change_ingest, change_stable, current_leader, role_change;
 
     *state_updated = false;
@@ -518,16 +519,13 @@ __clayered_adjust_state(WT_CURSOR_LAYERED *clayered, bool iteration, bool *state
         last_checkpoint_meta_lsn = WT_DISAGG_LSN_NONE;
 
     /*
-     * Has any state changed? What is not checked here is the possibility that a step down and
-     step
+     * Has any state changed? What is not checked here is the possibility that a step down and step
      * up have both occurred since the last check. We don't have a way to detect that (or its
      * opposite) at the moment. If we did, we'd want to issue a rollback if the stable cursor has
      * any changes. FIXME-WT-14545.
      */
     if (!role_change && last_checkpoint_meta_lsn == clayered->checkpoint_meta_lsn)
-        return (0);
-
-    snapshot_gen = clayered->snapshot_gen;
+        goto done;
 
     /* Is this a step up or step down? */
     if (role_change) {
@@ -582,18 +580,19 @@ __clayered_adjust_state(WT_CURSOR_LAYERED *clayered, bool iteration, bool *state
      * The second case of reopening the stable table is when we want to open a new checkpoint on a
      * follower to evict more entries from the ingest table.
      */
-    if ((change_stable = (clayered->stable_cursor != NULL &&
-           (__clayered_can_advance_stable(clayered, iteration) || role_change)))) {
-        snapshot_gen = __wt_session_gen(session, WT_GEN_HAS_SNAPSHOT);
+    if ((change_stable = clayered->stable_cursor != NULL &&
+            (__clayered_can_advance_stable(clayered, iteration) || role_change)))
         WT_RET(__clayered_reopen_stable(session, clayered));
-    }
 
     /* Update the state of the layered cursor. */
     clayered->leader = current_leader;
     clayered->checkpoint_meta_lsn = last_checkpoint_meta_lsn;
-    clayered->snapshot_gen = snapshot_gen;
     *state_updated = (change_ingest || change_stable);
 
+done:
+    txn_shared = WT_SESSION_TXN_SHARED(session);
+    clayered->snapshot_gen = __wt_session_gen(session, WT_GEN_HAS_SNAPSHOT);
+    clayered->read_timestamp = txn_shared != NULL ? txn_shared->read_timestamp : WT_TS_NONE;
     return (0);
 }
 
@@ -877,7 +876,12 @@ __clayered_range_truncate_ingest(
 {
     WT_DECL_RET;
     WT_CURSOR *cursor = start;
-    int cmp = -1;
+    int cmp;
+
+    /* Early return if stop key is strictly less than start key, nothing to truncate. */
+    WT_RET(start->compare(start, stop, &cmp));
+    if (cmp > 0)
+        return (0);
 
     do {
         /* Check the current position relative to the truncate end. */
@@ -991,18 +995,25 @@ __clayered_position_alternate(
         WT_RET(forward ? alternate->next(alternate) : alternate->prev(alternate));
 
         /*
-         * With higher isolation levels, where we have stable reads, we're done: the cursor is now
-         * positioned as expected.
+         * With higher isolation levels, the cursor is now positioned as expected; break out to
+         * check for committed truncate ranges before returning.
          *
          * With read-uncommitted isolation, a new record could have appeared in between the search
          * and stepping forward / back. In that case, keep going until we see a key in the expected
          * range.
          */
         if (session->txn->isolation != WT_ISO_READ_UNCOMMITTED)
-            return (0);
+            break;
 
         WT_RET(__clayered_cursor_compare(clayered, alternate, current, &cmp));
     }
+
+    /*
+     * If the alternate cursor points to stable cursor, advance past the keys that fall inside a
+     * committed truncate range.
+     */
+    if (alternate == clayered->stable_cursor && F_ISSET(alternate, WT_CURSTD_KEY_INT))
+        WT_RET(__clayered_reposition_truncate_iterate(clayered, alternate, forward));
 
     return (0);
 }
@@ -1189,11 +1200,13 @@ err:
 }
 
 /*
- * __clayered_iterate --
- *     Common function for moving a layered cursor to the next or previous position.
+ * __clayered_iterate_int --
+ *     Inner loop for moving a layered cursor to the next or previous position. Callers are
+ *     responsible for enter/leave and for clearing the iteration flag when the transaction context
+ *     has changed.
  */
 static int
-__clayered_iterate(WT_CURSOR_LAYERED *clayered, uint32_t iter_flag)
+__clayered_iterate_int(WT_CURSOR_LAYERED *clayered, uint32_t iter_flag)
 {
     WT_DECL_RET;
     bool deleted;
@@ -1217,6 +1230,47 @@ err:
 }
 
 /*
+ * __clayered_iterate --
+ *     Move a layered cursor to the next or previous position, handling enter/leave and refreshing
+ *     the parked alternate cursor when the transaction context changes between calls.
+ */
+static int
+__clayered_iterate(WT_CURSOR_LAYERED *clayered, uint32_t iter_flag)
+{
+    WT_CURSOR *iface;
+    WT_DECL_RET;
+    uint64_t prev_read_ts, prev_snapshot;
+
+    iface = &clayered->iface;
+    prev_snapshot = clayered->snapshot_gen;
+    prev_read_ts = clayered->read_timestamp;
+
+    WT_ERR(__clayered_enter(clayered, false, true, true));
+
+    /*
+     * If the transaction context has changed since the last call (different read timestamp or a new
+     * snapshot), the parked alternate cursor's cached position may be stale. Clear the iteration
+     * flag to force a re-search under the new context.
+     */
+    if (prev_snapshot != clayered->snapshot_gen || prev_read_ts != clayered->read_timestamp)
+        F_CLR(clayered, iter_flag);
+
+    WT_ERR(__clayered_iterate_int(clayered, iter_flag));
+
+    WT_ITEM_SET(iface->key, clayered->current_cursor->key);
+    WT_ITEM_SET(iface->value, clayered->current_cursor->value);
+    __clayered_deleted_decode(&iface->value);
+    F_CLR(iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+    F_SET(iface, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+
+err:
+    if (ret != 0)
+        F_CLR(iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+    __clayered_leave(clayered);
+    return (ret);
+}
+
+/*
  * __clayered_next --
  *     WT_CURSOR->next method for the layered cursor type.
  */
@@ -1232,14 +1286,9 @@ __clayered_next(WT_CURSOR *cursor)
     CURSOR_API_CALL(cursor, session, ret, next, clayered->dhandle);
     __cursor_novalue(cursor);
     WT_ERR(__cursor_copy_release(cursor));
-    WT_ERR(__clayered_enter(clayered, false, true, true));
 
     WT_STAT_CONN_DSRC_INCR(session, layered_curs_next);
-
     WT_ERR(__clayered_iterate(clayered, WT_CLAYERED_ITERATE_NEXT));
-
-    WT_ITEM_SET(cursor->key, clayered->current_cursor->key);
-    WT_ITEM_SET(cursor->value, clayered->current_cursor->value);
 
     if (clayered->current_cursor == clayered->ingest_cursor)
         WT_STAT_CONN_DSRC_INCR(session, layered_curs_next_ingest);
@@ -1249,13 +1298,6 @@ __clayered_next(WT_CURSOR *cursor)
     }
 
 err:
-    __clayered_leave(clayered);
-    if (ret == 0) {
-        __clayered_deleted_decode(&cursor->value);
-        F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-        F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
-    } else
-        F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
     API_END_RET(session, ret);
 }
 
@@ -1275,14 +1317,9 @@ __clayered_prev(WT_CURSOR *cursor)
     CURSOR_API_CALL(cursor, session, ret, prev, clayered->dhandle);
     __cursor_novalue(cursor);
     WT_ERR(__cursor_copy_release(cursor));
-    WT_ERR(__clayered_enter(clayered, false, true, true));
 
     WT_STAT_CONN_DSRC_INCR(session, layered_curs_prev);
-
     WT_ERR(__clayered_iterate(clayered, WT_CLAYERED_ITERATE_PREV));
-
-    WT_ITEM_SET(cursor->key, clayered->current_cursor->key);
-    WT_ITEM_SET(cursor->value, clayered->current_cursor->value);
 
     if (clayered->current_cursor == clayered->ingest_cursor)
         WT_STAT_CONN_DSRC_INCR(session, layered_curs_prev_ingest);
@@ -1292,13 +1329,6 @@ __clayered_prev(WT_CURSOR *cursor)
     }
 
 err:
-    __clayered_leave(clayered);
-    if (ret == 0) {
-        __clayered_deleted_decode(&cursor->value);
-        F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-        F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
-    } else
-        F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
     API_END_RET(session, ret);
 }
 
@@ -1907,7 +1937,7 @@ __clayered_search_near_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int *exa
     if (deleted) {
         /* Advance past the deleted record using normal cursor traversal interface */
         WT_ASSERT(session, !F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT));
-        if ((ret = __clayered_iterate(clayered, WT_CLAYERED_ITERATE_NEXT)) == 0) {
+        if ((ret = __clayered_iterate_int(clayered, WT_CLAYERED_ITERATE_NEXT)) == 0) {
             cmp = 1;
             deleted = false;
         }
@@ -1918,7 +1948,7 @@ __clayered_search_near_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int *exa
     if (deleted) {
         WT_ASSERT(session, clayered->current_cursor == NULL);
         WT_ASSERT(session, !F_ISSET(&clayered->iface, WT_CURSTD_KEY_INT));
-        WT_ERR(__clayered_iterate(clayered, WT_CLAYERED_ITERATE_PREV));
+        WT_ERR(__clayered_iterate_int(clayered, WT_CLAYERED_ITERATE_PREV));
         cmp = -1;
     }
 

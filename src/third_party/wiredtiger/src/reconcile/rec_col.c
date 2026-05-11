@@ -449,14 +449,24 @@ record_loop:
                 WT_ERR(__wti_rec_upd_select(session, r, ins, NULL, vpack, &upd_select));
                 upd = upd_select.upd;
                 ins = WT_SKIP_NEXT(ins);
-            }
+            } else
+                upd_select.skip_aborted_prepared_value = false;
 
             update_no_copy = true; /* No data copy */
             repeat_count = 1;      /* Single record */
             deleted = false;
 
-            if (upd == NULL && orig_stale) {
-                /* The on-disk value is stale and there was no update. Treat it as deleted. */
+            if (upd == NULL && orig_stale &&
+              (!F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) || !F_ISSET(r, WT_REC_EVICT) ||
+                !upd_select.skip_aborted_prepared_value)) {
+                /*
+                 * The on-disk value is stale and there was no update. Treat it as deleted.
+                 *
+                 * Keep the on-disk cell when the chain still has an unstable aborted prepared
+                 * update that we skipped this round: the cell is its only rollback fallback, and
+                 * dropping it now would strand the prepared update with nothing to fall back to on
+                 * a later reconciliation.
+                 */
                 deleted = true;
                 r->key_removed_from_disk_image = true;
                 twp = &clear_tw;

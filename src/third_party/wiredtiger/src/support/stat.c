@@ -2323,6 +2323,7 @@ static const char *const __stats_connection_desc[] = {
   "checkpoint: scrub most recent time (msecs)",
   "checkpoint: scrub total time (msecs)",
   "checkpoint: stop timing stress active",
+  "checkpoint: the percentage of checkpoint sync time spent in reconciliation across all threads",
   "checkpoint: time spent on per-tree checkpoint work (usecs)",
   "checkpoint: total failed number of checkpoints",
   "checkpoint: total succeed number of checkpoints",
@@ -3373,6 +3374,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing checkpoint_scrub_recent */
     /* not clearing checkpoint_scrub_total */
     /* not clearing checkpoint_stop_stress_active */
+    /* not clearing checkpoint_sync_rec_pct */
     stats->checkpoint_tree_duration = 0;
     stats->checkpoints_total_failed = 0;
     stats->checkpoints_total_succeed = 0;
@@ -4526,6 +4528,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->checkpoint_scrub_recent += WT_STAT_CONN_READ(from, checkpoint_scrub_recent);
     to->checkpoint_scrub_total += WT_STAT_CONN_READ(from, checkpoint_scrub_total);
     to->checkpoint_stop_stress_active += WT_STAT_CONN_READ(from, checkpoint_stop_stress_active);
+    to->checkpoint_sync_rec_pct += WT_STAT_CONN_READ(from, checkpoint_sync_rec_pct);
     to->checkpoint_tree_duration += WT_STAT_CONN_READ(from, checkpoint_tree_duration);
     to->checkpoints_total_failed += WT_STAT_CONN_READ(from, checkpoints_total_failed);
     to->checkpoints_total_succeed += WT_STAT_CONN_READ(from, checkpoints_total_succeed);

@@ -532,7 +532,8 @@ struct __wt_cursor_layered {
     int64_t next_random_seed;
     u_int next_random_sample_size;
 
-    uint64_t snapshot_gen;        /* Snapshot generation on last update */
+    uint64_t snapshot_gen;        /* Snapshot generation on last access */
+    uint64_t read_timestamp;      /* Read timestamp on last access */
     uint64_t checkpoint_meta_lsn; /* The LSN of the last checkpoint metadata */
     bool leader;                  /* Leader/follower state on last update */
 

@@ -301,9 +301,13 @@ replay_run_reset(void)
     uint64_t ts;
     uint32_t lane;
 
-    /* Set every lane's commit timestamp to the current timestamp. */
+    /*
+     * Record the run-start timestamp so the early-run guard in replay_prepare_ts fires correctly
+     * for the first LANE_COUNT timestamps of this run.
+     */
     ts = g.timestamp;
     g.timestamp_copy = ts;
+    g.replay_start_timestamp = ts;
     for (lane = 0; lane < LANE_COUNT; ++lane)
         g.lanes[lane].last_commit_ts = ts;
     g.replay_cached_committed = ts;
@@ -369,17 +373,35 @@ replay_read_ts(TINFO *tinfo)
 wt_timestamp_t
 replay_prepare_ts(TINFO *tinfo)
 {
-    wt_timestamp_t prepare_ts, ts;
+    wt_timestamp_t last_commit_ts, prepare_ts, ts;
 
     testutil_assert(GV(RUNS_PREDICTABLE_REPLAY));
 
-    /* See if we're just starting a run. */
+    last_commit_ts = g.lanes[tinfo->lane].last_commit_ts;
+
+    /*
+     * A prepare timestamp must be strictly greater than all active read timestamps.
+     * replay_maximum_committed() is bounded from below by last_commit_ts for in-use lanes, so
+     * prepare_ts must be > last_commit_ts. We also need prepare_ts < commit_ts (replay_ts) to
+     * satisfy the durable > prepare invariant. If replay_ts is only 1 more than last_commit_ts,
+     * then we can only choose one timestamp for both prepare and commit/rollback, which violates
+     * the durable > prepare invariant. If replay_ts is not more than last_commit_ts, then we cannot
+     * even prepare this transaction. So in either of those cases, we return WT_TS_NONE to signal
+     * that we should skip preparing this transaction. The transaction will still be committed with
+     * replay_ts as its commit timestamp, but it won't be a prepared transaction. This is a safe
+     * fallback that allows the run to continue with some prepared transactions, rather than failing
+     * or having no prepared transactions at all.
+     */
+    if (tinfo->replay_ts <= last_commit_ts + 1)
+        return (WT_TS_NONE);
+
+    /*
+     * See if we're just starting a run (first LANE_COUNT timestamps after run-start). Use replay_ts
+     * - 1: since replay_ts > last_commit_ts + 1, replay_ts - 1 > last_commit_ts, and replay_ts - 1
+     * < replay_ts (the commit timestamp).
+     */
     if (tinfo->replay_ts == WT_TS_NONE || tinfo->replay_ts <= g.replay_start_timestamp + LANE_COUNT)
-        /*
-         * When we're starting a run, we'll just use the final commit timestamp for our prepare
-         * timestamp. We know that's safe.
-         */
-        prepare_ts = tinfo->replay_ts;
+        prepare_ts = tinfo->replay_ts - 1;
     else {
         /*
          * Our lane's current operation will have a commit timestamp tinfo->replay_ts. Our lane's
@@ -390,11 +412,14 @@ replay_prepare_ts(TINFO *tinfo)
          */
         ts = tinfo->replay_ts - LANE_COUNT / 2;
 
-        /* As a sanity check, make sure the timestamp hasn't completely aged out. */
-        if (ts < g.oldest_timestamp)
+        /*
+         * Use the midpoint if it is valid (not aged out and above the lane's last commit).
+         * Otherwise fall back to one less than the commit timestamp.
+         */
+        if (ts >= g.oldest_timestamp && ts > last_commit_ts)
             prepare_ts = ts;
         else
-            prepare_ts = tinfo->replay_ts;
+            prepare_ts = tinfo->replay_ts - 1;
     }
     return (prepare_ts);
 }

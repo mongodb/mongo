@@ -885,6 +885,14 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
                     *has_newer_updatesp = true;
                     /* We should write nothing to disk. */
                     prepare_rollback_tombstone = NULL;
+
+                    /*
+                     * Same reason as the aborted-prepared skip earlier: this rolled-back prepared
+                     * value has no in-chain fallback, so the on-disk cell must not be dropped on
+                     * this reconciliation.
+                     */
+                    if (upd->txnid == WT_TXN_ABORTED && upd->type != WT_UPDATE_TOMBSTONE)
+                        upd_select->skip_aborted_prepared_value = true;
                     continue;
                 }
 
@@ -917,8 +925,8 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
                      */
                     WT_ASSERT_ALWAYS(session,
                       !F_ISSET(r, WT_REC_EVICT) || prepare_rollback_tombstone != NULL ||
-                        upd->next != NULL || !WT_REC_HAS_ON_DISK(vpack) ||
-                        !WT_TIME_WINDOW_HAS_PREPARE(&vpack->tw),
+                        upd->next != NULL ||
+                        (WT_REC_HAS_ON_DISK(vpack) && !WT_TIME_WINDOW_HAS_PREPARE(&vpack->tw)),
                       "leaked prepared update.");
                 } else
                     WT_ASSERT(session, !*has_newer_updatesp);
@@ -1007,9 +1015,20 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
                  */
                 WT_ASSERT(session,
                   *write_prepare &&
-                    (prepare_state == WT_PREPARE_INPROGRESS ||
-                      prepare_state == WT_PREPARE_LOCKED) &&
-                    prepare_rollback_tombstone->next == upd);
+                    (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED));
+#ifdef HAVE_DIAGNOSTIC
+                /*
+                 * Walk from the rollback tombstone to the current prepared update; the only updates
+                 * permitted in between are reserve updates. Any other update would mean an unknown
+                 * entry slipped in front of the prepared update we are about to select.
+                 */
+                WT_UPDATE *scan;
+                for (scan = prepare_rollback_tombstone->next; scan != NULL && scan != upd;
+                     scan = scan->next)
+                    WT_ASSERT(
+                      session, scan->type == WT_UPDATE_RESERVE && scan->txnid == WT_TXN_ABORTED);
+                WT_ASSERT(session, scan == upd);
+#endif
                 /* We skipped the prepare rollback tombstone. */
                 WT_ASSERT(session, *has_newer_updatesp);
                 /*
@@ -1432,15 +1451,17 @@ __rec_fill_tw_from_upd_select(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_U
          * itself; there is no case that returns no update but sets the time window.)
          *
          * If the tombstone is restored from the disk except for disaggregated btrees or the history
-         * store, the onpage value and the history store value should have been restored together.
-         * Therefore, we should not end up here.
+         * store, the onpage value and the history store value should have been restored together,
+         * so we should not end up here. Preserve-prepared mode is the other allowed case: the
+         * on-disk cell can survive on its own as the rollback fallback for an unresolved aborted
+         * prepared update sitting in front of a restored tombstone, so a restored tombstone may
+         * legitimately appear without a paired full value on the chain.
          */
-        WT_ASSERT_ALWAYS(session,
+        WT_ASSERT(session,
           (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&
             !F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_HS)) ||
-            (!F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS)),
-          "A tombstone written to the disk image except for disaggregated storage or history store "
-          "should be accompanied by the full value.");
+            (!F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS)) ||
+            F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED));
         WT_RET(__rec_append_orig_value(session, page, tombstone, vpack, write_prepare));
 
         /*

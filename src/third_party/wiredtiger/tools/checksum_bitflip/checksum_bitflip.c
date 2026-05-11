@@ -1,5 +1,6 @@
 /*-
- * Public Domain 2024-present MongoDB, Inc.
+ * Public Domain 2014-present MongoDB, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *

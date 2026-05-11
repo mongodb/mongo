@@ -47,6 +47,7 @@ func_ok()
         -e '/int __handle_close_default$/d' \
         -e '/int __handle_general_default$/d' \
         -e '/int __handle_progress_default$/d' \
+        -e '/int panic_event_handler$/d' \
         -e '/int __im_file_close$/d' \
         -e '/int __im_file_lock$/d' \
         -e '/int __im_file_size$/d' \

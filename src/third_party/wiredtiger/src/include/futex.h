@@ -1,10 +1,11 @@
-#pragma once
 /*-
- * Copyright (c) 2024-present MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
+#pragma once
 
 /*
  * Futex API is intended for building other synchronization mechanisms, and is not suitable for

@@ -55,13 +55,6 @@ class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
             self.skipTest("fast truncate support is not enabled")
         super().setUp()
 
-    def create_config(self):
-        cfg = 'key_format=i,value_format=S'
-        # Disagg table: URIs need the layered block-manager/type hints on create.
-        if self.uri.startswith('table:'):
-            cfg += ',block_manager=disagg,type=layered'
-        return cfg
-
     def visible_keys(self):
         c = self.session.open_cursor(self.uri)
         keys = []
@@ -70,10 +63,16 @@ class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
         c.close()
         return keys
 
+    def session_create_config(self):
+        cfg = 'key_format=i,value_format=S'
+        if self.uri.startswith('table:'):
+            cfg += ',block_manager=disagg,type=layered'
+        return cfg
+
     def setup_follower(self):
         # Create the table on the leader, load nrows, checkpoint, then reopen the
         # connection as a follower picking up that checkpoint.
-        self.session.create(self.uri, self.create_config())
+        self.session.create(self.uri, self.session_create_config())
 
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.nrows + 1):

@@ -166,19 +166,18 @@ class test_layered81(wttest.WiredTigerTestCase):
         cursor.reset()
 
         # Advance to a new checkpoint that adds odd keys.
+        # In production, the follower replicates all leader operations to its ingest table
+        # before the checkpoint is picked up.
         odd_keys = list(range(1, self.nkeys, 2))
         self.insert_leader(odd_keys)
+        self.insert_follower(odd_keys)
         self.do_checkpoint()
 
-        # Trigger the cursor to pick up the new checkpoint via search, then verify full scan sees all 1000 keys.
-        all_keys = [self.fmt_key(i) for i in range(self.nkeys)]
-        cursor.set_key(self.fmt_key(0))
-        self.assertEqual(cursor.search(), 0)
-        cursor.reset()
+        # After picking up the checkpoint, the full scan must see all 1000 keys.
         keys = []
         while cursor.next() == 0:
             keys.append(cursor.get_key())
-        self.assertEqual(keys, all_keys)
+        self.assertEqual(keys, [self.fmt_key(i) for i in range(self.nkeys)])
         cursor.close()
 
     # -----------------------------------------------------------------------
@@ -204,6 +203,7 @@ class test_layered81(wttest.WiredTigerTestCase):
         update_keys = list(range(0, self.nkeys, 10))
         update_vals = [f"updated_{i:06d}" for i in update_keys]
         self.insert_leader(update_keys, values=update_vals)
+        self.insert_follower(update_keys, values=update_vals)
         self.do_checkpoint()
 
         # After checkpoint advance, should see new values for updated keys.
@@ -272,9 +272,10 @@ class test_layered81(wttest.WiredTigerTestCase):
 
         # Advance checkpoint: adds key 1000.
         self.insert_leader([1000])
+        self.insert_follower([1000])
         self.do_checkpoint()
 
-        # Without resetting, verify the cursor can find new stable data.
+        # Without resetting, verify the cursor can find new data.
         cursor.set_key(self.fmt_key(1000))
         self.assertEqual(cursor.search(), 0)
         self.assertEqual(cursor.get_value(), self.fmt_val(1000))
@@ -331,6 +332,7 @@ class test_layered81(wttest.WiredTigerTestCase):
 
         # Add 500 and checkpoint.
         self.insert_leader([500])
+        self.insert_follower([500])
         self.do_checkpoint()
 
         # After checkpoint advance, search_near should find exact match.
@@ -420,6 +422,7 @@ class test_layered81(wttest.WiredTigerTestCase):
 
         # Add more data outside bounds and checkpoint.
         self.insert_leader([1001, 1002])
+        self.insert_follower([1001, 1002])
         self.do_checkpoint()
 
         cursor.set_key(self.fmt_key(500))
@@ -469,8 +472,11 @@ class test_layered81(wttest.WiredTigerTestCase):
         cursor.bound("bound=upper")
 
         # Add odd keys inside and outside bounds.
+        # In production, the follower replicates all leader operations to its ingest table
+        # before the checkpoint is picked up.
         odd_keys = list(range(1, self.nkeys, 2))
         self.insert_leader(odd_keys)
+        self.insert_follower(odd_keys)
         self.do_checkpoint()
 
         cursor.set_key(self.fmt_key(500))
