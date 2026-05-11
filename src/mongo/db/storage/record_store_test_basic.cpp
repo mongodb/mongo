@@ -920,9 +920,10 @@ DEATH_TEST_REGEX(RecordStoreTestDeathTest,
         ASSERT(cursor->next());
         // Clears _hasRestored
         cursor->save();
-        auto restoreFailed = [&ru, &cursor]() {
+        auto restoreFailed = [&]() {
             try {
-                FailPointEnableBlock failPoint("WTWriteConflictExceptionForReads");
+                auto failPoint = harnessHelper->enableWriteConflictForReads(
+                    FailPoint::ModeOptions{.mode = FailPoint::Mode::alwaysOn});
                 // Should not set _hasRestored
                 cursor->restore(ru);
                 return false;

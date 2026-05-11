@@ -147,6 +147,17 @@ std::unique_ptr<RecoveryUnit> WiredTigerHarnessHelper::newRecoveryUnit() {
     return std::unique_ptr<RecoveryUnit>(_engine->newRecoveryUnit());
 }
 
+std::unique_ptr<FailPointEnableBlock> WiredTigerHarnessHelper::enableWriteConflictForWrites(
+    FailPoint::ModeOptions mode) {
+    return std::make_unique<FailPointEnableBlock>("WTWriteConflictException", std::move(mode));
+}
+
+std::unique_ptr<FailPointEnableBlock> WiredTigerHarnessHelper::enableWriteConflictForReads(
+    FailPoint::ModeOptions mode) {
+    return std::make_unique<FailPointEnableBlock>("WTWriteConflictExceptionForReads",
+                                                  std::move(mode));
+}
+
 std::unique_ptr<RecordStoreHarnessHelper> makeWTRecordStoreHarnessHelper(
     RecordStoreHarnessHelper::Options options) {
     return std::make_unique<WiredTigerHarnessHelper>(options);

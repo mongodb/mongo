@@ -92,6 +92,12 @@ public:
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
 
+    std::unique_ptr<FailPointEnableBlock> enableWriteConflictForWrites(
+        FailPoint::ModeOptions mode) override;
+
+    std::unique_ptr<FailPointEnableBlock> enableWriteConflictForReads(
+        FailPoint::ModeOptions mode) override;
+
     /**
      * Create an oplog record store without starting the oplog manager.
      */

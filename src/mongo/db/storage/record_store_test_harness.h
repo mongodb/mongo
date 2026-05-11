@@ -34,6 +34,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/test_harness_helper.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
@@ -72,6 +73,20 @@ public:
         clusteredRSOptions.allowOverwrite = true;
         return clusteredRSOptions;
     }
+
+    /**
+     * Enables a fail point that injects write conflicts into write operations on the underlying
+     * storage engine.
+     */
+    virtual std::unique_ptr<FailPointEnableBlock> enableWriteConflictForWrites(
+        FailPoint::ModeOptions mode) = 0;
+
+    /**
+     * Enables a fail point that injects write conflicts into read operations on the underlying
+     * storage engine.
+     */
+    virtual std::unique_ptr<FailPointEnableBlock> enableWriteConflictForReads(
+        FailPoint::ModeOptions mode) = 0;
 
     /**
      * Advances the stable timestamp of the engine.
