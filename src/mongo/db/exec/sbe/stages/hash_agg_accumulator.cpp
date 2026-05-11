@@ -338,7 +338,11 @@ void ArithmeticAverageHashAggAccumulatorPartial::finalizePartialAggregate(
 
     auto [tagPartialSum, valPartialSum] = partialAggregateArray->getAt(0);
     auto [ownedFinalizedSum, tagFinalizedSum, valFinalizedSum] =
-        vm::ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(tagPartialSum, valPartialSum);
+        vm::ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(tagPartialSum, valPartialSum)
+            .releaseToRaw();
+    tassert(12084100,
+            "Expected builtinDoubleDoublePartialSumFinalizeImpl to return owned value",
+            ownedFinalizedSum);
     resultObject->push_back(mongo::stage_builder::partialSumName, tagFinalizedSum, valFinalizedSum);
 
     result.reset(std::move(resultObj));
@@ -607,9 +611,7 @@ void CountHashAggAccumulatorPartial::finalizePartialAggregate(
     // serialized 'DoubleDoubleSum' that the merger will expect. As a bonus, we will be prepared to
     // count groups with more than 9 quintillion documents in the event that storage size expands
     // faster than expected.
-    auto [ownedDoubleDoubleSum, tagDoubleDoubleSum, valDoubleDoubleSum] =
-        vm::ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(tagCount, valCount);
-    result.reset(ownedDoubleDoubleSum, tagDoubleDoubleSum, valDoubleDoubleSum);
+    result.reset(vm::ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(tagCount, valCount));
 }
 }  // namespace sbe
 }  // namespace mongo

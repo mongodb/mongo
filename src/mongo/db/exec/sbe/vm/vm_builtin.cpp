@@ -715,7 +715,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::doubleDoubleSumFinalize:
             return builtinDoubleDoubleSumFinalize(arity).releaseToRaw();
         case Builtin::doubleDoublePartialSumFinalize:
-            return builtinDoubleDoublePartialSumFinalize(arity);
+            return builtinDoubleDoublePartialSumFinalize(arity).releaseToRaw();
         case Builtin::aggMergeDoubleDoubleSums:
             return builtinAggDoubleDoubleSum<true /*merging*/>(arity).releaseToRaw();
         case Builtin::aggStdDev:

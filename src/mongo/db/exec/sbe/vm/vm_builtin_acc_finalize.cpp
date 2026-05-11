@@ -36,18 +36,17 @@ namespace vm {
 // This function is necessary because 'aggDoubleDoubleSum()' result is 'Array' type but we need
 // to produce a scalar value out of it.
 value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSumFinalize(ArityType arity) {
-    auto [_, fieldTag, fieldValue] = getFromStack(0);
-    auto arr = value::getArrayView(fieldValue);
+    auto fieldView = viewFromStack(0);
+    auto arr = value::getArrayView(fieldView.value);
     return aggDoubleDoubleSumFinalizeImpl(arr);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePartialSumFinalize(
-    ArityType arity) {
-    auto [_, fieldTag, fieldValue] = getFromStack(0);
-    return builtinDoubleDoublePartialSumFinalizeImpl(fieldTag, fieldValue);
+value::TagValueMaybeOwned ByteCode::builtinDoubleDoublePartialSumFinalize(ArityType arity) {
+    auto fieldView = viewFromStack(0);
+    return builtinDoubleDoublePartialSumFinalizeImpl(fieldView.tag, fieldView.value);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(
+value::TagValueMaybeOwned ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(
     value::TypeTags fieldTag, value::Value fieldValue) {
     // For {$sum: 1}, we use aggSum instruction. In this case, the result type is guaranteed to be
     // either 'NumberInt32', 'NumberInt64', or 'NumberDouble'. We should transform the scalar result
@@ -123,15 +122,13 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePart
 }  // ByteCode::builtinDoubleDoublePartialSumFinalize
 
 value::TagValueMaybeOwned ByteCode::builtinStdDevPopFinalize(ArityType arity) {
-    auto [_, fieldTag, fieldValue] = getFromStack(0);
-
-    return aggStdDevFinalizeImpl(fieldValue, false /* isSamp */);
+    auto fieldView = viewFromStack(0);
+    return aggStdDevFinalizeImpl(fieldView.value, false /* isSamp */);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinStdDevSampFinalize(ArityType arity) {
-    auto [_, fieldTag, fieldValue] = getFromStack(0);
-
-    return aggStdDevFinalizeImpl(fieldValue, true /* isSamp */);
+    auto fieldView = viewFromStack(0);
+    return aggStdDevFinalizeImpl(fieldView.value, true /* isSamp */);
 }
 
 }  // namespace vm

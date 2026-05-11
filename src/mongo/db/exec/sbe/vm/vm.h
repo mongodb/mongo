@@ -370,7 +370,7 @@ public:
                                              value::Value rhsValue);
     value::TagValueMaybeOwned builtinConvertSimpleSumToDoubleDoubleSumImpl(
         value::TypeTags simpleSumTag, value::Value simpleSumVal);
-    static FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoublePartialSumFinalizeImpl(
+    static value::TagValueMaybeOwned builtinDoubleDoublePartialSumFinalizeImpl(
         value::TypeTags fieldTag, value::Value fieldValue);
     static value::TagValueMaybeOwned genericDiv(value::TypeTags lhsTag,
                                                 value::Value lhsValue,
@@ -850,8 +850,7 @@ private:
     value::TagValueMaybeOwned builtinAggDoubleDoubleSum(ArityType arity);
 
     value::TagValueMaybeOwned builtinDoubleDoubleSumFinalize(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoublePartialSumFinalize(
-        ArityType arity);
+    value::TagValueMaybeOwned builtinDoubleDoublePartialSumFinalize(ArityType arity);
 
     // The template parameter is false for a regular std dev and true if merging partially computed
     // standard devations.
