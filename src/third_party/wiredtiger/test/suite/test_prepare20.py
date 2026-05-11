@@ -263,6 +263,8 @@ class test_prepare20(wttest.WiredTigerTestCase):
 
         # Now crash.
         simulate_crash_restart(self, ".", "RESTART")
+        # Recovery may emit a WT_VERB_LOG NOTICE when salvaging a partial log tail.
+        self.ignoreStdoutPatternIfExists('WT_VERB_LOG')
         dcursor = self.session.open_cursor(data_uri)
         self.log_open(log_uri)
 
