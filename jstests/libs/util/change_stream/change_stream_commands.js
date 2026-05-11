@@ -806,9 +806,20 @@ class RenameCommand extends Command {
         this.dropAfterRename = dropAfterRename;
     }
 
+    _getTargetDb() {
+        // Use dbName+collName as the target DB identifier so each writer in db-absent
+        // mode (where both writers have distinct dbNames and collNames) gets a unique
+        // target DB regardless of the shared random seed.
+        return this.crossDatabase ? `${this.dbName}_${this.collName}_target` : this.dbName;
+    }
+
     execute(connection) {
-        const targetDb = this.crossDatabase ? `${this.dbName}_target` : this.dbName;
+        const targetDb = this._getTargetDb();
         const targetColl = `${this.collName}_renamed`;
+
+        if (this.crossDatabase) {
+            this._ensureTargetDbOnSourceShard(connection, targetDb);
+        }
 
         if (this.targetShouldExist) {
             assert.commandWorked(connection.getDB(targetDb).createCollection(targetColl));
@@ -823,8 +834,24 @@ class RenameCommand extends Command {
         );
 
         if (this.dropAfterRename) {
-            assert.commandWorked(connection.getDB(targetDb).runCommand({drop: targetColl}));
+            if (this.crossDatabase) {
+                // Drop the entire target DB (a scratch DB unique to this instance) so
+                // the next FSM cycle starts with it absent, letting _ensureTargetDbOnSourceShard
+                // always use a plain enableSharding. Emits a dropDatabase event at cluster
+                // level (accounted for in getChangeEvents).
+                assert.commandWorked(connection.getDB(targetDb).runCommand({dropDatabase: 1}));
+            } else {
+                assert.commandWorked(connection.getDB(targetDb).runCommand({drop: targetColl}));
+            }
         }
+    }
+
+    _ensureTargetDbOnSourceShard(connection, targetDb) {
+        // The target DB is always absent here (dropped at the end of the previous
+        // execution, or never created). Just create it on the same primary shard as
+        // the source DB — no movePrimary needed.
+        const sourceDbPrimary = getDbPrimary(connection, this.dbName);
+        new CreateDatabaseCommand({dbName: targetDb, primaryShard: sourceDbPrimary}).execute(connection);
     }
 
     toString() {
@@ -841,7 +868,7 @@ class RenameCommand extends Command {
         }
         // NOTE: MongoDB does NOT emit 'dropIndexes' when renaming collections,
         // regardless of whether they were resharded or not. Verified via testing.
-        const targetDb = this.crossDatabase ? `${this.dbName}_target` : this.dbName;
+        const targetDb = this._getTargetDb();
         const targetColl = `${this.collName}_renamed`;
         const events = [];
 
@@ -856,6 +883,29 @@ class RenameCommand extends Command {
             events.push({operationType: "create", ns: {db: targetDb, coll: targetColl}});
         }
 
+        // Cross-DB rename is implemented as copy+drop on sharded clusters.
+        // The source collection receives a 'drop' event, not a 'rename' event.
+        if (this.crossDatabase) {
+            events.push({operationType: "drop", ns: {db: this.dbName, coll: this.collName}});
+            switch (watchMode) {
+                case ChangeStreamWatchMode.kCollection:
+                    events.push({operationType: "invalidate"});
+                    break;
+                case ChangeStreamWatchMode.kDb:
+                    break;
+                case ChangeStreamWatchMode.kCluster:
+                    if (this.dropAfterRename) {
+                        // Dropping the target DB emits a drop for the collection inside it
+                        // followed by a dropDatabase event.
+                        events.push({operationType: "drop", ns: {db: targetDb, coll: targetColl}});
+                        events.push({operationType: "dropDatabase", ns: {db: targetDb}});
+                    }
+                    break;
+            }
+            return events;
+        }
+
+        // Same-DB rename: produces a 'rename' event.
         events.push({
             operationType: "rename",
             ns: {db: this.dbName, coll: this.collName},
@@ -866,9 +916,7 @@ class RenameCommand extends Command {
                 events.push({operationType: "invalidate"});
                 break;
             case ChangeStreamWatchMode.kDb:
-                if (!this.crossDatabase) {
-                    events.push({operationType: "drop", ns: {db: targetDb, coll: targetColl}});
-                }
+                events.push({operationType: "drop", ns: {db: targetDb, coll: targetColl}});
                 break;
             case ChangeStreamWatchMode.kCluster:
                 events.push({operationType: "drop", ns: {db: targetDb, coll: targetColl}});

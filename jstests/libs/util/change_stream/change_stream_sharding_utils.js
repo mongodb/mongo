@@ -149,13 +149,13 @@ function computeExpectedEvents(commands, watchMode) {
         .map((e) => ({event: e, cursorClosed: e.operationType === "invalidate"}));
 }
 
-function buildCommandTrace(commands, source) {
+function buildCommandTrace(commands, source, watchMode = ChangeStreamWatchMode.kCollection) {
     return commands.map((cmd, i) => {
         const shardIds = Array.isArray(cmd.shardSet) ? cmd.shardSet.map((s) => s._id) : [];
         return {
             cmdIndex: i,
             cmdName: cmd.constructor.name,
-            events: cmd.getChangeEvents(ChangeStreamWatchMode.kCollection).map((e) => e.operationType),
+            events: cmd.getChangeEvents(watchMode).map((e) => e.operationType),
             ctx: cmd.collectionCtx ?? null,
             shardSet: shardIds,
             primaryShard: cmd.primaryShard ? cmd.primaryShard._id : null,
@@ -165,8 +165,8 @@ function buildCommandTrace(commands, source) {
     });
 }
 
-function buildAggregatedCommandTrace(writers) {
-    return writers.flatMap((w) => buildCommandTrace(w.commands, `${w.dbName}.${w.collName}`));
+function buildAggregatedCommandTrace(writers, watchMode = ChangeStreamWatchMode.kCollection) {
+    return writers.flatMap((w) => buildCommandTrace(w.commands, `${w.dbName}.${w.collName}`, watchMode));
 }
 
 /**
@@ -208,7 +208,7 @@ function buildReaderSpecs(commandsByWriter, startTime, batchSize, watchMode) {
                         dbName: w.dbName,
                         collName: w.collName,
                         numberOfEventsToRead: events.length,
-                        debugCommandTrace: buildCommandTrace(w.commands, `${w.dbName}.${w.collName}`),
+                        debugCommandTrace: buildCommandTrace(w.commands, `${w.dbName}.${w.collName}`, watchMode),
                     },
                 };
             });
@@ -230,7 +230,7 @@ function buildReaderSpecs(commandsByWriter, startTime, batchSize, watchMode) {
                         dbName,
                         collName: writers[0].collName,
                         numberOfEventsToRead: eventCount,
-                        debugCommandTrace: buildAggregatedCommandTrace(writers),
+                        debugCommandTrace: buildAggregatedCommandTrace(writers, watchMode),
                     },
                 };
             });
@@ -249,7 +249,7 @@ function buildReaderSpecs(commandsByWriter, startTime, batchSize, watchMode) {
                         dbName: "admin",
                         collName: null,
                         numberOfEventsToRead: eventCount,
-                        debugCommandTrace: buildAggregatedCommandTrace(commandsByWriter),
+                        debugCommandTrace: buildAggregatedCommandTrace(commandsByWriter, watchMode),
                     },
                 },
             ];

@@ -212,6 +212,12 @@ class ChangeStreamReader {
             pipeline.push({$match: {operationType: {$nin: config.excludeOperationTypes}}});
         }
 
+        // TODO SERVER-107688: drop leaked tmp.renameCollection events from cross-DB renames.
+        // Remove once the server marks those internal writes fromMigrate.
+        if (config.watchMode === ChangeStreamWatchMode.kCluster) {
+            pipeline.push({$match: {"ns.coll": {$not: /^tmp[A-Za-z0-9]+\.renameCollection$/}}});
+        }
+
         const cursorOptions = {};
         if (config.batchSize !== undefined) {
             cursorOptions.batchSize = config.batchSize;
