@@ -562,7 +562,7 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsTracksMergedSpillBatches) {
     // [1234567]             1 merge
     constexpr size_t kExpectedMergedSpills = 4;
 
-    std::vector<IteratorPtr> ranges;
+    auto& ranges = spiller->iterators();
     ranges.reserve(kInitialRanges);
     for (size_t i = 0; i < kInitialRanges; ++i) {
         std::vector<IWPair> oneRecord{{static_cast<int>(i), -static_cast<int>(i)}};
@@ -574,7 +574,6 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsTracksMergedSpillBatches) {
     spiller->mergeSpills(opts,
                          IWSorter::Settings{},
                          sorterStats,
-                         ranges,
                          IWComparator(ASC),
                          kNumTargetedSpills,
                          kMaxSpillsPerMerge);
@@ -600,12 +599,13 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDisjointRanges) {
     auto thirdRange = spillSingleKey(100);  // [2, 3)
 
     // Reorder to create a gap: [0, 1), [2, 3), [1, 2).
-    std::vector<IteratorPtr> disjointRanges{firstRange, thirdRange, secondRange};
+    spiller->iterators().push_back(std::move(firstRange));
+    spiller->iterators().push_back(std::move(thirdRange));
+    spiller->iterators().push_back(std::move(secondRange));
     SorterStats sorterStats{nullptr};
 
     ASSERT_THROWS_CODE(
-        spiller->mergeSpills(
-            opts, IWSorter::Settings{}, sorterStats, disjointRanges, IWComparator(ASC), 2, 2),
+        spiller->mergeSpills(opts, IWSorter::Settings{}, sorterStats, IWComparator(ASC), 2, 2),
         DBException,
         12017001);
 }
@@ -620,15 +620,12 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDecreasingOffsets) {
         return std::make_shared<RangeOnlyIterator>(SorterRange{start, end, 0});
     };
 
-    std::vector<IteratorPtr> invalidRanges{
-        makeRange(0, 1),
-        makeRange(2, 1),  // end < start
-    };
+    spiller->iterators().push_back(makeRange(0, 1));
+    spiller->iterators().push_back(makeRange(2, 1));  // end < start
     SorterStats sorterStats{nullptr};
 
     ASSERT_THROWS_CODE(
-        spiller->mergeSpills(
-            opts, IWSorter::Settings{}, sorterStats, invalidRanges, IWComparator(ASC), 1, 2),
+        spiller->mergeSpills(opts, IWSorter::Settings{}, sorterStats, IWComparator(ASC), 1, 2),
         DBException,
         12017000);
 }
@@ -1613,7 +1610,7 @@ TYPED_TEST(SpillerMergeDiskSpaceTest, MergeSpillsRespectsDiskSpaceCheck) {
     std::vector<IWPair> data{{1, 10}, {2, 20}, {3, 30}, {4, 40}};
     std::span<IWPair> span{data};
 
-    std::vector<IteratorPtr> ranges;
+    auto& ranges = spiller->iterators();
     ranges.push_back(spiller->spill(opts, IWSorter::Settings{}, span.subspan(0, 2)));
     ranges.push_back(spiller->spill(opts, IWSorter::Settings{}, span.subspan(2, 2)));
 
@@ -1624,7 +1621,6 @@ TYPED_TEST(SpillerMergeDiskSpaceTest, MergeSpillsRespectsDiskSpaceCheck) {
     ASSERT_THROWS_CODE(spiller->mergeSpills(opts,
                                             IWSorter::Settings{},
                                             sorterStats,
-                                            ranges,
                                             IWComparator(ASC),
                                             /*numTargetedSpills=*/1,
                                             /*maxSpillsPerMerge=*/2),

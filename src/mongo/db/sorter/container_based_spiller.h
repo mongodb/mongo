@@ -456,13 +456,12 @@ public:
     void mergeSpills(const SortOptions& opts,
                      const SpillerBase<Key, Value, Comparator>::Settings& settings,
                      SorterStats& stats,
-                     std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
                      Comparator comp,
                      std::size_t numTargetedSpills,
                      std::size_t maxSpillsPerMerge) override {
         std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>> oldIters;
-        while (iters.size() > numTargetedSpills) {
-            oldIters.swap(iters);
+        while (this->_iterators.size() > numTargetedSpills) {
+            oldIters.swap(this->_iterators);
             for (size_t i = 0; i < oldIters.size(); i += maxSpillsPerMerge) {
                 auto count = std::min(maxSpillsPerMerge, oldIters.size() - i);
                 auto spillsToMerge = std::span(oldIters).subspan(i, count);
@@ -541,7 +540,7 @@ public:
                                        });
                 }
 
-                iters.push_back(writer->done());
+                this->_iterators.push_back(writer->done());
                 _current += numSpilled;
                 _containerBasedStorage().updateCurrKey(_current);
 

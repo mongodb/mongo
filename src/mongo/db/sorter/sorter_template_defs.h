@@ -464,12 +464,12 @@ public:
     typename Sorter<Key, Value>::PersistedState getPersistedState() override {
         this->_spiller->getStorage().keep();
 
+        auto& iters = this->_spiller->iterators();
         std::vector<SorterRange> ranges;
-        ranges.reserve(this->_iters.size());
-        std::transform(this->_iters.begin(),
-                       this->_iters.end(),
-                       std::back_inserter(ranges),
-                       [](auto&& it) { return it->getRange(); });
+        ranges.reserve(iters.size());
+        std::transform(iters.begin(), iters.end(), std::back_inserter(ranges), [](auto&& it) {
+            return it->getRange();
+        });
 
         return {this->_spiller->getStorage().getStorageIdentifier(), std::move(ranges)};
     }
@@ -494,17 +494,17 @@ protected:
             return;
         }
 
-        if (this->_iters.size() > numTargetedSpills) {
+        auto& iters = this->_spiller->iterators();
+        if (iters.size() > numTargetedSpills) {
             LOGV2_INFO(8203700,
                        "Merging spills",
-                       "currentNumSpills"_attr = this->_iters.size(),
+                       "currentNumSpills"_attr = iters.size(),
                        "targetNumSpills"_attr = numTargetedSpills,
                        "maxSpillsPerMerge"_attr = maxSpillsPerMerge);
 
             _spiller->mergeSpills(this->_opts,
                                   this->_settings,
                                   this->_stats,
-                                  this->_iters,
                                   _comp,
                                   numTargetedSpills,
                                   maxSpillsPerMerge);
@@ -620,15 +620,16 @@ public:
         invariant(this->_spiller != nullptr);
         uassert(ErrorCodes::BadValue, "Cannot resume sorter from empty ranges", !ranges.empty());
 
-        this->_iters.reserve(ranges.size());
+        auto& iters = this->_spiller->iterators();
+        iters.reserve(ranges.size());
         std::transform(ranges.begin(),
                        ranges.end(),
-                       std::back_inserter(this->_iters),
+                       std::back_inserter(iters),
                        [this](const SorterRange& range) {
                            return this->_spiller->getStorage().getSortedIterator(range,
                                                                                  this->_settings);
                        });
-        this->_stats.setSpilledRanges(this->_iters.size());
+        this->_stats.setSpilledRanges(iters.size());
     }
 
     template <typename DataProducer>
@@ -668,7 +669,7 @@ public:
     std::unique_ptr<Iterator> done() override {
         invariant(!std::exchange(_done, true));
 
-        if (this->_iters.empty()) {
+        if (!this->_spiller || this->_spiller->iterators().empty()) {
             sort();
             if (this->_opts.moveSortedDataIntoIterator) {
                 return std::make_unique<InMemIterator<Key, Value, Comparator>>(std::move(_data),
@@ -680,7 +681,7 @@ public:
         spill();
         this->_mergeSpills();
 
-        return sorter::merge<Key, Value>(this->_iters, this->_opts, this->_comp);
+        return sorter::merge<Key, Value>(this->_spiller->iterators(), this->_opts, this->_comp);
     }
 
     std::unique_ptr<Iterator> pause() override {
@@ -688,7 +689,9 @@ public:
         invariant(!_paused);
 
         _paused = true;
-        tassert(8248300, "Spilled sort cannot be paused", this->_iters.empty());
+        tassert(8248300,
+                "Spilled sort cannot be paused",
+                !this->_spiller || this->_spiller->iterators().empty());
         return std::make_unique<InMemReadOnlyIterator<Key, Value, std::vector<Data>>>(_data);
     }
 
@@ -759,7 +762,8 @@ private:
         // _data may have grown very large. Even though it's clear()ed, we need to
         // free the excess memory.
         _data.shrink_to_fit();
-        this->_iters.push_back(iterator);
+        auto& iters = this->_spiller->iterators();
+        iters.push_back(iterator);
 
         auto& memPool = this->_memPool;
         if (memPool) {
@@ -773,9 +777,9 @@ private:
         this->_stats.incrementSpilledRanges();
 
         // Merge spills to remain below the `iteratorsMaxBytesSize` threshold.
-        if (this->_iters.size() >= this->iteratorsMaxNum) {
+        if (iters.size() >= this->iteratorsMaxNum) {
             this->updateSpillsNumToRespectMemoryLimits();
-            this->_mergeSpills(this->_iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
+            this->_mergeSpills(iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
         }
     }
 
@@ -955,7 +959,7 @@ public:
     }
 
     std::unique_ptr<Iterator> done() override {
-        if (this->_iters.empty()) {
+        if (!this->_spiller || this->_spiller->iterators().empty()) {
             sort();
             if (this->_opts.moveSortedDataIntoIterator) {
                 return std::make_unique<InMemIterator<Key, Value, Comparator>>(std::move(_data),
@@ -968,7 +972,7 @@ public:
         this->_mergeSpills();
 
         _done = true;
-        return sorter::merge<Key, Value>(this->_iters, this->_opts, this->_comp);
+        return sorter::merge<Key, Value>(this->_spiller->iterators(), this->_opts, this->_comp);
     }
 
     std::unique_ptr<Iterator> pause() override {
@@ -976,7 +980,9 @@ public:
         invariant(!_paused);
         _paused = true;
 
-        tassert(8248301, "Spilled sort cannot be paused", this->_iters.empty());
+        tassert(8248301,
+                "Spilled sort cannot be paused",
+                !this->_spiller || this->_spiller->iterators().empty());
         return std::make_unique<InMemReadOnlyIterator<Key, Value, std::vector<Data>>>(_data);
     }
 
@@ -1108,7 +1114,7 @@ private:
         sort();
         updateCutoff();
 
-        auto iters = this->_spiller->spill(this->_opts, this->_settings, _data);
+        auto iterator = this->_spiller->spill(this->_opts, this->_settings, _data);
 
         this->_stats.incrementSpilledKeyValuePairs(_data.size());
         _data.clear();
@@ -1116,15 +1122,16 @@ private:
         // free the excess memory.
         _data.shrink_to_fit();
 
-        this->_iters.push_back(iters);
+        auto& iters = this->_spiller->iterators();
+        iters.push_back(iterator);
 
         this->_stats.resetMemUsage();
         this->_stats.incrementSpilledRanges();
 
         // Merge spills to remain below the `iteratorsMaxBytesSize` threshold.
-        if (this->_iters.size() >= this->iteratorsMaxNum) {
+        if (iters.size() >= this->iteratorsMaxNum) {
             this->updateSpillsNumToRespectMemoryLimits();
-            this->_mergeSpills(this->_iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
+            this->_mergeSpills(iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
         }
     }
 

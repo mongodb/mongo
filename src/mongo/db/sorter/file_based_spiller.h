@@ -526,7 +526,6 @@ public:
     void mergeSpills(const SortOptions& opts,
                      const Settings& settings,
                      SorterStats& stats,
-                     std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
                      Comparator comp,
                      std::size_t numTargetedSpills,
                      std::size_t maxSpillsPerMerge) override;
@@ -552,22 +551,20 @@ private:
 };
 
 template <typename Key, typename Value, typename Comparator>
-void FileBasedSpiller<Key, Value, Comparator>::mergeSpills(
-    const SortOptions& opts,
-    const Settings& settings,
-    SorterStats& sorterStats,
-    std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
-    Comparator comp,
-    std::size_t numTargetedSpills,
-    std::size_t maxSpillsPerMerge) {
+void FileBasedSpiller<Key, Value, Comparator>::mergeSpills(const SortOptions& opts,
+                                                           const Settings& settings,
+                                                           SorterStats& sorterStats,
+                                                           Comparator comp,
+                                                           std::size_t numTargetedSpills,
+                                                           std::size_t maxSpillsPerMerge) {
     std::shared_ptr<File> newSpillsFile =
         std::make_shared<File>(sorter::nextFileName(_spillDir), _fileStats);
     FileBasedStorage<Key, Value> sorterStorage(
         newSpillsFile, this->getStorage().getDbName(), this->getStorage().getChecksumVersion());
 
     std::vector<std::shared_ptr<Iterator>> iterators;
-    while (iters.size() > numTargetedSpills) {
-        iterators.swap(iters);
+    while (this->_iterators.size() > numTargetedSpills) {
+        iterators.swap(this->_iterators);
 
         newSpillsFile = std::make_shared<File>(sorter::nextFileName(_spillDir), _fileStats);
         LOGV2_DEBUG(6033103,
@@ -606,7 +603,7 @@ void FileBasedSpiller<Key, Value, Comparator>::mergeSpills(
                 writer->addAlreadySorted(pair.first, pair.second);
                 ++pairCount;
             }
-            iters.push_back(writer->done());
+            this->_iterators.push_back(writer->done());
             sorterStats.incrementMergedSpills();
             sorterStats.incrementSpilledRanges();
             sorterStats.incrementSpilledKeyValuePairs(pairCount);
@@ -616,7 +613,7 @@ void FileBasedSpiller<Key, Value, Comparator>::mergeSpills(
         LOGV2_DEBUG(6033101,
                     1,
                     "Merged spills",
-                    "currentNumSpills"_attr = iters.size(),
+                    "currentNumSpills"_attr = this->_iterators.size(),
                     "targetNumSpills"_attr = numTargetedSpills);
     }
 

@@ -509,21 +509,19 @@ public:
         std::priority_queue<Data, std::vector<Data>, Greater<Key, Value, Comparator>>& heap) = 0;
 
     /**
-     * Merge 'iters' in groups of at most 'maxSpillsPerMerge' until at most
+     * Merge the spiller's iterators in groups of at most 'maxSpillsPerMerge' until at most
      * 'numTargetedSpills' remain.
-     *
-     * 'iters' must be ordered by increasing range start offset and form one contiguous
-     * range.
      */
     virtual void mergeSpills(const SortOptions& opts,
                              const Settings& settings,
                              SorterStats& stats,
-                             std::vector<std::shared_ptr<Iterator<Key, Value>>>& iters,
                              Comparator comp,
                              std::size_t numTargetedSpills,
                              std::size_t maxSpillsPerMerge) = 0;
 
     virtual Storage<Key, Value>& getStorage() = 0;
+
+    virtual std::vector<std::shared_ptr<Iterator<Key, Value>>>& iterators() = 0;
 
     /**
      * Retrieves the directory where the storage is created for spilling data.
@@ -574,8 +572,13 @@ public:
         return *_storage;
     }
 
+    std::vector<std::shared_ptr<Iterator<Key, Value>>>& iterators() override {
+        return _iterators;
+    }
+
 protected:
     std::unique_ptr<Storage<Key, Value>> _storage;
+    std::vector<std::shared_ptr<Iterator<Key, Value>>> _iterators;
     int64_t _minAvailableDiskBytesToSpill;
 
 private:
@@ -693,8 +696,6 @@ public:
 
 protected:
     SortOptions _opts;
-
-    std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
 
     boost::optional<SharedBufferFragmentBuilder> _memPool;
 };
