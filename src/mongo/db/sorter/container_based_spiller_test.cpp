@@ -739,14 +739,17 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
     std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}}, {100, {}}, {75, {}}, {125, {}}};
     std::span span{data};
 
-    auto it1 = spiller.spill(SortOptions{},
-                             Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                             span.subspan(0, 2));
-    auto it2 = spiller.spill(SortOptions{},
-                             Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                             span.subspan(2, 2));
+    spiller.spill(SortOptions{},
+                  Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                  span.subspan(0, 2));
+    spiller.spill(SortOptions{},
+                  Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                  span.subspan(2, 2));
 
     EXPECT_EQ(spilled, 2);
+    ASSERT_EQ(spiller.iterators().size(), 2);
+    auto it1 = spiller.iterators()[0];
+    auto it2 = spiller.iterators()[1];
 
     ASSERT_TRUE(it1->more());
     EXPECT_EQ(it1->next().first, 50);
@@ -788,16 +791,15 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
         {50, {}}, {100, {}}, {75, {}}, {125, {}}, {25, {}}};
     std::span<std::pair<IntWrapper, NullValue>> span{data};
 
-    auto& iterators = spiller.iterators();
-    iterators.push_back(spiller.spill(SortOptions{},
-                                      Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                                      span.subspan(0, 2)));
-    iterators.push_back(spiller.spill(SortOptions{},
-                                      Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                                      span.subspan(2, 2)));
-    iterators.push_back(spiller.spill(SortOptions{},
-                                      Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                                      span.subspan(4, 1)));
+    spiller.spill(SortOptions{},
+                  Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                  span.subspan(0, 2));
+    spiller.spill(SortOptions{},
+                  Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                  span.subspan(2, 2));
+    spiller.spill(SortOptions{},
+                  Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                  span.subspan(4, 1));
 
     SorterStats sorterStats{nullptr};
     spiller.mergeSpills(SortOptions{},
@@ -807,6 +809,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
                         2,
                         2);
 
+    auto& iterators = spiller.iterators();
     EXPECT_EQ(iterators.size(), 2);
     EXPECT_EQ(container.entries().size(), data.size());
     EXPECT_EQ(spilled, 3 + 2);  // 3 spills and 2 merge passes
@@ -863,11 +866,10 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
                                                        {105, {}}};
     std::span<std::pair<IntWrapper, NullValue>> span{data};
 
-    auto& iterators = spiller.iterators();
     for (size_t i = 0; i < data.size(); ++i) {
-        iterators.push_back(spiller.spill(SortOptions{},
-                                          Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
-                                          span.subspan(i, 1)));
+        spiller.spill(SortOptions{},
+                      Spiller<IntWrapper, NullValue, IWComparator>::Settings{},
+                      span.subspan(i, 1));
     }
 
     SorterStats sorterStats{nullptr};
@@ -878,6 +880,7 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
                         3,
                         2);
 
+    auto& iterators = spiller.iterators();
     EXPECT_EQ(iterators.size(), 3);
     EXPECT_EQ(container.entries().size(), data.size());
     EXPECT_EQ(spilled, data.size() + 8);  // data.size() spills and 8 merge passes

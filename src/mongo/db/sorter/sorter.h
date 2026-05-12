@@ -494,9 +494,9 @@ public:
         Settings;
     typedef std::pair<Key, Value> Data;
 
-    virtual std::shared_ptr<Iterator<Key, Value>> spill(const SortOptions& opts,
-                                                        const Settings& settings,
-                                                        std::span<std::pair<Key, Value>> data) = 0;
+    virtual void spill(const SortOptions& opts,
+                       const Settings& settings,
+                       std::span<std::pair<Key, Value>> data) = 0;
 
     virtual std::unique_ptr<Iterator<Key, Value>> spillUnique(
         const SortOptions& opts,
@@ -541,10 +541,10 @@ public:
         : _storage(std::move(storage)),
           _minAvailableDiskBytesToSpill(minAvailableDiskBytesToSpill) {}
 
-    std::shared_ptr<Iterator<Key, Value>> spill(const SortOptions& opts,
-                                                const Settings& settings,
-                                                std::span<std::pair<Key, Value>> data) override {
-        return _spill(opts, settings, data)->done();
+    void spill(const SortOptions& opts,
+               const Settings& settings,
+               std::span<std::pair<Key, Value>> data) override {
+        _iterators.push_back(_spill(opts, settings, data)->done());
     }
 
     std::unique_ptr<Iterator<Key, Value>> spillUnique(

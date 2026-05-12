@@ -755,15 +755,13 @@ private:
 
         sort();
 
-        auto iterator = this->_spiller->spill(this->_opts, this->_settings, _data);
+        this->_spiller->spill(this->_opts, this->_settings, _data);
 
         this->_stats.incrementSpilledKeyValuePairs(_data.size());
         _data.clear();
         // _data may have grown very large. Even though it's clear()ed, we need to
         // free the excess memory.
         _data.shrink_to_fit();
-        auto& iters = this->_spiller->iterators();
-        iters.push_back(iterator);
 
         auto& memPool = this->_memPool;
         if (memPool) {
@@ -777,6 +775,7 @@ private:
         this->_stats.incrementSpilledRanges();
 
         // Merge spills to remain below the `iteratorsMaxBytesSize` threshold.
+        auto& iters = this->_spiller->iterators();
         if (iters.size() >= this->iteratorsMaxNum) {
             this->updateSpillsNumToRespectMemoryLimits();
             this->_mergeSpills(iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
@@ -1114,7 +1113,7 @@ private:
         sort();
         updateCutoff();
 
-        auto iterator = this->_spiller->spill(this->_opts, this->_settings, _data);
+        this->_spiller->spill(this->_opts, this->_settings, _data);
 
         this->_stats.incrementSpilledKeyValuePairs(_data.size());
         _data.clear();
@@ -1122,13 +1121,11 @@ private:
         // free the excess memory.
         _data.shrink_to_fit();
 
-        auto& iters = this->_spiller->iterators();
-        iters.push_back(iterator);
-
         this->_stats.resetMemUsage();
         this->_stats.incrementSpilledRanges();
 
         // Merge spills to remain below the `iteratorsMaxBytesSize` threshold.
+        auto& iters = this->_spiller->iterators();
         if (iters.size() >= this->iteratorsMaxNum) {
             this->updateSpillsNumToRespectMemoryLimits();
             this->_mergeSpills(iters.size() / 2, this->_spillsNumToRespectMemoryLimits);
