@@ -99,7 +99,7 @@ result = testDB.runCommand({
 assert.commandFailedWithCode(result, 5491300);
 
 // Tests that the 'exchange' option cannot be specified by external client with 'apiStrict' set to
-// true.
+// true. The exchange check fires before the apiStrict check, so expect BadValue.
 result = testDB.runCommand({
     aggregate: collName,
     pipeline: [{$project: {_id: 0}}],
@@ -109,7 +109,7 @@ result = testDB.runCommand({
     apiStrict: true,
     exchange: {policy: "broadcast", consumers: NumberInt(10)},
 });
-assert.commandFailedWithCode(result, ErrorCodes.APIStrictError);
+assert.commandFailedWithCode(result, [ErrorCodes.BadValue, ErrorCodes.APIStrictError]);
 
 // Tests that the 'fromRouter' option cannot be specified by external client with 'apiStrict' set to
 // true.

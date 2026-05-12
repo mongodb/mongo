@@ -105,6 +105,7 @@ assert.commandWorked(
 );
 
 // Test that the 'exchange' parameter cannot be specified in a command sent to mongoS.
+// External clients are now rejected with BadValue before reaching the mongos-level check (51028).
 assert.commandFailedWithCode(
     mongosDB.runCommand({
         aggregate: mongosColl.getName(),
@@ -112,10 +113,11 @@ assert.commandFailedWithCode(
         cursor: {},
         exchange: {policy: "roundrobin", consumers: NumberInt(2)},
     }),
-    51028,
+    [ErrorCodes.BadValue, 51028],
 );
 
 // Test that the command fails when all internal parameters have been specified.
+// Exchange from an external client fails with BadValue before any other check.
 assert.commandFailedWithCode(
     mongosDB.runCommand({
         aggregate: mongosColl.getName(),
@@ -125,7 +127,7 @@ assert.commandFailedWithCode(
         fromRouter: true,
         exchange: {policy: "roundrobin", consumers: NumberInt(2)},
     }),
-    51028,
+    [ErrorCodes.BadValue, 51028],
 );
 
 // Test that the command fails when all internal parameters but exchange have been specified.
