@@ -357,6 +357,14 @@ void onCommitIndexBuild(OperationContext* opCtx,
     invariant(shard_role_details::getLocker(opCtx)->isWriteLocked(),
               str::stream() << "onCommitIndexBuild: " << buildUUID);
 
+    if (replState->protocol == IndexBuildProtocol::kPrimaryDriven) {
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit([buildUUID = replState->buildUUID](
+                                                                 OperationContext* opCtx,
+                                                                 boost::optional<Timestamp>) {
+            index_builds::primary_driven::registry(opCtx->getServiceContext()).remove(buildUUID);
+        });
+    }
+
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     const auto& collUUID = replState->collectionUUID;
     const auto& indexes = replState->getIndexes();

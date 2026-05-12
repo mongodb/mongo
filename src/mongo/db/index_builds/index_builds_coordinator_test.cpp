@@ -626,6 +626,47 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
         indexBuildsCoord->inProgForCollection(singlePhaseUUID, IndexBuildProtocol::kSinglePhase));
 }
 
+TEST_F(IndexBuildsCoordinatorTest, CommitRemovesBuildFromPrimaryDrivenRegistry) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto opCtx = operationContext();
+
+    auto ns = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.CommitRemovesBuildFromPrimaryDrivenRegistry");
+    ASSERT_OK(storageInterface()->createCollection(opCtx, ns, CollectionOptions{}));
+    auto collUUID = [&] {
+        auto collection = getCollectionExclusive(opCtx, ns);
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, collection.getCollectionPtr(), BSON("_id" << 1)));
+        wuow.commit();
+        return collection.uuid();
+    }();
+
+    auto indexes = toIndexBuildInfoVec(
+        std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1")},
+        *opCtx->getServiceContext()->getStorageEngine(),
+        ns.dbName());
+    auto buildUUID = UUID::gen();
+
+    auto& registry = index_builds::primary_driven::registry(opCtx->getServiceContext());
+    registry.add(buildUUID, ns.dbName(), collUUID, indexes, boost::none);
+
+    auto future = unittest::assertGet(IndexBuildsCoordinator::get(opCtx)->startIndexBuild(
+        opCtx,
+        ns.dbName(),
+        collUUID,
+        indexes,
+        buildUUID,
+        {.indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven,
+         .indexBuildProtocol = IndexBuildProtocol::kPrimaryDriven,
+         .commitQuorum = CommitQuorumOptions{CommitQuorumOptions::kPrimarySelfVote}}));
+    ASSERT_OK(future.getNoThrow());
+
+    EXPECT_TRUE(registry.all().empty());
+}
+
 // Persists a minimal kPrimaryDriven ResumeIndexInfo for `buildUUID` at the supplied phase,
 // wired to the side-writes/skipped/sorter idents that `index_builds::primary_driven::start`
 // already created via `indexes`. Lets resume-on-step-up tests stage the same setup without
