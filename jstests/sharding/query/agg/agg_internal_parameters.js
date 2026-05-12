@@ -26,103 +26,126 @@ assert.commandWorked(
 assert.commandFailedWithCode(
     mongosDB.runCommand(
         {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, needsMerge: false}),
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 
 // Test that the command fails if we have 'needsMerge: true' without 'fromRouter'.
 assert.commandFailedWithCode(
     mongosDB.runCommand(
         {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, needsMerge: true}),
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 
 // Test that the command fails if we have 'isClusterQueryWithoutShardKeyCmd: true' without
 // 'fromRouter'.
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: [],
-    cursor: {},
-    $_isClusterQueryWithoutShardKeyCmd: true
-}),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        $_isClusterQueryWithoutShardKeyCmd: true,
+    }),
+    ErrorCodes.InvalidOptions,
+);
 
 // Test that the command fails if we have 'isClusterQueryWithoutShardKeyCmd: true' with
 // 'fromRouter: false'.
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: [],
-    cursor: {},
-    fromRouter: false,
-    $_isClusterQueryWithoutShardKeyCmd: true
-}),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        fromRouter: false,
+        $_isClusterQueryWithoutShardKeyCmd: true,
+    }),
+    ErrorCodes.InvalidOptions,
+);
 
 // Test that 'fromRouter: true' cannot be specified in a command sent to mongoS.
 assert.commandFailedWithCode(
     mongosDB.runCommand(
         {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, fromRouter: true}),
-    51089);
+    51089,
+);
 
 // Test that 'fromRouter: false' can be specified in a command sent to mongoS.
-assert.commandWorked(mongosDB.runCommand(
-    {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, fromRouter: false}));
+assert.commandWorked(
+    mongosDB.runCommand(
+        {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, fromRouter: false}),
+);
 
 // Test that the command fails if we have 'needsMerge: true' with 'fromRouter: false'.
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: [],
-    cursor: {},
-    needsMerge: true,
-    fromRouter: false
-}),
-                             51089);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        needsMerge: true,
+        fromRouter: false,
+    }),
+    51089,
+);
 
 // Test that the command fails if we have 'needsMerge: true' with 'fromRouter: true'.
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: [],
-    cursor: {},
-    needsMerge: true,
-    fromRouter: true
-}),
-                             51089);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        needsMerge: true,
+        fromRouter: true,
+    }),
+    51089,
+);
 
 // Test that 'needsMerge: false' can be specified in a command sent to mongoS along with
 // 'fromRouter: false'.
-assert.commandWorked(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: [],
-    cursor: {},
-    needsMerge: false,
-    fromRouter: false
-}));
+assert.commandWorked(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        needsMerge: false,
+        fromRouter: false,
+    }),
+);
 
 // Test that the 'exchange' parameter cannot be specified in a command sent to mongoS.
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: [],
-    cursor: {},
-    exchange: {policy: 'roundrobin', consumers: NumberInt(2)}
-}),
-                             51028);
+// External clients are now rejected with BadValue before reaching the mongos-level check (51028).
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        exchange: {policy: "roundrobin", consumers: NumberInt(2)},
+    }),
+    [ErrorCodes.BadValue, 51028],
+);
 
 // Test that the command fails when all internal parameters have been specified.
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: [],
-    cursor: {},
-    needsMerge: true,
-    fromRouter: true,
-    exchange: {policy: 'roundrobin', consumers: NumberInt(2)}
-}),
-                             51028);
+// Exchange from an external client fails with BadValue before any other check.
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        needsMerge: true,
+        fromRouter: true,
+        exchange: {policy: "roundrobin", consumers: NumberInt(2)},
+    }),
+    [ErrorCodes.BadValue, 51028],
+);
 
 // Test that the command fails when all internal parameters but exchange have been specified.
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: [],
-    cursor: {},
-    needsMerge: true,
-    fromRouter: true
-}),
-                             51089);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [],
+        cursor: {},
+        needsMerge: true,
+        fromRouter: true,
+    }),
+    51089,
+);
 
 st.stop();

@@ -75,7 +75,7 @@ function runPipelineAndGetDiagnostics({db, collName, commandObj, source}) {
  * Helpers to verify that memory tracking stats are correctly reported for each diagnostic source.
  ******************************************************************************************************/
 
-function verifySlowQueryLogMetrics({
+export function verifySlowQueryLogMetrics({
     logLines,
     verifyOptions,
 }) {
@@ -156,7 +156,7 @@ function verifySlowQueryLogMetrics({
     }
 }
 
-function verifyProfilerMetrics({
+export function verifyProfilerMetrics({
     profilerEntries,
     verifyOptions,
 }) {
