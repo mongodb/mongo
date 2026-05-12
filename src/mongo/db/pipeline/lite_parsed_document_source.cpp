@@ -47,8 +47,6 @@ using ParserMap = LiteParsedDocumentSource::ParserMap;
 
 namespace {
 
-// Empty vector used by LiteParsedDocumentSources which do not have a sub pipeline.
-inline static std::vector<LiteParsedPipeline> kNoSubPipeline = {};
 
 ParserMap parserMap;
 
@@ -207,8 +205,8 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
     return lpds;
 }
 
-std::vector<LiteParsedPipeline>& LiteParsedDocumentSource::getMutableSubPipelines() {
-    return kNoSubPipeline;
+std::vector<LiteParsedPipeline>* LiteParsedDocumentSource::getMutableSubPipelines() {
+    return nullptr;
 }
 
 const ParserMap& LiteParsedDocumentSource::getParserMap() {

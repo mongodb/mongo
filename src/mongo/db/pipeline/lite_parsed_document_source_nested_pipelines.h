@@ -100,8 +100,8 @@ public:
         return Status::OK();
     }
 
-    std::vector<LiteParsedPipeline>& getMutableSubPipelines() override {
-        return _pipelines;
+    std::vector<LiteParsedPipeline>* getMutableSubPipelines() override {
+        return &_pipelines;
     }
 
     /**

@@ -600,18 +600,17 @@ public:
     virtual void assertSupportsMultiDocumentTransaction() const {}
 
     /**
-     * Returns this document source's subpipelines (const view). If none exist, a reference to an
-     * empty vector is returned.
+     * Returns this document source's subpipelines (const view). Returns nullptr if none exist.
      */
-    const std::vector<LiteParsedPipeline>& getSubPipelines() const {
+    const std::vector<LiteParsedPipeline>* getSubPipelines() const {
         return const_cast<LiteParsedDocumentSource*>(this)->getMutableSubPipelines();
     }
 
     /**
-     * Returns mutable subpipelines. Overridden by stages that have subpipelines (e.g. $lookup,
-     * $facet).
+     * Returns mutable subpipelines, or nullptr if this stage has no subpipelines. Overridden by
+     * stages that have subpipelines (e.g. $lookup, $facet).
      */
-    virtual std::vector<LiteParsedPipeline>& getMutableSubPipelines();
+    virtual std::vector<LiteParsedPipeline>* getMutableSubPipelines();
 
     /**
      * Returns the name of the stage that this LiteParsedDocumentSource represents.

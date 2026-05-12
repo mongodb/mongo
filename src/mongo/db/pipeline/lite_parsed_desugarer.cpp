@@ -58,9 +58,10 @@ bool LiteParsedDesugarer::desugar(LiteParsedPipeline* pipeline,
         auto hybridSearchFlagEnabled = ifrContext &&
             ifrContext->getSavedFlagValue(feature_flags::gFeatureFlagExtensionsInsideHybridSearch);
         if (hybridSearchFlagEnabled) {
-            auto& subpipelines = stage.getMutableSubPipelines();
-            for (auto& subpipelineLpp : subpipelines) {
-                modified |= LiteParsedDesugarer::desugar(&subpipelineLpp, ifrContext);
+            if (auto* subpipelines = stage.getMutableSubPipelines()) {
+                for (auto& subpipelineLpp : *subpipelines) {
+                    modified |= LiteParsedDesugarer::desugar(&subpipelineLpp, ifrContext);
+                }
             }
         }
 

@@ -421,7 +421,7 @@ TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupRequiredPrivileges) {
 
 TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupHasEmptySubPipelines) {
     auto liteParsed = parseLiteGraphLookup(getExpCtx());
-    ASSERT_TRUE(liteParsed->getMutableSubPipelines().empty());
+    ASSERT_TRUE(liteParsed->getMutableSubPipelines()->empty());
 }
 
 }  // namespace

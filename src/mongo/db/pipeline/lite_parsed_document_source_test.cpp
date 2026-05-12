@@ -417,8 +417,12 @@ TEST(LiteParsedPipelineClone, CloneClonesSubpipelinesForNestedStages) {
     ASSERT_NE(original.getStages()[0].get(), cloned.getStages()[0].get());
 
     // Verify both stages have subpipelines.
-    const auto& originalSubPipelines = original.getStages()[0]->getSubPipelines();
-    const auto& clonedSubPipelines = cloned.getStages()[0]->getSubPipelines();
+    auto* originalSubPipelinesPtr = original.getStages()[0]->getSubPipelines();
+    auto* clonedSubPipelinesPtr = cloned.getStages()[0]->getSubPipelines();
+    ASSERT_NE(originalSubPipelinesPtr, nullptr);
+    ASSERT_NE(clonedSubPipelinesPtr, nullptr);
+    const auto& originalSubPipelines = *originalSubPipelinesPtr;
+    const auto& clonedSubPipelines = *clonedSubPipelinesPtr;
 
     ASSERT_EQ(originalSubPipelines.size(), 1);
     ASSERT_EQ(clonedSubPipelines.size(), 1);
@@ -510,7 +514,9 @@ TEST(LiteParsedPipelineClone, CloneRemainsValidAfterOriginalIsDestroyed) {
     ASSERT_EQ(cloned->getStages().size(), 1);
 
     // Verify the stage data is still accessible.
-    const auto& clonedSubPipelines = cloned->getStages()[0]->getSubPipelines();
+    auto* clonedSubPipelinesPtr = cloned->getStages()[0]->getSubPipelines();
+    ASSERT_NE(clonedSubPipelinesPtr, nullptr);
+    const auto& clonedSubPipelines = *clonedSubPipelinesPtr;
     ASSERT_EQ(clonedSubPipelines.size(), 1);
     ASSERT_EQ(clonedSubPipelines[0].getStages().size(), 1);
 
@@ -543,7 +549,9 @@ TEST(LiteParsedPipelineClone, OriginalRemainsValidAfterCloneIsDestroyed) {
     ASSERT_EQ(original.getStages().size(), 1);
 
     // Verify the stage data is still accessible.
-    const auto& originalSubPipelines = original.getStages()[0]->getSubPipelines();
+    auto* originalSubPipelinesPtr = original.getStages()[0]->getSubPipelines();
+    ASSERT_NE(originalSubPipelinesPtr, nullptr);
+    const auto& originalSubPipelines = *originalSubPipelinesPtr;
     ASSERT_EQ(originalSubPipelines.size(), 1);
     ASSERT_EQ(originalSubPipelines[0].getStages().size(), 1);
 

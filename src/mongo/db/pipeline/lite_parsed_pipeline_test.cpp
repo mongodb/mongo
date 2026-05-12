@@ -257,7 +257,9 @@ TEST(LiteParsedPipelineTest, NestedLookupSubpipelineGetParseNssIsForeignCollecti
 
     ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
 
-    const auto& subPipelines = pipeline.getStages()[0]->getSubPipelines();
+    auto* subPipelinesPtr = pipeline.getStages()[0]->getSubPipelines();
+    ASSERT_NE(subPipelinesPtr, nullptr);
+    const auto& subPipelines = *subPipelinesPtr;
     ASSERT_EQ(subPipelines.size(), 1U);
     ASSERT_EQ(subPipelines[0].getOriginalParseNss(), kForeignNss);
 }
@@ -276,9 +278,10 @@ TEST(LiteParsedPipelineTest, NestedMergeSubpipelineGetParseNssIsTargetCollection
 
     ASSERT_EQ(pipeline.getOriginalParseNss(), kTestNss);
 
-    const auto& subPipelines = pipeline.getStages()[0]->getSubPipelines();
-    ASSERT_EQ(subPipelines.size(), 1U);
-    ASSERT_EQ(subPipelines[0].getOriginalParseNss(), kTargetNss);
+    const auto* subPipelines = pipeline.getStages()[0]->getSubPipelines();
+    ASSERT_NE(subPipelines, nullptr);
+    ASSERT_EQ(subPipelines->size(), 1U);
+    ASSERT_EQ((*subPipelines)[0].getOriginalParseNss(), kTargetNss);
 }
 
 TEST(LiteParsedPipelineTest, HandleViewPreservesParseNss) {

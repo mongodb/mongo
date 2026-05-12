@@ -145,8 +145,10 @@ void LiteParsedPipeline::tickGlobalStageCounters() const {
         // Tick counter corresponding to current stage.
         aggStageCounters.increment(stage->getParseTimeName(), 1);
         // Recursively step through any sub-pipelines.
-        for (auto&& subPipeline : stage->getSubPipelines()) {
-            subPipeline.tickGlobalStageCounters();
+        if (auto* subPipelines = stage->getSubPipelines()) {
+            for (auto&& subPipeline : *subPipelines) {
+                subPipeline.tickGlobalStageCounters();
+            }
         }
     }
 }
@@ -182,8 +184,10 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
                 opCtx, stageName, stageApiStrict, stageClientType, sometimesCallback);
         }
 
-        for (auto&& subPipeline : stage->getSubPipelines()) {
-            subPipeline.validate(opCtx, performApiVersionChecks);
+        if (auto* subPipelines = stage->getSubPipelines()) {
+            for (auto&& subPipeline : *subPipelines) {
+                subPipeline.validate(opCtx, performApiVersionChecks);
+            }
         }
     }
 }
@@ -211,8 +215,10 @@ void LiteParsedPipeline::checkStagesAllowedInViewDefinition() const {
                 "$score is currently unsupported in a view definition",
                 !(stage->getParseTimeName() == "$score"));
 
-        for (auto&& subPipeline : stage->getSubPipelines()) {
-            subPipeline.checkStagesAllowedInViewDefinition();
+        if (auto* subPipelines = stage->getSubPipelines()) {
+            for (auto&& subPipeline : *subPipelines) {
+                subPipeline.checkStagesAllowedInViewDefinition();
+            }
         }
     }
 }
