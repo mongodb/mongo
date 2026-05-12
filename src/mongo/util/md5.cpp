@@ -29,22 +29,36 @@
 
 #include "mongo/util/md5.h"
 
+#include "mongo/util/assert_util.h"
+
 #include <cstring>
 #include <sstream>
 
 namespace mongo {
 
+namespace {
+
+inline void check_md5_return(int ret) {
+    // Intentionally not providing any details and using the same report for all errors.
+    uassert(12220700, "MD5 operation failed", ret == CRYPT_OK);
+}
+}  // namespace
+
 void md5_init_state(md5_state_t* pms) {
+    invariant(pms);
     memset(pms, 0, sizeof(md5_state_t));
-    md5_init(pms);
+    check_md5_return(md5_init(pms));  // won't fail unless pms is null
 }
 
 void md5_append(md5_state_t* pms, const md5_byte_t* data, int nbytes) {
-    md5_process(pms, data, nbytes);
+    invariant(pms);
+    check_md5_return(md5_process(pms, data, nbytes));
 }
 
 void md5_finish(md5_state_t* pms, md5_byte_t digest[16]) {
-    md5_done(pms, digest);
+    invariant(pms);
+    invariant(digest);
+    check_md5_return(md5_done(pms, digest));
 }
 
 void md5(const void* buf, int nbytes, md5digest digest) {
@@ -77,5 +91,4 @@ std::string md5simpledigest(const void* buf, int nbytes) {
 std::string md5simpledigest(const std::string& s) {
     return md5simpledigest(s.data(), s.size());
 }
-
 }  // namespace mongo
