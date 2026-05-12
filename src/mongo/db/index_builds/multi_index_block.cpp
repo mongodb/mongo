@@ -965,10 +965,9 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
                                       objToIndex,
                                       progress->get(WithLock::withoutLock())->hits()));
 
-        // The external sorter is not part of the storage engine and therefore does not need
-        // a WriteUnitOfWork to write keys. In case there are constraint violations being
-        // suppressed, resulting in a write to the side table, all WUOW and write conflict exception
-        // handling for the side table write is handled internally.
+        // In case there are constraint violations being suppressed, resulting in a write to the
+        // side table, WUOW and write conflict exception handling for the side table write are
+        // handled internally.
 
         // If kRelaxConstraints, shouldRelaxConstraints will simply be ignored and all errors
         // suppressed. If kRelaxContraintsCallback, shouldRelaxConstraints is used to determine
