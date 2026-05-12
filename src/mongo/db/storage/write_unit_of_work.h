@@ -70,7 +70,8 @@ public:
     enum OplogEntryGroupType {
         kDontGroup,
         kGroupForTransaction,
-        kGroupForPossiblyRetryableOperations
+        kGroupForPossiblyRetryableOperations,
+        kGroupForAtomicWrite,
     };
 
     WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupType = kDontGroup);

@@ -81,6 +81,7 @@ enums:
         values:
             kLegacyMultiOpType: 0
             kApplyOpsAppliedSeparately: 1
+            kApplyOpsAppliedAtomically: 2
     CommandType:
         description: "The type of the command in an oplog entry"
         type: string
