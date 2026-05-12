@@ -194,6 +194,11 @@ touch include/vtune/VTuneWrapper.h
 mkdir -p include/wasm
 cp extract/js/src/_build/js/src/wasm/WasmBuiltinModuleGenerated.h include/wasm/
 
+# clang-format rules
+cp mozilla-release/.clang-format include/
+cp mozilla-release/.clang-format extract/
+cp mozilla-release/.clang-format-ignore extract/
+
 rm -rf \
     extract/js/src/_build/install_dist_bin.track \
     extract/js/src/_build/install_dist_include.track \

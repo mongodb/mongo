@@ -1,0 +1,62 @@
+BasedOnStyle: Google
+ColumnLimit: 80
+
+# Prevent the loss of indentation with these macros
+MacroBlockBegin: "^\
+JS_BEGIN_MACRO|\
+NS_INTERFACE_MAP_BEGIN|\
+NS_INTERFACE_TABLE_HEAD|\
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION|\
+NS_IMPL_CYCLE_COLLECTION_.*_BEGIN|\
+NS_INTERFACE_TABLE_HEAD_CYCLE_COLLECTION_INHERITED|\
+NS_INTERFACE_TABLE_BEGIN|\
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED|\
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED|\
+NS_QUERYFRAME_HEAD$"
+MacroBlockEnd: "^\
+JS_END_MACRO|\
+NS_INTERFACE_MAP_END|\
+NS_IMPL_CYCLE_COLLECTION_.*_END|\
+NS_INTERFACE_TABLE_END|\
+NS_INTERFACE_TABLE_TAIL.*|\
+NS_INTERFACE_MAP_END_.*|\
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END_INHERITED|\
+NS_IMPL_CYCLE_COLLECTION_UNLINK_END_INHERITED|\
+NS_QUERYFRAME_TAIL.*$"
+
+# Attribute macros used in classes. Workaround for behavior noted at
+# https://github.com/llvm/llvm-project/issues/94184.
+AttributeMacros: [
+    MOZ_STATIC_CLASS,
+    MOZ_STATIC_LOCAL_CLASS,
+    MOZ_STACK_CLASS,
+    MOZ_NONHEAP_CLASS,
+    MOZ_HEAP_CLASS,
+    MOZ_NON_TEMPORARY_CLASS,
+    MOZ_TEMPORARY_CLASS,
+    MOZ_RAII,
+    MOZ_ONLY_USED_TO_AVOID_STATIC_CONSTRUCTORS,
+    MOZ_TRIVIAL_CTOR_DTOR,
+    MOZ_IS_REFPTR,
+    MOZ_IS_SMARTPTR_TO_REFCOUNTED,
+    MOZ_NEEDS_NO_VTABLE_TYPE,
+    MOZ_NON_MEMMOVABLE,
+    MOZ_NEEDS_MEMMOVABLE_TYPE,
+    MOZ_NEEDS_MEMMOVABLE_MEMBERS,
+    MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS,
+    MOZ_NON_PARAM,
+    MOZ_NON_AUTOABLE
+]
+
+
+SortIncludes: false
+IndentPPDirectives: AfterHash
+StatementMacros: [MARKUPMAP, ASSERT_TRUE, ASSERT_FALSE, TEST, CHECK]
+
+# The Google coding style states:
+# You should do this consistently within a single file, so, when modifying an
+# existing file, use the style in that file.
+# Let's be more prescriptive and default to the one used in the Mozilla
+# coding style
+DerivePointerAlignment: false
+PointerAlignment: Left
