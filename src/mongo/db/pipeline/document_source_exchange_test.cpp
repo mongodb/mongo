@@ -907,6 +907,34 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidMissingKeys) {
         50967);
 }
 
+// Validates that when a document field value is exactly MaxKey, the exchange correctly
+// routes the document to the last consumer bucket.
+TEST_F(DocumentSourceExchangeTest, KeyRangeRoutesMaxKeyToLastBucket) {
+    // Source emits one document whose 'a' field is MaxKey.
+    auto source = DocumentSourceMock::createForTest(Document{{"a", Value(MAXKEY)}}, getExpCtx());
+
+    const std::vector<BSONObj> boundaries = {BSON("a" << MINKEY), BSON("a" << MAXKEY)};
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kKeyRange);
+    spec.setKey(BSON("a" << 1));
+    spec.setBoundaries(boundaries);
+    spec.setConsumers(1);
+    spec.setBufferSize(1024);
+
+    auto opCtx = getOpCtx();
+    boost::intrusive_ptr<exec::agg::Exchange> ex =
+        new exec::agg::Exchange(opCtx, std::move(spec), Pipeline::create({source}, getExpCtx()));
+
+    // Validate that the exchange correctly processes the document.
+    size_t docs = 0;
+    for (auto input = ex->getNext(opCtx, 0, nullptr); input.isAdvanced();
+         input = ex->getNext(opCtx, 0, nullptr)) {
+        ++docs;
+    }
+    ASSERT_EQ(1u, docs);
+}
+
 TEST_F(DocumentSourceExchangeTest, QueryShape) {
     const size_t nDocs = 500;
 
