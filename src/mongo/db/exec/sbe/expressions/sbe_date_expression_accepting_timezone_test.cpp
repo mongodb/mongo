@@ -89,7 +89,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfYear) {
 
     // Test $dayOfYear returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
     auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
@@ -120,7 +120,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfYear) {
 
     dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledDayOfYear.get(), 1);
 }
@@ -141,7 +141,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfMonth) {
 
     // Test $dayOfMonth returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
     auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
@@ -172,7 +172,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfMonth) {
 
     dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledDayOfMonth.get(), 1);
 }
@@ -193,7 +193,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfWeek) {
 
     // Test $dayOfWeek returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
     auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
@@ -224,7 +224,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicDayOfWeek) {
 
     dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledDayOfWeek.get(), 5);
 }
@@ -245,7 +245,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicYear) {
     auto compiledYear = compileExpression(*yearExpr);
 
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
 
     // Test $year
@@ -317,7 +317,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicYear) {
         value::bitcastFrom<int64_t>(
             kDefaultTimeZone.createFromDateParts(2023, 7, 18, 10, 10, 10, 0).toMillisSinceEpoch()));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledYear.get(), 2023);
 
@@ -347,7 +347,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMonth) {
 
     // Test $month returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(
         value::TypeTags::Date,
@@ -383,7 +383,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMonth) {
         value::bitcastFrom<int64_t>(
             kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 10, 10, 0).toMillisSinceEpoch()));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledMonth.get(), 7);
 }
@@ -404,7 +404,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicHour) {
 
     // Test $hour returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(value::TypeTags::Date,
                        value::bitcastFrom<int64_t>(
@@ -440,7 +440,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicHour) {
                            kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
                                .toMillisSinceEpoch()));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledHour.get(), 10);
 }
@@ -461,7 +461,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMinute) {
 
     // Test $minute returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(value::TypeTags::Date,
                        value::bitcastFrom<int64_t>(
@@ -497,7 +497,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMinute) {
                            kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
                                .toMillisSinceEpoch()));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledMinute.get(), 11);
 }
@@ -518,7 +518,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicSecond) {
 
     // Test $second returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(value::TypeTags::Date,
                        value::bitcastFrom<int64_t>(
@@ -554,7 +554,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicSecond) {
                            kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
                                .toMillisSinceEpoch()));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledSecond.get(), 12);
 }
@@ -575,7 +575,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMillisecond) {
 
     // Test $millisecond returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(value::TypeTags::Date,
                        value::bitcastFrom<int64_t>(
@@ -612,7 +612,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMillisecond) {
                            kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
                                .toMillisSinceEpoch()));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledMillisecond.get(), 123);
 }
@@ -633,7 +633,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicWeek) {
 
     // Test $week returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(value::TypeTags::Date,
                        value::bitcastFrom<int64_t>(
@@ -669,7 +669,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicWeek) {
                            kDefaultTimeZone.createFromDateParts(1996, 1, 1, 10, 11, 12, 123)
                                .toMillisSinceEpoch()));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledWeek.get(), 0);
 }
@@ -690,7 +690,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeekYear) {
 
     // Test $isoWeekYear returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(value::TypeTags::Date,
                        value::bitcastFrom<int64_t>(
@@ -727,7 +727,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeekYear) {
                            kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
                                .toMillisSinceEpoch()));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertIsoWeekYearExpression(compiledISOWeekYear.get(), static_cast<int64_t>(1996));
 }
@@ -748,7 +748,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISODayOfWeek) {
 
     // Test $isoDayOfWeek returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(value::TypeTags::Date,
                        value::bitcastFrom<int64_t>(
@@ -785,7 +785,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISODayOfWeek) {
                            kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
                                .toMillisSinceEpoch()));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledISODayOfWeek.get(), 4);
 }
@@ -806,7 +806,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeek) {
 
     // Test $isoWeek returns the correct value.
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     dateAccessor.reset(value::TypeTags::Date,
                        value::bitcastFrom<int64_t>(
@@ -842,7 +842,7 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeek) {
                            kDefaultTimeZone.createFromDateParts(1996, 1, 1, 10, 11, 12, 123)
                                .toMillisSinceEpoch()));
     auto timezone = tzdb->utcZone();
-    timezoneObjAccessor.reset(
+    timezoneObjAccessor.reset_raw(
         false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
     runAndAssertExpression(compiledISOWeek.get(), 1);
 }

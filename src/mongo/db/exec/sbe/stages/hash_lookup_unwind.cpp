@@ -219,7 +219,7 @@ PlanState HashLookupUnwindStage::getNext() {
             tassert(11846701, "Expected non-empty innerMatch", innerMatch);
             _lookupStageOutputAccessor.reset(*innerMatch);
             if (_indexSlot) {
-                _lookupStageIndexAccessor.reset(
+                _lookupStageIndexAccessor.reset_raw(
                     false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(_matchIndex));
                 ++_matchIndex;
             }
@@ -228,10 +228,10 @@ PlanState HashLookupUnwindStage::getNext() {
         }
         _outerKeyOpen = false;
         if (_joinType == sbe::JoinType::Left && !_innerSideMatched) {
-            _lookupStageOutputAccessor.reset(false, value::TypeTags::Nothing, 0);
+            _lookupStageOutputAccessor.reset_raw(false, value::TypeTags::Nothing, 0);
             if (_indexSlot) {
                 // Match $unwind semantics: null when no match/element.
-                _lookupStageIndexAccessor.reset(false, value::TypeTags::Null, 0);
+                _lookupStageIndexAccessor.reset_raw(false, value::TypeTags::Null, 0);
             }
             return trackPlanState(PlanState::ADVANCED);
         }

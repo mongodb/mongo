@@ -86,9 +86,9 @@ TEST_F(SBEDateFromStringTest, BasicDateFromString) {
 
     // Setup timezone database.
     auto timezoneDatabase = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(false,
-                             value::TypeTags::timeZoneDB,
-                             value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
+    timezoneDBAccessor.reset_raw(false,
+                                 value::TypeTags::timeZoneDB,
+                                 value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
 
     struct TestCase {
         std::pair<value::TypeTags, value::Value> timezone;
@@ -161,9 +161,9 @@ TEST_F(SBEDateFromStringTest, DateFromStringNoFormat) {
 
     // Setup timezone database.
     auto timezoneDatabase = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(false,
-                             value::TypeTags::timeZoneDB,
-                             value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
+    timezoneDBAccessor.reset_raw(false,
+                                 value::TypeTags::timeZoneDB,
+                                 value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
 
     struct TestCase {
         std::pair<value::TypeTags, value::Value> timezone;
@@ -238,9 +238,9 @@ TEST_F(SBEDateFromStringTest, DateFromStringNoThrow) {
 
     // Setup timezone database.
     auto timezoneDatabase = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(false,
-                             value::TypeTags::timeZoneDB,
-                             value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
+    timezoneDBAccessor.reset_raw(false,
+                                 value::TypeTags::timeZoneDB,
+                                 value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
 
     struct TestCase {
         std::pair<value::TypeTags, value::Value> timezone;
@@ -323,9 +323,9 @@ TEST_F(SBEDateFromStringTest, DateFromStringNoThrowNoFormat) {
 
     // Setup timezone database.
     auto timezoneDatabase = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(false,
-                             value::TypeTags::timeZoneDB,
-                             value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
+    timezoneDBAccessor.reset_raw(false,
+                                 value::TypeTags::timeZoneDB,
+                                 value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
 
     struct TestCase {
         std::pair<value::TypeTags, value::Value> timezone;

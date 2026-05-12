@@ -62,7 +62,7 @@ MONGO_COMPILER_ALWAYS_INLINE inline void placeFieldsFromRecordInAccessors(
         // and just use equality comparison.
         auto name = StringData{scanFieldNames[0]};
         auto [tag, val] = bson::getField(rawBson, name);
-        scanFieldAccessors.front().reset(false, tag, val);
+        scanFieldAccessors.front().reset_raw(false, tag, val);
     } else {
         // If we're looking for 2 or more fields, it's more efficient to use the hashtable.
         for (auto& accessor : scanFieldAccessors) {
@@ -79,7 +79,7 @@ MONGO_COMPILER_ALWAYS_INLINE inline void placeFieldsFromRecordInAccessors(
 
             if (accessor != nullptr) {
                 auto [tag, val] = bson::convertToView(bsonElement, end, field.size());
-                accessor->reset(false, tag, val);
+                accessor->reset_raw(false, tag, val);
                 if ((--fieldsToMatch) == 0) {
                     // No need to scan any further so bail out early.
                     break;

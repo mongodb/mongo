@@ -217,7 +217,7 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
     // Change the agg slot accessors to point to the blocks.
     for (size_t i = 0; i < _outAggBlocks.size(); ++i) {
         auto& outBlock = _outAggBlocks[i];
-        _outAggBlockAccessors[i].reset(
+        _outAggBlockAccessors[i].reset_raw(
             false, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(&outBlock));
     }
 
@@ -442,20 +442,20 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
                 continue;
             }
 
-            _accumulatorBitsetAccessor.reset(false,
-                                             value::TypeTags::valueBlock,
-                                             value::bitcastFrom<value::ValueBlock*>(&bitmask));
+            _accumulatorBitsetAccessor.reset_raw(false,
+                                                 value::TypeTags::valueBlock,
+                                                 value::bitcastFrom<value::ValueBlock*>(&bitmask));
         } else {
             // The partition bitmap would be all 1s if we computed it, so we can just use
             // the input bitmap in this case, that we already checked for not being made
             // by all False values.
-            _accumulatorBitsetAccessor.reset(false, bitmapInTag, bitmapInVal);
+            _accumulatorBitsetAccessor.reset_raw(false, bitmapInTag, bitmapInVal);
         }
 
         executeBlockLevelAccumulatorCode(tokenizedKeys.keys[partition]);
     }
     // Avoid leaving a pointer to inaccessible memory in the accessor.
-    _accumulatorBitsetAccessor.reset(false, value::TypeTags::Nothing, 0);
+    _accumulatorBitsetAccessor.reset_raw(false, value::TypeTags::Nothing, 0);
 }
 
 void BlockHashAggStage::runAccumulatorsElementWise(const value::DeblockedTagVals& extractedBitmap) {
@@ -479,7 +479,7 @@ void BlockHashAggStage::runAccumulatorsElementWise(const value::DeblockedTagVals
     // Call executeRowLevelAccumulatorCode() to run the row accumulators.
     executeRowLevelAccumulatorCode(extractedBitmap, extractedGbs, extractedData);
 
-    _accumulatorBitsetAccessor.reset(false, value::TypeTags::Nothing, 0);
+    _accumulatorBitsetAccessor.reset_raw(false, value::TypeTags::Nothing, 0);
 }
 
 boost::optional<std::vector<size_t>> BlockHashAggStage::tokenizeTokenInfos(
@@ -759,7 +759,7 @@ void BlockHashAggStage::open(bool reOpen) {
         switchToDisk();
     }
 
-    _accumulatorBitsetAccessor.reset(false, value::TypeTags::Nothing, 0);
+    _accumulatorBitsetAccessor.reset_raw(false, value::TypeTags::Nothing, 0);
     _htIt = _ht->end();
 }
 
@@ -848,7 +848,7 @@ PlanState BlockHashAggStage::getNext() {
     for (auto& b : _outIdBlocks) {
         b.clear();
         b.reserve(kBlockOutSize);
-        _outIdBlockAccessors[idx++].reset(
+        _outIdBlockAccessors[idx++].reset_raw(
             false, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(&b));
     }
 
@@ -1132,7 +1132,7 @@ size_t BlockHashAggStage::estimateCompileTimeSize() const {
 }
 
 void BlockHashAggStage::populateBitmapSlot(size_t n) {
-    _blockBitsetOutAccessor.reset(
+    _blockBitsetOutAccessor.reset_raw(
         true,
         value::TypeTags::valueBlock,
         value::bitcastFrom<value::ValueBlock*>(

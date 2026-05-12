@@ -208,9 +208,9 @@ TEST_F(LimitSkipStageTest, LimitSkipReopenTest) {
 
     for (long long limitValue = 0; limitValue <= 1; ++limitValue) {
         for (long long skipValue = 0; skipValue <= 10; skipValue += 5) {
-            ctx->getRuntimeEnvAccessor(limitSlot)->reset(
+            ctx->getRuntimeEnvAccessor(limitSlot)->reset_raw(
                 false, value::TypeTags::NumberInt64, value::bitcastFrom<long long>(limitValue));
-            ctx->getRuntimeEnvAccessor(skipSlot)->reset(
+            ctx->getRuntimeEnvAccessor(skipSlot)->reset_raw(
                 false, value::TypeTags::NumberInt64, value::bitcastFrom<long long>(skipValue));
 
             limit->open(true);

@@ -139,7 +139,7 @@ private:
     }
 
     void setValue(SlotType& slot, bool owned, TypedValue p) {
-        slot.reset(owned, p.first, p.second);
+        slot.reset_raw(owned, p.first, p.second);
     }
 
     void verifyValue(SlotType& slot, TypedValue p) {
@@ -195,7 +195,7 @@ public:
         // Test getOwnedBSONObj on unowned bsonObject
         {
             value::BSONObjValueAccessor slot;
-            slot.reset(
+            slot.reset_raw(
                 false, value::TypeTags::bsonObject, value::bitcastFrom<const char*>(obj.objdata()));
             auto [tag, val] = slot.getViewOfValue();
             auto slotData = value::bitcastTo<const char*>(val);
@@ -213,7 +213,7 @@ public:
         // Test getOwnedBSONObj on owned bsonObject
         {
             value::BSONObjValueAccessor slot;
-            slot.reset(
+            slot.reset_raw(
                 false, value::TypeTags::bsonObject, value::bitcastFrom<const char*>(obj.objdata()));
             slot.makeOwned();
             auto [tag, val] = slot.getViewOfValue();

@@ -71,7 +71,7 @@ value::SlotId RuntimeEnvironment::registerSlot(value::TypeTags tag,
     tassert(5645903, "Slot Id generator is null", slotIdGenerator);
     auto slot = slotIdGenerator->generate();
     emplaceAccessor(slot, _state->pushSlot(slot));
-    _accessors.at(slot).reset(owned, tag, val);
+    _accessors.at(slot).reset_raw(owned, tag, val);
     return slot;
 }
 
@@ -97,7 +97,7 @@ void RuntimeEnvironment::resetSlot(value::SlotId slot,
     tassert(11093406, "Cannot reset slot because parallelism is enabled", !_isSmp);
 
     if (auto it = _accessors.find(slot); it != _accessors.end()) {
-        it->second.reset(owned, tag, val);
+        it->second.reset_raw(owned, tag, val);
         return;
     }
 

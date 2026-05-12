@@ -171,9 +171,9 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
 
     // Setup timezone database.
     auto timezoneDatabase = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(false,
-                             value::TypeTags::timeZoneDB,
-                             value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
+    timezoneDBAccessor.reset_raw(false,
+                                 value::TypeTags::timeZoneDB,
+                                 value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
 
     struct TestCase {
         std::pair<value::TypeTags, value::Value> startDate;
@@ -333,12 +333,12 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
         int testNumber{0};
         for (auto&& testCase : testCases) {
             // Values will be freed after running block tests.
-            startDateAccessor.reset(false, testCase.startDate.first, testCase.startDate.second);
-            endDateAccessor.reset(false, testCase.endDate.first, testCase.endDate.second);
-            unitAccessor.reset(false, testCase.unit.first, testCase.unit.second);
-            timezoneAccessor.reset(false, testCase.timezone.first, testCase.timezone.second);
+            startDateAccessor.reset_raw(false, testCase.startDate.first, testCase.startDate.second);
+            endDateAccessor.reset_raw(false, testCase.endDate.first, testCase.endDate.second);
+            unitAccessor.reset_raw(false, testCase.unit.first, testCase.unit.second);
+            timezoneAccessor.reset_raw(false, testCase.timezone.first, testCase.timezone.second);
             if (testCase.startOfWeek) {
-                startOfWeekAccessor.reset(
+                startOfWeekAccessor.reset_raw(
                     false, testCase.startOfWeek->first, testCase.startOfWeek->second);
             }
 

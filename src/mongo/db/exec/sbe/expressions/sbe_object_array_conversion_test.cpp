@@ -135,14 +135,14 @@ TEST_F(SBEObjectArrayConversionTest, ObjectToArrayExpression) {
     // Test on Object input
     auto [objTag, objVal] = convertFromBSONObj(bsonObj);
 
-    inputAccessor.reset(true, objTag, objVal);
+    inputAccessor.reset_raw(true, objTag, objVal);
     runAndAssertExpression(compiledObjectToArray.get(),
                            value::TypeTags::Array,
                            value::TypeTags::bsonArray,
                            value::bitcastFrom<const char*>(bsonArr1.objdata()));
 
     // Test similarly on a bsonObject input
-    inputAccessor.reset(
+    inputAccessor.reset_raw(
         false, value::TypeTags::bsonObject, value::bitcastFrom<const char*>(bsonObj.objdata()));
     runAndAssertExpression(compiledObjectToArray.get(),
                            value::TypeTags::Array,
@@ -151,14 +151,14 @@ TEST_F(SBEObjectArrayConversionTest, ObjectToArrayExpression) {
 
     // Test with empty object
     auto [emptyObjTag, emptyObjVal] = value::makeNewObject();
-    inputAccessor.reset(true, emptyObjTag, emptyObjVal);
+    inputAccessor.reset_raw(true, emptyObjTag, emptyObjVal);
     auto [emptyArrTag, emptyArrVal] = value::makeNewArray();
     value::ValueGuard guard(emptyArrTag, emptyArrVal);
     runAndAssertExpression(
         compiledObjectToArray.get(), value::TypeTags::Array, emptyArrTag, emptyArrVal);
 
     // Test when input is not object Type
-    inputAccessor.reset(false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    inputAccessor.reset_raw(false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
     runAndAssertNothing(compiledObjectToArray.get());
 }
 
@@ -172,14 +172,14 @@ TEST_F(SBEObjectArrayConversionTest, ArrayToObjectExpression) {
 
     // Test with Array on first variant
     auto [arr1Tag, arr1Val] = convertFromBSONArray(bsonArr1);
-    inputAccessor.reset(true, arr1Tag, arr1Val);
+    inputAccessor.reset_raw(true, arr1Tag, arr1Val);
     runAndAssertExpression(compiledArrayToObject.get(),
                            value::TypeTags::Object,
                            value::TypeTags::bsonObject,
                            value::bitcastFrom<const char*>(bsonObj.objdata()));
 
     // Test with bsonArray on first variant
-    inputAccessor.reset(
+    inputAccessor.reset_raw(
         false, value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bsonArr1.objdata()));
     runAndAssertExpression(compiledArrayToObject.get(),
                            value::TypeTags::Object,
@@ -188,14 +188,14 @@ TEST_F(SBEObjectArrayConversionTest, ArrayToObjectExpression) {
 
     // Test with Array on second variant
     auto [arr2Tag, arr2Val] = convertFromBSONArray(bsonArr2);
-    inputAccessor.reset(true, arr2Tag, arr2Val);
+    inputAccessor.reset_raw(true, arr2Tag, arr2Val);
     runAndAssertExpression(compiledArrayToObject.get(),
                            value::TypeTags::Object,
                            value::TypeTags::bsonObject,
                            value::bitcastFrom<const char*>(bsonObj.objdata()));
 
     // Test with bsonArray on second variant
-    inputAccessor.reset(
+    inputAccessor.reset_raw(
         false, value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bsonArr2.objdata()));
     runAndAssertExpression(compiledArrayToObject.get(),
                            value::TypeTags::Object,
@@ -204,14 +204,14 @@ TEST_F(SBEObjectArrayConversionTest, ArrayToObjectExpression) {
 
     // Test with empty array
     auto [emptyArrTag, emptyArrVal] = value::makeNewArray();
-    inputAccessor.reset(true, emptyArrTag, emptyArrVal);
+    inputAccessor.reset_raw(true, emptyArrTag, emptyArrVal);
     auto [emptyObjTag, emptyObjVal] = value::makeNewObject();
     value::ValueGuard guard(emptyObjTag, emptyObjVal);
     runAndAssertExpression(
         compiledArrayToObject.get(), value::TypeTags::Object, emptyObjTag, emptyObjVal);
 
     // Test when input is not array Type
-    inputAccessor.reset(false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    inputAccessor.reset_raw(false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
     runAndAssertNothing(compiledArrayToObject.get());
 
     // Test error conditions
@@ -258,7 +258,7 @@ TEST_F(SBEObjectArrayConversionTest, ArrayToObjectExpression) {
     auto errIn = errInputs.begin();
     auto errCode = errCodes.begin();
     for (; errIn != errInputs.end(); errIn++, errCode++) {
-        inputAccessor.reset(
+        inputAccessor.reset_raw(
             false, value::TypeTags::bsonArray, value::bitcastFrom<const char*>(errIn->objdata()));
         runAndAssertErrorCode(compiledArrayToObject.get(), *errCode);
     }

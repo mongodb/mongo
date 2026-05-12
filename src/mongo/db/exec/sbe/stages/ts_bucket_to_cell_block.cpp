@@ -226,7 +226,7 @@ void TsBucketToCellBlockStage::doSaveState() {
         auto [cellBlockTag, cellBlockVal] = _blocksOutAccessor[i].getViewOfValue();
 
         auto [cpyTag, cpyVal] = value::copyValue(cellBlockTag, cellBlockVal);
-        _blocksOutAccessor[i].reset(true, cpyTag, cpyVal);
+        _blocksOutAccessor[i].reset_raw(true, cpyTag, cpyVal);
     }
 
     if (_metaOutSlotId) {
@@ -242,7 +242,7 @@ void TsBucketToCellBlockStage::initCellBlocks() {
     if (_metaOutSlotId) {
         auto metaElt = bucketObj[timeseries::kBucketMetaFieldName];
         auto [metaTag, metaVal] = bson::convertToView(metaElt);
-        _metaOutAccessor.reset(false, metaTag, metaVal);
+        _metaOutAccessor.reset_raw(false, metaTag, metaVal);
     }
 
     auto [nMeasurements, tsBlocks, cellBlocks] = _pathExtractor.extractCellBlocks(bucketObj);
@@ -251,18 +251,19 @@ void TsBucketToCellBlockStage::initCellBlocks() {
             "Number of cell blocks doesn't match the number of accessors",
             cellBlocks.size() == _blocksOutAccessor.size());
     for (size_t i = 0; i < cellBlocks.size(); ++i) {
-        _blocksOutAccessor[i].reset(true,
-                                    value::TypeTags::cellBlock,
-                                    value::bitcastFrom<value::CellBlock*>(cellBlocks[i].release()));
+        _blocksOutAccessor[i].reset_raw(
+            true,
+            value::TypeTags::cellBlock,
+            value::bitcastFrom<value::CellBlock*>(cellBlocks[i].release()));
     }
 
     // Initialize an all-1s bitset.
-    _bitmapOutAccessor.reset(true,
-                             value::TypeTags::valueBlock,
-                             value::bitcastFrom<value::ValueBlock*>(
-                                 std::make_unique<value::MonoBlock>(nMeasurements,
-                                                                    value::TypeTags::Boolean,
-                                                                    value::bitcastFrom<bool>(true))
-                                     .release()));
+    _bitmapOutAccessor.reset_raw(
+        true,
+        value::TypeTags::valueBlock,
+        value::bitcastFrom<value::ValueBlock*>(
+            std::make_unique<value::MonoBlock>(
+                nMeasurements, value::TypeTags::Boolean, value::bitcastFrom<bool>(true))
+                .release()));
 }
 }  // namespace mongo::sbe

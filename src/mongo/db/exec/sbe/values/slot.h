@@ -103,21 +103,24 @@ class AssignableSlotAccessor : public SlotAccessor {
 public:
     /**
      * Assigns a new value to this slot and releases the previous value if it was owned.
+     * Prefer the typed overloads (reset(TagValueOwned), reset(TagValueView),
+     * reset(TagValueMaybeOwned)) as they encode ownership in the type system and eliminate
+     * the risk of a mismatch between the 'owned' flag and the actual ownership of the value.
      */
-    virtual void reset(bool owned, TypeTags tag, Value val) = 0;
+    virtual void reset_raw(bool owned, TypeTags tag, Value val) = 0;
 
     void reset(TagValueMaybeOwned value) {
         auto [owned, tag, val] = value.releaseToRaw();
-        reset(owned, tag, val);
+        reset_raw(owned, tag, val);
     }
 
     void reset(TagValueOwned value) {
         auto [tag, val] = value.releaseToRaw();
-        reset(true, tag, val);
+        reset_raw(true, tag, val);
     }
 
     void reset(TagValueView value) {
-        reset(false, value.tag, value.value);
+        reset_raw(false, value.tag, value.value);
     }
 };
 
@@ -229,10 +232,10 @@ public:
     }
 
     void reset(TypeTags tag, Value val) {
-        reset(true, tag, val);
+        reset_raw(true, tag, val);
     }
 
-    void reset(bool owned, TypeTags tag, Value val) override {
+    void reset_raw(bool owned, TypeTags tag, Value val) override {
         release();
 
         _tag = tag;
@@ -391,7 +394,7 @@ public:
         }
     }
 
-    void reset(bool owned, TypeTags tag, Value val) override {
+    void reset_raw(bool owned, TypeTags tag, Value val) override {
         _it->second.reset(_slot, owned, tag, val);
     }
 
@@ -423,7 +426,7 @@ public:
         return _container[_it].copyOrMoveValue(_slot);
     }
 
-    void reset(bool owned, TypeTags tag, Value val) override {
+    void reset_raw(bool owned, TypeTags tag, Value val) override {
         _container[_it].reset(_slot, owned, tag, val);
     }
 
@@ -453,7 +456,7 @@ public:
     TagValueOwned copyOrMoveValue() override {
         return _row.copyOrMoveValue(_slot);
     }
-    void reset(bool owned, TypeTags tag, Value val) override {
+    void reset_raw(bool owned, TypeTags tag, Value val) override {
         _row.reset(_slot, owned, tag, val);
     }
 
@@ -639,10 +642,10 @@ public:
     }
 
     void reset(TypeTags tag, Value val) {
-        reset(true, tag, val);
+        reset_raw(true, tag, val);
     }
 
-    void reset(bool owned, TypeTags tag, Value val) override {
+    void reset_raw(bool owned, TypeTags tag, Value val) override {
         release();
 
         _tag = tag;

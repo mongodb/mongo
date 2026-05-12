@@ -2414,7 +2414,7 @@ public:
                 _inputAccessor.reset();
             } else {
                 auto [copyTag, copyVal] = sbe::value::copyValue(nextInputTag, nextInputVal);
-                _inputAccessor.reset(true, copyTag, copyVal);
+                _inputAccessor.reset_raw(true, copyTag, copyVal);
             }
 
             auto [outputTag, outputVal] = runCompiledExpression(code);
@@ -2448,7 +2448,7 @@ public:
                 FAIL("accumulator did not have expected value");
             }
 
-            _aggAccessor.reset(true, outputTag, outputVal);
+            _aggAccessor.reset_raw(true, outputTag, outputVal);
 
             inputEnumerator.advance();
             expectedEnumerator.advance();
@@ -2538,11 +2538,11 @@ public:
             // Convert the BSON value to an SBE value and put it inside the input slot.
             auto [tag, val] =
                 sbe::bson::convertToOwned(bsonElt, bsonEnd, fieldName.size()).releaseToRaw();
-            _inputAccessor.reset(true, tag, val);
+            _inputAccessor.reset_raw(true, tag, val);
 
             // Run the agg function, and put the result in the slot holding the aggregate value.
             auto [outputTag, outputVal] = runCompiledExpression(code.get());
-            _aggAccessor.reset(true, outputTag, outputVal);
+            _aggAccessor.reset_raw(true, outputTag, outputVal);
 
             bsonElt = sbe::bson::advance(bsonElt, fieldName.size());
         }
@@ -2623,13 +2623,13 @@ public:
         auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
 
         auto [mergeStateTag, mergeStateVal] = convertFromBSONArray(mergeState);
-        _aggAccessor.reset(true, mergeStateTag, mergeStateVal);
+        _aggAccessor.reset_raw(true, mergeStateTag, mergeStateVal);
 
         auto [inputStateTag, inputStateVal] = convertFromBSONArray(inputState);
-        _inputAccessor.reset(true, inputStateTag, inputStateVal);
+        _inputAccessor.reset_raw(true, inputStateTag, inputStateVal);
 
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        _aggAccessor.reset(true, resultTag, resultVal);
+        _aggAccessor.reset_raw(true, resultTag, resultVal);
         std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
 
         auto [compareTag, compareVal] =
@@ -2661,15 +2661,15 @@ public:
             sbe::makeFunction(aggFinalize, sbe::makeVariable(aggSlot), std::move(sortSpecConstant));
 
         auto [mergeStateTag, mergeStateVal] = convertFromBSONArray(mergeState);
-        _aggAccessor.reset(true, mergeStateTag, mergeStateVal);
+        _aggAccessor.reset_raw(true, mergeStateTag, mergeStateVal);
 
         auto [inputStateTag, inputStateVal] = convertFromBSONArray(inputState);
-        _inputAccessor.reset(true, inputStateTag, inputStateVal);
+        _inputAccessor.reset_raw(true, inputStateTag, inputStateVal);
 
         auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
 
         auto [newAccTag, newAccVal] = runCompiledExpression(compiledExpr.get());
-        _aggAccessor.reset(true, newAccTag, newAccVal);
+        _aggAccessor.reset_raw(true, newAccTag, newAccVal);
 
         auto compiledFinalExpr = compileExpression(*finalExpr);
 

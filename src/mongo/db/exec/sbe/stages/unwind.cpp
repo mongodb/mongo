@@ -148,10 +148,10 @@ PlanState UnwindStage::getNext() {
             if (_inArrayAccessor.atEnd()) {
                 _inArray = false;
                 if (_preserveNullAndEmptyArrays) {
-                    _outFieldOutputAccessor->reset(false, value::TypeTags::Nothing, 0);
+                    _outFieldOutputAccessor->reset_raw(false, value::TypeTags::Nothing, 0);
                     // The array index is set to null if the unwind field is not an array or if the
                     // unwind field is the empty array.
-                    _outIndexOutputAccessor->reset(false, value::TypeTags::Null, 0);
+                    _outIndexOutputAccessor->reset_raw(false, value::TypeTags::Null, 0);
                     return trackPlanState(PlanState::ADVANCED);
                 }
             }
@@ -159,10 +159,10 @@ PlanState UnwindStage::getNext() {
             bool nullOrNothing = tag == value::TypeTags::Null || tag == value::TypeTags::Nothing;
 
             if (!nullOrNothing || _preserveNullAndEmptyArrays) {
-                _outFieldOutputAccessor->reset(false, tag, val);
+                _outFieldOutputAccessor->reset_raw(false, tag, val);
                 // The array index is set to null if the unwind field is not an array or if the
                 // unwind field is the empty array.
-                _outIndexOutputAccessor->reset(false, value::TypeTags::Null, 0);
+                _outIndexOutputAccessor->reset_raw(false, value::TypeTags::Null, 0);
                 return trackPlanState(PlanState::ADVANCED);
             }
         }
@@ -171,8 +171,8 @@ PlanState UnwindStage::getNext() {
     // We are inside the array so pull out the current element and advance.
     auto [tagElem, valElem] = _inArrayAccessor.getViewOfValue();
 
-    _outFieldOutputAccessor->reset(false, tagElem, valElem);
-    _outIndexOutputAccessor->reset(
+    _outFieldOutputAccessor->reset_raw(false, tagElem, valElem);
+    _outIndexOutputAccessor->reset_raw(
         false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(_index));
 
     _inArrayAccessor.advance();

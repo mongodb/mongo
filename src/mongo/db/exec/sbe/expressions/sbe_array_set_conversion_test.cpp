@@ -112,11 +112,11 @@ TEST_F(SBEArraySetConversionTest, ArrayToSetExpression) {
     // Test with Array on first variant
     BSONArray bsonArr1 = BSON_ARRAY(1 << 1 << 2 << 1 << 2);
     auto [arr1Tag, arr1Val] = convertFromBSONArray(bsonArr1);
-    inputAccessor.reset(true, arr1Tag, arr1Val);
+    inputAccessor.reset_raw(true, arr1Tag, arr1Val);
     runAndAssertExpression(compiledArrayToSet.get(), BSON_ARRAY(1 << 2));
 
     // Test with bsonArray on first variant
-    inputAccessor.reset(
+    inputAccessor.reset_raw(
         false, value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bsonArr1.objdata()));
     runAndAssertExpression(compiledArrayToSet.get(), BSON_ARRAY(1 << 2));
 
@@ -124,23 +124,23 @@ TEST_F(SBEArraySetConversionTest, ArrayToSetExpression) {
     BSONArray bsonArr2 =
         BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2) << BSON("x" << 1) << "Y");
     auto [arr2Tag, arr2Val] = convertFromBSONArray(bsonArr2);
-    inputAccessor.reset(true, arr2Tag, arr2Val);
+    inputAccessor.reset_raw(true, arr2Tag, arr2Val);
     runAndAssertExpression(compiledArrayToSet.get(),
                            BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2) << "Y"));
 
     // Test with bsonArray on second variant
-    inputAccessor.reset(
+    inputAccessor.reset_raw(
         false, value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bsonArr2.objdata()));
     runAndAssertExpression(compiledArrayToSet.get(),
                            BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2) << "Y"));
 
     // Test with empty array
     auto [emptyArrTag, emptyArrVal] = value::makeNewArray();
-    inputAccessor.reset(true, emptyArrTag, emptyArrVal);
+    inputAccessor.reset_raw(true, emptyArrTag, emptyArrVal);
     runAndAssertExpression(compiledArrayToSet.get(), BSONArray());
 
     // Test when input is not array Type
-    inputAccessor.reset(false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    inputAccessor.reset_raw(false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
     runAndAssertNothing(compiledArrayToSet.get());
 }
 
@@ -166,11 +166,11 @@ TEST_F(SBEArraySetConversionTest, CollArrayToSetExpression) {
     // Test with Array on first variant
     BSONArray bsonArr1 = BSON_ARRAY(1 << 1 << 2 << 1 << 2);
     auto [arr1Tag, arr1Val] = convertFromBSONArray(bsonArr1);
-    inputAccessor.reset(true, arr1Tag, arr1Val);
+    inputAccessor.reset_raw(true, arr1Tag, arr1Val);
     runAndAssertExpression(compiledArrayToSet.get(), BSON_ARRAY(1 << 2));
 
     // Test with bsonArray on first variant
-    inputAccessor.reset(
+    inputAccessor.reset_raw(
         false, value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bsonArr1.objdata()));
     runAndAssertExpression(compiledArrayToSet.get(), BSON_ARRAY(1 << 2));
 
@@ -178,23 +178,23 @@ TEST_F(SBEArraySetConversionTest, CollArrayToSetExpression) {
     BSONArray bsonArr2 =
         BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2) << BSON("x" << 1) << "Y");
     auto [arr2Tag, arr2Val] = convertFromBSONArray(bsonArr2);
-    inputAccessor.reset(true, arr2Tag, arr2Val);
+    inputAccessor.reset_raw(true, arr2Tag, arr2Val);
     runAndAssertExpression(compiledArrayToSet.get(),
                            BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2)));
 
     // Test with bsonArray on second variant
-    inputAccessor.reset(
+    inputAccessor.reset_raw(
         false, value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bsonArr2.objdata()));
     runAndAssertExpression(compiledArrayToSet.get(),
                            BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2)));
 
     // Test with empty array
     auto [emptyArrTag, emptyArrVal] = value::makeNewArray();
-    inputAccessor.reset(true, emptyArrTag, emptyArrVal);
+    inputAccessor.reset_raw(true, emptyArrTag, emptyArrVal);
     runAndAssertExpression(compiledArrayToSet.get(), BSONArray());
 
     // Test when input is not array Type
-    inputAccessor.reset(false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    inputAccessor.reset_raw(false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
     runAndAssertNothing(compiledArrayToSet.get());
 }
 }  // namespace mongo::sbe

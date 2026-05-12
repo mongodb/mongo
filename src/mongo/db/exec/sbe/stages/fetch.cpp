@@ -198,7 +198,7 @@ void FetchStage::open(bool reOpen) {
     }
     _children[0]->open(reOpen);
     _childOpened = true;
-    _recordIdAccessor.reset(
+    _recordIdAccessor.reset_raw(
         false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_seekRid));
 
     if (_state->fetchCallbacks.scanOpenCallback) {
@@ -268,7 +268,7 @@ PlanState FetchStage::getNext() {
         }
     } while (!record || !checkRecordConsistency());
 
-    _recordAccessor.reset(
+    _recordAccessor.reset_raw(
         false, value::TypeTags::bsonObject, value::bitcastFrom<const char*>(record->data.data()));
     if (!_scanFieldAccessors.empty()) {
         placeFieldsFromRecordInAccessors(*record, _state->scanFieldNames, _scanFieldAccessors);

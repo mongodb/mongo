@@ -375,11 +375,11 @@ PlanState SearchCursorStage::doGetNext() {
             auto elemName = elem.fieldNameStringData();
             if (size_t pos = _metadataNames.findPos(elemName); pos != StringListSet::npos) {
                 auto [tag, val] = bson::convertToView(elem);
-                _metadataAccessors[pos].reset(false, tag, val);
+                _metadataAccessors[pos].reset_raw(false, tag, val);
             }
             if (_idSlot && elemName == "_id") {
                 auto [tag, val] = bson::convertToView(elem);
-                _idAccessor.reset(false, tag, val);
+                _idAccessor.reset_raw(false, tag, val);
             }
         }
 
@@ -402,14 +402,14 @@ PlanState SearchCursorStage::doGetNext() {
                     auto elemName = elem.fieldNameStringData();
                     if (size_t pos = _fieldNames.findPos(elemName); pos != StringListSet::npos) {
                         auto [tag, val] = bson::convertToView(elem);
-                        _fieldAccessors[pos].reset(false, tag, val);
+                        _fieldAccessors[pos].reset_raw(false, tag, val);
                     }
                 }
             }
             if (_resultSlot) {
-                _resultAccessor.reset(false,
-                                      value::TypeTags::bsonObject,
-                                      value::bitcastFrom<const char*>(_resultObj->objdata()));
+                _resultAccessor.reset_raw(false,
+                                          value::TypeTags::bsonObject,
+                                          value::bitcastFrom<const char*>(_resultObj->objdata()));
             }
         }
 

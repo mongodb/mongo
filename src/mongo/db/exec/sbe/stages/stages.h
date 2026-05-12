@@ -140,7 +140,7 @@ public:
         } else {
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
             auto [tag, val] = value::getPoisonValue();
-            accessor.reset(false, tag, val);
+            accessor.reset_raw(false, tag, val);
 #endif
         }
     }
@@ -158,7 +158,7 @@ public:
         } else {
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
             auto [tag, val] = value::getPoisonValue();
-            accessor.reset(false, tag, val);
+            accessor.reset_raw(false, tag, val);
 #endif
         }
     }

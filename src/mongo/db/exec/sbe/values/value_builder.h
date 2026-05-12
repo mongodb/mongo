@@ -288,7 +288,7 @@ public:
         for (size_t i = 0; i < _tagList.size(); ++i) {
             auto [tag, val] = getValue(i, bufferLen);
             invariant(i < accessors->size());
-            (*accessors)[i].reset(false, tag, val);
+            (*accessors)[i].reset_raw(false, tag, val);
         }
     }
 };

@@ -91,7 +91,7 @@ public:
             return copyValue(tag, val);
         }
 
-        void reset(bool owned, value::TypeTags tag, value::Value val) override {
+        void reset_raw(bool owned, value::TypeTags tag, value::Value val) override {
             release();
             _env->_state->values[_index] = {owned, tag, val};
         }

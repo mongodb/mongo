@@ -327,10 +327,10 @@ void MakeObjStageBase<MakeObjOutputType::Object>::produceObject() {
             }
             // Now we have to make a decision - return Nothing or the original _root.
             if (!_returnOldObject) {
-                _obj.reset(false, value::TypeTags::Nothing, 0);
+                _obj.reset_raw(false, value::TypeTags::Nothing, 0);
             } else {
                 // _root is not an object return it unmodified.
-                _obj.reset(false, tag, val);
+                _obj.reset_raw(false, tag, val);
             }
             return;
         }
@@ -478,10 +478,10 @@ void MakeObjStageBase<MakeObjOutputType::BsonObject>::produceObject() {
             }
             // Now we have to make a decision - return Nothing or the original _root.
             if (!_returnOldObject) {
-                _obj.reset(false, value::TypeTags::Nothing, 0);
+                _obj.reset_raw(false, value::TypeTags::Nothing, 0);
             } else {
                 // _root is not an object return it unmodified.
-                _obj.reset(false, tag, val);
+                _obj.reset_raw(false, tag, val);
             }
 
             return;

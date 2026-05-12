@@ -127,7 +127,7 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
     }
 
     if (_indexKeySlot) {
-        _recordAccessor.reset(
+        _recordAccessor.reset_raw(
             false, value::TypeTags::keyString, value::bitcastFrom<value::KeyStringEntry*>(&_key));
     }
 
@@ -296,7 +296,7 @@ PlanState IndexScanStageBaseImpl<Derived>::getNext() {
 
     if (_recordIdSlot) {
         auto nextRid = _nextKeyString.getRecordId();
-        _recordIdAccessor.reset(
+        _recordIdAccessor.reset_raw(
             false, value::TypeTags::RecordId, value::bitcastFrom<const RecordId*>(nextRid));
     }
 

@@ -87,7 +87,7 @@ TEST_F(SBEBuiltinDateAddTest, ComputesDateAdd) {
 
     int64_t startInstant = 1435006000;
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
     startDateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(startInstant));
     auto [unitTag, unitVal] = value::makeNewString("minute");
@@ -138,7 +138,7 @@ TEST_F(SBEBuiltinDateAddTest, ReturnsNothingDateAdd) {
     auto compiledExpr = compileExpression(*dateAddExpr);
 
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(
+    timezoneDBAccessor.reset_raw(
         false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
 
     // Invalid startDate.

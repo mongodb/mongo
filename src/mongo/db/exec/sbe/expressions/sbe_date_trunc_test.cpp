@@ -165,9 +165,9 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
 
     // Setup timezone database.
     auto timezoneDatabase = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset(false,
-                             value::TypeTags::timeZoneDB,
-                             value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
+    timezoneDBAccessor.reset_raw(false,
+                                 value::TypeTags::timeZoneDB,
+                                 value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
 
     struct TestCase {
         std::pair<value::TypeTags, value::Value> timezone;
@@ -417,11 +417,11 @@ TEST_F(SBEDateTruncTest, BasicDateTrunc) {
         int testNumber{0};
         for (auto&& testCase : testCases) {
             // Values will be freed after running block tests.
-            timezoneAccessor.reset(false, testCase.timezone.first, testCase.timezone.second);
-            dateAccessor.reset(false, testCase.date.first, testCase.date.second);
-            unitAccessor.reset(false, testCase.unit.first, testCase.unit.second);
-            binSizeAccessor.reset(false, testCase.binSize.first, testCase.binSize.second);
-            startOfWeekAccessor.reset(
+            timezoneAccessor.reset_raw(false, testCase.timezone.first, testCase.timezone.second);
+            dateAccessor.reset_raw(false, testCase.date.first, testCase.date.second);
+            unitAccessor.reset_raw(false, testCase.unit.first, testCase.unit.second);
+            binSizeAccessor.reset_raw(false, testCase.binSize.first, testCase.binSize.second);
+            startOfWeekAccessor.reset_raw(
                 false, testCase.startOfWeek.first, testCase.startOfWeek.second);
 
             // Execute the "dateTrunc" function.

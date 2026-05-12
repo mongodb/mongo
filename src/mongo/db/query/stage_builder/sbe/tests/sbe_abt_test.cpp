@@ -451,9 +451,9 @@ TEST_F(AbtToSbeExpression, LowerComparisonCollation) {
 
     auto checkCmp3w = [&](StringData lhs, StringData rhs, int result) {
         auto [lhsTag, lhsValue] = sbe::value::makeNewString(lhs);
-        lhsAccessor.reset(true, lhsTag, lhsValue);
+        lhsAccessor.reset_raw(true, lhsTag, lhsValue);
         auto [rhsTag, rhsValue] = sbe::value::makeNewString(rhs);
-        rhsAccessor.reset(true, rhsTag, rhsValue);
+        rhsAccessor.reset_raw(true, rhsTag, rhsValue);
 
         auto [tag, value] = runCompiledExpression(compiledExpr.get());
         sbe::value::ValueGuard guard(tag, value);

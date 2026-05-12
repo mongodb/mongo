@@ -653,7 +653,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyDeepTest) {
     auto compiledExpr = compileExpression(*fillEmptyExpr);
 
     auto [fillTag, fillVal] = value::makeNewString("Replacement for missing value"_sd);
-    fillAccessor.reset(true, fillTag, fillVal);
+    fillAccessor.reset_raw(true, fillTag, fillVal);
 
     value::HeterogeneousBlock block;
     block.push_back(value::makeNewString("First string"_sd));
@@ -791,7 +791,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
         value::MonoBlock monoBlock(2, blockTag, blockVal);
 
         auto [fillTag, fillVal] = makeInt32(0);
-        fillAccessor.reset(true, fillTag, fillVal);
+        fillAccessor.reset_raw(true, fillTag, fillVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
@@ -809,7 +809,7 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyMonoHomogeneousTest) {
         value::MonoBlock monoBlock(2, value::TypeTags::Nothing, value::Value{0u});
 
         auto [fillTag, fillVal] = value::makeNewString("MonoBlock string"_sd);
-        fillAccessor.reset(true, fillTag, fillVal);
+        fillAccessor.reset_raw(true, fillTag, fillVal);
 
         blockAccessor.reset(sbe::value::TypeTags::valueBlock,
                             value::bitcastFrom<value::ValueBlock*>(&monoBlock));
@@ -1213,7 +1213,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
     }
 
     {
-        aggAccessor.reset(false, value::TypeTags::Nothing, 0);
+        aggAccessor.reset_raw(false, value::TypeTags::Nothing, 0);
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMax,
@@ -1277,7 +1277,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
     }
 
     {
-        aggAccessor.reset(false, value::TypeTags::Nothing, 0);
+        aggAccessor.reset_raw(false, value::TypeTags::Nothing, 0);
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMax,
@@ -1316,7 +1316,8 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
                          value::bitcastFrom<value::ValueBlock*>(bitset.get()));
 
     {
-        aggAccessor.reset(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-10));
+        aggAccessor.reset_raw(
+            false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-10));
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMin,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
@@ -1334,7 +1335,8 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
     }
 
     {
-        aggAccessor.reset(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(100));
+        aggAccessor.reset_raw(
+            false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(100));
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMax,
@@ -1359,7 +1361,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
     bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
                          value::bitcastFrom<value::ValueBlock*>(allTrueBitset.get()));
     {
-        aggAccessor.reset(false, value::TypeTags::Nothing, 0);
+        aggAccessor.reset_raw(false, value::TypeTags::Nothing, 0);
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMin,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
@@ -1377,7 +1379,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
     }
 
     {
-        aggAccessor.reset(false, value::TypeTags::Nothing, 0);
+        aggAccessor.reset_raw(false, value::TypeTags::Nothing, 0);
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMax,
