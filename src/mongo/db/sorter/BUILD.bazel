@@ -84,8 +84,10 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/shard_role/shard_catalog:collection_mock",
         "//src/mongo/db/storage:encryption_hooks",
+        "//src/mongo/db/storage:record_store_test_harness",
         "//src/mongo/db/storage:spill_util",
         "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test_harness",
         "//src/third_party/snappy",
     ],
 )

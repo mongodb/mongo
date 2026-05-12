@@ -38,6 +38,8 @@
 #include "mongo/db/sorter/sorter_test_utils.h"
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/death_test.h"
@@ -1219,6 +1221,65 @@ TEST_F(SortedContainerWriterTest, ReconstructPartiallyExhaustedIterator) {
     ASSERT_TRUE(reconstructedRange.getCurrentChecksum().has_value());
     EXPECT_EQ(*reconstructedRange.getCurrentChecksum(), *range.getCurrentChecksum());
     EXPECT_FALSE(reconstructed->more());
+}
+
+TEST(ContainerIteratorTest, RecoverCursorAfterAbandoningSnapshot) {
+    auto harnessHelper = newRecordStoreHarnessHelper();
+    auto rs = harnessHelper->newRecordStore("test.container",
+                                            RecordStore::Options{.keyFormat = KeyFormat::Long});
+    auto& container =
+        std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs->getContainer()).get();
+
+    auto opCtx = harnessHelper->newOperationContext();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+    const std::vector<std::pair<IntWrapper, IntWrapper>> data = {
+        {1, 1},
+        {2, 2},
+        {3, 3},
+        {4, 4},
+        {5, 5},
+    };
+
+    SorterChecksumCalculator checksumCalc{sorter::kLatestChecksumVersion};
+    {
+        StorageWriteTransaction txn(ru);
+        int64_t containerKey = 1;
+        for (auto& [k, v] : data) {
+            BufBuilder buf;
+            k.serializeForSorter(buf);
+            v.serializeForSorter(buf);
+            ASSERT_OK(container.insert(ru,
+                                       containerKey++,
+                                       {buf.buf(), static_cast<size_t>(buf.len())},
+                                       container::ExistingKeyPolicy::reject));
+            checksumCalc.addData(buf.buf(), buf.len());
+        }
+        txn.commit();
+    }
+
+    ContainerIterator<IntWrapper, IntWrapper> iter(container.getCursor(ru),
+                                                   /*start=*/1,
+                                                   /*end=*/static_cast<int64_t>(data.size()) + 1,
+                                                   Iterator<IntWrapper, IntWrapper>::Settings{},
+                                                   checksumCalc.checksum(),
+                                                   sorter::kLatestChecksumVersion);
+
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{1, 1}));
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{2, 2}));
+
+    // Testing that we can recover from this.
+    ru.abandonSnapshot();
+
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{3, 3}));
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{4, 4}));
+    ASSERT_TRUE(iter.more());
+    EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{5, 5}));
+    ASSERT_FALSE(iter.more());
 }
 
 }  // namespace

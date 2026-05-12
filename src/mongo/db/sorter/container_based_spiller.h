@@ -178,11 +178,15 @@ private:
         uassert(11786000,
                 fmt::format("Sorter container unexpectedly reached end before key {}", _position),
                 result);
-        uassert(11786001,
-                fmt::format("Sorter container unexpectedly got key {} instead of {}",
-                            result->first,
-                            _position),
-                result->first == ++_position);
+        ++_position;
+        if (result->first != _position) {
+            // A write conflict may have reset this cursor.
+            auto found = _cursor->find(_position);
+            uassert(11786001,
+                    fmt::format("Sorter container missing expected key {}", _position),
+                    found);
+            return *found;
+        }
         return result->second;
     }
 
