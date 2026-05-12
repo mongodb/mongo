@@ -382,7 +382,7 @@ size_t Exchange::loadNextBatch() {
                 size_t target = getTargetConsumer(input.getDocument());
                 bool full = _consumers[target]->appendDocument(std::move(input), _maxBufferSize);
                 if (full && _orderPreserving) {
-                    // TODO send the high watermark here.
+                    // TODO SERVER-123923: send the high watermark here.
                 }
                 if (full)
                     return target;
@@ -429,7 +429,12 @@ size_t Exchange::getTargetConsumer(const Document& input) {
 
     // Binary search for the consumer id.
     auto it = std::upper_bound(_boundaries.begin(), _boundaries.end(), keyStr);
-    invariant(it != _boundaries.end());
+    // upper_bound returns end() when the key equals or exceeds the last boundary. The last
+    // boundary is always MaxKey, so this occurs when a document field value IS MaxKey. Route
+    // such documents to the last consumer bucket (the bucket bounded by the last two boundaries).
+    if (it == _boundaries.end()) {
+        --it;
+    }
 
     size_t distance = std::distance(_boundaries.begin(), it) - 1;
     invariant(distance < _consumerIds.size());
