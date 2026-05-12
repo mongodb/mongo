@@ -1766,11 +1766,6 @@ def _impl(ctx):
         ],
     )
 
-    # By default, undefined behavior sanitizer doesn't stop on the first error. Make
-    # it so. Newer versions of clang have renamed the flag. However, this flag
-    # cannot be included when using the fuzzer sanitizer if we want to suppress
-    # errors to uncover new ones.
-
     # In dynamic builds, the `vptr` sanitizer check can require additional
     # dependency edges. That is very inconvenient, because such builds can't use
     # z,defs. The result is a very fragile link graph, where refactoring the link
@@ -1779,9 +1774,7 @@ def _impl(ctx):
     # approaches in SERVER-49798 of adding a new descriptor type, but that didn't
     # address the fundamental issue that the correct link graph for a dynamic+ubsan
     # build isn't the same as the correct link graph for a regular dynamic build.
-    ubsan_compile_flags = []
-    if not ctx.attr.fsan_enabled:
-        ubsan_compile_flags += ["-fno-sanitize-recover"]
+    ubsan_compile_flags = ["-fno-sanitize-recover"]
     if not ctx.attr.linkstatic:
         ubsan_compile_flags += ["-fno-sanitize=vptr"]
     ubsan_feature = feature(

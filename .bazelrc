@@ -634,6 +634,11 @@ common:fission --remote_download_regex=.*\.dwo$
 --config=fuzztest
 common:fuzztest --no@fuzztest//fuzztest:use_riegeli
 common:fuzztest --@fuzztest//fuzztest:centipede_integration=True
+common:fuzztest --//bazel/config:fsan=True
+common:fuzztest --//bazel/config:ubsan=True
+common:fuzztest --//bazel/config:opt=debug
+common:fuzztest --//bazel/config:allocator=system
+common:fuzztest --compiler_type=clang
 
 # Avoid failing builds when BES metadata fails to upload.
 common --bes_upload_mode=fully_async

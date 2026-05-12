@@ -9,6 +9,9 @@ fun:_ZN8S2CellId14FromFaceIJWrapEiii
 
 src:src/third_party/abseil-cpp/dist/absl/numeric/int128_have_intrinsic.inc
 
+# fuzztest calls memcpy with a null dst when deserializing empty byte-vector corpus entries.
+src:external/fuzztest~/*
+
 # SERVER-62972
 # libunwind has some UB when doing stack unwinding
 [alignment]
