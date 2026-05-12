@@ -31,8 +31,8 @@ a notice will be included in
 | [Cyrus SASL]                                         | BSD-Attribution-HPND-disclaimer   | 2.1.28                                   |                      |                                 |
 | [fmt]                                                | MIT                               | 7.1.3                                    |                      | ✗                               |
 | [folly]                                              | Apache-2.0                        | 2025.04.21.00                            |                      | ✗                               |
-| [gperftools]                                         | BSD-3-Clause                      | 003775aa816cb3fe01215455825245089d423a7c |                      | ✗                               |
-| [gRPC (C++)]                                         | Apache-2.0                        | 1.46.5                                   |                      | ✗                               |
+| [gperftools]                                         | BSD-3-Clause                      | 2.9.1                                    |                      | ✗                               |
+| [gRPC (C++)]                                         | Apache-2.0                        | 1.46.6                                   |                      | ✗                               |
 | [ICU4C - International Components for Unicode C/C++] | Unicode-3.0                       | 57.1                                     | ✗                    | ✗                               |
 | [immer]                                              | BSL-1.0                           | 0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3 |                      | ✗                               |
 | [Intel® Decimal Floating-Point Math Library]         | BSD-3-Clause                      | 2.0.1                                    |                      | ✗                               |
@@ -40,7 +40,7 @@ a notice will be included in
 | [JSON-Schema-Test-Suite]                             | MIT                               | 728066f9c5c258ba3b1804a22a5b998f2ec77ec0 |                      |                                 |
 | [librdkafka - The Apache Kafka C/C++ library]        | BSD-2-Clause                      | 2.0.2                                    |                      | ✗                               |
 | [LibTomCrypt]                                        | Unlicense                         | 1.18.2                                   | ✗                    | ✗                               |
-| [libunwind]                                          | MIT                               | 1.6.0-rc1                                |                      | ✗                               |
+| [libunwind]                                          | MIT                               | 1.6.2                                    |                      | ✗                               |
 | [linenoise]                                          | BSD-2-Clause                      | 6cdc775807e57b2c3fd64bd207814f8ee1fe35f3 |                      | ✗                               |
 | [Mozilla Firefox ESR]                                | MPL-2.0                           | 140.9.0esr                               |                      | ✗                               |
 | [MurmurHash3]                                        | Public Domain                     | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
@@ -59,7 +59,7 @@ a notice will be included in
 | [valgrind.h]                                         | BSD-4-Clause                      | 093bef43d69236287ccc748591c9560a71181b0a |                      | ✗                               |
 | [variant]                                            | BSL-1.0                           | v1.4.0                                   |                      | ✗                               |
 | [yaml-cpp]                                           | MIT                               | 0.6.3                                    |                      | ✗                               |
-| [zlib]                                               | Zlib                              | 1.2.13                                   | ✗                    | ✗                               |
+| [zlib]                                               | Zlib                              | 1.3.2                                    | ✗                    | ✗                               |
 | [Zstandard (zstd)]                                   | BSD-3-Clause OR GPL-2.0-only      | 1.5.2                                    | ✗                    | ✗                               |
 
 [Abseil Common Libraries (C++)]: https://github.com/abseil/abseil-cpp.git

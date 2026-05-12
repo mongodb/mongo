@@ -145,7 +145,7 @@ def validate_license(component: dict, error_manager: ErrorManager) -> None:
             # )
             valid_license = not licensing_validate.errors or not licensing_validate.invalid_symbols
             if not valid_license:
-                error_manager.append_full_error_message(str(licensing_validate))
+                error_manager.append_full_error_message(licensing_validate.errors[0])
                 return
 
 
