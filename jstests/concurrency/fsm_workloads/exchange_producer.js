@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs stress tests of exchange producers, where multiple threads run concurrent getNexts on the
  * consumer cursors.
@@ -8,7 +6,10 @@
  *   assumes_against_mongod_not_mongos,
  *   # The config fuzzer runs logical session cache refreshes, which was occasionally killing the
  *   # cursors before the test is over.
- *   does_not_support_config_fuzzer
+ *   does_not_support_config_fuzzer,
+ *   # This will fail if using transactions because the FSM will attempt to call getMore on a cursor
+ *   # that's been created outside of the transaction.
+ *   does_not_support_transactions
  * ]
  */
 
@@ -16,7 +17,7 @@
 // iteration, or it may hang if the final getMore is blocked waiting on a different consumer to make
 // space in its buffer.
 var $config = (function() {
-    var data = {
+    let data = {
         numDocs: 10000,
         numConsumers: 5,
         bufferSize: 100 * 1024,
@@ -75,9 +76,22 @@ var $config = (function() {
     };
 
     function setup(db, collName, cluster) {
+        // Exchange requires an internal client connection. Create one by sending hello with
+        // internalClient.
+        const internalConn = (() => {
+            const conn = new Mongo(db.getMongo().host);
+            assert.commandWorked(
+                conn.getDB("admin").runCommand({
+                    hello: 1,
+                    internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+                }),
+            );
+            return conn;
+        })();
+
         // Start a session so we can pass the sessionId from when we retrieved the cursors to the
         // getMores where we want to iterate the cursors.
-        const session = db.getMongo().startSession();
+        const session = internalConn.startSession();
 
         // Load data.
         const bulk = db[collName].initializeUnorderedBulkOp();
@@ -90,16 +104,20 @@ var $config = (function() {
         assert.eq(this.numDocs, db[collName].find().itcount());
 
         // Run an exchange to get a list of cursors.
-        res = assert.commandWorked(session.getDatabase(db.getName()).runCommand({
-            aggregate: collName,
-            pipeline: [],
-            exchange: {
-                policy: "roundrobin",
-                consumers: NumberInt(this.numConsumers),
-                bufferSize: NumberInt(this.bufferSize)
-            },
-            cursor: {batchSize: 0},
-        }));
+        res = assert.commandWorked(
+            session.getDatabase(db.getName()).runCommand({
+                aggregate: collName,
+                pipeline: [],
+                exchange: {
+                    policy: "roundrobin",
+                    consumers: NumberInt(this.numConsumers),
+                    bufferSize: NumberInt(this.bufferSize),
+                },
+                cursor: {batchSize: 0},
+                readConcern: {},
+                writeConcern: {},
+            }),
+        );
 
         // Save the cursor ids to $config.data so each of the worker threads has access to the
         // cursors, as well as the sessionId.
@@ -128,11 +146,11 @@ var $config = (function() {
     return {
         threadCount: data.numConsumers,
         iterations: 20,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         setup: setup,
         teardown: teardown,
-        data: data
+        data: data,
     };
 })();

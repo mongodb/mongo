@@ -6,10 +6,20 @@
 // the cursor establishing command.
 TestData.disableImplicitSessions = true;
 
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
+
+// Exchange requires an internal client connection. Create one by sending hello with internalClient.
+const internalConn = (() => {
+    const conn = new Mongo(db.getMongo().host);
+    assert.commandWorked(
+        conn.getDB("admin").runCommand({
+            hello: 1,
+            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+        }),
+    );
+    return conn;
+})();
+const internalDB = internalConn.getDB(db.getName());
 
 const coll = db.testCollection;
 coll.drop();
@@ -18,7 +28,7 @@ const numDocs = 10000;
 
 const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < numDocs; ++i) {
-    bulk.insert({a: i, b: 'abcdefghijklmnopqrstuvxyz', c: {d: i}, e: [0, {f: i}]});
+    bulk.insert({a: i, b: "abcdefghijklmnopqrstuvxyz", c: {d: i}, e: [0, {f: i}]});
 }
 
 assert.commandWorked(bulk.execute());
@@ -61,24 +71,30 @@ const numConsumers = 4;
 assert.eq(0, numDocs % numConsumers);
 
 (function testParameterValidation() {
+    const internalColl = internalDB[coll.getName()];
+
     const tooManyConsumers = 101;
-    assertErrorCode(coll, [], 50950, "Expected too many consumers", {
+    assertErrorCode(internalColl, [], 50950, "Expected too many consumers", {
         exchange: {
             policy: "roundrobin",
             consumers: NumberInt(tooManyConsumers),
-            bufferSize: NumberInt(1024)
+            bufferSize: NumberInt(1024),
         },
-        cursor: {batchSize: 0}
+        cursor: {batchSize: 0},
+        readConcern: {},
+        writeConcern: {},
     });
 
     const bufferTooLarge = 200 * 1024 * 1024;  // 200 MB
-    assertErrorCode(coll, [], 50951, "Expected buffer too large", {
+    assertErrorCode(internalColl, [], 50951, "Expected buffer too large", {
         exchange: {
             policy: "roundrobin",
             consumers: NumberInt(numConsumers),
-            bufferSize: NumberInt(bufferTooLarge)
+            bufferSize: NumberInt(bufferTooLarge),
         },
-        cursor: {batchSize: 0}
+        cursor: {batchSize: 0},
+        readConcern: {},
+        writeConcern: {},
     });
 })();
 
@@ -86,13 +102,19 @@ assert.eq(0, numDocs % numConsumers);
  * RoundRobin - evenly distribute documents to consumers.
  */
 (function testRoundRobin() {
-    let res = assert.commandWorked(db.runCommand({
-        aggregate: coll.getName(),
-        pipeline: [],
-        exchange:
-            {policy: "roundrobin", consumers: NumberInt(numConsumers), bufferSize: NumberInt(1024)},
-        cursor: {batchSize: 0}
-    }));
+    let res = assert.commandWorked(
+        internalDB.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [],
+            exchange: {
+                policy: "roundrobin",
+                consumers: NumberInt(numConsumers),
+                bufferSize: NumberInt(1024)
+            },
+            cursor: {batchSize: 0},
+            writeConcern: {},
+        }),
+    );
     assert.eq(numConsumers, res.cursors.length);
 
     let parallelShells = [];
@@ -109,13 +131,19 @@ assert.eq(0, numDocs % numConsumers);
  * Broadcast - send a document to all consumers.
  */
 (function testBroadcast() {
-    let res = assert.commandWorked(db.runCommand({
-        aggregate: coll.getName(),
-        pipeline: [],
-        exchange:
-            {policy: "broadcast", consumers: NumberInt(numConsumers), bufferSize: NumberInt(1024)},
-        cursor: {batchSize: 0}
-    }));
+    let res = assert.commandWorked(
+        internalDB.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [],
+            exchange: {
+                policy: "broadcast",
+                consumers: NumberInt(numConsumers),
+                bufferSize: NumberInt(1024)
+            },
+            cursor: {batchSize: 0},
+            writeConcern: {},
+        }),
+    );
     assert.eq(numConsumers, res.cursors.length);
 
     let parallelShells = [];
@@ -132,19 +160,22 @@ assert.eq(0, numDocs % numConsumers);
  * Range - send documents to consumer based on the range of values of the 'a' field.
  */
 (function testRange() {
-    let res = assert.commandWorked(db.runCommand({
-        aggregate: coll.getName(),
-        pipeline: [],
-        exchange: {
-            policy: "keyRange",
-            consumers: NumberInt(numConsumers),
-            bufferSize: NumberInt(1024),
-            key: {a: 1},
-            boundaries: [{a: MinKey}, {a: 2500}, {a: 5000}, {a: 7500}, {a: MaxKey}],
-            consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
-        },
-        cursor: {batchSize: 0}
-    }));
+    let res = assert.commandWorked(
+        internalDB.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [],
+            exchange: {
+                policy: "keyRange",
+                consumers: NumberInt(numConsumers),
+                bufferSize: NumberInt(1024),
+                key: {a: 1},
+                boundaries: [{a: MinKey}, {a: 2500}, {a: 5000}, {a: 7500}, {a: MaxKey}],
+                consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
+            },
+            cursor: {batchSize: 0},
+            writeConcern: {},
+        }),
+    );
     assert.eq(numConsumers, res.cursors.length);
 
     let parallelShells = [];
@@ -161,19 +192,22 @@ assert.eq(0, numDocs % numConsumers);
  * Range with more complex pipeline.
  */
 (function testRangeComplex() {
-    let res = assert.commandWorked(db.runCommand({
-        aggregate: coll.getName(),
-        pipeline: [{$match: {a: {$gte: 5000}}}, {$sort: {a: -1}}, {$project: {_id: 0, b: 0}}],
-        exchange: {
-            policy: "keyRange",
-            consumers: NumberInt(numConsumers),
-            bufferSize: NumberInt(1024),
-            key: {a: 1},
-            boundaries: [{a: MinKey}, {a: 2500}, {a: 5000}, {a: 7500}, {a: MaxKey}],
-            consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
-        },
-        cursor: {batchSize: 0}
-    }));
+    let res = assert.commandWorked(
+        internalDB.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [{$match: {a: {$gte: 5000}}}, {$sort: {a: -1}}, {$project: {_id: 0, b: 0}}],
+            exchange: {
+                policy: "keyRange",
+                consumers: NumberInt(numConsumers),
+                bufferSize: NumberInt(1024),
+                key: {a: 1},
+                boundaries: [{a: MinKey}, {a: 2500}, {a: 5000}, {a: 7500}, {a: MaxKey}],
+                consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
+            },
+            cursor: {batchSize: 0},
+            writeConcern: {},
+        }),
+    );
     assert.eq(numConsumers, res.cursors.length);
 
     let parallelShells = [];
@@ -192,20 +226,23 @@ assert.eq(0, numDocs % numConsumers);
  * Range with a dotted path.
  */
 (function testRangeDottedPath() {
-    let res = assert.commandWorked(db.runCommand({
-        aggregate: coll.getName(),
-        pipeline: [],
-        exchange: {
-            policy: "keyRange",
-            consumers: NumberInt(numConsumers),
-            bufferSize: NumberInt(1024),
-            key: {"c.d": 1},
-            boundaries:
-                [{"c.d": MinKey}, {"c.d": 2500}, {"c.d": 5000}, {"c.d": 7500}, {"c.d": MaxKey}],
-            consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
-        },
-        cursor: {batchSize: 0}
-    }));
+    let res = assert.commandWorked(
+        internalDB.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [],
+            exchange: {
+                policy: "keyRange",
+                consumers: NumberInt(numConsumers),
+                bufferSize: NumberInt(1024),
+                key: {"c.d": 1},
+                boundaries:
+                    [{"c.d": MinKey}, {"c.d": 2500}, {"c.d": 5000}, {"c.d": 7500}, {"c.d": MaxKey}],
+                consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
+            },
+            cursor: {batchSize: 0},
+            writeConcern: {},
+        }),
+    );
     assert.eq(numConsumers, res.cursors.length);
 
     let parallelShells = [];
@@ -222,20 +259,23 @@ assert.eq(0, numDocs % numConsumers);
  * Range with a dotted path and array.
  */
 (function testRangeDottedPath() {
-    let res = assert.commandWorked(db.runCommand({
-        aggregate: coll.getName(),
-        pipeline: [],
-        exchange: {
-            policy: "keyRange",
-            consumers: NumberInt(numConsumers),
-            bufferSize: NumberInt(1024),
-            key: {"e.f": 1},
-            boundaries:
-                [{"e.f": MinKey}, {"e.f": 2500}, {"e.f": 5000}, {"e.f": 7500}, {"e.f": MaxKey}],
-            consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
-        },
-        cursor: {batchSize: 0}
-    }));
+    let res = assert.commandWorked(
+        internalDB.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [],
+            exchange: {
+                policy: "keyRange",
+                consumers: NumberInt(numConsumers),
+                bufferSize: NumberInt(1024),
+                key: {"e.f": 1},
+                boundaries:
+                    [{"e.f": MinKey}, {"e.f": 2500}, {"e.f": 5000}, {"e.f": 7500}, {"e.f": MaxKey}],
+                consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
+            },
+            cursor: {batchSize: 0},
+            writeConcern: {},
+        }),
+    );
     assert.eq(numConsumers, res.cursors.length);
 
     let parallelShells = [];
@@ -259,19 +299,22 @@ assert.eq(0, numDocs % numConsumers);
         assert.commandWorked(
             db.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn"}));
 
-        let res = assert.commandWorked(db.runCommand({
-            aggregate: coll.getName(),
-            pipeline: [],
-            exchange: {
-                policy: "keyRange",
-                consumers: NumberInt(numConsumers),
-                bufferSize: NumberInt(1024),
-                key: {a: 1},
-                boundaries: [{a: MinKey}, {a: 2500}, {a: 5000}, {a: 7500}, {a: MaxKey}],
-                consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)]
-            },
-            cursor: {batchSize: 0}
-        }));
+        let res = assert.commandWorked(
+            internalDB.runCommand({
+                aggregate: coll.getName(),
+                pipeline: [],
+                exchange: {
+                    policy: "keyRange",
+                    consumers: NumberInt(numConsumers),
+                    bufferSize: NumberInt(1024),
+                    key: {a: 1},
+                    boundaries: [{a: MinKey}, {a: 2500}, {a: 5000}, {a: 7500}, {a: MaxKey}],
+                    consumerIds: [NumberInt(0), NumberInt(1), NumberInt(2), NumberInt(3)],
+                },
+                cursor: {batchSize: 0},
+                writeConcern: {},
+            }),
+        );
         assert.eq(numConsumers, res.cursors.length);
 
         let parallelShells = [];
@@ -289,5 +332,4 @@ assert.eq(0, numDocs % numConsumers);
     } finally {
         assert.commandWorked(db.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
     }
-})();
 })();

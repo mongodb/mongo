@@ -114,7 +114,7 @@ assertErrorCode(inColl,
                         whenNotMatched: "insert"
                     }
                 }],
-                51132);
+                [51132, 51185]);
 
 // Turn off the exchange and rerun the query.
 assert.commandWorked(mongosDB.adminCommand({setParameter: 1, internalQueryDisableExchange: 1}));
@@ -137,9 +137,10 @@ assertErrorCode(inColl,
                         whenNotMatched: "insert"
                     }
                 }],
-                51132);
+                [51132, 51185]);
 
-// SERVER-38349 Make sure mongos rejects specifying exchange directly.
+// SERVER-38349 Make sure external clients cannot specify exchange directly.
+// External clients are now rejected with BadValue before reaching the mongos-level check (51028).
 assert.commandFailedWithCode(mongosDB.runCommand({
     aggregate: inColl.getName(),
     pipeline: [],
@@ -152,7 +153,7 @@ assert.commandFailedWithCode(mongosDB.runCommand({
         consumerIds: [NumberInt(0), NumberInt(1)]
     }
 }),
-                             51028);
+                             [ErrorCodes.BadValue, 51028]);
 
 assert.commandFailedWithCode(mongosDB.runCommand({
     aggregate: inColl.getName(),
@@ -168,7 +169,7 @@ assert.commandFailedWithCode(mongosDB.runCommand({
         consumerIds: [NumberInt(0), NumberInt(1)]
     }
 }),
-                             51028);
+                             [ErrorCodes.BadValue, 51028]);
 
 st.stop();
 }());

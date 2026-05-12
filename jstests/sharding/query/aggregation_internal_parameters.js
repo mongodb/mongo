@@ -104,7 +104,7 @@ assert.commandFailedWithCode(mongosDB.runCommand({
     cursor: {},
     exchange: {policy: 'roundrobin', consumers: NumberInt(2)}
 }),
-                             51028);
+                             [ErrorCodes.BadValue, 51028]);
 
 // Test that the command fails when all internal parameters have been specified.
 assert.commandFailedWithCode(mongosDB.runCommand({
@@ -115,7 +115,7 @@ assert.commandFailedWithCode(mongosDB.runCommand({
     fromMongos: true,
     exchange: {policy: 'roundrobin', consumers: NumberInt(2)}
 }),
-                             51028);
+                             [ErrorCodes.BadValue, 51028]);
 
 // Test that the command fails when all internal parameters but exchange have been specified.
 assert.commandFailedWithCode(mongosDB.runCommand({

@@ -212,6 +212,12 @@ void validateRequestForAPIVersion(const OperationContext* opCtx,
     bool isInternalClient =
         !client->session() || (client->session()->getTags() & transport::Session::kInternalClient);
 
+    if (request.getExchange()) {
+        // Forbid exchange from external clients
+        uassert(ErrorCodes::BadValue,
+                "BSON field 'exchange' is an unknown field",
+                isInternalClient || client->isInDirectClient());
+    }
     // Checks that the 'exchange' or 'fromMongos' option can only be specified by the internal
     // client.
     if ((request.getExchange() || request.getFromMongos()) && apiStrict && apiVersion == "1") {
