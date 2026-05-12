@@ -733,7 +733,7 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
         stats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        [&spilled] { ++spilled; },
+        [&spiller, &spilled] { EXPECT_EQ(spiller.iterators().size(), ++spilled); },
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};

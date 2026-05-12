@@ -457,6 +457,13 @@ public:
                                 batchBytes,
                                 minAvailableDiskBytesToSpill) {}
 
+    void spill(const SortOptions& opts,
+               const SpillerBase<Key, Value, Comparator>::Settings& settings,
+               std::span<std::pair<Key, Value>> data) override {
+        SpillerBase<Key, Value, Comparator>::spill(opts, settings, data);
+        _onSpill();
+    }
+
     void mergeSpills(const SortOptions& opts,
                      const SpillerBase<Key, Value, Comparator>::Settings& settings,
                      SorterStats& stats,
@@ -623,7 +630,6 @@ private:
 
         _current += data.size();
         _containerBasedStorage().updateCurrKey(_current);
-        _onSpill();
 
         return std::move(writer);
     }
