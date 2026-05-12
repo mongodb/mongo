@@ -209,19 +209,35 @@ makeSpiller(OperationContext* opCtx,
             ContainerWriteBehavior containerWriteBehavior,
             OnSpillFn onSpill = nullptr) {
     if (containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
-        return std::make_shared<sorter::ContainerBasedSpiller<key_string::Value,
-                                                              mongo::NullValue,
-                                                              BtreeExternalSortComparison>>(
-            *opCtx,
-            *shard_role_details::getRecoveryUnit(opCtx),
-            entry->indexBuildInterceptor()->getSorterContainer(),
-            containerStats,
-            dbName,
-            sorter::kLatestChecksumVersion,
-            std::move(onSpill),
-            primaryDrivenIndexBuildSorterInsertionBatchSize.load(),
-            primaryDrivenIndexBuildSorterInsertionBatchBytes.load(),
-            static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()));
+        return stateInfo && stateInfo->getRanges() && !stateInfo->getRanges()->empty()
+            ? std::make_shared<sorter::ContainerBasedSpiller<key_string::Value,
+                                                             mongo::NullValue,
+                                                             BtreeExternalSortComparison>>(
+                  *opCtx,
+                  *shard_role_details::getRecoveryUnit(opCtx),
+                  entry->indexBuildInterceptor()->getSorterContainer(),
+                  // Use the end of the last existing range as the starting key.
+                  stateInfo->getRanges()->back().getEnd(),
+                  containerStats,
+                  dbName,
+                  sorter::kLatestChecksumVersion,
+                  std::move(onSpill),
+                  primaryDrivenIndexBuildSorterInsertionBatchSize.load(),
+                  primaryDrivenIndexBuildSorterInsertionBatchBytes.load(),
+                  static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()))
+            : std::make_shared<sorter::ContainerBasedSpiller<key_string::Value,
+                                                             mongo::NullValue,
+                                                             BtreeExternalSortComparison>>(
+                  *opCtx,
+                  *shard_role_details::getRecoveryUnit(opCtx),
+                  entry->indexBuildInterceptor()->getSorterContainer(),
+                  containerStats,
+                  dbName,
+                  sorter::kLatestChecksumVersion,
+                  std::move(onSpill),
+                  primaryDrivenIndexBuildSorterInsertionBatchSize.load(),
+                  primaryDrivenIndexBuildSorterInsertionBatchBytes.load(),
+                  static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()));
     }
     invariant(!onSpill);
 
