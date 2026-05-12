@@ -16,6 +16,12 @@ COPTS = select({
         "/wd4800",  # 'type' : forcing value to bool 'true' or 'false' (performance warning)
         "/wd4996",  # The compiler encountered a deprecated declaration.
     ],
+    "//build_defs:config_clang": [
+        "-Wno-sign-compare",
+        # (spencer)  `a9dff35ad251` | [Clang] Enable -fextend-lifetimes at -Og (#118026)
+        #  prevents clang from correctly interacting with LimitToken's poisoned stack memory.
+        "-fextend-variable-liveness=none",
+    ],
     "//conditions:default": [
         "-Wno-sign-compare",
     ],

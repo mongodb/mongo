@@ -23,6 +23,11 @@ create_compiler_config_setting(
     value = "clang-cl",
 )
 
+create_compiler_config_setting(
+    name = "config_clang",
+    value = "clang",
+)
+
 platform(
     name = "x64_windows-clang-cl",
     constraint_values = [
