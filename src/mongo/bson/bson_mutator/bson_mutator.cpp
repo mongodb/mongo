@@ -44,8 +44,12 @@ namespace mongo::bson_mutator {
         bsontype, BSONElementDomainVariant(defaultdomain)        \
     }
 
-static BSONDomainMap default_domains_{
-    BSON_MUTATOR_TAIL(BSON_MUTATOR_EXPAND_FIELD_TYPES(DOMAIN_MAP_INIT))};
+// Dynamically initialized singleton, safe for access cross-TU.
+static BSONDomainMap& defaultDomains() {
+    static BSONDomainMap kDefaultDomains{
+        BSON_MUTATOR_TAIL(BSON_MUTATOR_EXPAND_FIELD_TYPES(DOMAIN_MAP_INIT))};
+    return kDefaultDomains;
+}
 
 void BSONPrinter::PrintCorpusValue(const CorpusType& val,
                                    fuzztest::domain_implementor::RawSink out,
@@ -374,8 +378,9 @@ void BSONObjImpl::RemoveRandomElement(BSONObjBuilder& bob,
 
 void BSONObjImpl::CreateRandomObj(BSONObjBuilder& bob, absl::BitGenRef prng) {
     // select a random type from the full list of default bson element domains
-    auto b = default_domains_.begin();
-    std::advance(b, absl::Uniform(prng, 0UL, default_domains_.size()));
+    auto& defaults = defaultDomains();
+    auto b = defaults.begin();
+    std::advance(b, absl::Uniform(prng, 0UL, defaults.size()));
     auto type = b->first;
 
     // get a random field name. This may collide with a preconfigured field name, but that is
@@ -484,8 +489,9 @@ void BSONObjImpl::ModifyRandomElement(
             } else {
                 // change the type
                 // This won't change the type for fields defined in _inputElements
-                auto b = default_domains_.begin();
-                std::advance(b, absl::Uniform(prng, 0UL, default_domains_.size()));
+                auto& defaults = defaultDomains();
+                auto b = defaults.begin();
+                std::advance(b, absl::Uniform(prng, 0UL, defaults.size()));
                 auto new_type = b->first;
 
                 visitDomain(OverloadedVisitor{
@@ -514,7 +520,7 @@ void BSONObjImpl::ModifyRandomElement(
 }
 
 BSONObjImpl& BSONObjImpl::WithAny(const std::string& name) {
-    _inputElements.try_emplace(name, default_domains_);
+    _inputElements.try_emplace(name, defaultDomains());
     return *this;
 }
 
@@ -534,7 +540,7 @@ void BSONObjImpl::visitDomain(F visitor, std::string fieldName, BSONType domainT
             std::visit(visitor, std::get<BSONElementDomainVariant>(domain->second));
         }
 
-    } else if (auto domain = default_domains_.find(domainType); domain != default_domains_.end()) {
+    } else if (auto domain = defaultDomains().find(domainType); domain != defaultDomains().end()) {
         std::visit(visitor, domain->second);
     } else {
         GTEST_FAIL() << "invalid BSON type: fieldname: " << fieldName
