@@ -93,9 +93,13 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
         }
 
         const ns = {db: dbName, coll: collectionName};
-        const qsutils = new QuerySettingsUtils(db, collectionName);
+        // Open a new connection for admin commands.
+        // This avoids problems if a test provides an internal connection
+        // (e.g., requiring an explicit readConcern)
+        const newConn = new Mongo(db.getMongo().host);
+        const qsutils = new QuerySettingsUtils(newConn.getDB(dbName), collectionName);
         qsutils.onSetQuerySettings(computeAndStoreResult);
-        const qstests = new QuerySettingsIndexHintsTests(qsutils);
+        const qstests = new QuerySettingsIndexHintsTests(qsutils, db);
         const representativeQuery = qsutils.makeQueryInstance(innerCmd);
         qstests.assertQuerySettingsFallback(representativeQuery, ns, explain);
     };
