@@ -24,6 +24,7 @@ variables:
     - ".long-perf"
     - ".oplog-perf"
     - ".wt2853-perf"
+    - ".ycsb-perf"
     - name: many-collection-test
       distros: ubuntu2004-wt-large
     - name: ".cppsuite-perf-test"

@@ -217,8 +217,7 @@ parse_tiered_opt(TEST_OPTS *opts)
         if (__wt_optarg == NULL || *__wt_optarg == '\0')
             testutil_die(EINVAL, "-Po option requires an argument");
 
-        if (strncmp(__wt_optarg, DIR_STORE, strlen(__wt_optarg)) != 0 &&
-          strncmp(__wt_optarg, S3_STORE, strlen(__wt_optarg)) != 0)
+        if (strcmp(__wt_optarg, DIR_STORE) != 0)
             testutil_die(EINVAL, "-Po not a valid argument");
 
         opts->tiered_storage_source = dstrdup(__wt_optarg);

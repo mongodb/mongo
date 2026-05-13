@@ -69,10 +69,8 @@ extern "C" {
 #endif
 
 #define DIR_STORE_BUCKET_NAME "bucket"
-#define S3_DEFAULT_BUCKET_NAME "s3testext;ap-southeast-2"
 
 #define DIR_STORE "dir_store"
-#define S3_STORE "s3_store"
 
 #define TESTUTIL_ENV_CONFIG_DISAGG                               \
     ",disaggregated=(role=%s,page_log=%s,drain_threads=%" PRIu64 \

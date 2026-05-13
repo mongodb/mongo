@@ -329,12 +329,6 @@ config_bool(
 )
 
 config_bool(
-    ENABLE_S3
-    "Build the S3 storage extension"
-    DEFAULT OFF
-)
-
-config_bool(
     ENABLE_GCP
     "Build the Google Cloud Platform storage extension"
     DEFAULT OFF

@@ -38,9 +38,6 @@ class test_tiered07(wttest.WiredTigerTestCase, TieredConfigMixin):
 
     storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered07', tiered_only=True)
 
-    # Disabled S3 (only indexing dirstore in storage sources) as S3 directory listing
-    # is interpreting a directory to end in a '/', whereas the code in the tiered storage doesn't
-    # expect that.
     flush_obj = [('ckpt', dict(first_ckpt=True)),
                  ('no_ckpt', dict(first_ckpt=False)),
                 ]

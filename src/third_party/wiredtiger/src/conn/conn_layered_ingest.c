@@ -210,10 +210,12 @@ __layered_fix_prepared_transaction_callback(
 {
     WT_FIX_PREPARED_COOKIE *cookie;
     WT_TXN *txn;
+    bool patched;
 
     cookie = (WT_FIX_PREPARED_COOKIE *)cookiep;
     txn = array_session->txn;
     *exit_walkp = false;
+    patched = false;
 
     if (!F_ISSET(txn, WT_TXN_PREPARE))
         return (0);
@@ -274,9 +276,17 @@ __layered_fix_prepared_transaction_callback(
          */
         (void)__wt_atomic_sub_int32(&cookie->ingest_btree->dhandle->session_inuse, 1);
         (void)__wt_atomic_add_int32(&cookie->stable_btree->dhandle->session_inuse, 1);
+        patched = true;
     }
 
-    *exit_walkp = true;
+    /*
+     * Only stop the walk when this session actually owned the key. In a split-prepared scenario two
+     * sessions can share the same prepared_id: one session reclaimed the id from a checkpoint (no
+     * transaction id assigned) and holds mods for some tables, while a second live session holds
+     * mods for different tables with the same id. If the first session matched by prepared_id but
+     * had no mods for this ingest btree, the walk must continue so the second session can be found.
+     */
+    *exit_walkp = patched;
     return (0);
 }
 

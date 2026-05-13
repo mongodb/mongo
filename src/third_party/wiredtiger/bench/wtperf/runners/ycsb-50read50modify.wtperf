@@ -1,0 +1,20 @@
+# This configuration is intended to be executed on a system with at least 32 GB of RAM and 16 CPUs.
+# Because of that, cache_size is set to 16 GB, since this is typically the WiredTiger cache size for
+# a 32 GB RAM system (50%).
+# This is also the reason for having 30M entries, which are expected to generate approximately 32 GB
+# of on-disk data, so the cache should hold around 50% of the total dataset.
+# The total number of user threads is also set to 16 to avoid oversubscription.
+
+conn_config="cache_size=16G,log=(enabled=true)"
+pareto=20
+table_config="type=file"
+key_sz=100
+value_sz=1024
+icount=30000000
+run_time=1800
+sess_config="isolation=snapshot"
+threads=((count=8,reads=1),(count=8,modify=1,ops_per_txn=1))
+warmup=120
+sample_interval=5
+populate_threads=8
+report_interval=5

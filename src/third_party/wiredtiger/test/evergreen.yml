@@ -324,10 +324,8 @@ functions:
           ${ENABLE_AZURE|} \
           ${ENABLE_CPPSUITE|} \
           ${ENABLE_GCP|} \
-          ${ENABLE_S3|} \
           ${IMPORT_AZURE_SDK|} \
           ${IMPORT_GCP_SDK|} \
-          ${IMPORT_S3_SDK|} \
           ${SPINLOCK_TYPE|} \
           ${ENABLE_COLORIZE_OUTPUT|-DENABLE_COLORIZE_OUTPUT=0} \
           ${CC_OPTIMIZE_LEVEL|} \
@@ -558,9 +556,6 @@ functions:
       params:
         working_dir: "wiredtiger/cmake_build"
         shell: bash
-        include_expansions_in_env:
-          - aws_sdk_s3_ext_access_key
-          - aws_sdk_s3_ext_secret_key
         script: |
           set -o errexit
           ${PREPARE_TEST_ENV}
@@ -586,7 +581,6 @@ functions:
 
           virtualenv -p python3 venv
           source venv/bin/activate
-          pip3 install boto3==1.34.144
           pip3 install azure-storage-blob==12.20.0
           pip3 install google-cloud-storage==2.17.0
 
@@ -1590,11 +1584,6 @@ variables:
     ENABLE_GCP: -DENABLE_GCP=1
     IMPORT_GCP_SDK: -DIMPORT_GCP_SDK=external
 
-  # Configure flags for tiered storage S3 extension.
-  - &configure_flags_tiered_storage_s3
-    ENABLE_S3: -DENABLE_S3=1
-    IMPORT_S3_SDK: -DIMPORT_S3_SDK=external
-
   # Configure flags for address sanitizer for stable mongodb toolchain clang (include builtins).
   - &configure_flags_asan_mongodb_stable_clang_with_builtins
     <<: *configure_flags_with_builtins
@@ -2446,26 +2435,6 @@ tasks:
           directory: test/csuite
           ctest_extra_args: -LE "long_running|check_disagg" ${ctest_extra_args} -j ${num_jobs}
 
-  - name: csuite-timestamp-abort-test-s3
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          <<: *configure_flags_tiered_storage_s3
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/test/csuite/timestamp_abort"
-          shell: bash
-          include_expansions_in_env:
-            - aws_sdk_s3_ext_access_key
-            - aws_sdk_s3_ext_secret_key
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-
-            ./test_timestamp_abort -PT -Po s3_store
-
   - name: csuite-random-abort-lazyfs
     commands:
       - func: "get project"
@@ -3236,26 +3205,6 @@ tasks:
         vars:
           unit_test_args: -v 2 --hook 'tiered=(tier_storage_source=dir_store,tier_storage_source_config=(force_delay=1,delay_ms=10,verbose=1))'
 
-  - name: unit-test-hook-tiered-s3
-    tags: ["python"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          <<: *configure_flags_tiered_storage_s3
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          shell: bash
-          include_expansions_in_env:
-            - aws_sdk_s3_ext_access_key
-            - aws_sdk_s3_ext_secret_key
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            ${python_binary|python3} ../test/suite/run.py ${ignore_stdout} ${unit_test_args|-v 2} --hook tiered=tier_storage_source='s3_store' -j ${num_jobs} 2>&1
-
   - name: unit-test-hook-tiered-timestamp
     tags: ["python"]
     depends_on:
@@ -3924,25 +3873,6 @@ tasks:
               ./test_fops
             fi
 
-  - name: bench-tiered-push-pull-s3
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          <<: *configure_flags_tiered_storage_s3
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build/bench/tiered"
-          shell: bash
-          include_expansions_in_env:
-            - aws_sdk_s3_ext_access_key
-            - aws_sdk_s3_ext_secret_key
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            ./test_push_pull -PT -Po s3_store
-
   - name: bench-tiered-push-pull
     depends_on:
     - name: compile
@@ -4493,58 +4423,6 @@ tasks:
 
       - func: "code coverage publish report"
 
-  - name: s3-tiered-storage-extensions-test
-    tags: ["python", "pull_request"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          <<: *configure_flags_tiered_storage_s3
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-      - func: "run tiered storage test"
-        vars:
-          # Set this in case of a core to get the correct python binary.
-          python_binary: $(pwd)/venv/bin/python3
-          tiered_storage_test_name: tiered
-  - name: s3-tiered-test-small
-    tags: ["python"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          <<: *configure_flags_tiered_storage_s3
-      - func: "run tiered storage test"
-        vars:
-          # Set this in case of a core to get the correct python binary.
-          python_binary: $(pwd)/venv/bin/python3
-          tiered_storage_test_name: tiered06
-  - name: s3-tiered-catch2-unittest-test
-    tags: ["tiered_unittest", "pull_request"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          <<: *configure_flags_tiered_storage_s3
-          HAVE_UNITTEST: -DHAVE_UNITTEST=1
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          shell: bash
-          include_expansions_in_env:
-            - aws_sdk_s3_ext_access_key
-            - aws_sdk_s3_ext_secret_key
-          script: |
-            set -o errexit
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-            # Run S3 extension unit testing.
-            ext/storage_sources/s3_store/test/run_s3_unit_tests
   - name: azure-gcp-tiered-storage-extensions-test
     tags: ["python"]
     commands:
@@ -6790,6 +6668,118 @@ tasks:
         vars:
           test-name: microbenchmark_prefetch_on_verify.py
 
+  ##########################
+  # YCSB Performance Tests #
+  ##########################
+
+  - name: perf-test-ycsb-50read50update
+    tags: ["ycsb-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: ycsb-50read50update.wtperf
+          maxruns: 1
+          wtarg: -ops '["read_ops", "update_ops", "avg_latency_read", "avg_latency_update"]'
+      - func: "upload stats to atlas"
+        vars:
+          test-name: ycsb-50read50update.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: ycsb-50read50update.wtperf
+
+  - name: perf-test-ycsb-95read5update
+    tags: ["ycsb-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: ycsb-95read5update.wtperf
+          maxruns: 1
+          wtarg: -ops '["read_ops", "update_ops", "avg_latency_read", "avg_latency_update"]'
+      - func: "upload stats to atlas"
+        vars:
+          test-name: ycsb-95read5update.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: ycsb-95read5update.wtperf
+
+  - name: perf-test-ycsb-100read
+    tags: ["ycsb-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: ycsb-100read.wtperf
+          maxruns: 1
+          wtarg: -ops '["read_ops", "avg_latency_read"]'
+      - func: "upload stats to atlas"
+        vars:
+          test-name: ycsb-100read.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: ycsb-100read.wtperf
+
+  - name: perf-test-ycsb-95readlatest5insert
+    tags: ["ycsb-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: ycsb-95readlatest5insert.wtperf
+          maxruns: 1
+          wtarg: -ops '["read_ops", "insert_ops", "avg_latency_read", "avg_latency_insert"]'
+      - func: "upload stats to atlas"
+        vars:
+          test-name: ycsb-95readlatest5insert.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: ycsb-95readlatest5insert.wtperf
+
+  - name: perf-test-ycsb-95scan5insert
+    tags: ["ycsb-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: ycsb-95scan5insert.wtperf
+          maxruns: 1
+          wtarg: -ops '["read_ops", "insert_ops", "avg_latency_read", "avg_latency_insert"]'
+      - func: "upload stats to atlas"
+        vars:
+          test-name: ycsb-95scan5insert.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: ycsb-95scan5insert.wtperf
+
+  - name: perf-test-ycsb-50read50modify
+    tags: ["ycsb-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: ycsb-50read50modify.wtperf
+          maxruns: 1
+          wtarg: -ops '["read_ops", "modify_ops", "avg_latency_read", "avg_latency_modify"]'
+      - func: "upload stats to atlas"
+        vars:
+          test-name: ycsb-50read50modify.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: ycsb-50read50modify.wtperf
+
   - name: bench-wt2853-perf-test-row
     tags: ["wt2853-perf"]
     depends_on:
@@ -6952,14 +6942,7 @@ buildvariants:
     - name: format-failure-configs-test
       distros: ubuntu2004-large
     - name: ".data-validation-stress-test"
-    - name: s3-tiered-storage-extensions-test
-    # FIXME-WT-12812 - This test is unstable when run with the new tmalloc install script. Disabled while WT-12812 is under investigation.
-    # - name: azure-gcp-tiered-storage-extensions-test
-    # FIXME-WT-14962 - Added for tiered storage; may help disagg but currently a CI blocker and needs re-evaluation.
-    # - name: csuite-timestamp-abort-test-s3
     - name: bench-tiered-push-pull
-    - name: bench-tiered-push-pull-s3
-    - name: unit-test-hook-tiered-s3
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-unit-test
@@ -7356,7 +7339,6 @@ buildvariants:
       batchtime: 1440 # once a day
     - name: model-test-long-random-config-disagg
       batchtime: 1440 # once a day
-    - name: s3-tiered-storage-extensions-test
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
       distros: ubuntu2004-arm64-large
@@ -7410,7 +7392,6 @@ buildvariants:
       distros: ubuntu2004-large
     - name: configure-combinations
     - name: format-smoke-test
-    - name: s3-tiered-storage-extensions-test
 
 - name: ubuntu2004-release-arm64
   display_name: "! Ubuntu 20.04 ARM64 (Release Build)"
@@ -7436,7 +7417,6 @@ buildvariants:
       distros: ubuntu2004-arm64-large
     - name: configure-combinations
     - name: format-smoke-test
-    - name: s3-tiered-storage-extensions-test
 
 - name: ubuntu2004-release-stress-tests
   display_name: "! Ubuntu 20.04 Stress tests (Release Build)"
@@ -7673,7 +7653,6 @@ buildvariants:
     - name: long-test
       distros: amazon2023.3-arm64-large
     - name: format-smoke-test
-    - name: s3-tiered-storage-extensions-test
 
 - name: amazon2023-arm64
   display_name: "! Amazon2023 ARM64"
@@ -7712,7 +7691,6 @@ buildvariants:
       batchtime: 1440 # once a day
     - name: model-test-long-random-config-disagg
       batchtime: 1440 # once a day
-    - name: s3-tiered-storage-extensions-test
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
       distros: amazon2023.3-arm64-large

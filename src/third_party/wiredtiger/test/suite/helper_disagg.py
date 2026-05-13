@@ -197,7 +197,7 @@ class DisaggConfigMixin:
         elif config != '':
             config = f'=(config=\"({config})\")'
 
-        # S3 store is built as an optional loadable extension, not all test environments build S3.
+        # The page log extension is optional and not all test environments build it.
         if not self.is_local_storage:
             extlist.skip_if_missing = True
         # Windows doesn't support dynamically loaded extension libraries.

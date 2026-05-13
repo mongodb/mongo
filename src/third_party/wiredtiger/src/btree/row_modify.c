@@ -365,15 +365,11 @@ err:
 void
 __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
-    WT_BTREE *btree;
     WT_PAGE *page;
     WT_TXN_GLOBAL *txn_global;
     WT_UPDATE *first;
-    wt_timestamp_t prune_timestamp;
-    uint64_t oldest_id;
     u_int count;
 
-    btree = S2BT(session);
     page = cbt->ref->page;
     txn_global = &S2C(session)->txn_global;
 
@@ -381,10 +377,6 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UP
     /* If we can't lock it, don't scan, that's okay. */
     if (WT_PAGE_TRYLOCK(session, page) != 0)
         return;
-
-    prune_timestamp = __wt_atomic_load_uint64_relaxed(&CUR2BT(cbt)->prune_timestamp);
-
-    oldest_id = __wt_txn_oldest_id(session);
 
     /*
      * This function identifies obsolete updates, and truncates them from the rest of the chain;
@@ -396,34 +388,13 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UP
      * Only updates with globally visible, self-contained data can terminate update chains.
      */
     for (first = NULL, count = 0; upd != NULL; upd = upd->next, count++) {
-        uint64_t txnid;
         /*
          * This function is only invoked when a new write is made. As a result, there is no risk of
          * racing with prepared rollback, since no updates should exist in the prepared state at
          * this point.
          */
-        if ((txnid = __wt_atomic_load_uint64_v_relaxed(&upd->txnid)) == WT_TXN_ABORTED) {
-            /*
-             * We only need to focus on prepared updates in the ingest table, as it is the only type
-             * of btree that requires draining during the step-up process.
-             */
-            if (!F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
-                continue;
-
-            if (upd->prepare_state != WT_PREPARE_INPROGRESS)
-                continue;
-
-            /*
-             * In disaggregated storage, we cannot garbage collect an aborted prepared update with a
-             * rollback timestamp greater than the prune timestamp. This is because the update
-             * information is required to roll back the prepared update on the stable table in case
-             * of a step-up.
-             */
-            if (upd->upd_rollback_ts > prune_timestamp)
-                first = NULL;
-
+        if (__wt_atomic_load_uint64_v_relaxed(&upd->txnid) == WT_TXN_ABORTED)
             continue;
-        }
 
         /*
          * Prepare transaction rollback adds a globally visible tombstone to the update chain to
@@ -432,24 +403,21 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UP
          * else. To avoid this problem, skip these globally visible tombstones from the update
          * obsolete check.
          */
-        if (F_ISSET(upd, WT_UPDATE_PREPARE_ROLLBACK))
+        if (F_ISSET(upd, WT_UPDATE_PREPARE_ROLLBACK)) {
+            first = NULL;
             continue;
+        }
 
-        /*
-         * If a table has garbage collection enabled, then trim updates as possible. We should check
-         * the logic here - it might be possible to do something more aggressive?
-         */
-        if (__wt_txn_upd_visible_all(session, upd) ||
-          (F_ISSET(CUR2BT(cbt), WT_BTREE_GARBAGE_COLLECT) &&
-            (txnid < oldest_id && prune_timestamp != WT_TS_NONE &&
-              upd->upd_durable_ts <= prune_timestamp))) {
+        /* Cannot truncate the updates if we need to remove the updates from the history store. */
+        if (F_ISSET(upd, WT_UPDATE_HS_MAX_STOP)) {
+            first = NULL;
+            continue;
+        }
+
+        if (__wt_txn_upd_visible_all(session, upd)) {
             if (first == NULL && WT_UPDATE_DATA_VALUE(upd))
                 first = upd;
         } else
-            first = NULL;
-
-        /* Cannot truncate the updates if we need to remove the updates from the history store. */
-        if (F_ISSET(upd, WT_UPDATE_HS_MAX_STOP))
             first = NULL;
     }
 

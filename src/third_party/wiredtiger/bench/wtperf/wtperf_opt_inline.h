@@ -203,7 +203,7 @@ DEF_OPT_AS_STRING(threads, "",
  * program will just use it. The program does not parse the connection configuration line.
  */
 DEF_OPT_AS_STRING(
-  tiered, "none", "tiered extension.  Allowed configuration values are: 'none', 'dir_store', 's3'")
+  tiered, "none", "tiered extension.  Allowed configuration values are: 'none', 'dir_store'")
 DEF_OPT_AS_STRING(tiered_bucket, "none", "Create this bucket directory before beginning the test.")
 DEF_OPT_AS_UINT32(tiered_flush_interval, 0,
   "Call flush_tier every interval seconds during the workload phase. "

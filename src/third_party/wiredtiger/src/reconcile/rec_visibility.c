@@ -361,15 +361,9 @@ __rec_save_delete_hs_upd_and_free_obs_updates(WT_SESSION_IMPL *session, WTI_RECO
             break;
         }
 
-        /*
-         * Track the first self-contained value that is globally visible. If a table has garbage
-         * collection enabled, then trim updates as possible. We should check the logic here - it
-         * might be possible to do something more aggressive?
-         */
+        /* Track the first self-contained value that is globally visible. */
         if (F_ISSET(r, WT_REC_CHECKPOINT) && visible_all_upd == NULL && delete_upd->next != NULL &&
-          WT_UPDATE_DATA_VALUE(delete_upd) &&
-          (__wt_txn_upd_visible_all(session, delete_upd) ||
-            WT_REC_CAN_PRUNE_UPD(delete_upd->txnid, delete_upd->upd_durable_ts, r)))
+          WT_UPDATE_DATA_VALUE(delete_upd) && __wt_txn_upd_visible_all(session, delete_upd))
             visible_all_upd = delete_upd;
     }
 
@@ -1212,16 +1206,15 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
         if (!found_last_upd_to_keep) {
             upd_select->upd = upd;
 
-            if (__wt_txn_upd_visible_all(session, upd)) {
+            /*
+             * For ingest btrees, skip the global visibility check for non-timestamped tombstones as
+             * they will not be globally visible until they can be pruned.
+             */
+            if ((!F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT) || upd->type != WT_UPDATE_TOMBSTONE ||
+                  upd->upd_durable_ts == WT_TS_NONE) &&
+              __wt_txn_upd_visible_all(session, upd)) {
                 found_last_upd_to_keep = true;
-
-                /*
-                 * If garbage collection is enabled, continue traversing the update chain. There may
-                 * be an aborted prepared update that cannot be discarded if the oldest timestamp
-                 * has moved beyond the prune timestamp.
-                 */
-                if (!F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT))
-                    break;
+                break;
             }
         }
     }
