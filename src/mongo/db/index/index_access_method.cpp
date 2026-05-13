@@ -1204,12 +1204,12 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
     }
 
     for (const auto& keyString : *keys) {
-        _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
+        _sorter->add(keyString, mongo::NullValue());
     }
     for (const auto& keyString : multikeyMetadataKeys) {
-        _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
+        _sorter->add(keyString, mongo::NullValue());
     }
 
     setIsMultikey(keys->size(), multikeyMetadataKeys, *multikeyPaths);

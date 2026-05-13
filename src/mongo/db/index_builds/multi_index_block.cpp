@@ -1064,6 +1064,10 @@ Status MultiIndexBlock::_insert(
         }
     }
 
+    // Update the last record inserted before actually performing the insert. That way if an
+    // on-spill callback runs, it can see the most up-to-date position.
+    _lastRecordIdInserted = loc;
+
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].filterExpression &&
             !exec::matcher::matchesBSON(_indexes[i].filterExpression, doc)) {
@@ -1091,8 +1095,6 @@ Status MultiIndexBlock::_insert(
         if (!idxStatus.isOK())
             return idxStatus;
     }
-
-    _lastRecordIdInserted = loc;
 
     return Status::OK();
 }
