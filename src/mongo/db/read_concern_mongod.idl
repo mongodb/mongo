@@ -42,3 +42,15 @@ server_parameters:
         cpp_varname: waitForSecondaryBeforeNoopWriteMS
         default: 10
         redact: false
+
+    testingSnapshotBehaviorInIsolation:
+        description: >-
+            Allows for testing of snapshot behavior by skipping the replication
+            related checks and isolating the storage/query side of snapshotting.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: gTestingSnapshotBehaviorInIsolation
+        default: false
+        redact: false
+        test_only: true
+        mod_visibility: public_for_technical_reasons

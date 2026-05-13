@@ -74,6 +74,7 @@
 #include "mongo/db/profile_collection.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/read_concern_mongod_gen.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_gen.h"
@@ -87,6 +88,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/request_execution_context.h"
+#include "mongo/db/rss/disable_snapshotting_fail_point.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -186,6 +188,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeSettingTxnInterruptFlag);
 MONGO_FAIL_POINT_DEFINE(hangAfterCheckingWritabilityForMultiDocumentTransactions);
 MONGO_FAIL_POINT_DEFINE(failWithErrorCodeAfterSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(failIngressRequestRateLimiting);
+MONGO_FAIL_POINT_DEFINE(hangBeforeComputeOperationTimeForMajorityRead);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not primary error resulted in network disconnection.
@@ -320,8 +323,23 @@ LogicalTime computeOperationTime(OperationContext* opCtx, LogicalTime startOpera
 
         // Note: ReadConcernArgs::getLevel returns kLocal if none was set.
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
-            operationTime =
-                LogicalTime(replCoord->getCurrentCommittedSnapshotOpTime().getTimestamp());
+            hangBeforeComputeOperationTimeForMajorityRead.executeIf(
+                [&](const BSONObj&) {
+                    hangBeforeComputeOperationTimeForMajorityRead.pauseWhileSet();
+                },
+                [&](const BSONObj& data) {
+                    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
+                    return fpNss.isEmpty() || CurOp::get(opCtx)->getNSS() == fpNss;
+                });
+            auto readTs = [&]() -> boost::optional<Timestamp> {
+                if (gTestingSnapshotBehaviorInIsolation ||
+                    MONGO_unlikely(disableSnapshotting.shouldFail())) {
+                    return boost::none;
+                }
+                return shard_role_details::getRecoveryUnit(opCtx)->getLastUsedReadTimestamp();
+            }();
+            operationTime = LogicalTime(
+                readTs ? *readTs : replCoord->getCurrentCommittedSnapshotOpTime().getTimestamp());
         } else {
             // Use the lockfree atomic shadow to avoid acquiring the ReplicationCoordinator
             // mutex on every response. Slight staleness is acceptable for operationTime.

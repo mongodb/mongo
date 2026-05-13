@@ -67,6 +67,16 @@ mongo_cc_library(
     }),
 )
 
+mongo_cc_library(
+    name = "disable_snapshotting_fail_point",
+    srcs = ["disable_snapshotting_fail_point.cpp"],
+    hdrs = ["disable_snapshotting_fail_point.h"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
 idl_generator(
     name = "snapshot_window_options_gen",
     src = "snapshot_window_options.idl",
