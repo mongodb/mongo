@@ -30,9 +30,11 @@
 #include "mongo/db/index_builds/primary_driven/util.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -41,8 +43,10 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/container.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -539,6 +543,177 @@ TEST_F(UtilTest, ResumeInfoParsesSuccessfully) {
         ASSERT_EQUALS(*indexes[i].skippedRecordsIdent,
                       *resumeState.getIndexes()[i].getSkippedRecordTrackerTable());
         ASSERT_EQUALS(*indexes[i].sorterIdent, *resumeState.getIndexes()[i].getStorageIdentifier());
+    }
+}
+
+std::vector<int64_t> getSorterKeys(OperationContext* opCtx, IntegerKeyedContainer& container) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto cursor = container.getCursor(ru);
+    std::vector<int64_t> keys;
+    while (auto entry = cursor->next()) {
+        keys.push_back(entry->first);
+    }
+    return keys;
+}
+
+void insertSorterEntries(OperationContext* opCtx,
+                         IntegerKeyedContainer& container,
+                         int64_t startKey,
+                         int64_t endKey) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    Lock::GlobalLock lk(opCtx, MODE_IX);
+    WriteUnitOfWork wuow{opCtx};
+    const char dummyValue[] = "value";
+    for (int64_t key = startKey; key < endKey; ++key) {
+        ASSERT_OK(container_write::insert(opCtx,
+                                          ru,
+                                          container,
+                                          key,
+                                          std::span<const char>(dummyValue, sizeof(dummyValue)),
+                                          mongo::container::ExistingKeyPolicy::overwrite));
+    }
+    wuow.commit();
+}
+
+TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesOutOfRangeKeys) {
+    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto opCtx = operationContext();
+    std::string sorterIdent = "internal-sorter-delete-test";
+    LazyRecordStore sorterTable(opCtx, sorterIdent, LazyRecordStore::CreateMode::immediate);
+    auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                          sorterTable.getTableOrThrow().getContainer())
+                          .get();
+
+    insertSorterEntries(opCtx, container, 1, 11);
+
+    IndexStateInfo indexInfo;
+    indexInfo.setSpec(BSON("key" << BSON("a" << 1) << "name"
+                                 << "a_1"
+                                 << "v" << IndexConfig::kLatestIndexVersion));
+    indexInfo.setIsMultikey(false);
+    indexInfo.setMultikeyPaths({});
+    indexInfo.setStorageIdentifier(sorterIdent);
+    SorterRange range;
+    range.setStart(3);
+    range.setEnd(8);
+    range.setChecksum(0);
+    indexInfo.setRanges(std::vector<SorterRange>{range});
+
+    deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
+
+    auto remainingKeys = getSorterKeys(opCtx, container);
+    EXPECT_EQ(remainingKeys.size(), 5u);
+    for (int64_t expected = 3; expected < 8; ++expected) {
+        ASSERT_TRUE(std::find(remainingKeys.begin(), remainingKeys.end(), expected) !=
+                    remainingKeys.end());
+    }
+}
+
+TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesNoOpWhenNoRanges) {
+    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto opCtx = operationContext();
+    std::string sorterIdent = "internal-sorter-noop-test";
+    LazyRecordStore sorterTable(opCtx, sorterIdent, LazyRecordStore::CreateMode::immediate);
+    auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                          sorterTable.getTableOrThrow().getContainer())
+                          .get();
+
+    insertSorterEntries(opCtx, container, 1, 6);
+
+    IndexStateInfo indexInfo;
+    indexInfo.setSpec(BSON("key" << BSON("a" << 1) << "name"
+                                 << "a_1"
+                                 << "v" << IndexConfig::kLatestIndexVersion));
+    indexInfo.setIsMultikey(false);
+    indexInfo.setMultikeyPaths({});
+    indexInfo.setStorageIdentifier(sorterIdent);
+
+    deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
+
+    auto remainingKeys = getSorterKeys(opCtx, container);
+    EXPECT_EQ(remainingKeys.size(), 5u);
+}
+
+TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesNoOpWhenAllWithinRange) {
+    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto opCtx = operationContext();
+    std::string sorterIdent = "internal-sorter-within-test";
+    LazyRecordStore sorterTable(opCtx, sorterIdent, LazyRecordStore::CreateMode::immediate);
+    auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                          sorterTable.getTableOrThrow().getContainer())
+                          .get();
+
+    insertSorterEntries(opCtx, container, 1, 6);
+
+    IndexStateInfo indexInfo;
+    indexInfo.setSpec(BSON("key" << BSON("a" << 1) << "name"
+                                 << "a_1"
+                                 << "v" << IndexConfig::kLatestIndexVersion));
+    indexInfo.setIsMultikey(false);
+    indexInfo.setMultikeyPaths({});
+    indexInfo.setStorageIdentifier(sorterIdent);
+    SorterRange range;
+    range.setStart(1);
+    range.setEnd(6);
+    range.setChecksum(0);
+    indexInfo.setRanges(std::vector<SorterRange>{range});
+
+    deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
+
+    auto remainingKeys = getSorterKeys(opCtx, container);
+    EXPECT_EQ(remainingKeys.size(), 5u);
+}
+
+TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesAcrossBatches) {
+    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    // Set a small batch size to force multiple delete batches.
+    RAIIServerParameterControllerForTest batchSize{
+        "primaryDrivenIndexBuildSorterInsertionBatchSize", 3};
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto opCtx = operationContext();
+    std::string sorterIdent = "internal-sorter-batch-test";
+    LazyRecordStore sorterTable(opCtx, sorterIdent, LazyRecordStore::CreateMode::immediate);
+    auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                          sorterTable.getTableOrThrow().getContainer())
+                          .get();
+
+    insertSorterEntries(opCtx, container, 1, 16);
+
+    IndexStateInfo indexInfo;
+    indexInfo.setSpec(BSON("key" << BSON("a" << 1) << "name"
+                                 << "a_1"
+                                 << "v" << IndexConfig::kLatestIndexVersion));
+    indexInfo.setIsMultikey(false);
+    indexInfo.setMultikeyPaths({});
+    indexInfo.setStorageIdentifier(sorterIdent);
+    SorterRange range;
+    range.setStart(1);
+    range.setEnd(6);
+    range.setChecksum(0);
+    indexInfo.setRanges(std::vector<SorterRange>{range});
+
+    deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
+
+    auto remainingKeys = getSorterKeys(opCtx, container);
+    EXPECT_EQ(remainingKeys.size(), 5u);
+    for (int64_t expected = 1; expected < 6; ++expected) {
+        ASSERT_TRUE(std::find(remainingKeys.begin(), remainingKeys.end(), expected) !=
+                    remainingKeys.end());
     }
 }
 

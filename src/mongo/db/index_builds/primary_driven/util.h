@@ -89,4 +89,10 @@ Status abort(OperationContext* opCtx,
  */
 ResumeIndexInfo resumeInfo(OperationContext* opCtx, const std::string& ident);
 
+/**
+ * For each index, deletes any sorter table entries that fall outside the persisted ranges.
+ */
+void deleteSorterEntriesOutsideRanges(OperationContext* opCtx,
+                                      const std::vector<IndexStateInfo>& resumeInfoIndexes);
+
 }  // namespace mongo::index_builds::primary_driven

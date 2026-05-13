@@ -3481,6 +3481,11 @@ void IndexBuildsCoordinator::_resumeHybridIndexBuildFromPhase(
     invariant(indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kHybrid ||
               indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven);
 
+    if (replState->protocol == IndexBuildProtocol::kPrimaryDriven) {
+        index_builds::primary_driven::deleteSorterEntriesOutsideRanges(opCtx,
+                                                                       resumeInfo.getIndexes());
+    }
+
     if (resumeInfo.getPhase() == IndexBuildPhaseEnum::kInitialized ||
         resumeInfo.getPhase() == IndexBuildPhaseEnum::kCollectionScan) {
         boost::optional<RecordId> resumeAfterRecordId;

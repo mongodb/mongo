@@ -31,14 +31,18 @@
 
 #include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/collection_crud/container_write.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
+#include "mongo/db/index_builds/multi_index_block_gen.h"
 #include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/index_key_validate.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/lazy_record_store.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -314,6 +318,77 @@ ResumeIndexInfo resumeInfo(OperationContext* opCtx, const std::string& ident) {
             "Failed to read/parse the index build resume state",
             resumeIndexInfo);
     return *resumeIndexInfo;
+}
+
+void deleteSorterEntriesOutsideRanges(OperationContext* opCtx,
+                                      const std::vector<IndexStateInfo>& resumeInfoIndexes) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+
+    for (const auto& indexStateInfo : resumeInfoIndexes) {
+        auto storageId = indexStateInfo.getStorageIdentifier();
+        const auto& ranges = indexStateInfo.getRanges();
+        if (!storageId || !ranges || ranges->empty()) {
+            continue;
+        }
+
+        int64_t firstStart = ranges->front().getStart();
+        int64_t lastEnd = ranges->back().getEnd();
+
+        LazyRecordStore sorterTable(opCtx, *storageId, LazyRecordStore::CreateMode::openExisting);
+        auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                              sorterTable.getTableOrThrow().getContainer())
+                              .get();
+
+        const auto batchMaxSize =
+            static_cast<size_t>(primaryDrivenIndexBuildSorterInsertionBatchSize.load());
+        std::vector<int64_t> keysToDelete;
+
+        auto flushDeletes = [&] {
+            writeConflictRetry(
+                opCtx, ru, "deleteSorterEntriesOutsideRanges", NamespaceString::kEmpty, [&] {
+                    WriteUnitOfWork wuow{opCtx};
+                    for (auto key : keysToDelete) {
+                        uassertStatusOK(container_write::remove(opCtx, ru, container, key));
+                    }
+                    wuow.commit();
+                });
+            keysToDelete.clear();
+        };
+
+        auto collectKey = [&](int64_t key) {
+            keysToDelete.push_back(key);
+            if (keysToDelete.size() >= batchMaxSize) {
+                flushDeletes();
+            }
+        };
+
+        auto cursor = container.getCursor(ru);
+
+        // Delete keys before firstStart. Write conflicts may reset the cursor to the beginning
+        // which is safe since we only delete keys < firstStart.
+        for (auto entry = cursor->next(); entry && entry->first < firstStart;
+             entry = cursor->next()) {
+            collectKey(entry->first);
+        }
+
+        // Delete keys at and after lastEnd. lastEnd is kept as a seek anchor and deleted last. A
+        // key < lastEnd after flush indicates a write conflict reset the cursor so we re-seek
+        // lastEnd.
+        if (cursor->find(lastEnd)) {
+            while (auto entry = cursor->next()) {
+                if (entry->first < lastEnd) {
+                    cursor->find(lastEnd);
+                    continue;
+                }
+                collectKey(entry->first);
+            }
+            collectKey(lastEnd);
+        }
+
+        if (!keysToDelete.empty()) {
+            flushDeletes();
+        }
+    }
 }
 
 }  // namespace mongo::index_builds::primary_driven

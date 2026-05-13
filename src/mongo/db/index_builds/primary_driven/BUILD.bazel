@@ -20,8 +20,10 @@ mongo_cc_library(
         "//src/mongo/db:index_key_validate",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/collection_crud:container_write",
         "//src/mongo/db/index_builds:index_build_interceptor",
         "//src/mongo/db/index_builds:index_builds_common",
+        "//src/mongo/db/index_builds:multi_index_block",
         "//src/mongo/db/index_builds:resumable_index_builds_common",
         "//src/mongo/db/query:collection_query_info",
         "//src/mongo/db/shard_role",
@@ -41,6 +43,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":primary_driven_index_builds",
+        "//src/mongo/db/collection_crud:container_write",
         "//src/mongo/db/repl:timestamp_block",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
