@@ -282,8 +282,8 @@ TEST_F(WriteOpsExecTest, TestUpdateRequestSizeEstimationLogic) {
     ASSERT(write_ops::verifySizeEstimate(update));
 
     // $$USER_ROLES
-    BSONArray arr = BSON_ARRAY(fromjson("{role: 'readWriteAnyDatabase', db: 'admin'}"));
-    legacyRuntimeConstants.setUserRoles(arr);
+    std::vector<BSONObj> roles = {fromjson("{role: 'readWriteAnyDatabase', db: 'admin'}")};
+    legacyRuntimeConstants.setUserRoles(roles);
     update.setLegacyRuntimeConstants(legacyRuntimeConstants);
     ASSERT(write_ops::verifySizeEstimate(update));
 

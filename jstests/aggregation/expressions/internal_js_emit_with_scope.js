@@ -6,6 +6,12 @@
 // @tags: [
 //   assumes_against_mongod_not_mongos,
 //   requires_scripting,
+//   # Uses fromMongos: true which requires an internal client connection; secondary-reads
+//   # passthroughs route commands through non-internal connections and break this.
+//   requires_spawning_own_processes,
+//   # Uses fromMongos: true with runtimeConstants which requires internalClient; not compatible
+//   # with FCV upgrade/downgrade suites that may restart nodes mid-test.
+//   cannot_run_during_upgrade_downgrade,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
@@ -48,8 +54,25 @@ let pipeline = [
 
 assert.commandWorked(coll.insert({text: 'wood chuck could chuck wood'}));
 
-let results =
-    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromMongos: true}).toArray();
+const internalConn = new Mongo(db.getMongo().host);
+assert.commandWorked(
+    internalConn.getDB("admin").runCommand({
+        hello: 1,
+        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+    }),
+);
+const internalDB = internalConn.getDB(db.getName());
+const internalColl = internalDB[coll.getName()];
+
+let results = internalColl
+              .aggregate(pipeline, {
+                  cursor: {},
+                  runtimeConstants: constants,
+                  fromMongos: true,
+                  readConcern: {},
+                  writeConcern: {},
+              })
+              .toArray();
 assert(resultsEq(results,
                  [
                      {k: "wood", v: weights["wood"]},
@@ -70,8 +93,15 @@ pipeline[0].$project.emits.$_internalJsEmit.eval = function() {
     }
 };
 
-results =
-    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromMongos: true}).toArray();
+results = internalColl
+              .aggregate(pipeline, {
+                  cursor: {},
+                  runtimeConstants: constants,
+                  fromMongos: true,
+                  readConcern: {},
+                  writeConcern: {},
+              })
+              .toArray();
 assert(resultsEq(results,
                  [
                      {k: "wood", v: weights["wood"]},
@@ -93,8 +123,15 @@ pipeline[0].$project.emits.$_internalJsEmit.eval = function() {
     }
 };
 
-results =
-    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromMongos: true}).toArray();
+results = internalColl
+              .aggregate(pipeline, {
+                  cursor: {},
+                  runtimeConstants: constants,
+                  fromMongos: true,
+                  readConcern: {},
+                  writeConcern: {},
+              })
+              .toArray();
 assert(resultsEq(results,
                  [
                      {k: "wood", v: weights["wood"] * 5},
@@ -110,8 +147,15 @@ pipeline[0].$project.emits.$_internalJsEmit.eval = function() {
         emit(word, 1);
     }
 };
-results =
-    coll.aggregate(pipeline, {cursor: {}, runtimeConstants: constants, fromMongos: true}).toArray();
+results = internalColl
+              .aggregate(pipeline, {
+                  cursor: {},
+                  runtimeConstants: constants,
+                  fromMongos: true,
+                  readConcern: {},
+                  writeConcern: {},
+              })
+              .toArray();
 assert(resultsEq(results,
                  [
                      {k: "wood", v: 1},
@@ -126,11 +170,14 @@ assert(resultsEq(results,
 // Test that the command fails if the jsScope is not an object.
 //
 constants.jsScope = "you cant do this";
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: pipeline,
-    cursor: {},
-    runtimeConstants: constants,
-    fromMongos: true
-}),
-                             ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    internalDB.runCommand({
+        aggregate: coll.getName(),
+        pipeline: pipeline,
+        cursor: {},
+        runtimeConstants: constants,
+        fromMongos: true,
+        readConcern: {},
+        writeConcern: {},
+    }),
+    ErrorCodes.TypeMismatch);

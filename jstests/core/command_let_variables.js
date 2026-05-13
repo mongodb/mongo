@@ -5,6 +5,12 @@
 //   requires_fcv_72,
 //   # Requires a batch size greater than one.
 //   does_not_support_config_fuzzer,
+//   # fromMongos: true requires an internalClient connection; secondary_reads suites route
+//   # connections through a secondary without the internalClient handshake.
+//   assumes_read_preference_unchanged,
+//   # fromMongos: true uses an internalClient connection that cannot be transparently retried
+//   # after a stepdown -- the retry goes on a new connection without the internalClient handshake.
+//   does_not_support_stepdowns,
 // ]
 //
 import {
@@ -116,29 +122,45 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
     // Test that if runtimeConstants and let are both specified, both will coexist.
     // Runtime constants are not allowed on mongos passthroughs.
     // Must set 'fromMongos: true' as otherwise 'runtimeConstants' is disallowed on mongod.
+    // fromMongos requires an internal client connection.
+    const internalConn = new Mongo(testDB.getMongo().host);
+    assert.commandWorked(internalConn.getDB("admin").runCommand({
+        hello: 1,
+        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+    }));
+    const internalDB = internalConn.getDB(testDB.getName());
+    const internalColl = internalDB[coll.getName()];
+
     let constants = {
         localNow: new Date(),
         clusterTime: new Timestamp(0, 0),
     };
 
-    assert.eq(coll.aggregate(pipeline, {
-                      runtimeConstants: constants,
-                      let : {target_trend: "weak decline"},
-                      fromMongos: true
-                  })
-                  .toArray(),
-              expectedResults);
+    assert.eq(
+        internalColl
+            .aggregate(pipeline, {
+                runtimeConstants: constants,
+                let: {target_trend: "weak decline"},
+                fromMongos: true,
+                readConcern: {},
+                writeConcern: {},
+            })
+            .toArray(),
+        expectedResults);
 
     // Test that undefined let params in the pipeline fail gracefully.
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: coll.getName(),
-        pipeline: pipeline,
-        runtimeConstants: constants,
-        cursor: {},
-        let : {cat: "not_a_bird"},
-        fromMongos: true
-    }),
-                                 17276);
+    assert.commandFailedWithCode(
+        internalDB.runCommand({
+            aggregate: coll.getName(),
+            pipeline: pipeline,
+            runtimeConstants: constants,
+            cursor: {},
+            let : {cat: "not_a_bird"},
+            fromMongos: true,
+            readConcern: {},
+            writeConcern: {},
+        }),
+        17276);
     // Test null and empty let parameters
     const pipeline_no_lets = [
         {$project: {_id: 0}},
@@ -147,28 +169,42 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
         {$sort: {Species: 1}}
     ];
     assert.eq(
-        coll.aggregate(pipeline_no_lets, {runtimeConstants: constants, let : {}, fromMongos: true})
+        internalColl
+            .aggregate(pipeline_no_lets,
+                       {
+                           runtimeConstants: constants,
+                           let : {},
+                           fromMongos: true,
+                           readConcern: {},
+                           writeConcern: {},
+                       })
             .toArray(),
         expectedResults);
 
-    assert.commandWorked(testDB.runCommand({
-        aggregate: coll.getName(),
-        pipeline: pipeline_no_lets,
-        runtimeConstants: constants,
-        cursor: {},
-        let : null,
-        fromMongos: true
-    }));
+    assert.commandWorked(
+        internalDB.runCommand({
+            aggregate: coll.getName(),
+            pipeline: pipeline_no_lets,
+            runtimeConstants: constants,
+            cursor: {},
+            let : null,
+            fromMongos: true,
+            readConcern: {},
+            writeConcern: {},
+        }));
 
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: coll.getName(),
-        pipeline: pipeline_no_lets,
-        runtimeConstants: constants,
-        cursor: {},
-        let : 1,
-        fromMongos: true
-    }),
-                                 ErrorCodes.TypeMismatch);
+    assert.commandFailedWithCode(
+        internalDB.runCommand({
+            aggregate: coll.getName(),
+            pipeline: pipeline_no_lets,
+            runtimeConstants: constants,
+            cursor: {},
+            let : 1,
+            fromMongos: true,
+            readConcern: {},
+            writeConcern: {},
+        }),
+        ErrorCodes.TypeMismatch);
 }
 
 // Test that $project stage can use 'let' variables

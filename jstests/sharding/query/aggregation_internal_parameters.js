@@ -57,10 +57,12 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(mongosDB))
 }
 
 // Test that 'fromMongos: true' cannot be specified in a command sent to mongoS.
+// External clients get BadValue from validateRequestForAPIVersion; internal clients get 51089 from
+// the router-level check.
 assert.commandFailedWithCode(
     mongosDB.runCommand(
         {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, fromMongos: true}),
-    51089);
+    [51089, ErrorCodes.BadValue]);
 
 // Test that 'fromMongos: false' can be specified in a command sent to mongoS.
 assert.commandWorked(mongosDB.runCommand(
@@ -84,7 +86,7 @@ assert.commandFailedWithCode(mongosDB.runCommand({
     needsMerge: true,
     fromMongos: true
 }),
-                             51089);
+                             [51089, ErrorCodes.BadValue]);
 
 // Test that 'needsMerge: false' can be specified in a command sent to mongoS along with
 // 'fromMongos: false'.
@@ -106,6 +108,7 @@ assert.commandFailedWithCode(mongosDB.runCommand({
                              [ErrorCodes.BadValue, 51028]);
 
 // Test that the command fails when all internal parameters have been specified.
+// fromMongos: true causes BadValue for external clients before the exchange (51028) check fires.
 assert.commandFailedWithCode(mongosDB.runCommand({
     aggregate: mongosColl.getName(),
     pipeline: [],
@@ -124,6 +127,6 @@ assert.commandFailedWithCode(mongosDB.runCommand({
     needsMerge: true,
     fromMongos: true
 }),
-                             51089);
+                             [51089, ErrorCodes.BadValue]);
 
 st.stop();

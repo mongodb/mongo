@@ -219,6 +219,12 @@ void validateRequestForAPIVersion(const OperationContext* opCtx,
                 "BSON field 'exchange' is an unknown field",
                 isInternalThreadOrClient || client->isInDirectClient());
     }
+
+    // Forbid fromMongos for non-internal clients. They can't actually be mongos.
+    uassert(ErrorCodes::BadValue,
+            "BSON field 'fromMongos' is an unknown field",
+            !request.getFromMongos() || isInternalThreadOrClient || client->isInDirectClient());
+
     // Checks that the 'exchange' or 'fromMongos' option can only be specified by the internal
     // client.
     if ((request.getExchange() || request.getFromMongos()) && apiStrict && apiVersion == "1") {

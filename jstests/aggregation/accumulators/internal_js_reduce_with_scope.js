@@ -6,6 +6,12 @@
 // @tags: [
 //   assumes_against_mongod_not_mongos,
 //   requires_scripting,
+//   # Uses fromMongos: true which requires an internal client connection; secondary-reads
+//   # passthroughs route commands through non-internal connections and break this.
+//   requires_spawning_own_processes,
+//   # Uses fromMongos: true with runtimeConstants which requires internalClient; not compatible
+//   # with FCV upgrade/downgrade suites that may restart nodes mid-test.
+//   cannot_run_during_upgrade_downgrade,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
@@ -40,6 +46,8 @@ const command = {
         }
     }],
     fromMongos: true,
+    readConcern: {},
+    writeConcern: {},
 };
 
 const expectedResults = [
@@ -48,5 +56,14 @@ const expectedResults = [
     {_id: "hi", wordCountMod: 1},
 ];
 
-const res = assert.commandWorked(db.runCommand(command));
+const internalConn = new Mongo(db.getMongo().host);
+assert.commandWorked(
+    internalConn.getDB("admin").runCommand({
+        hello: 1,
+        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+    }),
+);
+const internalDB = internalConn.getDB(db.getName());
+
+const res = assert.commandWorked(internalDB.runCommand(command));
 assert(resultsEq(res.cursor.firstBatch, expectedResults, res.cursor));

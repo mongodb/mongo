@@ -123,6 +123,7 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     "aggregate-param-fromMongos",
     "aggregate-param-$_requestReshardingResumeToken",
     "aggregate-param-isMapReduceCommand",
+    "aggregate-param-userRoles",
     "bulkWrite-param-shardVersion",
     "bulkWrite-reply-_id",
     "bulkWrite-reply-value",
@@ -868,8 +869,12 @@ def check_reply_field_type(
         return
 
     if array_check == ArrayTypeCheckResult.TRUE:
-        old_field.field_type = old_field.field_type.element_type
-        new_field.field_type = new_field.field_type.element_type
+        old_et = getattr(old_field.field_type, "element_type", None)
+        new_et = getattr(new_field.field_type, "element_type", None)
+        if old_et is None or new_et is None:
+            return
+        old_field.field_type = old_et
+        new_field.field_type = new_et
 
     old_field_type = old_field.field_type
     new_field_type = new_field.field_type
@@ -1482,8 +1487,12 @@ def check_param_or_command_type(
         return
 
     if array_check == ArrayTypeCheckResult.TRUE:
-        old_field.field_type = old_field.field_type.element_type
-        new_field.field_type = new_field.field_type.element_type
+        old_et = getattr(old_field.field_type, "element_type", None)
+        new_et = getattr(new_field.field_type, "element_type", None)
+        if old_et is None or new_et is None:
+            return
+        old_field.field_type = old_et
+        new_field.field_type = new_et
 
     old_type = old_field.field_type
     new_type = new_field.field_type
