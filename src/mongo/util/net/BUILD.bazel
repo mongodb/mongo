@@ -84,6 +84,7 @@ mongo_cc_library(
     deps = [
         ":ssl_options",
         "//src/mongo:base",
+        "//src/mongo/crypto:crypto_parameters_openssl",
         "//src/mongo/crypto:symmetric_crypto",
     ],
 )
