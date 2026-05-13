@@ -422,6 +422,14 @@ void onAbortIndexBuild(OperationContext* opCtx,
     invariant(shard_role_details::getLocker(opCtx)->isWriteLocked(),
               replState.buildUUID.toString());
 
+    if (replState.protocol == IndexBuildProtocol::kPrimaryDriven) {
+        shard_role_details::getRecoveryUnit(opCtx)->onCommit([buildUUID = replState.buildUUID](
+                                                                 OperationContext* opCtx,
+                                                                 boost::optional<Timestamp>) {
+            index_builds::primary_driven::registry(opCtx->getServiceContext()).remove(buildUUID);
+        });
+    }
+
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     auto collUUID = replState.collectionUUID;
     auto fromMigrate = false;
