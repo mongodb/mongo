@@ -38,15 +38,9 @@ imports:
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/basic_types.idl"
+    - "mongo/db/query/client_cursor/cursor_response.idl"
 
 structs:
-    ChangeStreamCursorInfo:
-        description: "Change stream metrics reported in a GenericCursor."
-        fields:
-            optime:
-                description: "The optime of the last document read by the change stream cursor."
-                type: timestamp
-
     GenericCursor:
         description: "A struct representing a cursor in either mongod or mongos"
         fields:
@@ -114,7 +108,7 @@ structs:
                 optional: true
             changeStreams:
                 description: "Change stream metrics, including the optime of the last document read."
-                type: ChangeStreamCursorInfo
+                type: ChangeStreamCursorMetrics
                 optional: true
             inUseTrackedMemBytes:
                 description: The number of bytes in use by the query associated with the cursor.

@@ -165,13 +165,6 @@ ClientCursor::ClientCursor(ClientCursorParams params,
     if (_isChangeStreamQuery) {
         change_stream_metrics::gCursorsTotalOpened.add(1);
         change_stream_metrics::gCursorsOpenTotal.add(1);
-
-        // Initialize optime to the current high-watermark so $currentOp reflects a valid
-        // timestamp even before the first getMore.
-        auto ts = _exec->getLatestOplogTimestamp();
-        if (!ts.isNull()) {
-            _changeStreamsCursorOptime = ts;
-        }
     }
 
     if (isNoTimeout()) {
@@ -195,17 +188,13 @@ ClientCursor::~ClientCursor() {
     _transactionResources.dispose();
 }
 
-void ClientCursor::setChangeStreamsCursorOptime(Timestamp ts) {
-    _changeStreamsCursorOptime = ts;
-}
-
 void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now) {
     if (_disposed) {
         return;
     }
 
     try {
-        updateCursorMetrics(now);
+        updateMetricsOnDispose(now);
     } catch (...) {
         // If any exception occurs when updating metrics, ignore it and continue the disposal.
     }
@@ -251,16 +240,14 @@ GenericCursor ClientCursor::toGenericCursor() const {
     if (auto opCtx = _operationUsingCursor) {
         gc.setOperationUsingCursorId(opCtx->getOpID());
     }
-    gc.setLastKnownCommittedOpTime(_lastKnownCommittedOpTime);
-    if (_changeStreamsCursorOptime) {
-        ChangeStreamCursorInfo cursorInfo;
-        cursorInfo.setOptime(*_changeStreamsCursorOptime);
-        gc.setChangeStreams(std::move(cursorInfo));
+    if (isChangeStreamQuery()) {
+        gc.setChangeStreams(_changeStreamMetrics);
     }
+    gc.setLastKnownCommittedOpTime(_lastKnownCommittedOpTime);
     return gc;
 }
 
-void ClientCursor::updateCursorMetrics(boost::optional<Date_t> now) {
+void ClientCursor::updateMetricsOnDispose(boost::optional<Date_t> now) {
     // Should only be called once per cursor.
     dassert(!_disposed);
 
@@ -284,6 +271,12 @@ void ClientCursor::updateCursorMetrics(boost::optional<Date_t> now) {
 
     if (_metrics.nBatches && *_metrics.nBatches > 1) {
         cursorStats().moreThanOneBatch.increment();
+    }
+}
+
+void ClientCursor::updateMetricsOnUnpin(const ChangeStreamCursorMetrics& csMetrics) {
+    if (_isChangeStreamQuery) {
+        _changeStreamMetrics = csMetrics;
     }
 }
 

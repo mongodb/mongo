@@ -777,6 +777,7 @@ public:
 
     // Whether this is an oplog getMore operation for replication oplog fetching.
     bool isReplOplogGetMore{false};
+    ChangeStreamCursorMetrics changeStreamMetrics;
 
 private:
     /**

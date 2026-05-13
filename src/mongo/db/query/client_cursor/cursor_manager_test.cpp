@@ -1063,5 +1063,41 @@ TEST_F(CursorManagerTest, ChangeStreamCursorMetricsTrackCursorOpenAndPin) {
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 0);
 }
 
+TEST_F(CursorManagerTest, UpdateMetricsOnUnpinSetsChangeStreamOptime) {
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
+    auto cursorPin = makeCursor(_opCtx.get());
+
+    {
+        // Without any 'updateMetricsOnUnpin()' call, "changeStreams" is not present in the cursor
+        // report.
+        auto gc = cursorPin->toGenericCursor();
+        ASSERT_FALSE(gc.getChangeStreams());
+    }
+
+    {
+        const Timestamp expectedOptime(42, 1);
+        ChangeStreamCursorMetrics metrics;
+        metrics.setOptime(expectedOptime);
+        cursorPin->updateMetricsOnUnpin(metrics);
+
+        auto gc = cursorPin->toGenericCursor();
+        ASSERT(gc.getChangeStreams());
+        ASSERT_TRUE(gc.getChangeStreams()->getOptime().has_value());
+        ASSERT_EQ(expectedOptime, *gc.getChangeStreams()->getOptime());
+    }
+}
+
+TEST_F(CursorManagerTest, UpdateMetricsOnUnpinIgnoredForRegularCursor) {
+    // 'isChangeStreamQuery' is false by default.
+    auto cursorPin = makeCursor(_opCtx.get());
+
+    ChangeStreamCursorMetrics metrics;
+    metrics.setOptime(Timestamp(42, 1));
+    cursorPin->updateMetricsOnUnpin(metrics);
+
+    auto gc = cursorPin->toGenericCursor();
+    ASSERT_FALSE(gc.getChangeStreams());
+}
+
 }  // namespace
 }  // namespace mongo

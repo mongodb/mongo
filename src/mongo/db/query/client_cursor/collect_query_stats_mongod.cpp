@@ -35,13 +35,13 @@
 namespace mongo {
 
 void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCursor) {
-    pinnedCursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().getAdditiveMetrics());
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    pinnedCursor->updateMetricsOnUnpin(opDebug.getAdditiveMetrics());
+    pinnedCursor->updateMetricsOnUnpin(opDebug.changeStreamMetrics);
 
-    // For a change stream query, we want to collect and update query stats on the initial query and
-    // for every getMore.
+    // For a change stream query, we want to collect and update query stats on the initial query
+    // and for every getMore.
     if (pinnedCursor->getQueryStatsWillNeverExhaust()) {
-        auto& opDebug = CurOp::get(opCtx)->debug();
-
         auto snapshot = query_stats::captureMetrics(
             opCtx,
             query_stats::microsecondsToUint64(opDebug.getAdditiveMetrics().executionTime),

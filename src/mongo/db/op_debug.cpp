@@ -398,6 +398,10 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->addDeepCopy("planCacheKey", zeroPaddedHex(*planCacheKey));
     }
 
+    if (isChangeStreamQuery) {
+        pAttrs->add("changeStreams", changeStreamMetrics.toBSON());
+    }
+
     switch (queryFramework) {
         case PlanExecutor::QueryFramework::kClassicOnly:
         case PlanExecutor::QueryFramework::kClassicHybrid:
@@ -692,6 +696,10 @@ void OpDebug::append(OperationContext* opCtx,
     }
     if (auto&& queryShapeHash = getQueryShapeHash()) {
         b.append("queryShapeHash", queryShapeHash->toHexString());
+    }
+
+    if (isChangeStreamQuery) {
+        b.append("changeStreams", changeStreamMetrics.toBSON());
     }
 
     switch (queryFramework) {

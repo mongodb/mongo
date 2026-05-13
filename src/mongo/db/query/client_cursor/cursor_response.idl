@@ -57,6 +57,16 @@ structs:
                 default: false
                 stability: internal
 
+    ChangeStreamCursorMetrics:
+        description: "Change stream metrics reported in a cursor response."
+        strict: false
+        fields:
+            optime:
+                description: "The oplog timestamp of the latest event processed by the change stream cursor."
+                type: timestamp
+                optional: true
+                stability: unstable
+
     CardinalityEstimationMethods:
         description: "Counts of cardinality estimation methods used by the cost-based ranker."
         strict: false

@@ -445,6 +445,17 @@ bool getFirstBatch(const AggExState& aggExState,
         if (!stashedResult) {
             responseBuilder.setPostBatchResumeToken(exec.getPostBatchResumeToken());
         }
+        if (aggExState.hasChangeStream()) {
+            // Set the initial change stream optime so that $currentOp reflects the cursor position
+            // before any getMore is issued. The executor's _latestOplogTimestamp is initialized
+            // from the initial post-batch resume token (resume token clusterTime,
+            // startAtOperationTime, or the current oplog tip when neither is specified).
+            auto ts = exec.getLatestOplogTimestamp();
+            tassert(12613200,
+                    "Change stream pipeline executor must have a non-null latest oplog timestamp",
+                    !ts.isNull());
+            curOp->debug().changeStreamMetrics.setOptime(ts);
+        }
 
         // Cursor needs to be in a saved state while we yield locks for getmore. State will be
         // restored in getMore().

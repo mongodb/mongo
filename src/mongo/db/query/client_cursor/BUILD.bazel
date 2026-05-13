@@ -69,6 +69,7 @@ idl_generator(
     name = "generic_cursor_gen",
     src = "generic_cursor.idl",
     deps = [
+        ":cursor_response_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/repl:replication_types_gen",
         "//src/mongo/db/session:logical_session_id_gen",
@@ -82,6 +83,7 @@ mongo_cc_library(
         ":generic_cursor_gen",
     ],
     deps = [
+        ":cursor_response_idl",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/util:secure_compare_memory",

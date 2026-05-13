@@ -250,12 +250,25 @@ public:
         _metrics.incrementNreturned(n);
     }
 
-    void incrementCursorMetrics(const OpDebug::AdditiveMetrics& newMetrics) {
+    /**
+     * Updates additive cursor metrics every time the cursor is unpinned.
+     */
+    void updateMetricsOnUnpin(const OpDebug::AdditiveMetrics& newMetrics) {
         _metrics.add(newMetrics);
         if (!_firstResponseExecutionTime) {
             _firstResponseExecutionTime = _metrics.executionTime;
         }
     }
+
+    /**
+     * Updates cursor metrics specific to change streams every time the cursor is unpinned.
+     */
+    void updateMetricsOnUnpin(const ChangeStreamCursorMetrics& csMetrics);
+
+    /**
+     * Updates the cursor metrics on cursor disposal. Only supposed to be called once per cursor.
+     */
+    void updateMetricsOnDispose(boost::optional<Date_t> now);
 
     /**
      * Returns the number of batches returned by this cursor so far.
@@ -326,12 +339,6 @@ public:
     void setLastKnownCommittedOpTime(boost::optional<repl::OpTime> lastCommittedOpTime) {
         _lastKnownCommittedOpTime = std::move(lastCommittedOpTime);
     }
-
-    boost::optional<Timestamp> getChangeStreamsCursorOptime() const {
-        return _changeStreamsCursorOptime;
-    }
-
-    void setChangeStreamsCursorOptime(Timestamp ts);
 
     friend std::size_t partitionOf(const ClientCursor* cursor) {
         return cursor->cursorid();
@@ -418,11 +425,6 @@ private:
         return _isNoTimeout;
     }
 
-    /**
-     * Updates the cursor metrics on cursor shutdown. Only supposed to be called once per cursor.
-     */
-    void updateCursorMetrics(boost::optional<Date_t> now);
-
     // The ID of the ClientCursor. A value of 0 is used to mean that no cursor id has been assigned.
     const CursorId _cursorid = 0;
 
@@ -504,10 +506,6 @@ private:
     // oplog fetching.
     boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
 
-    // Oplog timestamp of the last document read by this change stream cursor. Only set for
-    // change stream cursors.
-    boost::optional<Timestamp> _changeStreamsCursorOptime;
-
     // Passed along from the original query so that it can be logged if necessary in getMore
     // requests.
     boost::optional<uint32_t> _planCacheKey;
@@ -522,6 +520,10 @@ private:
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
     // Useful for diagnostics like queryStats.
     OpDebug::AdditiveMetrics _metrics;
+
+    // Metrics specific to change stream cursors, updated on each cursor unpin (e.g., in the getMore
+    // command stack).
+    boost::optional<ChangeStreamCursorMetrics> _changeStreamMetrics;
 
     // The Key used by query stats to generate the query stats store key.
     std::unique_ptr<query_stats::Key> _queryStatsKey;
