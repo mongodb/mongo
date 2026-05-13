@@ -913,7 +913,7 @@ assert.eq(shardAdminDB
 assert.commandFailedWithCode(
     shardAdminDB.runCommand(
         {aggregate: 1, pipeline: [{$currentOp: {}}], fromMongos: true, cursor: {}}),
-    40465);
+    [40465, ErrorCodes.BadValue]);
 
 // Test that an operation which is at the BSON user size limit does not throw an error when the
 // currentOp metadata is added to the output document.

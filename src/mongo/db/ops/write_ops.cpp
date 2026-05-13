@@ -234,8 +234,12 @@ int estimateRuntimeConstantsSize(const mongo::LegacyRuntimeConstants& constants)
 
     // $$USER_ROLES
     if (const auto& userRoles = constants.getUserRoles(); userRoles.has_value()) {
-        size += LegacyRuntimeConstants::kUserRolesFieldName.size() + userRoles->objsize() +
-            kPerElementOverhead;
+        auto arraySize = static_cast<int>(BSONObj::kMinBSONLength);
+        for (const auto& role : *userRoles) {
+            arraySize += role.objsize() + kWriteCommandBSONArrayPerElementOverheadBytes;
+        }
+        size +=
+            LegacyRuntimeConstants::kUserRolesFieldName.size() + arraySize + kPerElementOverhead;
     }
     return size;
 }

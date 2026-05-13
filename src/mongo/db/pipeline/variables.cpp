@@ -357,13 +357,23 @@ LegacyRuntimeConstants Variables::transitionalExtractRuntimeConstants() const {
                     break;
                 }
                 case kUserRolesId: {
-                    invariant(value.getType() == BSONType::Array);
-                    BSONArrayBuilder bab;
-                    for (const auto& val : value.getArray()) {
-                        invariant(val.getType() == BSONType::Object);
-                        bab.append(val.getDocument().toBson());
+                    // Use a named local ref because older compilers (e.g. clang 12) cannot capture
+                    // structured binding members inside the lambda that tassert/uassert create.
+                    const Value& roleValue = value;
+                    tassert(ErrorCodes::TypeMismatch,
+                            str::stream() << "$$USER_ROLES must be an array, found "
+                                          << typeName(roleValue.getType()),
+                            roleValue.getType() == BSONType::Array);
+                    std::vector<BSONObj> userRolesVec;
+                    for (const auto& val : roleValue.getArray()) {
+                        tassert(ErrorCodes::TypeMismatch,
+                                str::stream()
+                                    << "Each element of $$USER_ROLES must be an object, found "
+                                    << typeName(val.getType()),
+                                val.getType() == BSONType::Object);
+                        userRolesVec.push_back(val.getDocument().toBson());
                     }
-                    extracted.setUserRoles(bab.arr());
+                    extracted.setUserRoles(std::move(userRolesVec));
                     break;
                 }
                 default:

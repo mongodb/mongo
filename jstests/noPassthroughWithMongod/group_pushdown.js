@@ -18,6 +18,13 @@ const oldValue = originalValue.was;
 const coll = db.group_pushdown;
 coll.drop();
 
+const internalConn = new Mongo(db.getMongo().host);
+assert.commandWorked(internalConn.getDB("admin").runCommand({
+    hello: 1,
+    internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+}));
+const internalDB = internalConn.getDB(db.getName());
+
 const docs = [
     {"_id": 1, "item": "a", "price": 10, "quantity": 2, "date": ISODate("2014-01-01T08:00:00Z")},
     {"_id": 2, "item": "b", "price": 20, "quantity": 1, "date": ISODate("2014-02-03T09:00:00Z")},
@@ -85,7 +92,8 @@ let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCount
         cursor: {}
     };
 
-    const classicalRes = coll.runCommand(cmd).cursor.firstBatch;
+    const internalCollDB = internalConn.getDB(coll.getDB().getName());
+    const classicalRes = internalCollDB.runCommand(cmd).cursor.firstBatch;
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
     const explainCmd = {
@@ -96,9 +104,9 @@ let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCount
         explain: true,
         cursor: {}
     };
-    const explain = coll.runCommand(explainCmd);
+    const explain = internalCollDB.runCommand(explainCmd);
     assert.eq(expectedGroupCountInExplain, getAggPlanStages(explain, "GROUP").length, explain);
-    const sbeRes = coll.runCommand(cmd).cursor.firstBatch;
+    const sbeRes = internalCollDB.runCommand(cmd).cursor.firstBatch;
 
     assert.sameMembers(sbeRes, classicalRes);
 
@@ -664,7 +672,7 @@ assert(explain.stages[1].hasOwnProperty("$group"));
 // stage at the shard-side which does the partial aggregation. The shard-side $group stage is
 // requested with 'needsMerge' and 'fromMongos' flags set to true from the mongos, which we should
 // verify that is also pushed down and produces the correct results.
-explain = coll.runCommand({
+explain = internalDB.runCommand({
     aggregate: coll.getName(),
     explain: true,
     pipeline: [{$group: {_id: "$item"}}],
