@@ -7,6 +7,7 @@
     "@eslint/js": "^9",
     "eslint": "9.19.0",
     "eslint-formatter-unix": "^8.40.0",
+    "eslint-plugin-mocha-no-only": "^1.2.0",
     "globals": "14.0.0",
     "prettier": "3.4.2"
   },

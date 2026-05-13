@@ -33,6 +33,7 @@ mongo_js_library(
     deps = [
         ":node_modules/@eslint/eslintrc",
         ":node_modules/@eslint/js",
+        ":node_modules/eslint-plugin-mocha-no-only",
         ":node_modules/eslint-plugin-mongodb",
         ":node_modules/globals",
         "//src/mongo/shell/debugger/vscode:eslint",

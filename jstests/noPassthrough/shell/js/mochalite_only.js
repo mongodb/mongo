@@ -1,3 +1,4 @@
+/* eslint-disable mochaNoOnly/mocha-no-only -- this file tests the .only() feature of mochalite itself */
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 
 const log = [];

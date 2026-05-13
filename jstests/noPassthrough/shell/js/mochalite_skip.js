@@ -26,7 +26,7 @@ describe("describe", () => {
         beforeEach(die);
         afterEach(die);
         after(die);
-        it.only("test5", die);
+        it.only("test5", die); // eslint-disable-line mochaNoOnly/mocha-no-only
     });
 });
 

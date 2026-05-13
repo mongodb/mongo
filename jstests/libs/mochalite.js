@@ -1,3 +1,4 @@
+/* eslint-disable mochaNoOnly/mocha-no-only */
 /**
  * Simple test framework for running tests in JS files.
  *

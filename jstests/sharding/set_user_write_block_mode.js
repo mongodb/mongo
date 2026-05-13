@@ -22,7 +22,7 @@ import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 
-describe.only("setUserWriteBlockMode on replicaset", function () {
+describe("setUserWriteBlockMode on replicaset", function () {
     before(() => {
         this.is_83 = () => {
             const admin = this.rs.getPrimary().getDB("admin");

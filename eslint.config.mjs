@@ -1,5 +1,6 @@
 import {FlatCompat} from "@eslint/eslintrc";
 import js from "@eslint/js";
+import mocha_no_only_plugin from "eslint-plugin-mocha-no-only";
 import {default as mongodb_plugin} from "eslint-plugin-mongodb";
 import globals from "globals";
 import path from "node:path";
@@ -318,14 +319,15 @@ export default [
         },
 
         plugins: {
+            mochaNoOnly: mocha_no_only_plugin,
             mongodb: mongodb_plugin,
         },
 
         rules: {
+            "mochaNoOnly/mocha-no-only": 2,
             // TODO SERVER-99571 : enable mongodb/* rules.
             "mongodb/no-print-fn": 0,
             "mongodb/no-printing-tojson": 0,
-
             "no-prototype-builtins": 0,
             "no-useless-escape": 0,
             "no-irregular-whitespace": 0,

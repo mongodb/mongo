@@ -24,6 +24,9 @@ devDependencies:
   eslint-formatter-unix:
     specifier: ^8.40.0
     version: 8.40.0
+  eslint-plugin-mocha-no-only:
+    specifier: ^1.2.0
+    version: 1.2.0
   globals:
     specifier: 14.0.0
     version: 14.0.0
@@ -243,6 +246,13 @@ packages:
   /eslint-formatter-unix@8.40.0:
     resolution: {integrity: sha512-gfsmFZ/cb1MobrMfYl2IPFLZEz2tWQVO/tnmziNQdhWJMN85GfZD64dcPsEgaEoeVKgAtK6W9LWLlOxhJWZvDw==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+    dev: true
+
+  /eslint-plugin-mocha-no-only@1.2.0:
+    resolution: {integrity: sha512-sgOilWiikVmYysUvt9q7oUMBYuv/Tka8lQH3766DNxOVqJAKwmP7QqmGYVBiVmqGnn5CDYAo3WWT0F8qw5BDMQ==}
+    engines: {node: '>=0.10.0'}
+    dependencies:
+      requireindex: 1.1.0
     dev: true
 
   /eslint-scope@8.2.0:
@@ -549,6 +559,11 @@ packages:
   /punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
+    dev: true
+
+  /requireindex@1.1.0:
+    resolution: {integrity: sha512-LBnkqsDE7BZKvqylbmn7lTIVdpx4K/QCduRATpO5R+wtPmky/a8pN1bO2D6wXppn1497AJF9mNjqAXr6bdl9jg==}
+    engines: {node: '>=0.10.5'}
     dev: true
 
   /resolve-from@4.0.0:
