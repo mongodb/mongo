@@ -64,25 +64,36 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     const db = conn.getDB(jsTestName());
     const coll = db.spilling;
 
+    const internalConn = new Mongo(conn.host);
+    assert.commandWorked(
+        internalConn.getDB("admin").runCommand({
+            hello: 1,
+            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+        }),
+    );
+    const internalDB = internalConn.getDB(db.getName());
+
     const verifyOverTheWireDataFormatOnBothEngines = (testDesc, pipeline, expectedRes) => {
         const aggCmd = {
             aggregate: coll.getName(),
             pipeline: pipeline,
             needsMerge: true,
             fromRouter: true,
-            cursor: {}
+            cursor: {},
+            readConcern: {},
+            writeConcern: {},
         };
 
         // Turns on the classical engine.
         assert.commandWorked(db.adminCommand(
             {setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
-        const classicRes = assert.commandWorked(db.runCommand(aggCmd)).cursor.firstBatch;
+        const classicRes = assert.commandWorked(internalDB.runCommand(aggCmd)).cursor.firstBatch;
         assert.eq(classicRes, expectedRes, testDesc);
 
         // Turns off the classical engine.
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
-        const sbeRes = assert.commandWorked(db.runCommand(aggCmd)).cursor.firstBatch;
+        const sbeRes = assert.commandWorked(internalDB.runCommand(aggCmd)).cursor.firstBatch;
         assert.eq(sbeRes, expectedRes, testDesc);
     };
 

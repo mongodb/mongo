@@ -409,13 +409,20 @@ LegacyRuntimeConstants Variables::transitionalExtractRuntimeConstants() const {
                     break;
                 }
                 case kUserRolesId: {
-                    invariant(value.getType() == BSONType::array);
-                    BSONArrayBuilder bab;
+                    tassert(ErrorCodes::TypeMismatch,
+                            str::stream() << "$$USER_ROLES must be an array, found "
+                                          << typeName(value.getType()),
+                            value.getType() == BSONType::array);
+                    std::vector<BSONObj> userRolesVec;
                     for (const auto& val : value.getArray()) {
-                        invariant(val.getType() == BSONType::object);
-                        bab.append(val.getDocument().toBson());
+                        tassert(ErrorCodes::TypeMismatch,
+                                str::stream()
+                                    << "Each element of $$USER_ROLES must be an object, found "
+                                    << typeName(val.getType()),
+                                val.getType() == BSONType::object);
+                        userRolesVec.push_back(val.getDocument().toBson());
                     }
-                    extracted.setUserRoles(bab.arr());
+                    extracted.setUserRoles(std::move(userRolesVec));
                     break;
                 }
                 default:

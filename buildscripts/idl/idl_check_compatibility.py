@@ -535,6 +535,13 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext, field_pair: FieldCompa
         return
 
     if array_check == ArrayTypeCheckResult.TRUE:
+        if not isinstance(old_field.field_type, syntax.ArrayType) or not isinstance(
+            new_field.field_type, syntax.ArrayType
+        ):
+            # One side uses the old unparameterized 'array' type which has no element_type.
+            # This path is only reachable for unstable fields, so the change is permitted
+            # and no element-level compatibility check is needed.
+            return
         old_field.field_type = old_field.field_type.element_type
         new_field.field_type = new_field.field_type.element_type
 
@@ -1066,6 +1073,13 @@ def check_param_or_command_type(
         return
 
     if array_check == ArrayTypeCheckResult.TRUE:
+        if not isinstance(old_field.field_type, syntax.ArrayType) or not isinstance(
+            new_field.field_type, syntax.ArrayType
+        ):
+            # One side uses the old unparameterized 'array' type which has no element_type.
+            # This path is only reachable for unstable fields, so the change is permitted
+            # and no element-level compatibility check is needed.
+            return
         old_field.field_type = old_field.field_type.element_type
         new_field.field_type = new_field.field_type.element_type
 

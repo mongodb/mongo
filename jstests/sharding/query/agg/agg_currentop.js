@@ -921,10 +921,12 @@ assert.eq(shardAdminDB
           ]);
 
 // Test that attempting to 'spoof' a sharded request on non-shardsvr mongoD fails.
+// External clients get BadValue from validateRequestWithClient before $currentOp (40465) fires.
 assert.commandFailedWithCode(
     shardAdminDB.runCommand(
         {aggregate: 1, pipeline: [{$currentOp: {}}], fromRouter: true, cursor: {}}),
-    40465);
+    [40465, ErrorCodes.BadValue],
+);
 
 // Test that an operation which is at the BSON user size limit does not throw an error when the
 // currentOp metadata is added to the output document.

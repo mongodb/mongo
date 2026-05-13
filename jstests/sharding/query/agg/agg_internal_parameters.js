@@ -62,10 +62,12 @@ assert.commandFailedWithCode(
 );
 
 // Test that 'fromRouter: true' cannot be specified in a command sent to mongoS.
+// External clients get BadValue from validateRequestWithClient; internal clients get 51089 from
+// the router-level check.
 assert.commandFailedWithCode(
     mongosDB.runCommand(
         {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, fromRouter: true}),
-    51089,
+    [51089, ErrorCodes.BadValue],
 );
 
 // Test that 'fromRouter: false' can be specified in a command sent to mongoS.
@@ -95,7 +97,7 @@ assert.commandFailedWithCode(
         needsMerge: true,
         fromRouter: true,
     }),
-    51089,
+    [51089, ErrorCodes.BadValue],
 );
 
 // Test that 'needsMerge: false' can be specified in a command sent to mongoS along with
@@ -145,7 +147,7 @@ assert.commandFailedWithCode(
         needsMerge: true,
         fromRouter: true,
     }),
-    51089,
+    [51089, ErrorCodes.BadValue],
 );
 
 st.stop();

@@ -6,6 +6,15 @@
 //   does_not_support_config_fuzzer,
 //   requires_fcv_81,
 //   requires_getmore,
+//   # Explain will return different plan than expected when a collection becomes a time-series
+//   # collection. Also, query shape will be different.
+//   exclude_from_timeseries_crud_passthrough,
+//   # Primary-driven index builds must have batched writes enabled which config.image_collection
+//   # does not support.
+//   primary_driven_index_builds_incompatible_with_retryable_writes,
+//   # fromRouter: true requires an internalClient connection; secondary_reads suites route
+//   # connections through a secondary without the internalClient handshake.
+//   assumes_read_preference_unchanged,
 // ]
 //
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -111,27 +120,43 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
     // Test that if runtimeConstants and let are both specified, both will coexist.
     // Runtime constants are not allowed on mongos passthroughs.
     // Must set 'fromRouter: true' as otherwise 'runtimeConstants' is disallowed on mongod.
+    // fromRouter requires an internal client connection.
+    const internalConn = new Mongo(testDB.getMongo().host);
+    assert.commandWorked(
+        internalConn.getDB("admin").runCommand({
+            hello: 1,
+            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+        }),
+    );
+    const internalDB = internalConn.getDB(testDB.getName());
+    const internalColl = internalDB[coll.getName()];
+
     let constants = {
         localNow: new Date(),
         clusterTime: new Timestamp(0, 0),
     };
 
-    assert.eq(coll.aggregate(pipeline, {
+    assert.eq(internalColl
+                  .aggregate(pipeline, {
                       runtimeConstants: constants,
                       let : {target_trend: "weak decline"},
-                      fromRouter: true
+                      fromRouter: true,
+                      readConcern: {},
+                      writeConcern: {},
                   })
                   .toArray(),
               expectedResults);
 
     // Test that undefined let params in the pipeline fail gracefully.
-    assert.commandFailedWithCode(testDB.runCommand({
+    assert.commandFailedWithCode(internalDB.runCommand({
         aggregate: coll.getName(),
         pipeline: pipeline,
         runtimeConstants: constants,
         cursor: {},
         let : {cat: "not_a_bird"},
-        fromRouter: true
+        fromRouter: true,
+        readConcern: {},
+        writeConcern: {},
     }),
                                  17276);
     // Test null and empty let parameters
@@ -141,27 +166,37 @@ if (!isMongos && !TestData.testingReplicaSetEndpoint) {
         {$match: {$expr: {$eq: ["$population_trends.trend", "weak decline"]}}},
         {$sort: {Species: 1}}
     ];
-    assert.eq(
-        coll.aggregate(pipeline_no_lets, {runtimeConstants: constants, let : {}, fromRouter: true})
-            .toArray(),
-        expectedResults);
+    assert.eq(internalColl
+                  .aggregate(pipeline_no_lets, {
+                      runtimeConstants: constants,
+                      let : {},
+                      fromRouter: true,
+                      readConcern: {},
+                      writeConcern: {},
+                  })
+                  .toArray(),
+              expectedResults);
 
-    assert.commandWorked(testDB.runCommand({
+    assert.commandWorked(internalDB.runCommand({
         aggregate: coll.getName(),
         pipeline: pipeline_no_lets,
         runtimeConstants: constants,
         cursor: {},
         let : null,
-        fromRouter: true
+        fromRouter: true,
+        readConcern: {},
+        writeConcern: {},
     }));
 
-    assert.commandFailedWithCode(testDB.runCommand({
+    assert.commandFailedWithCode(internalDB.runCommand({
         aggregate: coll.getName(),
         pipeline: pipeline_no_lets,
         runtimeConstants: constants,
         cursor: {},
         let : 1,
-        fromRouter: true
+        fromRouter: true,
+        readConcern: {},
+        writeConcern: {},
     }),
                                  ErrorCodes.TypeMismatch);
 }

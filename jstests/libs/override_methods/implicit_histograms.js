@@ -56,6 +56,14 @@ export function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunctio
         return clientFunction.apply(conn, makeFuncArgs(cmdObj));
     }
 
+    // Commands with fromRouter:true are sent on internalClient connections, which require explicit
+    // writeConcern on every write. The implicit drop/analyze operations we inject would be sent on
+    // the same connection without writeConcern, causing them to fail. Skip histogram injection for
+    // these commands.
+    if (cmdObj.fromRouter) {
+        return clientFunction.apply(conn, makeFuncArgs(cmdObj));
+    }
+
     const db = conn.getDB(dbName);
     const innerCmd = getInnerCommand(cmdObj);
     const collectionName = getCollectionName(db, innerCmd);

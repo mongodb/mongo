@@ -67,7 +67,7 @@ structs:
                     mapReduce command.
             userRoles:
                 cpp_name: userRoles
-                type: array
+                type: array<object>
                 optional: true
                 description: A value of the $$USER_ROLES variable.
                 stability: unstable

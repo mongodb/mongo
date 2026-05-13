@@ -28,10 +28,14 @@ import {
 export class QuerySettingsIndexHintsTests {
     /**
      * Create a query settings utility class.
+     * commandDb is used to run the commands passed to the methods of this class. Defaults to the
+     * instance inside `qsutils`. Metadata operations (like interacting with the plan cache) is
+     * performed on the db instance inside `qsutils`.
      */
-    constructor(qsutils) {
+    constructor(qsutils, commandDb = null) {
         this._qsutils = qsutils;
         this._db = qsutils._db;
+        this._commandDb = commandDb || this._db;
         this.indexA = {a: 1};
         this.indexB = {b: 1};
         this.indexAB = {a: 1, b: 1};
@@ -135,7 +139,7 @@ export class QuerySettingsIndexHintsTests {
         this._db[collName].getPlanCache().clear();
 
         // Take the plan cache entries and ensure that they contain the 'settings'.
-        assert.commandWorked(this._db.runCommand(command),
+        assert.commandWorked(this._commandDb.runCommand(command),
                              `Failed to check the plan cache because the original command failed ${
                                  tojson(command)}`);
         const planCacheStatsAfterRunningCmd = this._db[collName].getPlanCache().list();
@@ -151,8 +155,8 @@ export class QuerySettingsIndexHintsTests {
     assertIndexUse(cmd, expectedIndex, stagesExtractor, expectedStrategy) {
         // For queries involving aggregation pipelines, we may not be able to deduct index usage
         // unless we run explain with "allPlansExecution" verbosity.
-        const explain = assert.commandWorked(
-            this._db.runCommand(getExplainCommand(cmd, "allPlansExecution" /* verbosity */)));
+        const explain = assert.commandWorked(this._commandDb.runCommand(
+            getExplainCommand(cmd, "allPlansExecution" /* verbosity */)));
         const stagesUsingIndex = stagesExtractor(explain);
         if (expectedIndex !== undefined) {
             assert.gte(stagesUsingIndex.length, 1, explain);
@@ -217,7 +221,7 @@ export class QuerySettingsIndexHintsTests {
     }
 
     assertCollScanStage(cmd, allowedDirections) {
-        const explain = assert.commandWorked(this._db.runCommand(getExplainCommand(cmd)));
+        const explain = assert.commandWorked(this._commandDb.runCommand(getExplainCommand(cmd)));
         const collscanStages = getQueryPlanners(explain)
                                    .map(queryPlan => getWinningPlanFromExplain(queryPlan, false))
                                    .flatMap(winningPlan => getPlanStages(winningPlan, "COLLSCAN"));
@@ -408,7 +412,8 @@ export class QuerySettingsIndexHintsTests {
         const queryWithHint = {...query, hint: this.indexA};
         const settings = {indexHints: {ns, allowedIndexes: [this.indexAB]}};
         const getWinningPlansForQuery = (query) => {
-            const explain = assert.commandWorked(this._db.runCommand(getExplainCommand(query)));
+            const explain =
+                assert.commandWorked(this._commandDb.runCommand(getExplainCommand(query)));
             return getQueryPlanners(explain).map(queryPlan =>
                                                      getWinningPlanFromExplain(queryPlan, false));
         };
@@ -441,7 +446,7 @@ export class QuerySettingsIndexHintsTests {
             this._qsutils.withQuerySettings(
                 {...query, $db: querySettingsQuery.$db}, settings, () => {
                     const explainCmd = getExplainCommand(query);
-                    const explain = assert.commandWorked(this._db.runCommand(explainCmd));
+                    const explain = assert.commandWorked(this._commandDb.runCommand(explainCmd));
                     winningPlans = getQueryPlanners(explain).map(
                         queryPlan => getWinningPlanFromExplain(queryPlan, false));
                 });
@@ -467,7 +472,7 @@ export class QuerySettingsIndexHintsTests {
         const explainWithQuerySettings =
             this._qsutils.withQuerySettings(querySettingsQuery, settings, () => {
                 const explain = assert.commandWorked(
-                    this._db.runCommand(explainCmd),
+                    this._commandDb.runCommand(explainCmd),
                     `Failed running ${tojson(explainCmd)} after setting query settings`);
                 this.assertQuerySettingsInCacheForCommand(
                     query, explainCmd, settings, this._qsutils._collName, explain);
@@ -476,7 +481,7 @@ export class QuerySettingsIndexHintsTests {
 
         if (!explainWithoutQuerySettings) {
             explainWithoutQuerySettings = assert.commandWorked(
-                this._db.runCommand(explainCmd),
+                this._commandDb.runCommand(explainCmd),
                 `Failed running ${tojson(explainCmd)} before setting query settings`);
         }
 
@@ -543,12 +548,12 @@ export class QuerySettingsIndexHintsTests {
         const query = this._qsutils.withoutDollarDB(invalidQuery);
         const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
 
-        const resultWithoutPqs = this._db.runCommand(query);
+        const resultWithoutPqs = this._commandDb.runCommand(query);
         // If the initial query throws another error, the query with PQS won't throw
         // 'NoQueryExecutionPlans'.
         if (resultWithoutPqs.code === ErrorCodes.NoQueryExecutionPlans) {
             this._qsutils.withQuerySettings(invalidQuery, settings, () => {
-                assert.commandFailedWithCode(this._db.runCommand(query),
+                assert.commandFailedWithCode(this._commandDb.runCommand(query),
                                              ErrorCodes.NoQueryExecutionPlans);
             });
         }
@@ -563,8 +568,8 @@ export class QuerySettingsIndexHintsTests {
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
         const settings = {indexHints: {ns, allowedIndexes: [this.indexAB]}};
         const expectedErrorCodes = [7746900, 7746901, 7923000, 7923001, 7708000, 7708001];
-        assert.commandFailedWithCode(this._db.runCommand({...query, querySettings: settings}),
-                                     expectedErrorCodes);
+        assert.commandFailedWithCode(
+            this._commandDb.runCommand({...query, querySettings: settings}), expectedErrorCodes);
     }
 
     testAggregateQuerySettingsNaturalHintEquiJoinStrategy(query, mainNs, secondaryNs) {
@@ -605,7 +610,7 @@ export class QuerySettingsIndexHintsTests {
                     // The order of the documents in output should correspond to the $natural hint
                     // direction set for the secondary collection.
                     const res = assert.commandWorked(
-                        this._db.runCommand(this._qsutils.withoutDollarDB(query)));
+                        this._commandDb.runCommand(this._qsutils.withoutDollarDB(query)));
                     const docs = getAllDocuments(this._db, res);
 
                     for (const doc of docs) {
