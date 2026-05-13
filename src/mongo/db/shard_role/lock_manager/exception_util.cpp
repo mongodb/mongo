@@ -274,7 +274,13 @@ void WriteConflictRetryAlgorithm::_handleWriteConflictException(const Status& s)
     _recoveryUnit().abandonSnapshot();
     _emitLog(s.reason());
 
-    sleepFor(floatScaleDuration(_backoffFactor / _attemptCount, _conflictTime));
+    // We have a backoff of ~1.1x, at 10ms the growth rate overtakes the loss of converting to ms.
+    auto backoff = floatScaleDuration(_backoffFactor / _attemptCount, _conflictTime);
+    if (backoff > Milliseconds(10)) {
+        _opCtx->sleepFor(duration_cast<Milliseconds>(backoff));
+    } else {
+        sleepFor(backoff);
+    }
     _backoffFactor *= backoffGrowth;
 
     _assertRetryLimit();
