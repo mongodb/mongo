@@ -30,6 +30,7 @@
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -43,16 +44,16 @@ class LiteParsedDocumentSourceNestedPipelines : public LiteParsedDocumentSourceD
 public:
     LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
                                             boost::optional<NamespaceString> foreignNss,
-                                            std::vector<LiteParsedPipeline> pipelines)
+                                            std::vector<OwnedLiteParsedPipeline> pipelines)
         : LiteParsedDocumentSourceDefault<Derived>(originalBson),
           _foreignNss(std::move(foreignNss)),
           _pipelines(std::move(pipelines)) {}
 
     LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
                                             boost::optional<NamespaceString> foreignNss,
-                                            boost::optional<LiteParsedPipeline> pipeline)
+                                            boost::optional<OwnedLiteParsedPipeline> pipeline)
         : LiteParsedDocumentSourceNestedPipelines(
-              originalBson, std::move(foreignNss), std::vector<LiteParsedPipeline>{}) {
+              originalBson, std::move(foreignNss), std::vector<OwnedLiteParsedPipeline>{}) {
         if (pipeline)
             _pipelines.emplace_back(std::move(pipeline.value()));
     }
@@ -62,8 +63,8 @@ public:
         if (_foreignNss)
             involvedNamespaces.insert(*_foreignNss);
 
-        for (auto&& pipeline : _pipelines) {
-            const auto& involvedInSubPipe = pipeline.getInvolvedNamespaces();
+        for (auto&& ownedPipeline : _pipelines) {
+            const auto& involvedInSubPipe = ownedPipeline->getInvolvedNamespaces();
             involvedNamespaces.insert(involvedInSubPipe.begin(), involvedInSubPipe.end());
         }
         return involvedNamespaces;
@@ -71,8 +72,8 @@ public:
 
     void getForeignExecutionNamespaces(
         stdx::unordered_set<NamespaceString>& nssSet) const override {
-        for (auto&& pipeline : _pipelines) {
-            auto nssVector = pipeline.getForeignExecutionNamespaces();
+        for (auto&& ownedPipeline : _pipelines) {
+            auto nssVector = ownedPipeline->getForeignExecutionNamespaces();
             for (const auto& nssOrUUID : nssVector) {
                 tassert(6458500,
                         "nss expected to contain a NamespaceString",
@@ -83,16 +84,16 @@ public:
     }
 
     bool isExemptFromIngressAdmissionControl() const override {
-        return std::any_of(_pipelines.begin(), _pipelines.end(), [](auto&& pipeline) {
-            return pipeline.isExemptFromIngressAdmissionControl();
+        return std::any_of(_pipelines.begin(), _pipelines.end(), [](auto&& ownedPipeline) {
+            return ownedPipeline->isExemptFromIngressAdmissionControl();
         });
     }
 
     Status checkShardedForeignCollAllowed(const NamespaceString& nss,
                                           bool inMultiDocumentTransaction) const override {
-        for (auto&& pipeline : _pipelines) {
+        for (auto&& ownedPipeline : _pipelines) {
             if (auto status =
-                    pipeline.checkShardedForeignCollAllowed(nss, inMultiDocumentTransaction);
+                    ownedPipeline->checkShardedForeignCollAllowed(nss, inMultiDocumentTransaction);
                 !status.isOK()) {
                 return status;
             }
@@ -100,22 +101,8 @@ public:
         return Status::OK();
     }
 
-    std::vector<LiteParsedPipeline>* getMutableSubPipelines() override {
+    std::vector<OwnedLiteParsedPipeline>* getMutableSubPipelines() override {
         return &_pipelines;
-    }
-
-    /**
-     * Converts this LiteParsedDocumentSource and all its subpipelines to own the BSON they hold.
-     * This recursively makes all stages in subpipelines owned as well.
-     */
-    void makeOwned() override {
-        // First, make the stage's own BSON owned
-        LiteParsedDocumentSourceDefault<Derived>::makeOwned();
-
-        // Then, make all subpipelines owned
-        for (auto& pipeline : _pipelines) {
-            pipeline.makeOwned();
-        }
     }
 
     /**
@@ -127,8 +114,8 @@ public:
         // Assume that the document source holding the pipeline has no constraints of its own, so
         // return the strictest of the constraints on the sub-pipelines.
         auto result = ReadConcernSupportResult::allSupportedAndDefaultPermitted();
-        for (auto& pipeline : _pipelines) {
-            result.merge(pipeline.sourcesSupportReadConcern(level, isImplicitDefault));
+        for (auto& ownedPipeline : _pipelines) {
+            result.merge(ownedPipeline->sourcesSupportReadConcern(level, isImplicitDefault));
             // If both result statuses are already not OK, stop checking.
             if (!result.readConcernSupport.isOK() && !result.defaultReadConcernPermit.isOK()) {
                 break;
@@ -147,16 +134,16 @@ protected:
      */
     PrivilegeVector requiredPrivilegesBasic(bool isMongos, bool bypassDocumentValidation) const {
         PrivilegeVector requiredPrivileges;
-        for (auto&& pipeline : _pipelines) {
+        for (auto&& ownedPipeline : _pipelines) {
             Privilege::addPrivilegesToPrivilegeVector(
                 &requiredPrivileges,
-                pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
+                ownedPipeline->requiredPrivileges(isMongos, bypassDocumentValidation));
         }
         return requiredPrivileges;
     }
 
     boost::optional<NamespaceString> _foreignNss;
-    std::vector<LiteParsedPipeline> _pipelines;
+    std::vector<OwnedLiteParsedPipeline> _pipelines;
 };
 
 }  // namespace mongo

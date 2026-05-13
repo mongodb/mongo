@@ -47,7 +47,6 @@ using ParserMap = LiteParsedDocumentSource::ParserMap;
 
 namespace {
 
-
 ParserMap parserMap;
 
 // Metrics are added to aggStageCounters upon LiteParsedDocumentSource registration. Considering
@@ -203,10 +202,6 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
     lpds->setApiStrict(lpInfo.allowedWithApiStrict);
     lpds->setClientType(lpInfo.allowedWithClientType);
     return lpds;
-}
-
-std::vector<LiteParsedPipeline>* LiteParsedDocumentSource::getMutableSubPipelines() {
-    return nullptr;
 }
 
 const ParserMap& LiteParsedDocumentSource::getParserMap() {

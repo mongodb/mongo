@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/document_source_merge_spec.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/allowed_contexts.h"
@@ -199,19 +200,16 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
                         idl::serialize(whenMatched),
                         idl::serialize(whenNotMatched)),
             isSupportedMergeMode(whenMatched, whenNotMatched));
-    boost::optional<LiteParsedPipeline> liteParsedPipeline;
+    boost::optional<OwnedLiteParsedPipeline> ownedPipeline;
     if (whenMatched == MergeWhenMatchedModeEnum::kPipeline) {
         auto pipeline = mergeSpec.getWhenMatched()->pipeline;
         tassert(11282975, "$merge spec is missing the whenMatched pipeline", pipeline);
-        auto subpipelineParseOptions = options;
-        subpipelineParseOptions.makeSubpipelineOwned = true;
         // The whenMatched pipeline runs against documents in the target collection, so parse it
         // with targetNss to match the convention used by $lookup and $unionWith.
-        liteParsedPipeline =
-            LiteParsedPipeline(targetNss, *pipeline, false, subpipelineParseOptions);
+        ownedPipeline = OwnedLiteParsedPipeline(targetNss, *pipeline, options);
     }
     return std::make_unique<DocumentSourceMerge::LiteParsed>(
-        spec, std::move(targetNss), whenMatched, whenNotMatched, std::move(liteParsedPipeline));
+        spec, std::move(targetNss), whenMatched, whenNotMatched, std::move(ownedPipeline));
 }
 
 PrivilegeVector DocumentSourceMerge::LiteParsed::requiredPrivileges(

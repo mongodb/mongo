@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_lookup.h"      // parseLookupFromAndResolveNamespace
 #include "mongo/db/pipeline/document_source_lookup_gen.h"  // DocumentSourceLookupSpec IDL
 #include "mongo/db/pipeline/document_source_queue.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -55,7 +56,7 @@ REGISTER_LITE_PARSED_DOCUMENT_SOURCE(lookup,
 
 LiteParsedLookUp::LiteParsedLookUp(const BSONElement& spec,
                                    NamespaceString foreignNss,
-                                   boost::optional<LiteParsedPipeline> pipeline,
+                                   boost::optional<OwnedLiteParsedPipeline> pipeline,
                                    std::vector<BSONObj> rawPipeline,
                                    std::string as,
                                    BSONObj letVariables,
@@ -107,13 +108,11 @@ std::unique_ptr<LiteParsedLookUp> LiteParsedLookUp::parse(const NamespaceString&
             str::stream() << "invalid $lookup namespace: " << fromNss.toStringForErrorMsg(),
             fromNss.isValid());
 
-    boost::optional<LiteParsedPipeline> liteParsedPipeline;
+    boost::optional<OwnedLiteParsedPipeline> ownedPipeline;
     std::vector<BSONObj> rawPipeline;
     if (lookupSpec.getPipeline().has_value()) {
         rawPipeline = lookupSpec.getPipeline().value();
-        auto optsCopy = options;
-        optsCopy.makeSubpipelineOwned = true;
-        liteParsedPipeline = LiteParsedPipeline(fromNss, rawPipeline, false, optsCopy);
+        ownedPipeline = OwnedLiteParsedPipeline(fromNss, rawPipeline, options);
     }
 
     std::string as = std::string{lookupSpec.getAs()};
@@ -138,7 +137,7 @@ std::unique_ptr<LiteParsedLookUp> LiteParsedLookUp::parse(const NamespaceString&
 
     return std::make_unique<LiteParsedLookUp>(spec,
                                               std::move(fromNss),
-                                              std::move(liteParsedPipeline),
+                                              std::move(ownedPipeline),
                                               std::move(rawPipeline),
                                               std::move(as),
                                               std::move(letVariables),
@@ -157,14 +156,14 @@ PrivilegeVector LiteParsedLookUp::requiredPrivileges(bool isMongos,
             _pipelines.size() <= 1);
     tassert(11282982, "Missing foreignNss", _foreignNss);
 
-    if (_pipelines.empty() || !_pipelines[0].startsWithInitialSource()) {
+    if (_pipelines.empty() || !_pipelines[0]->startsWithInitialSource()) {
         Privilege::addPrivilegeToPrivilegeVector(
             &requiredPrivileges,
             Privilege(ResourcePattern::forExactNamespace(*_foreignNss), ActionType::find));
     }
 
     if (!_pipelines.empty()) {
-        const LiteParsedPipeline& pipeline = _pipelines[0];
+        const LiteParsedPipeline& pipeline = *_pipelines[0];
         Privilege::addPrivilegesToPrivilegeVector(
             &requiredPrivileges, pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
     }
@@ -194,13 +193,13 @@ void LiteParsedLookUp::getForeignExecutionNamespaces(
 }
 
 bool LiteParsedLookUp::hasExtensionSearchStage() const {
-    return !_pipelines.empty() && _pipelines[0].hasExtensionSearchStage();
+    return !_pipelines.empty() && _pipelines[0]->hasExtensionSearchStage();
 }
 
 std::unique_ptr<StageParams> LiteParsedLookUp::getStageParams() const {
     boost::optional<LiteParsedPipeline> lpp;
     if (!_pipelines.empty()) {
-        lpp = _pipelines[0].clone();
+        lpp = _pipelines[0]->clone();
     }
     return std::make_unique<LookUpStageParams>(*_foreignNss,
                                                _as,

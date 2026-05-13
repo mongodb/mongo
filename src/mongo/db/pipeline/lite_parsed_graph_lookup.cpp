@@ -35,6 +35,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/pipeline/document_source_graph_lookup_gen.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -110,7 +111,7 @@ LiteParsedGraphLookUp::LiteParsedGraphLookUp(const BSONElement& spec,
     // is modeled as a LiteParsedDocumentSourceNestedPipelines so that view definitions resolved
     // from the foreign namespace can be attached as sub-pipelines during lite parsing.
     : LiteParsedDocumentSourceNestedPipelines(
-          spec, std::move(foreignNss), std::vector<LiteParsedPipeline>{}),
+          spec, std::move(foreignNss), std::vector<OwnedLiteParsedPipeline>{}),
       _as(std::move(as)),
       _connectFromField(std::move(connectFromField)),
       _connectToField(std::move(connectToField)),

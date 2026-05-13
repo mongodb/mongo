@@ -35,6 +35,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/server_options.h"
@@ -147,7 +148,7 @@ void LiteParsedPipeline::tickGlobalStageCounters() const {
         // Recursively step through any sub-pipelines.
         if (auto* subPipelines = stage->getSubPipelines()) {
             for (auto&& subPipeline : *subPipelines) {
-                subPipeline.tickGlobalStageCounters();
+                subPipeline->tickGlobalStageCounters();
             }
         }
     }
@@ -186,7 +187,7 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
 
         if (auto* subPipelines = stage->getSubPipelines()) {
             for (auto&& subPipeline : *subPipelines) {
-                subPipeline.validate(opCtx, performApiVersionChecks);
+                subPipeline->validate(opCtx, performApiVersionChecks);
             }
         }
     }
@@ -217,7 +218,7 @@ void LiteParsedPipeline::checkStagesAllowedInViewDefinition() const {
 
         if (auto* subPipelines = stage->getSubPipelines()) {
             for (auto&& subPipeline : *subPipelines) {
-                subPipeline.checkStagesAllowedInViewDefinition();
+                subPipeline->checkStagesAllowedInViewDefinition();
             }
         }
     }

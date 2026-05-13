@@ -79,10 +79,11 @@ public:
     /**
      * Constructs a LiteParsedPipeline from the raw BSON stages in 'pipelineStages'.
      *
-     * IMPORTANT: Each stage will store the BSONElement view into the original BSONObj, so the
-     * caller is responsible for ensuring the lifetime of the original BSONObj exceeds that of this
-     * LiteParsedPipeline. If the original BSON's lifetime cannot be guaranteed, the BSON can be
-     * owned by the LiteParsedPipeline by calling makeOwned() after construction.
+     * IMPORTANT: Each stage will store BSONElement views into the original BSONObjs, so the
+     * caller is responsible for ensuring their lifetimes exceed that of this LiteParsedPipeline.
+     * For top-level pipelines where BSON lifetime cannot be guaranteed, call makeOwned() after
+     * construction. For subpipelines inside a parent stage's lite parser, use
+     * OwnedLiteParsedPipeline instead, which co-locates the owned BSON with the parsed pipeline.
      */
     LiteParsedPipeline(const NamespaceString& nss,
                        const std::vector<BSONObj>& pipelineStages,
@@ -92,14 +93,7 @@ public:
           _isRunningAgainstView_ForHybridSearch(isRunningAgainstView_ForHybridSearch) {
         _stageSpecs.reserve(pipelineStages.size());
         for (auto&& rawStage : pipelineStages) {
-            auto stageCopy = rawStage;
-            if (options.makeSubpipelineOwned) {
-                stageCopy.makeOwned();
-            }
-            _stageSpecs.push_back(LiteParsedDocumentSource::parse(nss, stageCopy, options));
-            if (options.makeSubpipelineOwned) {
-                _stageSpecs.back()->setOwnedBson(stageCopy);
-            }
+            _stageSpecs.push_back(LiteParsedDocumentSource::parse(nss, rawStage, options));
         }
     }
 

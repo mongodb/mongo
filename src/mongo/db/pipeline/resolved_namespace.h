@@ -61,6 +61,7 @@ struct MONGO_MOD_PUBLIC TimeseriesViewMetadata {
 // the clone() implementation for the copy constructor of ResolvedNamespace.
 class LiteParsedPipeline;
 struct LiteParserOptions;
+class OwnedLiteParsedPipeline;
 
 struct MONGO_MOD_PUBLIC ResolvedNamespaceViewOptions {
     boost::optional<UUID> collUUID = boost::none;
@@ -190,7 +191,7 @@ private:
     boost::optional<TimeseriesViewMetadata> _timeseriesMetadata = boost::none;
 
     std::shared_ptr<LiteParserOptions> _lpOptions = nullptr;
-    std::unique_ptr<LiteParsedPipeline> _parsedPipeline;
+    std::unique_ptr<OwnedLiteParsedPipeline> _parsedPipeline;
 
     inline static ViewPipelineDesugarer _viewPipelineDesugarer;
 };

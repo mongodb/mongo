@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_params.h"
@@ -66,18 +67,15 @@ std::unique_ptr<LiteParsedRankFusion> LiteParsedRankFusion::parse(
 
     auto inputPipesObj = parsedSpec.getInput().getPipelines();
 
-    auto opts = options;
-    opts.makeSubpipelineOwned = true;
-
     // Only parse input pipelines here. All semantic validation happens in validate().
-    std::vector<LiteParsedPipeline> liteParsedPipelines;
+    std::vector<OwnedLiteParsedPipeline> ownedPipelines;
     for (const auto& elem : inputPipesObj) {
         auto bsonPipeline = parsePipelineFromBSON(elem);
-        liteParsedPipelines.push_back(LiteParsedPipeline(nss, bsonPipeline, false, opts));
+        ownedPipelines.emplace_back(nss, bsonPipeline, options);
     }
 
     return std::make_unique<LiteParsedRankFusion>(
-        spec, nss, std::move(parsedSpec), std::move(liteParsedPipelines));
+        spec, nss, std::move(parsedSpec), std::move(ownedPipelines));
 }
 
 void LiteParsedRankFusion::validate() const {
@@ -100,7 +98,8 @@ void LiteParsedRankFusion::validate() const {
             seenNames.insert(pipelineName).second);
     }
 
-    for (const auto& pipeline : _pipelines) {
+    for (const auto& ownedPipeline : _pipelines) {
+        const auto& pipeline = *ownedPipeline;
         const auto& stages = pipeline.getStages();
 
         // Each input pipeline must not be empty.

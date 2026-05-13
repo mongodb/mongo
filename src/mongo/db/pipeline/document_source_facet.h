@@ -132,7 +132,7 @@ public:
                                                  const BSONElement& spec,
                                                  const LiteParserOptions& options);
 
-        LiteParsed(const BSONElement& spec, std::vector<LiteParsedPipeline> pipelines)
+        LiteParsed(const BSONElement& spec, std::vector<OwnedLiteParsedPipeline> pipelines)
             : LiteParsedDocumentSourceNestedPipelines(spec, boost::none, std::move(pipelines)) {}
 
         PrivilegeVector requiredPrivileges(bool isMongos,

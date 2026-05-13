@@ -95,7 +95,7 @@ public:
             : LiteParsedDocumentSourceNestedPipelines(
                   spec,
                   std::move(foreignNss),
-                  std::vector<LiteParsedPipeline>{} /* no sub-pipelines for $out */) {}
+                  std::vector<OwnedLiteParsedPipeline>{} /* no sub-pipelines for $out */) {}
 
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,

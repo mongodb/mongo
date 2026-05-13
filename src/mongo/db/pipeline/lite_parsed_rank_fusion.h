@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_rank_fusion_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_params.h"
 
 #include <algorithm>
@@ -56,12 +57,12 @@ class Pipeline;
 class RankFusionStageParams : public StageParams {
 public:
     RankFusionStageParams(RankFusionSpec spec,
-                          const std::vector<LiteParsedPipeline>& pipelines,
+                          const std::vector<OwnedLiteParsedPipeline>& pipelines,
                           BSONObj originalBson)
         : _spec(std::move(spec)), _originalBson(std::move(originalBson)) {
         _pipelines.reserve(pipelines.size());
-        for (const auto& pipeline : pipelines) {
-            _pipelines.push_back(pipeline.clone());
+        for (const auto& ownedPipeline : pipelines) {
+            _pipelines.push_back(ownedPipeline->clone());
         }
     }
 
@@ -107,7 +108,7 @@ public:
     LiteParsedRankFusion(const BSONElement& spec,
                          const NamespaceString& nss,
                          RankFusionSpec parsedSpec,
-                         std::vector<LiteParsedPipeline> pipelines)
+                         std::vector<OwnedLiteParsedPipeline> pipelines)
         : LiteParsedDocumentSourceNestedPipelines(spec, nss, std::move(pipelines)),
           _parsedSpec(std::move(parsedSpec)) {}
 
@@ -120,7 +121,7 @@ public:
     }
 
     bool isSearchStage() const final {
-        return !_pipelines.empty() && _pipelines[0].hasSearchStage();
+        return !_pipelines.empty() && _pipelines[0]->hasSearchStage();
     }
 
     bool isHybridSearchStage() const final {
@@ -149,14 +150,14 @@ public:
     void validate() const override;
 
     bool hasExtensionVectorSearchStage() const override {
-        return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& pipeline) {
-            return pipeline.hasExtensionVectorSearchStage();
+        return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& ownedPipeline) {
+            return ownedPipeline->hasExtensionVectorSearchStage();
         });
     }
 
     bool hasExtensionSearchStage() const override {
-        return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& pipeline) {
-            return pipeline.hasExtensionSearchStage();
+        return std::any_of(_pipelines.begin(), _pipelines.end(), [](const auto& ownedPipeline) {
+            return ownedPipeline->hasExtensionSearchStage();
         });
     }
 

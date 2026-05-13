@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source_documents.h"       // for kStageName in validation
 #include "mongo/db/pipeline/document_source_queue.h"           // for kStageName in validation
 #include "mongo/db/pipeline/document_source_union_with_gen.h"  // UnionWithSpec IDL
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/idl/idl_parser.h"
@@ -54,7 +55,7 @@ REGISTER_LITE_PARSED_DOCUMENT_SOURCE(unionWith,
 
 LiteParsedUnionWith::LiteParsedUnionWith(const BSONElement& spec,
                                          NamespaceString foreignNss,
-                                         boost::optional<LiteParsedPipeline> pipeline,
+                                         boost::optional<OwnedLiteParsedPipeline> pipeline,
                                          std::vector<BSONObj> rawPipeline,
                                          bool hasForeignDB,
                                          bool isHybridSearch)
@@ -73,7 +74,7 @@ std::unique_ptr<LiteParsedUnionWith> LiteParsedUnionWith::parse(const NamespaceS
             spec.type() == BSONType::object || spec.type() == BSONType::string);
 
     NamespaceString unionNss;
-    boost::optional<LiteParsedPipeline> liteParsedPipeline;
+    boost::optional<OwnedLiteParsedPipeline> ownedPipeline;
     std::vector<BSONObj> rawPipeline;
     bool hasForeignDb = false;
     bool isHybridSearch = false;
@@ -102,12 +103,7 @@ std::unique_ptr<LiteParsedUnionWith> LiteParsedUnionWith::parse(const NamespaceS
 
         // Recursively lite parse the nested pipeline, if one exists.
         if (auto pipeline = unionWithSpec.getPipeline()) {
-            // The pipeline returned to us by the IDL is owned by us, but since it is a local
-            // variable, it will not be saved after parse() returns. We call makeOwned() so that the
-            // LiteParsedPipeline will own the BSON after this point.
-            auto optsCopy = options;
-            optsCopy.makeSubpipelineOwned = true;
-            liteParsedPipeline = LiteParsedPipeline(unionNss, *pipeline, false, optsCopy);
+            ownedPipeline = OwnedLiteParsedPipeline(unionNss, *pipeline, options);
             rawPipeline = *pipeline;
         }
 
@@ -116,7 +112,7 @@ std::unique_ptr<LiteParsedUnionWith> LiteParsedUnionWith::parse(const NamespaceS
 
     return std::make_unique<LiteParsedUnionWith>(spec,
                                                  std::move(unionNss),
-                                                 std::move(liteParsedPipeline),
+                                                 std::move(ownedPipeline),
                                                  rawPipeline,
                                                  hasForeignDb,
                                                  isHybridSearch);
@@ -136,7 +132,7 @@ PrivilegeVector LiteParsedUnionWith::requiredPrivileges(bool isMongos,
     // If no pipeline is specified, then assume that we're reading directly from the collection.
     // Otherwise check whether the pipeline starts with an "initial source" indicating that we don't
     // require the "find" privilege.
-    if (_pipelines.empty() || !_pipelines[0].startsWithInitialSource()) {
+    if (_pipelines.empty() || !_pipelines[0]->startsWithInitialSource()) {
         Privilege::addPrivilegeToPrivilegeVector(
             &requiredPrivileges,
             Privilege(ResourcePattern::forExactNamespace(*_foreignNss), ActionType::find));
@@ -144,7 +140,7 @@ PrivilegeVector LiteParsedUnionWith::requiredPrivileges(bool isMongos,
 
     // Add the sub-pipeline privileges, if one was specified.
     if (!_pipelines.empty()) {
-        const LiteParsedPipeline& pipeline = _pipelines[0];
+        const LiteParsedPipeline& pipeline = *_pipelines[0];
         Privilege::addPrivilegesToPrivilegeVector(
             &requiredPrivileges, pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
     }
@@ -154,7 +150,7 @@ PrivilegeVector LiteParsedUnionWith::requiredPrivileges(bool isMongos,
 std::unique_ptr<StageParams> LiteParsedUnionWith::getStageParams() const {
     boost::optional<LiteParsedPipeline> lpp;
     if (!_pipelines.empty()) {
-        lpp = _pipelines[0].clone();
+        lpp = _pipelines[0]->clone();
     }
     return std::make_unique<UnionWithStageParams>(*_foreignNss,
                                                   _rawPipeline,
@@ -165,11 +161,11 @@ std::unique_ptr<StageParams> LiteParsedUnionWith::getStageParams() const {
 }
 
 bool LiteParsedUnionWith::hasExtensionVectorSearchStage() const {
-    return !_pipelines.empty() && _pipelines[0].hasExtensionVectorSearchStage();
+    return !_pipelines.empty() && _pipelines[0]->hasExtensionVectorSearchStage();
 }
 
 bool LiteParsedUnionWith::hasExtensionSearchStage() const {
-    return !_pipelines.empty() && _pipelines[0].hasExtensionSearchStage();
+    return !_pipelines.empty() && _pipelines[0]->hasExtensionSearchStage();
 }
 
 void LiteParsedUnionWith::validateUnionWithCollectionlessPipeline(

@@ -35,6 +35,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_params.h"
 #include "mongo/db/pipeline/test_lite_parsed.h"
 #include "mongo/db/query/allowed_contexts.h"
@@ -431,10 +432,10 @@ TEST(LiteParsedPipelineClone, CloneClonesSubpipelinesForNestedStages) {
     ASSERT_NE(&originalSubPipelines[0], &clonedSubPipelines[0]);
 
     // Verify the subpipeline stages are also cloned (different pointers).
-    ASSERT_EQ(originalSubPipelines[0].getStages().size(), 1);
-    ASSERT_EQ(clonedSubPipelines[0].getStages().size(), 1);
-    ASSERT_NE(originalSubPipelines[0].getStages()[0].get(),
-              clonedSubPipelines[0].getStages()[0].get());
+    ASSERT_EQ(originalSubPipelines[0]->getStages().size(), 1);
+    ASSERT_EQ(clonedSubPipelines[0]->getStages().size(), 1);
+    ASSERT_NE(originalSubPipelines[0]->getStages()[0].get(),
+              clonedSubPipelines[0]->getStages()[0].get());
 }
 
 TEST(LiteParsedPipelineClone, DeferredCachesAreResetInClonedPipeline) {
@@ -518,7 +519,7 @@ TEST(LiteParsedPipelineClone, CloneRemainsValidAfterOriginalIsDestroyed) {
     ASSERT_NE(clonedSubPipelinesPtr, nullptr);
     const auto& clonedSubPipelines = *clonedSubPipelinesPtr;
     ASSERT_EQ(clonedSubPipelines.size(), 1);
-    ASSERT_EQ(clonedSubPipelines[0].getStages().size(), 1);
+    ASSERT_EQ(clonedSubPipelines[0]->getStages().size(), 1);
 
     // Verify we can access computed properties (exercises the deferred caches).
     const auto& involvedNamespaces = cloned->getInvolvedNamespaces();
@@ -553,7 +554,7 @@ TEST(LiteParsedPipelineClone, OriginalRemainsValidAfterCloneIsDestroyed) {
     ASSERT_NE(originalSubPipelinesPtr, nullptr);
     const auto& originalSubPipelines = *originalSubPipelinesPtr;
     ASSERT_EQ(originalSubPipelines.size(), 1);
-    ASSERT_EQ(originalSubPipelines[0].getStages().size(), 1);
+    ASSERT_EQ(originalSubPipelines[0]->getStages().size(), 1);
 
     // Verify we can access computed properties (exercises the deferred caches).
     const auto& involvedNamespaces = original.getInvolvedNamespaces();

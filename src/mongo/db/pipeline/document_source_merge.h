@@ -53,6 +53,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/merge_processor.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/stage_constraints.h"
@@ -107,7 +108,7 @@ public:
                    NamespaceString foreignNss,
                    MergeWhenMatchedModeEnum whenMatched,
                    MergeWhenNotMatchedModeEnum whenNotMatched,
-                   boost::optional<LiteParsedPipeline> onMatchedPipeline)
+                   boost::optional<OwnedLiteParsedPipeline> onMatchedPipeline)
             : LiteParsedDocumentSourceNestedPipelines(
                   spec, std::move(foreignNss), std::move(onMatchedPipeline)),
               _whenMatched(whenMatched),

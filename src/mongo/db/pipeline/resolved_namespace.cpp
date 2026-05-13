@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/resolved_namespace.h"
 
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 
 namespace mongo {
 
@@ -98,7 +99,7 @@ ResolvedNamespace::ResolvedNamespace(const ResolvedNamespace& other)
       _timeseriesMetadata(other._timeseriesMetadata),
       _lpOptions(other._lpOptions) {
     if (other._parsedPipeline) {
-        _parsedPipeline = std::make_unique<LiteParsedPipeline>(other._parsedPipeline->clone());
+        _parsedPipeline = std::make_unique<OwnedLiteParsedPipeline>(*other._parsedPipeline);
     }
 }
 
@@ -116,7 +117,7 @@ ResolvedNamespace& ResolvedNamespace::operator=(const ResolvedNamespace& other) 
     _timeseriesMetadata = other._timeseriesMetadata;
     _lpOptions = other._lpOptions;
     if (other._parsedPipeline) {
-        _parsedPipeline = std::make_unique<LiteParsedPipeline>(other._parsedPipeline->clone());
+        _parsedPipeline = std::make_unique<OwnedLiteParsedPipeline>(*other._parsedPipeline);
     } else {
         _parsedPipeline = nullptr;
     }
@@ -177,12 +178,7 @@ boost::optional<TimeseriesViewMetadata> ResolvedNamespace::getTimeseriesViewMeta
 
 void ResolvedNamespace::liteParseViewPipeline() {
     LiteParserOptions optsToUse = _lpOptions ? *_lpOptions : LiteParserOptions();
-    for (auto& bson : pipeline) {
-        bson = bson.getOwned();
-    }
-    // TODO SERVER-117525 Use an OwnedLiteParsedPipeline here.
-    _parsedPipeline = std::make_unique<LiteParsedPipeline>(ns, pipeline, false, optsToUse);
-    _parsedPipeline->makeOwned();
+    _parsedPipeline = std::make_unique<OwnedLiteParsedPipeline>(ns, pipeline, optsToUse);
 }
 
 void ResolvedNamespace::desugarViewPipeline() {
@@ -190,7 +186,7 @@ void ResolvedNamespace::desugarViewPipeline() {
     // ViewPipelineDesugarer typedef comment in resolved_namespace.h for why this is a callback.
     if (_parsedPipeline && _viewPipelineDesugarer) {
         auto ifrContext = _lpOptions ? _lpOptions->ifrContext : nullptr;
-        _viewPipelineDesugarer(_parsedPipeline.get(), std::move(ifrContext));
+        _viewPipelineDesugarer(&_parsedPipeline->pipeline(), std::move(ifrContext));
     }
 }
 
@@ -199,10 +195,10 @@ LiteParsedPipeline ResolvedNamespace::getViewPipeline() const {
             "ResolvedNamespace must be parsed before calling `getViewPipeline()`",
             _parsedPipeline);
 
-    // Ownership should be preserved because the original stages own their BSON, and the default
-    // copy constructor copies _ownedBson, which uses BSONObj's shared ownership. Still, we call
-    // makeOwned() defensively here. This is a no-op if the stages already own their BSON.
-    auto out = _parsedPipeline->clone();
+    // clone() produces stages that reference _ownedStages buffers inside _parsedPipeline.
+    // makeOwned() makes each stage own its buffer independently so the returned pipeline outlives
+    // this ResolvedNamespace.
+    auto out = _parsedPipeline->pipeline().clone();
     out.makeOwned();
     return out;
 }
@@ -217,8 +213,8 @@ std::vector<BSONObj> ResolvedNamespace::getSerializedViewPipeline() const {
             _parsedPipeline);
 
     std::vector<BSONObj> result;
-    result.reserve(_parsedPipeline->getStages().size());
-    for (const auto& stage : _parsedPipeline->getStages()) {
+    result.reserve(_parsedPipeline->pipeline().getStages().size());
+    for (const auto& stage : _parsedPipeline->pipeline().getStages()) {
         result.push_back(stage->getOriginalBson().wrap());
     }
     return result;

@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_params.h"
 #include "mongo/util/modules.h"
 
@@ -100,7 +101,7 @@ public:
 
     LiteParsedUnionWith(const BSONElement& spec,
                         NamespaceString foreignNss,
-                        boost::optional<LiteParsedPipeline> pipeline,
+                        boost::optional<OwnedLiteParsedPipeline> pipeline,
                         std::vector<BSONObj> rawPipeline,
                         bool hasForeignDB,
                         bool isHybridSearch);

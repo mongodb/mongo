@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/allowed_contexts.h"
@@ -159,15 +160,13 @@ std::string getStageNameNotAllowedInFacet(const DocumentSource& source,
 
 std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
-    std::vector<LiteParsedPipeline> liteParsedPipelines;
+    std::vector<OwnedLiteParsedPipeline> ownedPipelines;
 
-    auto subpipelineParseOptions = options;
-    subpipelineParseOptions.makeSubpipelineOwned = true;
     for (auto&& rawPipeline : extractRawPipelines(spec)) {
-        liteParsedPipelines.emplace_back(nss, rawPipeline.second, false, subpipelineParseOptions);
+        ownedPipelines.emplace_back(nss, rawPipeline.second, options);
     }
 
-    return std::make_unique<DocumentSourceFacet::LiteParsed>(spec, std::move(liteParsedPipelines));
+    return std::make_unique<DocumentSourceFacet::LiteParsed>(spec, std::move(ownedPipelines));
 }
 
 intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
