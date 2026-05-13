@@ -117,10 +117,10 @@ mongo_cc_library(
         ":commit_quorum_options",
         ":index_build_entry_helpers",
         ":index_build_entry_idl",
+        ":index_build_knobs_idl",
         ":index_build_oplog_entry",
         ":multi_index_block",
         ":resumable_index_builds_idl",
-        ":two_phase_index_build_knobs_idl",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db:index_repair",
         "//src/mongo/db:server_base",
@@ -167,8 +167,8 @@ mongo_cc_library(
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
+        ":index_build_knobs_idl",
         ":index_builds_common",
-        ":two_phase_index_build_knobs_idl",
         "//src/mongo/db:server_base",
         "//src/mongo/db/collection_crud:container_write",
         "//src/mongo/db/index:preallocated_container_pool",
@@ -190,9 +190,9 @@ mongo_cc_library(
     deps = [
         ":index_build_entry_helpers",
         ":index_build_entry_idl",
+        ":index_build_knobs_idl",
         ":index_builds_coordinator",
         ":resumable_index_builds_idl",
-        ":two_phase_index_build_knobs_idl",
         "//src/mongo/db/s:forwardable_operation_metadata",
         "//src/mongo/db/shard_role",
         "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
@@ -304,13 +304,25 @@ idl_generator(
 )
 
 idl_generator(
+    name = "index_build_knobs_gen",
+    src = "index_build_knobs.idl",
+)
+
+idl_generator(
+    name = "primary_driven_index_build_knobs_gen",
+    src = "primary_driven_index_build_knobs.idl",
+)
+
+idl_generator(
     name = "two_phase_index_build_knobs_gen",
     src = "two_phase_index_build_knobs.idl",
 )
 
 mongo_cc_library(
-    name = "two_phase_index_build_knobs_idl",
+    name = "index_build_knobs_idl",
     srcs = [
+        ":index_build_knobs_gen",
+        ":primary_driven_index_build_knobs_gen",
         ":two_phase_index_build_knobs_gen",
     ],
     deps = [

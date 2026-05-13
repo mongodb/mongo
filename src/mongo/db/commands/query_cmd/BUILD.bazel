@@ -325,7 +325,7 @@ mongo_cc_unit_test(
         ":map_reduce_agg",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/index_builds:two_phase_index_build_knobs_idl",
+        "//src/mongo/db/index_builds:index_build_knobs_idl",
         "//src/mongo/db/pipeline:expression_context_for_test",
         "//src/mongo/db/query:query_test_service_context",
     ],

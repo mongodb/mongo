@@ -35,8 +35,10 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index_builds/index_build_knobs_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/multi_index_block.h"
+#include "mongo/db/index_builds/primary_driven_index_build_knobs_gen.h"
 #include "mongo/db/index_repair.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -136,6 +138,17 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
                                            ? ContainerWriteBehavior::kReplicate
                                            : ContainerWriteBehavior::kDoNotReplicate);
     builder->setIsResumable(options.isResumable);
+
+    // Hint to the storage engine that this index build should not keep data that it reads in the
+    // cache.
+    shard_role_details::getRecoveryUnit(opCtx)->setReadOnce(
+        useReadOnceCursorsForIndexBuilds.load());
+
+    if (options.method == IndexBuildMethodEnum::kPrimaryDriven &&
+        !opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
+        shard_role_details::getRecoveryUnit(opCtx)->setPrefetching(
+            primaryDrivenIndexBuildPrefetching.load());
+    }
 
     try {
         writeConflictRetry(opCtx, "IndexBuildsManager::setUpIndexBuild", nss, [&]() {
