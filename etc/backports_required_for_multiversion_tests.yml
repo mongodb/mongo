@@ -933,6 +933,8 @@ last-continuous:
     ticket: SERVER-120668
   - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-121822
+  - test_file: jstests/sharding/shard_drain_chunk_size_behavior.js
+    ticket: SERVER-116528
   suites: null
 last-lts:
   all:
@@ -1928,4 +1930,6 @@ last-lts:
     ticket: SERVER-120668
   - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-121822
+  - test_file: jstests/sharding/shard_drain_chunk_size_behavior.js
+    ticket: SERVER-116528
   suites: null
