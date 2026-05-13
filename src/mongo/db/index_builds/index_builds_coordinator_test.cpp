@@ -220,6 +220,34 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictRelax) {
     ASSERT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
 }
 
+TEST_F(IndexBuildsCoordinatorTest, GetNumIndexesTotalReturnsCatalogCount) {
+    auto opCtx = operationContext();
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "IndexBuildsCoordinatorTest.GetNumIndexesTotalReturnsCatalogCount");
+    createCollectionWithDuplicateDocs(opCtx, nss);
+
+    {
+        auto collection = getCollectionExclusive(opCtx, nss);
+        EXPECT_EQ(1,
+                  IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.getCollectionPtr()));
+    }
+
+    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    auto spec = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << BSON("a" << 1)
+                         << "name" << "a_1");
+    {
+        auto collection = getCollectionExclusive(opCtx, nss);
+        ASSERT_DOES_NOT_THROW(indexBuildsCoord->createIndex(
+            opCtx, collection.uuid(), spec, IndexBuildsManager::IndexConstraints::kRelax, false));
+    }
+
+    {
+        auto collection = getCollectionExclusive(opCtx, nss);
+        EXPECT_EQ(2,
+                  IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.getCollectionPtr()));
+    }
+}
+
 class OpObserverMock : public OpObserverNoop {
 public:
     std::vector<std::string> createIndexIdents;

@@ -883,6 +883,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
                                                                          indexes,
                                                                          protocol,
                                                                          Date_t::now());
+        replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collWriter.get());
 
         Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
         if (!status.isOK()) {
@@ -1015,6 +1016,7 @@ Status IndexBuildsCoordinator::_registerResumeIndexBuild(OperationContext* opCtx
 
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
         buildUUID, collection->uuid(), dbName, mutableIndexes, protocol, Date_t::now());
+    replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collection.get());
 
     Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
     if (!status.isOK()) {

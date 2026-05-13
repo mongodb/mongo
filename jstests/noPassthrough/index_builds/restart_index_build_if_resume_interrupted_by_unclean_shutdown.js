@@ -123,12 +123,19 @@ checkLog.containsJson(primary, 20663, {
 });
 
 jsTestLog("15. Check that the index build completed successfully on secondary");
-checkLog.containsJson(secondary, 20663, {
-    buildUUID: function (uuid) {
-        return uuid && uuid["uuid"]["$uuid"] === buildUUID;
-    },
-    namespace: coll.getFullName(),
-});
+let completedBuilds;
+assert.soon(() => {
+    completedBuilds = checkLog.getFilteredLogMessages(secondary, 20663, {
+        buildUUID: function (uuid) {
+            return uuid && uuid["uuid"]["$uuid"] === buildUUID;
+        },
+        namespace: coll.getFullName(),
+    });
+    return completedBuilds.length >= 1;
+}, "Did not observe build-completion log on the secondary");
+for (const entry of completedBuilds) {
+    assert.gt(entry.attr.numIndexesBefore, 0, "numIndexesBefore should be > 0 after restart rebuild: " + tojson(entry));
+}
 
 jsTestLog("16. Join with parallel shell that ran the index build");
 awaitCreateIndexParallel();

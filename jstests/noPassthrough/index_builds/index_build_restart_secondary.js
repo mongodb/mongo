@@ -92,4 +92,19 @@ indexi();
 indexx();
 indexy();
 
+if (!FeatureFlagUtil.isPresentAndEnabled(secondaryDB, "PrimaryDrivenIndexBuilds")) {
+    let completedBuilds;
+    assert.soon(() => {
+        completedBuilds = checkLog.getFilteredLogMessages(secondary, 20663, {namespace: coll.getFullName()});
+        return completedBuilds.length >= 3;
+    }, "Did not observe 3 build-completion logs on the secondary");
+    for (const entry of completedBuilds) {
+        assert.gt(
+            entry.attr.numIndexesBefore,
+            0,
+            "numIndexesBefore should be > 0 after recovery rebuild: " + tojson(entry),
+        );
+    }
+}
+
 replTest.stopSet();
