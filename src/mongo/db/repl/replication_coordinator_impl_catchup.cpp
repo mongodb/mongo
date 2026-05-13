@@ -270,6 +270,10 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _lastWrittenOpTimeWaiterList.setErrorAll(
             lk,
             {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
+        // Wake up the optime waiter that is waiting for majority
+        _majorityReadWaiterList.setErrorAll(
+            lk,
+            {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
 
         // _canAcceptNonLocalWrites should already be set.
         invariant(!_readWriteAbility->canAcceptNonLocalWrites(lk));

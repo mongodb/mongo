@@ -1000,6 +1000,10 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
         // Snapshot of the DSR mutation counter. Used to detect ABA transitions.
         uint64_t dbMetadataMutationsSnapshot = 0;
 
+        // Stop retrying and bubble up the error if we have been interrupted (e.g. due to stepdown)
+        // TODO(SERVER-124363): Evaluate if this can be removed
+        opCtx->checkForInterrupt();
+
         // Prepare: under the CSR exclusive lock, decide whether to recover and, if so, register a
         // CollectionCacheRecoverer for this round. In Mode B also snapshot the DSR state we will
         // re-verify after the drain.
