@@ -1,0 +1,18 @@
+--- a/include/wasmtime/store.hh
++++ b/include/wasmtime/store.hh
+@@ -118,6 +118,15 @@
+       return std::monostate();
+     }
+
++    /// Sets the per-Store hostcall fuel cap (component model).
++    ///
++    /// Bounds how much data wasmtime will copy between host and guest across
++    /// component-model calls.  Pass `SIZE_MAX` to disable the cap.
++    /// Mirrors `Store::set_hostcall_fuel` on the Rust side.
++    void set_hostcall_fuel(size_t fuel) {
++      wasmtime_context_set_hostcall_fuel(ptr, fuel);
++    }
++
+     /// Returns the amount of fuel consumed so far by executing WebAssembly.
+     ///
+     /// Returns `std::nullopt` if fuel consumption is not enabled.

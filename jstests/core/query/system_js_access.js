@@ -12,7 +12,6 @@
 //   exclude_from_timeseries_crud_passthrough,
 //   # TODO SERVER-116052: Add support for $function.
 //   # TODO SERVER-116054: Add support for $where.
-//   # TODO SERVER-116055: Add support for $accumulate.
 //   mozjs_wasm_unsupported,
 // ]
 

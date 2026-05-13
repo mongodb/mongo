@@ -117,6 +117,12 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options
     // This is used to signal process killing.
     storeCtx.set_epoch_deadline(1);
 
+    // The default 128 MiB hostcall fuel cap is exhausted by long-running $accumulator /
+    // mapReduce pipelines that pass multi-megabyte BSON state across WIT calls.
+    // Disable it here; resource use is already bounded by the linear-memory limiter
+    // (opts.linearMemoryLimitMB), internalQueryMaxJsEmitBytes, and BSON 16 MiB per object.
+    storeCtx.set_hostcall_fuel(SIZE_MAX);
+
     wt::WasiConfig wasiConfig;
     wasiConfig.inherit_stdout();
     wasiConfig.inherit_stderr();

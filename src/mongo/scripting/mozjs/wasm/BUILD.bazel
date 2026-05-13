@@ -231,6 +231,7 @@ mongo_cc_unit_test(
     deps = [
         ":wasmtime_engine",
         "//src/mongo:base",
+        "//src/mongo/db/query:query_knobs",
         "//src/mongo/scripting:scripting_common",
     ],
 )
@@ -245,9 +246,9 @@ mongo_cc_library(
         "wasmtime_engine.h",
         "//src/mongo/scripting/mozjs/wasm/scope:scope.h",
     ],
+    private_hdrs = ["embedded_wasm_resource.h"],
     deps = [
         ":bridge",
-        ":embed_mozjs_wasm_obj",
         "//src/mongo:base",
         "//src/mongo/db:server_options",
         "//src/mongo/db:service_context",
@@ -255,5 +256,8 @@ mongo_cc_library(
         "//src/mongo/scripting:scripting_common",
         "//src/mongo/util/concurrency:spin_lock",
         "@crates//:wasmtime_c",
-    ],
+    ] + select({
+        "@platforms//os:windows": [":embed_mozjs_wasm_rc"],
+        "//conditions:default": [":embed_mozjs_wasm_obj"],
+    }),
 )

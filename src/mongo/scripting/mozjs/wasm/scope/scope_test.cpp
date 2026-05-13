@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/js_regex.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
@@ -109,46 +110,6 @@ TEST(WasmtimeScope, FunctionPattern_WithArgs) {
 
     BSONObj retVal = scope->getObject("__returnValue");
     ASSERT_EQ(retVal.getIntField("sum"), 42);
-}
-
-// $accumulator init/accumulate/merge pattern
-TEST(WasmtimeScope, AccumulatorPattern_InitAccumulateMerge) {
-    WasmtimeScriptEngine engine;
-    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
-    ASSERT(scope);
-
-    ScriptingFunction initFn = scope->createFunction("function() { return 0; }");
-    ASSERT(initFn != 0);
-
-    ScriptingFunction accFn = scope->createFunction("function(state, val) { return state + val; }");
-    ASSERT(accFn != 0);
-
-    ScriptingFunction mergeFn = scope->createFunction("function(s1, s2) { return s1 + s2; }");
-    ASSERT(mergeFn != 0);
-
-    // init
-    BSONObj emptyArgs;
-    ASSERT_EQ(0, scope->invoke(initFn, &emptyArgs, nullptr, 0));
-    double state = scope->getNumber("__returnValue");
-    ASSERT_EQ(state, 0.0);
-
-    // accumulate: state + 10
-    BSONObj accArgs1 = BSON("0" << state << "1" << 10);
-    ASSERT_EQ(0, scope->invoke(accFn, &accArgs1, nullptr, 0));
-    state = scope->getNumber("__returnValue");
-    ASSERT_EQ(state, 10.0);
-
-    // accumulate: state + 20
-    BSONObj accArgs2 = BSON("0" << state << "1" << 20);
-    ASSERT_EQ(0, scope->invoke(accFn, &accArgs2, nullptr, 0));
-    state = scope->getNumber("__returnValue");
-    ASSERT_EQ(state, 30.0);
-
-    // merge: 30 + 12
-    BSONObj mergeArgs = BSON("0" << state << "1" << 12.0);
-    ASSERT_EQ(0, scope->invoke(mergeFn, &mergeArgs, nullptr, 0));
-    double merged = scope->getNumber("__returnValue");
-    ASSERT_EQ(merged, 42.0);
 }
 
 // mapReduce.map pattern: injectNative("emit", ...) + invoke(func, nullptr, &doc, timeout, true)
@@ -734,6 +695,33 @@ TEST(WasmtimeScope, MemoryLimit_ResetWithInvalidParamsFails) {
     gWasmtimeStoreMemoryLimitMB.store(256);
 
     ASSERT_THROWS_CODE(scope->reset(), DBException, ErrorCodes::BadValue);
+}
+
+// Emit buffer must fit within the WASM store's linear memory.
+TEST(WasmtimeScope, EmitBufferExceedsStoreLimitFails) {
+    auto savedHeap = gJSHeapLimitMB.load();
+    auto savedStore = gWasmtimeStoreMemoryLimitMB.load();
+    auto savedEmit = internalQueryMaxJsEmitBytes.load();
+    ON_BLOCK_EXIT([&] {
+        gJSHeapLimitMB.store(savedHeap);
+        gWasmtimeStoreMemoryLimitMB.store(savedStore);
+        internalQueryMaxJsEmitBytes.store(savedEmit);
+    });
+
+    // heap=64 MB, overhead=max(64, 6)=64 MB → min store=128 MB for scope init to pass.
+    // With store=128 MB, emitBuf=128MB+16MB=144MB > 128MB → injectNative throws BadValue.
+    gJSHeapLimitMB.store(64);
+    gWasmtimeStoreMemoryLimitMB.store(128);
+    internalQueryMaxJsEmitBytes.store(128 * 1024 * 1024);
+
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ASSERT(scope);
+
+    ASSERT_THROWS_CODE(scope->injectNative(
+                           "emit", [](const BSONObj&, void*) { return BSONObj(); }, nullptr),
+                       DBException,
+                       ErrorCodes::BadValue);
 }
 
 // --- OOM detection ---

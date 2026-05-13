@@ -391,6 +391,12 @@ crate.annotation(
     crate = "wasmtime-c-api-impl",
     extra_aliased_targets = {"wasmtime_c": "wasmtime_c"},
     gen_build_script = "off",
+    patch_args = ["-p1"],
+    patches = [
+        "//bazel/wasmtime:store_rs.patch",
+        "//bazel/wasmtime:store_h.patch",
+        "//bazel/wasmtime:store_hh.patch",
+    ],
 )
 
 # Disable default features and re-enable everything except "objdump/explore" so we don't pull in capstone/capstone-sys.

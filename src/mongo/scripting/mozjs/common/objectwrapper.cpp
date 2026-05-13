@@ -34,6 +34,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/js_regex.h"
+#include "mongo/scripting/mozjs/common/exception.h"
 #include "mongo/scripting/mozjs/common/idwrapper.h"
 #include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/bson.h"
@@ -673,8 +674,6 @@ BSONObj ObjectWrapper::toBSON() {
             if (frames.size() == 1) {
                 IdWrapper idw(_context, id);
 
-                // TODO: check if it's cheaper to just compare with an interned
-                // string of "_id" rather than with ascii
                 if (idw.isString() && idw.equalsAscii("_id")) {
                     continue;
                 }
@@ -687,11 +686,12 @@ BSONObj ObjectWrapper::toBSON() {
     }
 
     const int sizeWithEOO = b.len() + 1 /*EOO*/ - 4 /*BSONObj::Holder ref count*/;
-    uassert(17260,
-            str::stream() << "Converting from JavaScript to BSON failed: "
-                          << "Object size " << sizeWithEOO << " exceeds limit of "
-                          << BSONObjMaxInternalSize << " bytes.",
-            sizeWithEOO <= BSONObjMaxInternalSize);
+    if (sizeWithEOO > BSONObjMaxInternalSize) {
+        std::string msg = str::stream() << "Converting from JavaScript to BSON failed: "
+                                        << "Object size " << sizeWithEOO << " exceeds limit of "
+                                        << BSONObjMaxInternalSize << " bytes.";
+        uasserted(17260, msg);
+    }
 
     return b.obj();
 }

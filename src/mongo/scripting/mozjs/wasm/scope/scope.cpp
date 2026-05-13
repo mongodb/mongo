@@ -98,6 +98,7 @@ void WasmtimeImplScope::init(const BSONObj* data) {
         opts.jsHeapLimitMB = static_cast<uint32_t>(*_jsHeapLimitMB);
     }
     opts.linearMemoryLimitMB = gWasmtimeStoreMemoryLimitMB.load();
+    _storeLinearMemBytes = static_cast<int64_t>(opts.linearMemoryLimitMB) * 1024 * 1024;
     _bridge = std::make_unique<wasm::MozJSWasmBridge>(_wasmEngineCtx, opts);
     bool initialized = _bridge->initialize();
     uassert(ErrorCodes::BadValue, "MozJS WASM bridge failed to initialize", initialized);
@@ -188,7 +189,13 @@ void WasmtimeImplScope::injectNative(const char* field, NativeFunction func, voi
     _emitCallbackData = data;
     // Margin lets WASM buffer one over-limit doc so the host's EmitState sees
     // it during drain and can throw, instead of WASM silently dropping it.
-    _bridge->setupEmit(internalQueryMaxJsEmitBytes.load() + BSONObjMaxInternalSize);
+    const int64_t emitBufBytes =
+        static_cast<int64_t>(internalQueryMaxJsEmitBytes.load()) + BSONObjMaxInternalSize;
+    uassert(ErrorCodes::BadValue,
+            "internalQueryMaxJsEmitBytes exceeds wasmtimeStoreMemoryLimitMB: the emit buffer "
+            "must fit within the WASM store's linear memory",
+            emitBufBytes <= _storeLinearMemBytes);
+    _bridge->setupEmit(emitBufBytes);
 }
 
 BSONObj WasmtimeImplScope::_resolveGlobal(const char* field) const {

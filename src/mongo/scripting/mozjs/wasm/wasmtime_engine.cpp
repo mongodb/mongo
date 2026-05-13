@@ -36,16 +36,10 @@
 #include "mongo/scripting/config_gen.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/wasm/bridge/bridge.h"
+#include "mongo/scripting/mozjs/wasm/embedded_wasm_resource.h"
 #include "mongo/scripting/mozjs/wasm/scope/scope.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-// Symbols produced by objcopy from the AOT-compiled mozjs_wasm_api.cwasm.
-// See embed_mozjs_wasm_obj in BUILD.bazel.
-extern "C" {
-extern const uint8_t _binary_mozjs_wasm_api_cwasm_start[];
-extern const uint8_t _binary_mozjs_wasm_api_cwasm_end[];
-}
 
 namespace mongo {
 
@@ -88,9 +82,8 @@ WasmtimeScriptEngine::WasmtimeScriptEngine() {}
 WasmtimeScriptEngine::~WasmtimeScriptEngine() {}
 
 std::shared_ptr<wasm::WasmEngineContext> WasmtimeScriptEngine::createWasmEngineContext() const {
-    size_t size =
-        static_cast<size_t>(_binary_mozjs_wasm_api_cwasm_end - _binary_mozjs_wasm_api_cwasm_start);
-    return wasm::WasmEngineContext::createFromPrecompiled(_binary_mozjs_wasm_api_cwasm_start, size);
+    auto [data, size] = wasm::getEmbeddedWasmResource();
+    return wasm::WasmEngineContext::createFromPrecompiled(data, size);
 }
 
 mongo::Scope* WasmtimeScriptEngine::createScope() {

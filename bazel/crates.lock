@@ -1,5 +1,5 @@
 {
-  "checksum": "09e089e4d857eb519291450cae1e356a0e8486203c17893a9ded5d57f1857484",
+  "checksum": "c5167d945fea0a88114d893d2437bad55ac3b4e295eaf0ed5348d3ba97edf335",
   "crates": {
     "addr2line 0.26.1": {
       "name": "addr2line",
@@ -17534,7 +17534,15 @@
       "repository": {
         "Http": {
           "url": "https://static.crates.io/crates/wasmtime-c-api-impl/44.0.1/download",
-          "sha256": "af63f5db854133f67cdec5faabff9db2764221968231c42fc18e8a9d63f849d5"
+          "sha256": "af63f5db854133f67cdec5faabff9db2764221968231c42fc18e8a9d63f849d5",
+          "patch_args": [
+            "-p1"
+          ],
+          "patches": [
+            "@@//bazel/wasmtime:store_h.patch",
+            "@@//bazel/wasmtime:store_hh.patch",
+            "@@//bazel/wasmtime:store_rs.patch"
+          ]
         }
       },
       "targets": [

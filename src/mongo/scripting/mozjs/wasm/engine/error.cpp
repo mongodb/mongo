@@ -31,6 +31,8 @@
 
 #include "mongo/scripting/mozjs/common/exception.h"
 
+#include <string>
+
 #include "js/ErrorReport.h"
 #include "js/Exception.h"
 

@@ -397,14 +397,6 @@ err_code_t MozJSScriptEngine::invokeFunction(uint64_t handle,
         return err ? err->code : SM_E_RUNTIME;
     }
 
-    if (_emitByteLimit > 0 && _emitBytesUsed > _emitByteLimit) {
-        if (err) {
-            err->code = SM_E_RUNTIME;
-            set_string(&err->msg, &err->msg_len, "emit() exceeded memory limit");
-        }
-        return SM_E_RUNTIME;
-    }
-
     // Store return value on global (same key as implscope) so getReturnValueBson can read it.
     ObjectWrapper(_cx, _global).setValue(kInvokeResult, out);
 
@@ -693,9 +685,15 @@ err_code_t MozJSScriptEngine::setGlobalValue(const char* name,
 BSONObj MozJSScriptEngine::_emitCallback(const BSONObj& args, void* data) {
     auto* engine = static_cast<MozJSScriptEngine*>(data);
 
+    int nArgs = args.nFields();
+    if (nArgs != 2) {
+        constexpr int kEmitArgCountCode = 31220;
+        uasserted(ErrorCodes::Error(kEmitArgCountCode), "emit takes 2 args");
+    }
+
     BSONObjIterator it(args);
-    BSONElement keyElem = it.more() ? it.next() : BSONElement();
-    BSONElement valElem = it.more() ? it.next() : BSONElement();
+    BSONElement keyElem = it.next();
+    BSONElement valElem = it.next();
 
     BSONObjBuilder b;
     if (keyElem.type() == BSONType::undefined || keyElem.eoo())

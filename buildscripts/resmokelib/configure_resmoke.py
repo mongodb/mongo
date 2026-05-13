@@ -778,9 +778,9 @@ flags in common: {common_set}
 
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
 
-    # TODO SERVER-116054, SERVER-116052, SERVER-116055, SERVER-116053: Remove this js_engine handling
-    # section and_detect_js_engine once mozjs-wasm supports $where, $function, $accumulator, and
-    # mapReduce, eliminating the need for this startup-time binary invocation.
+    # TODO SERVER-116054, SERVER-116052, SERVER-116053: Remove this js_engine handling
+    # section and _detect_js_engine once mozjs-wasm supports $where, $function, and mapReduce,
+    # eliminating the need for this startup-time binary invocation.
     _config.JS_ENGINE = _detect_js_engine(_config.MONGOD_EXECUTABLE)
     if _config.JS_ENGINE == "mozjs-wasm":
         _config.EXCLUDE_WITH_ANY_TAGS.append("mozjs_wasm_unsupported")
@@ -1198,8 +1198,6 @@ _MOZJS_PATTERNS = (
     "mapreduce",
     # TODO SERVER-116054: Add support for $where.
     '"$where"',
-    # TODO SERVER-116055: Add support for $accumulator.
-    '"$accumulator"',
 )
 
 

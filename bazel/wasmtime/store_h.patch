@@ -1,0 +1,19 @@
+--- a/include/wasmtime/store.h
++++ b/include/wasmtime/store.h
+@@ -164,6 +164,16 @@
+ WASM_API_EXTERN wasmtime_error_t *
+ wasmtime_context_set_fuel(wasmtime_context_t *store, uint64_t fuel);
+
++/**
++ * \brief Set the per-Store hostcall fuel cap (component model).
++ *
++ * Bounds how much data wasmtime will copy between host and guest across
++ * component-model calls.  Pass `SIZE_MAX` to disable the cap.  Mirrors
++ * `Store::set_hostcall_fuel` on the Rust side.
++ */
++WASM_API_EXTERN void
++wasmtime_context_set_hostcall_fuel(wasmtime_context_t *store, size_t fuel);
++
+ /**
+  * \brief Returns the amount of fuel remaining in this context's store.
+  *

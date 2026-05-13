@@ -120,6 +120,7 @@ private:
     const boost::optional<int> _jsHeapLimitMB;
 
     std::unique_ptr<wasm::MozJSWasmBridge> _bridge;
+    int64_t _storeLinearMemBytes = 0;
     DeadlineMonitor<WasmtimeImplScope> _deadlineMonitor;
     void _drainEmitToCallback();
     void _installHelpers();

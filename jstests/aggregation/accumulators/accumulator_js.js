@@ -376,3 +376,149 @@ command.pipeline = [
 res = assert.commandWorked(db.runCommand(command));
 expectedResults = [{_id: 1, value: {len: 3, types: ["object", "object", "object"], values: [null, null, null]}}];
 assert(resultsEq(res.cursor.firstBatch, expectedResults), res.cursor);
+
+// Test that throwing inside accumulate causes the command to fail.
+assert(db.accumulator_js.drop());
+assert.commandWorked(db.accumulator_js.insert({val: 1}));
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: "accumulator_js",
+        cursor: {},
+        pipeline: [
+            {
+                $group: {
+                    _id: 1,
+                    value: {
+                        $accumulator: {
+                            init: function () {
+                                return 0;
+                            },
+                            accumulateArgs: ["$val"],
+                            accumulate: function (state, val) {
+                                throw new Error("accumulate error");
+                            },
+                            merge: function (s1, s2) {
+                                return s1 + s2;
+                            },
+                            lang: "js",
+                        },
+                    },
+                },
+            },
+        ],
+    }),
+    ErrorCodes.JSInterpreterFailure,
+);
+
+// Test that init returning null is handled: accumulate receives null as initial state.
+assert(db.accumulator_js.drop());
+assert.commandWorked(db.accumulator_js.insert([{val: 10}, {val: 32}]));
+res = assert.commandWorked(
+    db.runCommand({
+        aggregate: "accumulator_js",
+        cursor: {},
+        pipeline: [
+            {
+                $group: {
+                    _id: 1,
+                    value: {
+                        $accumulator: {
+                            init: function () {
+                                return null;
+                            },
+                            accumulateArgs: ["$val"],
+                            accumulate: function (state, val) {
+                                return (state || 0) + val;
+                            },
+                            merge: function (s1, s2) {
+                                return (s1 || 0) + (s2 || 0);
+                            },
+                            lang: "js",
+                        },
+                    },
+                },
+            },
+        ],
+    }),
+);
+assert(resultsEq(res.cursor.firstBatch, [{_id: 1, value: 42}]), res.cursor);
+
+// Test that string state works: accumulate builds a comma-separated string.
+assert(db.accumulator_js.drop());
+assert.commandWorked(db.accumulator_js.insert([{word: "hello"}, {word: "world"}]));
+res = assert.commandWorked(
+    db.runCommand({
+        aggregate: "accumulator_js",
+        cursor: {},
+        pipeline: [
+            {
+                $sort: {word: 1},
+            },
+            {
+                $group: {
+                    _id: 1,
+                    value: {
+                        $accumulator: {
+                            init: function () {
+                                return "";
+                            },
+                            accumulateArgs: ["$word"],
+                            accumulate: function (state, val) {
+                                return state ? state + "," + val : val;
+                            },
+                            merge: function (s1, s2) {
+                                return s1 ? s1 + "," + s2 : s2;
+                            },
+                            finalize: function (state) {
+                                return state;
+                            },
+                            lang: "js",
+                        },
+                    },
+                },
+            },
+        ],
+    }),
+);
+assert.eq(res.cursor.firstBatch.length, 1);
+// The two words appear in the result separated by a comma (order may vary across shards).
+const words = res.cursor.firstBatch[0].value.split(",").sort();
+assert.sameMembers(words, ["hello", "world"]);
+
+// Test that when no documents match a group, finalize is called on the init state.
+assert(db.accumulator_js.drop());
+assert.commandWorked(db.accumulator_js.insert([{x: 1}, {x: 1}]));
+res = assert.commandWorked(
+    db.runCommand({
+        aggregate: "accumulator_js",
+        cursor: {},
+        pipeline: [
+            {$match: {x: 999}},
+            {
+                $group: {
+                    _id: 1,
+                    value: {
+                        $accumulator: {
+                            init: function () {
+                                return {count: 0, sum: 0};
+                            },
+                            accumulateArgs: ["$x"],
+                            accumulate: function (state, val) {
+                                return {count: state.count + 1, sum: state.sum + val};
+                            },
+                            merge: function (s1, s2) {
+                                return {count: s1.count + s2.count, sum: s1.sum + s2.sum};
+                            },
+                            finalize: function (state) {
+                                return state.count > 0 ? state.sum / state.count : 0;
+                            },
+                            lang: "js",
+                        },
+                    },
+                },
+            },
+        ],
+    }),
+);
+// No documents matched, so the group produces no output.
+assert.eq(res.cursor.firstBatch.length, 0, res.cursor);

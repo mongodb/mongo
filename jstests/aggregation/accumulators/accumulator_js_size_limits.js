@@ -2,8 +2,6 @@
 // @tags: [
 //   requires_scripting,
 //   resource_intensive,
-//   # TODO SERVER-116055: Add support for $accumulate.
-//   mozjs_wasm_unsupported,
 // ]
 const coll = db.accumulator_js_size_limits;
 
@@ -42,7 +40,9 @@ let res = runExample(1, {
     },
     lang: "js",
 });
-assert.commandFailedWithCode(res, [ErrorCodes.BSONObjectTooLarge, 10334]);
+// WASM path: objectwrapper.cpp throws 17260 ("Object size exceeds limit").
+// Legacy MozJS path: may throw 10334 (BSONObjectTooLarge) from BSONObjBuilder.
+assert.commandFailedWithCode(res, [ErrorCodes.BSONObjectTooLarge, 17260, 10334]);
 
 // Accumulator tries to return BSON larger than 16MB from JS.
 assert(coll.drop());
@@ -88,6 +88,8 @@ res = runExample(1, {
     },
     lang: "js",
 });
+// 4545000 is thrown by accumulator_js_reduce.cpp on the server before JS runs,
+// so it surfaces identically on legacy and WASM builds.
 assert.commandFailedWithCode(res, [4545000]);
 
 // $group size limit exceeded, and cannot spill.

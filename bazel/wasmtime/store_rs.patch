@@ -1,0 +1,20 @@
+--- a/src/store.rs
++++ b/src/store.rs
+@@ -263,6 +263,17 @@
+     crate::handle_result(store.set_fuel(fuel), |()| {})
+ }
+
++/// Sets the per-Store hostcall fuel cap that bounds how much data wasmtime
++/// will copy between the host and the guest across component-model calls.
++/// Pass `usize::MAX` for "unlimited".
++#[unsafe(no_mangle)]
++pub extern "C" fn wasmtime_context_set_hostcall_fuel(
++    mut store: WasmtimeStoreContextMut<'_>,
++    fuel: usize,
++) {
++    store.set_hostcall_fuel(fuel);
++}
++
+ #[unsafe(no_mangle)]
+ pub extern "C" fn wasmtime_context_get_fuel(
+     store: WasmtimeStoreContext<'_>,
