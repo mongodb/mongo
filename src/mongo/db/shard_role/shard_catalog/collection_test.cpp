@@ -469,6 +469,7 @@ TEST_F(CollectionTest, SetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
     MultikeyPaths paths = {{0}};
 
     {
+        // TODO SERVER-126415: use enableWriteConflictForWrites
         FailPointEnableBlock failPoint("WTWriteConflictException");
         WriteUnitOfWork wuow(opCtx);
         ASSERT_THROWS(coll->setIndexIsMultikey(opCtx, indexName, paths), WriteConflictException);
@@ -572,6 +573,7 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollbac
     MultikeyPaths paths = {{0}};
 
     {
+        // TODO SERVER-126415: use enableWriteConflictForWrites
         FailPointEnableBlock failPoint("WTWriteConflictException");
         WriteUnitOfWork wuow(opCtx);
         auto entry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);

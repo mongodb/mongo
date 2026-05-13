@@ -83,6 +83,7 @@ TEST_F(SpillTableTest, InsertRecordsWriteConflict) {
     std::vector<Record> records(kCacheSizeMB,
                                 {.id = {}, .data = {data.data(), static_cast<int>(data.size())}});
 
+    // TODO SERVER-126415: use enableWriteConflictForWrites
     FailPointEnableBlock writeConflict{
         "WTWriteConflictException",
         FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1}};
@@ -105,6 +106,7 @@ TEST_F(SpillTableTest, InsertRecordsRandomWriteConflicts) {
     std::vector<Record> records(kCacheSizeMB,
                                 {.id = {}, .data = {data.data(), static_cast<int>(data.size())}});
 
+    // TODO SERVER-126415: use enableWriteConflictForWrites
     FailPointEnableBlock writeConflict{
         "WTWriteConflictException",
         FailPoint::ModeOptions{

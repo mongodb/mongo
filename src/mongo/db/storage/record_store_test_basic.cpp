@@ -922,7 +922,7 @@ DEATH_TEST_REGEX(RecordStoreTestDeathTest,
         cursor->save();
         auto restoreFailed = [&]() {
             try {
-                auto failPoint = harnessHelper->enableWriteConflictForReads(
+                auto failPoint = enableWriteConflictForReads(
                     FailPoint::ModeOptions{.mode = FailPoint::Mode::alwaysOn});
                 // Should not set _hasRestored
                 cursor->restore(ru);

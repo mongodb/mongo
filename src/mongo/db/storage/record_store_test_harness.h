@@ -75,20 +75,6 @@ public:
     }
 
     /**
-     * Enables a fail point that injects write conflicts into write operations on the underlying
-     * storage engine.
-     */
-    virtual std::unique_ptr<FailPointEnableBlock> enableWriteConflictForWrites(
-        FailPoint::ModeOptions mode) = 0;
-
-    /**
-     * Enables a fail point that injects write conflicts into read operations on the underlying
-     * storage engine.
-     */
-    virtual std::unique_ptr<FailPointEnableBlock> enableWriteConflictForReads(
-        FailPoint::ModeOptions mode) = 0;
-
-    /**
      * Advances the stable timestamp of the engine.
      */
     void advanceStableTimestamp(Timestamp newTimestamp) {
@@ -110,5 +96,14 @@ void registerRecordStoreHarnessHelperFactory(
 std::unique_ptr<RecordStoreHarnessHelper> newRecordStoreHarnessHelper(
     RecordStoreHarnessHelper::Options options =
         RecordStoreHarnessHelper::Options::ReplicationEnabled);
+
+using WriteConflictFailPointFn =
+    std::function<std::unique_ptr<FailPointEnableBlock>(FailPoint::ModeOptions)>;
+
+void registerWriteConflictForWritesFactory(StringData engineName, WriteConflictFailPointFn factory);
+void registerWriteConflictForReadsFactory(StringData engineName, WriteConflictFailPointFn factory);
+
+std::unique_ptr<FailPointEnableBlock> enableWriteConflictForWrites(FailPoint::ModeOptions mode);
+std::unique_ptr<FailPointEnableBlock> enableWriteConflictForReads(FailPoint::ModeOptions mode);
 
 }  // namespace mongo
