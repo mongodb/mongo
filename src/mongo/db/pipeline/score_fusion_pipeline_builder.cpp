@@ -41,6 +41,8 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 
+#include <string>
+
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -59,16 +61,15 @@ public:
         // The default combination method is avg if no combination method is specified.
         ScoreFusionCombinationMethodEnum combinationMethod = ScoreFusionCombinationMethodEnum::kAvg;
         boost::optional<IDLAnyType> combinationExpression = boost::none;
-        if (combination.has_value() && combination->getMethod().has_value()) {
-            combinationMethod = combination->getMethod().get();
-            uassert(10017300,
-                    "combination.expression should only be specified when combination.method "
-                    "has the value \"expression\"",
-                    (combinationMethod != ScoreFusionCombinationMethodEnum::kExpression &&
-                     !combination->getExpression().has_value()) ||
-                        (combinationMethod == ScoreFusionCombinationMethodEnum::kExpression &&
-                         combination->getExpression().has_value()));
+        if (combination.has_value()) {
+            combinationMethod =
+                combination->getMethod().value_or(ScoreFusionCombinationMethodEnum::kAvg);
             combinationExpression = combination->getExpression();
+            uassert(10017300,
+                    "combination.expression must be specified if and only if combination.method "
+                    "is \"expression\"",
+                    combinationExpression.has_value() ==
+                        (combinationMethod == ScoreFusionCombinationMethodEnum::kExpression));
             uassert(10017301,
                     "both combination.expression and combination.weights cannot be specified",
                     !(combination->getWeights().has_value() && combinationExpression.has_value()));

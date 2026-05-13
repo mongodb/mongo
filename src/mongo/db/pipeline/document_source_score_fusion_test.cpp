@@ -8902,5 +8902,71 @@ TEST_F(DocumentSourceScoreFusionTest, InternalFieldBehaviorThroughGroupAndReshap
     ASSERT_TRUE(results[0]["__hs_name1_score"_sd].missing());
     ASSERT_TRUE(results[1]["__hs_name1_score"_sd].missing());
 }
+
+TEST_F(DocumentSourceScoreFusionTest,
+       ErrorsIfNoCombinationMethodButCombinationExpressionSpecified) {
+    auto spec = fromjson(R"({
+         $scoreFusion: {
+             input: {
+                 pipelines: {
+                     name1: [
+                         {
+                             $search: {
+                                 index: "search_index",
+                                 text: {
+                                     query: "mystery",
+                                     path: "genres"
+                                 }
+                             }
+                         },
+                         { $match : { author : "dave" } }
+                     ]
+                 },
+                 normalization: "none"
+             },
+             combination: {
+                 expression: {$sum: ["$$name1", 5.0]}
+             }
+         }
+     })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10017300);
+}
+
+TEST_F(DocumentSourceScoreFusionTest,
+       ErrorsIfCombinationMethodAvgButCombinationExpressionSpecified) {
+    auto spec = fromjson(R"({
+         $scoreFusion: {
+             input: {
+                 pipelines: {
+                     name1: [
+                         {
+                             $search: {
+                                 index: "search_index",
+                                 text: {
+                                     query: "mystery",
+                                     path: "genres"
+                                 }
+                             }
+                         },
+                         { $match : { author : "dave" } }
+                     ]
+                 },
+                 normalization: "none"
+             },
+             combination: {
+                 method: "avg",
+                 expression: {$sum: ["$$name1", 5.0]}
+             }
+         }
+     })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       10017300);
+}
+
 }  // namespace
 }  // namespace mongo
