@@ -641,11 +641,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::isoDateToParts:
             return builtinIsoDateToParts(arity);
         case Builtin::dayOfYear:
-            return builtinDayOfYear(arity);
+            return builtinDayOfYear(arity).releaseToRaw();
         case Builtin::dayOfMonth:
-            return builtinDayOfMonth(arity);
+            return builtinDayOfMonth(arity).releaseToRaw();
         case Builtin::dayOfWeek:
-            return builtinDayOfWeek(arity);
+            return builtinDayOfWeek(arity).releaseToRaw();
         case Builtin::dateToString:
             return builtinDateToString(arity);
         case Builtin::dateFromString:
@@ -821,11 +821,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::indexOfCP:
             return builtinIndexOfCP(arity);
         case Builtin::isDayOfWeek:
-            return builtinIsDayOfWeek(arity);
+            return builtinIsDayOfWeek(arity).releaseToRaw();
         case Builtin::isTimeUnit:
-            return builtinIsTimeUnit(arity);
+            return builtinIsTimeUnit(arity).releaseToRaw();
         case Builtin::isTimezone:
-            return builtinIsTimezone(arity);
+            return builtinIsTimezone(arity).releaseToRaw();
         case Builtin::isValidToStringFormat:
             return builtinIsValidToStringFormat(arity);
         case Builtin::validateFromStringFormat:
@@ -903,9 +903,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::makeBsonObj:
             return builtinMakeBsonObj(arity, code);
         case Builtin::tsSecond:
-            return builtinTsSecond(arity);
+            return builtinTsSecond(arity).releaseToRaw();
         case Builtin::tsIncrement:
-            return builtinTsIncrement(arity);
+            return builtinTsIncrement(arity).releaseToRaw();
         case Builtin::typeMatch:
             return builtinTypeMatch(arity);
         case Builtin::dateTrunc:
@@ -919,25 +919,25 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::getNonLeafSortKeyDesc:
             return builtinGetSortKey<false /*IsAscending*/, false /*IsLeaf*/>(arity);
         case Builtin::year:
-            return builtinYear(arity);
+            return builtinYear(arity).releaseToRaw();
         case Builtin::month:
-            return builtinMonth(arity);
+            return builtinMonth(arity).releaseToRaw();
         case Builtin::hour:
-            return builtinHour(arity);
+            return builtinHour(arity).releaseToRaw();
         case Builtin::minute:
-            return builtinMinute(arity);
+            return builtinMinute(arity).releaseToRaw();
         case Builtin::second:
-            return builtinSecond(arity);
+            return builtinSecond(arity).releaseToRaw();
         case Builtin::millisecond:
-            return builtinMillisecond(arity);
+            return builtinMillisecond(arity).releaseToRaw();
         case Builtin::week:
-            return builtinWeek(arity);
+            return builtinWeek(arity).releaseToRaw();
         case Builtin::isoWeekYear:
-            return builtinISOWeekYear(arity);
+            return builtinISOWeekYear(arity).releaseToRaw();
         case Builtin::isoDayOfWeek:
-            return builtinISODayOfWeek(arity);
+            return builtinISODayOfWeek(arity).releaseToRaw();
         case Builtin::isoWeek:
-            return builtinISOWeek(arity);
+            return builtinISOWeek(arity).releaseToRaw();
         case Builtin::objectToArray:
             return builtinObjectToArray(arity);
         case Builtin::arrayToObject:

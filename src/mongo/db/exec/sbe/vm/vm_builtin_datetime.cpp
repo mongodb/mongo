@@ -354,265 +354,252 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsoDateToParts(A
     return {true, dateObjTag, dateObjVal};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDayOfYear(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDayOfYear(ArityType arity) {
     tassert(11080050, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericDayOfYear(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericDayOfYear(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericDayOfYear(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericDayOfYear(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDayOfMonth(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDayOfMonth(ArityType arity) {
     tassert(11080049, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericDayOfMonth(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericDayOfMonth(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericDayOfMonth(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericDayOfMonth(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDayOfWeek(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDayOfWeek(ArityType arity) {
     tassert(11080048, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericDayOfWeek(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericDayOfWeek(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericDayOfWeek(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericDayOfWeek(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinYear(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinYear(ArityType arity) {
     tassert(11080047, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericYear(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericYear(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericYear(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericYear(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMonth(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinMonth(ArityType arity) {
     tassert(11080046, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericMonth(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericMonth(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericMonth(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericMonth(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinHour(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinHour(ArityType arity) {
     tassert(11080045, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericHour(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericHour(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericHour(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericHour(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMinute(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinMinute(ArityType arity) {
     tassert(11080044, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericMinute(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericMinute(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericMinute(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericMinute(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSecond(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSecond(ArityType arity) {
     tassert(11080043, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericSecond(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericSecond(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericSecond(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericSecond(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMillisecond(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinMillisecond(ArityType arity) {
     tassert(11080042, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericMillisecond(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericMillisecond(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericMillisecond(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericMillisecond(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinWeek(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinWeek(ArityType arity) {
     tassert(11080041, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericWeek(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericWeek(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericWeek(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericWeek(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinISOWeekYear(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinISOWeekYear(ArityType arity) {
     tassert(11080040, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericISOWeekYear(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericISOWeekYear(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericISOWeekYear(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericISOWeekYear(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinISODayOfWeek(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinISODayOfWeek(ArityType arity) {
     tassert(11080039, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericISODayOfWeek(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericISODayOfWeek(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericISODayOfWeek(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericISODayOfWeek(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinISOWeek(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinISOWeek(ArityType arity) {
     tassert(11080038, "Unexpected arity value", arity == 3 || arity == 2);
 
-    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    auto date = viewFromStack(0);
     if (arity == 3) {
-        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-        return genericISOWeek(
-            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tzDB = viewFromStack(1);
+        auto tz = viewFromStack(2);
+        return genericISOWeek(tzDB, date, tz);
     } else {
-        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
-        return genericISOWeek(dateTag, dateValue, timezoneTag, timezoneValue);
+        auto tz = viewFromStack(1);
+        return genericISOWeek(date, tz);
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsTimeUnit(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinIsTimeUnit(ArityType arity) {
     tassert(11080037, "Unexpected arity value", arity == 1);
-    auto [timeUnitOwn, timeUnitTag, timeUnitValue] = getFromStack(0);
-    if (!value::isString(timeUnitTag)) {
+    auto timeUnit = viewFromStack(0);
+    if (!value::isString(timeUnit.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
     return {false,
             value::TypeTags::Boolean,
             value::bitcastFrom<bool>(
-                isValidTimeUnit(value::getStringView(timeUnitTag, timeUnitValue)))};
+                isValidTimeUnit(value::getStringView(timeUnit.tag, timeUnit.value)))};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsDayOfWeek(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinIsDayOfWeek(ArityType arity) {
     tassert(11080036, "Unexpected arity value", arity == 1);
-    auto [dayOfWeekOwn, dayOfWeekTag, dayOfWeekValue] = getFromStack(0);
-    if (!value::isString(dayOfWeekTag)) {
+    auto dayOfWeek = viewFromStack(0);
+    if (!value::isString(dayOfWeek.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
     return {false,
             value::TypeTags::Boolean,
             value::bitcastFrom<bool>(
-                isValidDayOfWeek(value::getStringView(dayOfWeekTag, dayOfWeekValue)))};
+                isValidDayOfWeek(value::getStringView(dayOfWeek.tag, dayOfWeek.value)))};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsTimezone(ArityType arity) {
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBVal] = getFromStack(0);
-    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+value::TagValueMaybeOwned ByteCode::builtinIsTimezone(ArityType arity) {
+    auto tzDB = viewFromStack(0);
+    if (tzDB.tag != value::TypeTags::timeZoneDB) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto timezoneDB = value::getTimeZoneDBView(timezoneDBVal);
-    auto [timezoneOwn, timezoneTag, timezoneVal] = getFromStack(1);
-    if (!value::isString(timezoneTag)) {
+    auto timezoneDB = value::getTimeZoneDBView(tzDB.value);
+    auto tz = viewFromStack(1);
+    if (!value::isString(tz.tag)) {
         return {false, value::TypeTags::Boolean, false};
     }
-    auto timezoneStr = value::getStringView(timezoneTag, timezoneVal);
+    auto timezoneStr = value::getStringView(tz.tag, tz.value);
     if (timezoneDB->isTimeZoneIdentifier(timezoneStr)) {
         return {false, value::TypeTags::Boolean, true};
     }
     return {false, value::TypeTags::Boolean, false};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTsSecond(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinTsSecond(ArityType arity) {
     tassert(11080035, "Unexpected arity value", arity == 1);
 
-    auto [inputValueOwn, inputTypeTag, inputValue] = getFromStack(0);
+    auto input = viewFromStack(0);
 
-    if (inputTypeTag != value::TypeTags::Timestamp) {
+    if (input.tag != value::TypeTags::Timestamp) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto timestamp = Timestamp(value::bitcastTo<uint64_t>(inputValue));
+    auto timestamp = Timestamp(value::bitcastTo<uint64_t>(input.value));
     return {false, value::TypeTags::NumberInt64, value::bitcastFrom<uint64_t>(timestamp.getSecs())};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTsIncrement(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinTsIncrement(ArityType arity) {
     tassert(11080034, "Unexpected arity value", arity == 1);
 
-    auto [inputValueOwn, inputTypeTag, inputValue] = getFromStack(0);
+    auto input = viewFromStack(0);
 
-    if (inputTypeTag != value::TypeTags::Timestamp) {
+    if (input.tag != value::TypeTags::Timestamp) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto timestamp = Timestamp(value::bitcastTo<uint64_t>(inputValue));
+    auto timestamp = Timestamp(value::bitcastTo<uint64_t>(input.value));
     return {false, value::TypeTags::NumberInt64, value::bitcastFrom<uint64_t>(timestamp.getInc())};
 }
 
