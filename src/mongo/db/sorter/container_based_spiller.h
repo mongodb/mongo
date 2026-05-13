@@ -46,6 +46,7 @@
 #include "mongo/util/modules.h"
 
 #include <algorithm>
+#include <iterator>
 #include <memory>
 #include <span>
 #include <utility>
@@ -470,9 +471,10 @@ public:
                      Comparator comp,
                      std::size_t numTargetedSpills,
                      std::size_t maxSpillsPerMerge) override {
-        std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>> oldIters;
         while (this->_iterators.size() > numTargetedSpills) {
-            oldIters.swap(this->_iterators);
+            // Copy the current iterators so the merged-from iterators stay alive for the entire
+            // outer pass even after we erase them from _iterators below.
+            auto oldIters = this->_iterators;
             for (size_t i = 0; i < oldIters.size(); i += maxSpillsPerMerge) {
                 auto count = std::min(maxSpillsPerMerge, oldIters.size() - i);
                 auto spillsToMerge = std::span(oldIters).subspan(i, count);
@@ -532,6 +534,10 @@ public:
                 }
                 invariant((opts.limit) ? numSpilled <= numSourceRows : numSpilled == numSourceRows);
 
+                this->_iterators.erase(this->_iterators.begin(),
+                                       std::next(this->_iterators.begin(), count));
+                this->_iterators.push_back(writer->done());
+
                 _onSpill();
 
                 // TODO(SERVER-117546): Use a truncate rather than individual deletes.
@@ -551,7 +557,6 @@ public:
                                        });
                 }
 
-                this->_iterators.push_back(writer->done());
                 _current += numSpilled;
                 _containerBasedStorage().updateCurrKey(_current);
 
@@ -559,7 +564,6 @@ public:
                 stats.incrementSpilledRanges();
                 stats.incrementSpilledKeyValuePairs(numSpilled);
             }
-            oldIters.clear();
         }
     }
 
