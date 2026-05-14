@@ -30,8 +30,11 @@
 #include "mongo/db/exec/classic/requires_collection_stage.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 
 namespace mongo {
@@ -79,6 +82,22 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
     uassert(ErrorCodes::QueryPlanKilled,
             "the catalog was closed and reopened",
             getCatalogEpoch() == _catalogEpoch);
+
+    if (expCtx()->getQueryKnobConfiguration().getEnablePathArrayness()) {
+        if (auto current = CollectionQueryInfo::get(coll).getPathArrayness()) {
+            const auto& nonArrayPaths = expCtx()->nonArrayPathsForNss(coll->ns());
+            if (auto invalidated =
+                    PathArrayness::getFirstInvalidatedPath(nonArrayPaths, *current)) {
+                uasserted(
+                    ErrorCodes::QueryPlanKilled,
+                    str::stream()
+                        << "query plan killed :: non-array path became multikey during yield: "
+                           "namespace="
+                        << coll->ns().toStringForErrorMsg()
+                        << ", path=" << invalidated->fullPath());
+            }
+        }
+    }
 
     doRestoreStateRequiresCollection();
 }
