@@ -350,6 +350,15 @@ export function verifyChangeStreamOnWholeCluster({
 
     assert.commandWorked(stats);
 
+    // TODO SERVER-119944: explain for change streams v2 does not report a 'shards' attribute, so the
+    // assertion below and the per-shard checks that follow cannot be validated under v2. Skip the
+    // whole-cluster shard-level verification when v2 is enabled. The per-shard helpers themselves
+    // also short-circuit under v2, but we must guard the outer 'shards' assertion explicitly to
+    // avoid a hard failure before reaching them.
+    if (FeatureFlagUtil.isPresentAndEnabled(db, "ChangeStreamPreciseShardTargeting")) {
+        return;
+    }
+
     assert(
         stats.hasOwnProperty("shards"),
         () => `expecting stats to have 'shards' attribute, but got ${tojson(stats)}`,
