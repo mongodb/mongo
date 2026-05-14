@@ -20,16 +20,6 @@ mongo_toolchain_py_cxx_test(
 )
 
 py_test(
-    name = "test_validate_evergreen_patch_link",
-    srcs = ["test_validate_evergreen_patch_link.py"],
-    main = "test_validate_evergreen_patch_link.py",
-    visibility = ["//visibility:public"],
-    deps = [
-        "//buildscripts:validate_evergreen_patch_link",
-    ],
-)
-
-py_test(
     name = "test_sync_repo_with_copybara",
     srcs = [
         "test_sync_repo_with_copybara.py",
