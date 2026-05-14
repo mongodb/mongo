@@ -179,15 +179,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "remove_chunks_gen",
-    src = "remove_chunks.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "set_allow_migrations_coordinator_document_gen",
     src = "set_allow_migrations_coordinator_document.idl",
     deps = [

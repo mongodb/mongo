@@ -1026,7 +1026,6 @@ const allTestCases = {
         _configsvrEnsureChunkVersionIsGreaterThan: {skip: "TODO"},
         _configsvrGetHistoricalPlacement: {skip: "TODO"},
         _configsvrMoveRange: {skip: "TODO"},
-        _configsvrRemoveChunks: {skip: "TODO"},
         _configsvrRemoveShard: {skip: "TODO"},
         _configsvrRemoveShardFromZone: {skip: "TODO"},
         _configsvrRemoveTags: {skip: "TODO"},

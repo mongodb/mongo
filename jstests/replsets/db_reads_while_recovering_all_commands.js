@@ -51,7 +51,6 @@ const allCommands = {
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isPrimaryOnly},
     _configsvrGetHistoricalPlacement: {skip: isAnInternalCommand},
     _configsvrMoveRange: {skip: isPrimaryOnly},
-    _configsvrRemoveChunks: {skip: isPrimaryOnly},
     _configsvrRemoveShard: {skip: isPrimaryOnly},
     _configsvrRemoveShardFromZone: {skip: isPrimaryOnly},
     _configsvrRemoveTags: {skip: isPrimaryOnly},

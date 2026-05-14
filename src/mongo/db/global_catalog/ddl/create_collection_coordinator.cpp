@@ -48,7 +48,6 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/create_collection_coordinator_document_gen.h"
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_gen.h"
-#include "mongo/db/global_catalog/ddl/remove_chunks_gen.h"
 #include "mongo/db/global_catalog/ddl/shard_key_index_util.h"
 #include "mongo/db/global_catalog/ddl/shard_key_util.h"
 #include "mongo/db/global_catalog/ddl/shard_util.h"

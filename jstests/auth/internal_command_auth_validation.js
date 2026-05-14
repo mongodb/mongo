@@ -233,13 +233,6 @@ const internalCommandsMap = {
             toShard: shard0name,
         },
     },
-    _configsvrRemoveChunks: {
-        testname: "_configsvrRemoveChunks",
-        command: {
-            _configsvrRemoveChunks: 1,
-            collectionUUID: UUID(),
-        },
-    },
     _configsvrRemoveShard: {
         testname: "_configsvrRemoveShard",
         command: {_configsvrRemoveShard: 1, removeShard: shard0name},

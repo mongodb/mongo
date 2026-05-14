@@ -60,7 +60,6 @@ const allCommands = {
     _configsvrGetHistoricalPlacement: {skip: isAnInternalCommand},
     _configsvrHelloMe: {skip: isAnInternalCommand},
     _configsvrMoveRange: {skip: isAnInternalCommand},
-    _configsvrRemoveChunks: {skip: isAnInternalCommand},
     _configsvrRemoveShard: {skip: isAnInternalCommand},
     _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
     _configsvrRemoveTags: {skip: isAnInternalCommand},
