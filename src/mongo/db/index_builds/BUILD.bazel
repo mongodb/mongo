@@ -318,11 +318,17 @@ idl_generator(
     src = "two_phase_index_build_knobs.idl",
 )
 
+idl_generator(
+    name = "shared_index_build_knobs_gen",
+    src = "shared_index_build_knobs.idl",
+)
+
 mongo_cc_library(
     name = "index_build_knobs_idl",
     srcs = [
         ":index_build_knobs_gen",
         ":primary_driven_index_build_knobs_gen",
+        ":shared_index_build_knobs_gen",
         ":two_phase_index_build_knobs_gen",
     ],
     deps = [
