@@ -33,9 +33,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
+#include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -741,23 +741,8 @@ void persistPrimaryDrivenResumeState(OperationContext* opCtx,
                                      const UUID& collectionUUID,
                                      const std::string& resumeStateIdent,
                                      IndexBuildPhaseEnum phase) {
-    ResumeIndexInfo resumeIndexInfo;
-    resumeIndexInfo.setBuildUUID(buildUUID);
-    resumeIndexInfo.setPhase(phase);
-    resumeIndexInfo.setCollectionUUID(collectionUUID);
-
-    std::vector<IndexStateInfo> indexStateInfos;
-    for (auto&& indexBuildInfo : indexes) {
-        IndexStateInfo indexInfo;
-        indexInfo.setSpec(indexBuildInfo.spec);
-        indexInfo.setIsMultikey(false);
-        indexInfo.setMultikeyPaths({});
-        indexInfo.setSideWritesTable(*indexBuildInfo.sideWritesIdent);
-        indexInfo.setSkippedRecordTrackerTable(indexBuildInfo.skippedRecordsIdent);
-        indexInfo.setStorageIdentifier(indexBuildInfo.sorterIdent);
-        indexStateInfos.push_back(indexInfo);
-    }
-    resumeIndexInfo.setIndexes(indexStateInfos);
+    auto resumeIndexInfo =
+        index_builds::synthesizeResumeIndexInfo(buildUUID, phase, collectionUUID, indexes);
     auto obj = resumeIndexInfo.toBSON();
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
@@ -774,7 +759,8 @@ void persistPrimaryDrivenResumeState(OperationContext* opCtx,
 void runResumePrimaryDrivenOnStepUpTest(OperationContext* opCtx,
                                         repl::StorageInterface* storageInterface,
                                         StringData testName,
-                                        IndexBuildPhaseEnum phase) {
+                                        std::tuple<IndexBuildPhaseEnum, bool> param) {
+    auto [phase, hasPersistedResumeState] = param;
     // TODO (SERVER-116165): Remove.
     RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
     RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
@@ -811,8 +797,15 @@ void runResumePrimaryDrivenOnStepUpTest(OperationContext* opCtx,
     ASSERT_OK(index_builds::primary_driven::start(
         opCtx, nss.dbName(), collectionUUID, buildUUID, indexes, resumeStateIdent));
 
-    persistPrimaryDrivenResumeState(
-        opCtx, indexes, buildUUID, collectionUUID, resumeStateIdent, phase);
+    if (!hasPersistedResumeState) {
+        WriteUnitOfWork wuow(opCtx);
+        opCtx->getServiceContext()->getStorageEngine()->makeInternalRecordStore(
+            opCtx, resumeStateIdent, KeyFormat::Long);
+        wuow.commit();
+    } else {
+        persistPrimaryDrivenResumeState(
+            opCtx, indexes, buildUUID, collectionUUID, resumeStateIdent, phase);
+    }
 
     indexBuildsCoord->onStepUp(opCtx);
     indexBuildsCoord->awaitStepUpThread_forTestOnly();
@@ -851,7 +844,7 @@ void runResumePrimaryDrivenOnStepUpTest(OperationContext* opCtx,
 
 class IndexBuildsCoordinatorResumeOnStepUpTest
     : public IndexBuildsCoordinatorTest,
-      public testing::WithParamInterface<IndexBuildPhaseEnum> {};
+      public testing::WithParamInterface<std::tuple<IndexBuildPhaseEnum, bool>> {};
 
 TEST_P(IndexBuildsCoordinatorResumeOnStepUpTest, StepUpResumesPrimaryDriven) {
     runResumePrimaryDrivenOnStepUpTest(
@@ -861,23 +854,27 @@ TEST_P(IndexBuildsCoordinatorResumeOnStepUpTest, StepUpResumesPrimaryDriven) {
         GetParam());
 }
 
-INSTANTIATE_TEST_SUITE_P(Phases,
-                         IndexBuildsCoordinatorResumeOnStepUpTest,
-                         testing::Values(IndexBuildPhaseEnum::kInitialized,
-                                         IndexBuildPhaseEnum::kCollectionScan,
-                                         IndexBuildPhaseEnum::kDrainWrites),
-                         [](const testing::TestParamInfo<IndexBuildPhaseEnum>& info) {
-                             switch (info.param) {
-                                 case IndexBuildPhaseEnum::kInitialized:
-                                     return "Initialized";
-                                 case IndexBuildPhaseEnum::kCollectionScan:
-                                     return "CollectionScan";
-                                 case IndexBuildPhaseEnum::kDrainWrites:
-                                     return "DrainWrites";
-                                 default:
-                                     MONGO_UNREACHABLE;
-                             }
-                         });
+INSTANTIATE_TEST_SUITE_P(
+    Phases,
+    IndexBuildsCoordinatorResumeOnStepUpTest,
+    testing::Values(std::tuple{IndexBuildPhaseEnum::kInitialized, false},
+                    std::tuple{IndexBuildPhaseEnum::kInitialized, true},
+                    std::tuple{IndexBuildPhaseEnum::kCollectionScan, true},
+                    std::tuple{IndexBuildPhaseEnum::kDrainWrites, true}),
+    [](const testing::TestParamInfo<std::tuple<IndexBuildPhaseEnum, bool>>& info) {
+        auto phase = std::get<0>(info.param);
+        auto hasPersistedResumeState = std::get<1>(info.param);
+        switch (phase) {
+            case IndexBuildPhaseEnum::kInitialized:
+                return hasPersistedResumeState ? "Initialized" : "MissingResumeState";
+            case IndexBuildPhaseEnum::kCollectionScan:
+                return "CollectionScan";
+            case IndexBuildPhaseEnum::kDrainWrites:
+                return "DrainWrites";
+            default:
+                MONGO_UNREACHABLE;
+        }
+    });
 
 }  // namespace
 }  // namespace mongo

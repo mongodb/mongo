@@ -2186,8 +2186,8 @@ void IndexBuildsCoordinator::_resumePrimaryDrivenIndexBuildsOnStepUp(OperationCo
         bool resumeSucceeded = false;
         if (resumablePdibEnabled && build.indexBuildIdent) {
             try {
-                auto resumeInfo =
-                    index_builds::primary_driven::resumeInfo(opCtx, *build.indexBuildIdent);
+                auto resumeInfo = index_builds::primary_driven::resumeInfo(
+                    opCtx, build.collectionUUID, buildUUID, build.indexes, *build.indexBuildIdent);
 
                 invariant(pdibEnabled);
                 IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions = {

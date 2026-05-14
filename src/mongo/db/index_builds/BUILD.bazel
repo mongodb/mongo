@@ -254,6 +254,7 @@ mongo_cc_library(
         "resumable_index_builds_common.cpp",
     ],
     deps = [
+        ":index_builds_common",
         ":resumable_index_builds_idl",
         "//src/mongo:base",
     ],

@@ -1005,7 +1005,7 @@ TEST_F(MultiIndexBlockTest, PdibPersistsResumeStateOnFirstDrain) {
         if (storageEngine->getEngine()->hasIdent(
                 *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent)) {
             shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
-            EXPECT_FALSE(index_builds::readResumeIndexInfo(
+            EXPECT_FALSE(index_builds::readAndParseResumeIndexInfo(
                 storageEngine, operationContext(), indexBuildIdent));
         }
     }
@@ -1016,7 +1016,7 @@ TEST_F(MultiIndexBlockTest, PdibPersistsResumeStateOnFirstDrain) {
                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
-    auto resumeInfo = index_builds::readResumeIndexInfo(
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
         storageEngine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(IndexBuildPhaseEnum::kDrainWrites, resumeInfo->getPhase());
@@ -1031,7 +1031,7 @@ TEST_F(MultiIndexBlockTest, PdibPersistsResumeStateOnFirstDrain) {
                                              RecoveryUnit::ReadSource::kNoTimestamp,
                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
-    auto laterResumeInfo = index_builds::readResumeIndexInfo(
+    auto laterResumeInfo = index_builds::readAndParseResumeIndexInfo(
         storageEngine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
     ASSERT_TRUE(laterResumeInfo);
     EXPECT_EQ(IndexBuildPhaseEnum::kDrainWrites, laterResumeInfo->getPhase());
@@ -1112,7 +1112,7 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringDrain) {
     };
 
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
-    auto resumeInfo = index_builds::readResumeIndexInfo(
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
         storageEngine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
     ASSERT_TRUE(resumeInfo);
     ASSERT_EQ(IndexBuildPhaseEnum::kDrainWrites, resumeInfo->getPhase());
@@ -1217,7 +1217,7 @@ TEST_F(MultiIndexBlockTest, PdibSkipsResumeStateOnEmptyCollection) {
         if (storageEngine->getEngine()->hasIdent(
                 *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent)) {
             shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
-            EXPECT_FALSE(index_builds::readResumeIndexInfo(
+            EXPECT_FALSE(index_builds::readAndParseResumeIndexInfo(
                 storageEngine, operationContext(), indexBuildIdent));
         }
     }
@@ -1694,7 +1694,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateUsesContainerWrites) {
     ASSERT_EQUALS(writesBefore + 1, writesAfter);
 
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
-    auto resumeInfo = index_builds::readResumeIndexInfo(
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
         storageEngine, operationContext(), handle.indexBuildIdent);
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(handle.buildUUID, resumeInfo->getBuildUUID());
@@ -1756,7 +1756,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOverwritesPriorState) {
     // ...and the table still has a single record at the resume-state key (overwrite, not append).
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
-    auto resumeInfo = index_builds::readResumeIndexInfo(
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
         storageEngine, operationContext(), handle.indexBuildIdent);
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(handle.buildUUID, resumeInfo->getBuildUUID());
@@ -1793,7 +1793,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupUsesContainerWrites) {
 
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
-    auto resumeInfo = index_builds::readResumeIndexInfo(
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
         storageEngine, operationContext(), handle.indexBuildIdent);
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(handle.buildUUID, resumeInfo->getBuildUUID());
@@ -1836,7 +1836,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateNoOpWhenNotResumable) {
 
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
-    EXPECT_FALSE(index_builds::readResumeIndexInfo(
+    EXPECT_FALSE(index_builds::readAndParseResumeIndexInfo(
         storageEngine, operationContext(), handle.indexBuildIdent));
 
 
@@ -1945,7 +1945,7 @@ TEST_F(MultiIndexBlockTest, WriteStateToContainerOnSpillWhenResumable) {
 
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
     auto resumeInfo =
-        index_builds::readResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
+        index_builds::readAndParseResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
     ASSERT_TRUE(resumeInfo.has_value());
     EXPECT_EQ(resumeInfo->getBuildUUID(), buildUUID);
     EXPECT_EQ(resumeInfo->getCollectionUUID(), autoColl->uuid());
@@ -2000,7 +2000,7 @@ TEST_F(MultiIndexBlockTest, OnSpillCallbackSeesLatestRecordIdAndKeyCount) {
     ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
 
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
-    auto resumeInfo = index_builds::readResumeIndexInfo(
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
         &engine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(resumeInfo->getPhase(), IndexBuildPhaseEnum::kCollectionScan);
@@ -2074,7 +2074,7 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
     auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
     auto resumeInfo =
-        index_builds::readResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
+        index_builds::readAndParseResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(buildUUID, resumeInfo->getBuildUUID());
     EXPECT_EQ(IndexBuildPhaseEnum::kCollectionScan, resumeInfo->getPhase());
@@ -2177,7 +2177,7 @@ TEST_F(MultiIndexBlockTest, ResumedPdibSpillerContinuesContainerKeysPastPriorRan
     auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
     auto resumeInfo =
-        index_builds::readResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
+        index_builds::readAndParseResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
     ASSERT(resumeInfo);
     ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
     auto& priorRanges = resumeInfo->getIndexes()[0].getRanges();
@@ -2207,7 +2207,7 @@ TEST_F(MultiIndexBlockTest, ResumedPdibSpillerContinuesContainerKeysPastPriorRan
 
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
     auto resumeInfo2 =
-        index_builds::readResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
+        index_builds::readAndParseResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
     ASSERT(resumeInfo2);
     ASSERT_EQ(resumeInfo2->getIndexes().size(), 1);
     const auto& allRanges = resumeInfo2->getIndexes()[0].getRanges();

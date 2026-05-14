@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/collection_crud/container_write.h"
+#include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
@@ -172,48 +173,21 @@ protected:
         return indexes;
     }
 
-    BSONObj makeIndexBuildResumeState(const UUID& buildUUID,
-                                      const UUID& collectionUUID,
-                                      const std::vector<IndexBuildInfo>& indexBuildInfos,
-                                      IndexBuildPhaseEnum phase) {
-        std::vector<IndexStateInfo> indexStateInfos;
-        for (auto&& indexBuildInfo : indexBuildInfos) {
-            IndexStateInfo indexInfo;
-            indexInfo.setSpec(indexBuildInfo.spec);
-            indexInfo.setIsMultikey({});
-            indexInfo.setMultikeyPaths({});
-            if (indexBuildInfo.sideWritesIdent) {
-                indexInfo.setSideWritesTable(*indexBuildInfo.sideWritesIdent);
-            }
-            indexInfo.setSkippedRecordTrackerTable(indexBuildInfo.skippedRecordsIdent);
-            indexInfo.setDuplicateKeyTrackerTable(indexBuildInfo.constraintViolationsIdent);
-            indexInfo.setStorageIdentifier(indexBuildInfo.sorterIdent);
-            indexInfo.setRanges({{}});
-            indexStateInfos.push_back(indexInfo);
-        }
-
-        ResumeIndexInfo resumeInfo;
-        resumeInfo.setBuildUUID(buildUUID);
-        resumeInfo.setCollectionUUID(collectionUUID);
-        resumeInfo.setPhase(phase);
-        resumeInfo.setIndexes(std::move(indexStateInfos));
-
-        return resumeInfo.toBSON();
-    }
-
-    std::unique_ptr<RecordStore> makeIndexBuildResumeTable(const std::string& ident,
-                                                           const BSONObj& resumeStateData) {
+    std::unique_ptr<RecordStore> makeIndexBuildResumeTable(
+        const std::string& ident, boost::optional<BSONObj> resumeStateData) {
         std::unique_ptr<RecordStore> ret;
         auto opCtx = operationContext();
         Lock::GlobalLock lk(opCtx, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         ret = opCtx->getServiceContext()->getStorageEngine()->makeInternalRecordStore(
             opCtx, ident, KeyFormat::Long);
-        ASSERT_OK(ret->insertRecord(operationContext(),
-                                    *shard_role_details::getRecoveryUnit(opCtx),
-                                    resumeStateData.objdata(),
-                                    resumeStateData.objsize(),
-                                    Timestamp()));
+        if (resumeStateData) {
+            ASSERT_OK(ret->insertRecord(operationContext(),
+                                        *shard_role_details::getRecoveryUnit(opCtx),
+                                        resumeStateData->objdata(),
+                                        resumeStateData->objsize(),
+                                        Timestamp()));
+        }
         wuow.commit();
         return ret;
     }
@@ -500,26 +474,52 @@ TEST_F(UtilTest, AbortWithNoCommitTimestampDropsImmediately) {
 
 TEST_F(UtilTest, ResumeInfoRequiresValidIdent) {
     auto buildUUID = UUID::gen();
+    std::vector<IndexBuildInfo> indexes;
     std::vector<std::string> invalidIdents = {
         std::string(""),
         fmt::format("some-invalid-{}", buildUUID.toString()),
         ident::generateNewInternalIdent(kResumableIndexIdentStem)};
     for (auto&& testIdent : invalidIdents) {
-        ASSERT_THROWS_CODE(
-            resumeInfo(operationContext(), testIdent), DBException, ErrorCodes::InvalidOptions);
+        ASSERT_THROWS_CODE(resumeInfo(operationContext(), collUUID, buildUUID, indexes, testIdent),
+                           DBException,
+                           ErrorCodes::InvalidOptions);
     }
 }
 
 TEST_F(UtilTest, ResumeInfoFailsOnParseError) {
     auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a"});
     auto validResumableIndexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
 
     auto invalidResumeState = BSONObjBuilder{}.append("foo", BSON("bar" << "baz")).obj();
     makeIndexBuildResumeTable(validResumableIndexBuildIdent, invalidResumeState);
 
-    ASSERT_THROWS_CODE(resumeInfo(operationContext(), validResumableIndexBuildIdent),
-                       DBException,
-                       ErrorCodes::FailedToParse);
+    ASSERT_THROWS_CODE(
+        resumeInfo(operationContext(), collUUID, buildUUID, indexes, validResumableIndexBuildIdent),
+        DBException,
+        ErrorCodes::FailedToParse);
+}
+
+TEST_F(UtilTest, ResumeInfoSynthesizesMissingRecord) {
+    auto buildUUID = UUID::gen();
+    auto validResumableIndexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    auto indexes = makeIndexes({"a", "b", "c"});
+    makeIndexBuildResumeTable(validResumableIndexBuildIdent, boost::none);
+
+    auto resumeState =
+        resumeInfo(operationContext(), collUUID, buildUUID, indexes, validResumableIndexBuildIdent);
+    ASSERT_EQUALS(buildUUID, resumeState.getBuildUUID());
+    ASSERT_EQUALS(IndexBuildPhaseEnum::kInitialized, resumeState.getPhase());
+    ASSERT_EQUALS(collUUID, resumeState.getCollectionUUID());
+    for (size_t i = 0; i < indexes.size(); ++i) {
+        ASSERT_EQUALS(*indexes[i].sideWritesIdent,
+                      resumeState.getIndexes()[i].getSideWritesTable());
+        ASSERT_EQUALS(*indexes[i].constraintViolationsIdent,
+                      *resumeState.getIndexes()[i].getDuplicateKeyTrackerTable());
+        ASSERT_EQUALS(*indexes[i].skippedRecordsIdent,
+                      *resumeState.getIndexes()[i].getSkippedRecordTrackerTable());
+        ASSERT_EQUALS(*indexes[i].sorterIdent, *resumeState.getIndexes()[i].getStorageIdentifier());
+    }
 }
 
 TEST_F(UtilTest, ResumeInfoParsesSuccessfully) {
@@ -527,11 +527,14 @@ TEST_F(UtilTest, ResumeInfoParsesSuccessfully) {
     auto validResumableIndexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
     auto indexes = makeIndexes({"a", "b", "c"});
 
-    auto resumeStateBSONObj = makeIndexBuildResumeState(
-        buildUUID, collUUID, indexes, IndexBuildPhaseEnum::kCollectionScan);
+    auto resumeStateBSONObj =
+        index_builds::synthesizeResumeIndexInfo(
+            buildUUID, IndexBuildPhaseEnum::kCollectionScan, collUUID, indexes)
+            .toBSON();
     makeIndexBuildResumeTable(validResumableIndexBuildIdent, resumeStateBSONObj);
 
-    auto resumeState = resumeInfo(operationContext(), validResumableIndexBuildIdent);
+    auto resumeState =
+        resumeInfo(operationContext(), collUUID, buildUUID, indexes, validResumableIndexBuildIdent);
     ASSERT_EQUALS(buildUUID, resumeState.getBuildUUID());
     ASSERT_EQUALS(IndexBuildPhaseEnum::kCollectionScan, resumeState.getPhase());
     ASSERT_EQUALS(collUUID, resumeState.getCollectionUUID());

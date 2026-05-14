@@ -40,19 +40,36 @@ namespace mongo::index_builds {
 
 MONGO_FAIL_POINT_DEFINE(failToParseResumeIndexInfo);
 
-boost::optional<ResumeIndexInfo> readResumeIndexInfo(StorageEngine* engine,
-                                                     OperationContext* opCtx,
-                                                     const std::string& ident) {
+boost::optional<ResumeIndexInfo> readAndParseResumeIndexInfo(StorageEngine* engine,
+                                                             OperationContext* opCtx,
+                                                             const std::string& ident) {
+    auto doc = readResumeIndexInfo(engine, opCtx, ident);
+    if (!doc) {
+        return boost::none;
+    }
+
+    return parseResumeIndexInfo(*doc);
+}
+
+boost::optional<BSONObj> readResumeIndexInfo(StorageEngine* engine,
+                                             OperationContext* opCtx,
+                                             const std::string& ident) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    if (!engine->getEngine()->hasIdent(ru, ident)) {
+        return boost::none;
+    }
     auto rs = engine->getEngine()->getRecordStore(
         opCtx, NamespaceString::kEmpty, ident, RecordStore::Options{}, boost::none /* uuid */);
 
-    auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    auto cursor = rs->getCursor(opCtx, ru);
     auto record = cursor->next();
     if (!record) {
         return boost::none;
     }
-    auto doc = record.value().data.toBson();
+    return record.value().data.getOwned().releaseToBson();
+}
 
+boost::optional<ResumeIndexInfo> parseResumeIndexInfo(const BSONObj& doc) {
     // Parse the documents here so that we can restart (or abort) the build if the document
     // doesn't contain all the necessary information to be able to resume building the index.
     ResumeIndexInfo resumeInfo;
@@ -74,6 +91,42 @@ boost::optional<ResumeIndexInfo> readResumeIndexInfo(StorageEngine* engine,
 
     LOGV2(4916301,
           "Found unfinished index build to resume",
+          "buildUUID"_attr = resumeInfo.getBuildUUID(),
+          "collectionUUID"_attr = resumeInfo.getCollectionUUID(),
+          "phase"_attr = idl::serialize(resumeInfo.getPhase()));
+
+    return resumeInfo;
+}
+
+ResumeIndexInfo synthesizeResumeIndexInfo(const UUID& buildUUID,
+                                          IndexBuildPhaseEnum phase,
+                                          const UUID& collectionUUID,
+                                          const std::vector<IndexBuildInfo>& indexes) {
+    ResumeIndexInfo resumeInfo;
+    resumeInfo.setBuildUUID(buildUUID);
+    resumeInfo.setPhase(phase);
+    resumeInfo.setCollectionUUID(collectionUUID);
+
+    std::vector<IndexStateInfo> indexResumeInfos;
+    for (auto&& indexBuildInfo : indexes) {
+        uassert(ErrorCodes::BadValue,
+                "Failed to synthesize the index build resume state: unknown sideWritesIdent",
+                indexBuildInfo.sideWritesIdent);
+
+        IndexStateInfo indexResumeInfo;
+        indexResumeInfo.setSpec(indexBuildInfo.spec);
+        indexResumeInfo.setIsMultikey(false);
+        indexResumeInfo.setMultikeyPaths({});
+        indexResumeInfo.setSideWritesTable(*indexBuildInfo.sideWritesIdent);
+        indexResumeInfo.setDuplicateKeyTrackerTable(indexBuildInfo.constraintViolationsIdent);
+        indexResumeInfo.setSkippedRecordTrackerTable(indexBuildInfo.skippedRecordsIdent);
+        indexResumeInfo.setStorageIdentifier(indexBuildInfo.sorterIdent);
+        indexResumeInfos.push_back(std::move(indexResumeInfo));
+    }
+    resumeInfo.setIndexes(std::move(indexResumeInfos));
+
+    LOGV2(12500501,
+          "Found unfinished index build to resume (synthesized resume state)",
           "buildUUID"_attr = resumeInfo.getBuildUUID(),
           "collectionUUID"_attr = resumeInfo.getCollectionUUID(),
           "phase"_attr = idl::serialize(resumeInfo.getPhase()));

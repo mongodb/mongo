@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/modules.h"
 
@@ -35,12 +36,35 @@ namespace mongo::index_builds {
 
 /**
  * Read and parse the document storing the index build resume state from the resume state table,
- * specified by the given ident. Will return boost::none if the table or record cannot be found or
+ * specified by the given ident. Will return boost::none if the record cannot be found or
  * the document fails to parse.
  */
 MONGO_MOD_PUBLIC
-boost::optional<ResumeIndexInfo> readResumeIndexInfo(StorageEngine* engine,
-                                                     OperationContext* opCtx,
-                                                     const std::string& ident);
+boost::optional<ResumeIndexInfo> readAndParseResumeIndexInfo(StorageEngine* engine,
+                                                             OperationContext* opCtx,
+                                                             const std::string& ident);
+
+/**
+ * Read the document storing the index build resume state from the resume state table,
+ * specified by the given ident, if available, otherwise will return boost::none.
+ */
+boost::optional<BSONObj> readResumeIndexInfo(StorageEngine* engine,
+                                             OperationContext* opCtx,
+                                             const std::string& ident);
+
+/**
+ * Parse the document storing the index build resume state. Will return boost::none if the document
+ * fails to parse.
+ */
+boost::optional<ResumeIndexInfo> parseResumeIndexInfo(const BSONObj& data);
+
+/**
+ * Synthesizes an index build resume state, using default values for the state of each
+ * index being built, given the registered metadata about the index build.
+ */
+ResumeIndexInfo synthesizeResumeIndexInfo(const UUID& buildUUID,
+                                          IndexBuildPhaseEnum phase,
+                                          const UUID& collectionUUID,
+                                          const std::vector<IndexBuildInfo>& indexes);
 
 }  // namespace mongo::index_builds

@@ -79,7 +79,7 @@ bool identHandler(StorageEngine* engine,
     // When starting up after a clean shutdown and resumable index builds are supported, find the
     // internal idents that contain the relevant information to resume each index build and recover
     // the state.
-    auto resumeInfo = index_builds::readResumeIndexInfo(engine, opCtx, ident);
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(engine, opCtx, ident);
     if (resumeInfo) {
         // Keep the tables that are needed to rebuild this index.
         // Note: the table that stores the rebuild metadata itself (i.e. |ident|) isn't kept.

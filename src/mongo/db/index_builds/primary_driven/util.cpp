@@ -306,17 +306,33 @@ Status abort(OperationContext* opCtx,
     return Status::OK();
 }
 
-ResumeIndexInfo resumeInfo(OperationContext* opCtx, const std::string& ident) {
+ResumeIndexInfo resumeInfo(OperationContext* opCtx,
+                           const UUID& collectionUUID,
+                           const UUID& buildUUID,
+                           const std::vector<IndexBuildInfo>& indexes,
+                           const std::string& ident) {
     uassert(ErrorCodes::InvalidOptions,
             "Invalid index build resume state ident",
             ident::isInternalIdent(ident, kIndexBuildIdentStem));
 
-    auto resumeIndexInfo = index_builds::readResumeIndexInfo(
+    auto resumeIndexInfoDoc = index_builds::readResumeIndexInfo(
         opCtx->getServiceContext()->getStorageEngine(), opCtx, ident);
+
+    boost::optional<ResumeIndexInfo> resumeIndexInfo;
+    if (resumeIndexInfoDoc) {
+        resumeIndexInfo = index_builds::parseResumeIndexInfo(*resumeIndexInfoDoc);
+    } else {
+        // If we don't have a persisted resume state but we did have the index build in the
+        // registry, synthesize an initial phase resume state so that index builds that are
+        // interrupted prior to persisting their resume state can be handled properly.
+        resumeIndexInfo = index_builds::synthesizeResumeIndexInfo(
+            buildUUID, IndexBuildPhaseEnum::kInitialized, collectionUUID, indexes);
+    }
 
     uassert(ErrorCodes::FailedToParse,
             "Failed to read/parse the index build resume state",
             resumeIndexInfo);
+
     return *resumeIndexInfo;
 }
 

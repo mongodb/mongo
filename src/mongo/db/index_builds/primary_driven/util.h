@@ -87,7 +87,11 @@ Status abort(OperationContext* opCtx,
 /**
  * Handles retrieving the resume info of a primary-driven index build, if available.
  */
-ResumeIndexInfo resumeInfo(OperationContext* opCtx, const std::string& ident);
+ResumeIndexInfo resumeInfo(OperationContext* opCtx,
+                           const UUID& collectionUUID,
+                           const UUID& buildUUID,
+                           const std::vector<IndexBuildInfo>& indexes,
+                           const std::string& ident);
 
 /**
  * For each index, deletes any sorter table entries that fall outside the persisted ranges.
