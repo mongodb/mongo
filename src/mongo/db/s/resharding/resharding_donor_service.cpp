@@ -386,13 +386,11 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                                    "ReshardingDonorService::_"
                                    "writeTransactionOplogEntryThenTransitionToBlockingWrites");
                     _writeTransactionOplogEntryThenTransitionToBlockingWrites(factory);
-                })
-                .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
-                    auto span =
-                        _startSpan(telemetryCtx,
-                                   "ReshardingDonorService::_awaitChangeStreamsMonitorCompleted");
-                    return _awaitChangeStreamsMonitorCompleted(executor);
                 });
+            // SERVER-126445: The change streams monitor wait used to live here, inside the
+            // donor critical section. It is now performed in _finishReshardingOperation,
+            // after the critical section has been released, so writes are not blocked while
+            // we drain the monitor's tail batches.
         })
         .onTransientError([](const Status& status) {
             LOGV2(5633603,
@@ -562,13 +560,18 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                 }
             }
 
-            auto opCtx = _makeOperationContext(factory);
-            return _updateCoordinator(opCtx.get(), executor, factory).then([this, factory] {
-                {
-                    auto opCtx = _makeOperationContext(factory);
-                    removeDonorDocFailpoint.pauseWhileSet(opCtx.get());
-                }
-                _removeDonorDocument(factory);
+            // SERVER-126445: Wait for the change streams monitor to complete here, AFTER the
+            // donor's critical section has been released above. Previously this wait happened
+            // at the tail of _runUntilBlockingWritesOrErrored, while writes were still blocked.
+            return _awaitChangeStreamsMonitorCompleted(executor).then([this, executor, factory] {
+                auto opCtx = _makeOperationContext(factory);
+                return _updateCoordinator(opCtx.get(), executor, factory).then([this, factory] {
+                    {
+                        auto opCtx = _makeOperationContext(factory);
+                        removeDonorDocFailpoint.pauseWhileSet(opCtx.get());
+                    }
+                    _removeDonorDocument(factory);
+                });
             });
         })
         .onTransientError([](const Status& status) {
