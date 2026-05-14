@@ -439,7 +439,7 @@ class TestBranchFunctions(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 sync_repo_with_copybara.find_matching_commit(source_dir, destination_dir)
 
-    def test_duplicate_destination_origin_commits_fail_outside_source_ref(self):
+    def test_duplicate_destination_origin_commits_are_ignored_outside_source_ref(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_dir = os.path.join(tmpdir, "destination")
@@ -454,8 +454,34 @@ class TestBranchFunctions(unittest.TestCase):
                 [unrelated_private_hash, unrelated_private_hash],
             )
 
-            with self.assertRaises(SystemExit):
+            self.assertIsNone(
                 sync_repo_with_copybara.find_matching_commit(source_dir, destination_dir)
+            )
+
+    def test_find_matching_commit_pair_ignores_unrelated_duplicates_before_relevant_match(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            destination_dir = os.path.join(tmpdir, "destination")
+            os.mkdir(source_dir)
+            os.mkdir(destination_dir)
+
+            private_hashes = TestBranchFunctions.create_mock_repo_commits(source_dir, 3)
+            unrelated_private_hash = "a" * 40
+            public_hashes = TestBranchFunctions.create_mock_repo_commits(
+                destination_dir,
+                3,
+                [unrelated_private_hash, unrelated_private_hash, private_hashes[1]],
+            )
+
+            result = sync_repo_with_copybara.find_matching_commit_pair(source_dir, destination_dir)
+
+            self.assertEqual(
+                result,
+                sync_repo_with_copybara.MatchingCommit(
+                    source_commit=private_hashes[1],
+                    destination_commit=public_hashes[2],
+                ),
+            )
 
     def test_duplicate_destination_origin_commits_fail_on_unrelated_branches(self):
         with tempfile.TemporaryDirectory() as tmpdir:
