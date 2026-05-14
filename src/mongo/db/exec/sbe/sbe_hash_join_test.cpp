@@ -123,7 +123,6 @@ public:
 protected:
     void doSaveState() final {}
     void doRestoreState() final {}
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor&) override {}
 
 private:
     int _yieldOnCallN;

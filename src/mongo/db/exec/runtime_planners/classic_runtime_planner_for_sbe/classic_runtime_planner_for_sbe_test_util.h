@@ -60,9 +60,6 @@ public:
                       DebugPrintInfo& debugPrintInfo) const final {}
 
 protected:
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 };
 
 class MockExceededMemoryLimitStage : public BaseMockStage {

@@ -94,7 +94,7 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
     }
 
     tassert(12546100, "MultipleCollectionAccessor must be set on CompileCtx", ctx.mca);
-    doAttachCollectionAcquisition(*ctx.mca);
+    _coll = ctx.mca->getCollectionAcquisitionFromUuid(_collUuid);
 
     auto indexCatalog = _coll->getCollectionPtr()->getIndexCatalog();
     auto indexEntry = indexCatalog->findIndexByName(_opCtx, _indexName);
@@ -256,10 +256,6 @@ void IndexScanStageBase::openImpl(bool reOpen) {
 
     _open = true;
     _scanState = ScanState::kNeedSeek;
-}
-
-void IndexScanStageBase::doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
-    _coll = mca.getCollectionAcquisitionFromUuid(_collUuid);
 }
 
 template <typename Derived>

@@ -84,9 +84,6 @@ protected:
         return _currentStageIndex == idx;
     }
 
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 
 private:
     struct UnionBranch {

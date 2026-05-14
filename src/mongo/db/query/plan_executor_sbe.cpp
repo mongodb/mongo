@@ -98,7 +98,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _remoteExplains(std::move(remoteExplains)) {
     tassert(11321400, "nss must not be empty", !_nss.isEmpty());
     tassert(11321401, "plan.root must not be null", _root);
-    _root->attachCollectionAcquisition(mca);
     auto& env = _rootData.env;
     if (auto slot = _rootData.staticData->resultSlot) {
         _result = _root->getAccessor(env.ctx, *slot);

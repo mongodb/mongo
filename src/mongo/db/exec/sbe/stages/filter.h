@@ -204,9 +204,6 @@ protected:
         return true;
     }
 
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 
 private:
     const std::unique_ptr<EExpression> _filter;

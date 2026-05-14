@@ -137,7 +137,6 @@ protected:
     void doRestoreState() override;
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;
 
 private:
     UUID _collectionUuid;

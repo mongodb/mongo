@@ -81,10 +81,6 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
-
 private:
     const std::vector<BSONObj> _bsons;
 

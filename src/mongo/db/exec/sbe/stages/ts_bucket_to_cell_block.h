@@ -76,9 +76,6 @@ public:
 protected:
     void doSaveState() final;
 
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 
 private:
     PlanState advanceChild();

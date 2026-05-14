@@ -188,7 +188,6 @@ protected:
     value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final;
     void closeShared();
     void debugPrintShared(std::vector<DebugPrinter::Block>& ret) const;
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override;
     // Shared logic for getNext()
     inline void handleInterruptAndSlotAccess() {
         // We are about to call next() on a storage cursor so do not bother saving our internal

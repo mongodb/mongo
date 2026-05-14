@@ -127,9 +127,6 @@ protected:
     void doAttachToOperationContext(OperationContext* opCtx) override;
     void doDetachFromOperationContext() override;
 
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 
 private:
     using HashTableType = std::unordered_map<value::MaterializedRow,  // NOLINT

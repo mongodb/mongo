@@ -141,7 +141,7 @@ void ScanStageBase::prepareShared(CompileCtx& ctx) {
     }
 
     tassert(12546101, "MultipleCollectionAccessor must be set on CompileCtx", ctx.mca);
-    doAttachCollectionAcquisition(*ctx.mca);
+    _coll = ctx.mca->getCollectionAcquisitionFromUuid(_state->collUuid);
 }
 
 value::SlotAccessor* ScanStageBase::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -158,10 +158,6 @@ value::SlotAccessor* ScanStageBase::getAccessor(CompileCtx& ctx, value::SlotId s
     }
 
     return ctx.getAccessor(slot);
-}
-
-void ScanStageBase::doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
-    _coll = mca.getCollectionAcquisitionFromUuid(_state->collUuid);
 }
 
 void ScanStageBase::getStatsShared(BSONObjBuilder& bob) const {

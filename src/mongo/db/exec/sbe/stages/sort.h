@@ -97,10 +97,6 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
-
 private:
     void doForceSpill() override {
         if (_stageImpl) {

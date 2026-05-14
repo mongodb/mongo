@@ -91,9 +91,6 @@ public:
 protected:
     void doSaveState() final;
 
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 
 private:
     using MergeJoinBuffer = std::vector<value::MaterializedRow>;

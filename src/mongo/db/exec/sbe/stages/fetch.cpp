@@ -114,7 +114,7 @@ void FetchStage::prepare(CompileCtx& ctx) {
     }
 
     tassert(12546102, "MultipleCollectionAccessor must be set on CompileCtx", ctx.mca);
-    doAttachCollectionAcquisition(*ctx.mca);
+    _coll = ctx.mca->getCollectionAcquisitionFromUuid(_collectionUuid);
 }
 
 value::SlotAccessor* FetchStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -180,10 +180,6 @@ void FetchStage::doAttachToOperationContext(OperationContext* opCtx) {
     if (_cursor) {
         _cursor->reattachToOperationContext(opCtx);
     }
-}
-
-void FetchStage::doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
-    _coll = mca.getCollectionAcquisitionFromUuid(_collectionUuid);
 }
 
 void FetchStage::open(bool reOpen) {

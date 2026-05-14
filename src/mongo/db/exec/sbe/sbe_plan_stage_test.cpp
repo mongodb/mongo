@@ -139,9 +139,6 @@ void PlanStageTestFixture::prepareTree(CompileCtx* ctx, PlanStage* root) {
         ctx->mca = _mca;
     }
     root->prepare(*ctx);
-    if (_mca) {
-        root->attachCollectionAcquisition(*_mca);
-    }
     root->open(false);
 }
 

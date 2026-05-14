@@ -242,8 +242,9 @@ public:
         int32_t numSlots, const BSONArray& array);
 
     /**
-     * Sets the MultipleCollectionAccessor to use when calling prepareTree(). prepareTree() will
-     * call attachCollectionAcquisition() on the stage tree before opening it.
+     * Sets the MultipleCollectionAccessor to use when calling prepareTree(). prepareTree() routes
+     * it through CompileCtx::mca so leaf stages can resolve their CollectionAcquisition during
+     * prepare().
      */
     void attachCollectionAcquisition(const MultipleCollectionAccessor& mca) {
         _mca = &mca;

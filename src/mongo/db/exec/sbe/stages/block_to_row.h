@@ -80,9 +80,6 @@ public:
 protected:
     void doSaveState() override;
 
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 
 private:
     PlanState getNextFromDeblockedValues();

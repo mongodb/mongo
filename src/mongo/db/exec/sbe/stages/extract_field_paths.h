@@ -88,9 +88,6 @@ protected:
         return true;
     }
 
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 
 private:
     void constructRoot();

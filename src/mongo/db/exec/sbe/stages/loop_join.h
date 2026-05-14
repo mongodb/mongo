@@ -110,9 +110,6 @@ protected:
         return idx == 1;
     }
 
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 
 private:
     PlanState getNextOuterSide() {

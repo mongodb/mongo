@@ -110,10 +110,6 @@ public:
 
 
 protected:
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
-
 private:
     /**
      * Get the last row id either in the buffer or spilled.

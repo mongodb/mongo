@@ -70,8 +70,5 @@ public:
                       DebugPrintInfo& debugPrintInfo) const final {}
 
 protected:
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 };
 }  // namespace mongo::sbe

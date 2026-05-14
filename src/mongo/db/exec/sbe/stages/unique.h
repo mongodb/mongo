@@ -87,9 +87,6 @@ protected:
         return true;
     }
 
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 
 private:
     const value::SlotVector _keySlots;
@@ -142,9 +139,6 @@ protected:
         return true;
     }
 
-    void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
-        return;
-    }
 
 private:
     const value::SlotId _keySlot;
