@@ -62,11 +62,6 @@ function removeShardOld(s, shardName, timeout) {
                     // We should retry the operation when this happens.
                     return kRetry;
                 }
-                if (shardName == "config" && res.code === ErrorCodes.RemoveShardDrainingInProgress) {
-                    // If orphanCleanupDelaySecs hasn't elapsed yet, the command will fail with
-                    // RemoveShardDrainingInProgress. Keep retrying until the delay elapses.
-                    return kRetry;
-                }
             }
             assert.commandWorked(res);
             return res.state == "completed";
