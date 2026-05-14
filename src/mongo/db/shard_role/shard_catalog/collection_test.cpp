@@ -62,6 +62,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -469,8 +470,8 @@ TEST_F(CollectionTest, SetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
     MultikeyPaths paths = {{0}};
 
     {
-        // TODO SERVER-126415: use enableWriteConflictForWrites
-        FailPointEnableBlock failPoint("WTWriteConflictException");
+        auto failPoint =
+            enableWriteConflictForWrites(FailPoint::ModeOptions{.mode = FailPoint::Mode::alwaysOn});
         WriteUnitOfWork wuow(opCtx);
         ASSERT_THROWS(coll->setIndexIsMultikey(opCtx, indexName, paths), WriteConflictException);
     }
@@ -573,8 +574,8 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollbac
     MultikeyPaths paths = {{0}};
 
     {
-        // TODO SERVER-126415: use enableWriteConflictForWrites
-        FailPointEnableBlock failPoint("WTWriteConflictException");
+        auto failPoint =
+            enableWriteConflictForWrites(FailPoint::ModeOptions{.mode = FailPoint::Mode::alwaysOn});
         WriteUnitOfWork wuow(opCtx);
         auto entry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
         ASSERT_THROWS(coll->forceSetIndexIsMultikey(opCtx, entry->descriptor(), true, paths),

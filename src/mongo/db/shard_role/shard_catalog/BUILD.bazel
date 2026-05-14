@@ -520,6 +520,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/shard_role/ddl:coll_mod_command_idl",
         "//src/mongo/db/shard_role/ddl:index_commands_idl",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test_harness",
         "//src/mongo/db/timeseries:timeseries_collmod",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",

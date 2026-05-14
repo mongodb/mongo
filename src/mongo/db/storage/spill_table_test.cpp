@@ -34,6 +34,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/disk_space_monitor.h"
+#include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
@@ -83,10 +84,8 @@ TEST_F(SpillTableTest, InsertRecordsWriteConflict) {
     std::vector<Record> records(kCacheSizeMB,
                                 {.id = {}, .data = {data.data(), static_cast<int>(data.size())}});
 
-    // TODO SERVER-126415: use enableWriteConflictForWrites
-    FailPointEnableBlock writeConflict{
-        "WTWriteConflictException",
-        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1}};
+    auto writeConflict = enableWriteConflictForWrites(
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
     ASSERT_OK(spillTable->insertRecords(opCtx.get(), &records));
 
     auto cursor = spillTable->getCursor(opCtx.get());
@@ -106,12 +105,9 @@ TEST_F(SpillTableTest, InsertRecordsRandomWriteConflicts) {
     std::vector<Record> records(kCacheSizeMB,
                                 {.id = {}, .data = {data.data(), static_cast<int>(data.size())}});
 
-    // TODO SERVER-126415: use enableWriteConflictForWrites
-    FailPointEnableBlock writeConflict{
-        "WTWriteConflictException",
-        FailPoint::ModeOptions{
-            .mode = FailPoint::Mode::random,
-            .val = static_cast<int32_t>(std::numeric_limits<int32_t>::max() * 0.1)}};
+    auto writeConflict = enableWriteConflictForWrites(FailPoint::ModeOptions{
+        .mode = FailPoint::Mode::random,
+        .val = static_cast<int32_t>(std::numeric_limits<int32_t>::max() * 0.1)});
     ASSERT_OK(spillTable->insertRecords(opCtx.get(), &records));
 
     auto cursor = spillTable->getCursor(opCtx.get());

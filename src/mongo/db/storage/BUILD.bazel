@@ -661,6 +661,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage/key_string",
         "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test_harness",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/executor:network_interface_factory",
         "//src/mongo/executor:network_interface_mock",
