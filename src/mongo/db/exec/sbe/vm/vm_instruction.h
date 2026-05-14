@@ -107,7 +107,6 @@ struct Instruction {
         traversePImm,
         traverseF,  // traverse filter paths
         traverseFImm,
-        magicTraverseF,
         setField,      // add or overwrite a field in a document
         getArraySize,  // number of elements
 

@@ -136,7 +136,6 @@ public:
     void appendTraverseP(int codePosition, size_t numArgs, Instruction::Constants k);
     void appendTraverseF();
     void appendTraverseF(int codePosition, size_t numArgs, Instruction::Constants k);
-    void appendMagicTraverseF();
     void appendSetField();
     void appendGetArraySize(Instruction::Parameter input);
     void appendDateTrunc(TimeUnit unit, int64_t binSize, TimeZone timezone, DayOfWeek startOfWeek);

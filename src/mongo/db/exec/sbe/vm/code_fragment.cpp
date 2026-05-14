@@ -765,9 +765,6 @@ void CodeFragment::appendTraverseP(int codePosition, size_t numArgs, Instruction
     adjustStackSimple(i);
 }
 
-void CodeFragment::appendMagicTraverseF() {
-    appendSimpleInstruction(Instruction::magicTraverseF);
-}
 void CodeFragment::appendTraverseF() {
     appendSimpleInstruction(Instruction::traverseF);
 }

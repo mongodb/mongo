@@ -305,7 +305,6 @@ enum class EFn : uint16_t {
     kLn,
     kLog10,
     kLtrim,
-    kMagicTraverseF,
     kMakeBsonObj,
     kMakeObj,
     kMakeOwn,

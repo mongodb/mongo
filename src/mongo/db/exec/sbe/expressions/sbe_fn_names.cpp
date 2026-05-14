@@ -280,7 +280,6 @@ static constexpr EFnEntry kEFnByName[] = {
     {"ln"_sd,                                 EFn::kLn},
     {"log10"_sd,                              EFn::kLog10},
     {"ltrim"_sd,                              EFn::kLtrim},
-    {"magicTraverseF"_sd,                     EFn::kMagicTraverseF},
     {"makeBsonObj"_sd,                        EFn::kMakeBsonObj},
     {"makeObj"_sd,                            EFn::kMakeObj},
     {"makeOwn"_sd,                            EFn::kMakeOwn},

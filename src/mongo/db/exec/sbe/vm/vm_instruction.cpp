@@ -138,7 +138,6 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,   // traversePImm
     -2,  // traverseF
     0,   // traverseFImm
-    -4,  // magicTraverseF
     -2,  // setField
     0,   // getArraySize
 
@@ -328,7 +327,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                                         &&do_traversePImm,
                                         &&do_traverseF,
                                         &&do_traverseFImm,
-                                        &&do_magicTraverseF,
                                         &&do_setField,
                                         &&do_getArraySize,
 
@@ -1100,10 +1098,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                   codePosition,
                   providePosition == Instruction::True ? true : false,
                   k == Instruction::True ? true : false);
-    }
-    DISPATCH();
-    INSTRUCTION(magicTraverseF) {
-        magicTraverseF(code);
     }
     DISPATCH();
     INSTRUCTION(setField) {
