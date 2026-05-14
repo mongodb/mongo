@@ -449,6 +449,7 @@ private:
     struct MozRuntime {
     public:
         MozRuntime(const MozJSScriptEngine* engine, boost::optional<int> jsHeapLimitMB);
+        ~MozRuntime();
 
         std::unique_ptr<JSRuntime, std::function<void(JSRuntime*)>> _runtime;
         std::unique_ptr<JSContext, std::function<void(JSContext*)>> _context;
