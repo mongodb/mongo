@@ -1,0 +1,6 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/sls-log-service
+      - 10gen/sls-cis
