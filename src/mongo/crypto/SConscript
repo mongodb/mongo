@@ -51,6 +51,16 @@ cryptoEnv.Library(
 )
 
 cryptoEnv.Library(
+    target='crypto_parameters_openssl',
+    source='crypto_parameters_openssl.idl',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/server_options',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+cryptoEnv.Library(
     target='symmetric_crypto',
     source=[
         'symmetric_crypto.cpp',
