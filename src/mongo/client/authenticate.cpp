@@ -150,7 +150,7 @@ Future<void> authX509(RunCommandHook runCommand,
     }
     auto targetDb = std::move(swTargetDb.getValue());
 
-    auto argsBlock = std::make_tuple(hostname, params, std::string(clientName), targetDb);
+    auto argsBlock = std::make_tuple(hostname, std::string(clientName), targetDb);
     auto sharedBlock = std::make_shared<decltype(argsBlock)>(std::move(argsBlock));
 
     auto metricsRecorder = std::make_shared<AuthMetricsRecorder>();
@@ -160,13 +160,13 @@ Future<void> authX509(RunCommandHook runCommand,
     // into a Future<void>
     return runCommand(swAuthRequest.getValue())
         .then([metricsRecorder, sharedBlock](const BSONObj& obj) {
-            auto [hostname, params, clientName, targetDb] = *sharedBlock.get();
+            auto [hostname, clientName, targetDb] = *sharedBlock.get();
             BSONObj metrics = metricsRecorder->captureEgress();
+
             if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                 LOGV2(10748708,
                       "Authentication to remote host succeeded using MONGODB-X509",
                       "hostname"_attr = hostname,
-                      "params"_attr = params,
                       "subjectName"_attr = clientName,
                       "targetDatabase"_attr = targetDb,
                       "mechanism"_attr = kMechanismMongoX509,
@@ -175,13 +175,13 @@ Future<void> authX509(RunCommandHook runCommand,
             }
         })
         .onError([metricsRecorder, sharedBlock](const Status& status) {
-            auto [hostname, params, clientName, targetDb] = *sharedBlock.get();
+            auto [hostname, clientName, targetDb] = *sharedBlock.get();
             BSONObj metrics = metricsRecorder->captureEgress();
+
             if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                 LOGV2(10748707,
                       "Authentication to remote host failed using MONGODB-X509",
                       "hostname"_attr = hostname,
-                      "params"_attr = params,
                       "subjectName"_attr = clientName,
                       "targetDatabase"_attr = targetDb,
                       "mechanism"_attr = kMechanismMongoX509,
@@ -385,7 +385,6 @@ StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(
             LOGV2(10748709,
                   "Speculative authentication to remote host failed",
                   "hostname"_attr = host,
-                  "saslParameters"_attr = params,
                   "username"_attr = username,
                   "targetDatabase"_attr = authDB,
                   "mechanism"_attr = mechanism,
@@ -400,7 +399,6 @@ StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(
         LOGV2(10748710,
               "Speculative authentication to remote host succeeded",
               "hostname"_attr = host,
-              "saslParameters"_attr = params,
               "username"_attr = username,
               "targetDatabase"_attr = authDB,
               "mechanism"_attr = mechanism,

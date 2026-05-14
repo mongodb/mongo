@@ -343,7 +343,7 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
 
     BSONObj inputObj = BSON(saslCommandPayloadFieldName << "");
 
-    auto argsBlock = std::make_tuple(hostname, saslParameters, username, targetDatabase, mechanism);
+    auto argsBlock = std::make_tuple(hostname, username, targetDatabase, mechanism);
     auto sharedBlock = std::make_shared<decltype(argsBlock)>(std::move(argsBlock));
 
     session->metrics()->restart();
@@ -351,14 +351,13 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
     return asyncSaslConversation(
                runCommand, session, saslFirstCommandPrefix, inputObj, targetDatabase, saslLogLevel)
         .onError([session, sharedBlock](Status status) {
-            auto [hostname, saslParameters, username, targetDatabase, mechanism] =
-                *sharedBlock.get();
+            auto [hostname, username, targetDatabase, mechanism] = *sharedBlock.get();
             BSONObj metrics = session->metrics()->captureEgress();
+
             if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                 LOGV2(10748700,
                       "Authentication to remote host failed using SASL",
                       "hostname"_attr = hostname,
-                      "saslParameters"_attr = saslParameters,
                       "username"_attr = username,
                       "targetDatabase"_attr = targetDatabase,
                       "mechanism"_attr = mechanism,
@@ -369,14 +368,13 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
             return status;
         })
         .then([session, sharedBlock]() {
-            auto [hostname, saslParameters, username, targetDatabase, mechanism] =
-                *sharedBlock.get();
+            auto [hostname, username, targetDatabase, mechanism] = *sharedBlock.get();
             BSONObj metrics = session->metrics()->captureEgress();
+
             if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                 LOGV2(10748701,
                       "Authentication to remote host succeeded using SASL",
                       "hostname"_attr = hostname,
-                      "saslParameters"_attr = saslParameters,
                       "username"_attr = username,
                       "targetDatabase"_attr = targetDatabase,
                       "mechanism"_attr = mechanism,
