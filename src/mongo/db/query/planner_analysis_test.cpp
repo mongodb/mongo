@@ -457,4 +457,103 @@ TEST(QueryPlannerAnalysis, CannotTurnIndexScanAndFetchIntoCount) {
     qs.setRoot(std::move(fetch));
     ASSERT_FALSE(QueryPlannerAnalysis::turnIxscanIntoCount(&qs));
 }
+
+// ---------------------------------------------------------------------------
+// sortMatchesTraversalPreference
+// ---------------------------------------------------------------------------
+
+// Helper to build a TraversalPreference with just a sortPattern (direction and clusterField
+// are unused by sortMatchesTraversalPreference itself).
+TraversalPreference makeTraversalPreference(const BSONObj& sortPattern) {
+    return TraversalPreference{sortPattern, 1, ""};
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_ExactMatch) {
+    // Sort pattern exactly matches the index pattern → true.
+    ASSERT_TRUE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{a: 1, b: 1}")), fromjson("{a: 1, b: 1}"), {}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_SortIsProperPrefix) {
+    // Sort is a strict prefix of a longer index → true.
+    ASSERT_TRUE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{a: 1}")), fromjson("{a: 1, b: 1}"), {}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_SortLongerThanIndex) {
+    // Sort has more fields than the index can provide → false.
+    ASSERT_FALSE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{a: 1, b: 1}")), fromjson("{a: 1}"), {}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_SortEvenLongerThanIndex) {
+    // Sort has more fields than the index can provide → false.
+    ASSERT_FALSE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{a: 1, b: 1, c: 1}")), fromjson("{a: 1}"), {}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_SortFieldAfterIgnoreUnmatched) {
+    // The last field in the sort has no matching index field (index exhausted on it) → false.
+    ASSERT_FALSE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{a: 1, x: 1, b: 1}")), fromjson("{a: 1}"), {"x"}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_SortFieldAfterIgnoreDirectionMismatch) {
+    // The last field in the sort has no matching index field (index exhausted on it) → false.
+    ASSERT_FALSE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{a: 1, x: 1, b: -1}")), fromjson("{a: 1, b: 1}"), {"x"}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_TrailingIgnoredFields) {
+    // Sort has a trailing ignored field after all matched fields → true.
+    ASSERT_TRUE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{a: 1, x: 1}")), fromjson("{a: 1}"), {"x"}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_AllSortFieldsIgnored) {
+    // Every sort field is ignored → trivially true.
+    ASSERT_TRUE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{x: 1, y: 1}")), fromjson("{a: 1}"), {"x", "y"}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_IgnoredFieldInMiddle) {
+    // An ignored field sits between two non-ignored fields that both match → true.
+    ASSERT_TRUE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{a: 1, x: 1, b: 1}")), fromjson("{a: 1, b: 1}"), {"x"}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_DirectionMismatch) {
+    // Sort direction differs from index direction → false.
+    ASSERT_FALSE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{a: 1}")), fromjson("{a: -1}"), {}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_DirectionMismatchOnIgnoredField) {
+    // Direction mismatch only on an ignored field; the remaining fields match → true.
+    ASSERT_TRUE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{x: -1, a: 1}")), fromjson("{a: 1}"), {"x"}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_FieldNameMismatch) {
+    // Sort field name differs from the index field name → false.
+    ASSERT_FALSE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{a: 1}")), fromjson("{b: 1}"), {}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_EmptySort) {
+    // Empty sort is vacuously a prefix of any index → true.
+    ASSERT_TRUE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{}")), fromjson("{a: 1}"), {}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_BothEmpty) {
+    ASSERT_TRUE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{}")), fromjson("{}"), {}));
+}
+
+TEST(QueryPlannerAnalysis, SortMatchesTraversalPreference_InvalidData) {
+    // Non-number sort direction
+    ASSERT_FALSE(QueryPlannerAnalysis::sortMatchesTraversalPreference(
+        makeTraversalPreference(fromjson("{a: 'foo'}")), fromjson("{a: 'foo'}"), {}));
+}
 }  // namespace

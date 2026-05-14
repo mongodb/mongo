@@ -41,6 +41,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -201,6 +202,15 @@ public:
      * Otherwise, returns 'false'.
      */
     static bool turnIxscanIntoCount(QuerySolution* soln);
+
+    /**
+     * Returns true if traversalPreference.sortPattern is a prefix of indexPattern, ignoring any
+     * fields listed in ignoredFields. ignoredFields must already be absent from indexPattern (a
+     * tassert enforces this). Used for the timeseries bounded-sort optimization.
+     */
+    static bool sortMatchesTraversalPreference(const TraversalPreference& traversalPreference,
+                                               const BSONObj& indexPattern,
+                                               const std::set<std::string>& ignoredFields);
 };
 
 }  // namespace mongo

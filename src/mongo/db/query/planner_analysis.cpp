@@ -1255,16 +1255,40 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
     return true;
 }
 
-// This function is used to check if the given index pattern and direction in the traversal
-// preference can be used to satisfy the given sort pattern (specifically for time series
-// collections).
-bool sortMatchesTraversalPreference(const TraversalPreference& traversalPreference,
-                                    const BSONObj& indexPattern) {
+/**
+ * This function is used to check if the given index pattern and direction in the traversal
+ * preference can be used to satisfy the given sort pattern (specifically for time series
+ * collections). Evaluates to true if the traversalPreference is a prefix of the indexPattern, with
+ * ignoredFields skipped over.
+ *
+ * indexPattern should be the sort order supported by the index, with unsupported and ignored fields
+ * removed.
+ * ignoredFields should be a list of fields that don't contribute to the overall sort order of the
+ * index, ex fields with equality predicates that aren't collated or multikey. These fields should
+ * have already been removed from indexPattern and can be ignored in the traversalPreference.
+ */
+bool QueryPlannerAnalysis::sortMatchesTraversalPreference(
+    const TraversalPreference& traversalPreference,
+    const BSONObj& indexPattern,
+    const std::set<std::string>& ignoredFields) {
     BSONObjIterator sortIter(traversalPreference.sortPattern);
     BSONObjIterator indexIter(indexPattern);
-    while (sortIter.more() && indexIter.more()) {
+    while (sortIter.more()) {
         BSONElement sortPart = sortIter.next();
+        // Skip over ignored fields in the traversal preference.
+        if (ignoredFields.contains(std::string(sortPart.fieldNameStringData()))) {
+            continue;
+        }
+        if (!indexIter.more()) {
+            // The sort still has more, so it cannot be a prefix of the index.
+            return false;
+        }
+
         BSONElement indexPart = indexIter.next();
+        tassert(10091001,
+                fmt::format("Ignored field {} found in index sort pattern.",
+                            indexPart.fieldNameStringData()),
+                !ignoredFields.contains(std::string(indexPart.fieldNameStringData())));
 
         if (!sortPart.isNumber() || !indexPart.isNumber()) {
             return false;
@@ -1275,11 +1299,6 @@ bool sortMatchesTraversalPreference(const TraversalPreference& traversalPreferen
             (sortPart.safeNumberInt() > 0) != (indexPart.safeNumberInt() > 0)) {
             return false;
         }
-    }
-
-    if (!indexIter.more() && sortIter.more()) {
-        // The sort still has more, so it cannot be a prefix of the index.
-        return false;
     }
     return true;
 }
@@ -1335,6 +1354,13 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
 
         BSONObj solnSortPattern;
         if (solnRoot->getType() == StageType::STAGE_COLLSCAN || isShardedCollScan(solnRoot.get())) {
+            // If a collection scan was selected, check if we should reverse the scan direction. We
+            // use (clusterField: 1) as the sort order since timeseries collections are always
+            // clustered, so collection scans return records in clustering key order.
+            // For timeseries collections the clustering key is _id, but since _id is prefixed with
+            // minTime this is equivalent to sorting by minTime.
+            // A typical traversal preference that satisfies this case is
+            // (minTime: 1, direction: -1) for a query sort pattern of (timeField: -1)
             BSONObjBuilder builder;
             builder.append(params.traversalPreference->clusterField, 1);
             solnSortPattern = builder.obj();
@@ -1342,7 +1368,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
             solnSortPattern = providedSorts.getBaseSortPattern();
         }
 
-        if (sortMatchesTraversalPreference(params.traversalPreference.value(), solnSortPattern) &&
+        if (sortMatchesTraversalPreference(params.traversalPreference.value(),
+                                           solnSortPattern,
+                                           providedSorts.getIgnoredFields()) &&
             QueryPlannerCommon::scanDirectionsEqual(solnRoot.get(),
                                                     -params.traversalPreference->direction)) {
             QueryPlannerCommon::reverseScans(solnRoot.get(), true);

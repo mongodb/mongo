@@ -1461,8 +1461,8 @@ PipelineD::supportsSort(const timeseries::BucketUnpacker& bucketUnpacker,
             const auto& controlMinTime = bucketUnpacker.getMinField(time);
             const auto& controlMaxTime = bucketUnpacker.getMaxField(time);
 
-            auto directionCompatible = [&](const BSONElement& keyPatternComponent,
-                                           const SortPatternPart& sortComponent) -> bool {
+            auto directionCompatible = [&scan](const BSONElement& keyPatternComponent,
+                                               const SortPatternPart& sortComponent) -> bool {
                 // The index component must not be special.
                 if (!keyPatternComponent.isNumber() || abs(keyPatternComponent.numberInt()) != 1)
                     return false;
@@ -1472,6 +1472,14 @@ PipelineD::supportsSort(const timeseries::BucketUnpacker& bucketUnpacker,
                 // For example: a backwards scan of a descending index produces ascending data.
                 const bool scanIsAscending = scan->isForward() == indexIsAscending;
                 return scanIsAscending == sortComponent.isAscending;
+            };
+
+            auto hasPointPredicate = [&scan](StringData fieldName) -> bool {
+                for (auto&& field : scan->getBounds().fields) {
+                    if (field.name == fieldName)
+                        return field.isPoint();
+                }
+                return false;
             };
 
             // Return none if the keyPattern cannot support the sort.
@@ -1498,12 +1506,14 @@ PipelineD::supportsSort(const timeseries::BucketUnpacker& bucketUnpacker,
                     return boost::none;
                 }
 
+
                 // Does the leading sort field match the index?
 
                 if (sortAndKeyPatternPartAgreeAndOnMeta(bucketUnpacker,
                                                         keyPatternIter->fieldNameStringData(),
                                                         *sortIter->fieldPath)) {
-                    if (!directionCompatible(*keyPatternIter, *sortIter))
+                    if (!directionCompatible(*keyPatternIter, *sortIter) &&
+                        !hasPointPredicate(keyPatternIter->fieldNameStringData()))
                         return boost::none;
 
                     // No conflict. Continue comparing the index vs the sort.
@@ -1513,13 +1523,6 @@ PipelineD::supportsSort(const timeseries::BucketUnpacker& bucketUnpacker,
                 }
 
                 // Does this index field have a point predicate?
-                auto hasPointPredicate = [&](StringData fieldName) -> bool {
-                    for (auto&& field : scan->getBounds().fields) {
-                        if (field.name == fieldName)
-                            return field.isPoint();
-                    }
-                    return false;
-                };
                 if (hasPointPredicate(keyPatternIter->fieldNameStringData())) {
                     ++keyPatternIter;
                     continue;
