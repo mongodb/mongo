@@ -563,6 +563,31 @@ py_binary(
 )
 
 py_binary(
+    name = "validate_evergreen_patch_link",
+    srcs = ["validate_evergreen_patch_link.py"],
+    main = "validate_evergreen_patch_link.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "typing-extensions",
+            group = "core",
+        ),
+    ],
+)
+
+py_binary(
     name = "github_merge_queue_metrics",
     srcs = ["github_merge_queue_metrics.py"],
     main = "github_merge_queue_metrics.py",
