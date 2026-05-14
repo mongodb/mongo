@@ -19,6 +19,7 @@ void mongoBannedNamesCheckTest() {
     std::atomic<int> atomicVar;
     std::optional<std::string> strOpt;
     std::regex_search(std::string(""), std::regex(""));
+    std::jthread t([] {});
 }
 
 struct AtomicStruct {

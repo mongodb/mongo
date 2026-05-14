@@ -245,6 +245,10 @@ class MongoTidyTests(unittest.TestCase):
                 'std::regex_search(std::string(""), std::regex(""))',
                 "Consider using mongo::pcre::Regex instead.",
             ),
+            (
+                "std::jthread t([] {})",
+                "Do not use. Consider stdx::thread with an explicit join in production or unittest::JoinThread in unit tests.",
+            ),
             ("std::atomic<int> atomicVar", "Consider using mongo::Atomic<T> instead."),
             ("std::optional<std::string> strOpt", "Consider using boost::optional instead."),
             ("std::atomic<int> fieldDecl", "Consider using mongo::Atomic<T> instead."),

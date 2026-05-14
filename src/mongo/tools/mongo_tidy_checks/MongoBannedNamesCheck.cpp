@@ -133,6 +133,11 @@ const std::vector<BanInfo> baseTypeInfos = {
     {"timed_mutex", kDoNotUse, {kStd, kBoost}, "timed_mutex acquisitions are not interruptible."},
     {"unordered_map", kStdxReplacement, {kStd, kBoost}},
     {"unordered_set", kStdxReplacement, {kStd, kBoost}},
+    {"jthread",
+     kDoNotUse,
+     {kStd},
+     "Consider stdx::thread with an explicit join in production or unittest::JoinThread in unit "
+     "tests."},
 };
 
 // List of base enum names from the std and boost namespaces to be checked
