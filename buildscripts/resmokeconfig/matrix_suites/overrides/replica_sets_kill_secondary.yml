@@ -43,6 +43,13 @@
         hooks:
           - PeriodicKillSecondaries
       hooks:
+        # CleanEveryN guarantees that the cluster is wiped between tests so that residual databases
+        # from prior tests do not bleed into later ones (SERVER-104983). skip_fixture_restart is
+        # required because PeriodicKillSecondaries installs the rsSyncApplyStop failpoint, which
+        # would cause CleanEveryN's default fixture restart to hang (SERVER-105309).
+        - class: CleanEveryN
+          n: 20
+          skip_fixture_restart: true
         - class: PeriodicKillSecondaries
 
 - name: hooks_with_legacy_validate

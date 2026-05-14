@@ -42,6 +42,9 @@ executor:
         electionTimeoutMillis: 5000
     voting_secondaries: false
   hooks:
+    - class: CleanEveryN
+      n: 20
+      skip_fixture_restart: true
     - class: PeriodicKillSecondaries
     - class: ClusterParameter
       key: changeStreamOptions
