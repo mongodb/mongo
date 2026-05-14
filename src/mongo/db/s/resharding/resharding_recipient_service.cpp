@@ -435,13 +435,16 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                                    "awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency");
                     return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(executor,
                                                                                           factory);
-                })
-                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
-                    auto span = _startSpan(
-                        telemetryCtx,
-                        "ReshardingRecipientService::_awaitChangeStreamsMonitorCompleted");
-                    return _awaitChangeStreamsMonitorCompleted(executor, factory);
                 });
+            // SERVER-126417: Waiting for the change streams monitor to complete used to happen
+            // here, inside the critical section window (kStrictConsistency is reached just before
+            // acquireRecoverableCriticalSectionBlockWrites returns and the critical section is
+            // held until releaseRecoverableCriticalSection in _finishReshardingOperation). The
+            // monitor can take an arbitrarily long time to drain its final batch and that latency
+            // showed up as critical-section timeouts. The wait is now performed post-commit, after
+            // the critical section is released, in _finishReshardingOperation. Coordinator-side
+            // verification reads the documentsDelta via a dedicated command (parallel to
+            // SERVER-125432) rather than relying on the wait happening here.
         })
         .onTransientError([](const Status& status) {
             LOGV2(5551100,
@@ -601,6 +604,15 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                                 ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                                 ShardingRecoveryService::FilteringMetadataClearer());
                     }
+                })
+                .then([this, executor, factory] {
+                    // SERVER-126417: Wait for the change streams monitor to drain its final batch
+                    // and fulfil _changeStreamsMonitorCompleted with the documentsDelta. This used
+                    // to run inside the critical section in _runUntilStrictConsistencyOrErrored;
+                    // performing it here ensures the wait cannot block the critical section. The
+                    // subsequent _updateCoordinator call propagates the resulting documentsDelta
+                    // so the coordinator can perform post-commit verification.
+                    return _awaitChangeStreamsMonitorCompleted(executor, factory);
                 })
                 .then([this, executor, factory] {
                     auto opCtx = _makeOperationContext(factory);
