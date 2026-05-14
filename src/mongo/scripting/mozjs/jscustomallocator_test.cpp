@@ -238,5 +238,93 @@ TEST_F(JSCustomAllocatorTest, OOMDuringScopeInitDoesNotCrash) {
 }
 #endif  // MONGO_CONFIG_DEBUG_BUILD
 
+// With tracking disabled, record_mmap_alloc should be a no-op.
+TEST_F(JSCustomAllocatorTest, MmapTrackingDisabledByDefault) {
+    mongo::sm::reset(0, false);
+    mongo::sm::record_mmap_alloc(1024);
+    ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
+}
+
+// Basic alloc/free round-trip with mmap tracking enabled.
+TEST_F(JSCustomAllocatorTest, MmapAllocAndFree) {
+    // A non-zero limit is required; record_mmap_alloc no-ops when max_bytes == 0.
+    mongo::sm::reset(10 * 1024 * 1024, true);
+    mongo::sm::record_mmap_alloc(1024 * 1024);
+    ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 1024 * 1024);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 1024 * 1024);
+
+    mongo::sm::record_mmap_free(1024 * 1024);
+    ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
+}
+
+// mmap bytes count towards the shared total and can trigger OOM (signal_oom is
+// a safe no-op in unit-test context where no JSContext is running).
+TEST_F(JSCustomAllocatorTest, MmapCountedTowardsLimit) {
+    constexpr size_t kLimit = 2 * 1024 * 1024;  // 2 MB
+    mongo::sm::reset(kLimit, true);
+
+    // A malloc allocation of 0.5 MB should succeed and register in the total.
+    void* ptr = js_malloc(512 * 1024);
+    ASSERT_NOT_EQUALS(ptr, nullptr);
+
+    // First mmap alloc (1 MB): total is now ~1.5 MB, still under the 2 MB limit.
+    mongo::sm::record_mmap_alloc(1024 * 1024);
+    ASSERT_GREATER_THAN_OR_EQUALS(mongo::sm::get_total_bytes(), (1024 * 1024) + (512 * 1024));
+
+    // Second mmap alloc (1 MB): pushes total over 2 MB limit.  signal_oom() is
+    // called internally but is a safe no-op here; the counter still increments.
+    mongo::sm::record_mmap_alloc(1024 * 1024);
+    ASSERT_GREATER_THAN(mongo::sm::get_total_bytes(), kLimit);
+
+    // Clean up.
+    mongo::sm::record_mmap_free(2 * 1024 * 1024);
+    js_free(ptr);
+    ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
+}
+
+// malloc_bytes and mmap_bytes are tracked independently; get_total_bytes() is
+// their sum.
+TEST_F(JSCustomAllocatorTest, MmapAndMallocIndependent) {
+    mongo::sm::reset(10 * 1024 * 1024, true);
+
+    void* ptr = js_malloc(64 * 1024);
+    ASSERT_NOT_EQUALS(ptr, nullptr);
+    ASSERT_GREATER_THAN(mongo::sm::get_malloc_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 0);
+
+    mongo::sm::record_mmap_alloc(128 * 1024);
+    ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 128 * 1024);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(),
+                  mongo::sm::get_malloc_bytes() + mongo::sm::get_mmap_bytes());
+
+    mongo::sm::record_mmap_free(128 * 1024);
+    js_free(ptr);
+    ASSERT_EQUALS(mongo::sm::get_malloc_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 0);
+    ASSERT_EQUALS(mongo::sm::get_total_bytes(), 0);
+}
+
+// Toggling mmap tracking off via reset() suppresses subsequent record_mmap_alloc calls.
+TEST_F(JSCustomAllocatorTest, MmapTrackingToggle) {
+    // Enable tracking with a non-zero limit so record_mmap_alloc actually counts.
+    mongo::sm::reset(10 * 1024 * 1024, true);
+    mongo::sm::record_mmap_alloc(1024);
+    ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 1024);
+
+    // Free before reset — reset() asserts mmap_bytes == 0 as a production invariant
+    // (it is only called when a new JS runtime is created, at which point all prior
+    // allocations must already have been freed by the shutdown GC).
+    mongo::sm::record_mmap_free(1024);
+    ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 0);
+
+    // Toggle tracking off; subsequent alloc calls should be ignored.
+    mongo::sm::reset(0, false);
+    mongo::sm::record_mmap_alloc(2048);
+    ASSERT_EQUALS(mongo::sm::get_mmap_bytes(), 0);
+}
+
 }  // namespace mozjs
 }  // namespace mongo
