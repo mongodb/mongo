@@ -878,6 +878,9 @@ public:
                         bool dupsAllowed,
                         const RecordIdHandlerFn& onDuplicateRecord);
 
+    // Returns true if the current key is a duplicate multikey metadata key in wildcard indexes.
+    bool duplicateMetadataKeyCheck(const Sorter::Data& data);
+
     void insertKey(std::unique_ptr<SortedDataBuilderInterface>& inserter, const Sorter::Data& data);
 
     Status keyCommitted(const KeyHandlerFn& onDuplicateKeyInserted,
@@ -885,8 +888,6 @@ public:
                         bool isDup);
 
 private:
-    void _insertMultikeyMetadataKeysIntoSorter();
-
     Sorter* _makeSorter(
         size_t maxMemoryUsageBytes,
         StringData dbName,
@@ -903,14 +904,13 @@ private:
     // Set to true if any document added to the BulkBuilder causes the index to become multikey.
     bool _isMultiKey = false;
 
+    bool _hasMultiKeyMetadataKeys = false;
+
+    RecordId _wildcardMultikeyMetadataRecordId;
+
     // Holds the path components that cause this index to be multikey. The '_indexMultikeyPaths'
     // vector remains empty if this index doesn't support path-level multikey tracking.
     MultikeyPaths _indexMultikeyPaths;
-
-    // Caches the set of all multikey metadata keys generated during the bulk build process.
-    // These are inserted into the sorter after all normal data keys have been added, just
-    // before the bulk build is committed.
-    KeyStringSet _multikeyMetadataKeys;
 };
 
 std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::initiateBulk(
@@ -933,6 +933,9 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalog
       _iam(iam),
       _sorter(_makeSorter(maxMemoryUsageBytes, dbName)) {
     countNewBuildInStats();
+    _wildcardMultikeyMetadataRecordId = record_id_helpers::reservedIdFor(
+        record_id_helpers::ReservationId::kWildcardMultikeyMetadataId,
+        _iam->getSortedDataInterface()->rsKeyFormat());
 }
 
 SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* entry,
@@ -964,6 +967,7 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
 
     auto keys = executionCtx.keys();
     auto multikeyPaths = executionCtx.multikeyPaths();
+    KeyStringSet multikeyMetadataKeys;
 
     try {
         _iam->getKeys(opCtx,
@@ -974,7 +978,7 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
                       options.getKeysMode,
                       GetKeysContext::kAddingKeys,
                       keys.get(),
-                      &_multikeyMetadataKeys,
+                      &multikeyMetadataKeys,
                       multikeyPaths.get(),
                       loc,
                       onSuppressedError,
@@ -1000,9 +1004,16 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
         _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
     }
+    for (const auto& keyString : multikeyMetadataKeys) {
+        _sorter->add(keyString, mongo::NullValue());
+        ++_keysInserted;
+    }
+    if (!multikeyMetadataKeys.empty()) {
+        _hasMultiKeyMetadataKeys = true;
+    }
 
     _isMultiKey = _isMultiKey ||
-        _iam->shouldMarkIndexAsMultikey(keys->size(), _multikeyMetadataKeys, *multikeyPaths);
+        _iam->shouldMarkIndexAsMultikey(keys->size(), multikeyMetadataKeys, *multikeyPaths);
 
     return Status::OK();
 }
@@ -1016,7 +1027,6 @@ bool SortedDataIndexAccessMethod::BulkBuilderImpl::isMultikey() const {
 }
 
 IndexStateInfo SortedDataIndexAccessMethod::BulkBuilderImpl::persistDataForShutdown() {
-    _insertMultikeyMetadataKeysIntoSorter();
     auto state = _sorter->persistDataForShutdown();
 
     IndexStateInfo stateInfo;
@@ -1025,17 +1035,6 @@ IndexStateInfo SortedDataIndexAccessMethod::BulkBuilderImpl::persistDataForShutd
     stateInfo.setRanges(std::move(state.ranges));
 
     return stateInfo;
-}
-
-void SortedDataIndexAccessMethod::BulkBuilderImpl::_insertMultikeyMetadataKeysIntoSorter() {
-    for (const auto& keyString : _multikeyMetadataKeys) {
-        _sorter->add(keyString, mongo::NullValue());
-        ++_keysInserted;
-    }
-
-    // We clear the multikey metadata keys to prevent them from being inserted into the Sorter
-    // twice in the case that done() is called and then persistDataForShutdown() is later called.
-    _multikeyMetadataKeys.clear();
 }
 
 SortedDataIndexAccessMethod::BulkBuilderImpl::Sorter::Settings
@@ -1065,7 +1064,6 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorter(
 
 std::unique_ptr<mongo::Sorter<KeyString::Value, mongo::NullValue>::Iterator>
 SortedDataIndexAccessMethod::BulkBuilderImpl::finalizeSort() {
-    _insertMultikeyMetadataKeysIntoSorter();
     return std::unique_ptr<Sorter::Iterator>(_sorter->done());
 }
 
@@ -1077,6 +1075,25 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::setUpBulkInserter(OperationContext
     return _iam->getSortedDataInterface()->makeBulkBuilder(opCtx, dupsAllowed);
 }
 
+
+bool SortedDataIndexAccessMethod::BulkBuilderImpl::duplicateMetadataKeyCheck(
+    const Sorter::Data& data) {
+    // If any multikey metadata keys were created, there could be duplicates if two documents
+    // have the same shapes resulting in identical multikey paths. Compare the full KeyString
+    // because all these keys share the same dummy RecordId.
+    if (_hasMultiKeyMetadataKeys && data.first.compare(_previousKey) == 0) {
+        RecordId recordId =
+            KeyString::decodeRecordIdAtEnd(data.first.getBuffer(),
+                                           data.first.getSize(),
+                                           _iam->getSortedDataInterface()->rsKeyFormat());
+        tassert(11480600,
+                str::stream() << "Duplicate key " << data.first.toString()
+                              << " with unexpected RecordId " << recordId.toString(),
+                recordId == _wildcardMultikeyMetadataRecordId);
+        return true;
+    }
+    return false;
+}
 
 void SortedDataIndexAccessMethod::BulkBuilderImpl::debugEnsureSorted(const Sorter::Data& data) {
     if (data.first.compare(_previousKey) < 0) {
