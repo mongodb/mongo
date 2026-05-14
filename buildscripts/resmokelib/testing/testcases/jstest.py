@@ -94,6 +94,10 @@ class _SingleJSTestCase(interface.ProcessTestCase):
             if is_timeseries_file:
                 break
 
+        if "queryable_dbpath" in test_data and not os.path.isabs(test_data["queryable_dbpath"]):
+            base = config.DBPATH_PREFIX or config.DEFAULT_DBPATH_PREFIX
+            test_data["queryable_dbpath"] = os.path.join(base, test_data["queryable_dbpath"])
+
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
 

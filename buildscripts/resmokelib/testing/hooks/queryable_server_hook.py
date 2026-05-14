@@ -1,6 +1,8 @@
+import os
 import threading
 from http.server import HTTPServer
 
+from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.testing import queryable_server
 from buildscripts.resmokelib.testing.hooks import interface
 
@@ -14,6 +16,10 @@ class QueryableServerHook(interface.Hook):
         interface.Hook.__init__(self, hook_logger, fixture, QueryableServerHook.DESCRIPTION)
 
         assert queryable_dbpath
+
+        if not os.path.isabs(queryable_dbpath):
+            base = _config.DBPATH_PREFIX or _config.DEFAULT_DBPATH_PREFIX
+            queryable_dbpath = os.path.join(base, queryable_dbpath)
 
         self._queryable_dbpath = queryable_dbpath
         self._stop_event = None

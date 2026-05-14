@@ -91,6 +91,7 @@ resmoke_suite_test(
         "aggregation",
         "ci-release-critical",
         "common",
+        "cpu:2",
         "sharded",
     ],
     target_compatible_with = select({

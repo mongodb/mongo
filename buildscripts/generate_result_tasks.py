@@ -229,6 +229,9 @@ def get_assignment_tag(target: str) -> Optional[str]:
     # Format is like "assigned_to_jira_team_devprod_build".
     # See also docs/evergreen-testing/yaml_configuration/task_ownership_tags.md
 
+    # Route failures to devprod test infrastructure as RBE is rolled out. TODO SERVER-126116.
+    return "assigned_to_jira_team_devprod_test_infrastructure"
+
     assignment_tags = resolve_assignment_tags()
     tags = set()
     for codeowner in get_codeowners(target):

@@ -197,6 +197,7 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
+        "cpu:2",
         "large",
         "replica_sets",
         "san",
@@ -218,6 +219,7 @@ resmoke_suite_test(
     tags = [
         "ci-release-critical",
         "common",
+        "cpu:2",
         "large",
         "replica_sets",
         "san",
