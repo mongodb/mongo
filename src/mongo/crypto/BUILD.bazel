@@ -169,6 +169,15 @@ mongo_cc_library(
     ],
 )
 
+mongo_idl_library(
+    name = "crypto_parameters_openssl",
+    src = "crypto_parameters_openssl.idl",
+    deps = [
+        "//src/mongo/db:server_options",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
 mongo_cc_library(
     name = "symmetric_crypto",
     srcs = [
