@@ -1,0 +1,12 @@
+base_suite: disagg_sharding
+description: >-
+  DSC variant of sharding_max_mirroring_opportunistic_secondary_targeting. Combines
+  disagg_sharding_max_mirroring and opportunistic secondary targeting so we can confirm that
+  mirrored reads work on disaggregated storage clusters (SERVER-122158). You can run any of
+  these tests individually to debug any issues that might arise.
+overrides:
+  - "archive.no_archive"
+  - "max_mirroring.enable"
+  - "opportunistic_secondary_targeting.enable"
+excludes:
+  - "max_mirroring.sharding_excluded_files"

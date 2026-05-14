@@ -1,0 +1,7 @@
+base_suite: disagg_replica_sets
+description: >-
+  DSC variant of replica_sets_max_mirroring. Confirms mirrored reads work on disaggregated
+  replica-set deployments (SERVER-122158).
+overrides:
+  - "max_mirroring.enable"
+  - "replica_sets.non_enterprise_root"

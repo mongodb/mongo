@@ -1,0 +1,13 @@
+base_suite: disagg_sharding
+description: >-
+  DSC variant combining disagg_sharding_max_mirroring, disagg_sharding_ese_gcm, and
+  opportunistic secondary targeting (SERVER-122158). You can run any of these tests
+  individually to debug any issues that might arise.
+overrides:
+  - "max_mirroring.enable"
+  - "opportunistic_secondary_targeting.enable"
+  - "encryption.testdata_ese"
+  - "encryption.testdata_gcm"
+excludes:
+  - "max_mirroring.sharding_excluded_files"
+  - "encryption.excluded_files"
