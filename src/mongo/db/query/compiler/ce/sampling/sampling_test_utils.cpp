@@ -31,6 +31,7 @@
 
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/matcher/matcher.h"
+#include "mongo/db/query/compiler/ce/sampling/persistent_sample_gen.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 
@@ -591,6 +592,51 @@ size_t numberKeysMatch(const IndexBounds& bounds,
     SamplingEstimatorImpl::forNumberKeysMatch(
         bounds, {document}, [&](size_t cnt) { count += cnt; }, skipDuplicateMatches);
     return count;
+}
+
+BSONObj buildPersistentSampleDoc(const UUID& collUuid,
+                                 SamplingCEMethodEnum method,
+                                 size_t sampleSize,
+                                 const std::vector<BSONObj>& docs,
+                                 boost::optional<int> numChunks,
+                                 int schemaVersion,
+                                 BSONObj overrides) {
+    BSONObjBuilder builder;
+    // _id is required by the IDL schema. For intentionally-malformed docs (e.g. kChunk without
+    // numChunks used in parse-rejection tests) we can't build a valid key, so use a dummy string.
+    const bool validForKey = (method != SamplingCEMethodEnum::kChunk || numChunks.has_value());
+    if (validForKey) {
+        builder.append("_id", buildPersistentSampleId(collUuid, method, sampleSize, numChunks));
+    } else {
+        builder.append("_id", "dummy");
+    }
+    builder.append(PersistentSampleDoc::kCollectionUuidFieldName, collUuid.toString());
+    builder.append(PersistentSampleDoc::kSchemaVersionFieldName, schemaVersion);
+    builder.appendDate(PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
+    builder.append(PersistentSampleDoc::kSampleSizeFieldName, static_cast<long long>(sampleSize));
+    builder.append(PersistentSampleDoc::kSamplingMethodFieldName, idlSerialize(method));
+    if (numChunks) {
+        builder.append(PersistentSampleDoc::kNumChunksFieldName, numChunks.value());
+    }
+    BSONArrayBuilder arr(builder.subarrayStart(PersistentSampleDoc::kDocsFieldName));
+    for (const auto& d : docs) {
+        arr.append(d);
+    }
+    arr.done();
+
+    if (overrides.isEmpty()) {
+        return builder.obj();
+    }
+    // Merge: any field in `overrides` replaces the one just built.
+    BSONObjBuilder merged;
+    const BSONObj base = builder.obj();
+    for (auto&& elem : base) {
+        if (!overrides.hasField(elem.fieldNameStringData())) {
+            merged.append(elem);
+        }
+    }
+    merged.appendElements(overrides);
+    return merged.obj();
 }
 
 }  // namespace mongo::ce

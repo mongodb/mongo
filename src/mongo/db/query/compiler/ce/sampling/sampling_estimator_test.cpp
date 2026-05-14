@@ -35,6 +35,8 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/namespace_string_util.h"
+#include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
@@ -1966,6 +1968,388 @@ TEST_F(SamplingEstimatorTest, EstimateNDVUsesNRWhenFieldGenuinelyNonUnique) {
 
     auto ndv = estimator.estimateNDV({{.path = "a"}});
     ASSERT_LT(ndv.toDouble(), static_cast<double>(card));
+}
+
+TEST_F(SamplingEstimatorTest, RandomSamplingLoadsPersistentSample) {
+    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
+    // Source collection has docs that must NOT appear in the returned sample — hitting the
+    // persistent sample means we never read from them.
+    insertDocuments(kTestNss, {BSON("_id" << 1 << "tag" << "not_persisted")});
+    // Read the source collection UUID in a scope so its IS lock on the db is released before
+    // we create the samples collection (which needs MODE_X on the same db).
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollection(operationContext(), kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    std::vector<BSONObj> persistedDocs{BSON("_id" << 2 << "tag" << "persisted"),
+                                       BSON("_id" << 3 << "tag" << "persisted"),
+                                       BSON("_id" << 4 << "tag" << "persisted")};
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
+        {buildPersistentSampleDoc(
+            uuid, SamplingCEMethodEnum::kRandom, persistedDocs.size(), persistedDocs)});
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+    // Cardinality estimate must exceed `sampleSize` so `generateSample` takes the
+    // generateRandomSample path (which consults the persistent sample) instead of falling
+    // into the full-collection-scan branch.
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          persistedDocs.size(),
+                                          SamplingCEMethodEnum::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(100));
+    estimator.generateSample(ce::NoProjection{});
+
+    const auto& sample = estimator.getSample();
+    ASSERT_EQUALS(sample.size(), persistedDocs.size());
+    for (const auto& doc : sample) {
+        ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
+    }
+}
+
+TEST_F(SamplingEstimatorTest, RandomSamplingFallsBackOnPersistedMiss) {
+    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(kTestNss,
+                    {BSON("_id" << 1 << "tag" << "not_persisted"),
+                     BSON("_id" << 2 << "tag" << "not_persisted"),
+                     BSON("_id" << 3 << "tag" << "not_persisted"),
+                     BSON("_id" << 4 << "tag" << "not_persisted"),
+                     BSON("_id" << 5 << "tag" << "not_persisted"),
+                     BSON("_id" << 6 << "tag" << "not_persisted"),
+                     BSON("_id" << 7 << "tag" << "not_persisted"),
+                     BSON("_id" << 8 << "tag" << "not_persisted"),
+                     BSON("_id" << 9 << "tag" << "not_persisted"),
+                     BSON("_id" << 10 << "tag" << "not_persisted")});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          kSampleSize,
+                                          SamplingCEMethodEnum::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(10));
+    estimator.generateSample(ce::NoProjection{});
+
+    const auto& sample = estimator.getSample();
+    ASSERT_EQUALS(sample.size(), kSampleSize);
+    for (const auto& doc : sample) {
+        ASSERT_EQUALS(doc.getStringField("tag"), "not_persisted");
+    }
+}
+
+TEST_F(SamplingEstimatorTest, OnTheFlySourceSkipsPersistedLookup) {
+    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
+    // A matching persistent sample exists, but the estimator is constructed with kOnTheFlySample so
+    // it must ignore it and sample fresh from the source collection.
+    insertDocuments(kTestNss,
+                    {BSON("_id" << 1 << "tag" << "not_persisted"),
+                     BSON("_id" << 2 << "tag" << "not_persisted"),
+                     BSON("_id" << 3 << "tag" << "not_persisted"),
+                     BSON("_id" << 4 << "tag" << "not_persisted"),
+                     BSON("_id" << 5 << "tag" << "not_persisted"),
+                     BSON("_id" << 6 << "tag" << "not_persisted"),
+                     BSON("_id" << 7 << "tag" << "not_persisted"),
+                     BSON("_id" << 8 << "tag" << "not_persisted"),
+                     BSON("_id" << 9 << "tag" << "not_persisted"),
+                     BSON("_id" << 10 << "tag" << "not_persisted")});
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollection(operationContext(), kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    std::vector<BSONObj> persistedDocs{BSON("_id" << 11 << "tag" << "persisted"),
+                                       BSON("_id" << 12 << "tag" << "persisted")};
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
+        {buildPersistentSampleDoc(
+            uuid, SamplingCEMethodEnum::kRandom, persistedDocs.size(), persistedDocs)});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          persistedDocs.size(),
+                                          SamplingCEMethodEnum::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(10),
+                                          SamplingSourceEnum::kOnTheFlySample);
+    estimator.generateSample(ce::NoProjection{});
+
+    const auto& sample = estimator.getSample();
+    ASSERT_EQUALS(sample.size(), persistedDocs.size());
+    for (const auto& doc : sample) {
+        // Would be "persisted" if we had consulted the persistent sample.
+        ASSERT_EQUALS(doc.getStringField("tag"), "not_persisted");
+    }
+}
+
+TEST_F(SamplingEstimatorTest, ChunkSamplingLoadsPersistentSample) {
+    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
+    // Source collection has docs that must NOT appear in the returned sample — hitting the
+    // persistent sample means we never read from them.
+    insertDocuments(kTestNss, {BSON("_id" << 1 << "tag" << "not_persisted")});
+    // Read the source collection UUID in a scope so its IS lock on the db is released before
+    // we create the samples collection (which needs MODE_X on the same db).
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollection(operationContext(), kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    std::vector<BSONObj> persistedDocs{BSON("_id" << 2 << "tag" << "persisted"),
+                                       BSON("_id" << 3 << "tag" << "persisted"),
+                                       BSON("_id" << 4 << "tag" << "persisted")};
+    const int testNumChunks = 1;
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
+        {buildPersistentSampleDoc(uuid,
+                                  SamplingCEMethodEnum::kChunk,
+                                  persistedDocs.size(),
+                                  persistedDocs,
+                                  /*numChunks=*/testNumChunks)});
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+    // Cardinality estimate must exceed `sampleSize` so `generateSample` takes the
+    // generateChunkSample path (which consults the persistent sample) instead of falling
+    // into the full-collection-scan branch.
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          persistedDocs.size(),
+                                          SamplingCEMethodEnum::kChunk,
+                                          testNumChunks,
+                                          makeCardinalityEstimate(100));
+    estimator.generateSample(ce::NoProjection{});
+
+    const auto& sample = estimator.getSample();
+    ASSERT_EQUALS(sample.size(), persistedDocs.size());
+    for (const auto& doc : sample) {
+        ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
+    }
+}
+
+TEST_F(SamplingEstimatorTest, RandomSamplingSkipsPersistentSampleWhenFeatureFlagDisabled) {
+    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", false};
+    // A matching persistent sample exists, but the estimator must ignore it and sample
+    // fresh from the source collection.
+    insertDocuments(kTestNss,
+                    {BSON("_id" << 1 << "tag" << "not_persisted"),
+                     BSON("_id" << 2 << "tag" << "not_persisted"),
+                     BSON("_id" << 3 << "tag" << "not_persisted"),
+                     BSON("_id" << 4 << "tag" << "not_persisted"),
+                     BSON("_id" << 5 << "tag" << "not_persisted"),
+                     BSON("_id" << 6 << "tag" << "not_persisted"),
+                     BSON("_id" << 7 << "tag" << "not_persisted"),
+                     BSON("_id" << 8 << "tag" << "not_persisted"),
+                     BSON("_id" << 9 << "tag" << "not_persisted"),
+                     BSON("_id" << 10 << "tag" << "not_persisted")});
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollection(operationContext(), kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    std::vector<BSONObj> persistedDocs{BSON("_id" << 11 << "tag" << "persisted"),
+                                       BSON("_id" << 12 << "tag" << "persisted")};
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
+        {buildPersistentSampleDoc(
+            uuid, SamplingCEMethodEnum::kRandom, persistedDocs.size(), persistedDocs)});
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+
+    // Default samplingSource is kPersistentSample — the feature flag off is the only thing
+    // forcing the fallback to on-the-fly sampling.
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          persistedDocs.size(),
+                                          SamplingCEMethodEnum::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(10));
+    estimator.generateSample(ce::NoProjection{});
+
+    const auto& sample = estimator.getSample();
+    ASSERT_EQUALS(sample.size(), persistedDocs.size());
+    for (const auto& doc : sample) {
+        // Would be "persisted" if the flag check hadn't kicked us off the persistent path.
+        ASSERT_EQUALS(doc.getStringField("tag"), "not_persisted");
+    }
+}
+
+TEST_F(SamplingEstimatorTest, ChunkSamplingSkipsPersistentSampleWhenFeatureFlagDisabled) {
+    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", false};
+    insertDocuments(kTestNss,
+                    {BSON("_id" << 1 << "tag" << "not_persisted"),
+                     BSON("_id" << 2 << "tag" << "not_persisted"),
+                     BSON("_id" << 3 << "tag" << "not_persisted"),
+                     BSON("_id" << 4 << "tag" << "not_persisted"),
+                     BSON("_id" << 5 << "tag" << "not_persisted"),
+                     BSON("_id" << 6 << "tag" << "not_persisted"),
+                     BSON("_id" << 7 << "tag" << "not_persisted"),
+                     BSON("_id" << 8 << "tag" << "not_persisted"),
+                     BSON("_id" << 9 << "tag" << "not_persisted"),
+                     BSON("_id" << 10 << "tag" << "not_persisted")});
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollection(operationContext(), kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    std::vector<BSONObj> persistedDocs{BSON("_id" << 11 << "tag" << "persisted"),
+                                       BSON("_id" << 12 << "tag" << "persisted"),
+                                       BSON("_id" << 13 << "tag" << "persisted")};
+    const int testNumChunks = 1;
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
+        {buildPersistentSampleDoc(uuid,
+                                  SamplingCEMethodEnum::kChunk,
+                                  persistedDocs.size(),
+                                  persistedDocs,
+                                  /*numChunks=*/testNumChunks)});
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          persistedDocs.size(),
+                                          SamplingCEMethodEnum::kChunk,
+                                          testNumChunks,
+                                          makeCardinalityEstimate(100));
+    estimator.generateSample(ce::NoProjection{});
+
+    const auto& sample = estimator.getSample();
+    // A chunk that starts near end-of-collection may return fewer than sampleSize docs
+    // (see ChunkSamplingProcess test). Assert at most sampleSize and at least one doc.
+    ASSERT_GT(sample.size(), 0);
+    ASSERT_LTE(sample.size(), persistedDocs.size());
+    for (const auto& doc : sample) {
+        // Would be "persisted" if the flag check hadn't kicked us off the persistent path.
+        ASSERT_EQUALS(doc.getStringField("tag"), "not_persisted");
+    }
+}
+
+TEST_F(SamplingEstimatorTest, LoadPersistentSampleResetsUniqueDocCountCache) {
+    // _uniqueDocCount is a lazy cache of countUniqueDocuments(_sample), populated on the first
+    // estimateNDV call after a sample is loaded. When tryLoadPersistentSample replaces _sample it
+    // must also clear the cache — otherwise a stale count from a previous sample would be used.
+    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(kTestNss, {BSON("_id" << 1 << "tag" << "not_persisted")});
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollection(operationContext(), kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    std::vector<BSONObj> persistedDocs{BSON("_id" << 2 << "tag" << "persisted"),
+                                       BSON("_id" << 3 << "tag" << "persisted"),
+                                       BSON("_id" << 4 << "tag" << "persisted")};
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
+        {buildPersistentSampleDoc(
+            uuid, SamplingCEMethodEnum::kRandom, persistedDocs.size(), persistedDocs)});
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          persistedDocs.size(),
+                                          SamplingCEMethodEnum::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(100));
+    estimator.generateSample(ce::NoProjection{});
+    ASSERT_FALSE(estimator.getUniqueDocCountForTesting().has_value());
+    for (const auto& doc : estimator.getSample()) {
+        ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
+    }
+
+    // Simulate the cache being populated by a prior estimateNDV call.
+    estimator.setUniqueDocCountForTesting(99);
+    ASSERT_TRUE(estimator.getUniqueDocCountForTesting().has_value());
+
+    // A second generateSample via the persistent path must clear the cache.
+    estimator.generateSample(ce::NoProjection{});
+    ASSERT_FALSE(estimator.getUniqueDocCountForTesting().has_value());
+    for (const auto& doc : estimator.getSample()) {
+        ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
+    }
+}
+
+TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
+    // A doc with the correct _id key exists in system.stats.samples but is malformed (sampleSize
+    // field disagrees with the docs array length). tryLoadPersistentSample must log the error and
+    // fall back to on-the-fly sampling rather than crashing or returning a corrupt sample.
+    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
+    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
+    insertDocuments(kTestNss,
+                    {BSON("_id" << 1 << "tag" << "not_persisted"),
+                     BSON("_id" << 2 << "tag" << "not_persisted"),
+                     BSON("_id" << 3 << "tag" << "not_persisted"),
+                     BSON("_id" << 4 << "tag" << "not_persisted"),
+                     BSON("_id" << 5 << "tag" << "not_persisted"),
+                     BSON("_id" << 6 << "tag" << "not_persisted"),
+                     BSON("_id" << 7 << "tag" << "not_persisted"),
+                     BSON("_id" << 8 << "tag" << "not_persisted"),
+                     BSON("_id" << 9 << "tag" << "not_persisted"),
+                     BSON("_id" << 10 << "tag" << "not_persisted")});
+    const UUID uuid = [&] {
+        auto srcColl = acquireCollection(operationContext(), kTestNss);
+        return srcColl.getCollectionPtr()->uuid();
+    }();
+    // Build a doc whose _id matches the lookup key but whose sampleSize disagrees with the docs
+    // array — parsePersistentSample will return UnsupportedFormat (not NoSuchKey), triggering
+    // the non-miss logging path and the on-the-fly fallback.
+    std::vector<BSONObj> persistedDocs{BSON("_id" << 11 << "tag" << "persisted"),
+                                       BSON("_id" << 12 << "tag" << "persisted"),
+                                       BSON("_id" << 13 << "tag" << "persisted")};
+    createCollAndInsertDocuments(
+        operationContext(),
+        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
+        {buildPersistentSampleDoc(uuid,
+                                  SamplingCEMethodEnum::kRandom,
+                                  persistedDocs.size(),
+                                  persistedDocs,
+                                  /*numChunks=*/boost::none,
+                                  /*schemaVersion=*/kPersistentSampleSchemaVersion,
+                                  // Corrupt sampleSize: claims 1 doc but array has 3.
+                                  BSON(PersistentSampleDoc::kSampleSizeFieldName << 1LL))});
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(coll, {}, false);
+    SamplingEstimatorForTesting estimator(operationContext(),
+                                          colls,
+                                          kTestNss,
+                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                          persistedDocs.size(),
+                                          SamplingCEMethodEnum::kRandom,
+                                          numChunks,
+                                          makeCardinalityEstimate(100));
+    estimator.generateSample(ce::NoProjection{});
+
+    const auto& sample = estimator.getSample();
+    ASSERT_EQUALS(sample.size(), persistedDocs.size());
+    for (const auto& doc : sample) {
+        ASSERT_EQUALS(doc.getStringField("tag"), "not_persisted");
+    }
 }
 
 }  // namespace mongo::ce

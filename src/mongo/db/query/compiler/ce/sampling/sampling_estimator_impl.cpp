@@ -30,9 +30,7 @@
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
@@ -44,19 +42,23 @@
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/sampling/math.h"
+#include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
-#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/version_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
@@ -501,9 +503,19 @@ void SamplingEstimatorImpl::generateFullCollScanSample() {
 }
 
 void SamplingEstimatorImpl::generateRandomSample(size_t sampleSize) {
+    _sampleSize = sampleSize;
+    auto tryLoadStatus = tryLoadPersistentSample(SamplingCEMethodEnum::kRandom, sampleSize);
+    if (tryLoadStatus.isOK()) {
+        return;
+    }
+    if (tryLoadStatus.code() != ErrorCodes::NoSuchKey) {
+        LOGV2_WARNING(12432806,
+                      "Persistent sample not usable; falling back to on-the-fly sampling",
+                      "nss"_attr = _nss.toStringForErrorMsg(),
+                      "error"_attr = tryLoadStatus);
+    }
     // Create a CanonicalQuery for the sampling plan.
     auto cq = makeEmptyCanonicalQuery(_nss, _opCtx);
-    _sampleSize = sampleSize;
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
 
     auto plan = generateRandomSamplingPlan(sbeYieldPolicy.get());
@@ -518,9 +530,19 @@ void SamplingEstimatorImpl::generateRandomSample() {
 }
 
 void SamplingEstimatorImpl::generateChunkSample(size_t sampleSize) {
+    _sampleSize = sampleSize;
+    auto tryLoadStatus = tryLoadPersistentSample(SamplingCEMethodEnum::kChunk, sampleSize);
+    if (tryLoadStatus.isOK()) {
+        return;
+    }
+    if (tryLoadStatus.code() != ErrorCodes::NoSuchKey) {
+        LOGV2_WARNING(12432807,
+                      "Persistent sample not usable; falling back to on-the-fly sampling",
+                      "nss"_attr = _nss.toStringForErrorMsg(),
+                      "error"_attr = tryLoadStatus);
+    }
     // Create a CanonicalQuery for the sampling plan.
     auto cq = makeEmptyCanonicalQuery(_nss, _opCtx);
-    _sampleSize = sampleSize;
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
 
     auto plan = generateChunkSamplingPlan(sbeYieldPolicy.get());
@@ -909,7 +931,8 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              size_t sampleSize,
                                              SamplingCEMethodEnum samplingStyle,
                                              boost::optional<int> numChunks,
-                                             CardinalityEstimate collectionCard)
+                                             CardinalityEstimate collectionCard,
+                                             SamplingSourceEnum samplingSource)
     : _sampleSize(sampleSize),
       _opCtx(opCtx),
       _collections(collections),
@@ -917,7 +940,10 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
       _yieldPolicy(yieldPolicy),
       _samplingStyle(samplingStyle),
       _numChunks(numChunks),
-      _collectionCard(collectionCard) {}
+      _collectionCard(collectionCard),
+      _samplingSource(samplingSource) {
+    tassert(12432804, "numChunks must be positive when provided", !_numChunks || *_numChunks > 0);
+}
 
 SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              const MultipleCollectionAccessor& collections,
@@ -927,7 +953,8 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                                              CardinalityEstimate collectionCard,
                                              SamplingConfidenceIntervalEnum ci,
                                              double marginOfError,
-                                             boost::optional<int> numChunks)
+                                             boost::optional<int> numChunks,
+                                             SamplingSourceEnum samplingSource)
     : SamplingEstimatorImpl(opCtx,
                             collections,
                             nss,
@@ -935,7 +962,41 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                             calculateSampleSize(ci, marginOfError),
                             samplingStyle,
                             numChunks,
-                            collectionCard) {}
+                            collectionCard,
+                            samplingSource) {}
+
+Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingCEMethodEnum method,
+                                                      size_t sampleSize) {
+    if (!feature_flags::gFeatureFlagPersistentStats.isEnabled(
+            VersionContext::getDecoration(_opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return Status(ErrorCodes::NoSuchKey, "featureFlagPersistentStats is not enabled");
+    }
+    if (_samplingSource != SamplingSourceEnum::kPersistentSample) {
+        return Status(ErrorCodes::NoSuchKey, "sampling source is kOnTheFlySample");
+    }
+
+    const CollectionPtr& collection = _collections.lookupCollection(_nss);
+    if (!collection) {
+        return Status(ErrorCodes::NoSuchKey, "collection not found");
+    }
+
+    const boost::optional<int> numChunks =
+        (method == SamplingCEMethodEnum::kChunk) ? _numChunks : boost::none;
+
+    PersistentSampleLoader loader;
+    auto parsed =
+        loader.tryLoad(_opCtx, _nss.dbName(), collection->uuid(), method, sampleSize, numChunks);
+    if (!parsed.isOK()) {
+        return parsed.getStatus();
+    }
+
+    _sample = parsed.getValue().getDocs();
+    _sampleSize = _sample.size();
+    _uniqueDocCount = boost::none;
+    _isSampleGenerated = true;
+    return Status::OK();
+}
 
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 
@@ -1065,7 +1126,8 @@ std::unique_ptr<SamplingEstimator> SamplingEstimatorImpl::makeDefaultSamplingEst
     const CanonicalQuery& cq,
     CardinalityEstimate collCard,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    const MultipleCollectionAccessor& collections) {
+    const MultipleCollectionAccessor& collections,
+    SamplingSourceEnum samplingSource) {
     const auto& qkc = cq.getExpCtx()->getQueryKnobConfiguration();
     return std::unique_ptr<ce::SamplingEstimatorImpl>(
         new ce::SamplingEstimatorImpl(cq.getOpCtx(),
@@ -1076,7 +1138,8 @@ std::unique_ptr<SamplingEstimator> SamplingEstimatorImpl::makeDefaultSamplingEst
                                       collCard,
                                       qkc.getConfidenceInterval(),
                                       qkc.getSamplingMarginOfError(),
-                                      qkc.getNumChunksForChunkBasedSampling()));
+                                      qkc.getNumChunksForChunkBasedSampling(),
+                                      samplingSource));
 }
 
 }  // namespace mongo::ce

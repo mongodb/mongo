@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/compiler/ce/ce_test_utils.h"
+#include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
@@ -52,6 +53,14 @@ public:
 
     const std::vector<BSONObj>& getSample() {
         return _sample;
+    }
+
+    boost::optional<size_t> getUniqueDocCountForTesting() const {
+        return _uniqueDocCount;
+    }
+
+    void setUniqueDocCountForTesting(size_t count) {
+        _uniqueDocCount = count;
     }
 
     /**
@@ -306,4 +315,19 @@ IndexBounds getIndexBounds(const QueryConfiguration& queryConfig,
 size_t numberKeysMatch(const IndexBounds& bounds,
                        const BSONObj& document,
                        bool skipDuplicateMatches = false);
+
+/**
+ * Build a v1 persistent-sample BSON doc for test inputs.
+ *
+ * `overrides` lets tests replace individual top-level fields of the built document — any field
+ * present in `overrides` wins over the field this helper would have written. Use this for
+ * malformed-doc cases (bad schema_version, non-array docs, wrong collection_uuid type, etc.).
+ */
+BSONObj buildPersistentSampleDoc(const UUID& collUuid,
+                                 SamplingCEMethodEnum method,
+                                 size_t sampleSize,
+                                 const std::vector<BSONObj>& docs,
+                                 boost::optional<int> numChunks = boost::none,
+                                 int schemaVersion = kPersistentSampleSchemaVersion,
+                                 BSONObj overrides = BSONObj());
 }  // namespace mongo::ce

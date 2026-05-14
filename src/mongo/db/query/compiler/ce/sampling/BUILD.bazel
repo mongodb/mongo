@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -9,12 +9,22 @@ exports_files(
     ]),
 )
 
+idl_generator(
+    name = "persistent_sample_gen",
+    src = "persistent_sample.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query:query_optimization_knobs_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "sampling_test_utils",
     srcs = [
         "sampling_test_utils.cpp",
     ],
     deps = [
+        ":persistent_samples",
         "//src/mongo/db:write_stage_common",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/query:query_planner",
@@ -46,11 +56,27 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "persistent_samples",
+    srcs = [
+        "persistent_sample_loader.cpp",
+        ":persistent_sample_gen",
+    ],
+    hdrs = [
+        "persistent_sample_loader.h",
+    ],
+    deps = [
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db/query:query_knobs",
+    ],
+)
+
+mongo_cc_library(
     name = "sampling_estimator",
     srcs = [
         "sampling_estimator_impl.cpp",
     ],
     deps = [
+        ":persistent_samples",
         ":sampling_math",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
@@ -86,6 +112,18 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_fourth_group"],
     deps = [
         ":sampling_math",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "persistent_samples_test",
+    srcs = [
+        "persistent_sample_loader_test.cpp",
+    ],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":persistent_samples",
+        ":sampling_test_utils",
     ],
 )
 

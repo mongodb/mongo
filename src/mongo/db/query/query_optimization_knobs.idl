@@ -65,6 +65,17 @@ enums:
             kRandom: "random"
             kChunk: "chunk"
 
+    SamplingSource:
+        description: >-
+            Controls where CE samples come from. kPersistentSample attempts to read a
+            previously persisted sample from the per-database system.stats.samples
+            collection (populated via the analyze command) and falls back to on-the-fly
+            sampling on miss. kOnTheFlySample always samples freshly from the target collection.
+        type: string
+        values:
+            kPersistentSample: "persistentSample"
+            kOnTheFlySample: "onTheFlySample"
+
     SamplingConfidenceInterval:
         description: "Enum for supported confidence intervals for sampling estimates."
         type: string

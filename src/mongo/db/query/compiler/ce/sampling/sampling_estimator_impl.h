@@ -59,22 +59,28 @@ public:
         const CanonicalQuery& cq,
         CardinalityEstimate collCard,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
-        const MultipleCollectionAccessor& collections);
+        const MultipleCollectionAccessor& collections,
+        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
     /**
      * 'opCtx' is used to create a new CanonicalQuery for the sampling SBE plan.
      * 'collections' is needed to create a sampling SBE plan. 'samplingStyle' can specify the
-     * sampling method. Prefer the factory method above outside tests.
+     * sampling method. 'samplingSource' controls whether to try reading a persistent sample
+     * from `<db>.system.stats.samples` before falling back to on-the-fly SBE sampling;
+     * 'analyze' passes kOnTheFlySample to bypass the persisted read. Prefer the factory method
+     * above outside tests.
      */
-    SamplingEstimatorImpl(OperationContext* opCtx,
-                          const MultipleCollectionAccessor& collections,
-                          const NamespaceString& nss,
-                          PlanYieldPolicy::YieldPolicy yieldPolicy,
-                          SamplingCEMethodEnum samplingStyle,
-                          CardinalityEstimate collectionCard,
-                          SamplingConfidenceIntervalEnum ci,
-                          double marginOfError,
-                          boost::optional<int> numChunks);
+    SamplingEstimatorImpl(
+        OperationContext* opCtx,
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
+        SamplingCEMethodEnum samplingStyle,
+        CardinalityEstimate collectionCard,
+        SamplingConfidenceIntervalEnum ci,
+        double marginOfError,
+        boost::optional<int> numChunks,
+        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
     /*
      * This constructor allows the caller to specify the sample size if necessary. This constructor
@@ -82,14 +88,16 @@ public:
      * to do preliminary data distribution analysis with a small sample size. Testing cases may
      * require only a small sample. Prefer the factory method above outside tests.
      */
-    SamplingEstimatorImpl(OperationContext* opCtx,
-                          const MultipleCollectionAccessor& collections,
-                          const NamespaceString& nss,
-                          PlanYieldPolicy::YieldPolicy yieldPolicy,
-                          size_t sampleSize,
-                          SamplingCEMethodEnum samplingStyle,
-                          boost::optional<int> numChunks,
-                          CardinalityEstimate collectionCard);
+    SamplingEstimatorImpl(
+        OperationContext* opCtx,
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
+        size_t sampleSize,
+        SamplingCEMethodEnum samplingStyle,
+        boost::optional<int> numChunks,
+        CardinalityEstimate collectionCard,
+        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
     ~SamplingEstimatorImpl() override;
 
@@ -354,6 +362,16 @@ private:
      */
     void generateSampleBySeqScanningForTesting();
 
+    /**
+     * If '_samplingSource' is kPersistentSample, attempts to load a previously persisted sample
+     * for the given method + size from `<db>.system.stats.samples` using a DBDirectClient point
+     * lookup. Returns Status::OK() and populates '_sample' and '_sampleSize' on hit. Returns a
+     * non-OK status otherwise: NoSuchKey for a clean miss or misconfiguration, another code for
+     * a malformed doc. The caller is responsible for logging non-NoSuchKey failures and falling
+     * back to SBE sampling.
+     */
+    Status tryLoadPersistentSample(SamplingCEMethodEnum method, size_t sampleSize);
+
     OperationContext* _opCtx;
     // The collection the sampling plan runs against and is the one accessed by the query being
     // optimized.
@@ -367,6 +385,11 @@ private:
     boost::optional<int> _numChunks;
 
     CardinalityEstimate _collectionCard;
+
+    // Controls whether persistent samples are consulted before falling back to SBE sampling.
+    // 'analyze' constructs its estimator with kOnTheFlySample so it always collects a fresh sample
+    // (otherwise a refresh would just re-read the sample it's about to replace).
+    SamplingSourceEnum _samplingSource;
 };
 
 }  // namespace mongo::ce
