@@ -63,7 +63,7 @@
       "services": [
         {
           "name": "Endor Labs Inc",
-          "version": "v1.7.957"
+          "version": "v1.7.968"
         }
       ]
     }
@@ -2563,6 +2563,73 @@
   ],
   "dependencies": [
     {
+      "ref": "pkg:github/mongodb/mongo-c-driver@1.28.1",
+      "dependsOn": [
+        "pkg:github/madler/zlib@1.3.2"
+      ]
+    },
+    {
+      "ref": "pkg:github/mongodb/mongo@master",
+      "dependsOn": [
+        "pkg:deb/debian/firefox-esr@140.9.0esr-1?arch=source",
+        "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
+        "pkg:generic/unicode-org/unicode@8.0.0",
+        "pkg:generic/valgrind/valgrind@093bef43d69236287ccc748591c9560a71181b0a",
+        "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
+        "pkg:github/abseil/abseil-cpp@20250512.1",
+        "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
+        "pkg:github/arximboldi/immer@v0.9.1",
+        "pkg:github/boostorg/boost@boost-1.88.0",
+        "pkg:github/c-ares/c-ares@cares-1_27_0",
+        "pkg:github/chriskohlhoff/asio@asio-1-34-2",
+        "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
+        "pkg:github/davea42/libdwarf-code@libdwarf-2.1.0",
+        "pkg:github/dcleblanc/safeint@3.0.28a",
+        "pkg:github/derickr/timelib@2022.13",
+        "pkg:github/facebook/folly@v2025.04.21.00",
+        "pkg:github/facebook/zstd@v1.5.5",
+        "pkg:github/fmtlib/fmt@11.2.0",
+        "pkg:github/google/benchmark@v1.5.2",
+        "pkg:github/google/fuzztest@2025-07-28",
+        "pkg:github/google/googletest@v1.17.0",
+        "pkg:github/google/re2@2025-08-05",
+        "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
+        "pkg:github/google/snappy@1.1.10",
+        "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
+        "pkg:github/gperftools/gperftools@2.9.1",
+        "pkg:github/grpc/grpc@v1.74.1",
+        "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3",
+        "pkg:github/jeremy-rifkin/cpptrace@v1.0.3",
+        "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
+        "pkg:github/libtom/libtomcrypt@v1.18.2",
+        "pkg:github/libunwind/libunwind@v1.8.1",
+        "pkg:github/madler/zlib@1.3.2",
+        "pkg:github/mongodb/libmongocrypt@1.17.0",
+        "pkg:github/nlohmann/json@v3.11.3",
+        "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
+        "pkg:github/open-telemetry/opentelemetry-cpp@v1.24.0",
+        "pkg:github/open-telemetry/opentelemetry-proto@1.3.2",
+        "pkg:github/pcre2project/pcre2@pcre2-10.40",
+        "pkg:github/protocolbuffers/protobuf@v6.31.1",
+        "pkg:github/rnpgp/rnp@v0.18.1",
+        "pkg:github/roaringbitmap/croaring@v3.0.1",
+        "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
+        "pkg:github/snowballstem/snowball@1.0.0",
+        "pkg:github/unicode-org/icu@icu-release-57-1",
+        "pkg:github/veorq/siphash@32d067603b93b47828700880649198e0bfbbcffa",
+        "pkg:github/wiredtiger/wiredtiger@12.0.0",
+        "pkg:pypi/ocspbuilder@0.10.2",
+        "pkg:pypi/ocspresponder@0.5.0"
+      ]
+    },
+    {
+      "ref": "pkg:github/rnpgp/rnp@v0.18.1",
+      "dependsOn": [
+        "pkg:github/json-c/json-c@0.17",
+        "pkg:github/libarchive/bzip2@bzip2-1.0.8"
+      ]
+    },
+    {
       "ref": "pkg:deb/debian/firefox-esr@140.9.0esr-1?arch=source",
       "dependsOn": []
     },
@@ -2711,66 +2778,6 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/mongodb/mongo-c-driver@1.28.1",
-      "dependsOn": [
-        "pkg:github/madler/zlib@1.3.2"
-      ]
-    },
-    {
-      "ref": "pkg:github/mongodb/mongo@master",
-      "dependsOn": [
-        "pkg:deb/debian/firefox-esr@140.9.0esr-1?arch=source",
-        "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
-        "pkg:generic/unicode-org/unicode@8.0.0",
-        "pkg:generic/valgrind/valgrind@093bef43d69236287ccc748591c9560a71181b0a",
-        "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
-        "pkg:github/abseil/abseil-cpp@20250512.1",
-        "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
-        "pkg:github/arximboldi/immer@v0.9.1",
-        "pkg:github/boostorg/boost@boost-1.88.0",
-        "pkg:github/c-ares/c-ares@cares-1_27_0",
-        "pkg:github/chriskohlhoff/asio@asio-1-34-2",
-        "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
-        "pkg:github/davea42/libdwarf-code@libdwarf-2.1.0",
-        "pkg:github/dcleblanc/safeint@3.0.28a",
-        "pkg:github/derickr/timelib@2022.13",
-        "pkg:github/facebook/folly@v2025.04.21.00",
-        "pkg:github/facebook/zstd@v1.5.5",
-        "pkg:github/fmtlib/fmt@11.2.0",
-        "pkg:github/google/benchmark@v1.5.2",
-        "pkg:github/google/fuzztest@2025-07-28",
-        "pkg:github/google/googletest@v1.17.0",
-        "pkg:github/google/re2@2025-08-05",
-        "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
-        "pkg:github/google/snappy@1.1.10",
-        "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
-        "pkg:github/gperftools/gperftools@2.9.1",
-        "pkg:github/grpc/grpc@v1.74.1",
-        "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3",
-        "pkg:github/jeremy-rifkin/cpptrace@v1.0.3",
-        "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
-        "pkg:github/libtom/libtomcrypt@v1.18.2",
-        "pkg:github/libunwind/libunwind@v1.8.1",
-        "pkg:github/madler/zlib@1.3.2",
-        "pkg:github/mongodb/libmongocrypt@1.17.0",
-        "pkg:github/nlohmann/json@v3.11.3",
-        "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
-        "pkg:github/open-telemetry/opentelemetry-cpp@v1.24.0",
-        "pkg:github/open-telemetry/opentelemetry-proto@1.3.2",
-        "pkg:github/pcre2project/pcre2@pcre2-10.40",
-        "pkg:github/protocolbuffers/protobuf@v6.31.1",
-        "pkg:github/rnpgp/rnp@v0.18.1",
-        "pkg:github/roaringbitmap/croaring@v3.0.1",
-        "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
-        "pkg:github/snowballstem/snowball@1.0.0",
-        "pkg:github/unicode-org/icu@icu-release-57-1",
-        "pkg:github/veorq/siphash@32d067603b93b47828700880649198e0bfbbcffa",
-        "pkg:github/wiredtiger/wiredtiger@12.0.0",
-        "pkg:pypi/ocspbuilder@0.10.2",
-        "pkg:pypi/ocspresponder@0.5.0"
-      ]
-    },
-    {
       "ref": "pkg:github/nlohmann/json@v3.11.3",
       "dependsOn": []
     },
@@ -2793,13 +2800,6 @@
     {
       "ref": "pkg:github/protocolbuffers/protobuf@v6.31.1",
       "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/rnpgp/rnp@v0.18.1",
-      "dependsOn": [
-        "pkg:github/json-c/json-c@0.17",
-        "pkg:github/libarchive/bzip2@bzip2-1.0.8"
-      ]
     },
     {
       "ref": "pkg:github/roaringbitmap/croaring@v3.0.1",

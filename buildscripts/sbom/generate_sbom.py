@@ -35,6 +35,7 @@ from buildscripts.sbom.sbom_utils import (
     check_metadata_sbom,
     convert_sbom_to_public,
     read_sbom_json_file,
+    reconcile_dependency_refs,
     remove_sbom_component,
     sbom_components_to_dict,
     set_component_version,
@@ -587,7 +588,17 @@ def main() -> None:
                     # add_component_property(component, "Endor Labs purl", component["purl"])
                     component["purl"] = component["purl"].replace(old, new)
 
-    logger.info("Endor Labs SBOM pre-processed with %s components", len(endor_bom["components"]))
+    logger.info(
+        "Endor Labs SBOM pre-processed with %s components and %s dependencies",
+        len(endor_bom["components"]),
+        len(endor_bom.get("dependencies", [])),
+    )
+    reconcile_dependency_refs(endor_bom)
+    logger.info(
+        "Endor Labs SBOM with %s components and %s dependencies after reconciling dependency refs",
+        len(endor_bom["components"]),
+        len(endor_bom.get("dependencies", [])),
+    )
 
     # endregion Pre-process Endor Labs SBOM
 
@@ -597,6 +608,17 @@ def main() -> None:
 
     if os.path.exists(sbom_metadata_path):
         meta_bom = read_sbom_json_file(sbom_metadata_path)
+        logger.info(
+            "METADATA: pre-processed with %s components and %s dependencies",
+            len(meta_bom["components"]),
+            len(meta_bom.get("dependencies", [])),
+        )
+        reconcile_dependency_refs(meta_bom)
+        logger.info(
+            "METADATA: %s components and %s dependencies after reconciling dependency refs",
+            len(meta_bom["components"]),
+            len(meta_bom.get("dependencies", [])),
+        )
         check_components_and_dependencies(meta_bom, sbom_metadata_path)
     else:
         logger.error("No SBOM metadata file at '%s'. This is fatal.", sbom_metadata_path)

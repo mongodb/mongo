@@ -117,6 +117,8 @@ def check_components_and_dependencies(sbom: dict, label: str = "") -> None:
     """Warn if .components[].bom-ref and .dependencies[].ref are not in one-to-one correspondence."""
     prefix = f"{label}: " if label else ""
     component_refs = {c["bom-ref"] for c in sbom.get("components", [])}
+    if primary_ref := sbom.get("metadata", {}).get("component", {}).get("bom-ref"):
+        component_refs.add(primary_ref)
     dependency_refs = {d["ref"] for d in sbom.get("dependencies", [])}
 
     in_components_not_deps = component_refs - dependency_refs
@@ -134,6 +136,30 @@ def check_components_and_dependencies(sbom: dict, label: str = "") -> None:
             prefix,
             sorted(in_deps_not_components),
         )
+
+
+def reconcile_dependency_refs(sbom: dict) -> None:
+    """Add stub dependency entries for missing component refs; remove and warn about orphaned refs."""
+    component_refs = {c["bom-ref"] for c in sbom.get("components", [])}
+    if primary_ref := sbom.get("metadata", {}).get("component", {}).get("bom-ref"):
+        component_refs.add(primary_ref)
+    dependency_refs = {d["ref"] for d in sbom.get("dependencies", [])}
+
+    missing = component_refs - dependency_refs
+    if missing:
+        if "dependencies" not in sbom:
+            sbom["dependencies"] = []
+        for ref in sorted(missing):
+            sbom["dependencies"].append({"ref": ref, "dependsOn": []})
+            logger.debug("reconcile_dependency_refs: added missing dependency ref '%s'", ref)
+
+    orphaned = dependency_refs - component_refs
+    if orphaned:
+        logger.warning(
+            "COMPONENTS/DEPENDENCIES MISMATCH: removing orphaned dependency refs with no matching component: %s",
+            sorted(orphaned),
+        )
+        sbom["dependencies"] = [d for d in sbom["dependencies"] if d["ref"] not in orphaned]
 
 
 def convert_sbom_to_public(sbom_dict: dict):
