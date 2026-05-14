@@ -30,56 +30,31 @@
 #include "mongo/otel/metrics/otel_metric_name_validation.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/util/pcre.h"
 
 namespace mongo::otel::metrics {
 
 namespace {
-
-bool isAscii(StringData s) {
-    for (size_t i = 0; i < s.size(); ++i) {
-        if (static_cast<unsigned char>(s[i]) > 127) {
-            return false;
-        }
-    }
-    return true;
+// Each dot-separated segment starts with a lowercase letter and is then either:
+//   - snake_case: only lowercase letters, digits, and underscores, OR
+//   - camelCase:  only lowercase/uppercase letters and digits (no underscores)
+// Mixing the two styles within a single segment is disallowed. Underscores in snake_case
+// must be followed by at least one alphanumeric character, so trailing underscores and
+// consecutive underscores are rejected.
+constexpr StringData kSnakeCasePattern = "[a-z0-9]*(?:_[a-z0-9]+)*";
+constexpr StringData kCamelCasePattern = "[a-zA-Z0-9]*";
+std::string segmentPattern() {
+    return fmt::format("[a-z](?:{0}|{1})", kSnakeCasePattern, kCamelCasePattern);
 }
 
-bool isOtelNameSegment(StringData seg) {
-    if (seg.empty()) {
-        return false;
-    }
-    const char first = seg[0];
-    if (first < 'a' || first > 'z') {
-        return false;
-    }
-    for (size_t i = 1; i < seg.size(); ++i) {
-        const char c = seg[i];
-        if (c >= 'a' && c <= 'z') {
-            continue;
-        }
-        if (c >= '0' && c <= '9') {
-            continue;
-        }
-        if (c == '_') {
-            continue;
-        }
-        return false;
-    }
-    return true;
+const pcre::Regex& nameRegex() {
+    // Wrapping this in a function prevents static initialization order fiasco.
+    static const pcre::Regex kNameRegex = []() {
+        const auto seg = segmentPattern();
+        return pcre::Regex{fmt::format("^{0}(?:\\.{0})*$", seg)};
+    }();
+    return kNameRegex;
 }
-
-Status validateOneOtelSegment(StringData seg) {
-    if (seg.empty()) {
-        return {ErrorCodes::InvalidOptions,
-                "OpenTelemetry metric name cannot contain empty segments"};
-    }
-    if (!isOtelNameSegment(seg)) {
-        return {ErrorCodes::InvalidOptions,
-                "OpenTelemetry metric name contains an invalid segment"};
-    }
-    return Status::OK();
-}
-
 }  // namespace
 
 Status validateOtelMetricName(StringData name) {
@@ -89,26 +64,10 @@ Status validateOtelMetricName(StringData name) {
     if (name.size() > kMaxOtelMetricNameLength) {
         return {ErrorCodes::InvalidOptions, "OpenTelemetry metric name exceeds maximum length"};
     }
-    if (!isAscii(name)) {
-        return {ErrorCodes::InvalidOptions, "OpenTelemetry metric name must be ASCII"};
+    if (!nameRegex().matchView(name)) {
+        return {ErrorCodes::InvalidOptions, "OpenTelemetry metric name is invalid"};
     }
-    if (name[0] == '.' || name[name.size() - 1] == '.') {
-        return {ErrorCodes::InvalidOptions,
-                "OpenTelemetry metric name cannot start or end with a dot"};
-    }
-
-    size_t segStart = 0;
-    for (size_t i = 0; i < name.size(); ++i) {
-        if (name[i] != '.') {
-            continue;
-        }
-        const StringData seg = name.substr(segStart, i - segStart);
-        if (auto st = validateOneOtelSegment(seg); !st.isOK()) {
-            return st;
-        }
-        segStart = i + 1;
-    }
-    return validateOneOtelSegment(name.substr(segStart, name.size() - segStart));
+    return Status::OK();
 }
 
 }  // namespace mongo::otel::metrics

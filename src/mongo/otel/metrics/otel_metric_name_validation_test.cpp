@@ -35,6 +35,10 @@
 #include <string>
 
 namespace mongo::otel::metrics {
+namespace {
+
+using testing::Not;
+using unittest::match::StatusIsOK;
 
 TEST(OtelMetricNameValidation, RejectsEmpty) {
     ASSERT_NOT_OK(validateOtelMetricName({}));
@@ -71,14 +75,24 @@ TEST(OtelMetricNameValidation, AcceptsRegistryMetricNameSamples) {
     ASSERT_OK(validateOtelMetricName(MetricNames::kPrometheusFileExporterWrites.getName()));
 }
 
-TEST(OtelMetricNameValidation, RejectsCamelCaseSegments) {
-    ASSERT_NOT_OK(validateOtelMetricName("network.openConnections"));
-    ASSERT_NOT_OK(validateOtelMetricName("ingressNetwork.connections"));
+// camelCase interior letters are allowed to support legacy serverStatus-mirroring names
+// (e.g. serverStatus.network.numRequests). Prefer lowercase_snake_case for new metrics.
+TEST(OtelMetricNameValidation, AcceptsCamelCaseSegments) {
+    ASSERT_OK(validateOtelMetricName("network.openConnections"));
+    ASSERT_OK(validateOtelMetricName("serverStatus.network.numRequests"));
+    ASSERT_OK(validateOtelMetricName(
+        "serverStatus.network.ingressRequestRateLimiter.rejectedAdmissions"));
 }
 
-TEST(OtelMetricNameValidation, RejectsUppercaseLetters) {
+// Leading uppercase is still rejected (segments must start with a lowercase letter).
+TEST(OtelMetricNameValidation, RejectsLeadingUppercaseInSegment) {
     ASSERT_NOT_OK(validateOtelMetricName("network.Open_connections"));
     ASSERT_NOT_OK(validateOtelMetricName("Network.open_connections"));
+}
+
+TEST(OtelMetricNameValidation, RejectsMixedCamelAndSnakeCaseSegments) {
+    ASSERT_NOT_OK(validateOtelMetricName("network.openConnections_"));
+    ASSERT_NOT_OK(validateOtelMetricName("network.open_Connections"));
 }
 
 TEST(OtelMetricNameValidation, RejectsLeadingDigitInSegment) {
@@ -97,6 +111,15 @@ TEST(OtelMetricNameValidation, RejectsHyphenInSegment) {
 
 TEST(OtelMetricNameValidation, RejectsPunctuationInSegment) {
     ASSERT_NOT_OK(validateOtelMetricName("network.open!connections"));
+}
+
+TEST(OtelMetricNameValidation, RejectsMultipleUnderscores) {
+    EXPECT_THAT(validateOtelMetricName("x_____________y"), Not(StatusIsOK()));
+    EXPECT_THAT(validateOtelMetricName("a.k.k___fish.b.c.d"), Not(StatusIsOK()));
+}
+TEST(OtelMetricNameValidation, rejectsTrailingUnderscore) {
+    EXPECT_THAT(validateOtelMetricName("x_"), Not(StatusIsOK()));
+    EXPECT_THAT(validateOtelMetricName("a.k.k_.b"), Not(StatusIsOK()));
 }
 
 TEST(OtelMetricNameValidation, RejectsNonAscii) {
@@ -131,4 +154,5 @@ TEST(OtelMetricNameValidation, RejectsOverlongSingleSegment) {
     ASSERT_NOT_OK(validateOtelMetricName(s));
 }
 
+}  // namespace
 }  // namespace mongo::otel::metrics

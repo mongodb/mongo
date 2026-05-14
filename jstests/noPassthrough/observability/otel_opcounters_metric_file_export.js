@@ -48,14 +48,14 @@ describe("OTel opcounters metric file export", function () {
 
     it("increments opcounters.inserts on insert operations", function () {
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["opcounters.inserts"]?.value ?? 0;
+        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.inserts"]?.value ?? 0;
 
         assert.commandWorked(this.coll.insert({a: 1}));
         assert.commandWorked(this.coll.insert([{b: 2}, {c: 3}]));
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "opcounters.inserts",
+            metricName: "serverStatus.opcounters.inserts",
             minValue: initial + 3,
             afterDate: start,
         });
@@ -63,13 +63,13 @@ describe("OTel opcounters metric file export", function () {
 
     it("increments opcounters.queries on find operations", function () {
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["opcounters.queries"]?.value ?? 0;
+        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.queries"]?.value ?? 0;
 
         this.coll.find({}).toArray();
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "opcounters.queries",
+            metricName: "serverStatus.opcounters.queries",
             minValue: initial + 1,
             afterDate: start,
         });
@@ -77,13 +77,13 @@ describe("OTel opcounters metric file export", function () {
 
     it("increments opcounters.updates on update operations", function () {
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["opcounters.updates"]?.value ?? 0;
+        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.updates"]?.value ?? 0;
 
         assert.commandWorked(this.coll.update({a: 1}, {$set: {a: 99}}));
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "opcounters.updates",
+            metricName: "serverStatus.opcounters.updates",
             minValue: initial + 1,
             afterDate: start,
         });
@@ -91,13 +91,13 @@ describe("OTel opcounters metric file export", function () {
 
     it("increments opcounters.deletes on remove operations", function () {
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["opcounters.deletes"]?.value ?? 0;
+        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.deletes"]?.value ?? 0;
 
         assert.commandWorked(this.coll.remove({a: 99}));
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "opcounters.deletes",
+            metricName: "serverStatus.opcounters.deletes",
             minValue: initial + 1,
             afterDate: start,
         });
@@ -110,7 +110,7 @@ describe("OTel opcounters metric file export", function () {
         }
 
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["opcounters.get_mores"]?.value ?? 0;
+        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.getMores"]?.value ?? 0;
 
         this.coll
             .find({x: {$exists: true}})
@@ -119,7 +119,7 @@ describe("OTel opcounters metric file export", function () {
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "opcounters.get_mores",
+            metricName: "serverStatus.opcounters.getMores",
             minValue: initial + 1,
             afterDate: start,
         });
@@ -130,13 +130,13 @@ describe("OTel opcounters metric file export", function () {
         // their own (e.g. ping, serverStatus). 'aggregate', 'find', getMore, and write ops all
         // suppress this counter and increment their own specific counters instead.
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["opcounters.commands"]?.value ?? 0;
+        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.commands"]?.value ?? 0;
 
         assert.commandWorked(this.db.runCommand({ping: 1}));
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "opcounters.commands",
+            metricName: "serverStatus.opcounters.commands",
             minValue: initial + 1,
             afterDate: start,
         });
@@ -147,14 +147,14 @@ describe("OTel opcounters metric file export", function () {
         // 'find' increments 'queries' but NOT 'aggregates'; the two are fully exclusive.
         // Neither aggregate nor find increments 'commands'.
         const start = new Date();
-        const initial = getLatestMetrics(this.metricsDir)?.["opcounters.aggregates"]?.value ?? 0;
+        const initial = getLatestMetrics(this.metricsDir)?.["serverStatus.opcounters.aggregates"]?.value ?? 0;
 
         this.coll.aggregate([{$match: {}}]).toArray();
         this.coll.aggregate([{$match: {}}, {$count: "n"}]).toArray();
 
         waitForMetric({
             metricsDir: this.metricsDir,
-            metricName: "opcounters.aggregates",
+            metricName: "serverStatus.opcounters.aggregates",
             minValue: initial + 2,
             afterDate: start,
         });

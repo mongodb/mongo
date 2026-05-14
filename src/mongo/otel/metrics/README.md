@@ -51,6 +51,8 @@ metric_names.h.
 
 ### Naming Conventions
 
+#### New metrics
+
 Follow
 [OpenTelemetry naming conventions](https://opentelemetry.io/docs/specs/semconv/general/naming/):
 
@@ -62,6 +64,12 @@ Follow
 
 `mongodb.` will be automatically prepended to all metric names because it is the service name
 provided to OTel.
+
+#### Migrating existing serverStatus metrics
+
+Use the same name as the metric in serverStatus, (e.g. `serverStatus.network.bytesIn`) including the
+unit if the metric name includes that already (e.g.
+`serverStatus.metrics.network.totalTimeForEgressConnectionAcquiredToWireMicros`).
 
 ### Available Units
 

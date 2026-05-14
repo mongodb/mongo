@@ -124,7 +124,10 @@ mongo_cc_unit_test(
 mongo_cc_library(
     name = "otel_metric_name_validation",
     srcs = ["otel_metric_name_validation.cpp"],
-    deps = ["//src/mongo:base"],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util:pcre_wrapper",
+    ],
 )
 
 mongo_cc_library(

@@ -188,14 +188,21 @@ public:
     // Query Integration Team Metrics
 
     // Op Counters
-    static constexpr MetricName kInsertOpCount = MetricNameMaker::make("opcounters.inserts");
-    static constexpr MetricName kQueryOpCount = MetricNameMaker::make("opcounters.queries");
-    static constexpr MetricName kUpdateOpCount = MetricNameMaker::make("opcounters.updates");
-    static constexpr MetricName kDeleteOpCount = MetricNameMaker::make("opcounters.deletes");
-    static constexpr MetricName kGetMoreOpCount = MetricNameMaker::make("opcounters.get_mores");
-    static constexpr MetricName kCommandOpCount = MetricNameMaker::make("opcounters.commands");
+    static constexpr MetricName kInsertOpCount =
+        MetricNameMaker::make("serverStatus.opcounters.inserts");
+    static constexpr MetricName kQueryOpCount =
+        MetricNameMaker::make("serverStatus.opcounters.queries");
+    static constexpr MetricName kUpdateOpCount =
+        MetricNameMaker::make("serverStatus.opcounters.updates");
+    static constexpr MetricName kDeleteOpCount =
+        MetricNameMaker::make("serverStatus.opcounters.deletes");
+    static constexpr MetricName kGetMoreOpCount =
+        MetricNameMaker::make("serverStatus.opcounters.getMores");
+    static constexpr MetricName kCommandOpCount =
+        MetricNameMaker::make("serverStatus.opcounters.commands");
     // New in SERVER-123987 - Counts every top-level 'aggregate' command.
-    static constexpr MetricName kAggregateOpCount = MetricNameMaker::make("opcounters.aggregates");
+    static constexpr MetricName kAggregateOpCount =
+        MetricNameMaker::make("serverStatus.opcounters.aggregates");
 
     // Test-only
     static constexpr MetricName kTest1 = MetricNameMaker::make("test_only.metric1");

@@ -39,16 +39,14 @@ namespace mongo::otel::metrics {
 
 /**
  * Validates `name` for use as an OpenTelemetry metric instrument name (e.g. MetricName registry
- * strings).
+ * strings). A valid name has size less than kMaxOtelMetricNameLength and is made up of one or more
+ * dot-separated segments. Each segment is nonempty and may be either snake_case or camelCase.
+ * Numbers are allowed but not to initiate a segment. E.g.
  *
- * Rules:
- * - non-empty ASCII
- * - length at most kMaxOtelMetricNameLength
- * - no leading or trailing dot
- * - no empty segments (no `..`)
- * - one or more dot-separated segments (a single segment with no `.` is valid)
- * - each segment is snake_case. First character `a–z`. Remaining characters may be `a–z`, `0–9`, or
- *   `_`. No uppercase inside a segment.
+ * Valid: "network.open_connections.count", "ingress.ingressTLSLatency", "foo",
+ *   "serverStatus.my_metric.latency3"
+ * Invalid: "", ".", "network..open_connections", "network.OpenConnections",
+ *   "network.Open_connections", "network.2connections"
  */
 Status validateOtelMetricName(StringData name);
 
