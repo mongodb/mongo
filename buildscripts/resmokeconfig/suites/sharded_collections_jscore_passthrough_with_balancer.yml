@@ -1,0 +1,127 @@
+# SERVER-86747: jscore passthrough that runs over a sharded cluster with the
+# balancer enabled and random_migrations in the background. The goal is to
+# exercise the long tail of core jstests that previously only ran under
+# multi_stmt_txn_jscore_passthrough_with_migration (the only sharding jscore
+# passthrough doing background moveChunk/moveCollection) but without the
+# transactional wrapper, so the migration-coverage signal extends to
+# non-transactional commands as well.
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  exclude_files:
+    # These tests run in the jscore_txn passthrough suites.
+    - jstests/core/txns/**/*.js
+
+    # The following tests fail because a certain command or functionality is not supported by
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
+    - jstests/core/**/awaitdata_getmore_cmd.js # capped collections.
+    - jstests/core/**/bypass_doc_validation.js # sharded $out output not permitted
+    - jstests/core/**/check_shard_index.js # checkShardingIndex.
+    - jstests/core/**/compact_keeps_indexes.js # compact.
+    - jstests/core/**/currentop.js # uses fsync.
+    - jstests/core/**/dbhash.js # dbhash.
+    - jstests/core/**/fsync.js # uses fsync.
+    - jstests/core/**/geo_update_btree2.js # notablescan.
+    - jstests/core/**/queryoptimizera.js # "local" database.
+    - jstests/core/**/startup_log.js # "local" database.
+    - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
+    - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
+    - jstests/core/**/tailable_skip_limit.js # capped collections.
+    - jstests/core/**/query/top/top.js # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
+    - jstests/core/**/geo_s2explain.js # inputStage in different spot in explain().
+    - jstests/core/**/geo_s2sparse.js # keysPerIndex in different spot in validate().
+    - jstests/core/**/operation_latency_histogram.js # Stats are counted differently on mongos, SERVER-24880.
+    # TODO SERVER-103278: Remove after fixing. executionStats.nReturned is incorrect for sharded distinct commands.
+    - jstests/core/**/distinct_index1.js
+    # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
+    - jstests/core/**/expr_index_use.js
+    - jstests/core/**/index_multikey.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
+    - jstests/core/**/sort_array.js
+
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    # This passthrough implicitly shards the accessed collections. Do not run tests where collections
+    # can't be created on `getCollection` call.
+    - assumes_no_implicit_collection_creation_on_get_collection
+    # Tests tagged with the following will fail because they assume collections are not sharded.
+    - assumes_no_implicit_collection_creation_after_drop
+    - assumes_no_implicit_index_creation
+    - assumes_unsharded_collection
+    - cannot_create_unique_index_when_using_hashed_shard_key
+    # system.profile collection doesn't exist on mongos.
+    - requires_profiling
+    # Capped collections cannot be sharded
+    - requires_capped
+    #
+    # Deltas vs sharded_collections_jscore_passthrough_base.yml: this suite enables the balancer
+    # plus random_migrations in the background, so we exclude tests that explicitly require the
+    # balancer off or assume the collection UUID is stable across moveCollection.
+    #
+    - assumes_balancer_off
+    # moveCollection rewrites the collection under a new UUID, so any test that pins UUID across
+    # operations is incompatible with random_migrations: true.
+    - assumes_stable_collection_uuid
+    # Background migrations make fastcount unreliable (orphans + in-flight chunks).
+    - requires_fastcount
+    # Some assertions are racy when chunks move underneath the test (e.g. orphan filtering,
+    # plan-cache entry activeness, count(*) reporting).
+    - inspects_whether_plan_cache_entry_is_active
+    # implicitly_retry_on_migration_in_progress.js coalesces find/aggregate results into a single
+    # batch so getMore is not used; tests that explicitly require getMore semantics are skipped.
+    - assumes_no_implicit_cursor_exhaustion
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+      global_vars:
+        TestData:
+          # Mirrors multi_stmt_txn_jscore_passthrough_with_migration: signals to tests/overrides
+          # that a "very bad" balancer is moving chunks/collections in the background.
+          runningWithBalancer: true
+  hooks:
+    # Run fixture-dependent hooks before CleanEveryN so a fixture restart can't disrupt them.
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckShardFilteringMetadata
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    num_shards: 2
+    num_mongos: 3
+    num_rs_nodes_per_shard: 2
+    enable_balancer: true
+    random_migrations: true
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        skipDroppingHashedShardKeyIndex: true
+        # Best-effort to avoid QueryPlanKilled when a query yields while a moveCollection is in
+        # flight (see SERVER-88275; mirrors multi_stmt_txn_jscore_passthrough_with_migration).
+        # TODO SERVER-88275 Remove both parameters once the underlying bug is addressed.
+        internalQueryExecYieldPeriodMS: 6000
+        internalQueryExecYieldIterations: 1000000
