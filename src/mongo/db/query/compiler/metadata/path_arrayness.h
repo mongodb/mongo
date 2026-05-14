@@ -37,6 +37,8 @@
 
 #include <set>
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 
 class ExpressionContext;
@@ -48,6 +50,10 @@ class MonotonicallyIncreasingFieldPathSet {
 public:
     void insert(const FieldPath& path) {
         _paths.insert(path);
+    }
+
+    bool empty() const {
+        return _paths.empty();
     }
 
     auto begin() const {
@@ -75,12 +81,11 @@ public:
     ~PathArrayness() = default;
 
     /**
-     * Returns true if any path in 'nonArrayPaths' is now possibly-array in 'current'. Used during
-     * yield restore to detect invalidated assumptions. The 'nonArrayPaths' set is maintained
-     * per-query on the ExpressionContext, not on the shared PathArrayness instance.
+     * Returns the first path in 'nonArrayPaths' that is now possibly-array in 'current', or
+     * boost::none if no paths are invalidated.
      */
-    static bool hasInvalidatedPaths(const MonotonicallyIncreasingFieldPathSet& nonArrayPaths,
-                                    const PathArrayness& current);
+    static boost::optional<FieldPath> getFirstInvalidatedPath(
+        const MonotonicallyIncreasingFieldPathSet& nonArrayPaths, const PathArrayness& current);
 
     /**
      * Returns a reference to an empty PathArrayness instance. This represents the conservative

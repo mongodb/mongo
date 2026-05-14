@@ -500,8 +500,9 @@ protected:
     }
 
     bool hasInvalidatedPaths() {
-        return PathArrayness::hasInvalidatedPaths(
-            _expCtx.nonArrayPathsForNss(_expCtx.getNamespaceString()), _current);
+        return PathArrayness::getFirstInvalidatedPath(
+                   _expCtx.nonArrayPathsForNss(_expCtx.getNamespaceString()), _current)
+            .has_value();
     }
 
 private:
@@ -675,8 +676,8 @@ TEST(PathArraynessInvalidation, SharedPathArraynessDoesNotLeakNonArrayPathsAcros
     current.addPath(FieldPath("b"), MultikeyComponents{0}, true);
     current.addPath(FieldPath("c"), MultikeyComponents{}, true);
 
-    ASSERT_FALSE(PathArrayness::hasInvalidatedPaths(nonArrayPaths1, current));
-    ASSERT_TRUE(PathArrayness::hasInvalidatedPaths(nonArrayPaths2, current));
+    ASSERT_FALSE(PathArrayness::getFirstInvalidatedPath(nonArrayPaths1, current).has_value());
+    ASSERT_TRUE(PathArrayness::getFirstInvalidatedPath(nonArrayPaths2, current).has_value());
 }
 
 TEST(ExpressionContextFieldRefOverload, InvalidEmptyPath) {

@@ -29,15 +29,21 @@
 
 #pragma once
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
+#include <functional>
 #include <memory>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 class PlanStage;
@@ -75,7 +81,22 @@ public:
         _yieldingPlans.clear();
     }
 
+    struct PathArraynessInfo {
+        MultipleCollectionAccessor collections;
+        stdx::unordered_map<NamespaceString, MonotonicallyIncreasingFieldPathSet>
+            nonArrayPathsForNss;
+        // Returns current PathArrayness for a collection. Caller supplies this so
+        // PlanYieldPolicySBE need not depend on CollectionQueryInfo directly.
+        std::function<std::shared_ptr<const PathArrayness>(const CollectionPtr&)> getPathArrayness;
+    };
+
+    /**
+     * Registers a path arrayness check to run after each yield/restore cycle.
+     */
+    void setPathArraynessInfo(PathArraynessInfo info);
+
 private:
+    void _checkPathArrayness();
     PlanYieldPolicySBE(OperationContext* opCtx,
                        YieldPolicy policy,
                        ClockSource* clockSource,
@@ -91,6 +112,8 @@ private:
 
     // The list of plans registered to yield when the configured policy triggers a yield.
     std::vector<sbe::PlanStage*> _yieldingPlans;
+
+    boost::optional<PathArraynessInfo> _pathArraynessInfo;
 };
 
 }  // namespace mongo

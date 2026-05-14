@@ -232,6 +232,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db/query:plan_executor",
         "//src/mongo/db/query:plan_yield_policy",
+        "//src/mongo/db/query/compiler/metadata:path_arrayness",
         "//src/mongo/util:clock_sources",
     ],
 )

@@ -1,27 +1,6 @@
 /**
- * Tests that traverseF elision without yield-time invalidation can miss documents when a
- * concurrent multikey flip breaks PathArrayness assumptions.
- *
- * Setup:
- *   - Collection has document {a: {b: 1, c: 1}} with indexes on {"a.b": 1} and {"a.c": 1}.
- *   - Both indexes are non-multikey, so PathArrayness infers canPathBeArray("a.b") == false
- *     and canPathBeArray("a.c") == false.
- *
- * Three plan shapes exercise the elision:
- *   - FETCH mode: a $match + $group with hint {"a.b": 1}. One predicate drives the IXSCAN;
- *     the other becomes a residual filter on FETCH with traverseF elision.
- *   - COLLSCAN mode: a $match with hint {$natural: 1} on a non-clustered collection. The
- *     filter runs on a generic ScanStage with traverseF elision.
- *   - CLUSTERED COLLSCAN mode: an _id range predicate on a clustered collection drives
- *     the clustered ScanStage bounds; residual "a.b"/"a.c" predicates run as the filter
- *     with traverseF elision.
- *
- * While yielded (before restore), we insert {a: [{b: 1, c: 1}, {b: 2, c: 1}]}, flipping both
- * indexes to multikey. When PathArrayness is enabled, the elided traverseF causes the query to
- * return wrong results (empty set) because the direct getField chain cannot descend into arrays.
- *
- * When PathArrayness is disabled, traverseF is never elided, so the query returns the new
- * document correctly.
+ * Verifies that when path arrayness assumptions are invalidated, queries that
+ * rely on these assumptions are killed during restore.
  *
  * @tags: [requires_fcv_90, requires_sbe]
  */
@@ -97,9 +76,9 @@ function runTest({testCase, setParameters, expect}) {
                 function (dbName, collName, pipeline, aggOptions, expect) {
                     const testColl = db.getSiblingDB(dbName)[collName];
                     const runAgg = () => testColl.aggregate(pipeline, aggOptions).toArray();
-                    if (expect === "wrong") {
-                        const results = runAgg();
-                        assert.sameMembers(results, [], "Unexpected results: " + tojson(results));
+                    if (expect === "killed") {
+                        const err = assert.throws(runAgg);
+                        assert.eq(err.code, ErrorCodes.QueryPlanKilled, "Unexpected error: " + tojson(err));
                     } else if (expect === "correct") {
                         const results = runAgg();
                         assert.sameMembers(results, [{_id: 1}], "Unexpected results: " + tojson(results));
@@ -163,23 +142,17 @@ const flagOffOff = {
     logComponentVerbosity: tojson({query: {verbosity: 5}}),
 };
 
-// FETCH mode: traverseF elision on the residual FETCH filter. Without invalidation, the query
-// returns wrong results (empty set) when an elided path becomes multikey during yield.
-runTest({testCase: fetchCase, setParameters: flagOnOn, expect: "wrong"});
+runTest({testCase: fetchCase, setParameters: flagOnOn, expect: "killed"});
 runTest({testCase: fetchCase, setParameters: flagOnOff, expect: "correct"});
 runTest({testCase: fetchCase, setParameters: flagOffOn, expect: "correct"});
 runTest({testCase: fetchCase, setParameters: flagOffOff, expect: "correct"});
 
-// COLLSCAN mode: traverseF elision on the ScanStage filter. Without invalidation, the query
-// returns wrong results (empty set) when an elided path becomes multikey during yield.
-runTest({testCase: collScanCase, setParameters: flagOnOn, expect: "wrong"});
+runTest({testCase: collScanCase, setParameters: flagOnOn, expect: "killed"});
 runTest({testCase: collScanCase, setParameters: flagOnOff, expect: "correct"});
 runTest({testCase: collScanCase, setParameters: flagOffOn, expect: "correct"});
 runTest({testCase: collScanCase, setParameters: flagOffOff, expect: "correct"});
 
-// CLUSTERED COLLSCAN mode: same ScanStage machinery, reached via the clustered-collection
-// _id-bounded scan path. Without invalidation, wrong results for the same reason.
-runTest({testCase: clusteredCollScanCase, setParameters: flagOnOn, expect: "wrong"});
+runTest({testCase: clusteredCollScanCase, setParameters: flagOnOn, expect: "killed"});
 runTest({testCase: clusteredCollScanCase, setParameters: flagOnOff, expect: "correct"});
 runTest({testCase: clusteredCollScanCase, setParameters: flagOffOn, expect: "correct"});
 runTest({testCase: clusteredCollScanCase, setParameters: flagOffOff, expect: "correct"});

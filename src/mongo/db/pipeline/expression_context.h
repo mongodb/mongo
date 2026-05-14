@@ -175,6 +175,9 @@ public:
         kForcePlanCache,    // Query is being cached even if it has a single plan
     };
 
+    using NonArrayPathsForNss =
+        stdx::unordered_map<NamespaceString, MonotonicallyIncreasingFieldPathSet>;
+
     // TODO SERVER-123364: variables are heavily used everywhere, move these inside
     // ExpressionContextParams at some point.
     Variables variables;
@@ -1085,6 +1088,10 @@ public:
         return it != _nonArrayPathsForNss.end() ? it->second : kEmpty;
     }
 
+    const NonArrayPathsForNss& getNonArrayPathsForNss() const {
+        return _nonArrayPathsForNss;
+    }
+
 protected:
     struct ExpressionContextParams {
         OperationContext* opCtx = nullptr;
@@ -1239,7 +1246,7 @@ protected:
 
     ExpressionContextParams _params;
 
-    stdx::unordered_map<NamespaceString, MonotonicallyIncreasingFieldPathSet> _nonArrayPathsForNss;
+    NonArrayPathsForNss _nonArrayPathsForNss;
 
     /**
      * Construct an expression context using ExpressionContextParams. Consider using

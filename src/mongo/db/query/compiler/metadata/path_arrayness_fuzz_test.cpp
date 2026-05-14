@@ -112,8 +112,9 @@ auto QueryCompsDomain() {
 void EmptyOldTrieNeverInvalidates(std::vector<PathOp> ops) {
     ExpressionContextForTest expCtx;
     PathArrayness current = buildPathArrayness(ops);
-    EXPECT_FALSE(PathArrayness::hasInvalidatedPaths(
-        expCtx.nonArrayPathsForNss(expCtx.getNamespaceString()), current));
+    EXPECT_FALSE(PathArrayness::getFirstInvalidatedPath(
+                     expCtx.nonArrayPathsForNss(expCtx.getNamespaceString()), current)
+                     .has_value());
 }
 
 FUZZ_TEST(PathArraynessFuzz, EmptyOldTrieNeverInvalidates).WithDomains(PathOpsDomain());
@@ -140,7 +141,8 @@ void HasInvalidatedPathsMatchesManualCheck(std::vector<PathOp> oldOps,
         if (checkExpCtx.canPathBeArrayForNss(path, checkNss))
             expected = true;
 
-    EXPECT_EQ(PathArrayness::hasInvalidatedPaths(expCtx.nonArrayPathsForNss(nss), current),
+    EXPECT_EQ(PathArrayness::getFirstInvalidatedPath(expCtx.nonArrayPathsForNss(nss), current)
+                  .has_value(),
               expected);
 }
 
@@ -154,7 +156,8 @@ void SelfDoesNotInvalidate(std::vector<PathOp> ops, std::vector<std::vector<int>
     const auto& nss = expCtx.getNamespaceString();
     for (const auto& comps : queryComps)
         expCtx.canPathBeArrayForNss(buildFieldPath(comps), nss);
-    EXPECT_FALSE(PathArrayness::hasInvalidatedPaths(expCtx.nonArrayPathsForNss(nss), *old));
+    EXPECT_FALSE(
+        PathArrayness::getFirstInvalidatedPath(expCtx.nonArrayPathsForNss(nss), *old).has_value());
 }
 
 FUZZ_TEST(PathArraynessFuzz, SelfDoesNotInvalidate)

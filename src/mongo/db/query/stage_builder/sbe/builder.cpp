@@ -65,10 +65,12 @@
 #include "mongo/db/pipeline/window_function/window_function_shift.h"
 #include "mongo/db/pipeline/window_function/window_function_top_bottom_n.h"
 #include "mongo/db/query/bind_input_params.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/find_command.h"
@@ -262,6 +264,15 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     auto& env = data->env;
     env.ctx.remoteCursors = remoteCursors;
     env.ctx.mca = &collections;
+    if (expCtx->getQueryKnobConfiguration().getEnablePathArrayness() &&
+        !expCtx->getNonArrayPathsForNss().empty()) {
+        yieldPolicy->setPathArraynessInfo(
+            {MultipleCollectionAccessor{collections},
+             expCtx->getNonArrayPathsForNss(),
+             [](const CollectionPtr& coll) {
+                 return CollectionQueryInfo::get(coll).getPathArrayness();
+             }});
+    }
 
     root->prepare(env.ctx);
 
