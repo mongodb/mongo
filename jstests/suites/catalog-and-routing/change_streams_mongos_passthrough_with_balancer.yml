@@ -1,0 +1,98 @@
+# SERVER-86751: Passthrough that runs jstests/change_streams/** while the
+# balancer continuously moves unsharded collections in the background. This
+# exercises change-stream resumability and shard-targeting against the
+# topology-mutation events emitted by moveCollection / movePrimary while a
+# stream is open against a mongos router.
+#
+# The base behaviour (selectors, mongos fixture, change_stream hooks) mirrors
+# `change_streams_mongos_passthrough.yml`. The delta vs the base suite is:
+#   - selector excludes that are incompatible with background collection moves;
+#   - the ContinuousMoveCollection hook is added to executor.hooks;
+#   - the fixture turns the balancer on and lowers
+#     `balancerMigrationsThrottlingMs` so movements occur frequently enough to
+#     interleave with the streamed test workload.
+#
+# Run locally:
+#   bazel test //jstests/suites/catalog-and-routing:change_streams_mongos_passthrough_with_balancer
+#
+# Or, outside the bazel sandbox:
+#   python buildscripts/resmoke.py run \
+#     --suites=change_streams_mongos_passthrough_with_balancer
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/change_streams/**/*.js
+  exclude_with_any_tags:
+    ##
+    # Tags inherited from change_streams_mongos_passthrough.yml.
+    ##
+    - assumes_against_mongod_not_mongos
+    - assumes_standalone_mongod
+    - requires_profiling
+    ##
+    # Background collection moves are incompatible with tests that depend on a
+    # collection staying on the same shard for the duration of the test, or
+    # that orchestrate their own balancer / chunk migrations.
+    ##
+    - assumes_balancer_off
+    - assumes_no_track_upon_creation
+    - assumes_unsharded_collection
+    - requires_collection_stays_on_same_shard
+    - does_not_support_concurrent_moves
+    - uses_parallel_shell
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: |
+        await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
+        await import("jstests/libs/override_methods/enable_sessions.js");
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: "majority"
+          enableMajorityReadConcern: true
+          # Surface to tests + libraries that the balancer is running and may
+          # relocate unsharded collections in the background.
+          runningWithBalancer: true
+          runningWithMoveCollectionInBackground: true
+  hooks:
+    # Continuously emit `moveCollection` against random unsharded collections
+    # owned by the test database while the change-stream is open. This is the
+    # SERVER-86751 coverage delta vs the existing
+    # change_streams_mongos_passthrough suite.
+    - class: ContinuousMoveCollection
+    # Background topology mutation can race with FCV transitions, so re-check
+    # routing metadata once the stream-consuming workload settles.
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: true
+    num_shards: 2
+    num_rs_nodes_per_shard: 2
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        # Drive the balancer hot so moves interleave with the open
+        # change-stream's getMore cadence (~1s).
+        balancerMigrationsThrottlingMs: 250
+        writePeriodicNoops: true
+        periodicNoopIntervalSecs: 1
+        reshardingMinimumOperationDurationMillis: 0
+    configsvr_options:
+      set_parameters:
+        enableTestCommands: 1
+        reshardingCriticalSectionTimeoutMillis: 86400000  # 24h

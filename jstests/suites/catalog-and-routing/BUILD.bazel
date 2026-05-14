@@ -64,6 +64,40 @@ resmoke_suite_test(
     ],
 )
 
+# SERVER-86751: Passthrough running jstests/change_streams/** while the
+# balancer continuously moves unsharded collections in the background.
+# Exercises change-stream resumability + shard-targeting under topology
+# mutation. See change_streams_mongos_passthrough_with_balancer.yml for the
+# selector/hook/fixture deltas vs change_streams_mongos_passthrough.
+resmoke_suite_test(
+    name = "change_streams_mongos_passthrough_with_balancer",
+    config = ":change_streams_mongos_passthrough_with_balancer.yml",
+    data = [
+        "//jstests/change_streams:all_javascript_files",
+        "//jstests/libs/query:all_javascript_files",
+        "//jstests/sharding/libs:all_subpackage_javascript_files",
+    ] + CORE_DATA,
+    shard_count = 12,
+    tags = [
+        "ci-default",
+        "change_streams",
+        "common",
+        "cpu:2",
+        "sharded",
+    ],
+    target_compatible_with = select({
+        "@platforms//cpu:ppc64le": ["@platforms//:incompatible"],
+        "@platforms//cpu:s390x": ["@platforms//:incompatible"],
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
 resmoke_suite_test(
     name = "sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough",
     config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough.yml",
