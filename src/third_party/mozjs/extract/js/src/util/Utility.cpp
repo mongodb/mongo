@@ -98,7 +98,8 @@ void InitLargeAllocLimit() {
 // allocator implementation in mongo_sources.
 #ifndef JS_USE_CUSTOM_ALLOCATOR
 
-JS_PUBLIC_API void mongo::sm::check_oom_on_mmap_allocation(size_t bytes) {}
+JS_PUBLIC_API void mongo::sm::record_mmap_alloc(size_t bytes) {}
+JS_PUBLIC_API void mongo::sm::record_mmap_free(size_t bytes) {}
 
 JS_PUBLIC_DATA arena_id_t js::MallocArena;
 JS_PUBLIC_DATA arena_id_t js::BackgroundMallocArena;

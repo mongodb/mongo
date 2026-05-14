@@ -49,7 +49,8 @@ extern MOZ_NORETURN MOZ_COLD JS_PUBLIC_API void JS_Assert(const char* s,
  */
 namespace mongo {
 namespace sm {
-JS_PUBLIC_API void check_oom_on_mmap_allocation(size_t bytes);
+JS_PUBLIC_API void record_mmap_alloc(size_t bytes);
+JS_PUBLIC_API void record_mmap_free(size_t bytes);
 }  // namespace sm
 }  // namespace mongo
 
