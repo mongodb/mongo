@@ -133,4 +133,137 @@ inline otel::metrics::UpDownCounter<int64_t>& createCursorsOpenPinned() {
         kCursorsOpenPinnedOpts);
 }
 
+// -----------------------------------------------------------------------------
+// SERVER-126371: process-wide change-stream error counters on mongoS.
+//
+// Six counters live under `metrics.changeStreams.errors.*` and are incremented
+// from the router-role error paths (handle_topology_change_v2, mongos_process_
+// interface, sharded_agg_helpers) at the point the error is classified.  The
+// `.role = ClusterRole::RouterServer` marker scopes serverStatus exposure to
+// mongoS processes; on a replica-set primary the dotted path is omitted.
+//
+// Wiring (separate commits, not in this metric-declaration change):
+//   * totalRetriable                  : isResumableChangeStreamError(status) == true
+//   * totalNonRetriable               : isResumableChangeStreamError(status) == false
+//   * historyLost                     : ErrorCodes::ChangeStreamHistoryLost
+//   * resumeTokenNotFound             : ErrorCodes::ChangeStreamFatalError +
+//                                        ResumeTokenNotFound classifier
+//   * bsonObjectTooLarge              : ErrorCodes::BSONObjectTooLarge
+//                                        (catch site in plan_executor_pipeline.cpp:154)
+//   * interruptedDueToReplStepChange  : ErrorCodes::InterruptedDueToReplStateChange
+// -----------------------------------------------------------------------------
+
+inline const otel::metrics::CounterOptions kErrorsTotalRetriableOpts = [] {
+    otel::metrics::CounterOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = "changeStreams.errors.totalRetriable",
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+    };
+    return opts;
+}();
+
+inline otel::metrics::Counter<int64_t>& createErrorsTotalRetriable() {
+    return otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kChangeStreamErrorsTotalRetriable,
+        "Total number of resumable (retriable) change stream errors observed on the router.",
+        otel::metrics::MetricUnit::kErrors,
+        kErrorsTotalRetriableOpts);
+}
+
+inline const otel::metrics::CounterOptions kErrorsTotalNonRetriableOpts = [] {
+    otel::metrics::CounterOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = "changeStreams.errors.totalNonRetriable",
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+    };
+    return opts;
+}();
+
+inline otel::metrics::Counter<int64_t>& createErrorsTotalNonRetriable() {
+    return otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kChangeStreamErrorsTotalNonRetriable,
+        "Total number of non-resumable change stream errors observed on the router.",
+        otel::metrics::MetricUnit::kErrors,
+        kErrorsTotalNonRetriableOpts);
+}
+
+inline const otel::metrics::CounterOptions kErrorsHistoryLostOpts = [] {
+    otel::metrics::CounterOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = "changeStreams.errors.historyLost",
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+    };
+    return opts;
+}();
+
+inline otel::metrics::Counter<int64_t>& createErrorsHistoryLost() {
+    return otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kChangeStreamErrorsHistoryLost,
+        "Count of ChangeStreamHistoryLost errors observed on the router.",
+        otel::metrics::MetricUnit::kErrors,
+        kErrorsHistoryLostOpts);
+}
+
+inline const otel::metrics::CounterOptions kErrorsResumeTokenNotFoundOpts = [] {
+    otel::metrics::CounterOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = "changeStreams.errors.resumeTokenNotFound",
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+    };
+    return opts;
+}();
+
+inline otel::metrics::Counter<int64_t>& createErrorsResumeTokenNotFound() {
+    return otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kChangeStreamErrorsResumeTokenNotFound,
+        "Count of resume-token-not-found classifier firings on the router.",
+        otel::metrics::MetricUnit::kErrors,
+        kErrorsResumeTokenNotFoundOpts);
+}
+
+inline const otel::metrics::CounterOptions kErrorsBsonObjectTooLargeOpts = [] {
+    otel::metrics::CounterOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = "changeStreams.errors.bsonObjectTooLarge",
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+    };
+    return opts;
+}();
+
+inline otel::metrics::Counter<int64_t>& createErrorsBsonObjectTooLarge() {
+    return otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kChangeStreamErrorsBsonObjectTooLarge,
+        "Count of BSONObjectTooLarge errors observed by change stream pipelines on the router.",
+        otel::metrics::MetricUnit::kErrors,
+        kErrorsBsonObjectTooLargeOpts);
+}
+
+inline const otel::metrics::CounterOptions kErrorsInterruptedDueToReplStepChangeOpts = [] {
+    otel::metrics::CounterOptions opts{};
+    opts.serverStatusOptions = otel::metrics::ServerStatusOptions{
+        .dottedPath = "changeStreams.errors.interruptedDueToReplStepChange",
+        .role = ::mongo::ClusterRole{::mongo::ClusterRole::RouterServer},
+    };
+    return opts;
+}();
+
+inline otel::metrics::Counter<int64_t>& createErrorsInterruptedDueToReplStepChange() {
+    return otel::metrics::MetricsService::instance().createInt64Counter(
+        otel::metrics::MetricNames::kChangeStreamErrorsInterruptedDueToReplStepChange,
+        "Count of InterruptedDueToReplStateChange errors observed by change stream pipelines on "
+        "the router.",
+        otel::metrics::MetricUnit::kErrors,
+        kErrorsInterruptedDueToReplStepChangeOpts);
+}
+
+// Process-wide error counters. Declared `extern` here so that exactly one
+// translation unit (change_stream_metrics_util.cpp, follow-up commit) owns the
+// definitions, mirroring the gCursorsTotalOpened / gCursorsOpenTotal pattern.
+extern otel::metrics::Counter<int64_t>& gErrorsTotalRetriable;
+extern otel::metrics::Counter<int64_t>& gErrorsTotalNonRetriable;
+extern otel::metrics::Counter<int64_t>& gErrorsHistoryLost;
+extern otel::metrics::Counter<int64_t>& gErrorsResumeTokenNotFound;
+extern otel::metrics::Counter<int64_t>& gErrorsBsonObjectTooLarge;
+extern otel::metrics::Counter<int64_t>& gErrorsInterruptedDueToReplStepChange;
+
 }  // namespace mongo::change_stream
