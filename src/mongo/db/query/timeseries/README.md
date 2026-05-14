@@ -89,6 +89,41 @@ the same namespace as the timeseries collection and set the `rawData` field on t
 `true`. Therefore, queries on `<namespace>` with `rawData = true` will return the same results as
 queries on `system.buckets.<namespace>`.
 
+#### `rawData` semantics: truthy, not "present"
+
+The `rawData` generic command argument is an `OptionalBool` with three observable client states:
+
+1. `rawData` unset — non-raw execution path. The command operates on the user-facing namespace.
+2. `rawData: false` — non-raw execution path. Equivalent to unset from the server's perspective.
+3. `rawData: true` — raw-data execution path. The command operates on the underlying bucket
+   documents and additionally requires the `performRawDataOperations` privilege (or `internal`).
+
+The contract every code path must honor: **`rawData: false` is identical to unset**. Only `true`
+selects the raw-data path; only `true` requires the `performRawDataOperations` privilege gate.
+
+This means `rawData: false` must be treated as a truthy check, not a "field is present" check. The
+canonical way to test the value in C++ is:
+
+```cpp
+if (genArg.getRawData()) {            // CORRECT: truthy. Only true is raw-data.
+    // raw-data path
+}
+
+if (genArg.getRawData().has_value()) { // WRONG: rawData:false also returns true here.
+    // raw-data path
+}
+```
+
+The authoritative authorization gate lives in `checkAuthForRawData` in
+[src/mongo/db/commands.cpp][cmd auth gate] and uses the truthy form. Every router-side dispatch
+that decides whether to enter raw-data execution mode (for example, the cluster `findAndModify`
+command) must use the same truthy check so that the routing decision agrees with the
+authorization decision. A `has_value()` check at the router would cause a `rawData: false`
+request to enter the raw-data execution path while skipping the privilege check — an authorization
+bypass.
+
+[cmd auth gate]: https://github.com/mongodb/mongo/blob/master/src/mongo/db/commands.cpp
+
 ### Considerations when working with viewless timeseries
 
 These were important lessons taken from SPM-4217, which added aggregation support for viewless
