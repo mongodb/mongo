@@ -34,10 +34,23 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/platform/atomic_word.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::oplog_truncation {
+
+namespace {
+// Cumulative count of write-conflict retries observed inside `reclaimOplog`'s
+// `writeConflictRetry` block. See `getWriteConflictCount()` in the header for the
+// observability contract; SERVER-123047 wires this into the `oplogTruncation` server-status
+// section.
+AtomicWord<int64_t> writeConflictCount;
+}  // namespace
+
+int64_t getWriteConflictCount() {
+    return writeConflictCount.load();
+}
 
 RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayTruncateUpTo) {
     RecordId highestTruncated;
@@ -49,8 +62,15 @@ RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayT
         }
         invariant(truncateMarker->lastRecord.isValid());
 
+        // Counts retry-attempts of the lambda below. `writeConflictRetry` only re-invokes the
+        // callable on WriteConflictException / TemporarilyUnavailableException, so every
+        // attempt after the first faithfully records one write-conflict retry. We snapshot the
+        // attempt count, run the retry, then attribute (attempts - 1) into the cumulative
+        // metric so we never double-count a successful first-try.
+        int64_t attempts = 0;
         getNextMarker =
             writeConflictRetry(opCtx, "reclaimOplog", NamespaceString::kRsOplogNamespace, [&] {
+                ++attempts;
                 auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
                 StorageWriteTransaction txn(ru);
 
@@ -135,6 +155,10 @@ RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayT
                 highestTruncated = truncateMarker->lastRecord;
                 return true;
             });
+
+        if (attempts > 1) {
+            writeConflictCount.fetchAndAdd(attempts - 1);
+        }
     }
 
     return highestTruncated;

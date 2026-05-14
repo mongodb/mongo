@@ -74,6 +74,18 @@ AtomicWord<int64_t> truncateCount;
 // Cumulative number of times the thread has been interrupted
 AtomicWord<int64_t> interruptCount;
 
+// SERVER-123047 visibility for oplog truncation lag:
+//   * `currentTruncateStartMillis` is the wall-clock millisecond timestamp at which the
+//     in-flight truncate action began, or 0 when no action is in flight. Operators can graph
+//     `now - currentTruncateStartMillis` as a "duration in current truncate" signal. A
+//     monotonically rising value over many sampling intervals is the fingerprint of a stuck
+//     truncate (see SERVER-123045 and the reviewer comments on SERVER-123047).
+//   * `lastTruncateDurationMicros` is the duration of the most recently completed truncate
+//     action, paired with the existing `totalTimeTruncatingMicros` for histogram-style
+//     visualisation.
+AtomicWord<int64_t> currentTruncateStartMillis;
+AtomicWord<int64_t> lastTruncateDurationMicros;
+
 MONGO_FAIL_POINT_DEFINE(hangOplogCapMaintainerThread);
 MONGO_FAIL_POINT_DEFINE(hangBeforeOplogSampling);
 
@@ -131,6 +143,14 @@ public:
         builder.append("totalTimeTruncatingMicros", totalTimeTruncating.load());
         builder.append("truncateCount", truncateCount.load());
         builder.append("interruptCount", interruptCount.load());
+
+        // SERVER-123047 visibility for oplog truncation lag. Four scalars; together they let
+        // an operator distinguish "healthy throughput" from "stuck cap maintainer".
+        const int64_t startMillis = currentTruncateStartMillis.load();
+        builder.append("truncateInProgress", startMillis != 0);
+        builder.append("currentTruncateActionStartMillis", startMillis);
+        builder.append("lastTruncateDurationMicros", lastTruncateDurationMicros.load());
+        builder.append("writeConflictCount", oplog_truncation::getWriteConflictCount());
 
         return builder.obj();
     }
@@ -260,6 +280,16 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
 
         Timer timer;
 
+        // SERVER-123047: publish "an oplog truncate action is in flight, started at T" so
+        // that operators graphing (now - currentTruncateActionStartMillis) see a
+        // monotonically rising line whenever the cap maintainer is stuck. Cleared in the
+        // success path below and via the ON_BLOCK_EXIT guard so abnormal exits don't leave a
+        // stale gauge.
+        const int64_t startMillis =
+            durationCount<Milliseconds>(Date_t::now().toDurationSinceEpoch());
+        currentTruncateStartMillis.store(startMillis);
+        ON_BLOCK_EXIT([&] { currentTruncateStartMillis.store(0); });
+
         if (_reclaimOplog(opCtx, *rs, RecordId(mayTruncateUpTo.asULL())).isNull()) {
             LOGV2_DEBUG(11341900, 2, "Truncation did not occur");
             return false;
@@ -268,6 +298,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
         auto elapsedMicros = timer.micros();
         totalTimeTruncating.fetchAndAdd(elapsedMicros);
         truncateCount.fetchAndAdd(1);
+        lastTruncateDurationMicros.store(elapsedMicros);
 
         auto elapsedMillis = elapsedMicros / 1000;
         LOGV2(22402,

@@ -34,6 +34,8 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
 
+#include <cstdint>
+
 namespace mongo::oplog_truncation {
 
 /**
@@ -45,5 +47,14 @@ namespace mongo::oplog_truncation {
  * Returns the highest RecordId that was truncated, or a null RecordId if nothing was truncated.
  */
 RecordId reclaimOplog(OperationContext* opCtx, RecordStore& oplog, RecordId mayTruncateUpTo);
+
+/**
+ * Cumulative count of write-conflict retries observed inside `reclaimOplog`'s
+ * `writeConflictRetry` block. A monotonically rising counter here paired with a stalled
+ * `currentTruncateActionStartMillis` in the `oplogTruncation` server-status section is the
+ * fingerprint of SERVER-123045 and related stalls. Exposed for the server-status section
+ * defined in `oplog_cap_maintainer_thread.cpp`.
+ */
+int64_t getWriteConflictCount();
 
 }  // namespace mongo::oplog_truncation
