@@ -1,0 +1,58 @@
+# Chaos suite for SERVER-126514: exercises oplog truncation edge cases under repeated step-ups.
+#
+# The driver test (jstests/replsets/oplog_truncation_chaos_stepup.js) drives explicit replSetStepUp
+# commands at every secondary while a steady majority-write workload runs. The ContinuousStepdown
+# hook below is configured with randomize_kill=true so that the chaos surface also includes
+# graceful stepdowns, SIGTERM, and SIGKILL between rounds — together this stresses every code path
+# the oplog truncator may hit when a new primary takes over (e.g. truncating back to the stable
+# timestamp, redriving applied-through, recovering from an unclean shutdown).
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/replsets/oplog_truncation_chaos_stepup.js
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+      global_vars:
+        TestData:
+          alwaysInjectTransactionNumber: true
+          logRetryAttempts: true
+          networkErrorAndTxnOverrideConfig:
+            retryOnNetworkErrors: true
+          overrideRetryAttempts: 6
+          runningWithStepdowns: true
+  hooks:
+    # Layer chaos on top of the explicit step-ups the driver test issues. randomize_kill picks
+    # between clean stepdown, SIGTERM, and SIGKILL with equal probability — the full surface area
+    # the oplog truncation code path needs to survive.
+    - class: ContinuousStepdown
+      stepdown_interval_ms: 4000
+      randomize_kill: true
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 1
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        # Surface enough replication detail to debug failures from the archived logs.
+        logComponentVerbosity:
+          replication:
+            heartbeats: 2
+            election: 2
+            rollback: 2
+    all_nodes_electable: true
+    num_nodes: 3
