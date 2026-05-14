@@ -1,0 +1,181 @@
+# Based on the concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard
+# suite. This suite enables Dynamic Shard Creation (DSC, disaggregated storage) on top of the
+# continuous shard add/remove + config transition workload mix.
+#
+# SERVER-119363: Enable concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard.yml
+# for DSC.
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+  exclude_files:
+    # Inherited exclusions from the base
+    # concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard
+    # suite. Reasons are preserved verbatim from that suite; see SERVER-119363 history.
+
+    # test creates too many collections for ContinuousAddRemoveShard
+    - jstests/concurrency/fsm_workloads/ddl/create_collection/create_collection.js
+
+    # TODO SERVER-89841: Performs many sharding DDL operations and can time out taking the DDL lock
+    # on slower variants.
+    - jstests/concurrency/fsm_workloads/query/agg/agg_lookup.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_out.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_interrupt.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_remove.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_nonexistent.js
+    - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_operations.js
+    - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_check_metadata_consistency_killop.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_sharded_collection.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_chain.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_droptarget.js
+    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out.js
+
+    # Connects directly to shards that might have been decomissioned, which leads to network errors.
+    - jstests/concurrency/fsm_workloads/cleanup_orphaned_with_balancer.js
+
+    # Tests that perform shard addition, shard removal, or movePrimary operations,
+    # might interfere with the state expected during execution of the ContinuousAddRemoveShard hook.
+    - jstests/concurrency/fsm_workloads/crud/move_primary_with_crud.js
+
+    # TODO SERVER-90609: movePrimary does not synchronize with index builds.
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod_separate_collections.js
+
+    # This test runs a large number of inserts, which can cause moveCollection to take a long time
+    # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
+
+    # These tests runs a large number of inserts while chunk migrations occur, which can cause the test
+    # to time out because we don't do inserts with bucket reopening.
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_reopening_respects_control_closed.js
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_crud_operations_respect_control_closed.js
+
+  exclude_with_any_tags:
+    - requires_standalone
+    - assumes_against_mongod_not_mongos
+    - assumes_balancer_off
+    - requires_replication
+    # mongos has no system.profile collection.
+    - requires_profiling
+    - assumes_unsharded_collection
+
+    # The following tags are excluded specifically for this suite.
+    - config_shard_incompatible
+    - assumes_stable_shard_list
+
+    # Workloads that kill random sessions might interrupt operations
+    # performed by the ContinuousAddRemoveShard hook.
+    - kills_random_sessions
+
+    # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
+    # so that the whole result set is returned through a single batch
+    - assumes_no_implicit_cursor_exhaustion
+
+    # DSC-specific exclusions: workloads that exercise features the disaggregated
+    # storage stack does not yet support or that are known-incompatible with the
+    # auto-bootstrap path used when disaggregatedStorageEnabled is set.
+    - incompatible_with_disaggregated_storage
+    - incompatible_with_dsc
+    # DSC clusters use auto-bootstrap; tests that drive replSetInitiate
+    # manually deadlock under disagg_storage_override.js.
+    - requires_explicit_repl_set_initiate
+    # DSC does not yet persist findAndModify pre/post-images in
+    # config.image_collection — workloads depending on that path are skipped.
+    - uses_image_collection_for_findAndModify
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: >-
+        await import("src/mongo/db/modules/atlas/jstests/disagg_storage/libs/disagg_storage_override.js");
+        await import("jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
+        await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+        await import("jstests/libs/override_methods/implicitly_retry_crud_on_no_progress_made.js");
+      global_vars:
+        TestData:
+          runningWithBalancer: true
+          shardsAddedRemoved: true
+          hasRandomShardsAddedRemoved: true
+          implicitlyShardOnCreateCollectionOnly: true
+          useActionPermittedFile: [ContinuousAddRemoveShard]
+          shardCollectionProbability: 0.5
+          # DSC: see query_golden_sharding_disagg.yml for the canonical DSC TestData
+          # overrides. Mirrored here so the FSM driver picks up the same coherence
+          # relaxations as the golden suites.
+          defaultReplSetNumNodes: 2
+          # TODO(SERVER-116998): Inter-node collection hash validation is an ASC-only check.
+          skipInterNodeCollectionHashValidation: true
+          # TODO(SERVER-115393): Remove if possible.
+          supportsParallelReplSetInitiateAndStop: false
+          # TODO(SERVER-112499): Remove.
+          skipEnforceFastCountOnValidate: true
+          # TODO(SLS-1414): Remove.
+          doesNotSupportGracefulStepdown: true
+          # TODO(SERVER-113063): Remove.
+          skipAwaitReplicationConfigVersionCheck: true
+          # DSC doesn't support storing findAndModify pre/post-images in config.image_collection.
+          doesNotSupportFindAndModifyImageCollection: true
+  hooks:
+    - class: ContinuousAddRemoveShard
+      transition_configsvr: true
+      add_remove_random_shards: true
+      is_fsm_workload: true
+      # TODO SERVER-120162: Re-enable once all the false positive have been addressed and the test is stable.
+    # - class: CheckIdleCursors
+    - class: CheckShardFilteringMetadata
+    # Suites that shutdown nodes are not compatible with the CheckReplDBHashInBackground hook, so
+    # this suite does not include that hook
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            shardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: true
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+    - class: CleanupConcurrencyWorkloads
+  fixture:
+    class: ShardedClusterFixture
+    config_shard: "any"
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+        set_parameters:
+          # Enable Dynamic Shard Creation (disaggregated storage) on every shard
+          # mongod brought up by the fixture. The auto-bootstrap path keyed off
+          # this flag is what `replicaset.py:_initiate_repl_set` checks.
+          disaggregatedStorageEnabled: true
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        roleGraphInvalidationIsFatal: 1
+        queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        skipDroppingHashedShardKeyIndex: true
+        reshardingMinimumOperationDurationMillis: 0
+        balancerMigrationsThrottlingMs: 250
+        featureFlagReshardingForTimeseries: true
+        # DSC also needs the flag on the config server nodes when running in
+        # config_shard mode so the auto-bootstrap path engages.
+        disaggregatedStorageEnabled: true
+    num_rs_nodes_per_shard: 3
+    # Use 3 shards so there's always at least two for workloads with manual migrations, etc.
+    num_shards: 3
+    num_mongos: 2
+    enable_balancer: true
+    random_migrations: true
