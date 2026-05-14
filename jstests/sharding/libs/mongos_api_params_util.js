@@ -334,21 +334,6 @@ export let MongosAPIParametersUtil = (function () {
         {commandName: "oidcRefreshKeys", skip: "TODO(SERVER-108802)", conditional: true},
         {commandName: "removeQuerySettings", skip: "TODO(SERVER-108802)"},
         {
-            commandName: "repairShardedCollectionChunksHistory",
-            run: {
-                inAPIVersion1: false,
-                configServerCommandName: "_configsvrRepairShardedCollectionChunksHistory",
-                runsAgainstAdminDb: true,
-                permittedInTxn: false,
-                permittedOnShardedCollection: true,
-                setUp: () => {
-                    assert.commandWorked(st.s.adminCommand({enableSharding: "db", primaryShard: st.shard0.shardName}));
-                    assert.commandWorked(st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
-                },
-                command: () => ({repairShardedCollectionChunksHistory: "db.collection"}),
-            },
-        },
-        {
             commandName: "resetPlacementHistory",
             // The command is expected to fail when the featureFlagChangeStreamPreciseShardTargeting is disabled.
             skip: "SERVER-73741 Re-enable execution once 9.0 becomes last-lts.",

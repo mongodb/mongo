@@ -662,18 +662,6 @@ public:
      */
     static void clearForTests(ServiceContext* serviceContext);
 
-    //
-    // Upgrade/downgrade
-    //
-
-    /**
-     * Upgrade the chunk metadata to include the history field.
-     */
-    void upgradeChunksHistory(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              bool force,
-                              const Timestamp& validAfter);
-
     /**
      * Returns a catalog client that will always run commands locally. Can only be used on a
      * config server node.

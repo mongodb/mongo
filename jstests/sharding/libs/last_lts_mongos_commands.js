@@ -6,6 +6,7 @@
 export const commandsRemovedFromMongosSinceLastLTS = [
     "_getAuditConfigGeneration", // Removed in 8.1
     "changePrimary", // Removed in 9.0
+    "repairShardedCollectionChunksHistory", // Removed in 9.0
     "startRecordingTraffic",
     "stopRecordingTraffic",
     "cleanupReshardCollection",

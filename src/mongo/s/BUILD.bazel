@@ -289,7 +289,6 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:move_primary_gen",
         "//src/mongo/db/global_catalog/ddl:placement_history_commands_gen",
         "//src/mongo/db/global_catalog/ddl:remove_shard_from_zone_request_type.cpp",
-        "//src/mongo/db/global_catalog/ddl:repair_sharded_collection_chunks_history_gen",
         "//src/mongo/db/global_catalog/ddl:set_allow_migrations_gen",
         "//src/mongo/db/global_catalog/ddl:sharded_ddl_commands_gen",
         "//src/mongo/db/global_catalog/ddl:shardsvr_join_ddl_coordinators_request_gen",

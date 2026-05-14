@@ -288,7 +288,6 @@ const allCommands = {
         command: {renameCollection: fullNs, to: dbName + ".renamedColl"},
         isAdminCommand: true,
     },
-    repairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
     replicateSearchIndexCommand: {skip: isAnInternalCommand},
     replSetGetStatus: {skip: "mongos does not run replset commands"},
     resetPlacementHistory: {command: {resetPlacementHistory: 1}, isAdminCommand: true},

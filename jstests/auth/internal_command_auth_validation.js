@@ -252,10 +252,6 @@ const internalCommandsMap = {
         testname: "_configsvrRemoveTags",
         command: {_configsvrRemoveTags: "test"},
     },
-    _configsvrRepairShardedCollectionChunksHistory: {
-        testname: "_configsvrRepairShardedCollectionChunksHistory",
-        command: {_configsvrRepairShardedCollectionChunksHistory: ns},
-    },
     _configsvrResetPlacementHistory: {
         testname: "_configsvrResetPlacementHistory",
         command: {_configsvrResetPlacementHistory: ns},

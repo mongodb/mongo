@@ -59,7 +59,6 @@ const allCommands = {
     _configsvrRemoveShard: {skip: isAnInternalCommand},
     _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
     _configsvrRemoveTags: {skip: isAnInternalCommand},
-    _configsvrRepairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
     _configsvrResetPlacementHistory: {skip: isAnInternalCommand},
     _configsvrReshardCollection: {skip: isAnInternalCommand},
     _configsvrRunRestore: {skip: isAnInternalCommand},
@@ -1045,7 +1044,6 @@ const allCommands = {
             assert.commandWorked(mongoS.getDB(dbName).runCommand({drop: collName}));
         },
     },
-    repairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
     replicateSearchIndexCommand: {skip: isAnInternalCommand},
     replSetAbortPrimaryCatchUp: {skip: "tested in direct_shard_connection_auth_rs_commands.js"},
     replSetFreeze: {skip: "tested in direct_shard_connection_auth_rs_commands.js"},

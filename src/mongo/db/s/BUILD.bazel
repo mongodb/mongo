@@ -582,7 +582,6 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:configsvr_merge_chunks_command.cpp",
         "//src/mongo/db/global_catalog/ddl:configsvr_remove_chunks_command.cpp",
         "//src/mongo/db/global_catalog/ddl:configsvr_remove_shard_from_zone_command.cpp",
-        "//src/mongo/db/global_catalog/ddl:configsvr_repair_sharded_collection_chunks_history_command.cpp",
         "//src/mongo/db/global_catalog/ddl:configsvr_reset_placement_history_command.cpp",
         "//src/mongo/db/global_catalog/ddl:configsvr_run_restore_command.cpp",
         "//src/mongo/db/global_catalog/ddl:configsvr_run_restore_gen",

@@ -64,7 +64,6 @@ const allCommands = {
     _configsvrRemoveShard: {skip: isAnInternalCommand},
     _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
     _configsvrRemoveTags: {skip: isAnInternalCommand},
-    _configsvrRepairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
     _configsvrResetPlacementHistory: {skip: isAnInternalCommand},
     _configsvrReshardCollection: {skip: isAnInternalCommand},
     _configsvrRunRestore: {skip: isAnInternalCommand},
@@ -1337,7 +1336,6 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName + "2"}));
         },
     },
-    repairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
     replicateSearchIndexCommand: {skip: isAnInternalCommand},
     replSetAbortPrimaryCatchUp: {
         // This will be tested in FCV upgrade/downgrade passthroughs through the replsets directory.
