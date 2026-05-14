@@ -531,7 +531,7 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     FeatureCompatibilityVersionDocument newFCVDoc = fcvTransitions.getFCVDocument(version);
 
     newFCVDoc.setChangeTimestamp(changeTimestamp);
-    newFCVDoc.setPhase(phase);
+    newFCVDoc.setPhase(gFeatureFlagSymmetricFCV.isEnabled() ? phase : boost::none);
 
     // The setIsCleaningServerMetadata parameter can either be true, false, or boost::none.
     // True indicates we want to set the isCleaningServerMetadata FCV document field to true.
