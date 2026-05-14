@@ -525,9 +525,7 @@ private:
     Value _value;
 };
 
-/**
- * A view of a tag & value, not owned here.
- */
+// Forward-declared here because TagValueView::copy() references it.
 class TagValueOwned;
 
 /**
@@ -542,6 +540,9 @@ inline bool tagIn(TypeTags t, Tags... tags) {
     return ((t == tags) || ...);
 }
 
+/**
+ * A view of a tag & value, not owned here.
+ */
 struct TagValueView {
     TypeTags tag = TypeTags::Nothing;
     Value value = 0;
