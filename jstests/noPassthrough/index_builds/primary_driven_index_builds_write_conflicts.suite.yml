@@ -1,0 +1,43 @@
+# Resmoke suite: noPassthrough_primary_driven_index_builds_write_conflicts
+#
+# SERVER-126326 — PDIB WC-injection test coverage.
+#
+# CANONICAL LOCATION (must be moved before merging):
+#   buildscripts/resmokeconfig/suites/noPassthrough_primary_driven_index_builds_write_conflicts.yml
+#
+# This file is staged here under jstests/noPassthrough/index_builds/ because the
+# substrate-contrib/w3-68 worktree uses a sparse-checkout that excludes
+# buildscripts/. The reviewer should `git mv` this file into the canonical
+# buildscripts/resmokeconfig/suites/ directory (renaming off the .suite.yml
+# suffix) when integrating.
+#
+# Modelled on the existing jstestfuzz_replication_write_conflicts suite — same
+# WTWriteConflictException injection strategy, scoped to PDIB-only jstests.
+
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/noPassthrough/index_builds/primary_driven_index_build_wce_injection_*.js
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      nodb: ""
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        # Enable the PDIB feature flag so the tests do not self-skip when run
+        # against a build that has the flag gated off by default.
+        featureFlagPrimaryDrivenIndexBuilds: true
+        # Surface WCEs in logs for triage when a test fails under injection.
+        traceWriteConflictExceptions: true
