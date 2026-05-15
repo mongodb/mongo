@@ -50,7 +50,8 @@ bulk_write_exec::BulkWriteReplyInfo processFLEResponse(OperationContext* opCtx,
  * Attempt to run the bulkWriteCommandRequest through Queryable Encryption code path.
  * Returns kNotProcessed if falling back to the regular bulk write code path is needed instead.
  *
- * This function does not throw, any errors are reported via the function return.
+ * This function may throw. Errors from FLE CRUD operations are reported via the function return;
+ * errors from request validation or response processing propagate as exceptions.
  */
 std::pair<FLEBatchResult, bulk_write_exec::BulkWriteReplyInfo> attemptExecuteFLE(
     OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest);

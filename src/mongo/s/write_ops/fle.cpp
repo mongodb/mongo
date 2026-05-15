@@ -32,6 +32,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/commands/query_cmd/bulk_write_common.h"
+#include "mongo/db/error_labels.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -221,37 +222,19 @@ std::pair<FLEBatchResult, bulk_write_exec::BulkWriteReplyInfo> attemptExecuteFLE
     const auto& ops = clientRequest.getOps();
     BulkWriteCRUDOp firstOp(ops[0]);
     auto firstOpType = firstOp.getType();
-    try {
-        BatchedCommandResponse response;
-        FLEBatchResult fleResult;
+    BatchedCommandResponse response;
+    FLEBatchResult fleResult;
 
-        BatchedCommandRequest fleRequest = makeFLECommandRequest(opCtx, clientRequest, ops);
-        fleResult = processFLEBatch(opCtx, fleRequest, &response);
+    BatchedCommandRequest fleRequest = makeFLECommandRequest(opCtx, clientRequest, ops);
+    fleResult = processFLEBatch(opCtx, fleRequest, &response);
 
-        if (fleResult == FLEBatchResult::kNotProcessed) {
-            return {FLEBatchResult::kNotProcessed, bulk_write_exec::BulkWriteReplyInfo()};
-        }
-
-        bulk_write_exec::BulkWriteReplyInfo replyInfo = processFLEResponse(
-            opCtx, fleRequest, firstOpType, clientRequest.getErrorsOnly(), response);
-        return {FLEBatchResult::kProcessed, std::move(replyInfo)};
-    } catch (const DBException& ex) {
-        LOGV2_WARNING(7749700,
-                      "Failed to process bulkWrite with Queryable Encryption",
-                      "error"_attr = redact(ex));
-        // If Queryable encryption adds support for update with multi: true, we might have to update
-        // the way we make replies here to handle SERVER-15292 correctly.
-        bulk_write_exec::BulkWriteReplyInfo replyInfo;
-        BulkWriteReplyItem reply(0, ex.toStatus());
-        reply.setN(0);
-        if (firstOpType == BulkWriteCRUDOp::kUpdate) {
-            reply.setNModified(0);
-        }
-
-        replyInfo.replyItems.push_back(reply);
-        replyInfo.summaryFields.nErrors = 1;
-        return {FLEBatchResult::kProcessed, std::move(replyInfo)};
+    if (fleResult == FLEBatchResult::kNotProcessed) {
+        return {FLEBatchResult::kNotProcessed, bulk_write_exec::BulkWriteReplyInfo()};
     }
+
+    bulk_write_exec::BulkWriteReplyInfo replyInfo =
+        processFLEResponse(opCtx, fleRequest, firstOpType, clientRequest.getErrorsOnly(), response);
+    return {FLEBatchResult::kProcessed, std::move(replyInfo)};
 }
 
 }  // namespace mongo

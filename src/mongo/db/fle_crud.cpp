@@ -122,6 +122,8 @@ MONGO_FAIL_POINT_DEFINE(fleCrudHangPreFindAndModify);
 
 MONGO_FAIL_POINT_DEFINE(fleCrudPauseNonTxnGetTags);
 
+MONGO_FAIL_POINT_DEFINE(fleCrudThrowTransientTxnError);
+
 namespace mongo {
 namespace {
 std::vector<write_ops::WriteError> singleStatusToWriteErrors(const Status& status) {
@@ -461,6 +463,12 @@ insertSingleDocument(OperationContext* opCtx,
                 fleCrudHangPreInsert.pauseWhileSet();
             }
 
+            if (MONGO_unlikely(fleCrudThrowTransientTxnError.shouldFail())) {
+                uasserted(
+                    ErrorCodes::LockTimeout,
+                    "insertSingleDocument failed due to fleCrudThrowTransientTxnError fail point");
+            }
+
             *reply = uassertStatusOK(processInsert(&queryImpl,
                                                    edcNss2,
                                                    *serverPayload2.get(),
@@ -639,6 +647,10 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
                 fleCrudHangPreDelete.pauseWhileSet();
             }
 
+            if (MONGO_unlikely(fleCrudThrowTransientTxnError.shouldFail())) {
+                uasserted(ErrorCodes::LockTimeout,
+                          "processDelete failed due to fleCrudThrowTransientTxnError fail point");
+            }
 
             *reply = processDelete(&queryImpl, expCtx2, deleteRequest2, efc2);
 
@@ -760,6 +772,11 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
             if (MONGO_unlikely(fleCrudHangPreUpdate.shouldFail())) {
                 LOGV2(6516703, "Hanging due to fleCrudHangPreUpdate fail point");
                 fleCrudHangPreUpdate.pauseWhileSet();
+            }
+
+            if (MONGO_unlikely(fleCrudThrowTransientTxnError.shouldFail())) {
+                uasserted(ErrorCodes::LockTimeout,
+                          "processUpdate failed due to fleCrudThrowTransientTxnError fail point");
             }
 
             *reply = processUpdate(&queryImpl, expCtx2, updateRequest2, efc2);
@@ -1103,6 +1120,12 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
             if (MONGO_unlikely(fleCrudHangPreFindAndModify.shouldFail())) {
                 LOGV2(6516704, "Hanging due to fleCrudHangPreFindAndModify fail point");
                 fleCrudHangPreFindAndModify.pauseWhileSet();
+            }
+
+            if (MONGO_unlikely(fleCrudThrowTransientTxnError.shouldFail())) {
+                uasserted(
+                    ErrorCodes::LockTimeout,
+                    "processFindAndModify failed due to fleCrudThrowTransientTxnError fail point");
             }
 
             *reply = processCallback(expCtx, &queryImpl, findAndModifyRequest2);

@@ -107,6 +107,9 @@ function WriteResult(bulkResult, singleBatchType, writeConcern) {
     defineReadOnlyProperty(this, "nMatched", bulkResult.nMatched);
     defineReadOnlyProperty(this, "nModified", bulkResult.nModified);
     defineReadOnlyProperty(this, "nRemoved", bulkResult.nRemoved);
+    if (bulkResult.hasOwnProperty("errorLabels")) {
+        defineReadOnlyProperty(this, "errorLabels", bulkResult.errorLabels);
+    }
     if (bulkResult.upserted.length > 0) {
         defineReadOnlyProperty(this, "_id", bulkResult.upserted[bulkResult.upserted.length - 1]._id);
     }
@@ -219,6 +222,9 @@ function BulkWriteResult(bulkResult, singleBatchType, writeConcern) {
     defineReadOnlyProperty(this, "nMatched", bulkResult.nMatched);
     defineReadOnlyProperty(this, "nModified", bulkResult.nModified);
     defineReadOnlyProperty(this, "nRemoved", bulkResult.nRemoved);
+    if (bulkResult.hasOwnProperty("errorLabels")) {
+        defineReadOnlyProperty(this, "errorLabels", bulkResult.errorLabels);
+    }
 
     //
     // Define access methods
@@ -866,6 +872,15 @@ let Bulk = function (collection, ordered) {
 
         if (result.writeConcernError) {
             bulkResult.writeConcernErrors.push(new WriteConcernError(result.writeConcernError));
+        }
+
+        if (Array.isArray(result.errorLabels)) {
+            if (!bulkResult.errorLabels) bulkResult.errorLabels = [];
+            for (const label of result.errorLabels) {
+                if (!bulkResult.errorLabels.includes(label)) {
+                    bulkResult.errorLabels.push(label);
+                }
+            }
         }
     };
 
