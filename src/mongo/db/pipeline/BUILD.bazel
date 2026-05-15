@@ -43,6 +43,26 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "change_stream_stage_test_fixture",
+    srcs = [
+        "change_stream_stage_test_fixture.cpp",
+    ],
+    deps = [
+        ":aggregation_context_fixture",
+        ":change_stream_pipeline",
+        ":change_stream_test_helpers",
+        ":document_source_mock",
+        "//src/mongo/db:change_stream_options",
+        "//src/mongo/db:change_stream_options_manager",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/unittest",
+    ],
+)
+
 idl_generator(
     name = "change_stream_pre_and_post_images_options_gen",
     src = "change_stream_pre_and_post_images_options.idl",
@@ -1226,10 +1246,8 @@ mongo_cc_unit_test(
         "change_stream_rewrites_test.cpp",
         "change_stream_shard_targeter_test.cpp",
         "change_stream_split_event_helpers_test.cpp",
-        "change_stream_stage_test_fixture.cpp",
         "change_stream_test.cpp",
         "document_source_change_stream_add_post_image_test.cpp",
-        "document_source_change_stream_handle_topology_change_v2_test.cpp",
         "document_source_change_stream_test.cpp",
     ],
     tags = [
@@ -1241,6 +1259,7 @@ mongo_cc_unit_test(
         ":aggregation_context_fixture",
         ":change_stream_pipeline",
         ":change_stream_preimage",
+        ":change_stream_stage_test_fixture",
         ":change_stream_test_helpers",
         ":document_source_mock",
         "//src/mongo/db:change_stream_options",
@@ -1251,6 +1270,41 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/pipeline:change_stream_expired_pre_image_remover",
+        "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/db/repl:oplog_entry_test_helpers",
+        "//src/mongo/unittest",
+        "//src/mongo/util:mock_periodic_runner",
+        "//src/mongo/util:version_impl",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "change_stream_handle_topology_change_v2_stage_test",
+    srcs = [
+        "document_source_change_stream_handle_topology_change_v2_cursor_management_and_error_handling_test.cpp",
+        "document_source_change_stream_handle_topology_change_v2_invalid_state_transitions_test.cpp",
+        "document_source_change_stream_handle_topology_change_v2_stage_properties_test.cpp",
+        "document_source_change_stream_handle_topology_change_v2_state_fetching_initialization_and_starting_test.cpp",
+        "document_source_change_stream_handle_topology_change_v2_state_fetching_normal_and_degraded_test.cpp",
+        "document_source_change_stream_handle_topology_change_v2_state_uninitialized_and_waiting_test.cpp",
+        "document_source_change_stream_handle_topology_change_v2_test_helpers.cpp",
+    ],
+    tags = [
+        "code_coverage_quarantine",
+        "code_coverage_quarantine_SERVER-98846",
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        ":aggregation_context_fixture",
+        ":change_stream_pipeline",
+        ":change_stream_stage_test_fixture",
+        ":change_stream_test_helpers",
+        ":document_source_mock",
+        "//src/mongo/db:change_stream_options",
+        "//src/mongo/db:change_stream_options_manager",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/repl:oplog_entry",
         "//src/mongo/db/repl:oplog_entry_test_helpers",
         "//src/mongo/unittest",
