@@ -600,12 +600,7 @@ common:public-release --stamp
 --config=public-release-local
 common:public-release-local --config=public-release
 common:public-release-local --remote_executor=
-common:public-release-local --experimental_remote_downloader=
 common:public-release-local --remote_cache=
-common:public-release-local --bes_backend=
-common:public-release-local --bes_results_url=
-common:public-release-local --tls_client_certificate=
-common:public-release-local --tls_client_key=
 common:public-release-local --remote_cache_compression=false
 common:public-release-local --grpc_keepalive_time=0s
 common:public-release-local --legacy_important_outputs
