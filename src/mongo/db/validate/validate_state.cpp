@@ -125,12 +125,18 @@ ValidateState::ValidateState(OperationContext* opCtx,
     // RepairMode is incompatible with the ValidateModes kBackground and
     // kForegroundFullEnforceFast[Count|Size|CountAndSize].
     if (fixErrors()) {
-        invariant(!isBackground());
-        invariant(!shouldEnforceFastCount(opCtx));
+        uassert(11950900,
+                "Cannot fix errors when validation is run in the background",
+                !isBackground());
+        uassert(11950901,
+                "Cannot enforce fast count when fixErrors is enabled",
+                !shouldEnforceFastCount(opCtx));
     }
 
     if (adjustMultikey()) {
-        invariant(!isBackground());
+        uassert(11950902,
+                "Cannot run adjust multikey repair when validation is run in the background",
+                !isBackground());
     }
 }
 
