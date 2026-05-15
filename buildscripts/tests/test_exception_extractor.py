@@ -251,3 +251,7 @@ class TestExceptionExtractor(unittest.TestCase):
         assert extractor.active is True
         assert extractor.exception_detected is False
         assert extractor.get_exception() == []
+
+
+if __name__ == "__main__":
+    unittest.main()

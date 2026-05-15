@@ -66,3 +66,7 @@ class TestHasHighNotFoundPathsRatio(unittest.TestCase):
         frames = []
         ret = under_test.has_high_not_found_paths_ratio(frames)
         self.assertEqual(ret, False)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -25,3 +25,7 @@ class TestWriteFileToDir(unittest.TestCase):
             under_test.write_file_to_dir("dir", "file", "contents", overwrite=False)
 
         mock_write_file.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()

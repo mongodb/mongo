@@ -66,3 +66,6 @@ class TestMessagesToReport(unittest.TestCase):
 
 
 # 'foo' optional comma + whitespace
+
+if __name__ == "__main__":
+    unittest.main()

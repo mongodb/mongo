@@ -46,3 +46,7 @@ class TestStepdownThread(unittest.TestCase):
         shardcluster_fixture.mongos.is_running.return_value = False
         with self.assertRaises(errors.ServerFailure):
             stepdown_thread.pause()
+
+
+if __name__ == "__main__":
+    unittest.main()

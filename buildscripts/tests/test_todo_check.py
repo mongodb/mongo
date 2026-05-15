@@ -262,3 +262,7 @@ class TestWalkFs(unittest.TestCase):
             under_test.walk_fs(tmpdir, visit_file)
 
             self.assertDictEqual(expected_files, seen_files)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -67,3 +67,7 @@ class TestLintFiles(unittest.TestCase):
             under_test._lint_files(["buildscripts/todo_linter.py"])
 
         self.assertEqual(context.exception.code, 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

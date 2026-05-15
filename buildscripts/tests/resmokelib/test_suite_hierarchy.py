@@ -222,3 +222,7 @@ class TestSuiteHierarchy(unittest.TestCase):
                 full_union,
                 f"Min set union\n{min_set_union}\n != full union\n{full_union}",
             )
+
+
+if __name__ == "__main__":
+    unittest.main()

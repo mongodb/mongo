@@ -190,3 +190,7 @@ class TestBufferedFileHandler(unittest.TestCase):
         flush_t.join(timeout=5)
         self.assertFalse(flush_t.is_alive(), "Flush thread did not finish in time")
         self.assertEqual(errors, [], f"Race condition caused errors: {errors}")
+
+
+if __name__ == "__main__":
+    unittest.main()

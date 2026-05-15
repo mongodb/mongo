@@ -35,3 +35,7 @@ class TestFindTestsInGitDiff(unittest.TestCase):
         tests = ["some/non/existent/jstest_file.js"]
         result = feature_flag_tags_check.get_tests_missing_fcv_tag(tests)
         self.assertCountEqual([], result)
+
+
+if __name__ == "__main__":
+    unittest.main()

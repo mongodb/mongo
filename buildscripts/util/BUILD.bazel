@@ -39,6 +39,10 @@ py_library(
             group = "testing",
         ),
         dependency(
+            "pydantic",
+            group = "evergreen",
+        ),
+        dependency(
             "requests-oauthlib",
             group = "testing",
         ),

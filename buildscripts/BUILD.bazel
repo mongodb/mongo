@@ -45,15 +45,19 @@ py_binary(
     ],
 )
 
+py_library(
+    name = "build_system_options",
+    srcs = ["build_system_options.py"],
+    visibility = ["//visibility:public"],
+)
+
 py_binary(
     name = "mongosymb",
-    srcs = [
-        "build_system_options.py",
-        "mongosymb.py",
-    ],
+    srcs = ["mongosymb.py"],
     main = "mongosymb.py",
     visibility = ["//visibility:public"],
     deps = [
+        "//buildscripts:build_system_options",
         "//buildscripts/util",
         dependency(
             "requests",
@@ -311,11 +315,23 @@ py_binary(
         "//buildscripts/patch_builds",
         "//buildscripts/resmokelib",
         dependency(
-            "structlog",
+            "click",
             group = "evergreen",
         ),
         dependency(
             "gitpython",
+            group = "evergreen",
+        ),
+        dependency(
+            "pydantic",
+            group = "evergreen",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "structlog",
             group = "evergreen",
         ),
     ],
@@ -421,6 +437,7 @@ py_binary(
 py_binary(
     name = "validate_evg_project_config",
     srcs = ["validate_evg_project_config.py"],
+    visibility = ["//visibility:public"],
     deps = [
         "//buildscripts/ciconfig",
         dependency(
@@ -587,6 +604,240 @@ py_binary(
         dependency(
             "boto3",
             group = "aws",
+        ),
+    ],
+)
+
+py_library(
+    name = "check_for_noexcept",
+    srcs = ["check_for_noexcept.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "gitpython",
+            group = "evergreen",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "typer",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "debugsymb_mapper",
+    srcs = ["debugsymb_mapper.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:build_system_options",
+        "//buildscripts/resmokelib",
+        "//buildscripts/util",
+        dependency(
+            "requests",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "evergreen_activate_gen_tasks",
+    srcs = ["evergreen_activate_gen_tasks.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        dependency(
+            "click",
+            group = "evergreen",
+        ),
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "pydantic",
+            group = "evergreen",
+        ),
+        dependency(
+            "retry",
+            group = "testing",
+        ),
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+    ],
+)
+
+py_library(
+    name = "evergreen_resmoke_job_count",
+    srcs = ["evergreen_resmoke_job_count.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "psutil",
+            group = "build-metrics",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "evergreen_task_tags",
+    srcs = ["evergreen_task_tags.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/ciconfig",
+    ],
+)
+
+py_library(
+    name = "feature_flag_tags_check",
+    srcs = ["feature_flag_tags_check.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)
+
+py_library(
+    name = "jepsen_report",
+    srcs = ["jepsen_report.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:simple_report",
+        dependency(
+            "click",
+            group = "evergreen",
+        ),
+        dependency(
+            "typing-extensions",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "package_test_internal",
+    srcs = ["package_test_internal.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "packager",
+    srcs = ["packager.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "gitpython",
+            group = "evergreen",
+        ),
+    ],
+)
+
+py_library(
+    name = "powercycle_sentinel",
+    srcs = ["powercycle_sentinel.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/util",
+        dependency(
+            "click",
+            group = "evergreen",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+    ],
+)
+
+py_library(
+    name = "sort_backport_multiversion",
+    srcs = ["sort_backport_multiversion.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "validate_commit_message",
+    srcs = ["validate_commit_message.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@bazel_rules_mongo//utils:evergreen_git",
+        "@poetry//:library_pathspec",
+        dependency(
+            "requests",
+            group = "core",
+        ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "gitpython",
+            group = "evergreen",
+        ),
+        dependency(
+            "typing-extensions",
+            group = "core",
+        ),
+    ],
+)
+
+py_library(
+    name = "todo_check",
+    srcs = ["todo_check.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:validate_commit_message",
+        dependency(
+            "click",
+            group = "evergreen",
+        ),
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+    ],
+)
+
+py_library(
+    name = "validate_mongocryptd",
+    srcs = ["validate_mongocryptd.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/ciconfig",
+        dependency(
+            "pyyaml",
+            group = "core",
         ),
     ],
 )

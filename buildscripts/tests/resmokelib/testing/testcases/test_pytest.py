@@ -59,3 +59,7 @@ class TestPyTestCase(unittest.TestCase):
         self.assertIn(" -m unittest", proc.as_command())
         self.assertIn(pytest_case.test_name, proc.as_command())
         self.assertEqual(proc.logger, logger)
+
+
+if __name__ == "__main__":
+    unittest.main()

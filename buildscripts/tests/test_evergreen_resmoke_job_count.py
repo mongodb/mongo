@@ -144,3 +144,7 @@ class DetermineJobsTest(unittest.TestCase):
 
         job_count_matching = under_test.determine_jobs(task, variant, distro, jobs_max=jobs_default)
         self.assertEqual(jobs_default, job_count_matching)
+
+
+if __name__ == "__main__":
+    unittest.main()

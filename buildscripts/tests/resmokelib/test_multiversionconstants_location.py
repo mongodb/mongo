@@ -26,3 +26,7 @@ class TestMultiversionconstantsLocation(unittest.TestCase):
                     f" uses this constant. If the module was changed, one-click repro tool"
                     f" should also be updated. Please reach out in #server-testing slack channel.",
                 )
+
+
+if __name__ == "__main__":
+    unittest.main()

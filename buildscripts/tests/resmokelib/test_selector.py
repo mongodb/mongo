@@ -738,3 +738,7 @@ class TestFilterTests(unittest.TestCase):
         selected, excluded = selector.filter_tests("db_test", config, self.test_file_explorer)
         self.assertEqual(["dbtestB"], selected)
         self.assertEqual(["dbtestA", "dbtestC"], excluded)
+
+
+if __name__ == "__main__":
+    unittest.main()

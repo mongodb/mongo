@@ -424,3 +424,7 @@ class TestParseCommandLine(unittest.TestCase):
         with self.assertRaises(SystemExit) as cm:
             parse_command_line(["run", "nonexistent_file.js"], should_configure_otel=False)
         self.assertEqual(cm.exception.code, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

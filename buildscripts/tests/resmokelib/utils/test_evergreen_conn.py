@@ -303,3 +303,7 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
 
         urls = evergreen_conn.get_compile_artifact_urls(mock_evg_api, mock_version, "test")
         self.assertEqual(urls, {})
+
+
+if __name__ == "__main__":
+    unittest.main()

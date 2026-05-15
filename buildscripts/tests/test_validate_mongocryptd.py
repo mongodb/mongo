@@ -59,3 +59,7 @@ class TestReadVariableFromYml(unittest.TestCase):
 
         yaml_mock.safe_load.return_value = mock_nodes
         self.assertEqual(expected_value, under_test.read_variable_from_yml("filename", search_key))
+
+
+if __name__ == "__main__":
+    unittest.main()

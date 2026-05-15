@@ -374,3 +374,7 @@ class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
         urlinfo = self.setup_multiversion.get_urls("4.4.1")
         self.assertEqual(urlinfo.urls, {})
         self.assertEqual(urlinfo.evg_version_id, None)
+
+
+if __name__ == "__main__":
+    unittest.main()

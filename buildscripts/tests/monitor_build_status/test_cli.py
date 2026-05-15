@@ -107,3 +107,7 @@ class TestSummarize(unittest.TestCase):
         expected_summary = f"`SUMMARY [scope]` " f"{under_test.SummaryMsg.BELOW_THRESHOLDS.value}"
 
         self.assertEqual(summary, expected_summary)
+
+
+if __name__ == "__main__":
+    unittest.main()

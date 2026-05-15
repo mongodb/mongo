@@ -19,3 +19,7 @@ class TestResmokeProxy(unittest.TestCase):
         test_list = resmoke_proxy.list_tests("some suite")
 
         self.assertEqual(len(test_list), 7)
+
+
+if __name__ == "__main__":
+    unittest.main()

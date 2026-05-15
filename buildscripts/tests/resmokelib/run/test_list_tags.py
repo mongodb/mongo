@@ -249,3 +249,7 @@ class TestGetTagDoc(unittest.TestCase):
         )
         result = list_tags.get_tag_doc(tag_block)
         self.assertEqual(expected, result)
+
+
+if __name__ == "__main__":
+    unittest.main()

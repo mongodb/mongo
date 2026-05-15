@@ -49,3 +49,7 @@ class TestSuitesConfig(unittest.TestCase):
             test_kind=("fsm_workload_test", "js_test")
         )
         self.assertEqual(membership_map, dict(test1=all_suites, test2=all_suites))
+
+
+if __name__ == "__main__":
+    unittest.main()

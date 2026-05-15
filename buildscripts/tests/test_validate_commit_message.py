@@ -234,3 +234,7 @@ class ValidateCommitMessageTest(unittest.TestCase):
             commits[0].message,
             "SERVER-1234 Add a ton of great support (#32823)\nThis PR adds back support for a lot of things\nMany great things!",
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

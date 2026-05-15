@@ -6,6 +6,7 @@ py_test(
         "__init__.py",
         "test_evergreen.py",
     ],
+    data = ["//buildscripts/tests/ciconfig:evergreen.yml"],
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts/ciconfig",

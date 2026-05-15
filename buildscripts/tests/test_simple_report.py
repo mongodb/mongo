@@ -54,3 +54,7 @@ class TestSimpleReport(unittest.TestCase):
             self.assertEqual(results[0]["status"], "fail")
             self.assertEqual(report["failures"], 1)
         self.assertEqual(result.exit_code, 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

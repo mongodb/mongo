@@ -202,3 +202,7 @@ Everything looks good! ヽ(‘ー`)ノ
             self.assertEqual(result.exit_code, 1)
         else:
             self.assertEqual(result.exit_code, 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

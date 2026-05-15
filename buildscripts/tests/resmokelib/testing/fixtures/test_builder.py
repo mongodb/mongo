@@ -318,3 +318,7 @@ class TestMakeFixtureIFRExclusion(unittest.TestCase):
             enable_feature_flags=False,
         )
         self.assertNotIn(ifr_flag, mongod.mongod_options[SET_PARAMS])
+
+
+if __name__ == "__main__":
+    unittest.main()

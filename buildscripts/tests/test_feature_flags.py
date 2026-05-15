@@ -22,3 +22,7 @@ class TestFeatureFlags(unittest.TestCase):
                 fully_disabled_flags,
                 f"Feature flag {flag} defaults to true but is listed as fully disabled.",
             )
+
+
+if __name__ == "__main__":
+    unittest.main()

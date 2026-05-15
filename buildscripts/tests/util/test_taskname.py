@@ -50,3 +50,7 @@ class TestDetermineTaskBaseName(unittest.TestCase):
         base_task_name = under_test.determine_task_base_name(task_name, bv)
 
         self.assertEqual("auth", base_task_name)
+
+
+if __name__ == "__main__":
+    unittest.main()

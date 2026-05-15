@@ -338,3 +338,7 @@ class TestGenerateExcludeYaml(unittest.TestCase):
 
         self.patch_and_run(latest_yaml, old_yaml, MultiversionOptions.LAST_LTS)
         self.assert_contents(expected)
+
+
+if __name__ == "__main__":
+    unittest.main()

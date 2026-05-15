@@ -199,3 +199,7 @@ class TestHistoricTaskData(unittest.TestCase):
         result = under_test.HistoricTaskData.get_stats_from_s3("project", "task", "variant")
 
         self.assertEqual(result, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

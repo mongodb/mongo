@@ -431,3 +431,7 @@ class TestDetermineIdleTimeout(unittest.TestCase):
             timeout_override=3,
             expected_timeout=timedelta(minutes=3),
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

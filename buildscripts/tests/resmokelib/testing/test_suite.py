@@ -238,3 +238,7 @@ class TestGetTestsForKind(unittest.TestCase):
 
         self.assertEqual(set(shard1), set(["1.js", "3.js"]))
         self.assertEqual(set(shard2), set(["2.js", "4.js"]))
+
+
+if __name__ == "__main__":
+    unittest.main()

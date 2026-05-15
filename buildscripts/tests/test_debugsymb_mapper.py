@@ -120,3 +120,7 @@ class TestGetBinVersion(TestCmdOutputExtractor):
         bin_version_output = self.cmd_output_extractor.get_bin_version("path/to/bin")
         self.assertIsNone(bin_version_output.mongodb_version)
         self.assertEqual(bin_version_output.cmd_output, version_cmd_output)
+
+
+if __name__ == "__main__":
+    unittest.main()

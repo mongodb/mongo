@@ -3,6 +3,11 @@ load("//bazel:mongo_js_rules.bzl", "mongo_js_library")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files([
+    "fully_disabled_feature_flags.yml",
+    "resmoke_modules.yml",
+])
+
 filegroup(
     name = "all_files",
     srcs = glob(["**"]),

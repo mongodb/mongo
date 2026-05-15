@@ -121,3 +121,7 @@ class TestDetectRogueProcess(unittest.TestCase):
             self.fail("Process was killed when it should not have been.")
 
         proc.wait()
+
+
+if __name__ == "__main__":
+    unittest.main()

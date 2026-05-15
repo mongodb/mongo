@@ -430,7 +430,8 @@ def _set_up_tracing(
                 extra_context["git.branch_name"] = branch_name
             except Exception:
                 print(
-                    "Unable to setup git repo. This will result in incomplete telemetry data being uploaded."
+                    "Unable to setup git repo. This will result in incomplete telemetry data being uploaded.",
+                    file=sys.stderr,
                 )
 
             processor = BatchedBaggageSpanProcessor(OTLPSpanExporter(endpoint=COLLECTOR_ENDPOINT))

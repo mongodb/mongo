@@ -80,3 +80,7 @@ class DenormalizeTestFileTest(unittest.TestCase):
         unix_file = "test/found/under/unix.sh"
         expected = [unix_file, "test\\found\\under\\unix.sh"]
         self.assertEqual(expected, testname_utils.denormalize_test_file(unix_file))
+
+
+if __name__ == "__main__":
+    unittest.main()

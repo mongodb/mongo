@@ -71,3 +71,7 @@ class TestBfIssue(unittest.TestCase):
             bf_issue = under_test.IssueTuple.from_jira_issue(jira_issue)
 
         self.assertEqual(bf_issue.team_assignment_duration_hours, 3 * 24)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -29,3 +29,7 @@ class TestBuiltinScheduler(unittest.TestCase):
 
         self.__scheduler.cancel(event2)
         self.assertEqual(self.__scheduler.queue, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

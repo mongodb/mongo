@@ -76,3 +76,7 @@ class TestMergeMongoOptionDicts(unittest.TestCase):
         }
 
         self.assertDictEqual(original, expected)
+
+
+if __name__ == "__main__":
+    unittest.main()

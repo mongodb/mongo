@@ -2,8 +2,7 @@ import json
 import os
 import pathlib
 import tempfile
-from urllib.parse import urlparse, unquote
-
+from urllib.parse import unquote, urlparse
 
 COMPILE_COMMAND_FRAGMENT_EXT = ".compile_command.json"
 

@@ -111,3 +111,7 @@ class TestFindChangedFilesAndLinesInRepos(unittest.TestCase):
         mock_open.assert_called_once_with("src/module/test1.cpp", "r")
 
         self.assertEqual(result, expected_result)
+
+
+if __name__ == "__main__":
+    unittest.main()

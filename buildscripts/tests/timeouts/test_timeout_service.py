@@ -391,3 +391,7 @@ class TestHaveEnoughHistoricStats(unittest.TestCase):
             timeout_service._have_enough_historic_stats(num_tests=-1, num_tests_missing_data=0)
         with self.assertRaises(ValueError):
             timeout_service._have_enough_historic_stats(num_tests=-100, num_tests_missing_data=0)
+
+
+if __name__ == "__main__":
+    unittest.main()

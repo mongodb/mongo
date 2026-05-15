@@ -34,6 +34,313 @@ py_test(
     ],
 )
 
+py_test(
+    name = "test_activate_task",
+    srcs = ["test_activate_task.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//evergreen:all_python_files",
+    ],
+)
+
+py_test(
+    name = "test_bazel_plus_test_interface",
+    srcs = ["test_bazel_plus_test_interface.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//bazel/wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "test_bazel_run_resmoke",
+    srcs = ["test_bazel_run_resmoke.py"],
+    data = [
+        "//buildscripts/resmokeconfig:all_files",
+        "//buildscripts/resmokeconfig/loggers:all_files",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)
+
+py_test(
+    name = "test_check_for_noexcept",
+    srcs = ["test_check_for_noexcept.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:check_for_noexcept",
+    ],
+)
+
+py_test(
+    name = "test_codeowners_auto_approver",
+    srcs = ["test_codeowners_auto_approver.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@bazel_rules_mongo//codeowners",
+    ],
+)
+
+py_test(
+    name = "test_compiledb_output_format",
+    srcs = ["test_compiledb_output_format.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//bazel/wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "test_compiledb_posthook",
+    srcs = ["test_compiledb_posthook.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//bazel/wrapper_hook",
+    ],
+)
+
+py_test(
+    name = "test_debugsymb_mapper",
+    srcs = ["test_debugsymb_mapper.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:debugsymb_mapper",
+    ],
+)
+
+py_test(
+    name = "test_errorcodes",
+    srcs = ["test_errorcodes.py"],
+    data = glob(["data/errorcodes/**/*"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:errorcodes",
+    ],
+)
+
+py_test(
+    name = "test_evergreen_activate_gen_tasks",
+    srcs = ["test_evergreen_activate_gen_tasks.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:evergreen_activate_gen_tasks",
+        dependency(
+            "mock",
+            group = "testing",
+        ),
+    ],
+)
+
+py_test(
+    name = "test_evergreen_resmoke_job_count",
+    srcs = ["test_evergreen_resmoke_job_count.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:evergreen_resmoke_job_count",
+    ],
+)
+
+py_test(
+    name = "test_evergreen_task_tags",
+    srcs = ["test_evergreen_task_tags.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:evergreen_task_tags",
+        dependency(
+            "mock",
+            group = "testing",
+        ),
+    ],
+)
+
+py_test(
+    name = "test_evergreen_task_timeout",
+    srcs = ["test_evergreen_task_timeout.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:evergreen_task_timeout",
+    ],
+)
+
+py_test(
+    name = "test_exception_extractor",
+    srcs = ["test_exception_extractor.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)
+
+py_test(
+    name = "test_feature_flag_tags_check",
+    srcs = ["test_feature_flag_tags_check.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:feature_flag_tags_check",
+    ],
+)
+
+py_test(
+    name = "test_feature_flags",
+    srcs = ["test_feature_flags.py"],
+    data = ["//buildscripts/resmokeconfig:fully_disabled_feature_flags.yml"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/idl",
+        "//buildscripts/resmokelib",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_test(
+    name = "test_generate_sbom",
+    srcs = ["test_generate_sbom.py"],
+    data = [
+        "//buildscripts/sbom:metadata.cdx.json",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/sbom:config",
+        "//buildscripts/sbom:endorctl_utils",
+        "//buildscripts/sbom:sbom_utils",
+    ],
+)
+
+py_test(
+    name = "test_jepsen_report",
+    srcs = ["test_jepsen_report.py"],
+    data = ["//buildscripts/tests:test_jepsen_report_corpus.log.txt"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:jepsen_report",
+    ],
+)
+
+py_test(
+    name = "test_legacy_commands_check",
+    srcs = ["test_legacy_commands_check.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:legacy_commands_check",
+    ],
+)
+
+py_test(
+    name = "test_merge_tidy_configs",
+    srcs = ["test_merge_tidy_configs.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//bazel:merge_tidy_configs",
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+py_test(
+    name = "test_mongosymb",
+    srcs = ["test_mongosymb.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:mongosymb",
+    ],
+)
+
+py_test(
+    name = "test_package_test_internal",
+    srcs = ["test_package_test_internal.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:package_test_internal",
+    ],
+)
+
+py_test(
+    name = "test_packager",
+    srcs = ["test_packager.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:packager",
+    ],
+)
+
+py_test(
+    name = "test_powercycle_sentinel",
+    srcs = ["test_powercycle_sentinel.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:powercycle_sentinel",
+        dependency(
+            "mock",
+            group = "testing",
+        ),
+    ],
+)
+
+py_test(
+    name = "test_simple_report",
+    srcs = ["test_simple_report.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:simple_report",
+    ],
+)
+
+py_test(
+    name = "test_sort_backport_multiversion",
+    srcs = ["test_sort_backport_multiversion.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:sort_backport_multiversion",
+    ],
+)
+
+py_test(
+    name = "test_todo_check",
+    srcs = ["test_todo_check.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:todo_check",
+    ],
+)
+
+py_test(
+    name = "test_todo_linter",
+    srcs = ["test_todo_linter.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:todo_linter",
+    ],
+)
+
+py_test(
+    name = "test_validate_evg_project_config",
+    srcs = ["test_validate_evg_project_config.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:validate_evg_project_config",
+    ],
+)
+
+py_test(
+    name = "test_validate_mongocryptd",
+    srcs = ["test_validate_mongocryptd.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:validate_mongocryptd",
+        dependency(
+            "mock",
+            group = "testing",
+        ),
+    ],
+)
+
 # TODO(SERVER-105817): The following library is autogenerated, please split these out into individual python targets
 py_library(
     name = "all_python_files",

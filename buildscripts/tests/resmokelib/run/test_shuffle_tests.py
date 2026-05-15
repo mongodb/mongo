@@ -79,3 +79,7 @@ class TestShuffle(unittest.TestCase):
         expected = ["c", "a", "b", "d"]
         actual = TestRunner.LongestFirstPartialShuffle(history).shuffle(tests)
         self.assertListEqual(actual, expected)
+
+
+if __name__ == "__main__":
+    unittest.main()

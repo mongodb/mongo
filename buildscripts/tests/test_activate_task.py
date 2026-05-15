@@ -176,3 +176,7 @@ class TestActivateTask(unittest.TestCase):
             "Could not determine the build variant for patch activation from build build_id",
         ):
             under_test.main("archive_dist_test_debug")
+
+
+if __name__ == "__main__":
+    unittest.main()

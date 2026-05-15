@@ -65,3 +65,7 @@ class TestIssueReport(unittest.TestCase):
 
         count = report.get_issue_count(under_test.IssueCategory.HOT)
         self.assertEqual(count, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -388,3 +388,7 @@ class TestIsEnterpriseParamAvailable(unittest.TestCase):
     def test_modules_with_enterprise_enterprise_param(self):
         with mock.patch.object(config, "MODULES", ["enterprise"]):
             self.assertTrue(is_enterprise_param_available({"enterprise_only": True}))
+
+
+if __name__ == "__main__":
+    unittest.main()

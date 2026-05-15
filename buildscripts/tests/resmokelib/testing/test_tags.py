@@ -120,3 +120,7 @@ class TestTagsConfig(unittest.TestCase):
         conf.add_tag(test_kind, test_pattern, "tag1|aaa")
         tags = conf.get_tags(test_kind, test_pattern)
         self.assertEqual(["ta|g2", "tag1", "tag1|aaa", "tag2", "tag3"], tags)
+
+
+if __name__ == "__main__":
+    unittest.main()

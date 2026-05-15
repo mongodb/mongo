@@ -126,3 +126,7 @@ class TestGetAllTasks(unittest.TestCase):
         task_list = ett.get_all_tasks(evg_config, variant)
         self.assertEqual(evg_config.get_variant.return_value.task_names, task_list)
         evg_config.get_variant.assert_called_with(variant)
+
+
+if __name__ == "__main__":
+    unittest.main()

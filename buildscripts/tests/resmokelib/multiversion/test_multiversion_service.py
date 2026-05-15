@@ -1,5 +1,6 @@
 """Unit tests for multiversion_service.py."""
 
+import unittest
 from unittest import TestCase
 
 from packaging.version import Version
@@ -156,3 +157,7 @@ class TestCalculateFcvConstants(TestCase):
                 ]
             ],
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -20,3 +20,7 @@ class ResmokeProgramsTestCase(unittest.TestCase):
             'dummy_key["a"]["b"] = "c"',
         ]
         self.assertEqual(string_builder, expected)
+
+
+if __name__ == "__main__":
+    unittest.main()

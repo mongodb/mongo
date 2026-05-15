@@ -1,4 +1,3 @@
-load("@poetry//:dependencies.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_test")
 
 py_test(
@@ -13,9 +12,13 @@ py_test(
 py_test(
     name = "test_find_suites",
     srcs = ["test_find_suites.py"],
+    data = [
+        "//buildscripts/resmokeconfig:all_files",
+        "//jstests/core/testing:all_subpackage_javascript_files",
+    ],
     visibility = ["//visibility:public"],
     deps = [
-        "//buildscripts/resmokelib",
+        "//buildscripts:resmoke",
     ],
 )
 

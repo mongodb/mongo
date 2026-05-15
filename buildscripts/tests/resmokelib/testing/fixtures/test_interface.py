@@ -55,3 +55,7 @@ class UnitTestFixture(interface.Fixture):
     def _do_teardown(self, finished=False, mode=None):
         if self._should_raise:
             raise errors.ServerFailure(self.ERROR_MESSAGE)
+
+
+if __name__ == "__main__":
+    unittest.main()

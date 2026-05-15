@@ -235,3 +235,7 @@ class TestTimeouts(unittest.TestCase):
             timer.cancel()
         self.assertTrue(testcase.timed_out.is_set())
         self.assertTrue(testcase.timed_out_processed.is_set())
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -30,3 +30,7 @@ class TestTestDiscoverySubCommand(unittest.TestCase):
 
         for i in range(6):
             self.assertIn(f"test_{i}.js", tests.tests)
+
+
+if __name__ == "__main__":
+    unittest.main()

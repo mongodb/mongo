@@ -135,3 +135,7 @@ class TestFileBasedThreadLifecycle(unittest.TestCase):
 
         self.assertFalse(lifecycle.wait_for_action_permitted())
         self.assertTrue(cond.wait.called)
+
+
+if __name__ == "__main__":
+    unittest.main()

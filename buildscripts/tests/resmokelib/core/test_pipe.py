@@ -79,3 +79,7 @@ class TestFormatLineForLogging(unittest.TestCase):
         line_output = _pipe.LoggerPipe._format_line_for_logging(line)
 
         self.assertEqual(2, len(line_output))
+
+
+if __name__ == "__main__":
+    unittest.main()

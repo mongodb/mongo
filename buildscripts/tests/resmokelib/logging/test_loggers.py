@@ -73,3 +73,7 @@ class TestLoggers(unittest.TestCase):
         for full_name, expected_short_name in transform:
             short_name = loggers._shorten(full_name)
             self.assertEqual(short_name, expected_short_name)
+
+
+if __name__ == "__main__":
+    unittest.main()

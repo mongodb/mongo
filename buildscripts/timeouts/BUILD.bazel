@@ -10,6 +10,10 @@ py_library(
             "shrub-py",
             group = "testing",
         ),
+        dependency(
+            "structlog",
+            group = "evergreen",
+        ),
     ],
 )
 

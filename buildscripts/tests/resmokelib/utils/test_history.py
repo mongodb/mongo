@@ -250,3 +250,7 @@ History:
             notify_calls,
             "copy() must not call notify_subscriber_write() during construction",
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

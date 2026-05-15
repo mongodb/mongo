@@ -233,3 +233,7 @@ class TestFileService(unittest.TestCase):
         self.file_service.add_to_processed_files(processed_files)
         filtered = self.file_service.filter_out_already_processed_files(files)
         self.assertTrue(all(file not in processed_files for file in filtered))
+
+
+if __name__ == "__main__":
+    unittest.main()

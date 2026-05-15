@@ -58,3 +58,7 @@ class TestWatchTasks(unittest.TestCase):
         )
         long_running_task_ids = watch_tasks(task_ids, evg_api, 0)
         self.assertEqual([task_2.task_id], long_running_task_ids)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -141,3 +141,7 @@ class TestSbom(unittest.TestCase):
         if not error_manager.zero_error():
             error_manager.print_errors()
         self.assertTrue(error_manager.zero_error())
+
+
+if __name__ == "__main__":
+    unittest.main()

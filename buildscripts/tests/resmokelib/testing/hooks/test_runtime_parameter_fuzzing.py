@@ -144,3 +144,7 @@ class TestRuntimeFuzzGeneration(unittest.TestCase):
             _runtime_fuzzer.validate_runtime_parameter_spec(bad_spec_value_no_period)
         # No exception for good dict
         _runtime_fuzzer.validate_runtime_parameter_spec(good_spec)
+
+
+if __name__ == "__main__":
+    unittest.main()

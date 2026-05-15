@@ -90,3 +90,7 @@ class TestQueueElemRepeatTime(unittest.TestCase):
         queue_elem = queue_element.QueueElemRepeatTime(None, None, suite_options)
         job_time = 1
         self.assert_elem_queues_n_times(queue_elem, job_time, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,5 +1,6 @@
 """Unit tests for the packager script."""
 
+import unittest
 from dataclasses import dataclass
 from unittest import TestCase
 
@@ -89,3 +90,7 @@ class TestPackager(TestCase):
             with self.subTest(name=case.name):
                 spec = Spec(ver=case.version)
                 self.assertEqual(spec.suffix(), case.want)
+
+
+if __name__ == "__main__":
+    unittest.main()

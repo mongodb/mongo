@@ -56,3 +56,7 @@ class TestCompareBinVersions(unittest.TestCase):
         self.assertGreaterEqual(version_comparison.compare_bin_versions("8.3.0", "8.3"), 0)
         self.assertLess(version_comparison.compare_bin_versions("8.2", "8.3"), 0)
         self.assertGreater(version_comparison.compare_bin_versions("8.4", "8.3"), 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

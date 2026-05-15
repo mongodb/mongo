@@ -35,3 +35,7 @@ class TestGetConfigValue(unittest.TestCase):
         )
 
         self.assertEqual("cmdline value", value)
+
+
+if __name__ == "__main__":
+    unittest.main()

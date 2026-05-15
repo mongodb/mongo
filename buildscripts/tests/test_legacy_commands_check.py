@@ -66,3 +66,7 @@ class TestCheckFileForLegacyType(unittest.TestCase):
 
         modified_lines = [(0, ""), (1, "class AddShardCmd : public CommandInvocationHooks")]
         self.assertEqual(check_file_for_legacy_type(modified_lines), False)
+
+
+if __name__ == "__main__":
+    unittest.main()

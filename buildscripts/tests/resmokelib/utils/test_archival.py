@@ -245,3 +245,7 @@ class DirectoryArchivalTests(unittest.TestCase):
         expected = os.path.join(self.temp_dir, archive_name)
         self.assertTrue(os.path.exists(expected), f"Expected archive does not exist: {expected}")
         self.assertEqual(0, status, message)
+
+
+if __name__ == "__main__":
+    unittest.main()

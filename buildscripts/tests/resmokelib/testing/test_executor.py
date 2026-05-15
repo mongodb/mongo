@@ -128,3 +128,7 @@ class TestTestQueueAddTestCases(unittest.TestCase):
         while not test_queue.empty():
             element = test_queue.get()
             self.assertIn(element, self.test_cases)
+
+
+if __name__ == "__main__":
+    unittest.main()

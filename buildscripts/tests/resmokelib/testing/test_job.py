@@ -330,3 +330,7 @@ class TestNoOpFixtureSetupAndTeardown(unittest.TestCase):
     def test_teardown_called_for_noop_fixture(self):
         self.assertTrue(self.__job_object.manager.teardown_fixture(self.logger))
         self.__noop_fixture.teardown.assert_called_once_with(finished=True)
+
+
+if __name__ == "__main__":
+    unittest.main()

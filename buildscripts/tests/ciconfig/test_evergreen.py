@@ -588,3 +588,7 @@ class TestVariant(unittest.TestCase):
         variant_amazon = self.conf.get_variant("amazon")
         self.assertEqual(3, len(variant_amazon.tasks))
         self.assertIn("compile", variant_amazon.task_names)
+
+
+if __name__ == "__main__":
+    unittest.main()

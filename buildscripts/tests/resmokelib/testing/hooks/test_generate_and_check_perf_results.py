@@ -848,3 +848,7 @@ class TestCheckPerfResultTestCase(unittest.TestCase):
 
         with self.assertRaisesRegex(ServerFailure, "threshold check"):
             test_case.run_test()
+
+
+if __name__ == "__main__":
+    unittest.main()

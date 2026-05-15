@@ -67,3 +67,7 @@ class TestErrorcodes(unittest.TestCase):
         self.assertEqual(1234, errorcodes.coerce_to_number("server-1234"))
         self.assertEqual(1234, errorcodes.coerce_to_number("SERVER-1234"))
         self.assertEqual(-1, errorcodes.coerce_to_number("not a ticket"))
+
+
+if __name__ == "__main__":
+    unittest.main()

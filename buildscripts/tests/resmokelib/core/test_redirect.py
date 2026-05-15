@@ -55,3 +55,7 @@ class TestStdoutRedirect(unittest.TestCase):
 
         print("not to be captured")
         self.assertEqual(string + "\n", acc.getvalue().decode("utf-8"))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -109,3 +109,7 @@ class TestTimeoutInfo(unittest.TestCase):
     def test_override_with_no_values(self):
         with self.assertRaises(ValueError):
             under_test.TimeoutInfo.overridden()
+
+
+if __name__ == "__main__":
+    unittest.main()
