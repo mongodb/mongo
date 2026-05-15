@@ -35,141 +35,116 @@ namespace sbe {
 namespace vm {
 value::TagValueMaybeOwned ByteCode::builtinAbs(ArityType arity) {
     tassert(11080079, "Unexpected arity value", arity == 1);
-
-    auto [_, tagOperand, valOperand] = getFromStack(0);
-
-    return genericAbs(tagOperand, valOperand);
+    return genericAbs(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCeil(ArityType arity) {
     tassert(11080078, "Unexpected arity value", arity == 1);
-
-    auto [_, tagOperand, valOperand] = getFromStack(0);
-
-    return genericCeil(tagOperand, valOperand);
+    return genericCeil(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinFloor(ArityType arity) {
     tassert(11080077, "Unexpected arity value", arity == 1);
-
-    auto [_, tagOperand, valOperand] = getFromStack(0);
-
-    return genericFloor(tagOperand, valOperand);
+    return genericFloor(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinExp(ArityType arity) {
     tassert(11080076, "Unexpected arity value", arity == 1);
-
-    auto [_, tagOperand, valOperand] = getFromStack(0);
-
-    return genericExp(tagOperand, valOperand);
+    return genericExp(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinLn(ArityType arity) {
     tassert(11080075, "Unexpected arity value", arity == 1);
-
-    auto [_, tagOperand, valOperand] = getFromStack(0);
-
-    return genericLn(tagOperand, valOperand);
+    return genericLn(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinLog10(ArityType arity) {
     tassert(11080074, "Unexpected arity value", arity == 1);
-
-    auto [_, tagOperand, valOperand] = getFromStack(0);
-
-    return genericLog10(tagOperand, valOperand);
+    return genericLog10(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSqrt(ArityType arity) {
     tassert(11080073, "Unexpected arity value", arity == 1);
-
-    auto [_, tagOperand, valOperand] = getFromStack(0);
-
-    return genericSqrt(tagOperand, valOperand);
+    return genericSqrt(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinPow(ArityType arity) {
     tassert(11080072, "Unexpected arity value", arity == 2);
-    auto [baseOwned, baseTag, baseValue] = getFromStack(0);
-    auto [exponentOwned, exponentTag, exponentValue] = getFromStack(1);
-
-    return genericPow(baseTag, baseValue, exponentTag, exponentValue);
+    return genericPow(viewFromStack(0), viewFromStack(1));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAcos(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericAcos(operandTag, operandValue);
+    tassert(12603700, "Unexpected arity value", arity == 1);
+    return genericAcos(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAcosh(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericAcosh(operandTag, operandValue);
+    tassert(12603701, "Unexpected arity value", arity == 1);
+    return genericAcosh(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAsin(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericAsin(operandTag, operandValue);
+    tassert(12603702, "Unexpected arity value", arity == 1);
+    return genericAsin(viewFromStack(0));
 }
 value::TagValueMaybeOwned ByteCode::builtinAsinh(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericAsinh(operandTag, operandValue);
+    tassert(12603703, "Unexpected arity value", arity == 1);
+    return genericAsinh(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAtan(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericAtan(operandTag, operandValue);
+    tassert(12603704, "Unexpected arity value", arity == 1);
+    return genericAtan(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAtanh(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericAtanh(operandTag, operandValue);
+    tassert(12603705, "Unexpected arity value", arity == 1);
+    return genericAtanh(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAtan2(ArityType arity) {
-    auto [owned1, operandTag1, operandValue1] = getFromStack(0);
-    auto [owned2, operandTag2, operandValue2] = getFromStack(1);
-    return genericAtan2(operandTag1, operandValue1, operandTag2, operandValue2);
+    tassert(12603706, "Unexpected arity value", arity == 2);
+    return genericAtan2(viewFromStack(0), viewFromStack(1));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCos(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericCos(operandTag, operandValue);
+    tassert(12603707, "Unexpected arity value", arity == 1);
+    return genericCos(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCosh(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericCosh(operandTag, operandValue);
+    tassert(12603708, "Unexpected arity value", arity == 1);
+    return genericCosh(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinDegreesToRadians(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericDegreesToRadians(operandTag, operandValue);
+    tassert(12603709, "Unexpected arity value", arity == 1);
+    return genericDegreesToRadians(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinRadiansToDegrees(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericRadiansToDegrees(operandTag, operandValue);
+    tassert(12603710, "Unexpected arity value", arity == 1);
+    return genericRadiansToDegrees(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSin(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericSin(operandTag, operandValue);
+    tassert(12603711, "Unexpected arity value", arity == 1);
+    return genericSin(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinSinh(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericSinh(operandTag, operandValue);
+    tassert(12603712, "Unexpected arity value", arity == 1);
+    return genericSinh(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinTan(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericTan(operandTag, operandValue);
+    tassert(12603713, "Unexpected arity value", arity == 1);
+    return genericTan(viewFromStack(0));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinTanh(ArityType arity) {
-    auto [_, operandTag, operandValue] = getFromStack(0);
-    return genericTanh(operandTag, operandValue);
+    tassert(12603714, "Unexpected arity value", arity == 1);
+    return genericTanh(viewFromStack(0));
 }
 
 /**
@@ -257,14 +232,13 @@ value::TagValueMaybeOwned ByteCode::scalarRoundTrunc(std::string funcName,
                                                      ArityType arity) {
     tassert(11080071, "Unexpected arity value", arity == 1 || arity == 2);
     int32_t place = 0;
-    const auto [_, numTag, numVal] = getFromStack(0);
-    value::TagValueView num(numTag, numVal);
+    auto num = viewFromStack(0);
     if (arity == 2) {
-        const auto [placeOwn, placeTag, placeVal] = getFromStack(1);
-        if (!value::isNumber(placeTag)) {
+        auto placeArg = viewFromStack(1);
+        if (!value::isNumber(placeArg.tag)) {
             return {false, value::TypeTags::Nothing, 0};
         }
-        place = convertNumericToInt32(placeTag, placeVal);
+        place = convertNumericToInt32(placeArg.tag, placeArg.value);
     }
 
     return genericRoundTrunc(funcName, roundingMode, place, num.tag, num.value);
@@ -291,18 +265,17 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSum(ArityType arity) {
 
     // Sweep across all tags and pick the result type.
     for (ArityType idx = 0; idx < arity; ++idx) {
-        auto [own, tag, val] = getFromStack(idx);
-        if (tag == value::TypeTags::Date) {
+        auto arg = viewFromStack(idx);
+        if (arg.tag == value::TypeTags::Date) {
             if (haveDate) {
                 uassert(4848404, "only one date allowed in an $add expression", !haveDate);
             }
             // Date is a simple 64 bit integer.
             haveDate = true;
-            tag = value::TypeTags::NumberInt64;
-        }
-        if (value::isNumber(tag)) {
-            resultTag = value::getWidestNumericalType(resultTag, tag);
-        } else if (tag == value::TypeTags::Nothing || tag == value::TypeTags::Null) {
+            resultTag = value::getWidestNumericalType(resultTag, value::TypeTags::NumberInt64);
+        } else if (value::isNumber(arg.tag)) {
+            resultTag = value::getWidestNumericalType(resultTag, arg.tag);
+        } else if (arg.tag == value::TypeTags::Nothing || arg.tag == value::TypeTags::Null) {
             // What to do about null and nothing?
             return {false, value::TypeTags::Nothing, 0};
         } else {
@@ -314,11 +287,11 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSum(ArityType arity) {
     if (resultTag == value::TypeTags::NumberDecimal) {
         Decimal128 sum;
         for (ArityType idx = 0; idx < arity; ++idx) {
-            auto [own, tag, val] = getFromStack(idx);
-            if (tag == value::TypeTags::Date) {
-                sum = sum.add(Decimal128(value::bitcastTo<int64_t>(val)));
+            auto arg = viewFromStack(idx);
+            if (arg.tag == value::TypeTags::Date) {
+                sum = sum.add(Decimal128(value::bitcastTo<int64_t>(arg.value)));
             } else {
-                sum = sum.add(value::numericCast<Decimal128>(tag, val));
+                sum = sum.add(value::numericCast<Decimal128>(arg.tag, arg.value));
             }
         }
         if (haveDate) {
@@ -330,15 +303,15 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSum(ArityType arity) {
     } else {
         DoubleDoubleSummation sum;
         for (ArityType idx = 0; idx < arity; ++idx) {
-            auto [own, tag, val] = getFromStack(idx);
-            if (tag == value::TypeTags::NumberInt32) {
-                sum.addInt(value::numericCast<int32_t>(tag, val));
-            } else if (tag == value::TypeTags::NumberInt64) {
-                sum.addLong(value::numericCast<int64_t>(tag, val));
-            } else if (tag == value::TypeTags::NumberDouble) {
-                sum.addDouble(value::numericCast<double>(tag, val));
-            } else if (tag == value::TypeTags::Date) {
-                sum.addLong(value::bitcastTo<int64_t>(val));
+            auto arg = viewFromStack(idx);
+            if (arg.tag == value::TypeTags::NumberInt32) {
+                sum.addInt(value::numericCast<int32_t>(arg.tag, arg.value));
+            } else if (arg.tag == value::TypeTags::NumberInt64) {
+                sum.addLong(value::numericCast<int64_t>(arg.tag, arg.value));
+            } else if (arg.tag == value::TypeTags::NumberDouble) {
+                sum.addDouble(value::numericCast<double>(arg.tag, arg.value));
+            } else if (arg.tag == value::TypeTags::Date) {
+                sum.addLong(value::bitcastTo<int64_t>(arg.value));
             }
         }
         if (haveDate) {
@@ -379,8 +352,8 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSum(ArityType arity) {
 
 value::TagValueMaybeOwned ByteCode::builtinConvertSimpleSumToDoubleDoubleSum(ArityType arity) {
     tassert(11080069, "Unexpected arity value", arity == 1);
-    auto [_, simpleSumTag, simpleSumVal] = getFromStack(0);
-    return builtinConvertSimpleSumToDoubleDoubleSumImpl(simpleSumTag, simpleSumVal);
+    auto simpleSum = viewFromStack(0);
+    return builtinConvertSimpleSumToDoubleDoubleSumImpl(simpleSum.tag, simpleSum.value);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinConvertSimpleSumToDoubleDoubleSumImpl(

@@ -479,17 +479,14 @@ private:
                                          value::Value lhsValue,
                                          value::TypeTags rhsTag,
                                          value::Value rhsValue);
-    value::TagValueMaybeOwned genericAbs(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericCeil(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericFloor(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericExp(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericLn(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericLog10(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericSqrt(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericPow(value::TypeTags baseTag,
-                                         value::Value baseValue,
-                                         value::TypeTags exponentTag,
-                                         value::Value exponentValue);
+    value::TagValueMaybeOwned genericAbs(value::TagValueView operand);
+    value::TagValueMaybeOwned genericCeil(value::TagValueView operand);
+    value::TagValueMaybeOwned genericFloor(value::TagValueView operand);
+    value::TagValueMaybeOwned genericExp(value::TagValueView operand);
+    value::TagValueMaybeOwned genericLn(value::TagValueView operand);
+    value::TagValueMaybeOwned genericLog10(value::TagValueView operand);
+    value::TagValueMaybeOwned genericSqrt(value::TagValueView operand);
+    value::TagValueMaybeOwned genericPow(value::TagValueView base, value::TagValueView exponent);
     value::TagValueMaybeOwned genericRoundTrunc(std::string funcName,
                                                 Decimal128::RoundingMode roundingMode,
                                                 int32_t place,
@@ -592,26 +589,22 @@ private:
                                                            value::TypeTags fieldTag,
                                                            value::Value fieldValue);
 
-    value::TagValueMaybeOwned genericAcos(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericAcosh(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericAsin(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericAsinh(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericAtan(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericAtanh(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericAtan2(value::TypeTags operandTag1,
-                                           value::Value operandValue1,
-                                           value::TypeTags operandTag2,
-                                           value::Value operandValue2);
-    value::TagValueMaybeOwned genericCos(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericCosh(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericDegreesToRadians(value::TypeTags operandTag,
-                                                      value::Value operandValue);
-    value::TagValueMaybeOwned genericRadiansToDegrees(value::TypeTags operandTag,
-                                                      value::Value operandValue);
-    value::TagValueMaybeOwned genericSin(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericSinh(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericTan(value::TypeTags operandTag, value::Value operandValue);
-    value::TagValueMaybeOwned genericTanh(value::TypeTags operandTag, value::Value operandValue);
+    value::TagValueMaybeOwned genericAcos(value::TagValueView operand);
+    value::TagValueMaybeOwned genericAcosh(value::TagValueView operand);
+    value::TagValueMaybeOwned genericAsin(value::TagValueView operand);
+    value::TagValueMaybeOwned genericAsinh(value::TagValueView operand);
+    value::TagValueMaybeOwned genericAtan(value::TagValueView operand);
+    value::TagValueMaybeOwned genericAtanh(value::TagValueView operand);
+    value::TagValueMaybeOwned genericAtan2(value::TagValueView operand1,
+                                           value::TagValueView operand2);
+    value::TagValueMaybeOwned genericCos(value::TagValueView operand);
+    value::TagValueMaybeOwned genericCosh(value::TagValueView operand);
+    value::TagValueMaybeOwned genericDegreesToRadians(value::TagValueView operand);
+    value::TagValueMaybeOwned genericRadiansToDegrees(value::TagValueView operand);
+    value::TagValueMaybeOwned genericSin(value::TagValueView operand);
+    value::TagValueMaybeOwned genericSinh(value::TagValueView operand);
+    value::TagValueMaybeOwned genericTan(value::TagValueView operand);
+    value::TagValueMaybeOwned genericTanh(value::TagValueView operand);
 
     value::TagValueMaybeOwned genericDayOfYear(value::TagValueView tzDB,
                                                value::TagValueView date,
