@@ -14,7 +14,7 @@ selector:
     # Skip any tests that run with auth explicitly.
     - jstests/replsets/*[aA]uth*.js
     - jstests/replsets/advance_cluster_time.js
-    - jstests/replsets/buildindexes_false_with_system_indexes.js
+    - jstests/replsets/index_builds/buildindexes_false_with_system_indexes.js
     - jstests/replsets/db_reads_while_recovering_all_commands.js
     - jstests/replsets/disable_cluster_time_gossiping_in_unreadable_state.js
     - jstests/replsets/localhostAuthBypass.js

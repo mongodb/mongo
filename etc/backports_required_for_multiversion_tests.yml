@@ -480,7 +480,7 @@ last-lts:
       ticket: SERVER-89618
     - test_file: jstests/replsets/retryable_write_interrupted_on_stepdown.js
       ticket: SERVER-110728
-    - test_file: jstests/replsets/rollback_index_build_start_abort.js
+    - test_file: jstests/replsets/index_builds/rollback_index_build_start_abort.js
       ticket: SERVER-103955
     - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application_inserts.js
       ticket: SERVER-99185
