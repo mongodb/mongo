@@ -77,22 +77,19 @@ include:
   - filename: etc/evergreen_yml_components/variants/mongot/test_dev.yml
 
   - filename: etc/evergreen_yml_components/variants/rhel/test_dev.yml
-  - filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
   - filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
 
   - filename: etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   - filename: etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 
-  - filename: etc/evergreen_yml_components/variants/ubuntu/test_dev_master_and_lts_branches_only.yml
-  - filename: etc/evergreen_yml_components/variants/ubuntu/test_dev_master_branch_only.yml
+  - filename: etc/evergreen_yml_components/variants/ubuntu/test_dev.yml
 
   - filename: etc/evergreen_yml_components/variants/windows/test_dev.yml
-  - filename: etc/evergreen_yml_components/variants/windows/test_dev_master_and_lts_branches_only.yml
   - filename: etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml
 
   - filename: etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
 
-  - filename: etc/evergreen_yml_components/variants/codecoverage/test_dev.yml
+  - filename: etc/evergreen_yml_components/variants/codecoverage/test_dev_master_branch_only.yml
 
   - filename: etc/evergreen_yml_components/variants/amazon/streams/streams_dev.yml
 
