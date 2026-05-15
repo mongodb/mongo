@@ -32,7 +32,7 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToBool(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCoerceToBool(ArityType arity) {
     auto [operandOwned, operandTag, operandVal] = getFromStack(0);
 
     auto [tag, val] = value::coerceToBool(operandTag, operandVal);

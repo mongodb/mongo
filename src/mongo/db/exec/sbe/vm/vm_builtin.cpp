@@ -631,15 +631,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
                                                                          const CodeFragment* code) {
     switch (f) {
         case Builtin::dateDiff:
-            return builtinDateDiff(arity);
+            return builtinDateDiff(arity).releaseToRaw();
         case Builtin::dateParts:
-            return builtinDate(arity);
+            return builtinDate(arity).releaseToRaw();
         case Builtin::datePartsWeekYear:
-            return builtinDateWeekYear(arity);
+            return builtinDateWeekYear(arity).releaseToRaw();
         case Builtin::dateToParts:
-            return builtinDateToParts(arity);
+            return builtinDateToParts(arity).releaseToRaw();
         case Builtin::isoDateToParts:
-            return builtinIsoDateToParts(arity);
+            return builtinIsoDateToParts(arity).releaseToRaw();
         case Builtin::dayOfYear:
             return builtinDayOfYear(arity).releaseToRaw();
         case Builtin::dayOfMonth:
@@ -647,29 +647,29 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::dayOfWeek:
             return builtinDayOfWeek(arity).releaseToRaw();
         case Builtin::dateToString:
-            return builtinDateToString(arity);
+            return builtinDateToString(arity).releaseToRaw();
         case Builtin::dateFromString:
-            return builtinDateFromString(arity);
+            return builtinDateFromString(arity).releaseToRaw();
         case Builtin::dateFromStringNoThrow:
-            return builtinDateFromStringNoThrow(arity);
+            return builtinDateFromStringNoThrow(arity).releaseToRaw();
         case Builtin::split:
-            return builtinSplit(arity);
+            return builtinSplit(arity).releaseToRaw();
         case Builtin::regexMatch:
-            return builtinRegexMatch(arity);
+            return builtinRegexMatch(arity).releaseToRaw();
         case Builtin::replaceOne:
-            return builtinReplaceOne(arity);
+            return builtinReplaceOne(arity).releaseToRaw();
         case Builtin::dropFields:
-            return builtinDropFields(arity);
+            return builtinDropFields(arity).releaseToRaw();
         case Builtin::newArray:
-            return builtinNewArray(arity);
+            return builtinNewArray(arity).releaseToRaw();
         case Builtin::keepFields:
-            return builtinKeepFields(arity);
+            return builtinKeepFields(arity).releaseToRaw();
         case Builtin::newArrayFromRange:
-            return builtinNewArrayFromRange(arity);
+            return builtinNewArrayFromRange(arity).releaseToRaw();
         case Builtin::newObj:
-            return builtinNewObj(arity);
+            return builtinNewObj(arity).releaseToRaw();
         case Builtin::newBsonObj:
-            return builtinNewBsonObj(arity);
+            return builtinNewBsonObj(arity).releaseToRaw();
         case Builtin::newKs:
             return builtinNewKeyString(arity).releaseToRaw();
         case Builtin::collNewKs:
@@ -693,19 +693,19 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::pow:
             return builtinPow(arity).releaseToRaw();
         case Builtin::addToArray:
-            return builtinAddToArray(arity);
+            return builtinAddToArray(arity).releaseToRaw();
         case Builtin::addToArrayCapped:
-            return builtinAddToArrayCapped(arity);
+            return builtinAddToArrayCapped(arity).releaseToRaw();
         case Builtin::mergeObjects:
-            return builtinMergeObjects(arity);
+            return builtinMergeObjects(arity).releaseToRaw();
         case Builtin::addToSet:
-            return builtinAddToSet(arity);
+            return builtinAddToSet(arity).releaseToRaw();
         case Builtin::addToSetCapped:
-            return builtinAddToSetCapped(arity);
+            return builtinAddToSetCapped(arity).releaseToRaw();
         case Builtin::collAddToSet:
-            return builtinCollAddToSet(arity);
+            return builtinCollAddToSet(arity).releaseToRaw();
         case Builtin::collAddToSetCapped:
-            return builtinCollAddToSetCapped(arity);
+            return builtinCollAddToSetCapped(arity).releaseToRaw();
         case Builtin::doubleDoubleSum:
             return builtinDoubleDoubleSum(arity).releaseToRaw();
         case Builtin::convertSimpleSumToDoubleDoubleSum:
@@ -727,35 +727,35 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::stdDevSampFinalize:
             return builtinStdDevSampFinalize(arity).releaseToRaw();
         case Builtin::bitTestZero:
-            return builtinBitTestZero(arity);
+            return builtinBitTestZero(arity).releaseToRaw();
         case Builtin::bitTestMask:
-            return builtinBitTestMask(arity);
+            return builtinBitTestMask(arity).releaseToRaw();
         case Builtin::bitTestPosition:
-            return builtinBitTestPosition(arity);
+            return builtinBitTestPosition(arity).releaseToRaw();
         case Builtin::bsonSize:
-            return builtinBsonSize(arity);
+            return builtinBsonSize(arity).releaseToRaw();
         case Builtin::strLenBytes:
-            return builtinStrLenBytes(arity);
+            return builtinStrLenBytes(arity).releaseToRaw();
         case Builtin::strLenCP:
-            return builtinStrLenCP(arity);
+            return builtinStrLenCP(arity).releaseToRaw();
         case Builtin::substrBytes:
-            return builtinSubstrBytes(arity);
+            return builtinSubstrBytes(arity).releaseToRaw();
         case Builtin::substrCP:
-            return builtinSubstrCP(arity);
+            return builtinSubstrCP(arity).releaseToRaw();
         case Builtin::toUpper:
-            return builtinToUpper(arity);
+            return builtinToUpper(arity).releaseToRaw();
         case Builtin::toLower:
-            return builtinToLower(arity);
+            return builtinToLower(arity).releaseToRaw();
         case Builtin::trim:
-            return builtinTrim(arity, true, true);
+            return builtinTrim(arity, true, true).releaseToRaw();
         case Builtin::ltrim:
-            return builtinTrim(arity, true, false);
+            return builtinTrim(arity, true, false).releaseToRaw();
         case Builtin::rtrim:
-            return builtinTrim(arity, false, true);
+            return builtinTrim(arity, false, true).releaseToRaw();
         case Builtin::coerceToBool:
-            return builtinCoerceToBool(arity);
+            return builtinCoerceToBool(arity).releaseToRaw();
         case Builtin::coerceToString:
-            return builtinCoerceToString(arity);
+            return builtinCoerceToString(arity).releaseToRaw();
         case Builtin::acos:
             return builtinAcos(arity).releaseToRaw();
         case Builtin::acosh:
@@ -791,15 +791,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::round:
             return builtinRound(arity).releaseToRaw();
         case Builtin::concat:
-            return builtinConcat(arity);
+            return builtinConcat(arity).releaseToRaw();
         case Builtin::concatArrays:
-            return builtinConcatArrays(arity);
+            return builtinConcatArrays(arity).releaseToRaw();
         case Builtin::zipArrays:
-            return builtinZipArrays(arity);
+            return builtinZipArrays(arity).releaseToRaw();
         case Builtin::aggConcatArraysCapped:
             return builtinAggConcatArraysCapped(arity).releaseToRaw();
         case Builtin::concatArraysCapped:
-            return builtinConcatArraysCapped(arity);
+            return builtinConcatArraysCapped(arity).releaseToRaw();
         case Builtin::aggSetUnion:
             return builtinAggSetUnion(arity).releaseToRaw();
         case Builtin::aggCollSetUnion:
@@ -809,17 +809,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::aggCollSetUnionCapped:
             return builtinAggCollSetUnionCapped(arity).releaseToRaw();
         case Builtin::setUnionCapped:
-            return builtinSetUnionCapped(arity);
+            return builtinSetUnionCapped(arity).releaseToRaw();
         case Builtin::collSetUnionCapped:
-            return builtinCollSetUnionCapped(arity);
+            return builtinCollSetUnionCapped(arity).releaseToRaw();
         case Builtin::isMember:
-            return builtinIsMember(arity);
+            return builtinIsMember(arity).releaseToRaw();
         case Builtin::collIsMember:
-            return builtinCollIsMember(arity);
+            return builtinCollIsMember(arity).releaseToRaw();
         case Builtin::indexOfBytes:
-            return builtinIndexOfBytes(arity);
+            return builtinIndexOfBytes(arity).releaseToRaw();
         case Builtin::indexOfCP:
-            return builtinIndexOfCP(arity);
+            return builtinIndexOfCP(arity).releaseToRaw();
         case Builtin::isDayOfWeek:
             return builtinIsDayOfWeek(arity).releaseToRaw();
         case Builtin::isTimeUnit:
@@ -827,97 +827,97 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::isTimezone:
             return builtinIsTimezone(arity).releaseToRaw();
         case Builtin::isValidToStringFormat:
-            return builtinIsValidToStringFormat(arity);
+            return builtinIsValidToStringFormat(arity).releaseToRaw();
         case Builtin::validateFromStringFormat:
-            return builtinValidateFromStringFormat(arity);
+            return builtinValidateFromStringFormat(arity).releaseToRaw();
         case Builtin::setUnion:
-            return builtinSetUnion(arity);
+            return builtinSetUnion(arity).releaseToRaw();
         case Builtin::setIntersection:
-            return builtinSetIntersection(arity);
+            return builtinSetIntersection(arity).releaseToRaw();
         case Builtin::setDifference:
-            return builtinSetDifference(arity);
+            return builtinSetDifference(arity).releaseToRaw();
         case Builtin::setEquals:
-            return builtinSetEquals(arity);
+            return builtinSetEquals(arity).releaseToRaw();
         case Builtin::setIsSubset:
-            return builtinSetIsSubset(arity);
+            return builtinSetIsSubset(arity).releaseToRaw();
         case Builtin::collSetUnion:
-            return builtinCollSetUnion(arity);
+            return builtinCollSetUnion(arity).releaseToRaw();
         case Builtin::collSetIntersection:
-            return builtinCollSetIntersection(arity);
+            return builtinCollSetIntersection(arity).releaseToRaw();
         case Builtin::collSetDifference:
-            return builtinCollSetDifference(arity);
+            return builtinCollSetDifference(arity).releaseToRaw();
         case Builtin::collSetEquals:
-            return builtinCollSetEquals(arity);
+            return builtinCollSetEquals(arity).releaseToRaw();
         case Builtin::collSetIsSubset:
-            return builtinCollSetIsSubset(arity);
+            return builtinCollSetIsSubset(arity).releaseToRaw();
         case Builtin::runJsPredicate:
-            return builtinRunJsPredicate(arity);
+            return builtinRunJsPredicate(arity).releaseToRaw();
         case Builtin::regexCompile:
-            return builtinRegexCompile(arity);
+            return builtinRegexCompile(arity).releaseToRaw();
         case Builtin::regexFind:
-            return builtinRegexFind(arity);
+            return builtinRegexFind(arity).releaseToRaw();
         case Builtin::regexFindAll:
-            return builtinRegexFindAll(arity);
+            return builtinRegexFindAll(arity).releaseToRaw();
         case Builtin::shardFilter:
-            return builtinShardFilter(arity);
+            return builtinShardFilter(arity).releaseToRaw();
         case Builtin::shardHash:
-            return builtinShardHash(arity);
+            return builtinShardHash(arity).releaseToRaw();
         case Builtin::extractSubArray:
-            return builtinExtractSubArray(arity);
+            return builtinExtractSubArray(arity).releaseToRaw();
         case Builtin::isArrayEmpty:
-            return builtinIsArrayEmpty(arity);
+            return builtinIsArrayEmpty(arity).releaseToRaw();
         case Builtin::reverseArray:
-            return builtinReverseArray(arity);
+            return builtinReverseArray(arity).releaseToRaw();
         case Builtin::sortArray:
-            return builtinSortArray(arity);
+            return builtinSortArray(arity).releaseToRaw();
         case Builtin::topN:
-            return builtinTopN(arity);
+            return builtinTopN(arity).releaseToRaw();
         case Builtin::top:
-            return builtinTop(arity);
+            return builtinTop(arity).releaseToRaw();
         case Builtin::bottomN:
-            return builtinBottomN(arity);
+            return builtinBottomN(arity).releaseToRaw();
         case Builtin::bottom:
-            return builtinBottom(arity);
+            return builtinBottom(arity).releaseToRaw();
         case Builtin::dateAdd:
-            return builtinDateAdd(arity);
+            return builtinDateAdd(arity).releaseToRaw();
         case Builtin::hasNullBytes:
-            return builtinHasNullBytes(arity);
+            return builtinHasNullBytes(arity).releaseToRaw();
         case Builtin::getRegexPattern:
-            return builtinGetRegexPattern(arity);
+            return builtinGetRegexPattern(arity).releaseToRaw();
         case Builtin::getRegexFlags:
-            return builtinGetRegexFlags(arity);
+            return builtinGetRegexFlags(arity).releaseToRaw();
         case Builtin::hash:
-            return builtinHash(arity);
+            return builtinHash(arity).releaseToRaw();
         case Builtin::ftsMatch:
-            return builtinFtsMatch(arity);
+            return builtinFtsMatch(arity).releaseToRaw();
         case Builtin::generateSortKey:
-            return builtinGenerateSortKey(arity);
+            return builtinGenerateSortKey(arity).releaseToRaw();
         case Builtin::generateCheapSortKey:
-            return builtinGenerateCheapSortKey(arity);
+            return builtinGenerateCheapSortKey(arity).releaseToRaw();
         case Builtin::sortKeyComponentVectorGetElement:
-            return builtinSortKeyComponentVectorGetElement(arity);
+            return builtinSortKeyComponentVectorGetElement(arity).releaseToRaw();
         case Builtin::sortKeyComponentVectorToArray:
-            return builtinSortKeyComponentVectorToArray(arity);
+            return builtinSortKeyComponentVectorToArray(arity).releaseToRaw();
         case Builtin::makeObj:
-            return builtinMakeObj(arity, code);
+            return builtinMakeObj(arity, code).releaseToRaw();
         case Builtin::makeBsonObj:
-            return builtinMakeBsonObj(arity, code);
+            return builtinMakeBsonObj(arity, code).releaseToRaw();
         case Builtin::tsSecond:
             return builtinTsSecond(arity).releaseToRaw();
         case Builtin::tsIncrement:
             return builtinTsIncrement(arity).releaseToRaw();
         case Builtin::typeMatch:
-            return builtinTypeMatch(arity);
+            return builtinTypeMatch(arity).releaseToRaw();
         case Builtin::dateTrunc:
-            return builtinDateTrunc(arity);
+            return builtinDateTrunc(arity).releaseToRaw();
         case Builtin::getSortKeyAsc:
-            return builtinGetSortKey<true /*IsAscending*/, true /*IsLeaf*/>(arity);
+            return builtinGetSortKey<true /*IsAscending*/, true /*IsLeaf*/>(arity).releaseToRaw();
         case Builtin::getSortKeyDesc:
-            return builtinGetSortKey<false /*IsAscending*/, true /*IsLeaf*/>(arity);
+            return builtinGetSortKey<false /*IsAscending*/, true /*IsLeaf*/>(arity).releaseToRaw();
         case Builtin::getNonLeafSortKeyAsc:
-            return builtinGetSortKey<true /*IsAscending*/, false /*IsLeaf*/>(arity);
+            return builtinGetSortKey<true /*IsAscending*/, false /*IsLeaf*/>(arity).releaseToRaw();
         case Builtin::getNonLeafSortKeyDesc:
-            return builtinGetSortKey<false /*IsAscending*/, false /*IsLeaf*/>(arity);
+            return builtinGetSortKey<false /*IsAscending*/, false /*IsLeaf*/>(arity).releaseToRaw();
         case Builtin::year:
             return builtinYear(arity).releaseToRaw();
         case Builtin::month:
@@ -939,19 +939,19 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::isoWeek:
             return builtinISOWeek(arity).releaseToRaw();
         case Builtin::objectToArray:
-            return builtinObjectToArray(arity);
+            return builtinObjectToArray(arity).releaseToRaw();
         case Builtin::arrayToObject:
-            return builtinArrayToObject(arity);
+            return builtinArrayToObject(arity).releaseToRaw();
         case Builtin::unwindArray:
-            return builtinUnwindArray(arity);
+            return builtinUnwindArray(arity).releaseToRaw();
         case Builtin::arrayToSet:
-            return builtinArrayToSet(arity);
+            return builtinArrayToSet(arity).releaseToRaw();
         case Builtin::collArrayToSet:
-            return builtinCollArrayToSet(arity);
+            return builtinCollArrayToSet(arity).releaseToRaw();
         case Builtin::setToArray:
-            return builtinSetToArray(arity);
+            return builtinSetToArray(arity).releaseToRaw();
         case Builtin::fillType:
-            return builtinFillType(arity);
+            return builtinFillType(arity).releaseToRaw();
         case Builtin::aggFirstNNeedsMoreInput:
             return builtinAggFirstNNeedsMoreInput(arity).releaseToRaw();
         case Builtin::aggFirstN:
@@ -1222,7 +1222,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::cellBlockGetFlatValuesBlock:
             return builtinCellBlockGetFlatValuesBlock(arity);
         case Builtin::currentDate:
-            return builtinCurrentDate(arity);
+            return builtinCurrentDate(arity).releaseToRaw();
         case Builtin::singleByteEndMarker:
             MONGO_UNREACHABLE_TASSERT(11274614);
     }

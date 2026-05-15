@@ -1057,8 +1057,7 @@ ByteCode::genericRemovableSumState(value::Array* state) {
     return {sumAcc, nanCount, posInfinityCount, negInfinityCount, doubleCount, decimalCount};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggRemovableSumFinalizeImpl(
-    value::Array* state) {
+value::TagValueMaybeOwned ByteCode::aggRemovableSumFinalizeImpl(value::Array* state) {
     auto [sumAcc, nanCount, posInfinityCount, negInfinityCount, doubleCount, decimalCount] =
         genericRemovableSumState(state);
 

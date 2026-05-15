@@ -1369,7 +1369,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableSumFinalize(ArityType ari
 
     uassert(7795109, "state should be of array type", stateView.tag == value::TypeTags::Array);
     auto state = value::getArrayView(stateView.value);
-    return value::TagValueMaybeOwned::fromRaw(aggRemovableSumFinalizeImpl(state));
+    return aggRemovableSumFinalizeImpl(state);
 }
 
 namespace {
@@ -1849,7 +1849,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggIntegralFinalize(ArityType arity) 
                 value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())};
     }
 
-    auto resultTagVal = value::TagValueMaybeOwned::fromRaw(aggRemovableSumFinalizeImpl(integral));
+    auto resultTagVal = aggRemovableSumFinalizeImpl(integral);
     if (unitMillis) {
         auto [divResultOwned, divResultTag, divResultVal] =
             genericDiv(resultTagVal.tag(),
@@ -2036,7 +2036,7 @@ value::TagValueMaybeOwned ByteCode::aggRemovableAvgFinalizeImpl(value::Array* su
     if (count == 0) {
         return {false, sbe::value::TypeTags::Null, 0};
     }
-    auto sumTagVal = value::TagValueMaybeOwned::fromRaw(aggRemovableSumFinalizeImpl(sumState));
+    auto sumTagVal = aggRemovableSumFinalizeImpl(sumState);
 
     if (sumTagVal.tag() == value::TypeTags::NumberInt32) {
         auto sum = static_cast<double>(value::bitcastTo<int>(sumTagVal.value()));
@@ -2296,7 +2296,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggCovarianceFinalize(ArityType arity
         return {false, value::TypeTags::Null, 0};
     }
 
-    auto cXYTagVal = value::TagValueMaybeOwned::fromRaw(aggRemovableSumFinalizeImpl(cXYState));
+    auto cXYTagVal = aggRemovableSumFinalizeImpl(cXYState);
     return genericDiv(cXYTagVal.tag(),
                       cXYTagVal.value(),
                       value::TypeTags::NumberDouble,

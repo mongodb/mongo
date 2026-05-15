@@ -55,8 +55,7 @@ std::pair<SortSpec*, CollatorInterface*> ByteCode::generateSortKeyHelper(ArityTy
     return {ss, collator};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateCheapSortKey(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinGenerateCheapSortKey(ArityType arity) {
     auto [sortSpec, collator] = generateSortKeyHelper(arity);
     if (!sortSpec) {
         return {false, value::TypeTags::Nothing, 0};
@@ -71,7 +70,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateCheapSor
             value::bitcastFrom<value::SortKeyComponentVector*>(sortKeyComponentVector)};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinGenerateSortKey(ArityType arity) {
     auto [sortSpec, collator] = generateSortKeyHelper(arity);
     if (!sortSpec) {
         return {false, value::TypeTags::Nothing, 0};
@@ -95,8 +94,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey(
             value::makeKeyString(sortSpec->generateSortKey(bsonObj, collator)).second};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponentVectorGetElement(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSortKeyComponentVectorGetElement(ArityType arity) {
     tassert(11080008, "Unexpected arity value", arity == 2);
 
     auto [sortVecOwned, sortVecTag, sortVecVal] = getFromStack(0);
@@ -116,8 +114,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponent
     return {false, outTag, outVal};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponentVectorToArray(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSortKeyComponentVectorToArray(ArityType arity) {
     tassert(11080007, "Unexpected arity value", arity == 1);
 
     auto [sortVecOwned, sortVecTag, sortVecVal] = getFromStack(0);
@@ -201,7 +198,7 @@ std::pair<value::TypeTags, value::Value> builtinGetSortKeyImpl(value::TypeTags i
 }
 
 template <bool IsAscending, bool IsLeaf>
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetSortKey(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinGetSortKey(ArityType arity) {
     tassert(11080006, "Unexpected arity value", arity == 1 || arity == 2);
 
     CollatorInterface* collator = nullptr;
@@ -218,7 +215,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetSortKey(Arity
     // is Nothing or another simple type, treat it as the return value.
     if (!value::isArray(inputTag)) {
         if (inputTag != value::TypeTags::Nothing) {
-            return moveFromStack(0);
+            return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
         } else {
             return {false, value::TypeTags::Null, 0};
         }
@@ -236,14 +233,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetSortKey(Arity
         return {false, resultTag, resultVal};
     }
 }
-template FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetSortKey<false, false>(
-    ArityType arity);
-template FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetSortKey<false, true>(
-    ArityType arity);
-template FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetSortKey<true, false>(
-    ArityType arity);
-template FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetSortKey<true, true>(
-    ArityType arity);
+template value::TagValueMaybeOwned ByteCode::builtinGetSortKey<false, false>(ArityType arity);
+template value::TagValueMaybeOwned ByteCode::builtinGetSortKey<false, true>(ArityType arity);
+template value::TagValueMaybeOwned ByteCode::builtinGetSortKey<true, false>(ArityType arity);
+template value::TagValueMaybeOwned ByteCode::builtinGetSortKey<true, true>(ArityType arity);
 
 std::pair<value::TypeTags, value::Value> GetSortKeyAscFunctor::operator()(value::TypeTags tag,
                                                                           value::Value val) const {

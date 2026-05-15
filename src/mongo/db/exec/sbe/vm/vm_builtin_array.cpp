@@ -55,7 +55,7 @@ void expectOwnedArray(bool owned, value::TypeTags type) {
 // This is assumed by both builtinZipArrays and builtinExtractSubArray.
 static_assert(sizeof(size_t) >= sizeof(int32_t), "size_t must be at least 32-bits");
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArray(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinNewArray(ArityType arity) {
     auto result = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto arr = value::getArrayView(result.value());
 
@@ -66,10 +66,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArray(ArityTy
         }
     }
 
-    return result.releaseToMaybeOwnedRaw();
+    return std::move(result);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArrayFromRange(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinNewArrayFromRange(ArityType arity) {
     auto result = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto arr = value::getArrayView(result.value());
 
@@ -112,10 +112,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArrayFromRang
         arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
     }
 
-    return result.releaseToMaybeOwnedRaw();
+    return std::move(result);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinAddToArray(ArityType arity) {
     auto aggView = viewFromStack(0);
     auto field = value::TagValueOwned::fromRaw(moveOwnedFromStack(1));
 
@@ -134,7 +134,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(Arity
     // Push back the value. Note that array will ignore Nothing.
     arr->push_back(field.releaseToRaw());
 
-    return agg.releaseToRaw();
+    return agg;
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAddToArrayCappedImpl(
@@ -201,7 +201,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToArrayCappedImpl(
 
 // The value being accumulated is an SBE array that contains an integer and the accumulated array,
 // where the integer is the total size in bytes of the elements in the array.
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArrayCapped(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinAddToArrayCapped(ArityType arity) {
     auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
     auto newElem = value::TagValueMaybeOwned::fromRaw(moveFromStack(1));
 
@@ -209,16 +209,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArrayCapped
 
     // Return the unmodified accumulator state when the collator or size cap is malformed.
     if (sizeCap.tag != value::TypeTags::NumberInt32) {
-        return accumulatorState.releaseToMaybeOwnedRaw();
+        return std::move(accumulatorState);
     }
 
-    return builtinAddToArrayCappedImpl(std::move(accumulatorState),
-                                       std::move(newElem),
-                                       value::bitcastTo<int32_t>(sizeCap.value))
-        .releaseToRaw();
+    return builtinAddToArrayCappedImpl(
+        std::move(accumulatorState), std::move(newElem), value::bitcastTo<int32_t>(sizeCap.value));
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinConcatArrays(ArityType arity) {
     auto result = value::TagValueOwned::fromRaw(value::makeNewArray());
     auto resView = value::getArrayView(result.value());
 
@@ -233,10 +231,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(Ari
         });
     }
 
-    return result.releaseToMaybeOwnedRaw();
+    return std::move(result);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinZipArrays(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
     ArityType localVariables = 0;
     tassert(5156501, "Invalid parameter count for builtin ZipArrays", arity >= 2);
 
@@ -316,11 +314,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinZipArrays(ArityT
         resView->push_back(intermediateRes.releaseToRaw());
     }
 
-    return result.releaseToMaybeOwnedRaw();
+    return std::move(result);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArraysCapped(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinConcatArraysCapped(ArityType arity) {
     auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
     auto newArrayElements = value::TagValueOwned::fromRaw(moveOwnedFromStack(1));
 
@@ -328,7 +325,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArraysCapp
 
     // Return the unmodified accumulator state when the size cap is malformed.
     if (sizeCap.tag != value::TypeTags::NumberInt32) {
-        return accumulatorState.releaseToMaybeOwnedRaw();
+        return std::move(accumulatorState);
     }
 
     auto newArrayElemsSize =
@@ -337,15 +334,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArraysCapp
     return concatArraysAccumImpl(std::move(accumulatorState),
                                  std::move(newArrayElements),
                                  newArrayElemsSize,
-                                 value::bitcastTo<int32_t>(sizeCap.value))
-        .releaseToRaw();
+                                 value::bitcastTo<int32_t>(sizeCap.value));
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::isMemberImpl(value::TypeTags exprTag,
-                                                                      value::Value exprVal,
-                                                                      value::TypeTags arrTag,
-                                                                      value::Value arrVal,
-                                                                      CollatorInterface* collator) {
+value::TagValueMaybeOwned ByteCode::isMemberImpl(value::TypeTags exprTag,
+                                                 value::Value exprVal,
+                                                 value::TypeTags arrTag,
+                                                 value::Value arrVal,
+                                                 CollatorInterface* collator) {
     if (!value::isArray(arrTag) && arrTag != value::TypeTags::inList) {
         return {false, value::TypeTags::Nothing, 0};
     }
@@ -394,7 +390,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::isMemberImpl(value::Typ
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinIsMember(ArityType arity) {
     tassert(11080068, "Unexpected arity value", arity == 2);
     auto expr = viewFromStack(0);
     auto arr = viewFromStack(1);
@@ -402,7 +398,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(ArityTy
     return ByteCode::isMemberImpl(expr.tag, expr.value, arr.tag, arr.value, nullptr);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollIsMember(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCollIsMember(ArityType arity) {
     tassert(11080067, "Unexpected arity value", arity == 3);
     auto expr = viewFromStack(0);
     auto arr = viewFromStack(1);
@@ -419,7 +415,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollIsMember(Ari
     return ByteCode::isMemberImpl(expr.tag, expr.value, arr.tag, arr.value, collator);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinExtractSubArray(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinExtractSubArray(ArityType arity) {
     auto arrayView = viewFromStack(0);
     auto limitView = viewFromStack(1);
 
@@ -524,10 +520,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinExtractSubArray(
         }
     }
 
-    return result.releaseToMaybeOwnedRaw();
+    return std::move(result);
 }  // ByteCode::builtinExtractSubArray
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsArrayEmpty(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinIsArrayEmpty(ArityType arity) {
     tassert(11080066, "Unexpected arity value", arity == 1);
     auto arr = viewFromStack(0);
 
@@ -548,7 +544,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsArrayEmpty(Ari
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinReverseArray(ArityType arity) {
     tassert(11080065, "Unexpected arity value", arity == 1);
     auto input = viewFromStack(0);
 
@@ -570,7 +566,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(Ari
             }
         }
 
-        return result.releaseToMaybeOwnedRaw();
+        return std::move(result);
     } else if (input.tagIn(value::TypeTags::bsonArray, value::TypeTags::ArraySet)) {
         // Using intermediate vector since bsonArray and ArraySet don't
         // support reverse iteration.
@@ -595,7 +591,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(Ari
             }
         }
 
-        return result.releaseToMaybeOwnedRaw();
+        return std::move(result);
     } else {
         // Earlier in this function we bailed out if the 'inputType' wasn't
         // Array, ArraySet or bsonArray, so it should be impossible to reach
@@ -604,7 +600,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(Ari
     }
 }  // ByteCode::builtinReverseArray
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortArray(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSortArray(ArityType arity) {
     tassert(11080064, "Unexpected arity value", arity == 2 || arity == 3);
     auto input = viewFromStack(0);
 
@@ -652,7 +648,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortArray(ArityT
             }
         }
 
-        return result.releaseToMaybeOwnedRaw();
+        return std::move(result);
     } else if (input.tagIn(value::TypeTags::bsonArray, value::TypeTags::ArraySet)) {
         value::ArrayEnumerator enumerator{input.tag, input.value};
 
@@ -681,7 +677,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortArray(ArityT
             }
         }
 
-        return result.releaseToMaybeOwnedRaw();
+        return std::move(result);
     } else {
         // Earlier in this function we bailed out if the 'inputType' wasn't
         // Array, ArraySet or bsonArray, so it should be impossible to reach
@@ -770,8 +766,7 @@ void extractTopOrBottomN(std::vector<std::pair<value::TypeTags, value::Value>>& 
 
 }  // namespace
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomImpl(ArityType arity,
-                                                                         TopBottomSense sense) {
+value::TagValueMaybeOwned ByteCode::topOrBottomImpl(ArityType arity, TopBottomSense sense) {
     tassert(1127464, "Unexpected arity value", arity == 2 || arity == 3);
 
     auto input = viewFromStack(0);
@@ -821,7 +816,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomImpl(ArityTy
             }
         }
 
-        return best_element.copy().releaseToMaybeOwnedRaw();
+        return best_element.copy();
     } else if (input.tagIn(value::TypeTags::bsonArray, value::TypeTags::ArraySet)) {
         value::ArrayEnumerator enumerator{input.tag, input.value};
 
@@ -840,7 +835,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomImpl(ArityTy
             enumerator.advance();
         }
 
-        return best_element.copy().releaseToMaybeOwnedRaw();
+        return best_element.copy();
     } else {
         // Earlier in this function we bailed out if the 'inputType' wasn't
         // Array, ArraySet or bsonArray, so it should be impossible to reach
@@ -849,8 +844,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomImpl(ArityTy
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomNImpl(ArityType arity,
-                                                                          TopBottomSense sense) {
+value::TagValueMaybeOwned ByteCode::topOrBottomNImpl(ArityType arity, TopBottomSense sense) {
     tassert(1127461, "Unexpected arity value", arity == 3 || arity == 4);
 
     auto nView = viewFromStack(0);
@@ -889,7 +883,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomNImpl(ArityT
         auto inputView = value::getArrayView(input.value);
         size_t inputSize = inputView->size();
         if (inputSize == 0) {
-            return result.releaseToMaybeOwnedRaw();
+            return std::move(result);
         }
 
         resultView->reserve(std::min(inputSize, static_cast<size_t>(n)));
@@ -900,11 +894,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomNImpl(ArityT
         }
         extractTopOrBottomN(sortVector, static_cast<size_t>(n), resultView, cmp, sense);
 
-        return result.releaseToMaybeOwnedRaw();
+        return std::move(result);
     } else if (input.tagIn(value::TypeTags::bsonArray, value::TypeTags::ArraySet)) {
         value::ArrayEnumerator enumerator{input.tag, input.value};
         if (enumerator.atEnd()) {
-            return result.releaseToMaybeOwnedRaw();
+            return std::move(result);
         }
         // Using intermediate vector since bsonArray and ArraySet don't
         // support reverse iteration.
@@ -927,7 +921,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomNImpl(ArityT
             extractTopOrBottomN(inputContents, static_cast<size_t>(n), resultView, cmp, sense);
         }
 
-        return result.releaseToMaybeOwnedRaw();
+        return std::move(result);
     } else {
         // Earlier in this function we bailed out if the 'inputType' wasn't
         // Array, ArraySet or bsonArray, so it should be impossible to reach
@@ -936,23 +930,23 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::topOrBottomNImpl(ArityT
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTopN(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinTopN(ArityType arity) {
     return topOrBottomNImpl(arity, TopBottomSense::kTop);
 }  // ByteCode::builtinTopN
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBottomN(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinBottomN(ArityType arity) {
     return topOrBottomNImpl(arity, TopBottomSense::kBottom);
 }  // ByteCode::builtinBottomN
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTop(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinTop(ArityType arity) {
     return topOrBottomImpl(arity, TopBottomSense::kTop);
 }  // ByteCode::builtinTop
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBottom(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinBottom(ArityType arity) {
     return topOrBottomImpl(arity, TopBottomSense::kBottom);
 }  // ByteCode::builtinBottom
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinArrayToObject(ArityType arity) {
     tassert(11080063, "Unexpected arity value", arity == 1);
 
     auto arr = viewFromStack(0);
@@ -968,7 +962,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
 
     // return empty object for empty array
     if (arrayEnumerator.atEnd()) {
-        return obj.releaseToMaybeOwnedRaw();
+        return std::move(obj);
     }
 
     // There are two accepted input formats in an array: [ [key, val] ] or [ {k:key, v:val} ]. The
@@ -1092,10 +1086,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
         }
         arrayEnumerator.advance();
     }
-    return obj.releaseToMaybeOwnedRaw();
+    return std::move(obj);
 }  // ByteCode::builtinArrayToObject
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinUnwindArray(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinUnwindArray(ArityType arity) {
     tassert(11080059, "Unexpected arity value", arity == 1);
 
     auto arr = viewFromStack(0);
@@ -1127,10 +1121,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinUnwindArray(Arit
         arrayEnumerator.advance();
     }
 
-    return result.releaseToMaybeOwnedRaw();
+    return std::move(result);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToSet(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinArrayToSet(ArityType arity) {
     tassert(11080058, "Unexpected arity value", arity == 1);
     auto arr = viewFromStack(0);
 
@@ -1152,10 +1146,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToSet(Arity
         arrayEnumerator.advance();
     }
 
-    return result.releaseToMaybeOwnedRaw();
+    return std::move(result);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollArrayToSet(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCollArrayToSet(ArityType arity) {
     tassert(11080057, "Unexpected arity value", arity == 2);
 
     auto collView = viewFromStack(0);
@@ -1184,7 +1178,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollArrayToSet(A
         arrayEnumerator.advance();
     }
 
-    return result.releaseToMaybeOwnedRaw();
+    return std::move(result);
 }
 
 }  // namespace vm

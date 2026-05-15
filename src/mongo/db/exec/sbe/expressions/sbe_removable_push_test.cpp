@@ -49,6 +49,8 @@ public:
     void runAndAssertExpression(std::vector<std::pair<value::TypeTags, value::Value>>& inputValues,
                                 std::vector<RemovablePushOp>& operations,
                                 std::vector<std::pair<value::TypeTags, value::Value>>& expValues) {
+        ValueVectorGuard inputGuard{inputValues};
+        ValueVectorGuard expGuard{expValues};
         value::ViewOfValueAccessor inputAccessor;
         auto inputSlot = bindAccessor(&inputAccessor);
 
@@ -85,15 +87,10 @@ public:
 
             aggAccessor.reset(runTag, runVal);
             auto out = runCompiledExpression(compiledRemovablePushFinalize.get());
+            value::ValueGuard outGuard{out.first, out.second};
 
             ASSERT_EQ(out.first, expValues[i].first);
             ASSERT_THAT(out, ValueEq(expValues[i]));
-
-            value::releaseValue(out.first, out.second);
-            value::releaseValue(expValues[i].first, expValues[i].second);
-        }
-        for (size_t i = 0; i < inputValues.size(); ++i) {
-            value::releaseValue(inputValues[i].first, inputValues[i].second);
         }
     }
 };

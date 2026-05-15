@@ -34,7 +34,7 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSet(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinAddToSet(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
     auto [tagField, valField] = moveOwnedFromStack(1);
     value::ValueGuard guardField{tagField, valField};
@@ -62,7 +62,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSet(ArityTy
     return {ownAgg, tagAgg, valAgg};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSetCapped(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinAddToSetCapped(ArityType arity) {
     auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
     auto newElem = value::TagValueMaybeOwned::fromRaw(moveFromStack(1));
 
@@ -70,17 +70,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSetCapped(A
 
     // Return the unmodified accumulator state when the size cap is malformed.
     if (tagSizeCap != value::TypeTags::NumberInt32) {
-        return accumulatorState.releaseToMaybeOwnedRaw();
+        return std::move(accumulatorState);
     }
 
     return addToSetCappedImpl(std::move(accumulatorState),
                               std::move(newElem),
                               value::bitcastTo<int32_t>(valSizeCap),
-                              nullptr /*collator*/)
-        .releaseToRaw();
+                              nullptr /*collator*/);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSet(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCollAddToSet(ArityType arity) {
     auto [ownAgg, tagAgg, valAgg] = getFromStack(0);
     auto [ownColl, tagColl, valColl] = getFromStack(1);
     auto [tagField, valField] = moveOwnedFromStack(2);
@@ -117,8 +116,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSet(Ari
     return {ownAgg, tagAgg, valAgg};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSetCapped(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCollAddToSetCapped(ArityType arity) {
     auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
 
     auto [_ownedCollator, tagCollator, valCollator] = getFromStack(1);
@@ -129,17 +127,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSetCapp
 
     // Return the unmodified accumulator state when the collator or size cap is malformed.
     if (tagCollator != value::TypeTags::collator || tagSizeCap != value::TypeTags::NumberInt32) {
-        return accumulatorState.releaseToMaybeOwnedRaw();
+        return std::move(accumulatorState);
     }
 
     return addToSetCappedImpl(std::move(accumulatorState),
                               std::move(newElem),
                               value::bitcastTo<int32_t>(valSizeCap),
-                              value::getCollatorView(valCollator))
-        .releaseToRaw();
+                              value::getCollatorView(valCollator));
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnionCapped(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSetUnionCapped(ArityType arity) {
     auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
     auto newSetMembers = value::TagValueOwned::fromRaw(moveOwnedFromStack(1));
 
@@ -147,18 +144,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnionCapped(A
 
     // Return the unmodified accumulator state when the size cap is malformed.
     if (tagSizeCap != value::TypeTags::NumberInt32) {
-        return accumulatorState.releaseToMaybeOwnedRaw();
+        return std::move(accumulatorState);
     }
 
     return setUnionAccumImpl(std::move(accumulatorState),
                              std::move(newSetMembers),
                              value::bitcastTo<int32_t>(valSizeCap),
-                             nullptr /*collator*/)
-        .releaseToRaw();
+                             nullptr /*collator*/);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnionCapped(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCollSetUnionCapped(ArityType arity) {
     auto accumulatorState = value::TagValueOwned::fromRaw(moveOwnedFromStack(0));
 
     auto [_ownedCollator, tagCollator, valCollator] = getFromStack(1);
@@ -169,23 +164,19 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnionCapp
 
     // Return the unmodified accumulator state when the size cap or collator is malformed.
     if (tagCollator != value::TypeTags::collator || tagSizeCap != value::TypeTags::NumberInt32) {
-        auto [arrOwned, arrTag, arrVal] = getFromStack(0);
-        topStack(false, value::TypeTags::Nothing, 0);
-        return {arrOwned, arrTag, arrVal};
+        return std::move(accumulatorState);
     }
 
     return setUnionAccumImpl(std::move(accumulatorState),
                              std::move(newSetMembers),
                              value::bitcastTo<int32_t>(valSizeCap),
-                             value::getCollatorView(valCollator))
-        .releaseToRaw();
+                             value::getCollatorView(valCollator));
 }
 
 namespace {
-FastTuple<bool, value::TypeTags, value::Value> setUnion(
-    const std::vector<value::TypeTags>& argTags,
-    const std::vector<value::Value>& argVals,
-    const CollatorInterface* collator = nullptr) {
+value::TagValueMaybeOwned setUnion(const std::vector<value::TypeTags>& argTags,
+                                   const std::vector<value::Value>& argVals,
+                                   const CollatorInterface* collator = nullptr) {
     auto [resTag, resVal] = value::makeNewArraySet(collator);
     value::ValueGuard resGuard{resTag, resVal};
     auto resView = value::getArraySetView(resVal);
@@ -202,10 +193,9 @@ FastTuple<bool, value::TypeTags, value::Value> setUnion(
     return {true, resTag, resVal};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> setIntersection(
-    const std::vector<value::TypeTags>& argTags,
-    const std::vector<value::Value>& argVals,
-    const CollatorInterface* collator = nullptr) {
+value::TagValueMaybeOwned setIntersection(const std::vector<value::TypeTags>& argTags,
+                                          const std::vector<value::Value>& argVals,
+                                          const CollatorInterface* collator = nullptr) {
     auto intersectionMap =
         value::ValueMapType<size_t>{0, value::ValueHash(collator), value::ValueEq(collator)};
 
@@ -263,12 +253,11 @@ value::ValueSetType valueToShallowSetHelper(value::TypeTags tag,
     return setValues;
 }
 
-FastTuple<bool, value::TypeTags, value::Value> setDifference(
-    value::TypeTags lhsTag,
-    value::Value lhsVal,
-    value::TypeTags rhsTag,
-    value::Value rhsVal,
-    const CollatorInterface* collator = nullptr) {
+value::TagValueMaybeOwned setDifference(value::TypeTags lhsTag,
+                                        value::Value lhsVal,
+                                        value::TypeTags rhsTag,
+                                        value::Value rhsVal,
+                                        const CollatorInterface* collator = nullptr) {
     auto [resTag, resVal] = value::makeNewArraySet(collator);
     value::ValueGuard resGuard{resTag, resVal};
     auto resView = value::getArraySetView(resVal);
@@ -292,10 +281,9 @@ FastTuple<bool, value::TypeTags, value::Value> setDifference(
     return {true, resTag, resVal};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> setEquals(
-    const std::vector<value::TypeTags>& argTags,
-    const std::vector<value::Value>& argVals,
-    const CollatorInterface* collator = nullptr) {
+value::TagValueMaybeOwned setEquals(const std::vector<value::TypeTags>& argTags,
+                                    const std::vector<value::Value>& argVals,
+                                    const CollatorInterface* collator = nullptr) {
     auto setValuesFirstArg = valueToShallowSetHelper(argTags[0], argVals[0], collator);
 
     for (size_t idx = 1; idx < argVals.size(); ++idx) {
@@ -317,12 +305,11 @@ FastTuple<bool, value::TypeTags, value::Value> setEquals(
     return {false, value::TypeTags::Boolean, true};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> setIsSubset(
-    value::TypeTags lhsTag,
-    value::Value lhsVal,
-    value::TypeTags rhsTag,
-    value::Value rhsVal,
-    const CollatorInterface* collator = nullptr) {
+value::TagValueMaybeOwned setIsSubset(value::TypeTags lhsTag,
+                                      value::Value lhsVal,
+                                      value::TypeTags rhsTag,
+                                      value::Value rhsVal,
+                                      const CollatorInterface* collator = nullptr) {
 
     if (!value::isArray(lhsTag) || !value::isArray(rhsTag)) {
         return {false, value::TypeTags::Nothing, 0};
@@ -349,7 +336,7 @@ FastTuple<bool, value::TypeTags, value::Value> setIsSubset(
 }
 }  // namespace
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnion(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCollSetUnion(ArityType arity) {
     tassert(11080016, "Unexpected arity value", arity >= 1);
 
     auto [_, collTag, collVal] = getFromStack(0);
@@ -372,7 +359,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnion(Ari
     return setUnion(argTags, argVals, value::getCollatorView(collVal));
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnion(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSetUnion(ArityType arity) {
     std::vector<value::TypeTags> argTags;
     std::vector<value::Value> argVals;
 
@@ -389,8 +376,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnion(ArityTy
     return setUnion(argTags, argVals);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetIntersection(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCollSetIntersection(ArityType arity) {
     tassert(11080015, "Unexpected arity value", arity >= 1);
 
     auto [_, collTag, collVal] = getFromStack(0);
@@ -414,7 +400,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetIntersect
     return setIntersection(argTags, argVals, value::getCollatorView(collVal));
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIntersection(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSetIntersection(ArityType arity) {
     std::vector<value::TypeTags> argTags;
     std::vector<value::Value> argVals;
 
@@ -431,7 +417,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIntersection(
     return setIntersection(argTags, argVals);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetDifference(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCollSetDifference(ArityType arity) {
     tassert(11080014, "Unexpected arity value", arity == 3);
 
     auto [_, collTag, collVal] = getFromStack(0);
@@ -449,7 +435,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetDifferenc
     return setDifference(lhsTag, lhsVal, rhsTag, rhsVal, value::getCollatorView(collVal));
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetEquals(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCollSetEquals(ArityType arity) {
     tassert(11080013, "Unexpected arity value", arity >= 3);
 
     auto [_, collTag, collVal] = getFromStack(0);
@@ -473,7 +459,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetEquals(Ar
     return setEquals(argTags, argVals, value::getCollatorView(collVal));
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetIsSubset(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCollSetIsSubset(ArityType arity) {
     tassert(5154701, "$setIsSubset expects two sets and a collator", arity == 3);
 
     auto [_, collTag, collVal] = getFromStack(0);
@@ -487,7 +473,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetIsSubset(
     return setIsSubset(lhsTag, lhsVal, rhsTag, rhsVal, value::getCollatorView(collVal));
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSetDifference(ArityType arity) {
     tassert(11080012, "Unexpected arity value", arity == 2);
 
     auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
@@ -500,7 +486,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(Ar
     return setDifference(lhsTag, lhsVal, rhsTag, rhsVal);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetEquals(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSetEquals(ArityType arity) {
     tassert(11080011, "Unexpected arity value", arity >= 2);
 
     std::vector<value::TypeTags> argTags;
@@ -519,7 +505,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetEquals(ArityT
     return setEquals(argTags, argVals);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIsSubset(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSetIsSubset(ArityType arity) {
     tassert(5154702, "$setIsSubset expects two sets", arity == 2);
 
     auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
@@ -528,7 +514,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIsSubset(Arit
     return setIsSubset(lhsTag, lhsVal, rhsTag, rhsVal);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetToArray(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSetToArray(ArityType arity) {
     tassert(11080010, "Unexpected arity value", arity == 1);
 
     auto [owned, tag, val] = getFromStack(0);

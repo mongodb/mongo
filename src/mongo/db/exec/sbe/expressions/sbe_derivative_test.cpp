@@ -51,6 +51,9 @@ public:
                                 std::vector<std::pair<value::TypeTags, value::Value>>& sortByValues,
                                 std::vector<DerivativeOp>& operations,
                                 std::vector<std::pair<value::TypeTags, value::Value>>& expValues) {
+        ValueVectorGuard inputGuard{inputValues};
+        ValueVectorGuard sortByGuard{sortByValues};
+        ValueVectorGuard expGuard{expValues};
         value::ViewOfValueAccessor inputAccessorFirst;
         auto inputFirstSlot = bindAccessor(&inputAccessorFirst);
 
@@ -101,16 +104,10 @@ public:
             }
 
             auto out = runCompiledExpression(compiledDerivativeFinalize.get());
+            value::ValueGuard outGuard{out.first, out.second};
 
             ASSERT_EQ(out.first, expValues[i].first);
             ASSERT_THAT(out, ValueEq(expValues[i]));
-
-            value::releaseValue(out.first, out.second);
-            value::releaseValue(expValues[i].first, expValues[i].second);
-        }
-        for (size_t i = 0; i < inputValues.size(); ++i) {
-            value::releaseValue(inputValues[i].first, inputValues[i].second);
-            value::releaseValue(sortByValues[i].first, sortByValues[i].second);
         }
     }
 
@@ -119,6 +116,8 @@ public:
                                std::vector<std::pair<value::TypeTags, value::Value>>& sortByValues,
                                std::vector<DerivativeOp>& operations,
                                int expErrCode) {
+        ValueVectorGuard inputGuard{inputValues};
+        ValueVectorGuard sortByGuard{sortByValues};
         value::ViewOfValueAccessor inputAccessorFirst;
         auto inputFirstSlot = bindAccessor(&inputAccessorFirst);
 
@@ -172,7 +171,7 @@ public:
                     }
 
                     auto out = runCompiledExpression(compiledDerivativeFinalize.get());
-                    value::releaseValue(out.first, out.second);
+                    value::ValueGuard outGuard{out.first, out.second};
                 }
                 return Status::OK();
             } catch (AssertionException& ex) {
@@ -181,10 +180,6 @@ public:
         }();
         ASSERT_FALSE(status.isOK());
         ASSERT_EQ(status.code(), expErrCode);
-        for (size_t i = 0; i < inputValues.size(); ++i) {
-            value::releaseValue(inputValues[i].first, inputValues[i].second);
-            value::releaseValue(sortByValues[i].first, sortByValues[i].second);
-        }
     }
 };
 

@@ -32,8 +32,7 @@
 #include "mongo/db/exec/sbe/vm/vm_makeobj.h"
 
 namespace mongo::sbe::vm {
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeObj(ArityType arity,
-                                                                        const CodeFragment* code) {
+value::TagValueMaybeOwned ByteCode::builtinMakeObj(ArityType arity, const CodeFragment* code) {
     tassert(9531000,
             str::stream() << "Unsupported number of args passed to makeObj(): " << arity,
             arity >= 2);

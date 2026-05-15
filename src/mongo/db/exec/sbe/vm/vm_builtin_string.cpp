@@ -36,7 +36,7 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSplit(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSplit(ArityType arity) {
     auto [ownedSeparator, tagSeparator, valSeparator] = getFromStack(1);
     auto [ownedInput, tagInput, valInput] = getFromStack(0);
 
@@ -70,7 +70,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSplit(ArityType 
     return {true, tag, val};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReplaceOne(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinReplaceOne(ArityType arity) {
     tassert(11080005, "Unexpected arity value", arity == 3);
 
     auto [ownedInputStr, typeTagInputStr, valueInputStr] = getFromStack(0);
@@ -110,7 +110,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReplaceOne(Arity
     return {true, outputStrTypeTag, outputStrValue};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenBytes(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinStrLenBytes(ArityType arity) {
     tassert(11080004, "Unexpected arity value", arity == 1);
 
     auto [_, operandTag, operandVal] = getFromStack(0);
@@ -126,7 +126,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenBytes(Arit
     return {false, value::TypeTags::Nothing, 0};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenCP(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinStrLenCP(ArityType arity) {
     tassert(11080003, "Unexpected arity value", arity == 1);
 
     auto [_, operandTag, operandVal] = getFromStack(0);
@@ -142,7 +142,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenCP(ArityTy
     return {false, value::TypeTags::Nothing, 0};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrBytes(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSubstrBytes(ArityType arity) {
     tassert(11080002, "Unexpected arity value", arity == 3);
 
     auto [strOwned, strTag, strVal] = getFromStack(0);
@@ -187,7 +187,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrBytes(Arit
     return {true, outTag, outVal};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrCP(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinSubstrCP(ArityType arity) {
     tassert(11080001, "Unexpected arity value", arity == 3);
 
     auto [strOwned, strTag, strVal] = getFromStack(0);
@@ -205,7 +205,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrCP(ArityTy
     return {true, outTag, outVal};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinToUpper(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinToUpper(ArityType arity) {
     auto [_, operandTag, operandVal] = getFromStack(0);
 
     if (value::isString(operandTag)) {
@@ -218,7 +218,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinToUpper(ArityTyp
     return {false, value::TypeTags::Nothing, 0};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinToLower(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinToLower(ArityType arity) {
     auto [_, operandTag, operandVal] = getFromStack(0);
 
     if (value::isString(operandTag)) {
@@ -231,7 +231,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinToLower(ArityTyp
     return {false, value::TypeTags::Nothing, 0};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCoerceToString(ArityType arity) {
     auto [operandOwn, operandTag, operandVal] = getFromStack(0);
 
     if (value::isString(operandTag)) {
@@ -302,7 +302,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(A
     return {false, value::TypeTags::Nothing, 0};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinConcat(ArityType arity) {
     StringBuilder result;
     for (ArityType idx = 0; idx < arity; ++idx) {
         auto [_, tag, value] = getFromStack(idx);
@@ -316,9 +316,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(ArityType
     return {true, strTag, strValue};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTrim(ArityType arity,
-                                                                     bool trimLeft,
-                                                                     bool trimRight) {
+value::TagValueMaybeOwned ByteCode::builtinTrim(ArityType arity, bool trimLeft, bool trimRight) {
     auto [ownedChars, tagChars, valChars] = getFromStack(1);
     auto [ownedInput, tagInput, valInput] = getFromStack(0);
 
@@ -348,7 +346,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTrim(ArityType a
     return {true, strTag, strValue};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfBytes(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinIndexOfBytes(ArityType arity) {
     auto [strOwn, strTag, strVal] = getFromStack(0);
     auto [substrOwn, substrTag, substrVal] = getFromStack(1);
     if ((!value::isString(strTag)) || (!value::isString(substrTag))) {
@@ -396,7 +394,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfBytes(Ari
     return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfCP(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinIndexOfCP(ArityType arity) {
     auto [strOwn, strTag, strVal] = getFromStack(0);
     auto [substrOwn, substrTag, substrVal] = getFromStack(1);
     if ((!value::isString(strTag)) || (!value::isString(substrTag))) {
@@ -467,8 +465,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfCP(ArityT
     return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
 }  // ByteCode::builtinIndexOfCP
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsValidToStringFormat(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinIsValidToStringFormat(ArityType arity) {
     auto [formatOwn, formatTag, formatVal] = getFromStack(0);
     if (!value::isString(formatTag)) {
         return {false, value::TypeTags::Boolean, false};
@@ -480,8 +477,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsValidToStringF
     return {false, value::TypeTags::Boolean, false};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValidateFromStringFormat(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinValidateFromStringFormat(ArityType arity) {
     auto [formatOwn, formatTag, formatVal] = getFromStack(0);
     if (!value::isString(formatTag)) {
         return {false, value::TypeTags::Boolean, false};
@@ -491,7 +487,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValidateFromStri
     return {false, value::TypeTags::Boolean, true};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinHasNullBytes(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinHasNullBytes(ArityType arity) {
     tassert(11080000, "Unexpected arity value", arity == 1);
     auto [strOwned, strType, strValue] = getFromStack(0);
 

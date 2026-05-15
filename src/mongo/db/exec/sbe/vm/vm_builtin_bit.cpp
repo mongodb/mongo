@@ -33,7 +33,7 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestPosition(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinBitTestPosition(ArityType arity) {
     tassert(11080056, "Unexpected arity value", arity == 3);
 
     auto [ownedMask, maskTag, maskValue] = getFromStack(0);
@@ -97,7 +97,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestPosition(
                                      bitTestBehavior == BitTestBehavior::AllClear)};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestZero(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinBitTestZero(ArityType arity) {
     tassert(11080055, "Unexpected arity value", arity == 2);
     auto [maskOwned, maskTag, maskValue] = getFromStack(0);
     auto [inputOwned, inputTag, inputValue] = getFromStack(1);
@@ -113,7 +113,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestZero(Arit
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestMask(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinBitTestMask(ArityType arity) {
     tassert(11080054, "Unexpected arity value", arity == 2);
     auto [maskOwned, maskTag, maskValue] = getFromStack(0);
     auto [inputOwned, inputTag, inputValue] = getFromStack(1);

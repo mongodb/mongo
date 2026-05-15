@@ -34,7 +34,7 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinHash(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinHash(ArityType arity) {
     auto hashVal = value::hashInit();
     for (ArityType idx = 0; idx < arity; ++idx) {
         auto [owned, tag, val] = getFromStack(idx);
@@ -44,7 +44,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinHash(ArityType a
     return {false, value::TypeTags::NumberInt64, value::bitcastFrom<decltype(hashVal)>(hashVal)};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinShardHash(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinShardHash(ArityType arity) {
     tassert(11080027, "Unexpected arity value", arity == 1);
 
     auto [ownedShardKey, shardKeyTag, shardKeyValue] = getFromStack(0);

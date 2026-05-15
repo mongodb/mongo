@@ -667,12 +667,12 @@ private:
     value::TagValueMaybeOwned genericISOWeek(value::TagValueView date, value::TagValueView tz);
     value::TagValueMaybeOwned genericNewKeyString(ArityType arity,
                                                   CollatorInterface* collator = nullptr);
-    FastTuple<bool, value::TypeTags, value::Value> dateTrunc(value::TypeTags dateTag,
-                                                             value::Value dateValue,
-                                                             TimeUnit unit,
-                                                             int64_t binSize,
-                                                             TimeZone timezone,
-                                                             DayOfWeek startOfWeek);
+    value::TagValueMaybeOwned dateTrunc(value::TypeTags dateTag,
+                                        value::Value dateValue,
+                                        TimeUnit unit,
+                                        int64_t binSize,
+                                        TimeZone timezone,
+                                        DayOfWeek startOfWeek);
 
     template <bool IsBlockBuiltin = false>
     bool validateDateTruncParameters(TimeUnit* unit,
@@ -694,23 +694,23 @@ private:
      * referenced in the function name (e.g. builtinSplit is invoked when Builtin::split is
      * encountered).
      */
-    FastTuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinDateWeekYear(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinDateDiff(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinDateToParts(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinIsoDateToParts(ArityType arity);
+    value::TagValueMaybeOwned builtinSplit(ArityType arity);
+    value::TagValueMaybeOwned builtinDate(ArityType arity);
+    value::TagValueMaybeOwned builtinDateWeekYear(ArityType arity);
+    value::TagValueMaybeOwned builtinDateDiff(ArityType arity);
+    value::TagValueMaybeOwned builtinDateToParts(ArityType arity);
+    value::TagValueMaybeOwned builtinIsoDateToParts(ArityType arity);
     value::TagValueMaybeOwned builtinDayOfYear(ArityType arity);
     value::TagValueMaybeOwned builtinDayOfMonth(ArityType arity);
     value::TagValueMaybeOwned builtinDayOfWeek(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinRegexMatch(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinKeepFields(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinReplaceOne(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinDropFields(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinNewArray(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinNewArrayFromRange(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinNewObj(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinNewBsonObj(ArityType arity);
+    value::TagValueMaybeOwned builtinRegexMatch(ArityType arity);
+    value::TagValueMaybeOwned builtinKeepFields(ArityType arity);
+    value::TagValueMaybeOwned builtinReplaceOne(ArityType arity);
+    value::TagValueMaybeOwned builtinDropFields(ArityType arity);
+    value::TagValueMaybeOwned builtinNewArray(ArityType arity);
+    value::TagValueMaybeOwned builtinNewArrayFromRange(ArityType arity);
+    value::TagValueMaybeOwned builtinNewObj(ArityType arity);
+    value::TagValueMaybeOwned builtinNewBsonObj(ArityType arity);
     value::TagValueMaybeOwned builtinNewKeyString(ArityType arity);
     value::TagValueMaybeOwned builtinCollNewKeyString(ArityType arity);
     value::TagValueMaybeOwned builtinAbs(ArityType arity);
@@ -722,36 +722,36 @@ private:
     value::TagValueMaybeOwned builtinLog10(ArityType arity);
     value::TagValueMaybeOwned builtinSqrt(ArityType arity);
     value::TagValueMaybeOwned builtinPow(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAddToArray(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAddToArrayCapped(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinMergeObjects(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAddToSet(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSet(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> isMemberImpl(value::TypeTags exprTag,
-                                                                value::Value exprVal,
-                                                                value::TypeTags arrTag,
-                                                                value::Value arrVal,
-                                                                CollatorInterface* collator);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAddToSetCapped(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinSetToArray(ArityType arity);
+    value::TagValueMaybeOwned builtinAddToArray(ArityType arity);
+    value::TagValueMaybeOwned builtinAddToArrayCapped(ArityType arity);
+    value::TagValueMaybeOwned builtinMergeObjects(ArityType arity);
+    value::TagValueMaybeOwned builtinAddToSet(ArityType arity);
+    value::TagValueMaybeOwned builtinCollAddToSet(ArityType arity);
+    value::TagValueMaybeOwned isMemberImpl(value::TypeTags exprTag,
+                                           value::Value exprVal,
+                                           value::TypeTags arrTag,
+                                           value::Value arrVal,
+                                           CollatorInterface* collator);
+    value::TagValueMaybeOwned builtinAddToSetCapped(ArityType arity);
+    value::TagValueMaybeOwned builtinCollAddToSetCapped(ArityType arity);
+    value::TagValueMaybeOwned builtinSetToArray(ArityType arity);
 
-    FastTuple<bool, value::TypeTags, value::Value> builtinSetUnionCapped(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollSetUnionCapped(ArityType arity);
+    value::TagValueMaybeOwned builtinSetUnionCapped(ArityType arity);
+    value::TagValueMaybeOwned builtinCollSetUnionCapped(ArityType arity);
 
     /**
      * If the BSON type of the value at stack[0] matches the BSON type mask at stack[1] (see
      * value::getBSONTypeMask()), returns true, else returns false. (Returns Nothing if stack[0] is
      * Nothing or stack[1] is not a NumberInt32.)
      */
-    FastTuple<bool, value::TypeTags, value::Value> builtinTypeMatch(ArityType arity);
+    value::TagValueMaybeOwned builtinTypeMatch(ArityType arity);
 
     /**
      * If the BSON type of the value at stack[0] matches the BSON type mask at stack[1] (see
      * value::getBSONTypeMask()), returns stack[2] (the fill value), else returns stack[0] (the
      * original value). (Returns Nothing if stack[0] is Nothing or stack[1] is not a NumberInt32.)
      */
-    FastTuple<bool, value::TypeTags, value::Value> builtinFillType(ArityType arity);
+    value::TagValueMaybeOwned builtinFillType(ArityType arity);
 
     value::TagValueMaybeOwned builtinConvertSimpleSumToDoubleDoubleSum(ArityType arity);
     value::TagValueMaybeOwned builtinDoubleDoubleSum(ArityType arity);
@@ -770,18 +770,18 @@ private:
 
     value::TagValueMaybeOwned builtinStdDevPopFinalize(ArityType arity);
     value::TagValueMaybeOwned builtinStdDevSampFinalize(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinBitTestZero(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinBitTestMask(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinBitTestPosition(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinBsonSize(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinStrLenBytes(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinStrLenCP(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinSubstrBytes(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinSubstrCP(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinToUpper(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinToLower(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCoerceToBool(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCoerceToString(ArityType arity);
+    value::TagValueMaybeOwned builtinBitTestZero(ArityType arity);
+    value::TagValueMaybeOwned builtinBitTestMask(ArityType arity);
+    value::TagValueMaybeOwned builtinBitTestPosition(ArityType arity);
+    value::TagValueMaybeOwned builtinBsonSize(ArityType arity);
+    value::TagValueMaybeOwned builtinStrLenBytes(ArityType arity);
+    value::TagValueMaybeOwned builtinStrLenCP(ArityType arity);
+    value::TagValueMaybeOwned builtinSubstrBytes(ArityType arity);
+    value::TagValueMaybeOwned builtinSubstrCP(ArityType arity);
+    value::TagValueMaybeOwned builtinToUpper(ArityType arity);
+    value::TagValueMaybeOwned builtinToLower(ArityType arity);
+    value::TagValueMaybeOwned builtinCoerceToBool(ArityType arity);
+    value::TagValueMaybeOwned builtinCoerceToString(ArityType arity);
     value::TagValueMaybeOwned builtinAcos(ArityType arity);
     value::TagValueMaybeOwned builtinAcosh(ArityType arity);
     value::TagValueMaybeOwned builtinAsin(ArityType arity);
@@ -799,80 +799,72 @@ private:
     value::TagValueMaybeOwned builtinTanh(ArityType arity);
     value::TagValueMaybeOwned builtinRand(ArityType arity);
     value::TagValueMaybeOwned builtinRound(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinConcatArrays(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinZipArrays(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinTrim(ArityType arity,
-                                                               bool trimLeft,
-                                                               bool trimRight);
+    value::TagValueMaybeOwned builtinConcat(ArityType arity);
+    value::TagValueMaybeOwned builtinConcatArrays(ArityType arity);
+    value::TagValueMaybeOwned builtinZipArrays(ArityType arity);
+    value::TagValueMaybeOwned builtinTrim(ArityType arity, bool trimLeft, bool trimRight);
     value::TagValueMaybeOwned builtinAggConcatArraysCapped(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinConcatArraysCapped(ArityType arity);
+    value::TagValueMaybeOwned builtinConcatArraysCapped(ArityType arity);
     value::TagValueMaybeOwned builtinAggSetUnion(ArityType arity);
     value::TagValueMaybeOwned builtinAggCollSetUnion(ArityType arity);
     value::TagValueMaybeOwned builtinAggSetUnionCapped(ArityType arity);
     value::TagValueMaybeOwned builtinAggCollSetUnionCapped(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(ArityType arity);
+    value::TagValueMaybeOwned builtinIsMember(ArityType arity);
+    value::TagValueMaybeOwned builtinCollIsMember(ArityType arity);
+    value::TagValueMaybeOwned builtinIndexOfBytes(ArityType arity);
+    value::TagValueMaybeOwned builtinIndexOfCP(ArityType arity);
     value::TagValueMaybeOwned builtinIsDayOfWeek(ArityType arity);
     value::TagValueMaybeOwned builtinIsTimeUnit(ArityType arity);
     value::TagValueMaybeOwned builtinIsTimezone(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinIsValidToStringFormat(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValidateFromStringFormat(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinSetUnion(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinSetIntersection(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinSetDifference(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinSetEquals(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinSetIsSubset(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollSetUnion(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollSetIntersection(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollSetDifference(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollSetEquals(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollSetIsSubset(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinRunJsPredicate(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinRegexCompile(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinRegexFind(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinRegexFindAll(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinShardFilter(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinShardHash(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinExtractSubArray(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinIsArrayEmpty(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinReverseArray(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinSortArray(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinTopN(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinTop(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinBottomN(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinBottom(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> topOrBottomImpl(ArityType arity,
-                                                                   TopBottomSense sense);
-    FastTuple<bool, value::TypeTags, value::Value> topOrBottomNImpl(ArityType arity,
-                                                                    TopBottomSense sense);
-    FastTuple<bool, value::TypeTags, value::Value> builtinDateAdd(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinHasNullBytes(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinGetRegexPattern(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinGetRegexFlags(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinHash(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinFtsMatch(ArityType arity);
+    value::TagValueMaybeOwned builtinIsValidToStringFormat(ArityType arity);
+    value::TagValueMaybeOwned builtinValidateFromStringFormat(ArityType arity);
+    value::TagValueMaybeOwned builtinSetUnion(ArityType arity);
+    value::TagValueMaybeOwned builtinSetIntersection(ArityType arity);
+    value::TagValueMaybeOwned builtinSetDifference(ArityType arity);
+    value::TagValueMaybeOwned builtinSetEquals(ArityType arity);
+    value::TagValueMaybeOwned builtinSetIsSubset(ArityType arity);
+    value::TagValueMaybeOwned builtinCollSetUnion(ArityType arity);
+    value::TagValueMaybeOwned builtinCollSetIntersection(ArityType arity);
+    value::TagValueMaybeOwned builtinCollSetDifference(ArityType arity);
+    value::TagValueMaybeOwned builtinCollSetEquals(ArityType arity);
+    value::TagValueMaybeOwned builtinCollSetIsSubset(ArityType arity);
+    value::TagValueMaybeOwned builtinRunJsPredicate(ArityType arity);
+    value::TagValueMaybeOwned builtinRegexCompile(ArityType arity);
+    value::TagValueMaybeOwned builtinRegexFind(ArityType arity);
+    value::TagValueMaybeOwned builtinRegexFindAll(ArityType arity);
+    value::TagValueMaybeOwned builtinShardFilter(ArityType arity);
+    value::TagValueMaybeOwned builtinShardHash(ArityType arity);
+    value::TagValueMaybeOwned builtinExtractSubArray(ArityType arity);
+    value::TagValueMaybeOwned builtinIsArrayEmpty(ArityType arity);
+    value::TagValueMaybeOwned builtinReverseArray(ArityType arity);
+    value::TagValueMaybeOwned builtinSortArray(ArityType arity);
+    value::TagValueMaybeOwned builtinTopN(ArityType arity);
+    value::TagValueMaybeOwned builtinTop(ArityType arity);
+    value::TagValueMaybeOwned builtinBottomN(ArityType arity);
+    value::TagValueMaybeOwned builtinBottom(ArityType arity);
+    value::TagValueMaybeOwned topOrBottomImpl(ArityType arity, TopBottomSense sense);
+    value::TagValueMaybeOwned topOrBottomNImpl(ArityType arity, TopBottomSense sense);
+    value::TagValueMaybeOwned builtinDateAdd(ArityType arity);
+    value::TagValueMaybeOwned builtinHasNullBytes(ArityType arity);
+    value::TagValueMaybeOwned builtinGetRegexPattern(ArityType arity);
+    value::TagValueMaybeOwned builtinGetRegexFlags(ArityType arity);
+    value::TagValueMaybeOwned builtinHash(ArityType arity);
+    value::TagValueMaybeOwned builtinFtsMatch(ArityType arity);
     std::pair<SortSpec*, CollatorInterface*> generateSortKeyHelper(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinGenerateSortKey(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinGenerateCheapSortKey(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinSortKeyComponentVectorGetElement(
-        ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinSortKeyComponentVectorToArray(
-        ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinMakeObj(ArityType arity,
-                                                                  const CodeFragment* code);
-    FastTuple<bool, value::TypeTags, value::Value> builtinMakeBsonObj(ArityType arity,
-                                                                      const CodeFragment* code);
+    value::TagValueMaybeOwned builtinGenerateSortKey(ArityType arity);
+    value::TagValueMaybeOwned builtinGenerateCheapSortKey(ArityType arity);
+    value::TagValueMaybeOwned builtinSortKeyComponentVectorGetElement(ArityType arity);
+    value::TagValueMaybeOwned builtinSortKeyComponentVectorToArray(ArityType arity);
+    value::TagValueMaybeOwned builtinMakeObj(ArityType arity, const CodeFragment* code);
+    value::TagValueMaybeOwned builtinMakeBsonObj(ArityType arity, const CodeFragment* code);
     value::TagValueMaybeOwned builtinTsSecond(ArityType arity);
     value::TagValueMaybeOwned builtinTsIncrement(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinDateToString(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinDateFromString(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinDateFromStringNoThrow(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinDateTrunc(ArityType arity);
+    value::TagValueMaybeOwned builtinDateToString(ArityType arity);
+    value::TagValueMaybeOwned builtinDateFromString(ArityType arity);
+    value::TagValueMaybeOwned builtinDateFromStringNoThrow(ArityType arity);
+    value::TagValueMaybeOwned builtinDateTrunc(ArityType arity);
     template <bool IsAscending, bool IsLeaf>
-    FastTuple<bool, value::TypeTags, value::Value> builtinGetSortKey(ArityType arity);
+    value::TagValueMaybeOwned builtinGetSortKey(ArityType arity);
     value::TagValueMaybeOwned builtinYear(ArityType arity);
     value::TagValueMaybeOwned builtinMonth(ArityType arity);
     value::TagValueMaybeOwned builtinHour(ArityType arity);
@@ -883,8 +875,8 @@ private:
     value::TagValueMaybeOwned builtinISOWeekYear(ArityType arity);
     value::TagValueMaybeOwned builtinISODayOfWeek(ArityType arity);
     value::TagValueMaybeOwned builtinISOWeek(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinObjectToArray(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinArrayToObject(ArityType arity);
+    value::TagValueMaybeOwned builtinObjectToArray(ArityType arity);
+    value::TagValueMaybeOwned builtinArrayToObject(ArityType arity);
 
     /**
      * Implementation of the builtin function 'unwindArray'. It accepts 1 argument that must be one
@@ -893,14 +885,14 @@ private:
      * array items.
      * E.g. unwindArray([ 1, ['a', ['b']], 2, [] ]) = [ 1, 'a', ['b'], 2 ]
      */
-    FastTuple<bool, value::TypeTags, value::Value> builtinUnwindArray(ArityType arity);
+    value::TagValueMaybeOwned builtinUnwindArray(ArityType arity);
     /**
      * Implementation of the builtin function 'arrayToSet'. It accepts 1 argument that must be one
      * of the SBE array types (BSONArray, Array, ArraySet, ArrayMultiSet) and returns an ArraySet
      * object that contains all the non-duplicate items of the input.
      * E.g. arrayToSet([ 1, ['a', ['b']], 2, 1]) = [ 1, ['a', ['b']], 2 ]
      */
-    FastTuple<bool, value::TypeTags, value::Value> builtinArrayToSet(ArityType arity);
+    value::TagValueMaybeOwned builtinArrayToSet(ArityType arity);
     /**
      * Implementation of the builtin function 'collArrayToSet'. It accepts 2 arguments; the first
      * one is the collator object to be used when performing comparisons, the second must be one of
@@ -908,7 +900,7 @@ private:
      * object that contains all the non-duplicate items of the input.
      * E.g. collArrayToSet(<case-insensitive collator>, ['a', ['a'], 'A']) = ['a', ['a']]
      */
-    FastTuple<bool, value::TypeTags, value::Value> builtinCollArrayToSet(ArityType arity);
+    value::TagValueMaybeOwned builtinCollArrayToSet(ArityType arity);
 
     static MultiAccState getMultiAccState(value::TypeTags stateTag, value::Value stateVal);
 
@@ -969,7 +961,7 @@ private:
     value::TagValueMaybeOwned builtinAggRemovableSumFinalize(ArityType arity);
     template <int sign>
     void aggRemovableSumImpl(value::Array* state, value::TypeTags rhsTag, value::Value rhsVal);
-    FastTuple<bool, value::TypeTags, value::Value> aggRemovableSumFinalizeImpl(value::Array* state);
+    value::TagValueMaybeOwned aggRemovableSumFinalizeImpl(value::Array* state);
     template <class T, int sign>
     void updateRemovableSumAccForIntegerType(value::Array* sumAcc,
                                              value::TypeTags rhsTag,
@@ -1172,7 +1164,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_P(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCellBlockGetFlatValuesBlock(
         ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCurrentDate(ArityType arity);
+    value::TagValueMaybeOwned builtinCurrentDate(ArityType arity);
 
     /**
      * Dispatcher for calls to VM built-in C++ functions enumerated by enum class Builtin.

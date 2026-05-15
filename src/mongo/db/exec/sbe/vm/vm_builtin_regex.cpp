@@ -46,11 +46,11 @@ namespace {
  * - isMatch: Boolean flag to mark if the caller function is $regexMatch, in which case the result
  * returned is true/false.
  */
-FastTuple<bool, value::TypeTags, value::Value> pcreNextMatch(pcre::Regex* pcre,
-                                                             StringData inputString,
-                                                             uint32_t& startBytePos,
-                                                             uint32_t& codePointPos,
-                                                             bool isMatch) {
+value::TagValueMaybeOwned pcreNextMatch(pcre::Regex* pcre,
+                                        StringData inputString,
+                                        uint32_t& startBytePos,
+                                        uint32_t& codePointPos,
+                                        bool isMatch) {
     pcre::MatchData m = pcre->matchView(inputString, {}, startBytePos);
     if (!m && m.error() != pcre::Errc::ERROR_NOMATCH) {
         LOGV2_ERROR(5073414,
@@ -110,12 +110,11 @@ FastTuple<bool, value::TypeTags, value::Value> pcreNextMatch(pcre::Regex* pcre,
  * A helper function with common logic for $regexMatch and $regexFind functions. Both extract only
  * the first match to a regular expression, but return different result objects.
  */
-FastTuple<bool, value::TypeTags, value::Value> genericPcreRegexSingleMatch(
-    value::TypeTags typeTagPcreRegex,
-    value::Value valuePcreRegex,
-    value::TypeTags typeTagInputStr,
-    value::Value valueInputStr,
-    bool isMatch) {
+value::TagValueMaybeOwned genericPcreRegexSingleMatch(value::TypeTags typeTagPcreRegex,
+                                                      value::Value valuePcreRegex,
+                                                      value::TypeTags typeTagInputStr,
+                                                      value::Value valueInputStr,
+                                                      bool isMatch) {
     if (!value::isStringOrSymbol(typeTagInputStr) || !value::isPcreRegex(typeTagPcreRegex)) {
         return {false, value::TypeTags::Nothing, 0};
     }
@@ -130,7 +129,7 @@ FastTuple<bool, value::TypeTags, value::Value> genericPcreRegexSingleMatch(
 
 }  // namespace
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexCompile(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinRegexCompile(ArityType arity) {
     tassert(11080022, "Unexpected arity value", arity == 2);
 
     auto [patternOwned, patternTypeTag, patternValue] = getFromStack(0);
@@ -151,7 +150,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexCompile(Ari
     return {true, pcreTag, pcreValue};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinRegexMatch(ArityType arity) {
     tassert(11080021, "Unexpected arity value", arity == 2);
     auto [ownedPcreRegex, tagPcreRegex, valPcreRegex] = getFromStack(0);
     auto [ownedInputStr, tagInputStr, valInputStr] = getFromStack(1);
@@ -159,15 +158,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(Arity
     if (value::isArray(tagPcreRegex)) {
         for (value::ArrayEnumerator ae(tagPcreRegex, valPcreRegex); !ae.atEnd(); ae.advance()) {
             auto [elemTag, elemVal] = ae.getViewOfValue();
-            auto [ownedResult, tagResult, valResult] =
+            auto result =
                 genericPcreRegexSingleMatch(elemTag, elemVal, tagInputStr, valInputStr, true);
 
-            if (tagResult == value::TypeTags::Boolean && value::bitcastTo<bool>(valResult)) {
-                return {ownedResult, tagResult, valResult};
-            }
-
-            if (ownedResult) {
-                value::releaseValue(tagResult, valResult);
+            if (result.tag() == value::TypeTags::Boolean &&
+                value::bitcastTo<bool>(result.value())) {
+                return result;
             }
         }
 
@@ -177,7 +173,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(Arity
     return genericPcreRegexSingleMatch(tagPcreRegex, valPcreRegex, tagInputStr, valInputStr, true);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFind(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinRegexFind(ArityType arity) {
     tassert(11080020, "Unexpected arity value", arity == 2);
     auto [ownedPcreRegex, typeTagPcreRegex, valuePcreRegex] = getFromStack(0);
     auto [ownedInputStr, typeTagInputStr, valueInputStr] = getFromStack(1);
@@ -186,7 +182,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFind(ArityT
         typeTagPcreRegex, valuePcreRegex, typeTagInputStr, valueInputStr, false);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
     tassert(11080019, "Unexpected arity value", arity == 2);
     auto [ownedPcre, typeTagPcreRegex, valuePcreRegex] = getFromStack(0);
     auto [ownedStr, typeTagInputStr, valueInputStr] = getFromStack(1);
@@ -208,23 +204,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(Ari
 
     int resultSize = 0;
     do {
-        auto [_, matchTag, matchVal] =
-            pcreNextMatch(pcre, inputString, startBytePos, codePointPos, false);
-        value::ValueGuard matchGuard{matchTag, matchVal};
+        auto match = pcreNextMatch(pcre, inputString, startBytePos, codePointPos, false);
 
-        if (matchTag == value::TypeTags::Null) {
+        if (match.tag() == value::TypeTags::Null) {
             break;
         }
-        if (matchTag != value::TypeTags::Object) {
+        if (match.tag() != value::TypeTags::Object) {
             return {false, value::TypeTags::Nothing, 0};
         }
 
-        resultSize += getApproximateSize(matchTag, matchVal);
+        resultSize += getApproximateSize(match.tag(), match.value());
         uassert(5126606,
                 "$regexFindAll: the size of buffer to store output exceeded the 64MB limit",
                 resultSize <= mongo::BufferMaxSize);
 
-        matchGuard.reset();
+        auto [matchTag, matchVal] = match.raw();
+        match.disownAndClear();
         arrayView->push_back(matchTag, matchVal);
 
         // Move indexes after the current matched string to prepare for the next search.
@@ -245,7 +240,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(Ari
     return {true, arrTag, arrVal};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexPattern(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinGetRegexPattern(ArityType arity) {
     tassert(11080018, "Unexpected arity value", arity == 1);
     auto [regexOwned, regexType, regexValue] = getFromStack(0);
 
@@ -259,7 +254,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexPattern(
     return {true, strType, strValue};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexFlags(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinGetRegexFlags(ArityType arity) {
     tassert(11080017, "Unexpected arity value", arity == 1);
     auto [regexOwned, regexType, regexValue] = getFromStack(0);
 

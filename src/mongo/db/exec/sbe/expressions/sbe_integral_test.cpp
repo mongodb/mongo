@@ -114,6 +114,9 @@ public:
                                 std::vector<IntegralOp>& operations,
                                 std::vector<std::pair<value::TypeTags, value::Value>>& expValues,
                                 bool isNonRemovable = false) {
+        ValueVectorGuard inputGuard{inputValues};
+        ValueVectorGuard sortByGuard{sortByValues};
+        ValueVectorGuard expGuard{expValues};
         value::ViewOfValueAccessor inputAccessor;
         auto inputSlot = bindAccessor(&inputAccessor);
 
@@ -159,18 +162,13 @@ public:
 
             aggAccessor.reset(runTag, runVal);
             auto [outTag, outVal] = runCompiledExpression(compiledIntegralFinalize.get());
+            value::ValueGuard outGuard{outTag, outVal};
 
             ASSERT_EQ(expValues[i].first, outTag);
             auto [compareTag, compareVal] =
                 value::compareValue(expValues[i].first, expValues[i].second, outTag, outVal);
             ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
             ASSERT_EQ(value::bitcastTo<int32_t>(compareVal), 0);
-            value::releaseValue(outTag, outVal);
-            value::releaseValue(expValues[i].first, expValues[i].second);
-        }
-        for (size_t i = 0; i < inputValues.size(); ++i) {
-            value::releaseValue(inputValues[i].first, inputValues[i].second);
-            value::releaseValue(sortByValues[i].first, sortByValues[i].second);
         }
     }
 
@@ -180,6 +178,8 @@ public:
                                std::vector<IntegralOp>& operations,
                                int expErrCode,
                                bool isNonRemovable = false) {
+        ValueVectorGuard inputGuard{inputValues};
+        ValueVectorGuard sortByGuard{sortByValues};
         value::ViewOfValueAccessor inputAccessor;
         auto inputSlot = bindAccessor(&inputAccessor);
 
@@ -231,10 +231,6 @@ public:
         }();
         ASSERT_FALSE(status.isOK());
         ASSERT_EQ(status.code(), expErrCode);
-        for (size_t i = 0; i < inputValues.size(); ++i) {
-            value::releaseValue(inputValues[i].first, inputValues[i].second);
-            value::releaseValue(sortByValues[i].first, sortByValues[i].second);
-        }
     }
 };
 

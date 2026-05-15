@@ -65,7 +65,7 @@ public:
     using BaseT::BaseT;
 
     template <typename ObjWriterT, typename ArrWriterT>
-    MONGO_COMPILER_ALWAYS_INLINE FastTuple<bool, value::TypeTags, value::Value> makeObj() const {
+    MONGO_COMPILER_ALWAYS_INLINE value::TagValueMaybeOwned makeObj() const {
         constexpr int64_t maxInt64 = std::numeric_limits<int64_t>::max();
 
         auto [specOwned, specTag, specVal] = getSpec();
@@ -90,7 +90,7 @@ public:
                        MakeObjSpec::NonObjInputBehavior::kReturnInput) {
                 // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
                 // 'kReturnInput', then return the input.
-                return extractInputObject();
+                return value::TagValueMaybeOwned::fromRaw(extractInputObject());
             }
         }
 

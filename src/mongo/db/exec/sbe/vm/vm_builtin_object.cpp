@@ -34,7 +34,7 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDropFields(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
     auto [ownedSeparator, tagInObj, valInObj] = getFromStack(0);
 
     // We operate only on objects.
@@ -91,7 +91,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDropFields(Arity
     return {true, tag, val};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinKeepFields(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
     auto [ownedInObj, tagInObj, valInObj] = getFromStack(0);
 
     // We operate only on objects.
@@ -148,7 +148,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinKeepFields(Arity
     return {true, tag, val};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewObj(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
     std::vector<value::TypeTags> typeTags;
     std::vector<value::Value> values;
     std::vector<std::string> names;
@@ -191,7 +191,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewObj(ArityType
     return {true, tag, val};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewBsonObj(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinNewBsonObj(ArityType arity) {
     UniqueBSONObjBuilder bob;
 
     for (ArityType idx = 0; idx < arity; idx += 2) {
@@ -210,7 +210,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewBsonObj(Arity
     return {true, value::TypeTags::bsonObject, value::bitcastFrom<char*>(data)};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMergeObjects(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinMergeObjects(ArityType arity) {
     auto [_, tagField, valField] = getFromStack(1);
     // Move the incoming accumulator state from the stack. Given that we are now the owner of the
     // state we are free to do any in-place update as we see fit.
@@ -270,7 +270,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMergeObjects(Ari
     return {true, tagAgg, valAgg};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBsonSize(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinBsonSize(ArityType arity) {
     auto [_, tagOperand, valOperand] = getFromStack(0);
 
     if (tagOperand == value::TypeTags::Object) {
@@ -286,7 +286,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBsonSize(ArityTy
     return {false, value::TypeTags::Nothing, 0};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinObjectToArray(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinObjectToArray(ArityType arity) {
     tassert(11080026, "Unexpected arity value", arity == 1);
 
     auto [objOwned, objTag, objVal] = getFromStack(0);

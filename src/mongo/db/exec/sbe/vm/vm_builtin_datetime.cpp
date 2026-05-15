@@ -54,7 +54,7 @@ const size_t kStackPosOffsetBlock = 1u;
  */
 using DateFn = std::function<Date_t(
     TimeZone, long long, long long, long long, long long, long long, long long, long long)>;
-FastTuple<bool, value::TypeTags, value::Value> builtinDateHelper(
+value::TagValueMaybeOwned builtinDateHelper(
     DateFn computeDateFn,
     FastTuple<bool, value::TypeTags, value::Value> tzdb,
     FastTuple<bool, value::TypeTags, value::Value> yearOrWeekYear,
@@ -102,7 +102,7 @@ FastTuple<bool, value::TypeTags, value::Value> builtinDateHelper(
     return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(date.asInt64())};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDate(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDate(ArityType arity) {
     auto timeZoneDBTuple = getFromStack(0);
     auto yearTuple = getFromStack(1);
     auto monthTuple = getFromStack(2);
@@ -135,7 +135,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDate(ArityType a
         timezoneTuple);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateToString(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDateToString(ArityType arity) {
     tassert(11080051, "Unexpected arity value", arity == 4);
 
     auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
@@ -180,7 +180,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateToString(Ari
     return {true, strTag, strValue};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateFromString(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDateFromString(ArityType arity) {
     auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
     if (timezoneDBTag != value::TypeTags::timeZoneDB) {
         return {false, value::TypeTags::Nothing, 0};
@@ -215,8 +215,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateFromString(A
     return {true, value::TypeTags::Date, value::bitcastFrom<int64_t>(date.toMillisSinceEpoch())};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateFromStringNoThrow(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDateFromStringNoThrow(ArityType arity) {
     try {
         return builtinDateFromString(arity);
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
@@ -225,12 +224,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateFromStringNo
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::dateTrunc(value::TypeTags dateTag,
-                                                                   value::Value dateValue,
-                                                                   TimeUnit unit,
-                                                                   int64_t binSize,
-                                                                   TimeZone timezone,
-                                                                   DayOfWeek startOfWeek) {
+value::TagValueMaybeOwned ByteCode::dateTrunc(value::TypeTags dateTag,
+                                              value::Value dateValue,
+                                              TimeUnit unit,
+                                              int64_t binSize,
+                                              TimeZone timezone,
+                                              DayOfWeek startOfWeek) {
     // Get date.
     if (!coercibleToDate(dateTag)) {
         return {false, value::TypeTags::Nothing, 0};
@@ -243,7 +242,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dateTrunc(value::TypeTa
             value::bitcastFrom<int64_t>(truncatedDate.toMillisSinceEpoch())};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateWeekYear(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDateWeekYear(ArityType arity) {
     auto timeZoneDBTuple = getFromStack(0);
     auto yearTuple = getFromStack(1);
     auto weekTuple = getFromStack(2);
@@ -276,7 +275,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateWeekYear(Ari
         timezoneTuple);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateToParts(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
     auto [timezoneDBOwn, timezoneDBTag, timezoneDBVal] = getFromStack(0);
     if (timezoneDBTag != value::TypeTags::timeZoneDB) {
         return {false, value::TypeTags::Nothing, 0};
@@ -315,7 +314,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateToParts(Arit
     return {true, dateObjTag, dateObjVal};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsoDateToParts(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinIsoDateToParts(ArityType arity) {
     auto [timezoneDBOwn, timezoneDBTag, timezoneDBVal] = getFromStack(0);
     if (timezoneDBTag != value::TypeTags::timeZoneDB) {
         return {false, value::TypeTags::Nothing, 0};
@@ -682,7 +681,7 @@ bool ByteCode::validateDateTruncParameters(TimeUnit* unit,
     return true;
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateTrunc(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDateTrunc(ArityType arity) {
     tassert(11080033, "Unexpected arity value", arity == 6);
 
     TimeUnit unit{TimeUnit::year};
@@ -776,7 +775,7 @@ bool ByteCode::validateDateDiffParameters(Date_t* endDate,
     return true;
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateDiff(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDateDiff(ArityType arity) {
     tassert(11080032,
             "Unexpected arity value",
             arity == 5 || arity == 6);  // 6th parameter is 'startOfWeek'.
@@ -855,7 +854,7 @@ bool ByteCode::validateDateAddParameters(TimeUnit* unit, int64_t* amount, TimeZo
     return true;
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateAdd(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinDateAdd(ArityType arity) {
     tassert(11080031, "Unexpected arity value", arity == 5);
     TimeUnit unit{TimeUnit::year};
     int64_t amount;
@@ -1177,7 +1176,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateAd
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCurrentDate(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinCurrentDate(ArityType arity) {
     if (MONGO_unlikely(sleepBeforeCurrentDateEvaluationSBE.shouldFail())) {
         sleepBeforeCurrentDateEvaluationSBE.execute(
             [&](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });

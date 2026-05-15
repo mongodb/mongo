@@ -60,6 +60,9 @@ public:
     void runAndAssertExpression(std::vector<std::pair<value::TypeTags, value::Value>>& inputValues,
                                 std::vector<std::pair<value::TypeTags, value::Value>>& sortByValues,
                                 std::vector<std::pair<value::TypeTags, value::Value>>& expValues) {
+        ValueVectorGuard inputGuard{inputValues};
+        ValueVectorGuard sortByGuard{sortByValues};
+        ValueVectorGuard expGuard{expValues};
         value::ViewOfValueAccessor inputAccessor;
         auto inputSlot = bindAccessor(&inputAccessor);
 
@@ -108,15 +111,10 @@ public:
 
             sortByAccessor.reset(sortByValues[i].first, sortByValues[i].second);
             auto out = runCompiledExpression(compiledLinearFillFinalize.get());
+            value::ValueGuard outGuard{out.first, out.second};
 
             ASSERT_EQ(out.first, expValues[i].first);
             ASSERT_THAT(out, ValueEq(expValues[i]));
-
-            value::releaseValue(out.first, out.second);
-            value::releaseValue(expValues[i].first, expValues[i].second);
-
-            value::releaseValue(inputValues[i].first, inputValues[i].second);
-            value::releaseValue(sortByValues[i].first, sortByValues[i].second);
         }
     }
 };

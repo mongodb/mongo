@@ -37,7 +37,7 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinFtsMatch(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinFtsMatch(ArityType arity) {
     tassert(11080025, "Unexpected arity value", arity == 2);
 
     auto [matcherOwn, matcherTag, matcherVal] = getFromStack(0);
@@ -63,7 +63,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinFtsMatch(ArityTy
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(matches)};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRunJsPredicate(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinRunJsPredicate(ArityType arity) {
     tassert(11080024, "Unexpected arity value", arity == 2);
 
     auto [predicateOwned, predicateType, predicateValue] = getFromStack(0);
@@ -89,7 +89,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRunJsPredicate(A
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(predicateResult)};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinShardFilter(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinShardFilter(ArityType arity) {
     tassert(11080023, "Unexpected arity value", arity == 2);
 
     auto [ownedFilter, filterTag, filterValue] = getFromStack(0);
