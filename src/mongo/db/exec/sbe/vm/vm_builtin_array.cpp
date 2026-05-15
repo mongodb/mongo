@@ -66,7 +66,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewArray(ArityType arity) {
         }
     }
 
-    return std::move(result);
+    return result;
 }
 
 value::TagValueMaybeOwned ByteCode::builtinNewArrayFromRange(ArityType arity) {
@@ -112,7 +112,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewArrayFromRange(ArityType arity) {
         arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
     }
 
-    return std::move(result);
+    return result;
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAddToArray(ArityType arity) {
@@ -209,7 +209,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToArrayCapped(ArityType arity) {
 
     // Return the unmodified accumulator state when the collator or size cap is malformed.
     if (sizeCap.tag != value::TypeTags::NumberInt32) {
-        return std::move(accumulatorState);
+        return accumulatorState;
     }
 
     return builtinAddToArrayCappedImpl(
@@ -231,7 +231,7 @@ value::TagValueMaybeOwned ByteCode::builtinConcatArrays(ArityType arity) {
         });
     }
 
-    return std::move(result);
+    return result;
 }
 
 value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
@@ -314,7 +314,7 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
         resView->push_back(intermediateRes.releaseToRaw());
     }
 
-    return std::move(result);
+    return result;
 }
 
 value::TagValueMaybeOwned ByteCode::builtinConcatArraysCapped(ArityType arity) {
@@ -325,7 +325,7 @@ value::TagValueMaybeOwned ByteCode::builtinConcatArraysCapped(ArityType arity) {
 
     // Return the unmodified accumulator state when the size cap is malformed.
     if (sizeCap.tag != value::TypeTags::NumberInt32) {
-        return std::move(accumulatorState);
+        return accumulatorState;
     }
 
     auto newArrayElemsSize =
@@ -520,7 +520,7 @@ value::TagValueMaybeOwned ByteCode::builtinExtractSubArray(ArityType arity) {
         }
     }
 
-    return std::move(result);
+    return result;
 }  // ByteCode::builtinExtractSubArray
 
 value::TagValueMaybeOwned ByteCode::builtinIsArrayEmpty(ArityType arity) {
@@ -566,7 +566,7 @@ value::TagValueMaybeOwned ByteCode::builtinReverseArray(ArityType arity) {
             }
         }
 
-        return std::move(result);
+        return result;
     } else if (input.tagIn(value::TypeTags::bsonArray, value::TypeTags::ArraySet)) {
         // Using intermediate vector since bsonArray and ArraySet don't
         // support reverse iteration.
@@ -591,7 +591,7 @@ value::TagValueMaybeOwned ByteCode::builtinReverseArray(ArityType arity) {
             }
         }
 
-        return std::move(result);
+        return result;
     } else {
         // Earlier in this function we bailed out if the 'inputType' wasn't
         // Array, ArraySet or bsonArray, so it should be impossible to reach
@@ -648,7 +648,7 @@ value::TagValueMaybeOwned ByteCode::builtinSortArray(ArityType arity) {
             }
         }
 
-        return std::move(result);
+        return result;
     } else if (input.tagIn(value::TypeTags::bsonArray, value::TypeTags::ArraySet)) {
         value::ArrayEnumerator enumerator{input.tag, input.value};
 
@@ -677,7 +677,7 @@ value::TagValueMaybeOwned ByteCode::builtinSortArray(ArityType arity) {
             }
         }
 
-        return std::move(result);
+        return result;
     } else {
         // Earlier in this function we bailed out if the 'inputType' wasn't
         // Array, ArraySet or bsonArray, so it should be impossible to reach
@@ -883,7 +883,7 @@ value::TagValueMaybeOwned ByteCode::topOrBottomNImpl(ArityType arity, TopBottomS
         auto inputView = value::getArrayView(input.value);
         size_t inputSize = inputView->size();
         if (inputSize == 0) {
-            return std::move(result);
+            return result;
         }
 
         resultView->reserve(std::min(inputSize, static_cast<size_t>(n)));
@@ -894,11 +894,11 @@ value::TagValueMaybeOwned ByteCode::topOrBottomNImpl(ArityType arity, TopBottomS
         }
         extractTopOrBottomN(sortVector, static_cast<size_t>(n), resultView, cmp, sense);
 
-        return std::move(result);
+        return result;
     } else if (input.tagIn(value::TypeTags::bsonArray, value::TypeTags::ArraySet)) {
         value::ArrayEnumerator enumerator{input.tag, input.value};
         if (enumerator.atEnd()) {
-            return std::move(result);
+            return result;
         }
         // Using intermediate vector since bsonArray and ArraySet don't
         // support reverse iteration.
@@ -921,7 +921,7 @@ value::TagValueMaybeOwned ByteCode::topOrBottomNImpl(ArityType arity, TopBottomS
             extractTopOrBottomN(inputContents, static_cast<size_t>(n), resultView, cmp, sense);
         }
 
-        return std::move(result);
+        return result;
     } else {
         // Earlier in this function we bailed out if the 'inputType' wasn't
         // Array, ArraySet or bsonArray, so it should be impossible to reach
@@ -962,7 +962,7 @@ value::TagValueMaybeOwned ByteCode::builtinArrayToObject(ArityType arity) {
 
     // return empty object for empty array
     if (arrayEnumerator.atEnd()) {
-        return std::move(obj);
+        return obj;
     }
 
     // There are two accepted input formats in an array: [ [key, val] ] or [ {k:key, v:val} ]. The
@@ -1086,7 +1086,7 @@ value::TagValueMaybeOwned ByteCode::builtinArrayToObject(ArityType arity) {
         }
         arrayEnumerator.advance();
     }
-    return std::move(obj);
+    return obj;
 }  // ByteCode::builtinArrayToObject
 
 value::TagValueMaybeOwned ByteCode::builtinUnwindArray(ArityType arity) {
@@ -1121,7 +1121,7 @@ value::TagValueMaybeOwned ByteCode::builtinUnwindArray(ArityType arity) {
         arrayEnumerator.advance();
     }
 
-    return std::move(result);
+    return result;
 }
 
 value::TagValueMaybeOwned ByteCode::builtinArrayToSet(ArityType arity) {
@@ -1146,7 +1146,7 @@ value::TagValueMaybeOwned ByteCode::builtinArrayToSet(ArityType arity) {
         arrayEnumerator.advance();
     }
 
-    return std::move(result);
+    return result;
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCollArrayToSet(ArityType arity) {
@@ -1178,7 +1178,7 @@ value::TagValueMaybeOwned ByteCode::builtinCollArrayToSet(ArityType arity) {
         arrayEnumerator.advance();
     }
 
-    return std::move(result);
+    return result;
 }
 
 }  // namespace vm
