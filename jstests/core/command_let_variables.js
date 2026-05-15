@@ -7,6 +7,7 @@
 //   # fromMongos: true uses an internalClient connection that cannot be transparently retried
 //   # after a stepdown -- the retry goes on a new connection without the internalClient handshake.
 //   does_not_support_stepdowns,
+//   no_selinux,
 // ]
 //
 (function() {
