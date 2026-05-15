@@ -1114,9 +1114,9 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMult(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDiv(ArityType arity);
 
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDateDiff(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDateTrunc(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDateAdd(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockDateDiff(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockDateTrunc(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockDateAdd(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockRound(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockTrunc(ArityType arity);

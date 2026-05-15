@@ -43,20 +43,16 @@ namespace mongo {
 namespace sbe {
 namespace vm {
 
-bool isValidTimezone(value::TypeTags timezoneTag,
-                     value::Value timezoneValue,
-                     const TimeZoneDatabase* timezoneDB) {
-    if (!value::isString(timezoneTag)) {
+bool isValidTimezone(value::TagValueView timezone, const TimeZoneDatabase* timezoneDB) {
+    if (!value::isString(timezone.tag)) {
         return false;
     }
-    auto timezoneStringView = value::getStringView(timezoneTag, timezoneValue);
+    auto timezoneStringView = value::getStringView(timezone.tag, timezone.value);
     return timezoneStringView.empty() || timezoneDB->isTimeZoneIdentifier(timezoneStringView);
 }
 
-TimeZone getTimezone(value::TypeTags timezoneTag,
-                     value::Value timezoneVal,
-                     TimeZoneDatabase* timezoneDB) {
-    auto timezoneStr = value::getStringView(timezoneTag, timezoneVal);
+TimeZone getTimezone(value::TagValueView timezone, TimeZoneDatabase* timezoneDB) {
+    auto timezoneStr = value::getStringView(timezone.tag, timezone.value);
     if (timezoneStr.empty()) {
         return timezoneDB->utcZone();
     } else {
@@ -89,8 +85,11 @@ Date_t getDate(value::TypeTags dateTag, value::Value dateVal) {
 }
 
 bool coercibleToDate(value::TypeTags typeTag) {
-    return typeTag == value::TypeTags::Date || typeTag == value::TypeTags::Timestamp ||
-        typeTag == value::TypeTags::ObjectId || typeTag == value::TypeTags::bsonObjectId;
+    return value::tagIn(typeTag,
+                        value::TypeTags::Date,
+                        value::TypeTags::Timestamp,
+                        value::TypeTags::ObjectId,
+                        value::TypeTags::bsonObjectId);
 }
 
 namespace {
@@ -222,8 +221,11 @@ value::TagValueMaybeOwned genericDateExpressionAcceptingTimeZone(value::TagValue
                                                                  value::TagValueView date,
                                                                  value::TagValueView tz) {
     // Get date.
-    if (date.tag != value::TypeTags::Date && date.tag != value::TypeTags::Timestamp &&
-        date.tag != value::TypeTags::ObjectId && date.tag != value::TypeTags::bsonObjectId) {
+    if (!value::tagIn(date.tag,
+                      value::TypeTags::Date,
+                      value::TypeTags::Timestamp,
+                      value::TypeTags::ObjectId,
+                      value::TypeTags::bsonObjectId)) {
         return {false, value::TypeTags::Nothing, 0};
     }
     auto dateMs = getDate(date.tag, date.value);
@@ -237,7 +239,7 @@ value::TagValueMaybeOwned genericDateExpressionAcceptingTimeZone(value::TagValue
     if (!value::isString(tz.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto timezone = getTimezone(tz.tag, tz.value, timezoneDB);
+    auto timezone = getTimezone(tz, timezoneDB);
 
     int32_t result;
     Op::doOperation(dateMs, timezone, result);
@@ -260,8 +262,11 @@ template <typename Op>
 value::TagValueMaybeOwned genericDateExpressionAcceptingTimeZone(value::TagValueView date,
                                                                  value::TagValueView tz) {
     // Get date.
-    if (date.tag != value::TypeTags::Date && date.tag != value::TypeTags::Timestamp &&
-        date.tag != value::TypeTags::ObjectId && date.tag != value::TypeTags::bsonObjectId) {
+    if (!value::tagIn(date.tag,
+                      value::TypeTags::Date,
+                      value::TypeTags::Timestamp,
+                      value::TypeTags::ObjectId,
+                      value::TypeTags::bsonObjectId)) {
         return {false, value::TypeTags::Nothing, 0};
     }
     auto dateMs = getDate(date.tag, date.value);

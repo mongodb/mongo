@@ -54,65 +54,43 @@ const size_t kStackPosOffsetBlock = 1u;
  */
 using DateFn = std::function<Date_t(
     TimeZone, long long, long long, long long, long long, long long, long long, long long)>;
-value::TagValueMaybeOwned builtinDateHelper(
-    DateFn computeDateFn,
-    FastTuple<bool, value::TypeTags, value::Value> tzdb,
-    FastTuple<bool, value::TypeTags, value::Value> yearOrWeekYear,
-    FastTuple<bool, value::TypeTags, value::Value> monthOrWeek,
-    FastTuple<bool, value::TypeTags, value::Value> day,
-    FastTuple<bool, value::TypeTags, value::Value> hour,
-    FastTuple<bool, value::TypeTags, value::Value> minute,
-    FastTuple<bool, value::TypeTags, value::Value> second,
-    FastTuple<bool, value::TypeTags, value::Value> millisecond,
-    FastTuple<bool, value::TypeTags, value::Value> timezone) {
+value::TagValueMaybeOwned builtinDateHelper(DateFn computeDateFn,
+                                            value::TagValueView tzdb,
+                                            value::TagValueView yearOrWeekYear,
+                                            value::TagValueView monthOrWeek,
+                                            value::TagValueView day,
+                                            value::TagValueView hour,
+                                            value::TagValueView minute,
+                                            value::TagValueView second,
+                                            value::TagValueView millisecond,
+                                            value::TagValueView timezone) {
 
-    auto [ownedTzdb, typeTagTzdb, valueTzdb] = tzdb;
-    auto [ownedYearOrWeekYear, typeTagYearOrWeekYear, valueYearOrWeekYear] = yearOrWeekYear;
-    auto [ownedMonthOrWeek, typeTagMonthOrWeek, valueMonthOrWeek] = monthOrWeek;
-    auto [ownedDay, typeTagDay, valueDay] = day;
-    auto [ownedHr, typeTagHr, valueHr] = hour;
-    auto [ownedMin, typeTagMin, valueMin] = minute;
-    auto [ownedSec, typeTagSec, valueSec] = second;
-    auto [ownedMillis, typeTagMillis, valueMillis] = millisecond;
-    auto [ownedTz, typeTagTz, valueTz] = timezone;
-
-    if (typeTagTzdb != value::TypeTags::timeZoneDB || !value::isNumber(typeTagYearOrWeekYear) ||
-        !value::isNumber(typeTagMonthOrWeek) || !value::isNumber(typeTagDay) ||
-        !value::isNumber(typeTagHr) || !value::isNumber(typeTagMin) ||
-        !value::isNumber(typeTagSec) || !value::isNumber(typeTagMillis) ||
-        !value::isString(typeTagTz)) {
+    if (tzdb.tag != value::TypeTags::timeZoneDB || !value::isNumber(yearOrWeekYear.tag) ||
+        !value::isNumber(monthOrWeek.tag) || !value::isNumber(day.tag) ||
+        !value::isNumber(hour.tag) || !value::isNumber(minute.tag) ||
+        !value::isNumber(second.tag) || !value::isNumber(millisecond.tag) ||
+        !value::isString(timezone.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    tassert(11054000, "unexpected TZDB value", valueTzdb);
-    auto timeZoneDB = value::getTimeZoneDBView(valueTzdb);
+    tassert(11054000, "unexpected TZDB value", tzdb.value);
+    auto timeZoneDB = value::getTimeZoneDBView(tzdb.value);
 
-    auto tzString = value::getStringView(typeTagTz, valueTz);
+    auto tzString = value::getStringView(timezone.tag, timezone.value);
     const auto tz = tzString == "" ? timeZoneDB->utcZone() : timeZoneDB->getTimeZone(tzString);
 
-    auto date =
-        computeDateFn(tz,
-                      value::numericCast<int64_t>(typeTagYearOrWeekYear, valueYearOrWeekYear),
-                      value::numericCast<int64_t>(typeTagMonthOrWeek, valueMonthOrWeek),
-                      value::numericCast<int64_t>(typeTagDay, valueDay),
-                      value::numericCast<int64_t>(typeTagHr, valueHr),
-                      value::numericCast<int64_t>(typeTagMin, valueMin),
-                      value::numericCast<int64_t>(typeTagSec, valueSec),
-                      value::numericCast<int64_t>(typeTagMillis, valueMillis));
+    auto date = computeDateFn(tz,
+                              value::numericCast<int64_t>(yearOrWeekYear.tag, yearOrWeekYear.value),
+                              value::numericCast<int64_t>(monthOrWeek.tag, monthOrWeek.value),
+                              value::numericCast<int64_t>(day.tag, day.value),
+                              value::numericCast<int64_t>(hour.tag, hour.value),
+                              value::numericCast<int64_t>(minute.tag, minute.value),
+                              value::numericCast<int64_t>(second.tag, second.value),
+                              value::numericCast<int64_t>(millisecond.tag, millisecond.value));
     return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(date.asInt64())};
 }
 
 value::TagValueMaybeOwned ByteCode::builtinDate(ArityType arity) {
-    auto timeZoneDBTuple = getFromStack(0);
-    auto yearTuple = getFromStack(1);
-    auto monthTuple = getFromStack(2);
-    auto dayTuple = getFromStack(3);
-    auto hourTuple = getFromStack(4);
-    auto minuteTuple = getFromStack(5);
-    auto secondTuple = getFromStack(6);
-    auto millisTuple = getFromStack(7);
-    auto timezoneTuple = getFromStack(8);
-
     return builtinDateHelper(
         [](TimeZone tz,
            long long year,
@@ -124,49 +102,49 @@ value::TagValueMaybeOwned ByteCode::builtinDate(ArityType arity) {
            long long millis) -> Date_t {
             return tz.createFromDateParts(year, month, day, hour, min, sec, millis);
         },
-        timeZoneDBTuple,
-        yearTuple,
-        monthTuple,
-        dayTuple,
-        hourTuple,
-        minuteTuple,
-        secondTuple,
-        millisTuple,
-        timezoneTuple);
+        viewFromStack(0),
+        viewFromStack(1),
+        viewFromStack(2),
+        viewFromStack(3),
+        viewFromStack(4),
+        viewFromStack(5),
+        viewFromStack(6),
+        viewFromStack(7),
+        viewFromStack(8));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinDateToString(ArityType arity) {
     tassert(11080051, "Unexpected arity value", arity == 4);
 
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
-    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+    auto timezoneDBView = viewFromStack(0);
+    if (timezoneDBView.tag != value::TypeTags::timeZoneDB) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto timezoneDB = value::getTimeZoneDBView(timezoneDBValue);
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBView.value);
 
     // Get date.
-    auto [dateOwn, dateTag, dateValue] = getFromStack(1);
-    if (!coercibleToDate(dateTag)) {
+    auto dateView = viewFromStack(1);
+    if (!coercibleToDate(dateView.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto date = getDate(dateTag, dateValue);
+    auto date = getDate(dateView.tag, dateView.value);
 
     // Get format.
-    auto [formatOwn, formatTag, formatValue] = getFromStack(2);
-    if (!value::isString(formatTag)) {
+    auto formatView = viewFromStack(2);
+    if (!value::isString(formatView.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto formatString = value::getStringView(formatTag, formatValue);
+    auto formatString = value::getStringView(formatView.tag, formatView.value);
     if (!TimeZone::isValidToStringFormat(formatString)) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
     // Get timezone.
-    auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(3);
-    if (!isValidTimezone(timezoneTag, timezoneValue, timezoneDB)) {
+    auto timezoneView = viewFromStack(3);
+    if (!isValidTimezone(timezoneView, timezoneDB)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
+    auto timezone = getTimezone(timezoneView, timezoneDB);
 
     StringBuilder formatted;
 
@@ -181,31 +159,31 @@ value::TagValueMaybeOwned ByteCode::builtinDateToString(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinDateFromString(ArityType arity) {
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
-    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+    auto timezoneDBView = viewFromStack(0);
+    if (timezoneDBView.tag != value::TypeTags::timeZoneDB) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto timezoneDB = value::getTimeZoneDBView(timezoneDBValue);
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBView.value);
 
     // Get parameter tuples from stack.
-    auto [dateStringOwn, dateStringTag, dateStringValue] = getFromStack(1);
-    auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+    auto dateStringView = viewFromStack(1);
+    auto timezoneView = viewFromStack(2);
 
-    auto timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
+    auto timezone = getTimezone(timezoneView, timezoneDB);
 
     // Attempt to get the date from the string. This may throw a ConversionFailure error.
     Date_t date;
-    auto dateString = value::getStringView(dateStringTag, dateStringValue);
+    auto dateString = value::getStringView(dateStringView.tag, dateStringView.value);
     if (arity == 3) {
         // Format wasn't specified, so we call fromString without it.
         date = timezoneDB->fromString(dateString, timezone);
     } else {
         // Fetch format from the stack, validate it, and call fromString with it.
-        auto [formatOwn, formatTag, formatValue] = getFromStack(3);
-        if (!value::isString(formatTag)) {
+        auto formatView = viewFromStack(3);
+        if (!value::isString(formatView.tag)) {
             return {false, value::TypeTags::Nothing, 0};
         }
-        auto formatString = value::getStringView(formatTag, formatValue);
+        auto formatString = value::getStringView(formatView.tag, formatView.value);
         if (!TimeZone::isValidFromStringFormat(formatString)) {
             return {false, value::TypeTags::Nothing, 0};
         }
@@ -243,16 +221,6 @@ value::TagValueMaybeOwned ByteCode::dateTrunc(value::TypeTags dateTag,
 }
 
 value::TagValueMaybeOwned ByteCode::builtinDateWeekYear(ArityType arity) {
-    auto timeZoneDBTuple = getFromStack(0);
-    auto yearTuple = getFromStack(1);
-    auto weekTuple = getFromStack(2);
-    auto dayTuple = getFromStack(3);
-    auto hourTuple = getFromStack(4);
-    auto minuteTuple = getFromStack(5);
-    auto secondTuple = getFromStack(6);
-    auto millisTuple = getFromStack(7);
-    auto timezoneTuple = getFromStack(8);
-
     return builtinDateHelper(
         [](TimeZone tz,
            long long year,
@@ -264,38 +232,41 @@ value::TagValueMaybeOwned ByteCode::builtinDateWeekYear(ArityType arity) {
            long long millis) -> Date_t {
             return tz.createFromIso8601DateParts(year, month, day, hour, min, sec, millis);
         },
-        timeZoneDBTuple,
-        yearTuple,
-        weekTuple,
-        dayTuple,
-        hourTuple,
-        minuteTuple,
-        secondTuple,
-        millisTuple,
-        timezoneTuple);
+        viewFromStack(0),
+        viewFromStack(1),
+        viewFromStack(2),
+        viewFromStack(3),
+        viewFromStack(4),
+        viewFromStack(5),
+        viewFromStack(6),
+        viewFromStack(7),
+        viewFromStack(8));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBVal] = getFromStack(0);
-    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+    auto timezoneDBView = viewFromStack(0);
+    if (timezoneDBView.tag != value::TypeTags::timeZoneDB) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto timezoneDB = value::getTimeZoneDBView(timezoneDBVal);
-    auto [dateOwn, dateTag, dateVal] = getFromStack(1);
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBView.value);
+    auto dateView = viewFromStack(1);
 
     // Get timezone.
-    auto [timezoneOwn, timezoneTag, timezoneVal] = getFromStack(2);
-    if (!value::isString(timezoneTag)) {
+    auto timezoneView = viewFromStack(2);
+    if (!value::isString(timezoneView.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    TimeZone timezone = getTimezone(timezoneTag, timezoneVal, timezoneDB);
+    TimeZone timezone = getTimezone(timezoneView, timezoneDB);
 
     // Get date.
-    if (dateTag != value::TypeTags::Date && dateTag != value::TypeTags::Timestamp &&
-        dateTag != value::TypeTags::ObjectId && dateTag != value::TypeTags::bsonObjectId) {
+    if (!value::tagIn(dateView.tag,
+                      value::TypeTags::Date,
+                      value::TypeTags::Timestamp,
+                      value::TypeTags::ObjectId,
+                      value::TypeTags::bsonObjectId)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    Date_t date = getDate(dateTag, dateVal);
+    Date_t date = getDate(dateView.tag, dateView.value);
 
     // Get date parts.
     auto dateParts = timezone.dateParts(date);
@@ -315,26 +286,29 @@ value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
 }
 
 value::TagValueMaybeOwned ByteCode::builtinIsoDateToParts(ArityType arity) {
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBVal] = getFromStack(0);
-    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+    auto timezoneDBView = viewFromStack(0);
+    if (timezoneDBView.tag != value::TypeTags::timeZoneDB) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto timezoneDB = value::getTimeZoneDBView(timezoneDBVal);
-    auto [dateOwn, dateTag, dateVal] = getFromStack(1);
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBView.value);
+    auto dateView = viewFromStack(1);
 
     // Get timezone.
-    auto [timezoneOwn, timezoneTag, timezoneVal] = getFromStack(2);
-    if (!value::isString(timezoneTag)) {
+    auto timezoneView = viewFromStack(2);
+    if (!value::isString(timezoneView.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    TimeZone timezone = getTimezone(timezoneTag, timezoneVal, timezoneDB);
+    TimeZone timezone = getTimezone(timezoneView, timezoneDB);
 
     // Get date.
-    if (dateTag != value::TypeTags::Date && dateTag != value::TypeTags::Timestamp &&
-        dateTag != value::TypeTags::ObjectId && dateTag != value::TypeTags::bsonObjectId) {
+    if (!value::tagIn(dateView.tag,
+                      value::TypeTags::Date,
+                      value::TypeTags::Timestamp,
+                      value::TypeTags::ObjectId,
+                      value::TypeTags::bsonObjectId)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    Date_t date = getDate(dateTag, dateVal);
+    Date_t date = getDate(dateView.tag, dateView.value);
 
     // Get date parts.
     auto dateParts = timezone.dateIso8601Parts(date);
@@ -624,31 +598,31 @@ bool ByteCode::validateDateTruncParameters(TimeUnit* unit,
                                            DayOfWeek* startOfWeek) {
     size_t timezoneDBStackPos =
         IsBlockBuiltin ? kTimezoneDBStackPosBlock : kTimezoneDBStackPosDefault;
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(timezoneDBStackPos);
-    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+    auto timezoneDBView = viewFromStack(timezoneDBStackPos);
+    if (timezoneDBView.tag != value::TypeTags::timeZoneDB) {
         return false;
     }
-    auto timezoneDB = value::getTimeZoneDBView(timezoneDBValue);
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBView.value);
 
     size_t stackPosOffset = IsBlockBuiltin ? kStackPosOffsetBlock : 0u;
 
-    auto [unitOwn, unitTag, unitValue] = getFromStack(2 + stackPosOffset);
-    if (!value::isString(unitTag)) {
+    auto unitView = viewFromStack(2 + stackPosOffset);
+    if (!value::isString(unitView.tag)) {
         return false;
     }
-    auto unitString = value::getStringView(unitTag, unitValue);
+    auto unitString = value::getStringView(unitView.tag, unitView.value);
     if (!isValidTimeUnit(unitString)) {
         return false;
     }
     *unit = parseTimeUnit(unitString);
 
     // Get binSize.
-    auto [binSizeOwned, binSizeTag, binSizeValue] = getFromStack(3 + stackPosOffset);
-    if (!value::isNumber(binSizeTag)) {
+    auto binSizeView = viewFromStack(3 + stackPosOffset);
+    if (!value::isNumber(binSizeView.tag)) {
         return false;
     }
     auto binSizeLong =
-        value::genericNumConvert(binSizeTag, binSizeValue, value::TypeTags::NumberInt64);
+        value::genericNumConvert(binSizeView.tag, binSizeView.value, value::TypeTags::NumberInt64);
     if (binSizeLong.tag() == value::TypeTags::Nothing) {
         return false;
     }
@@ -658,20 +632,19 @@ bool ByteCode::validateDateTruncParameters(TimeUnit* unit,
     }
 
     // Get timezone.
-    auto [timezoneOwned, timezoneTag, timezoneValue] = getFromStack(4 + stackPosOffset);
-    if (!isValidTimezone(timezoneTag, timezoneValue, timezoneDB)) {
+    auto timezoneView = viewFromStack(4 + stackPosOffset);
+    if (!isValidTimezone(timezoneView, timezoneDB)) {
         return false;
     }
-    *timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
+    *timezone = getTimezone(timezoneView, timezoneDB);
 
     // Get startOfWeek, if 'startOfWeek' parameter was passed and time unit is the week.
     if (*unit == TimeUnit::week) {
-        auto [startOfWeekOwned, startOfWeekTag, startOfWeekValue] =
-            getFromStack(5 + stackPosOffset);
-        if (!value::isString(startOfWeekTag)) {
+        auto startOfWeekView = viewFromStack(5 + stackPosOffset);
+        if (!value::isString(startOfWeekView.tag)) {
             return false;
         }
-        auto startOfWeekString = value::getStringView(startOfWeekTag, startOfWeekValue);
+        auto startOfWeekString = value::getStringView(startOfWeekView.tag, startOfWeekView.value);
         if (!isValidDayOfWeek(startOfWeekString)) {
             return false;
         }
@@ -694,9 +667,9 @@ value::TagValueMaybeOwned ByteCode::builtinDateTrunc(ArityType arity) {
     }
 
     // Get date.
-    auto [dateOwn, dateTag, dateValue] = getFromStack(1);
+    auto dateView = viewFromStack(1);
 
-    return dateTrunc(dateTag, dateValue, unit, binSize, timezone, startOfWeek);
+    return dateTrunc(dateView.tag, dateView.value, unit, binSize, timezone, startOfWeek);
 }
 
 
@@ -727,45 +700,46 @@ bool ByteCode::validateDateDiffParameters(Date_t* endDate,
                                           DayOfWeek* startOfWeek) {
     size_t timezoneDBStackPos =
         IsBlockBuiltin ? kTimezoneDBStackPosBlock : kTimezoneDBStackPosDefault;
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(timezoneDBStackPos);
-    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+    auto timezoneDBView = viewFromStack(timezoneDBStackPos);
+    if (timezoneDBView.tag != value::TypeTags::timeZoneDB) {
         return false;
     }
-    auto timezoneDB = value::getTimeZoneDBView(timezoneDBValue);
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBView.value);
 
     size_t stackPosOffset = IsBlockBuiltin ? kStackPosOffsetBlock : 0u;
 
-    auto [endDateOwn, endDateTag, endDateValue] = getFromStack(2 + stackPosOffset);
-    if (!coercibleToDate(endDateTag)) {
+    auto endDateView = viewFromStack(2 + stackPosOffset);
+    if (!coercibleToDate(endDateView.tag)) {
         return false;
     }
-    *endDate = getDate(endDateTag, endDateValue);
+    *endDate = getDate(endDateView.tag, endDateView.value);
 
-    auto [unitOwn, unitTag, unitValue] = getFromStack(3 + stackPosOffset);
-    if (!value::isString(unitTag)) {
+    auto unitView = viewFromStack(3 + stackPosOffset);
+    if (!value::isString(unitView.tag)) {
         return false;
     }
-    auto unitString = value::getStringView(unitTag, unitValue);
+    auto unitString = value::getStringView(unitView.tag, unitView.value);
     if (!isValidTimeUnit(unitString)) {
         return false;
     }
     *unit = parseTimeUnit(unitString);
 
     // Get timezone.
-    auto [timezoneOwned, timezoneTag, timezoneValue] = getFromStack(4 + stackPosOffset);
-    if (!isValidTimezone(timezoneTag, timezoneValue, timezoneDB)) {
+    auto timezoneView = viewFromStack(4 + stackPosOffset);
+    if (!isValidTimezone(timezoneView, timezoneDB)) {
         return false;
     }
-    *timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
+    *timezone = getTimezone(timezoneView, timezoneDB);
 
     // Get startOfWeek, if 'startOfWeek' parameter was requested and time unit is the week.
     if (startOfWeek) {
-        auto [startOfWeekOwn, startOfWeekTag, startOfWeekValue] = getFromStack(5 + stackPosOffset);
-        if (!value::isString(startOfWeekTag)) {
+        auto startOfWeekView = viewFromStack(5 + stackPosOffset);
+        if (!value::isString(startOfWeekView.tag)) {
             return false;
         }
         if (TimeUnit::week == *unit) {
-            auto startOfWeekString = value::getStringView(startOfWeekTag, startOfWeekValue);
+            auto startOfWeekString =
+                value::getStringView(startOfWeekView.tag, startOfWeekView.value);
             if (!isValidDayOfWeek(startOfWeekString)) {
                 return false;
             }
@@ -791,11 +765,11 @@ value::TagValueMaybeOwned ByteCode::builtinDateDiff(ArityType arity) {
     }
 
     // Get startDate.
-    auto [startDateOwn, startDateTag, startDateValue] = getFromStack(1);
-    if (!coercibleToDate(startDateTag)) {
+    auto startDateView = viewFromStack(1);
+    if (!coercibleToDate(startDateView.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto startDate = getDate(startDateTag, startDateValue);
+    auto startDate = getDate(startDateView.tag, startDateView.value);
 
     auto result = dateDiff(startDate, endDate, unit, timezone, startOfWeek);
     return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
@@ -822,35 +796,35 @@ template <bool IsBlockBuiltin>
 bool ByteCode::validateDateAddParameters(TimeUnit* unit, int64_t* amount, TimeZone* timezone) {
     size_t timezoneDBStackPos =
         IsBlockBuiltin ? kTimezoneDBStackPosBlock : kTimezoneDBStackPosDefault;
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBVal] = getFromStack(timezoneDBStackPos);
-    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+    auto timezoneDBView = viewFromStack(timezoneDBStackPos);
+    if (timezoneDBView.tag != value::TypeTags::timeZoneDB) {
         return false;
     }
-    auto timezoneDB = value::getTimeZoneDBView(timezoneDBVal);
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBView.value);
 
     size_t stackPosOffset = IsBlockBuiltin ? kStackPosOffsetBlock : 0u;
 
-    auto [unitOwn, unitTag, unitVal] = getFromStack(2 + stackPosOffset);
-    if (!value::isString(unitTag)) {
+    auto unitView = viewFromStack(2 + stackPosOffset);
+    if (!value::isString(unitView.tag)) {
         return false;
     }
-    std::string unitStr{value::getStringView(unitTag, unitVal)};
+    std::string unitStr{value::getStringView(unitView.tag, unitView.value)};
     if (!isValidTimeUnit(unitStr)) {
         return false;
     }
     *unit = parseTimeUnit(unitStr);
 
-    auto [amountOwn, amountTag, amountVal] = getFromStack(3 + stackPosOffset);
-    if (amountTag != value::TypeTags::NumberInt64) {
+    auto amountView = viewFromStack(3 + stackPosOffset);
+    if (amountView.tag != value::TypeTags::NumberInt64) {
         return false;
     }
-    *amount = value::bitcastTo<int64_t>(amountVal);
+    *amount = value::bitcastTo<int64_t>(amountView.value);
 
-    auto [timezoneOwn, timezoneTag, timezoneVal] = getFromStack(4 + stackPosOffset);
-    if (!value::isString(timezoneTag) || !isValidTimezone(timezoneTag, timezoneVal, timezoneDB)) {
+    auto timezoneView = viewFromStack(4 + stackPosOffset);
+    if (!value::isString(timezoneView.tag) || !isValidTimezone(timezoneView, timezoneDB)) {
         return false;
     }
-    *timezone = getTimezone(timezoneTag, timezoneVal, timezoneDB);
+    *timezone = getTimezone(timezoneView, timezoneDB);
     return true;
 }
 
@@ -864,11 +838,11 @@ value::TagValueMaybeOwned ByteCode::builtinDateAdd(ArityType arity) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto [startDateOwn, startDateTag, startDateVal] = getFromStack(1);
-    if (!coercibleToDate(startDateTag)) {
+    auto startDateView = viewFromStack(1);
+    if (!coercibleToDate(startDateView.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto startDate = getDate(startDateTag, startDateVal);
+    auto startDate = getDate(startDateView.tag, startDateView.value);
 
     auto resDate = dateAdd(startDate, unit, amount, timezone);
     return {
@@ -1011,7 +985,7 @@ static const auto dateAddOp =
 }  // namespace
 
 namespace {
-FastTuple<bool, value::TypeTags, value::Value> makeNothingBlock(value::ValueBlock* block) {
+value::TagValueMaybeOwned makeNothingBlock(value::ValueBlock* block) {
     return {true,
             value::TypeTags::valueBlock,
             value::bitcastFrom<value::ValueBlock*>(
@@ -1024,21 +998,21 @@ FastTuple<bool, value::TypeTags, value::Value> makeNothingBlock(value::ValueBloc
  * with corresponding bit set to true have been truncated based on arguments provided. Values that
  * are not coercible to dates are turned into Nothings instead.
  */
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateTrunc(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinValueBlockDateTrunc(ArityType arity) {
     tassert(11080030, "Unexpected arity value", arity == 7);
 
-    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    auto inputView = viewFromStack(1);
     tassert(8625725,
             "Expected input argument to be of valueBlock type",
-            inputTag == value::TypeTags::valueBlock);
-    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+            inputView.tag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputView.value);
 
-    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    auto bitsetView = viewFromStack(0);
     // A bitmap argument set to Nothing is equivalent to a bitmap made of all True values.
     tassert(8625726,
             "Expected bitset argument to be of either Nothing or valueBlock type",
-            bitsetTag == value::TypeTags::Nothing || bitsetTag == value::TypeTags::valueBlock);
+            bitsetView.tag == value::TypeTags::Nothing ||
+                bitsetView.tag == value::TypeTags::valueBlock);
 
     TimeUnit unit{TimeUnit::year};
     int64_t binSize{0u};
@@ -1076,21 +1050,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateTr
  * date in the input block with corresponding bit set to true and the argument provided. Values that
  * are not coercible to dates are turned into Nothings instead.
  */
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateDiff(
-    ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinValueBlockDateDiff(ArityType arity) {
     tassert(11080029, "Unexpected arity value", arity == 6 || arity == 7);
 
-    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    auto inputView = viewFromStack(1);
     tassert(8625727,
             "Expected input argument to be of valueBlock type",
-            inputTag == value::TypeTags::valueBlock);
-    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+            inputView.tag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputView.value);
 
-    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    auto bitsetView = viewFromStack(0);
     // A bitmap argument set to Nothing is equivalent to a bitmap made of all True values.
     tassert(8625728,
             "Expected bitset argument to be of either Nothing or valueBlock type",
-            bitsetTag == value::TypeTags::Nothing || bitsetTag == value::TypeTags::valueBlock);
+            bitsetView.tag == value::TypeTags::Nothing ||
+                bitsetView.tag == value::TypeTags::valueBlock);
 
     Date_t endDate;
     TimeUnit unit{TimeUnit::year};
@@ -1115,20 +1089,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateDi
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateAdd(ArityType arity) {
+value::TagValueMaybeOwned ByteCode::builtinValueBlockDateAdd(ArityType arity) {
     tassert(11080028, "Unexpected arity value", arity == 6);
 
-    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    auto inputView = viewFromStack(1);
     tassert(8649700,
             "Expected input argument to be of valueBlock type",
-            inputTag == value::TypeTags::valueBlock);
-    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+            inputView.tag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputView.value);
 
-    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    auto bitsetView = viewFromStack(0);
     // A bitmap argument set to Nothing is equivalent to a bitmap made of all True values.
     tassert(8649701,
             "Expected bitset argument to be of either Nothing or valueBlock type",
-            bitsetTag == value::TypeTags::Nothing || bitsetTag == value::TypeTags::valueBlock);
+            bitsetView.tag == value::TypeTags::Nothing ||
+                bitsetView.tag == value::TypeTags::valueBlock);
 
     TimeUnit unit{TimeUnit::year};
     int64_t amount;
@@ -1137,9 +1112,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateAd
         return makeNothingBlock(valueBlockIn);
     }
 
-    if (bitsetTag == value::TypeTags::valueBlock) {
+    if (bitsetView.tag == value::TypeTags::valueBlock) {
         // TODO SERVER-86457: refactor this after map() accepts bitmask argument
-        auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+        auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetView.value);
         auto bitset = bitsetBlock->extract();
         auto bitsetVals = const_cast<value::Value*>(bitset.vals());
         auto bitsetTags = const_cast<value::TypeTags*>(bitset.tags());

@@ -1158,11 +1158,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::valueBlockAggBottomNArray:
             return ByteCode::builtinValueBlockAggBottomNArray(arity);
         case Builtin::valueBlockDateDiff:
-            return builtinValueBlockDateDiff(arity);
+            return builtinValueBlockDateDiff(arity).releaseToRaw();
         case Builtin::valueBlockDateTrunc:
-            return builtinValueBlockDateTrunc(arity);
+            return builtinValueBlockDateTrunc(arity).releaseToRaw();
         case Builtin::valueBlockDateAdd:
-            return builtinValueBlockDateAdd(arity);
+            return builtinValueBlockDateAdd(arity).releaseToRaw();
         case Builtin::valueBlockTrunc:
             return builtinValueBlockTrunc(arity);
         case Builtin::valueBlockRound:

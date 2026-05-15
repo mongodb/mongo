@@ -1425,7 +1425,7 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
             auto binSize = value::bitcastTo<int64_t>(binSizeLong.value());
 
             auto [timezoneTag, timezoneVal] = _nodes[4]->as<EConstant>()->getConstant();
-            auto timezone = vm::getTimezone(timezoneTag, timezoneVal, timezoneDB);
+            auto timezone = vm::getTimezone({timezoneTag, timezoneVal}, timezoneDB);
 
             DayOfWeek startOfWeek{kStartOfWeekDefault};
             if (unit == TimeUnit::week) {

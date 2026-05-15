@@ -38,24 +38,17 @@ namespace mongo {
 namespace sbe {
 namespace vm {
 
-bool isValidTimezone(value::TypeTags timezoneTag,
-                     value::Value timezoneValue,
-                     const TimeZoneDatabase* timezoneDB);
 /**
- * Returns true if a timezone represented by 'timezoneTag' and 'timezoneValue' is valid and exists
- * in database 'timezoneDB', meaning that it can be retrieved by function 'getTimezone()'.
+ * Returns true if a timezone represented by 'timezone' is valid and exists in database
+ * 'timezoneDB', meaning that it can be retrieved by function 'getTimezone()'.
  */
-bool isValidTimezone(value::TypeTags timezoneTag,
-                     value::Value timezoneValue,
-                     const TimeZoneDatabase* timezoneDB);
+bool isValidTimezone(value::TagValueView timezone, const TimeZoneDatabase* timezoneDB);
 
 /**
- * Returns a TimeZone object representing the zone given by timezoneTag and timezoneVal, or UTC if
- * it was an empty string.
+ * Returns a TimeZone object representing the zone given by 'timezone', or UTC if it was an empty
+ * string.
  */
-TimeZone getTimezone(value::TypeTags timezoneTag,
-                     value::Value timezoneVal,
-                     TimeZoneDatabase* timezoneDB);
+TimeZone getTimezone(value::TagValueView timezone, TimeZoneDatabase* timezoneDB);
 
 /**
  * Returns a Date_t object representing the datetime given by dateTag and dateVal.

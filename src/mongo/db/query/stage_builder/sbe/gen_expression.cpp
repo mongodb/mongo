@@ -1352,8 +1352,7 @@ public:
                         timezoneDBTag == sbe::value::TypeTags::timeZoneDB);
                 uassert(4997806,
                         "$dateFromString parameter 'timezone' must be a valid timezone",
-                        sbe::vm::isValidTimezone(timezoneTag,
-                                                 timezoneVal,
+                        sbe::vm::isValidTimezone({timezoneTag, timezoneVal},
                                                  sbe::value::getTimeZoneDBView(timezoneDBVal)));
             }
         } else {
@@ -1731,7 +1730,7 @@ public:
                 // If the query did not specify a format string and a non-UTC timezone was
                 // specified, the default format should not use a 'Z' suffix.
                 if (!expr->isFormatSpecified() &&
-                    !(sbe::vm::getTimezone(timezoneTag, timezoneVal, timezoneDB).isUtcZone())) {
+                    !(sbe::vm::getTimezone({timezoneTag, timezoneVal}, timezoneDB).isUtcZone())) {
                     formatExpression = _b.makeStrConstant(kIsoFormatStringNonZ);
                 }
 
@@ -1741,7 +1740,7 @@ public:
                         sbe::value::isString(timezoneTag));
                 uassert(4997906,
                         "$dateToString parameter 'timezone' must be a valid timezone",
-                        sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
+                        sbe::vm::isValidTimezone({timezoneTag, timezoneVal}, timezoneDB));
             }
         } else {
             inputValidationCases.emplace_back(
@@ -1870,7 +1869,7 @@ public:
                     sbe::value::isString(timezoneTag));
             tassert(7157929,
                     "$dateTrunc parameter 'timezone' must be a valid timezone",
-                    sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
+                    sbe::vm::isValidTimezone({timezoneTag, timezoneVal}, timezoneDB));
         } else {
             inputValidationCases.emplace_back(
                 _b.generateNonStringCheck(timezoneVar),
@@ -3686,9 +3685,9 @@ private:
             uassert(5157901,
                     str::stream() << "$" << sbe::toString(exprName)
                                   << " parameter 'timezone' must be a valid timezone",
-                    sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
+                    sbe::vm::isValidTimezone({timezoneTag, timezoneVal}, timezoneDB));
             auto [timezoneObjTag, timezoneObjVal] = sbe::value::makeCopyTimeZone(
-                sbe::vm::getTimezone(timezoneTag, timezoneVal, timezoneDB));
+                sbe::vm::getTimezone({timezoneTag, timezoneVal}, timezoneDB));
             auto timezoneConst = _b.makeConstant(timezoneObjTag, timezoneObjVal);
             arguments.push_back(std::move(timezoneConst));
         } else {
