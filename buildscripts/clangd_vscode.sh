@@ -4,6 +4,12 @@ set -euo pipefail
 # Collect all passed arguments
 ARGS=("$@")
 
+# Source user-defined clangd environment variables
+CLANGD_ENV="$PWD/.vscode/clangd.env"
+if [[ -f $CLANGD_ENV ]]; then
+    source "$CLANGD_ENV"
+fi
+
 # Ordered list of possible clangd locations (each candidate must be a single path)
 CANDIDATES=(
     "$(command -v custom-clangd || true)"
@@ -23,6 +29,7 @@ for CANDIDATE in "${CANDIDATES[@]}"; do
 done
 
 SKIP_SWAP="${SKIP_SWAP:-0}"
+SKIP_LIMITS="${CLANGD_NO_LIMITS:-0}"
 
 # Fail if no clangd was found
 if [[ -z "$CLANGD" ]]; then
@@ -42,6 +49,7 @@ fi
 
 FINAL_ARGS=(
     "${ARGS[@]}"
+    "-j=${CLANGD_JOBS:-4}"
     "--query-driver=./**/*{clang,gcc,g++}*" # allow any clang or gcc binary in the repo
     "--header-insertion=never"
 )
@@ -136,25 +144,27 @@ can_use_systemd_user() {
     timeout 1s systemd-run --user --quiet --scope true >/dev/null 2>&1
 }
 
-if can_use_systemd_user; then
+if [[ "$SKIP_LIMITS" != "1" ]] && can_use_systemd_user; then
     if systemd-run --user --quiet --collect --pipe \
         --unit="$UNIT" \
-        -p MemoryHigh=4G \
-        -p MemoryMax=8G \
-        -p MemorySwapMax=16G \
-        -p IOWeight=10 \
-        -p IOSchedulingClass=idle \
-        -p IOSchedulingPriority=7 \
+        -p "MemoryHigh=${CLANGD_MEMORY_HIGH:-4G}" \
+        -p "MemoryMax=${CLANGD_MEMORY_MAX:-8G}" \
+        -p "MemorySwapMax=${CLANGD_MEMORY_SWAP_MAX:-16G}" \
+        -p "IOWeight=${CLANGD_IO_WEIGHT:-10}" \
+        -p "IOSchedulingClass=${CLANGD_IO_SCHEDULING_CLASS:-idle}" \
+        -p "IOSchedulingPriority=${CLANGD_IO_SCHEDULING_PRIORITY:-7}" \
         -- "$CLANGD" "${FINAL_ARGS[@]}"; then
         exit 0
     else
         echo "[WARN] systemd-run --user failed; falling back to direct clangd." >&2
     fi
+elif [[ "$SKIP_LIMITS" == "1" ]]; then
+    echo "[INFO] Resource limits disabled (CLANGD_NO_LIMITS=1). Running clangd without systemd limits." >&2
 else
     echo "[WARN] systemd-run not available (common in containers). Running clangd without systemd limits." >&2
 fi
 
-# Fallback: run clangd directly (used when systemd-run is unavailable or fails at runtime)
+# Fallback: run clangd directly (used when systemd-run is unavailable, limits are disabled, or systemd-run fails)
 if command -v ionice >/dev/null 2>&1; then
     exec ionice -c3 nice -n 19 "$CLANGD" "${FINAL_ARGS[@]}"
 else

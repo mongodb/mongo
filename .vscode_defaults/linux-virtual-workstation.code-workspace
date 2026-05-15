@@ -99,8 +99,9 @@
 				}
 			},
 		],
+		// Set CLANGD_NO_LIMITS=1 in .vscode/clangd.env to disable systemd resource limits on clangd.
+		// Set CLANGD_JOBS=<n> in .vscode/clangd.env to control clangd parallelism (default: 4).
 		"clangd.arguments": [
-			"-j=4",
 			"--background-index-priority=low",
 			"--pch-storage=disk",
 			"--malloc-trim",
