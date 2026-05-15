@@ -49,22 +49,22 @@ public:
 
 TEST_F(IsReplicatedFastCountEnabledTest, DisabledWhenFeatureFlagOff) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", false);
-    ASSERT_FALSE(isReplicatedFastCountEnabled(operationContext()));
+    EXPECT_FALSE(isReplicatedFastCountEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledTest, DisabledWhenProviderReturnsFalse) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
-    ASSERT_TRUE(isReplicatedFastCountEnabled(operationContext()));
+    EXPECT_TRUE(isReplicatedFastCountEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledWithProviderTest, DisabledWhenFeatureFlagOff) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", false);
-    ASSERT_TRUE(isReplicatedFastCountEnabled(operationContext()));
+    EXPECT_TRUE(isReplicatedFastCountEnabled(operationContext()));
 }
 
 TEST_F(IsReplicatedFastCountEnabledWithProviderTest, EnabledWhenBothFlagAndProviderOn) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
-    ASSERT_TRUE(isReplicatedFastCountEnabled(operationContext()));
+    EXPECT_TRUE(isReplicatedFastCountEnabled(operationContext()));
 }
 
 TEST(ReplicatedFastCountEligibleNsTest, NormalCollectionsEligible) {

@@ -153,8 +153,8 @@ void TimeseriesWriteOpsInternalTest::_testStageUnorderedWritesUnoptimized(
         &errors);
     ASSERT_EQ(batches.size(), 1);
     auto batch = batches.front();
-    ASSERT_EQ(batch->measurements.size(), expectedIndices.size());
-    ASSERT_EQ(batch->userBatchIndices, expectedIndices);
+    EXPECT_EQ(batch->measurements.size(), expectedIndices.size());
+    EXPECT_EQ(batch->userBatchIndices, expectedIndices);
 }
 
 
@@ -205,7 +205,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatch) {
     auto& batch = writeBatches.front();
     for (size_t i = 0; i < batch->measurements.size(); i++) {
         auto userBatchIndex = batch->userBatchIndices.at(i);
-        ASSERT_EQ(batch->measurements[i].woCompare(originalUserBatch[userBatchIndex]), 0);
+        EXPECT_EQ(batch->measurements[i].woCompare(originalUserBatch[userBatchIndex]), 0);
     }
 }
 
@@ -261,8 +261,8 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithStm
 
     for (size_t i = 0; i < batch->measurements.size(); i++) {
         auto userBatchIndex = batch->userBatchIndices.at(i);
-        ASSERT_EQ(batch->measurements[i].woCompare(originalUserBatch[userBatchIndex]), 0);
-        ASSERT_EQ(batch->stmtIds[i], stmtIds[userBatchIndex]);
+        EXPECT_EQ(batch->measurements[i].woCompare(originalUserBatch[userBatchIndex]), 0);
+        EXPECT_EQ(batch->stmtIds[i], stmtIds[userBatchIndex]);
     }
 }
 
@@ -317,8 +317,8 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestRewriteIndicesForSubsetOfBatchWithSin
 
     for (size_t i = 0; i < batch->measurements.size(); i++) {
         auto userBatchIndex = batch->userBatchIndices.at(i);
-        ASSERT_EQ(batch->measurements[i].woCompare(originalUserBatch[userBatchIndex]), 0);
-        ASSERT_EQ(batch->stmtIds[i], stmtId + userBatchIndex);
+        EXPECT_EQ(batch->measurements[i].woCompare(originalUserBatch[userBatchIndex]), 0);
+        EXPECT_EQ(batch->stmtIds[i], stmtId + userBatchIndex);
     }
 }
 
@@ -365,7 +365,7 @@ TEST_F(TimeseriesWriteOpsInternalTest, TestProcessErrorsForSubsetOfBatchWithErro
 
     ASSERT_EQ(errors.size(), 1);
     auto& error = errors.front();
-    ASSERT_EQ(error.getIndex(), 2);
+    EXPECT_EQ(error.getIndex(), 2);
 }
 
 TEST_F(TimeseriesWriteOpsInternalTest, StageUnorderedWritesToBucketCatalogHandlesDocsToRetry) {

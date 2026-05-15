@@ -217,7 +217,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexFails) {
 
     // Attempt and fail to register an index build on _testFooNss with the same index name, while
     // the prior build is still running.
-    ASSERT_EQ(_indexBuildsCoord->startIndexBuild(operationContext(),
+    EXPECT_EQ(_indexBuildsCoord->startIndexBuild(operationContext(),
                                                  _testFooNss.dbName(),
                                                  _testFooUUID,
                                                  makeSpecs({"b"}, {3}),
@@ -232,8 +232,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexFails) {
 
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
     auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());
-    ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
-    ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);
+    EXPECT_EQ(1, indexCatalogStats.numIndexesBefore);
+    EXPECT_EQ(3, indexCatalogStats.numIndexesAfter);
 }
 
 // Incrementally registering index builds and checking both that the registration was successful and
@@ -251,7 +251,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                                                      testFoo1BuildUUID,
                                                      _indexBuildOptions));
 
-    ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testFooNss.dbName()), 1);
+    EXPECT_EQ(_indexBuildsCoord->numInProgForDb(_testFooNss.dbName()), 1);
     ASSERT(_indexBuildsCoord->inProgForCollection(_testFooUUID));
     ASSERT(_indexBuildsCoord->inProgForDb(_testFooNss.dbName()));
     ASSERT_THROWS_WITH_CHECK(
@@ -273,7 +273,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                                                      testFoo2BuildUUID,
                                                      _indexBuildOptions));
 
-    ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testFooNss.dbName()), 2);
+    EXPECT_EQ(_indexBuildsCoord->numInProgForDb(_testFooNss.dbName()), 2);
     ASSERT(_indexBuildsCoord->inProgForCollection(_testFooUUID));
     ASSERT(_indexBuildsCoord->inProgForDb(_testFooNss.dbName()));
     ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testFooUUID),
@@ -292,7 +292,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                                                                       testBarBuildUUID,
                                                                       _indexBuildOptions));
 
-    ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_testBarNss.dbName()), 3);
+    EXPECT_EQ(_indexBuildsCoord->numInProgForDb(_testBarNss.dbName()), 3);
     ASSERT(_indexBuildsCoord->inProgForCollection(_testBarUUID));
     ASSERT(_indexBuildsCoord->inProgForDb(_testBarNss.dbName()));
     ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testBarUUID),
@@ -312,7 +312,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                                                      othertestFooBuildUUID,
                                                      _indexBuildOptions));
 
-    ASSERT_EQ(_indexBuildsCoord->numInProgForDb(_othertestFooNss.dbName()), 1);
+    EXPECT_EQ(_indexBuildsCoord->numInProgForDb(_othertestFooNss.dbName()), 1);
     ASSERT(_indexBuildsCoord->inProgForCollection(_othertestFooUUID));
     ASSERT(_indexBuildsCoord->inProgForDb(_othertestFooNss.dbName()));
     ASSERT_THROWS_CODE(_indexBuildsCoord->assertNoIndexBuildInProgForCollection(_othertestFooUUID),
@@ -330,9 +330,9 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
         repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
 
     auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());
-    ASSERT_GTE(indexCatalogStats.numIndexesBefore, 1);
-    ASSERT_GT(indexCatalogStats.numIndexesAfter, 1);
-    ASSERT_LTE(indexCatalogStats.numIndexesAfter, 5);
+    EXPECT_GE(indexCatalogStats.numIndexesBefore, 1);
+    EXPECT_GT(indexCatalogStats.numIndexesAfter, 1);
+    EXPECT_LE(indexCatalogStats.numIndexesAfter, 5);
 
     ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
         operationContext(),
@@ -340,9 +340,9 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
         repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
 
     indexCatalogStats = unittest::assertGet(testFoo2Future.getNoThrow());
-    ASSERT_GTE(indexCatalogStats.numIndexesBefore, 1);
-    ASSERT_GT(indexCatalogStats.numIndexesAfter, 1);
-    ASSERT_LTE(indexCatalogStats.numIndexesAfter, 5);
+    EXPECT_GE(indexCatalogStats.numIndexesBefore, 1);
+    EXPECT_GT(indexCatalogStats.numIndexesAfter, 1);
+    EXPECT_LE(indexCatalogStats.numIndexesAfter, 5);
 
     ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
         operationContext(),
@@ -350,8 +350,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
         repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
 
     indexCatalogStats = unittest::assertGet(testBarFuture.getNoThrow());
-    ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
-    ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);
+    EXPECT_EQ(1, indexCatalogStats.numIndexesBefore);
+    EXPECT_EQ(3, indexCatalogStats.numIndexesAfter);
 
     ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
         operationContext(),
@@ -359,8 +359,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
         repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
 
     indexCatalogStats = unittest::assertGet(othertestFooFuture.getNoThrow());
-    ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
-    ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);
+    EXPECT_EQ(1, indexCatalogStats.numIndexesBefore);
+    EXPECT_EQ(3, indexCatalogStats.numIndexesAfter);
 
     _indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testFooUUID);
     _indexBuildsCoord->assertNoIndexBuildInProgForCollection(_testBarUUID);
@@ -369,8 +369,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
     _indexBuildsCoord->assertNoBgOpInProgForDb(_testFooNss.dbName());
     _indexBuildsCoord->assertNoBgOpInProgForDb(_othertestFooNss.dbName());
 
-    ASSERT_NOT_EQUALS(_testFooNss, _testBarNss);
-    ASSERT_NOT_EQUALS(_testFooNss, _othertestFooNss);
+    EXPECT_NE(_testFooNss, _testBarNss);
+    EXPECT_NE(_testFooNss, _othertestFooNss);
 }
 
 TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
@@ -381,18 +381,18 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
     // Pass in an empty index list.
     Status status =
         _indexBuildsCoord->setCommitQuorum(operationContext(), _testFooNss, {}, newCommitQuorum);
-    ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
+    EXPECT_EQ(ErrorCodes::IndexNotFound, status);
 
     // Use an invalid collection namespace.
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("bad.collection");
     status = _indexBuildsCoord->setCommitQuorum(
         operationContext(), nss, {"a_1", "b_1"}, newCommitQuorum);
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
+    EXPECT_EQ(ErrorCodes::NamespaceNotFound, status);
 
     // No index builds are happening on the collection.
     status = _indexBuildsCoord->setCommitQuorum(
         operationContext(), _testFooNss, {"a_1", "b_1"}, newCommitQuorum);
-    ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
+    EXPECT_EQ(ErrorCodes::IndexNotFound, status);
 
     // Register an index build on _testFooNss.
     const auto testFoo1BuildUUID = UUID::gen();
@@ -407,12 +407,12 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
     // No index with the name "c" is being built.
     status =
         _indexBuildsCoord->setCommitQuorum(operationContext(), _testFooNss, {"c"}, newCommitQuorum);
-    ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
+    EXPECT_EQ(ErrorCodes::IndexNotFound, status);
 
     // Pass in extra indexes not being built by the same index builder.
     status = _indexBuildsCoord->setCommitQuorum(
         operationContext(), _testFooNss, {"a_1", "b_1", "c_1"}, newCommitQuorum);
-    ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
+    EXPECT_EQ(ErrorCodes::IndexNotFound, status);
 
     ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
         operationContext(),
@@ -497,7 +497,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsTrackFailedBuilds) {
         buildUUID,
         repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
     auto buildStatus = failedBuildFuture.getNoThrow();
-    ASSERT_EQ(buildStatus.getStatus(), ErrorCodes::DuplicateKey);
+    EXPECT_EQ(buildStatus.getStatus(), ErrorCodes::DuplicateKey);
     _indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(
         operationContext(), _testBarUUID, IndexBuildProtocol::kTwoPhase);
 
@@ -529,7 +529,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsTrackAbortedBuildsAsFailures
         IndexBuildAction::kPrimaryAbort,
         Status{ErrorCodes::IndexBuildAborted, "test abort"}));
     auto buildStatus = buildFuture.getNoThrow();
-    ASSERT_EQ(buildStatus.getStatus(), ErrorCodes::IndexBuildAborted);
+    EXPECT_EQ(buildStatus.getStatus(), ErrorCodes::IndexBuildAborted);
 
     const auto metricsAfterAbort = readIndexBuildMetrics(capturer);
     EXPECT_EQ(metricsAfterAbort.active, metricsBeforeBuild.active);

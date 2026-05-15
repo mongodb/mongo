@@ -62,7 +62,7 @@ TEST(TimeseriesSizingConstants, OpenBucket) {
         Date_t{},
         registry);
 
-    ASSERT_EQ(contexts.global.allocated(), kExpectedOpenBucketSize);
+    EXPECT_EQ(contexts.global.allocated(), kExpectedOpenBucketSize);
 }
 
 TEST(TimeseriesSizingConstants, ArchivedBucket) {
@@ -85,7 +85,7 @@ TEST(TimeseriesSizingConstants, ArchivedBucket) {
         numBuckets += stripe.archivedBuckets.size();
     }
 
-    ASSERT_EQ(memUsage / numBuckets, kExpectedArchivedBucketSize);
+    EXPECT_EQ(memUsage / numBuckets, kExpectedArchivedBucketSize);
 }
 
 TEST(TimeseriesSizingConstants, Schema) {
@@ -101,7 +101,7 @@ TEST(TimeseriesSizingConstants, Schema) {
 
     // Calculate overhead of storing an object in MinMax. Assuming that the element is stored once
     // internally.
-    ASSERT_EQ(context.allocated() - empty - obj.firstElement().size(),
+    EXPECT_EQ(context.allocated() - empty - obj.firstElement().size(),
               kExpectedSchemaSizePerElement);
 }
 
@@ -118,7 +118,7 @@ TEST(TimeseriesSizingConstants, MinMax) {
 
     // Calculate overhead of storing an object in MinMax. Assuming that the element is stored twice
     // internally.
-    ASSERT_EQ(context.allocated() - empty - (obj.firstElement().size() * 2),
+    EXPECT_EQ(context.allocated() - empty - (obj.firstElement().size() * 2),
               kExpectedMinMaxSizePerElement);
 }
 
@@ -146,7 +146,7 @@ TEST(TimeseriesSizingConstants, BSONColumnBuilder) {
         memUsage += context.allocated();
     }
 
-    ASSERT_EQ(sizeof(column) + (memUsage - empty) / kMaxColumnSize,
+    EXPECT_EQ(sizeof(column) + (memUsage - empty) / kMaxColumnSize,
               kExpectedBSONColumnBuilderPerElement);
 }
 

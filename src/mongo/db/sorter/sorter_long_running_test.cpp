@@ -280,26 +280,26 @@ void assertOutputMatches(IteratorHandle dataToValidate,
         const auto key = static_cast<int>(pair.first);
         const auto value = static_cast<int>(pair.second);
 
-        ASSERT_EQ(value, -key);
+        EXPECT_EQ(value, -key);
         if (prev) {
             if (direction == ASC) {
-                ASSERT_LTE(*prev, key);
+                EXPECT_LE(*prev, key);
             } else {
-                ASSERT_GTE(*prev, key);
+                EXPECT_GE(*prev, key);
             }
         }
         prev = key;
 
         auto it = expected.frequencies.find(key);
         ASSERT(it != expected.frequencies.end());
-        ASSERT_GT(it->second, 0U);
+        EXPECT_GT(it->second, 0U);
         if (--it->second == 0) {
             expected.frequencies.erase(it);
         }
         ++seen;
     }
 
-    ASSERT_EQ(seen, expected.count);
+    EXPECT_EQ(seen, expected.count);
     ASSERT(expected.frequencies.empty());
 }
 
@@ -309,15 +309,15 @@ void validateSortOutput(const std::shared_ptr<IWSorter>& sorter,
                         Direction direction) {
     auto expected = expectedOutputForLimit(input, opts, direction);
     assertOutputMatches(sorter->done(), std::move(expected), direction);
-    ASSERT_EQ(sorter->stats().numSorted(), input.size());
+    EXPECT_EQ(sorter->stats().numSorted(), input.size());
 }
 
 void assertPersistedRangeInfo(const std::shared_ptr<IWSorter>& sorter,
                               const SortOptions& opts,
                               const RangeCoverageExpectation& expected) {
     auto state = sorter->persistDataForShutdown();
-    ASSERT_EQ(state.ranges.size(), expected.numRanges);
-    ASSERT_EQ(sorter->stats().spilledRanges(), expected.spilledRanges);
+    EXPECT_EQ(state.ranges.size(), expected.numRanges);
+    EXPECT_EQ(sorter->stats().spilledRanges(), expected.spilledRanges);
 }
 
 template <typename Traits>
@@ -439,10 +439,10 @@ protected:
                 assertPersistedRangeInfo(mergedSorters[1], sortOpts, *expectedRangeCoverage);
             }
         }
-        ASSERT_EQ(expectedRangeCoverage.has_value(),
+        EXPECT_EQ(expectedRangeCoverage.has_value(),
                   !boost::filesystem::is_empty(spillDir().path()));
 #else
-        ASSERT_EQ(expectedRangeCoverage.has_value(),
+        EXPECT_EQ(expectedRangeCoverage.has_value(),
                   !boost::filesystem::is_empty(spillDir().path()));
 #endif
     }
@@ -591,17 +591,17 @@ TEST_F(SortedFileWriterAndFileIteratorTests, SortedFileWriterAndFileIterator) {
 
     currentFileSize = appendToFile(opts, spillDir.path(), &sorterFileStats, currentFileSize, 5);
 
-    ASSERT_EQ(sorterFileStats.opened.load(), 1);
-    ASSERT_EQ(sorterFileStats.closed.load(), 1);
-    ASSERT_LTE(sorterTracker.bytesSpilled.load(), currentFileSize);
+    EXPECT_EQ(sorterFileStats.opened.load(), 1);
+    EXPECT_EQ(sorterFileStats.closed.load(), 1);
+    EXPECT_LE(sorterTracker.bytesSpilled.load(), currentFileSize);
 
     currentFileSize =
         appendToFile(opts, spillDir.path(), &sorterFileStats, currentFileSize, 10 * 1000 * 1000);
 
-    ASSERT_EQ(sorterFileStats.opened.load(), 2);
-    ASSERT_EQ(sorterFileStats.closed.load(), 2);
-    ASSERT_LTE(sorterTracker.bytesSpilled.load(), currentFileSize);
-    ASSERT_LTE(sorterFileStats.bytesSpilled(), currentFileSize);
+    EXPECT_EQ(sorterFileStats.opened.load(), 2);
+    EXPECT_EQ(sorterFileStats.closed.load(), 2);
+    EXPECT_LE(sorterTracker.bytesSpilled.load(), currentFileSize);
+    EXPECT_LE(sorterFileStats.bytesSpilled(), currentFileSize);
 
     ASSERT(boost::filesystem::is_empty(spillDir.path()));
 }

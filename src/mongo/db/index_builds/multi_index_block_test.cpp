@@ -179,17 +179,17 @@ boost::optional<std::string> findPersistedResumeState(
         }
 
         if (phase) {
-            ASSERT_EQUALS(*phase, resumeInfo.getPhase());
+            EXPECT_EQ(*phase, resumeInfo.getPhase());
         }
 
         if (collectionUUID) {
-            ASSERT_EQUALS(*collectionUUID, resumeInfo.getCollectionUUID());
+            EXPECT_EQ(*collectionUUID, resumeInfo.getCollectionUUID());
         }
 
         // Should not discover >1 recovery ident with a resumeInfo containing the same buildUUID, or
         // multiple documents in the recovery ident.
-        ASSERT_FALSE(foundResumeIdent);
-        ASSERT_FALSE(cursor->next());
+        EXPECT_FALSE(foundResumeIdent);
+        EXPECT_FALSE(cursor->next());
 
         foundResumeIdent = *it;
     }
@@ -215,7 +215,7 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none));
-    ASSERT_EQUALS(0U, specs.size());
+    EXPECT_EQ(0U, specs.size());
 
     ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll));
     ASSERT_OK(indexer->checkConstraints(operationContext(), coll.getCollectionPtr()));
@@ -248,7 +248,7 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::InitialSync,
                                                    boost::none));
-    ASSERT_EQUALS(0U, specs.size());
+    EXPECT_EQ(0U, specs.size());
 
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
         operationContext(),
@@ -285,7 +285,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::InitialSync,
                                                    boost::none));
-    ASSERT_EQUALS(0U, specs.size());
+    EXPECT_EQ(0U, specs.size());
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
         operationContext(),
         coll.get(),
@@ -318,7 +318,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnAbortWithoutCleanup) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none));
-    ASSERT_EQUALS(1U, specs.size());
+    EXPECT_EQ(1U, specs.size());
 
     indexer->setIsResumable(true);
     indexer->abortWithoutCleanup(operationContext(), coll.get());
@@ -351,7 +351,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndCommit) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none));
-    ASSERT_EQUALS(1U, specs.size());
+    EXPECT_EQ(1U, specs.size());
 
     indexer->setIsResumable(true);
     indexer->persistResumeState(operationContext(), coll.get());
@@ -394,13 +394,13 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndOnAbort) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none));
-    ASSERT_EQUALS(1U, specs.size());
+    EXPECT_EQ(1U, specs.size());
 
     indexer->setIsResumable(true);
     indexer->persistResumeState(operationContext(), coll.get());
     auto indexBuildIdent = findPersistedResumeState(
         operationContext(), buildUUID, IndexBuildPhaseEnum::kInitialized, autoColl->uuid());
-    ASSERT_TRUE(indexBuildIdent);
+    EXPECT_TRUE(indexBuildIdent);
 
     indexer->abortWithoutCleanup(operationContext(), coll.get());
     indexBuildIdent = findPersistedResumeState(operationContext(), buildUUID);
@@ -487,7 +487,7 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
                                  boost::none)
                           .getStatus();
         ASSERT_NOT_OK(status);
-        ASSERT_NE(status, ErrorCodes::IndexBuildAlreadyInProgress);
+        EXPECT_NE(status, ErrorCodes::IndexBuildAlreadyInProgress);
     }
 
     // Start one index build is OK
@@ -509,7 +509,7 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // Trying to start the index build again fails with IndexBuildAlreadyInProgress
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_EQ(secondaryIndexer
+        EXPECT_EQ(secondaryIndexer
                       ->init(operationContext(),
                              coll,
                              {indexBuildInfo1},
@@ -524,7 +524,7 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // IndexBuildAlreadyInProgress if there is an existing index build matching any spec
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_EQ(secondaryIndexer
+        EXPECT_EQ(secondaryIndexer
                       ->init(operationContext(),
                              coll,
                              {indexBuildInfo1, indexBuildInfo2},
@@ -546,7 +546,7 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     // IndexBuildAlreadyInProgress
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_EQ(secondaryIndexer
+        EXPECT_EQ(secondaryIndexer
                       ->init(operationContext(),
                              coll,
                              {indexBuildInfo3, indexBuildInfo1},
@@ -699,10 +699,10 @@ TEST_F(MultiIndexBlockTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none,
                                                    /*generateTableWrites=*/true));
-    ASSERT_EQUALS(1U, specs.size());
+    EXPECT_EQ(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 
     const Timestamp commitTs(100, 0);
@@ -718,7 +718,7 @@ TEST_F(MultiIndexBlockTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
     }
 
     // After commit, the ident is still in WiredTiger but is drop-pending in the reaper.
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 
     // The drop was registered at the commit timestamp. A timestamp <= commitTs should fail.
@@ -730,7 +730,7 @@ TEST_F(MultiIndexBlockTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
     // A timestamp greater than commitTs should succeed.
     storageEngine->dropIdentTimestamped(
         operationContext(), sideWritesIdent, Timestamp(commitTs.getSecs() + 1, 0));
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 }
 
@@ -756,10 +756,10 @@ TEST_F(MultiIndexBlockTest, CommitWithNoCommitTimestampDropsImmediately) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none));
-    ASSERT_EQUALS(1U, specs.size());
+    EXPECT_EQ(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 
     {
@@ -772,12 +772,12 @@ TEST_F(MultiIndexBlockTest, CommitWithNoCommitTimestampDropsImmediately) {
     }
 
     // The ident is still in WiredTiger, pending drop in the reaper.
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 
     // Without a commit timestamp, the drop is registered as Immediate.
     ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), sideWritesIdent));
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 }
 
@@ -801,19 +801,19 @@ TEST_F(MultiIndexBlockTest, AbortDropsTemporaryTables) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none));
-    ASSERT_EQUALS(1U, specs.size());
+    EXPECT_EQ(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 
     // After abort, the ident is still in WiredTiger but is drop-pending in the reaper.
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
     ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), sideWritesIdent));
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 }
 
@@ -848,10 +848,10 @@ TEST_F(MultiIndexBlockTest, CommitDropsResumablePrimaryDrivenIndexBuildTable) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none));
-    ASSERT_EQUALS(1U, specs.size());
+    EXPECT_EQ(1U, specs.size());
 
     const auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
 
     {
@@ -865,7 +865,7 @@ TEST_F(MultiIndexBlockTest, CommitDropsResumablePrimaryDrivenIndexBuildTable) {
 
     // After commit the ident is drop-pending; immediatelyCompletePendingDrop finalizes it.
     ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), indexBuildIdent));
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
 }
 
@@ -897,10 +897,10 @@ TEST_F(MultiIndexBlockTest, InitSkipsResumablePrimaryDrivenIndexBuildTableWhenNo
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none));
-    ASSERT_EQUALS(1U, specs.size());
+    EXPECT_EQ(1U, specs.size());
 
     const auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
 
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
@@ -937,16 +937,16 @@ TEST_F(MultiIndexBlockTest, AbortDropsResumablePrimaryDrivenIndexBuildTable) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none));
-    ASSERT_EQUALS(1U, specs.size());
+    EXPECT_EQ(1U, specs.size());
 
     const auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
 
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 
     ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), indexBuildIdent));
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
 }
 
@@ -1115,7 +1115,7 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringDrain) {
     auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
         storageEngine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
     ASSERT_TRUE(resumeInfo);
-    ASSERT_EQ(IndexBuildPhaseEnum::kDrainWrites, resumeInfo->getPhase());
+    EXPECT_EQ(IndexBuildPhaseEnum::kDrainWrites, resumeInfo->getPhase());
 
     ASSERT_EQ(1U, resumeInfo->getIndexes().size());
     // All three ident fields must be propagated into the persisted resume state.
@@ -1293,7 +1293,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupDoesNotDropTables) {
                                                    MultiIndexBlock::kNoopOnInitFn,
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none));
-    ASSERT_EQUALS(1U, specs.size());
+    EXPECT_EQ(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
 
@@ -1301,10 +1301,10 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupDoesNotDropTables) {
     indexer->abortWithoutCleanup(operationContext(), coll.get());
 
     // After abortWithoutCleanup, the ident should still exist and not be drop-pending.
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
     ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), sideWritesIdent));
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 }
 
@@ -1422,21 +1422,21 @@ TEST_F(MultiIndexBlockTest, AbortWithNoCommitTimestampDropsImmediately) {
                                                    MultiIndexBlock::InitMode::SteadyState,
                                                    boost::none,
                                                    /*generateTableWrites=*/true));
-    ASSERT_EQUALS(1U, specs.size());
+    EXPECT_EQ(1U, specs.size());
 
     auto sideWritesIdent = *indexBuildInfo.sideWritesIdent;
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 
     // The ident is still in WiredTiger, pending drop in the reaper.
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 
     // Without a commit timestamp, the drop is registered as Immediate.
     ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), sideWritesIdent));
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), sideWritesIdent));
 }
 
@@ -1680,7 +1680,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateUsesContainerWrites) {
         setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, autoColl, coll, getNSS());
 
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), handle.indexBuildIdent));
 
     // The load phase already produced one resume-state write; use a delta to isolate
@@ -1691,7 +1691,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateUsesContainerWrites) {
     const auto writesAfter = observer.countInsertsForIdent(handle.indexBuildIdent) +
         observer.countUpdatesForIdent(handle.indexBuildIdent);
 
-    ASSERT_EQUALS(writesBefore + 1, writesAfter);
+    EXPECT_EQ(writesBefore + 1, writesAfter);
 
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
     auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
@@ -1701,7 +1701,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateUsesContainerWrites) {
     EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
 
     // Per-index IndexStateInfo round-trips with the input spec / idents.
-    EXPECT_EQ(1U, resumeInfo->getIndexes().size());
+    ASSERT_EQ(1U, resumeInfo->getIndexes().size());
     const auto& indexState = resumeInfo->getIndexes()[0];
     EXPECT_EQ("a_1", indexState.getSpec()["name"].String());
     EXPECT_EQ(*handle.indexBuildInfo.sideWritesIdent, indexState.getSideWritesTable());
@@ -1748,10 +1748,10 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOverwritesPriorState) {
     indexer->persistResumeState(operationContext(), coll.get());
     indexer->persistResumeState(operationContext(), coll.get());
 
-    ASSERT_EQUALS(writesBefore + 2,
-                  observer.countInsertsForIdent(handle.indexBuildIdent) +
-                      observer.countUpdatesForIdent(handle.indexBuildIdent));
-    ASSERT_GTE(observer.countUpdatesForIdent(handle.indexBuildIdent), updatesBefore + 1);
+    EXPECT_EQ(writesBefore + 2,
+              observer.countInsertsForIdent(handle.indexBuildIdent) +
+                  observer.countUpdatesForIdent(handle.indexBuildIdent));
+    EXPECT_GE(observer.countUpdatesForIdent(handle.indexBuildIdent), updatesBefore + 1);
 
     // ...and the table still has a single record at the resume-state key (overwrite, not append).
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
@@ -1787,9 +1787,9 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupUsesContainerWrites) {
     const auto writesBefore = observer.countInsertsForIdent(handle.indexBuildIdent) +
         observer.countUpdatesForIdent(handle.indexBuildIdent);
     indexer->abortWithoutCleanup(operationContext(), coll.get());
-    ASSERT_EQUALS(writesBefore + 1,
-                  observer.countInsertsForIdent(handle.indexBuildIdent) +
-                      observer.countUpdatesForIdent(handle.indexBuildIdent));
+    EXPECT_EQ(writesBefore + 1,
+              observer.countInsertsForIdent(handle.indexBuildIdent) +
+                  observer.countUpdatesForIdent(handle.indexBuildIdent));
 
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
@@ -1830,9 +1830,9 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateNoOpWhenNotResumable) {
         observer.countUpdatesForIdent(handle.indexBuildIdent);
     indexer->persistResumeState(operationContext(), coll.get());
 
-    ASSERT_EQUALS(writesBefore,
-                  observer.countInsertsForIdent(handle.indexBuildIdent) +
-                      observer.countUpdatesForIdent(handle.indexBuildIdent));
+    EXPECT_EQ(writesBefore,
+              observer.countInsertsForIdent(handle.indexBuildIdent) +
+                  observer.countUpdatesForIdent(handle.indexBuildIdent));
 
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
@@ -1881,7 +1881,7 @@ TEST_F(MultiIndexBlockTest, HybridBuildDoesNotUseContainerWrites) {
     indexer->persistResumeState(operationContext(), coll.get());
 
     // Hybrid builds use the regular RecordStore path, so the OpObserver sees no container ops.
-    ASSERT_EQUALS(0U, observer.inserts.size());
+    EXPECT_EQ(0U, observer.inserts.size());
 
     indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
@@ -1934,7 +1934,7 @@ TEST_F(MultiIndexBlockTest, WriteStateToContainerOnSpillWhenResumable) {
                            boost::none));
 
     auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
-    ASSERT_TRUE(engine.getEngine()->hasIdent(
+    EXPECT_TRUE(engine.getEngine()->hasIdent(
         *shard_role_details::getRecoveryUnit(operationContext()), indexBuildIdent));
 
     // Insert the data into the sorter. The first spill will trigger an insert into the index build
@@ -1949,7 +1949,7 @@ TEST_F(MultiIndexBlockTest, WriteStateToContainerOnSpillWhenResumable) {
     ASSERT_TRUE(resumeInfo.has_value());
     EXPECT_EQ(resumeInfo->getBuildUUID(), buildUUID);
     EXPECT_EQ(resumeInfo->getCollectionUUID(), autoColl->uuid());
-    EXPECT_EQ(resumeInfo->getIndexes().size(), 1);
+    ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
     EXPECT_EQ(resumeInfo->getIndexes()[0].getSpec()["name"].String(), "a_1");
 
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
@@ -2184,7 +2184,7 @@ TEST_F(MultiIndexBlockTest, ResumedPdibSpillerContinuesContainerKeysPastPriorRan
     ASSERT(priorRanges);
     ASSERT_FALSE(priorRanges->empty());
     auto prevLastEnd = priorRanges->back().getEnd();
-    ASSERT_GT(prevLastEnd, 1);
+    EXPECT_GT(prevLastEnd, 1);
 
     indexer.markAsCleanedUp();
     resumeInfo->setPhase(IndexBuildPhaseEnum::kCollectionScan);

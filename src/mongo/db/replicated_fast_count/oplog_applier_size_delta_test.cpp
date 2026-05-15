@@ -79,7 +79,7 @@ TEST_F(SizeDeltaTestDisable, DeleteCorrectSizeDeltaInSecondaryModeSucceeds) {
     auto op = makeDeleteOplogEntryWithRecordIdAndSizeMetadata(
         nextOpTime(), _nss, _uuid, BSON("_id" << 1), rid, -doc.objsize());
     ASSERT_OK(runOpSteadyState(op));
-    ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
+    EXPECT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
 }
 
 TEST_F(SizeDeltaTestDisable, DeleteAbsentSizeMetadataIsSkippedInSecondaryMode) {
@@ -90,7 +90,7 @@ TEST_F(SizeDeltaTestDisable, DeleteAbsentSizeMetadataIsSkippedInSecondaryMode) {
 
     auto op = makeDeleteOplogEntryWithRecordId(nextOpTime(), _nss, _uuid, BSON("_id" << 1), rid);
     ASSERT_OK(runOpSteadyState(op));
-    ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
+    EXPECT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
 }
 
 TEST_F(SizeDeltaTest, DeleteWrongSizeDeltaInInitialSyncModeIsIgnored) {
@@ -102,7 +102,7 @@ TEST_F(SizeDeltaTest, DeleteWrongSizeDeltaInInitialSyncModeIsIgnored) {
     auto op = makeDeleteOplogEntryWithRecordIdAndSizeMetadata(
         nextOpTime(), _nss, _uuid, BSON("_id" << 1), rid, -doc.objsize() + 999);
     ASSERT_OK(runOpInitialSync(op));
-    ASSERT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
+    EXPECT_FALSE(documentExistsAtRecordId(_opCtx.get(), _nss, rid));
 }
 
 TEST_F(SizeDeltaTestDisable, DeleteWrongSizeDeltaInSecondaryModeReturnsError) {
@@ -113,7 +113,7 @@ TEST_F(SizeDeltaTestDisable, DeleteWrongSizeDeltaInSecondaryModeReturnsError) {
     // Off-by-one to simulate a primary/secondary size divergence.
     auto op = makeDeleteOplogEntryWithRecordIdAndSizeMetadata(
         nextOpTime(), _nss, _uuid, BSON("_id" << 1), rid, -doc.objsize() + 1);
-    ASSERT_EQ(runOpSteadyState(op).code(), 12380200);
+    EXPECT_EQ(runOpSteadyState(op).code(), 12380200);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ TEST_F(SizeDeltaTestDisable, UpdateWrongSizeDeltaInSecondaryModeReturnsError) {
     // The real delta is 0 (int -> int, same size), but we claim 42 to simulate divergence.
     auto op = makeUpdateOplogEntryWithRecordIdAndSizeMetadata(
         nextOpTime(), _nss, BSON("_id" << 1), BSON("$set" << BSON("x" << 200)), rid, 42);
-    ASSERT_EQ(runOpSteadyState(op).code(), 12380201);
+    EXPECT_EQ(runOpSteadyState(op).code(), 12380201);
 }
 
 }  // namespace

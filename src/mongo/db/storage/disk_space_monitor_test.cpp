@@ -70,25 +70,25 @@ TEST_F(DiskSpaceMonitorTest, Threshold) {
     {
         FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 2000)};
         monitor.runAllActions(opCtx);
-        ASSERT_EQ(0, hitsCounter);
+        EXPECT_EQ(0, hitsCounter);
     }
 
     {
         FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 1024)};
         monitor.runAllActions(opCtx);
-        ASSERT_EQ(1, hitsCounter);
+        EXPECT_EQ(1, hitsCounter);
     }
 
     {
         FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 1000)};
         monitor.runAllActions(opCtx);
-        ASSERT_EQ(2, hitsCounter);
+        EXPECT_EQ(2, hitsCounter);
     }
 
     {
         FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 2000)};
         monitor.runAllActions(opCtx);
-        ASSERT_EQ(2, hitsCounter);
+        EXPECT_EQ(2, hitsCounter);
     }
 
     monitor.deregisterAction(actionId);
@@ -108,16 +108,16 @@ TEST_F(DiskSpaceMonitorTest, TwoActions) {
 
         // Check both actions don't get incremented.
         monitor.runAllActions(opCtx);
-        ASSERT_EQ(0, hitsCounter1);
-        ASSERT_EQ(0, hitsCounter2);
+        EXPECT_EQ(0, hitsCounter1);
+        EXPECT_EQ(0, hitsCounter2);
 
         monitor.runAction(opCtx, action1Id);
-        ASSERT_EQ(0, hitsCounter1);
-        ASSERT_EQ(0, hitsCounter2);
+        EXPECT_EQ(0, hitsCounter1);
+        EXPECT_EQ(0, hitsCounter2);
 
         monitor.runAction(opCtx, action2Id);
-        ASSERT_EQ(0, hitsCounter1);
-        ASSERT_EQ(0, hitsCounter2);
+        EXPECT_EQ(0, hitsCounter1);
+        EXPECT_EQ(0, hitsCounter2);
     }
 
     {
@@ -125,16 +125,16 @@ TEST_F(DiskSpaceMonitorTest, TwoActions) {
 
         // Check both actions get incremented.
         monitor.runAllActions(opCtx);
-        ASSERT_EQ(1, hitsCounter1);
-        ASSERT_EQ(1, hitsCounter2);
+        EXPECT_EQ(1, hitsCounter1);
+        EXPECT_EQ(1, hitsCounter2);
 
         monitor.runAction(opCtx, action1Id);
-        ASSERT_EQ(2, hitsCounter1);
-        ASSERT_EQ(1, hitsCounter2);
+        EXPECT_EQ(2, hitsCounter1);
+        EXPECT_EQ(1, hitsCounter2);
 
         monitor.runAction(opCtx, action2Id);
-        ASSERT_EQ(2, hitsCounter1);
-        ASSERT_EQ(2, hitsCounter2);
+        EXPECT_EQ(2, hitsCounter1);
+        EXPECT_EQ(2, hitsCounter2);
     }
 
     // Deregister action1.
@@ -145,12 +145,12 @@ TEST_F(DiskSpaceMonitorTest, TwoActions) {
 
         // Check that we increment action2.
         monitor.runAllActions(opCtx);
-        ASSERT_EQ(2, hitsCounter1);
-        ASSERT_EQ(3, hitsCounter2);
+        EXPECT_EQ(2, hitsCounter1);
+        EXPECT_EQ(3, hitsCounter2);
 
         monitor.runAction(opCtx, action2Id);
-        ASSERT_EQ(2, hitsCounter1);
-        ASSERT_EQ(4, hitsCounter2);
+        EXPECT_EQ(2, hitsCounter1);
+        EXPECT_EQ(4, hitsCounter2);
     }
 
     {
@@ -158,12 +158,12 @@ TEST_F(DiskSpaceMonitorTest, TwoActions) {
 
         // Check both actions remain unchanged.
         monitor.runAllActions(opCtx);
-        ASSERT_EQ(2, hitsCounter1);
-        ASSERT_EQ(4, hitsCounter2);
+        EXPECT_EQ(2, hitsCounter1);
+        EXPECT_EQ(4, hitsCounter2);
 
         monitor.runAction(opCtx, action2Id);
-        ASSERT_EQ(2, hitsCounter1);
-        ASSERT_EQ(4, hitsCounter2);
+        EXPECT_EQ(2, hitsCounter1);
+        EXPECT_EQ(4, hitsCounter2);
 
         monitor.deregisterAction(action2Id);
     }

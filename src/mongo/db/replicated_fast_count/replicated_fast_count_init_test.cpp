@@ -107,9 +107,9 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesRecordStoreId
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
 
     // Verify idents do not exist before setup.
-    ASSERT_FALSE(
+    EXPECT_FALSE(
         storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
 
     EXPECT_EQ(_fastCountManager->isRunning_ForTest(), false);
@@ -117,9 +117,9 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesRecordStoreId
     setUpReplicatedFastCount(_opCtx);
 
     // Verify both idents exist after setup.
-    ASSERT_TRUE(
+    EXPECT_TRUE(
         storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
 }
 
@@ -130,18 +130,18 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
 
-    ASSERT_FALSE(
+    EXPECT_FALSE(
         storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
 
     EXPECT_EQ(_fastCountManager->isRunning_ForTest(), false);
 
     setUpReplicatedFastCount(_opCtx);
 
-    ASSERT_TRUE(
+    EXPECT_TRUE(
         storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
 
     EXPECT_EQ(_fastCountManager->isRunning_ForTest(), true);
@@ -154,9 +154,9 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
 
     setUpReplicatedFastCount(_opCtx);
 
-    ASSERT_TRUE(
+    EXPECT_TRUE(
         storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
         *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
 
     EXPECT_EQ(_fastCountManager->isRunning_ForTest(), true);
@@ -172,9 +172,9 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountSkipsContainersWhenF
     setUpReplicatedFastCount(_opCtx);
 
     // Containers should not be created when the flag is disabled.
-    ASSERT_FALSE(
+    EXPECT_FALSE(
         storageEngine->getEngine()->hasIdent(*ru, std::string(ident::kFastCountMetadataStore)));
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(
         *ru, std::string(ident::kFastCountMetadataStoreTimestamps)));
 
     // Collections and manager should still be set up.
@@ -214,14 +214,14 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyM
         wuow.commit();
     }
 
-    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
-    ASSERT_FALSE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
+    EXPECT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
+    EXPECT_FALSE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
 
     setUpReplicatedFastCount(_opCtx);
 
     // Both idents should exist after setup creates the timestamps ident.
-    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
-    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
+    EXPECT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
+    EXPECT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
 }
 
 // TODO SERVER-122317 Add a similar test case where timestamps is non-empty. Creation should then
@@ -246,14 +246,14 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyT
         wuow.commit();
     }
 
-    ASSERT_FALSE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
-    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
+    EXPECT_FALSE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
+    EXPECT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
 
     setUpReplicatedFastCount(_opCtx);
 
     // Both idents should exist after setup creates the metadata ident.
-    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
-    ASSERT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
+    EXPECT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStore));
+    EXPECT_TRUE(engine->hasIdent(*ru, ident::kFastCountMetadataStoreTimestamps));
 }
 
 }  // namespace

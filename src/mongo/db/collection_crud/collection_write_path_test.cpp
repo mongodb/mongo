@@ -251,9 +251,9 @@ TEST_F(TruncateRangeFixture, Given_OplogCollectionWithoutIndexes_When_truncateRa
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
     const CollectionPtr& coll = *autoColl;
     ASSERT(coll);
-    ASSERT_TRUE(coll->ns().isOplog());
-    ASSERT_EQ(0, coll->getTotalIndexCount());
-    ASSERT_FALSE(coll->isChangeStreamPreAndPostImagesEnabled());
+    EXPECT_TRUE(coll->ns().isOplog());
+    EXPECT_EQ(0, coll->getTotalIndexCount());
+    EXPECT_FALSE(coll->isChangeStreamPreAndPostImagesEnabled());
 
     RecordId minRecordId(0);
     RecordId maxRecordId(1);
@@ -272,9 +272,9 @@ TEST_F(TruncateRangeFixture,
     auto preImagesAcq = acquirePreImagesCollectionForWrite(opCtx);
     const auto& collPtr = preImagesAcq.getCollectionPtr();
     ASSERT(collPtr);
-    ASSERT_TRUE(collPtr->ns().isChangeStreamPreImagesCollection());
-    ASSERT_EQ(0, collPtr->getTotalIndexCount());
-    ASSERT_FALSE(collPtr->isChangeStreamPreAndPostImagesEnabled());
+    EXPECT_TRUE(collPtr->ns().isChangeStreamPreImagesCollection());
+    EXPECT_EQ(0, collPtr->getTotalIndexCount());
+    EXPECT_FALSE(collPtr->isChangeStreamPreAndPostImagesEnabled());
 
     const UUID collUUID = UUID::gen();
 

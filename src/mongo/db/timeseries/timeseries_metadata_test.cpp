@@ -311,7 +311,7 @@ TEST(TimeseriesMetadataTest, AreMetadataEqualIgnoresFieldOrder) {
             auto lhsElement = lhs.getField(lhsMetaFieldName);
             auto rhsElement = rhs.getField(rhsMetaFieldName);
 
-            ASSERT_EQ(areMetadataEqual(lhsElement, rhsElement), expectedEqual);
+            EXPECT_EQ(areMetadataEqual(lhsElement, rhsElement), expectedEqual);
 
             auto lhsObjNormalized = getNormalizedValue(lhsElement);
             auto lhsElementNormalized = lhsObjNormalized.getField(lhsMetaFieldName);
@@ -324,9 +324,9 @@ TEST(TimeseriesMetadataTest, AreMetadataEqualIgnoresFieldOrder) {
 
             // Assert that normalizing either or both of the values behaves accordingly with
             // 'expectedEqual'.
-            ASSERT_EQ(areMetadataEqual(lhsElement, rhsElementNormalized), expectedEqual);
-            ASSERT_EQ(areMetadataEqual(lhsElementNormalized, rhsElement), expectedEqual);
-            ASSERT_EQ(areMetadataEqual(lhsElementNormalized, rhsElementNormalized), expectedEqual);
+            EXPECT_EQ(areMetadataEqual(lhsElement, rhsElementNormalized), expectedEqual);
+            EXPECT_EQ(areMetadataEqual(lhsElementNormalized, rhsElement), expectedEqual);
+            EXPECT_EQ(areMetadataEqual(lhsElementNormalized, rhsElementNormalized), expectedEqual);
         }
     }
 }
@@ -378,7 +378,7 @@ TEST(TimeseriesMetadataTest, IncorrectFieldNamesForArraysGetIgnored) {
 
         auto lhsElement = lhs.getField(kMetaFieldName);
         auto rhsElement = rhs.getField(kMetaFieldName);
-        ASSERT_EQ(areMetadataEqual(lhsElement, rhsElement), expectedEqual);
+        EXPECT_EQ(areMetadataEqual(lhsElement, rhsElement), expectedEqual);
 
         auto lhsObjNormalized = getNormalizedValue(lhsElement);
         auto lhsElementNormalized = lhsObjNormalized.getField(kMetaFieldName);
@@ -391,9 +391,9 @@ TEST(TimeseriesMetadataTest, IncorrectFieldNamesForArraysGetIgnored) {
 
         // Assert that normalizing either or both of the values behaves accordingly with
         // 'expectedEqual'.
-        ASSERT_EQ(areMetadataEqual(lhsElement, rhsElementNormalized), expectedEqual);
-        ASSERT_EQ(areMetadataEqual(lhsElementNormalized, rhsElement), expectedEqual);
-        ASSERT_EQ(areMetadataEqual(lhsElementNormalized, rhsElementNormalized), expectedEqual);
+        EXPECT_EQ(areMetadataEqual(lhsElement, rhsElementNormalized), expectedEqual);
+        EXPECT_EQ(areMetadataEqual(lhsElementNormalized, rhsElement), expectedEqual);
+        EXPECT_EQ(areMetadataEqual(lhsElementNormalized, rhsElementNormalized), expectedEqual);
     }
 }
 

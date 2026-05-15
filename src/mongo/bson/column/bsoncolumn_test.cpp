@@ -65,9 +65,9 @@ using namespace mongo::bsoncolumn::internal;
 using namespace sbe::bsoncolumn;
 
 void assertBinaryEqual(BSONBinData finalizedColumn, const BufBuilder& buffer) {
-    ASSERT_EQ(finalizedColumn.type, BinDataType::Column);
-    ASSERT_EQ(finalizedColumn.length, buffer.len());
-    ASSERT_EQ(memcmp(finalizedColumn.data, buffer.buf(), finalizedColumn.length), 0);
+    EXPECT_EQ(finalizedColumn.type, BinDataType::Column);
+    EXPECT_EQ(finalizedColumn.length, buffer.len());
+    EXPECT_EQ(memcmp(finalizedColumn.data, buffer.buf(), finalizedColumn.length), 0);
 }
 
 class BSONColumnTest : public unittest::Test {
@@ -75,7 +75,7 @@ public:
     ~BSONColumnTest() override {
         auto& trackingContext = trackingContextChecker.trackingContext;
         auto allocated = trackingContext.allocated();
-        ASSERT_GT(allocated, 0);
+        EXPECT_GT(allocated, 0);
 
         // Move construct and move assign builders. These operations may allocate memory on certain
         // platforms/implementations so we cannot check the exact memory usage in an platform
@@ -286,12 +286,12 @@ public:
     }
 
     static uint64_t deltaOfDeltaObjectId(BSONElement val, BSONElement prev, BSONElement prevprev) {
-        ASSERT_EQ(memcmp(val.OID().getInstanceUnique().bytes,
+        EXPECT_EQ(memcmp(val.OID().getInstanceUnique().bytes,
                          prev.OID().getInstanceUnique().bytes,
                          OID::kInstanceUniqueSize),
                   0);
 
-        ASSERT_EQ(memcmp(prevprev.OID().getInstanceUnique().bytes,
+        EXPECT_EQ(memcmp(prevprev.OID().getInstanceUnique().bytes,
                          prev.OID().getInstanceUnique().bytes,
                          OID::kInstanceUniqueSize),
                   0);
@@ -449,7 +449,7 @@ public:
         }
 
         s8bBuilder.flush(writeFn);
-        ASSERT_EQ(builder.len() - prev, sizeof(uint64_t));
+        EXPECT_EQ(builder.len() - prev, sizeof(uint64_t));
     }
 
     static void appendSimple8bBlock64(BufBuilder& builder, boost::optional<uint64_t> val) {
@@ -478,7 +478,7 @@ public:
             }
         }
         s8bBuilder.flush(writeFn);
-        ASSERT_EQ((builder.len() - prev) / sizeof(uint64_t), expectedNum);
+        EXPECT_EQ((builder.len() - prev) / sizeof(uint64_t), expectedNum);
     }
 
     static void appendSimple8bBlocks64(BufBuilder& builder,
@@ -512,9 +512,9 @@ public:
         if (actual.first == sbe::value::TypeTags::StringSmall) {
             // Generic conversion won't produce StringSmall from BSONElements, but
             // SBEColumnMaterializer will, don't compare the type tag for that case.
-            ASSERT_EQ(expectedSBE.first, sbe::value::TypeTags::bsonString);
+            EXPECT_EQ(expectedSBE.first, sbe::value::TypeTags::bsonString);
         } else {
-            ASSERT_EQ(actual.first, expectedSBE.first);
+            EXPECT_EQ(actual.first, expectedSBE.first);
         }
         ASSERT(areSBEBinariesEqual(actual, expectedSBE));
     }
@@ -529,7 +529,7 @@ public:
             ++cnt;
         }
 
-        ASSERT_EQ(bsoncolumn::count(buffer, size), cnt);
+        EXPECT_EQ(bsoncolumn::count(buffer, size), cnt);
 
         BSONColumnBuilder<> reopen(buffer, size);
         [[maybe_unused]] auto diff = reference.intermediate();
@@ -541,20 +541,20 @@ public:
     static void verifyBinary(BSONBinData columnBinary,
                              const BufBuilder& expected,
                              bool testReopen = true) {
-        ASSERT_EQ(columnBinary.type, BinDataType::Column);
+        EXPECT_EQ(columnBinary.type, BinDataType::Column);
 
         auto buf = expected.buf();
         ASSERT_EQ(columnBinary.length, expected.len());
         for (int i = 0; i < columnBinary.length; ++i) {
-            ASSERT_EQ(*(reinterpret_cast<const char*>(columnBinary.data) + i), buf[i]);
+            EXPECT_EQ(*(reinterpret_cast<const char*>(columnBinary.data) + i), buf[i]);
         }
-        ASSERT_EQ(memcmp(columnBinary.data, buf, columnBinary.length), 0);
+        EXPECT_EQ(memcmp(columnBinary.data, buf, columnBinary.length), 0);
 
         // Verify BSONColumnBuilder::last
         {
             BSONColumnBuilder cb;
             // Initial state returns eoo
-            ASSERT_TRUE(cb.last().eoo());
+            EXPECT_TRUE(cb.last().eoo());
 
             BSONColumn column(columnBinary);
             BSONElement last;
@@ -567,13 +567,13 @@ public:
 
                 if (last.eoo()) {
                     // Only skips have been encountered, last() should continue to return EOO
-                    ASSERT_TRUE(cb.last().eoo());
+                    EXPECT_TRUE(cb.last().eoo());
                 } else if (last.type() != BSONType::object && last.type() != BSONType::array) {
                     // Empty objects and arrays _may_ be encoded as scalar depending on what else
                     // has been added to the builder. This makes this case difficult to test and we
                     // just test the scalar types instead.
-                    ASSERT_FALSE(cb.last().eoo());
-                    ASSERT_TRUE(last.binaryEqualValues(cb.last()));
+                    EXPECT_FALSE(cb.last().eoo());
+                    EXPECT_TRUE(last.binaryEqualValues(cb.last()));
                 }
             }
         }
@@ -611,7 +611,7 @@ public:
                 // intermediate was called
                 if (empty) {
                     auto diff = cb.intermediate();
-                    ASSERT_EQ(diff.offset(), 0);
+                    EXPECT_EQ(diff.offset(), 0);
                     buffer.appendBuf(diff.data(), diff.size());
                 }
 
@@ -679,7 +679,7 @@ public:
 
                     // Call intermediate to obtain the initial binary
                     auto diff = cb.intermediate();
-                    ASSERT_EQ(diff.offset(), 0);
+                    EXPECT_EQ(diff.offset(), 0);
                     buffer.appendBuf(diff.data(), diff.size());
 
                     // Append the rest of the data
@@ -739,20 +739,20 @@ public:
 
             // Verify optimized min, max and minmax expressions against expected values.
             auto minResult = min<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(minResult.first.binaryEqualValues(expected.min.first));
+            EXPECT_TRUE(minResult.first.binaryEqualValues(expected.min.first));
             if (!minResult.first.eoo()) {
-                ASSERT_EQ(minResult.second, expected.min.second);
+                EXPECT_EQ(minResult.second, expected.min.second);
             }
 
             auto maxResult = max<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(maxResult.first.binaryEqualValues(expected.max.first));
+            EXPECT_TRUE(maxResult.first.binaryEqualValues(expected.max.first));
             if (!maxResult.first.eoo()) {
-                ASSERT_EQ(maxResult.second, expected.max.second);
+                EXPECT_EQ(maxResult.second, expected.max.second);
             }
 
             auto [minmaxMin, minmaxMax] = minmax<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(minmaxMin.binaryEqualValues(expected.min.first));
-            ASSERT_TRUE(minmaxMax.binaryEqualValues(expected.max.first));
+            EXPECT_TRUE(minmaxMin.binaryEqualValues(expected.min.first));
+            EXPECT_TRUE(minmaxMax.binaryEqualValues(expected.max.first));
         }
     }
 
@@ -892,7 +892,7 @@ public:
             auto&& vec = vecs[pathIdx];
             for (size_t i = 0; i < vec.size(); ++i) {
                 if (expected[i].eoo()) {
-                    ASSERT_TRUE(vec[i].eoo());
+                    EXPECT_TRUE(vec[i].eoo());
                     continue;
                 }
 
@@ -902,12 +902,12 @@ public:
                     iter++;
                     if (elem.eoo()) {
                         // Path failed to resolve in expected, result should be missing
-                        ASSERT_TRUE(vec[i].eoo());
+                        EXPECT_TRUE(vec[i].eoo());
                         break;
                     }
                     if (iter == path._fields.end()) {
                         // Path resolved in expected, result should match
-                        ASSERT_TRUE(vec[i].binaryEqualValues(elem));
+                        EXPECT_TRUE(vec[i].binaryEqualValues(elem));
                     } else {
                         // Path is ongoing, expected should not have found a leaf
                         ASSERT(elem.isABSONObj());
@@ -941,9 +941,9 @@ public:
         {
             BSONColumn col(columnElement);
             ASSERT_EQ(col.size(), expected.size());
-            ASSERT_EQ(std::distance(col.begin(), col.end()), expected.size());
-            ASSERT_EQ(col.size(), expected.size());
-            ASSERT_EQ(bsoncolumn::count(columnBinary), expected.size());
+            EXPECT_EQ(std::distance(col.begin(), col.end()), expected.size());
+            EXPECT_EQ(col.size(), expected.size());
+            EXPECT_EQ(bsoncolumn::count(columnBinary), expected.size());
 
             auto it = col.begin();
             for (auto elem : expected) {
@@ -952,7 +952,7 @@ public:
                 ASSERT_TRUE(it.more());
                 ++it;
             }
-            ASSERT_FALSE(it.more());
+            EXPECT_FALSE(it.more());
         }
 
         // Verify that we can traverse BSONColumn and extract values on the first pass
@@ -996,7 +996,7 @@ public:
                     for (size_t i = 0; i < e; ++i, ++it) {
                         ASSERT(expected[i].binaryEqualValues(*it));
                     }
-                    ASSERT_EQ(col.size(), expected.size());
+                    EXPECT_EQ(col.size(), expected.size());
                 }
             }
 
@@ -1070,33 +1070,33 @@ public:
             }
 
             BSONElement firstElem = first<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(firstElem.binaryEqualValues(actualFirst));
+            EXPECT_TRUE(firstElem.binaryEqualValues(actualFirst));
 
             BSONElement lastElem = last<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(lastElem.binaryEqualValues(actualLast));
+            EXPECT_TRUE(lastElem.binaryEqualValues(actualLast));
 
             auto minResult = min<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(minResult.first.binaryEqualValues(actualMin));
+            EXPECT_TRUE(minResult.first.binaryEqualValues(actualMin));
             if (!minResult.first.eoo()) {
                 ASSERT_LT(minResult.second, expected.size());
-                ASSERT_TRUE(expected[minResult.second].binaryEqualValues(minResult.first));
+                EXPECT_TRUE(expected[minResult.second].binaryEqualValues(minResult.first));
             }
 
             auto maxResult = max<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(maxResult.first.binaryEqualValues(actualMax));
+            EXPECT_TRUE(maxResult.first.binaryEqualValues(actualMax));
             if (!maxResult.first.eoo()) {
                 ASSERT_LT(maxResult.second, expected.size());
-                ASSERT_TRUE(expected[maxResult.second].binaryEqualValues(maxResult.first));
+                EXPECT_TRUE(expected[maxResult.second].binaryEqualValues(maxResult.first));
             }
 
             auto minmaxElems = minmax<BSONElementMaterializer>(columnBinary, allocator);
-            ASSERT_TRUE(minmaxElems.first.binaryEqualValues(actualMin));
-            ASSERT_TRUE(minmaxElems.second.binaryEqualValues(actualMax));
+            EXPECT_TRUE(minmaxElems.first.binaryEqualValues(actualMin));
+            EXPECT_TRUE(minmaxElems.second.binaryEqualValues(actualMax));
 
             // dense() is true iff no element in the decompressed stream is missing (EOO).
             bool expectedDense = std::none_of(
                 expected.begin(), expected.end(), [](const BSONElement& e) { return e.eoo(); });
-            ASSERT_EQ(dense(columnBinary), expectedDense);
+            EXPECT_EQ(dense(columnBinary), expectedDense);
         }
 
         // Verify we can decompress the entire column using the block-based API using the
@@ -1259,7 +1259,7 @@ protected:
     struct TrackingContextChecker {
         ~TrackingContextChecker() {
             // Ensure we have freed all memory we allocated and are tracking this properly.
-            ASSERT_EQ(trackingContext.allocated(), 0);
+            EXPECT_EQ(trackingContext.allocated(), 0);
         }
 
         tracking::Context trackingContext;
@@ -1397,7 +1397,7 @@ TEST_F(BSONColumnTest, PathFuzzerDiscoveredEdgeCases) {
                     continue;
                 }
                 // Must be an EOO element.
-                ASSERT_TRUE(elem.type() == BSONType::eoo);
+                EXPECT_TRUE(elem.type() == BSONType::eoo);
                 BSONObjBuilder bob;
                 iteratorObjs.push_back(bob.obj());
             };
@@ -1414,7 +1414,7 @@ TEST_F(BSONColumnTest, PathFuzzerDiscoveredEdgeCases) {
 
         // If one API failed, then both APIs must fail.
         if (!iteratorError.empty() || !blockBasedError.empty()) {
-            ASSERT_TRUE(!(iteratorError.empty() || blockBasedError.empty()));
+            EXPECT_TRUE(!(iteratorError.empty() || blockBasedError.empty()));
             continue;
         }
 
@@ -1599,11 +1599,11 @@ TEST_F(BSONColumnTest, BuilderFuzzerGenerationDiscoveredEdgeCases) {
         auto it = col.begin();
         for (auto elem : generatedElements) {
             BSONElement other = *it;
-            ASSERT_TRUE(elem.binaryEqualValues(other));
+            EXPECT_TRUE(elem.binaryEqualValues(other));
             ASSERT_TRUE(it.more());
             ++it;
         }
-        ASSERT_TRUE(!it.more());
+        EXPECT_TRUE(!it.more());
     }
 }
 
@@ -1635,7 +1635,7 @@ TEST_F(BSONColumnTest, BuilderFuzzerReopenDiscoveredEdgeCases) {
 
         // Verify binary reopen gives identical state as intermediate
         BSONColumnBuilder reopen(binary.data(), binary.size());
-        ASSERT_TRUE(builder.isInternalStateIdentical(reopen));
+        EXPECT_TRUE(builder.isInternalStateIdentical(reopen));
     }
 }
 
@@ -1669,15 +1669,15 @@ TEST_F(BSONColumnTest, ContainsScalarInt32SimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberInt), true);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::array), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::string), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::object), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::oid), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1703,15 +1703,15 @@ TEST_F(BSONColumnTest, ContainsScalarInt64SimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberLong), true);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::array), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::string), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::object), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::oid), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1738,15 +1738,15 @@ TEST_F(BSONColumnTest, ContainsScalarDoubleSimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberDouble), true);
+    EXPECT_EQ(col.contains_forTest(BSONType::array), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::string), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::object), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::oid), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1773,15 +1773,15 @@ TEST_F(BSONColumnTest, ContainsScalarTimestampSimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::array), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::timestamp), true);
+    EXPECT_EQ(col.contains_forTest(BSONType::string), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::object), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::oid), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1804,15 +1804,15 @@ TEST_F(BSONColumnTest, ContainsScalarStringSimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::string), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::array), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::string), true);
+    EXPECT_EQ(col.contains_forTest(BSONType::object), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::oid), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1844,15 +1844,15 @@ TEST_F(BSONColumnTest, ContainsScalarObjectIDSimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::oid), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::array), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::string), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::object), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::oid), true);
+    EXPECT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1878,15 +1878,15 @@ TEST_F(BSONColumnTest, ContainsScalarBoolSimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::boolean), true);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::array), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::string), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::object), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::oid), false);
+    EXPECT_EQ(col.contains_forTest(BSONType::boolean), true);
 
     verifyBinary(binData, colBuf);
 }
@@ -2869,7 +2869,7 @@ TEST_F(BSONColumnTest, DoubleRescalingPreserveRLE) {
     elems.push_back(createElementDouble(std::bit_cast<double>(value += kLargeDelta)));
 
     // One of the values are scalable, this will trigger rescaling.
-    ASSERT_TRUE(Simple8bTypeUtil::encodeDouble(elems.at(2).Double(), 0).has_value());
+    EXPECT_TRUE(Simple8bTypeUtil::encodeDouble(elems.at(2).Double(), 0).has_value());
 
     for (auto&& elem : elems) {
         cb.append(elem);
@@ -3068,7 +3068,7 @@ TEST_F(BSONColumnTest, DoubleZerosSignDifference) {
 
     // These numbers are encoded as a large integer that does not fit in Simple8b so the result is
     // two uncompressed literals.
-    ASSERT_EQ(deltaDoubleMemory(d2, d1), 0xFFFFFFFFFFFFFFFF);
+    EXPECT_EQ(deltaDoubleMemory(d2, d1), 0xFFFFFFFFFFFFFFFF);
 
     BufBuilder expected;
     appendLiteral(expected, d1);
@@ -4143,7 +4143,7 @@ TEST_F(BSONColumnTest, StringEmptyAfterLarge) {
     cb.append(large);
     auto empty = createElementString("");
     // Confirm that empty string is encoded as 0 which this test relies on.
-    ASSERT_EQ(*Simple8bTypeUtil::encodeString(empty.valueStringData()), 0);
+    EXPECT_EQ(*Simple8bTypeUtil::encodeString(empty.valueStringData()), 0);
     cb.append(empty);
 
     BufBuilder expected;
@@ -8599,7 +8599,7 @@ TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
     appendEOO(expected);
 
     // We should now have 16 regular Simple8b blocks and then a 17th using RLE at the end.
-    ASSERT_EQ(blockCount, 17);
+    EXPECT_EQ(blockCount, 17);
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
@@ -8656,13 +8656,13 @@ TEST_F(BSONColumnTest, NonZeroRLEInLastBlock) {
 
     // Verify that we have not yet written the last RLE block. This will happen during flush
     // (equivalent to BSONColumn::finalize).
-    ASSERT_EQ(blockCount, 15);
+    EXPECT_EQ(blockCount, 15);
 
     s8bBuilder.flush(writeFn);
     appendEOO(expected);
 
     // We should now have 15 regular Simple8b blocks and then a 16th using RLE at the end.
-    ASSERT_EQ(blockCount, 16);
+    EXPECT_EQ(blockCount, 16);
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
@@ -9202,7 +9202,7 @@ TEST_F(BSONColumnTest, AppendObjDirectly) {
     auto binData = cb.finalize();
     auto binData2 = cb2.finalize();
     ASSERT_EQ(binData.length, binData2.length);
-    ASSERT_EQ(memcmp(binData.data, binData2.data, binData.length), 0);
+    EXPECT_EQ(memcmp(binData.data, binData2.data, binData.length), 0);
 }
 
 TEST_F(BSONColumnTest, AppendArrayDirectly) {
@@ -9219,7 +9219,7 @@ TEST_F(BSONColumnTest, AppendArrayDirectly) {
     auto binData = cb.finalize();
     auto binData2 = cb2.finalize();
     ASSERT_EQ(binData.length, binData2.length);
-    ASSERT_EQ(memcmp(binData.data, binData2.data, binData.length), 0);
+    EXPECT_EQ(memcmp(binData.data, binData2.data, binData.length), 0);
 }
 
 TEST_F(BSONColumnTest, Intermediate) {
@@ -9283,8 +9283,8 @@ TEST_F(BSONColumnTest, Intermediate) {
     {
         auto diff = cb.intermediate();
         ASSERT_EQ(diff.size(), 1);
-        ASSERT_EQ(*diff.data(), '\0');
-        ASSERT_EQ(diff.offset(), 0);
+        EXPECT_EQ(*diff.data(), '\0');
+        EXPECT_EQ(diff.offset(), 0);
     }
 
     BufBuilder buffer;
@@ -9819,7 +9819,7 @@ TEST_F(BSONColumnTest, FTDCRoundTrip) {
     };
 
     // Test that we can decompress and re-compress without any data loss.
-    ASSERT_EQ(roundtrip(compressed), compressed);
+    EXPECT_EQ(roundtrip(compressed), compressed);
 }
 #endif
 
@@ -9944,58 +9944,58 @@ TEST_F(BSONColumnTest, TestCollector) {
     size_t expectedSize = 0;
 
     collector.append(true);
-    ASSERT_EQ(collection.size(), ++expectedSize);
-    ASSERT_EQ(true, std::get<bool>(collection.back()));
+    EXPECT_EQ(collection.size(), ++expectedSize);
+    EXPECT_EQ(true, std::get<bool>(collection.back()));
 
     collector.append((int64_t)1);
-    ASSERT_EQ(collection.size(), ++expectedSize);
-    ASSERT_EQ(1, std::get<int64_t>(collection.back()));
+    EXPECT_EQ(collection.size(), ++expectedSize);
+    EXPECT_EQ(1, std::get<int64_t>(collection.back()));
 
     BSONBinData bsonBinData;
     bsonBinData.data = "foo";
     bsonBinData.length = 3;
     bsonBinData.type = BinDataGeneral;
     collector.append(bsonBinData);
-    ASSERT_EQ(collection.size(), ++expectedSize);
+    EXPECT_EQ(collection.size(), ++expectedSize);
     StringData result = std::get<StringData>(collection.back());
     ASSERT_EQ(3, result.size());
-    ASSERT_EQ(0, memcmp("foo", result.data(), 3));
+    EXPECT_EQ(0, memcmp("foo", result.data(), 3));
 
     BSONCode bsonCode;
     bsonCode.code = "bar";
     collector.append(bsonCode);
-    ASSERT_EQ(collection.size(), ++expectedSize);
+    EXPECT_EQ(collection.size(), ++expectedSize);
     result = std::get<StringData>(collection.back());
     ASSERT_EQ(3, result.size());
-    ASSERT_EQ(0, memcmp("bar", result.data(), 3));
+    EXPECT_EQ(0, memcmp("bar", result.data(), 3));
 
     BSONElement doubleVal = createElementDouble(2.0);
     collector.append<double>(doubleVal);
-    ASSERT_EQ(collection.size(), ++expectedSize);
-    ASSERT_EQ(2.0, std::get<double>(collection.back()));
+    EXPECT_EQ(collection.size(), ++expectedSize);
+    EXPECT_EQ(2.0, std::get<double>(collection.back()));
 
     BSONElement stringVal = createElementString(StringData("bam", 3));
     collector.append<StringData>(stringVal);
-    ASSERT_EQ(collection.size(), ++expectedSize);
+    EXPECT_EQ(collection.size(), ++expectedSize);
     result = std::get<StringData>(collection.back());
     ASSERT_EQ(3, result.size());
-    ASSERT_EQ(0, memcmp("bam", result.data(), 3));
+    EXPECT_EQ(0, memcmp("bam", result.data(), 3));
 
     BSONElement codeVal = createElementCode(StringData("baz", 3));
     collector.append<BSONCode>(codeVal);
-    ASSERT_EQ(collection.size(), ++expectedSize);
+    EXPECT_EQ(collection.size(), ++expectedSize);
     result = std::get<StringData>(collection.back());
     ASSERT_EQ(3, result.size());
-    ASSERT_EQ(0, memcmp("baz", result.data(), 3));
+    EXPECT_EQ(0, memcmp("baz", result.data(), 3));
 
     BSONElement obj = createElementObj(BSON("x" << 1));
     collector.appendPreallocated(obj);
-    ASSERT_EQ(collection.size(), ++expectedSize);
-    ASSERT_EQ(std::monostate(), std::get<std::monostate>(collection.back()));
+    EXPECT_EQ(collection.size(), ++expectedSize);
+    EXPECT_EQ(std::monostate(), std::get<std::monostate>(collection.back()));
 
     collector.appendMissing();
-    ASSERT_EQ(collection.size(), ++expectedSize);
-    ASSERT_EQ(std::monostate(), std::get<std::monostate>(collection.back()));
+    EXPECT_EQ(collection.size(), ++expectedSize);
+    EXPECT_EQ(std::monostate(), std::get<std::monostate>(collection.back()));
 }
 
 TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
@@ -10010,14 +10010,14 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
         auto bin = col.finalize();
 
         auto minResult = min<BSONElementMaterializer>(bin, allocator);
-        ASSERT_FALSE(minResult.first.eoo());
-        ASSERT_EQ(minResult.first.Int(), 3);
-        ASSERT_EQ(minResult.second, 2u);
+        EXPECT_FALSE(minResult.first.eoo());
+        EXPECT_EQ(minResult.first.Int(), 3);
+        EXPECT_EQ(minResult.second, 2u);
 
         auto maxResult = max<BSONElementMaterializer>(bin, allocator);
-        ASSERT_FALSE(maxResult.first.eoo());
-        ASSERT_EQ(maxResult.first.Int(), 7);
-        ASSERT_EQ(maxResult.second, 1u);
+        EXPECT_FALSE(maxResult.first.eoo());
+        EXPECT_EQ(maxResult.first.Int(), 7);
+        EXPECT_EQ(maxResult.second, 1u);
     }
 
     // Sparse column [10, skip, skip, 4]: missing slots count toward the index, so 4 is at index 3.
@@ -10030,9 +10030,9 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
         auto bin = col.finalize();
 
         auto minResult = min<BSONElementMaterializer>(bin, allocator);
-        ASSERT_FALSE(minResult.first.eoo());
-        ASSERT_EQ(minResult.first.Int(), 4);
-        ASSERT_EQ(minResult.second, 3u);
+        EXPECT_FALSE(minResult.first.eoo());
+        EXPECT_EQ(minResult.first.Int(), 4);
+        EXPECT_EQ(minResult.second, 3u);
     }
 
     // Single element [42]: min at index 0.
@@ -10042,9 +10042,9 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
         auto bin = col.finalize();
 
         auto minResult = min<BSONElementMaterializer>(bin, allocator);
-        ASSERT_FALSE(minResult.first.eoo());
-        ASSERT_EQ(minResult.first.Int(), 42);
-        ASSERT_EQ(minResult.second, 0u);
+        EXPECT_FALSE(minResult.first.eoo());
+        EXPECT_EQ(minResult.first.Int(), 42);
+        EXPECT_EQ(minResult.second, 0u);
     }
 
     // Type transition [int32(50), string("abc"), int32(10)]: canonical type ordering puts numerics
@@ -10058,9 +10058,9 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
         auto bin = col.finalize();
 
         auto minResult = min<BSONElementMaterializer>(bin, allocator);
-        ASSERT_FALSE(minResult.first.eoo());
-        ASSERT_EQ(minResult.first.Int(), 10);
-        ASSERT_EQ(minResult.second, 2u);
+        EXPECT_FALSE(minResult.first.eoo());
+        EXPECT_EQ(minResult.first.Int(), 10);
+        EXPECT_EQ(minResult.second, 2u);
     }
 
     // All-missing column: min/max return eoo element.
@@ -10071,8 +10071,8 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
         col.skip();
         auto bin = col.finalize();
 
-        ASSERT_TRUE(min<BSONElementMaterializer>(bin, allocator).first.eoo());
-        ASSERT_TRUE(max<BSONElementMaterializer>(bin, allocator).first.eoo());
+        EXPECT_TRUE(min<BSONElementMaterializer>(bin, allocator).first.eoo());
+        EXPECT_TRUE(max<BSONElementMaterializer>(bin, allocator).first.eoo());
     }
 
     // Empty column: min/max return eoo element.
@@ -10080,8 +10080,8 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
         BSONColumnBuilder<> col;
         auto bin = col.finalize();
 
-        ASSERT_TRUE(min<BSONElementMaterializer>(bin, allocator).first.eoo());
-        ASSERT_TRUE(max<BSONElementMaterializer>(bin, allocator).first.eoo());
+        EXPECT_TRUE(min<BSONElementMaterializer>(bin, allocator).first.eoo());
+        EXPECT_TRUE(max<BSONElementMaterializer>(bin, allocator).first.eoo());
     }
 
     // Leading skips: index of the only value must include them.
@@ -10093,9 +10093,9 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
         auto bin = col.finalize();
 
         auto minResult = min<BSONElementMaterializer>(bin, allocator);
-        ASSERT_FALSE(minResult.first.eoo());
-        ASSERT_EQ(minResult.first.Int(), 7);
-        ASSERT_EQ(minResult.second, 2u);
+        EXPECT_FALSE(minResult.first.eoo());
+        EXPECT_EQ(minResult.first.Int(), 7);
+        EXPECT_EQ(minResult.second, 2u);
     }
 
     // Trailing skips do not shift the index of the extreme.
@@ -10108,9 +10108,9 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
         auto bin = col.finalize();
 
         auto minResult = min<BSONElementMaterializer>(bin, allocator);
-        ASSERT_FALSE(minResult.first.eoo());
-        ASSERT_EQ(minResult.first.Int(), 2);
-        ASSERT_EQ(minResult.second, 1u);
+        EXPECT_FALSE(minResult.first.eoo());
+        EXPECT_EQ(minResult.first.Int(), 2);
+        EXPECT_EQ(minResult.second, 1u);
     }
 
     // Skips on both sides of the extreme.
@@ -10124,14 +10124,14 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
         auto bin = col.finalize();
 
         auto minResult = min<BSONElementMaterializer>(bin, allocator);
-        ASSERT_FALSE(minResult.first.eoo());
-        ASSERT_EQ(minResult.first.Int(), 3);
-        ASSERT_EQ(minResult.second, 3u);
+        EXPECT_FALSE(minResult.first.eoo());
+        EXPECT_EQ(minResult.first.Int(), 3);
+        EXPECT_EQ(minResult.second, 3u);
 
         auto maxResult = max<BSONElementMaterializer>(bin, allocator);
-        ASSERT_FALSE(maxResult.first.eoo());
-        ASSERT_EQ(maxResult.first.Int(), 5);
-        ASSERT_EQ(maxResult.second, 1u);
+        EXPECT_FALSE(maxResult.first.eoo());
+        EXPECT_EQ(maxResult.first.Int(), 5);
+        EXPECT_EQ(maxResult.second, 1u);
     }
 
     // Ties: when the same minimum appears more than once, the index of the first occurrence wins.
@@ -10146,30 +10146,30 @@ TEST_F(BSONColumnTest, MinMaxReturnLogicalIndex) {
         auto bin = col.finalize();
 
         auto minResult = min<BSONElementMaterializer>(bin, allocator);
-        ASSERT_FALSE(minResult.first.eoo());
-        ASSERT_EQ(minResult.first.Int(), 3);
-        ASSERT_EQ(minResult.second, 1u);
+        EXPECT_FALSE(minResult.first.eoo());
+        EXPECT_EQ(minResult.first.Int(), 3);
+        EXPECT_EQ(minResult.second, 1u);
     }
 }
 
 TEST(DenseTest, EmptyColumn) {
     BSONColumnBuilder<> cb;
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, SingleValue) {
     BSONColumnBuilder<> cb;
     cb.append(BSON("" << 42).firstElement());
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, SingleSkip) {
     BSONColumnBuilder<> cb;
     cb.skip();
     auto bin = cb.finalize();
-    ASSERT_FALSE(dense(bin));
+    EXPECT_FALSE(dense(bin));
 }
 
 TEST(DenseTest, MultipleValues) {
@@ -10178,7 +10178,7 @@ TEST(DenseTest, MultipleValues) {
         cb.append(BSON("" << i).firstElement());
     }
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, SkipAmongValues) {
@@ -10191,7 +10191,7 @@ TEST(DenseTest, SkipAmongValues) {
         cb.append(BSON("" << i).firstElement());
     }
     auto bin = cb.finalize();
-    ASSERT_FALSE(dense(bin));
+    EXPECT_FALSE(dense(bin));
 }
 
 TEST(DenseTest, InterleavedObjects) {
@@ -10201,7 +10201,7 @@ TEST(DenseTest, InterleavedObjects) {
     cb.append(BSON("a" << 3 << "b" << 4));
     cb.append(BSON("a" << 5 << "b" << 6));
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, InterleavedWithMissingSubFields) {
@@ -10213,7 +10213,7 @@ TEST(DenseTest, InterleavedWithMissingSubFields) {
     cb.append(BSON("b" << 5));
     cb.append(BSON("a" << 6 << "b" << 7));
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, InterleavedOneDenseStream) {
@@ -10225,7 +10225,7 @@ TEST(DenseTest, InterleavedOneDenseStream) {
     cb.append(BSON("a" << 5));
     cb.append(BSON("a" << 6 << "b" << 7));
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, InterleavedWithTrueMissing) {
@@ -10237,7 +10237,7 @@ TEST(DenseTest, InterleavedWithTrueMissing) {
     cb.skip();
     cb.append(BSON("a" << 6 << "b" << 7));
     auto bin = cb.finalize();
-    ASSERT_FALSE(dense(bin));
+    EXPECT_FALSE(dense(bin));
 }
 
 TEST(DenseTest, RLEValues) {
@@ -10247,7 +10247,7 @@ TEST(DenseTest, RLEValues) {
         cb.append(BSON("" << 7).firstElement());
     }
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, LeadingRLEBlock) {
@@ -10262,7 +10262,7 @@ TEST(DenseTest, LeadingRLEBlock) {
     buf.appendNum(static_cast<uint64_t>(simple8b_internal::kRleSelector));
     // End sentinel.
     buf.appendChar(char(0x00));
-    ASSERT_FALSE(dense(buf.buf(), buf.len()));
+    EXPECT_FALSE(dense(buf.buf(), buf.len()));
 }
 
 TEST(DenseTest, RLEMissingValues) {
@@ -10272,7 +10272,7 @@ TEST(DenseTest, RLEMissingValues) {
         cb.skip();
     }
     auto bin = cb.finalize();
-    ASSERT_FALSE(dense(bin));
+    EXPECT_FALSE(dense(bin));
 }
 
 TEST(DenseTest, Doubles) {
@@ -10282,7 +10282,7 @@ TEST(DenseTest, Doubles) {
         cb.append(BSON("" << (double)i).firstElement());
     }
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, DoublesWithSkip) {
@@ -10296,7 +10296,7 @@ TEST(DenseTest, DoublesWithSkip) {
         cb.append(BSON("" << (double)i).firstElement());
     }
     auto bin = cb.finalize();
-    ASSERT_FALSE(dense(bin));
+    EXPECT_FALSE(dense(bin));
 }
 
 TEST(DenseTest, InterleavedThenDenseScalars) {
@@ -10308,7 +10308,7 @@ TEST(DenseTest, InterleavedThenDenseScalars) {
     cb.append(BSON("" << 5).firstElement());
     cb.append(BSON("" << 6).firstElement());
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, InterleavedThenScalarSkip) {
@@ -10320,7 +10320,7 @@ TEST(DenseTest, InterleavedThenScalarSkip) {
     cb.append(BSON("" << 5).firstElement());
     cb.skip();
     auto bin = cb.finalize();
-    ASSERT_FALSE(dense(bin));
+    EXPECT_FALSE(dense(bin));
 }
 
 TEST(DenseTest, RLEBlockAfterInterleaved) {
@@ -10355,7 +10355,7 @@ TEST(DenseTest, RLEBlockAfterInterleaved) {
     // BSONColumn end sentinel.
     buf.appendChar(char(0x00));
 
-    ASSERT_TRUE(dense(buf.buf(), buf.len()));
+    EXPECT_TRUE(dense(buf.buf(), buf.len()));
 
     // Verify the hand-crafted binary is structurally valid by decoding it. If this throws, the
     // binary is malformed and dense() may be returning the wrong answer for the wrong reason.
@@ -10377,7 +10377,7 @@ TEST(DenseTest, InterleavedManySkips) {
     }
     cb.append(BSON("a" << 5 << "b" << 6));
     auto bin = cb.finalize();
-    ASSERT_FALSE(dense(bin));
+    EXPECT_FALSE(dense(bin));
 }
 
 TEST(DenseTest, InterleavedMisalignedMissingsThreeStreams) {
@@ -10391,7 +10391,7 @@ TEST(DenseTest, InterleavedMisalignedMissingsThreeStreams) {
     cb.append(BSON("a" << 4 << "b" << 4));  // c missing
     cb.append(BSON("a" << 5 << "b" << 5 << "c" << 5));
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, InterleavedAllStreamsMissAtRow) {
@@ -10403,7 +10403,7 @@ TEST(DenseTest, InterleavedAllStreamsMissAtRow) {
     cb.skip();
     cb.append(BSON("a" << 3 << "b" << 3 << "c" << 3));
     auto bin = cb.finalize();
-    ASSERT_FALSE(dense(bin));
+    EXPECT_FALSE(dense(bin));
 }
 
 TEST(DenseTest, InterleavedLargeSection) {
@@ -10419,7 +10419,7 @@ TEST(DenseTest, InterleavedLargeSection) {
         }
     }
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, InterleavedLargeJumpToFirstMiss) {
@@ -10437,7 +10437,7 @@ TEST(DenseTest, InterleavedLargeJumpToFirstMiss) {
         }
     }
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 TEST(DenseTest, InterleavedBackToBackSections) {
@@ -10451,7 +10451,7 @@ TEST(DenseTest, InterleavedBackToBackSections) {
     cb.append(BSON("x" << 10 << "y" << 20));
     cb.append(BSON("x" << 30 << "y" << 40));
     auto bin = cb.finalize();
-    ASSERT_TRUE(dense(bin));
+    EXPECT_TRUE(dense(bin));
 }
 
 }  // namespace

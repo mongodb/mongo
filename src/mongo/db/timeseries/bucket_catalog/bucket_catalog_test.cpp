@@ -330,8 +330,8 @@ void BucketCatalogTest::_commit(const NamespaceString& ns,
                                 uint16_t numPreviouslyCommittedMeasurements,
                                 size_t expectedBatchSize) {
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(ns)));
-    ASSERT_EQ(batch->measurements.size(), expectedBatchSize) << batch->toBSON();
-    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, numPreviouslyCommittedMeasurements)
+    EXPECT_EQ(batch->measurements.size(), expectedBatchSize) << batch->toBSON();
+    EXPECT_EQ(batch->numPreviouslyCommittedMeasurements, numPreviouslyCommittedMeasurements)
         << batch->toBSON();
     finish(*_bucketCatalog, batch);
 }
@@ -403,7 +403,7 @@ std::shared_ptr<bucket_catalog::WriteBatch> BucketCatalogTest::_insertOneWithout
     size_t currentPosition = 0;
     std::shared_ptr<bucket_catalog::WriteBatch> writeBatch =
         activeBatch(catalog.trackingContexts, bucket, opId, batchedInsertCtx.stripeNumber, stats);
-    ASSERT_EQ(bucket_catalog::internal::StageInsertBatchResult::Success,
+    EXPECT_EQ(bucket_catalog::internal::StageInsertBatchResult::Success,
               bucket_catalog::internal::stageInsertBatchIntoEligibleBucket(catalog,
                                                                            opId,
                                                                            collator,
@@ -442,17 +442,17 @@ void BucketCatalogTest::_testMeasurementSchema(
             if (firstMember) {
                 if (firstGroup) {
                     // We don't expect to close a bucket if we are on the first group.
-                    ASSERT_EQ(pre, post) << "expected " << doc << " to be compatible";
+                    EXPECT_EQ(pre, post) << "expected " << doc << " to be compatible";
                     firstGroup = false;
                 } else {
                     // Otherwise we expect that we are in fact closing a bucket because we have
                     // an incompatible schema change.
-                    ASSERT_EQ(pre + 1, post) << "expected " << doc << " to be incompatible";
+                    EXPECT_EQ(pre + 1, post) << "expected " << doc << " to be incompatible";
                 }
                 firstMember = false;
             } else {
                 // Should have compatible schema, no expected bucket closure.
-                ASSERT_EQ(pre, post) << "expected " << doc << " to be compatible";
+                EXPECT_EQ(pre, post) << "expected " << doc << " to be compatible";
             }
         }
     }
@@ -586,7 +586,7 @@ void BucketCatalogTest::_testBucketMetadataFieldOrdering(const BSONObj& inputMet
     ASSERT_OK(swBucketKeyAndTime);
 
     auto metadata = swBucketKeyAndTime.getValue().first.metadata.toBSON();
-    ASSERT_EQ(metadata.woCompare(BSON(_metaField << expectedMetadata)), 0);
+    EXPECT_EQ(metadata.woCompare(BSON(_metaField << expectedMetadata)), 0);
 }
 
 boost::optional<bucket_catalog::BucketMetadata> BucketCatalogTest::getBucketMetadata(
@@ -626,13 +626,13 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithMetaField(
         trackingContext,
         errorsAndIndices);
 
-    ASSERT_EQ(batchedInsertContextVector.size(), metaFieldMetadataToCorrectIndexOrderMap.size());
+    EXPECT_EQ(batchedInsertContextVector.size(), metaFieldMetadataToCorrectIndexOrderMap.size());
 
     // Check that all of the tuples in each BatchedInsertContext have the correct order and
     // measurement.
     for (size_t i = 0; i < batchedInsertContextVector.size(); i++) {
         auto insertBatchContext = batchedInsertContextVector[i];
-        ASSERT_EQ(insertBatchContext.key.metadata.getMetaField().get(), _metaField);
+        EXPECT_EQ(insertBatchContext.key.metadata.getMetaField().get(), _metaField);
         auto metaFieldMetadata = insertBatchContext.key.metadata;
         ASSERT_EQ(insertBatchContext.measurementsTimesAndIndices.size(),
                   metaFieldMetadataToCorrectIndexOrderMap[metaFieldMetadata].size());
@@ -644,19 +644,19 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithMetaField(
                 trackingContext, measurement[_metaField], tsOptions.getMetaField().get()};
             ASSERT(metadata == metaFieldMetadata);
             auto index = std::get<size_t>(tuple);
-            ASSERT_EQ(index, metaFieldMetadataToCorrectIndexOrderMap[metaFieldMetadata][j]);
-            ASSERT_EQ(userMeasurementsBatch[index].woCompare(measurement), 0);
+            EXPECT_EQ(index, metaFieldMetadataToCorrectIndexOrderMap[metaFieldMetadata][j]);
+            EXPECT_EQ(userMeasurementsBatch[index].woCompare(measurement), 0);
         }
     }
 
-    ASSERT_EQ(errorsAndIndices.size(), expectedIndicesWithErrors.size());
+    EXPECT_EQ(errorsAndIndices.size(), expectedIndicesWithErrors.size());
 
     // If we expected to see errors, check that the Statuses have the correct error code and
     // that there is a one-to-one mapping between indices that we expected to see errors for and
     // the indices that we did see errors for.
     for (size_t i = 0; i < errorsAndIndices.size(); i++) {
         auto writeStageErrorAndIndex = errorsAndIndices[i];
-        ASSERT_EQ(writeStageErrorAndIndex.error.code(), ErrorCodes::BadValue);
+        EXPECT_EQ(writeStageErrorAndIndex.error.code(), ErrorCodes::BadValue);
         auto index = writeStageErrorAndIndex.index;
         ASSERT(expectedIndicesWithErrors.contains(index));
     }
@@ -741,30 +741,30 @@ void BucketCatalogTest::_testBuildBatchedInsertContextWithoutMetaField(
     // fit into one batch. The only exception here will be when all of the measurements are
     // malformed, in which case we should have an empty vector.
     if (expectedIndicesWithErrors.size() == userMeasurementsBatch.size()) {
-        ASSERT_EQ(batchedInsertContextVector.size(), 0);
+        EXPECT_EQ(batchedInsertContextVector.size(), 0);
     } else {
         ASSERT_EQ(batchedInsertContextVector.size(), 1);
         auto batchedInsertContext = batchedInsertContextVector.front();
-        ASSERT_EQ(batchedInsertContext.key.metadata.getMetaField(), boost::none);
+        EXPECT_EQ(batchedInsertContext.key.metadata.getMetaField(), boost::none);
 
         // Check that all of the tuples in the BatchedInsertContext have the correct order and
         // measurement.
         for (size_t i = 0; i < batchedInsertContext.measurementsTimesAndIndices.size(); i++) {
             auto tuple = batchedInsertContext.measurementsTimesAndIndices[i];
-            ASSERT_EQ(correctIndexOrder[i], std::get<size_t>(tuple));
-            ASSERT_EQ(
+            EXPECT_EQ(correctIndexOrder[i], std::get<size_t>(tuple));
+            EXPECT_EQ(
                 userMeasurementsBatch[correctIndexOrder[i]].woCompare(std::get<BSONObj>(tuple)), 0);
         }
     }
 
-    ASSERT_EQ(errorsAndIndices.size(), expectedIndicesWithErrors.size());
+    EXPECT_EQ(errorsAndIndices.size(), expectedIndicesWithErrors.size());
 
     // If we expected to see errors, check that the Statuses have the correct error code and
     // that there is a one-to-one mapping between indices that we expected to see errors for and
     // the indices that we did see errors for.
     for (size_t i = 0; i < errorsAndIndices.size(); i++) {
         auto writeStageErrorAndIndex = errorsAndIndices[i];
-        ASSERT_EQ(writeStageErrorAndIndex.error.code(), ErrorCodes::BadValue);
+        EXPECT_EQ(writeStageErrorAndIndex.error.code(), ErrorCodes::BadValue);
         auto index = writeStageErrorAndIndex.index;
         ASSERT(expectedIndicesWithErrors.contains(index));
     }
@@ -911,7 +911,7 @@ void BucketCatalogTest::_testStageInsertBatch(const NamespaceString& ns,
     for (size_t i = 0; i < batchedInsertContexts.size(); i++) {
         numMeasurements += batchedInsertContexts[i].measurementsTimesAndIndices.size();
     }
-    ASSERT_EQ(numMeasurements, batchOfMeasurements.size());
+    EXPECT_EQ(numMeasurements, batchOfMeasurements.size());
 
     for (size_t i = 0; i < batchedInsertContexts.size(); i++) {
         auto writeBatches = bucket_catalog::stageInsertBatch(_opCtx,
@@ -923,7 +923,7 @@ void BucketCatalogTest::_testStageInsertBatch(const NamespaceString& ns,
                                                              _compressBucketFuncUnused,
                                                              AllowQueryBasedReopening::kAllow,
                                                              batchedInsertContexts[i]);
-        ASSERT_EQ(writeBatches.size(), numWriteBatches[i]);
+        EXPECT_EQ(writeBatches.size(), numWriteBatches[i]);
     }
 }
 
@@ -1036,12 +1036,12 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
                                                    /*docsToRetry=*/{},
                                                    errorsAndIndices);
     ASSERT(errorsAndIndices.empty());
-    ASSERT_EQ(batchedInsertContexts.size(), numBatchedInsertContexts);
+    EXPECT_EQ(batchedInsertContexts.size(), numBatchedInsertContexts);
     size_t numMeasurements = 0;
     for (size_t i = 0; i < batchedInsertContexts.size(); i++) {
         numMeasurements += batchedInsertContexts[i].measurementsTimesAndIndices.size();
     }
-    ASSERT_EQ(numMeasurements, measurements.size());
+    EXPECT_EQ(numMeasurements, measurements.size());
 
     size_t curPosition = 0;
     size_t totalMeasurementsInserted = 0;
@@ -1079,11 +1079,11 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
                                                          *bucketToInsertInto,
                                                          curPosition,
                                                          newWriteBatch);
-        ASSERT_EQ((bucketToInsertInto->numMeasurements - prevNumMeasurements),
+        EXPECT_EQ((bucketToInsertInto->numMeasurements - prevNumMeasurements),
                   numMeasurementsInWriteBatch[i]);
         curPositionFromNumMeasurementsInBatch += numMeasurementsInWriteBatch[i];
         totalMeasurementsInserted += (curPosition - prevCurPosition);
-        ASSERT_EQ(totalMeasurementsInserted, curPositionFromNumMeasurementsInBatch);
+        EXPECT_EQ(totalMeasurementsInserted, curPositionFromNumMeasurementsInBatch);
 
         // We need to rollover so we don't have multiple open buckets.
         // We rollover with kSchemaChange regardless of the rollover reason. This
@@ -1096,10 +1096,10 @@ void BucketCatalogTest::_testStageInsertBatchIntoEligibleBucket(
                            *bucketToInsertInto,
                            RolloverReason::kSchemaChange);
         if (i == (numMeasurementsInWriteBatch.size() - 1)) {
-            ASSERT_EQ(successfulInsertion,
+            EXPECT_EQ(successfulInsertion,
                       bucket_catalog::internal::StageInsertBatchResult::Success);
         } else {
-            ASSERT_NE(successfulInsertion,
+            EXPECT_NE(successfulInsertion,
                       bucket_catalog::internal::StageInsertBatchResult::Success);
         }
     }
@@ -1215,7 +1215,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
     // A subsequent insert into the same bucket should land in the same batch.
     auto batch2 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    ASSERT_EQ(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
+    EXPECT_EQ(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
     // The batch hasn't actually been committed yet.
     ASSERT(!isWriteBatchFinished(*batch1));
@@ -1227,8 +1227,8 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
 
     // The batch should contain both documents since they belong in the same bucket and happened
     // in the same commit epoch. Nothing else has been committed in this bucket yet.
-    ASSERT_EQ(batch1->measurements.size(), 2) << batch1->toBSON();
-    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
+    EXPECT_EQ(batch1->measurements.size(), 2) << batch1->toBSON();
+    EXPECT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
 
     // Once the commit has occurred, the waiter should be notified.
     finish(*_bucketCatalog, batch1);
@@ -1253,9 +1253,9 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
         _opCtx, *_bucketCatalog, _ns2, _uuid2, BSON(_timeField << Date_t::now()));
 
     // Inserts should all be into three distinct buckets (and therefore batches).
-    ASSERT_NE(batch1, batch2);
-    ASSERT_NE(batch1, batch3);
-    ASSERT_NE(batch2, batch3);
+    EXPECT_NE(batch1, batch2);
+    EXPECT_NE(batch1, batch3);
+    EXPECT_NE(batch2, batch3);
 
     // Check metadata in buckets.
     ASSERT_BSONOBJ_EQ(BSON(_metaField << "123"), _getMetadata(*_bucketCatalog, batch1->bucketId));
@@ -1281,18 +1281,18 @@ TEST_F(BucketCatalogTest, InsertThroughDifferentCatalogsIntoDifferentBuckets) {
 
     // Inserts should be into different buckets (and therefore batches) because they went through
     // different bucket catalogs.
-    ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
+    EXPECT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
     // Committing one bucket should only return the one document in that bucket and should not
     // affect the other bucket.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
-    ASSERT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
-    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
+    EXPECT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
+    EXPECT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
     finish(*_bucketCatalog, batch1);
 
     ASSERT_OK(prepareCommit(temporaryBucketCatalog, batch2, _getCollator(_ns2)));
-    ASSERT_EQ(batch2->measurements.size(), 1) << batch2->toBSON();
-    ASSERT_EQ(batch2->numPreviouslyCommittedMeasurements, 0) << batch2->toBSON();
+    EXPECT_EQ(batch2->measurements.size(), 1) << batch2->toBSON();
+    EXPECT_EQ(batch2->numPreviouslyCommittedMeasurements, 0) << batch2->toBSON();
     finish(temporaryBucketCatalog, batch2);
 }
 
@@ -1324,7 +1324,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
 
     // Check metadata in buckets.
-    ASSERT_EQ(batchedInsertCtx1.key, batchedInsertCtx2.key);
+    EXPECT_EQ(batchedInsertCtx1.key, batchedInsertCtx2.key);
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
@@ -1359,7 +1359,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
 
     // Check metadata in buckets.
-    ASSERT_EQ(batchedInsertCtx1.key, batchedInsertCtx2.key);
+    EXPECT_EQ(batchedInsertCtx1.key, batchedInsertCtx2.key);
 }
 
 
@@ -1395,7 +1395,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
 
     // Check metadata in buckets.
-    ASSERT_EQ(batchedInsertCtx1.key, batchedInsertCtx2.key);
+    EXPECT_EQ(batchedInsertCtx1.key, batchedInsertCtx2.key);
 }
 
 TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
@@ -1426,7 +1426,7 @@ TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
     auto batchedInsertCtx2 = batchedInsertContexts2[0];
 
     // Inserts should all be into two distinct buckets.
-    ASSERT_NE(batchedInsertCtx1.key, batchedInsertCtx2.key);
+    EXPECT_NE(batchedInsertCtx1.key, batchedInsertCtx2.key);
 
     // Check metadata in buckets.
     ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONNULL), batchedInsertCtx1.key.metadata.toBSON());
@@ -1438,13 +1438,13 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
     auto batch1 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
-    ASSERT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
-    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
+    EXPECT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
+    EXPECT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
 
     // Insert before finish so there's a second batch live at the same time.
     auto batch2 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
+    EXPECT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
     finish(*_bucketCatalog, batch1);
     ASSERT(isWriteBatchFinished(*batch1));
@@ -1471,7 +1471,7 @@ TEST_F(BucketCatalogTest, CommitReturnsNewFields) {
                                             BSON(_timeField << Date_t::now() << "a" << 0));
     auto oldId = batch->bucketId;
     _commit(_nsNoMeta, batch, 0);
-    ASSERT_EQ(2U, batch->newFieldNamesToBeInserted.size()) << batch->toBSON();
+    EXPECT_EQ(2U, batch->newFieldNamesToBeInserted.size()) << batch->toBSON();
     ASSERT(batch->newFieldNamesToBeInserted.count(_timeField)) << batch->toBSON();
     ASSERT(batch->newFieldNamesToBeInserted.count("a")) << batch->toBSON();
 
@@ -1482,7 +1482,7 @@ TEST_F(BucketCatalogTest, CommitReturnsNewFields) {
                                        _uuidNoMeta,
                                        BSON(_timeField << Date_t::now() << "a" << 1));
     _commit(_nsNoMeta, batch, 1);
-    ASSERT_EQ(0U, batch->newFieldNamesToBeInserted.size()) << batch->toBSON();
+    EXPECT_EQ(0U, batch->newFieldNamesToBeInserted.size()) << batch->toBSON();
 
     // Insert a new measurement with the a new field.
     batch = _insertOneWithoutReopening(_opCtx,
@@ -1491,7 +1491,7 @@ TEST_F(BucketCatalogTest, CommitReturnsNewFields) {
                                        _uuidNoMeta,
                                        BSON(_timeField << Date_t::now() << "a" << 2 << "b" << 2));
     _commit(_nsNoMeta, batch, 2);
-    ASSERT_EQ(1U, batch->newFieldNamesToBeInserted.size()) << batch->toBSON();
+    EXPECT_EQ(1U, batch->newFieldNamesToBeInserted.size()) << batch->toBSON();
     ASSERT(batch->newFieldNamesToBeInserted.count("b")) << batch->toBSON();
 
     // Fill up the bucket.
@@ -1502,7 +1502,7 @@ TEST_F(BucketCatalogTest, CommitReturnsNewFields) {
                                            _uuidNoMeta,
                                            BSON(_timeField << Date_t::now() << "a" << i));
         _commit(_nsNoMeta, batch, i);
-        ASSERT_EQ(0U, batch->newFieldNamesToBeInserted.size()) << i << ":" << batch->toBSON();
+        EXPECT_EQ(0U, batch->newFieldNamesToBeInserted.size()) << i << ":" << batch->toBSON();
     }
 
     // When a bucket overflows, committing to the new overflow bucket should return the fields of
@@ -1513,9 +1513,9 @@ TEST_F(BucketCatalogTest, CommitReturnsNewFields) {
         _nsNoMeta,
         _uuidNoMeta,
         BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount));
-    ASSERT_NE(oldId, batch2->bucketId) << batch2->toBSON();
+    EXPECT_NE(oldId, batch2->bucketId) << batch2->toBSON();
     _commit(_nsNoMeta, batch2, 0);
-    ASSERT_EQ(2U, batch2->newFieldNamesToBeInserted.size()) << batch2->toBSON();
+    EXPECT_EQ(2U, batch2->newFieldNamesToBeInserted.size()) << batch2->toBSON();
     ASSERT(batch2->newFieldNamesToBeInserted.count(_timeField)) << batch2->toBSON();
     ASSERT(batch2->newFieldNamesToBeInserted.count("a")) << batch2->toBSON();
 }
@@ -1524,17 +1524,17 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
     auto batch1 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
-    ASSERT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
-    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
+    EXPECT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
+    EXPECT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
 
     // Insert before finish so there's a second batch live at the same time.
     auto batch2 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
+    EXPECT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
 
     abort(*_bucketCatalog, batch2, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(isWriteBatchFinished(*batch2));
-    ASSERT_EQ(getWriteBatchStatus(*batch2), ErrorCodes::TimeseriesBucketCleared);
+    EXPECT_EQ(getWriteBatchStatus(*batch2), ErrorCodes::TimeseriesBucketCleared);
 
     finish(*_bucketCatalog, batch1);
     ASSERT(isWriteBatchFinished(*batch1));
@@ -1549,13 +1549,13 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
 
     ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT(isWriteBatchFinished(*batch));
-    ASSERT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
+    EXPECT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
 
     batch = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
-    ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
-    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0) << batch->toBSON();
+    EXPECT_EQ(batch->measurements.size(), 1) << batch->toBSON();
+    EXPECT_EQ(batch->numPreviouslyCommittedMeasurements, 0) << batch->toBSON();
 
     clear(*_bucketCatalog, _uuid1);
 
@@ -1574,29 +1574,29 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
     auto batch = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
-    ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
-    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0) << batch->toBSON();
+    EXPECT_EQ(batch->measurements.size(), 1) << batch->toBSON();
+    EXPECT_EQ(batch->numPreviouslyCommittedMeasurements, 0) << batch->toBSON();
 
     ASSERT_THROWS(directWriteStart(_bucketCatalog->bucketStateRegistry, batch->bucketId),
                   WriteConflictException);
 
     abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(isWriteBatchFinished(*batch));
-    ASSERT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
+    EXPECT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
 }
 
 TEST_F(BucketCatalogTest, PrepareCommitOnClearedBucketWithAlreadyPreparedBatch) {
     auto batch1 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
-    ASSERT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
-    ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
+    EXPECT_EQ(batch1->measurements.size(), 1) << batch1->toBSON();
+    EXPECT_EQ(batch1->numPreviouslyCommittedMeasurements, 0) << batch1->toBSON();
 
     // Insert before clear so there's a second batch live at the same time.
     auto batch2 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    ASSERT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
-    ASSERT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
+    EXPECT_NE(batch1, batch2) << batch1->toBSON() << batch2->toBSON();
+    EXPECT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
 
     // Now clear the bucket. Since there's a prepared batch it should conflict.
     clearBucketState(_bucketCatalog->bucketStateRegistry, batch1->bucketId);
@@ -1604,7 +1604,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBucketWithAlreadyPreparedBatch) 
     // Now try to prepare the second batch. Ensure it aborts the batch.
     ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2)));
     ASSERT(isWriteBatchFinished(*batch2));
-    ASSERT_EQ(getWriteBatchStatus(*batch2), ErrorCodes::TimeseriesBucketCleared);
+    EXPECT_EQ(getWriteBatchStatus(*batch2), ErrorCodes::TimeseriesBucketCleared);
 
     // Make sure we didn't clear the bucket state when we aborted the second batch.
     clear(*_bucketCatalog, _uuid1);
@@ -1613,9 +1613,9 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBucketWithAlreadyPreparedBatch) 
     // state and prevent us from finishing the first batch.
     auto batch3 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    ASSERT_NE(batch1, batch3) << batch1->toBSON() << batch3->toBSON();
-    ASSERT_NE(batch2, batch3) << batch2->toBSON() << batch3->toBSON();
-    ASSERT_NE(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
+    EXPECT_NE(batch1, batch3) << batch1->toBSON() << batch3->toBSON();
+    EXPECT_NE(batch2, batch3) << batch2->toBSON() << batch3->toBSON();
+    EXPECT_NE(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
     // Clean up this batch
     abort(*_bucketCatalog, batch3, {ErrorCodes::TimeseriesBucketCleared, ""});
 
@@ -1631,11 +1631,11 @@ TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
 
     abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(isWriteBatchFinished(*batch));
-    ASSERT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
+    EXPECT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
 
     ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
     ASSERT(isWriteBatchFinished(*batch));
-    ASSERT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
+    EXPECT_EQ(getWriteBatchStatus(*batch), ErrorCodes::TimeseriesBucketCleared);
 }
 
 TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
@@ -1681,8 +1681,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                                              _uuid1,
                                              BSON(_timeField << Date_t::now()));
 
-    ASSERT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
-    ASSERT_EQ(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
+    EXPECT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
+    EXPECT_EQ(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
 
     // Batch 2 will not be able to commit until batch 1 has finished.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
@@ -1709,7 +1709,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
     // Make sure a new batch ends up in a new bucket.
     auto batch4 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    ASSERT_NE(batch2->bucketId, batch4->bucketId) << batch2->toBSON() << batch4->toBSON();
+    EXPECT_NE(batch2->bucketId, batch4->bucketId) << batch2->toBSON() << batch4->toBSON();
 }
 
 TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
@@ -1723,7 +1723,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
                                              BSON(_timeField << Date_t::now()));
 
     // Batch 1 and 2 use the same bucket.
-    ASSERT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
+    EXPECT_EQ(batch1->bucketId, batch2->bucketId) << batch1->toBSON() << batch2->toBSON();
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1, _getCollator(_ns1)));
 
     // Batch 1 will be in a prepared state now. Abort the second batch so that bucket 1 will be
@@ -1737,7 +1737,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
     // aborted batch/bucket.
     auto batch3 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
-    ASSERT_NE(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
+    EXPECT_NE(batch1->bucketId, batch3->bucketId) << batch1->toBSON() << batch3->toBSON();
 }
 
 TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
@@ -1752,8 +1752,8 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
 
     // Batch 2 is the first batch to commit the time field.
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch2, _getCollator(_ns2)));
-    ASSERT_EQ(batch2->newFieldNamesToBeInserted.size(), 1) << batch2->toBSON();
-    ASSERT_EQ(batch2->newFieldNamesToBeInserted.begin()->first, _timeField) << batch2->toBSON();
+    EXPECT_EQ(batch2->newFieldNamesToBeInserted.size(), 1) << batch2->toBSON();
+    EXPECT_EQ(batch2->newFieldNamesToBeInserted.begin()->first, _timeField) << batch2->toBSON();
     finish(*_bucketCatalog, batch2);
 
     // Batch 1 was the first batch to insert the time field, but by commit time it was already
@@ -1823,8 +1823,8 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
     // Buckets are frozen when rejected by the validator.
     auto unfreezeBucket = [&]() -> void {
         registry.bucketStates[bucketId] = {BucketState::kNormal};
-        ASSERT_EQ(registry.bucketStates.bucket_count(), 1);
-        ASSERT_EQ(*std::get_if<BucketState>(&registry.bucketStates.find(bucketId)->second),
+        EXPECT_EQ(registry.bucketStates.bucket_count(), 1);
+        EXPECT_EQ(*std::get_if<BucketState>(&registry.bucketStates.find(bucketId)->second),
                   BucketState::kNormal);
     };
 
@@ -1832,25 +1832,25 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
         // Missing _id field.
         BSONObj missingIdObj = compressedBucketDoc.removeField("_id");
         ASSERT_NOT_OK(_reopenBucket(*autoColl, missingIdObj));
-        ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMalformedIdField.load());
+        EXPECT_EQ(1, stats->numBucketReopeningsFailedDueToMalformedIdField.load());
 
         // Bad _id type.
         BSONObj badIdObj = compressedBucketDoc.addFields(BSON("_id" << 123));
         ASSERT_NOT_OK(_reopenBucket(*autoColl, badIdObj));
-        ASSERT_EQ(2, stats->numBucketReopeningsFailedDueToMalformedIdField.load());
+        EXPECT_EQ(2, stats->numBucketReopeningsFailedDueToMalformedIdField.load());
     }
 
     {
         // Missing control field.
         BSONObj missingControlObj = compressedBucketDoc.removeField("control");
         ASSERT_NOT_OK(_reopenBucket(*autoColl, missingControlObj));
-        ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToValidator.load());
+        EXPECT_EQ(1, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
         // Bad control type.
         BSONObj badControlObj = compressedBucketDoc.addFields(BSON("control" << BSONArray()));
         ASSERT_NOT_OK(_reopenBucket(*autoColl, badControlObj));
-        ASSERT_EQ(2, stats->numBucketReopeningsFailedDueToValidator.load());
+        EXPECT_EQ(2, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
         // Bad control.version type.
@@ -1860,7 +1860,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                           << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z")) << "max"
                           << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_reopenBucket(*autoColl, badVersionObj));
-        ASSERT_EQ(3, stats->numBucketReopeningsFailedDueToValidator.load());
+        EXPECT_EQ(3, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
         // Bad control.min type.
@@ -1869,7 +1869,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                               << 1 << "min" << 123 << "max"
                               << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_reopenBucket(*autoColl, badMinObj));
-        ASSERT_EQ(4, stats->numBucketReopeningsFailedDueToValidator.load());
+        EXPECT_EQ(4, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
         // Bad control.max type.
@@ -1879,7 +1879,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                                    << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
                                    << "max" << 123)));
         ASSERT_NOT_OK(_reopenBucket(*autoColl, badMaxObj));
-        ASSERT_EQ(5, stats->numBucketReopeningsFailedDueToValidator.load());
+        EXPECT_EQ(5, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
         // Missing control.min.time.
@@ -1888,7 +1888,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                               << 1 << "min" << BSON("abc" << 1) << "max"
                               << BSON("time" << BSON("$date" << "2022-06-06T15:34:30.000Z")))));
         ASSERT_NOT_OK(_reopenBucket(*autoColl, missingMinTimeObj));
-        ASSERT_EQ(6, stats->numBucketReopeningsFailedDueToValidator.load());
+        EXPECT_EQ(6, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
         // Missing control.max.time.
@@ -1898,7 +1898,7 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
                                    << BSON("time" << BSON("$date" << "2022-06-06T15:34:00.000Z"))
                                    << "max" << BSON("abc" << 1))));
         ASSERT_NOT_OK(_reopenBucket(*autoColl, missingMaxTimeObj));
-        ASSERT_EQ(7, stats->numBucketReopeningsFailedDueToValidator.load());
+        EXPECT_EQ(7, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
     }
 
@@ -1906,20 +1906,20 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
         // Missing data field.
         BSONObj missingDataObj = compressedBucketDoc.removeField("data");
         ASSERT_NOT_OK(_reopenBucket(*autoColl, missingDataObj));
-        ASSERT_EQ(8, stats->numBucketReopeningsFailedDueToValidator.load());
+        EXPECT_EQ(8, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
 
         // Bad time field in the data field.
         BSONObj badTimeFieldInDataFieldObj =
             compressedBucketDoc.addFields(BSON("data" << BSON("time" << BSON("0" << 123))));
         ASSERT_NOT_OK(_reopenBucket(*autoColl, badTimeFieldInDataFieldObj));
-        ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToUncompressedTimeColumn.load());
+        EXPECT_EQ(1, stats->numBucketReopeningsFailedDueToUncompressedTimeColumn.load());
         unfreezeBucket();
 
         // Bad data type.
         BSONObj badDataObj = compressedBucketDoc.addFields(BSON("data" << 123));
         ASSERT_NOT_OK(_reopenBucket(*autoColl, badDataObj));
-        ASSERT_EQ(9, stats->numBucketReopeningsFailedDueToValidator.load());
+        EXPECT_EQ(9, stats->numBucketReopeningsFailedDueToValidator.load());
         unfreezeBucket();
     }
 }
@@ -1947,7 +1947,7 @@ TEST_F(BucketCatalogTest, ReopenMixedSchemaDataBucket) {
     ASSERT_NOT_OK(_reopenBucket(*autoColl, compressedBucketDoc));
 
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
-    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToSchemaGeneration.load());
+    EXPECT_EQ(1, stats->numBucketReopeningsFailedDueToSchemaGeneration.load());
 }
 
 TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
@@ -1968,7 +1968,7 @@ TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
         BSONObj compressedClosedBucketDoc = _getCompressedBucketDoc(closedBucket);
         ASSERT_NOT_OK(_reopenBucket(*autoColl, compressedClosedBucketDoc));
         auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
-        ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMarkedClosed.load());
+        EXPECT_EQ(1, stats->numBucketReopeningsFailedDueToMarkedClosed.load());
         auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
         ASSERT_EQ(1, bucketStates.size());
         ASSERT(isBucketStateFrozen(bucketStates.begin()->second));
@@ -1994,7 +1994,7 @@ TEST_F(BucketCatalogTest, ReopenNotClosedBuckets) {
         auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
         ASSERT_EQ(1, bucketStates.size());
         ASSERT(std::holds_alternative<BucketState>(bucketStates.begin()->second));
-        ASSERT_EQ(BucketState::kNormal, std::get<BucketState>(bucketStates.begin()->second));
+        EXPECT_EQ(BucketState::kNormal, std::get<BucketState>(bucketStates.begin()->second));
     }
 
     {
@@ -2013,7 +2013,7 @@ TEST_F(BucketCatalogTest, ReopenNotClosedBuckets) {
         auto bucketStates = _bucketCatalog->bucketStateRegistry.bucketStates;
         ASSERT_EQ(1, bucketStates.size());
         ASSERT(std::holds_alternative<BucketState>(bucketStates.begin()->second));
-        ASSERT_EQ(BucketState::kNormal, std::get<BucketState>(bucketStates.begin()->second));
+        EXPECT_EQ(BucketState::kNormal, std::get<BucketState>(bucketStates.begin()->second));
     }
 }
 
@@ -2034,8 +2034,8 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
     Status status = _reopenBucket(*autoColl, compressedBucketDoc);
     auto memUsageAfter = getMemoryUsage(*_bucketCatalog);
     ASSERT_OK(status);
-    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumBucketsReopened));
-    ASSERT_GT(memUsageAfter, memUsageBefore);
+    EXPECT_EQ(1, _getExecutionStat(_uuid1, kNumBucketsReopened));
+    EXPECT_GT(memUsageAfter, memUsageBefore);
 
     // Insert a measurement that is compatible with the reopened bucket.
     auto batch = _insertOneWithoutReopening(
@@ -2046,13 +2046,13 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
         ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":-100,"b":100})"));
 
-    ASSERT_EQ(0, _getExecutionStat(_uuid1, kNumSchemaChanges));
+    EXPECT_EQ(0, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
-    ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
+    EXPECT_EQ(batch->measurements.size(), 1) << batch->toBSON();
 
     // The reopened bucket already contains three committed measurements.
-    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 3) << batch->toBSON();
+    EXPECT_EQ(batch->numPreviouslyCommittedMeasurements, 3) << batch->toBSON();
 
     // Verify that the min and max is updated correctly when inserting new measurements.
     ASSERT_BSONOBJ_BINARY_EQ(batch->min, BSON("u" << BSON("a" << -100)));
@@ -2080,8 +2080,8 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     Status status = _reopenBucket(*autoColl, compressedBucketDoc);
     auto memUsageAfter = getMemoryUsage(*_bucketCatalog);
     ASSERT_OK(status);
-    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumBucketsReopened));
-    ASSERT_GT(memUsageAfter, memUsageBefore);
+    EXPECT_EQ(1, _getExecutionStat(_uuid1, kNumBucketsReopened));
+    EXPECT_GT(memUsageAfter, memUsageBefore);
 
     // Insert a measurement that is incompatible with the reopened bucket.
     auto batch = _insertOneWithoutReopening(
@@ -2092,13 +2092,13 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
         ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":{},"b":{}})"));
 
-    ASSERT_EQ(1, _getExecutionStat(_uuid1, kNumSchemaChanges));
+    EXPECT_EQ(1, _getExecutionStat(_uuid1, kNumSchemaChanges));
 
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1)));
-    ASSERT_EQ(batch->measurements.size(), 1) << batch->toBSON();
+    EXPECT_EQ(batch->measurements.size(), 1) << batch->toBSON();
 
     // Since the reopened bucket was incompatible, we opened a new one.
-    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0) << batch->toBSON();
+    EXPECT_EQ(batch->numPreviouslyCommittedMeasurements, 0) << batch->toBSON();
 
     finish(*_bucketCatalog, batch);
 }
@@ -2215,7 +2215,7 @@ TEST_F(BucketCatalogTest, RehydrateMixedSchemaDataBucket) {
     ASSERT_NOT_OK(_testRehydrateBucket(*autoColl, compressedBucketDoc));
 
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
-    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToSchemaGeneration.load());
+    EXPECT_EQ(1, stats->numBucketReopeningsFailedDueToSchemaGeneration.load());
 }
 
 TEST_F(BucketCatalogTest, RehydrateClosedBuckets) {
@@ -2292,10 +2292,10 @@ TEST_F(BucketCatalogTest, ReopenBucketWithIncorrectEra) {
     _bucketCatalog->bucketStateRegistry.currentEra = 1ul;
     ASSERT_NOT_OK(_reopenBucket(*autoColl, compressedBucketDoc, 0ul));
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
-    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToEraMismatch.load());
+    EXPECT_EQ(1, stats->numBucketReopeningsFailedDueToEraMismatch.load());
 
     ASSERT_NOT_OK(_reopenBucket(*autoColl, compressedBucketDoc, boost::none, 0ul));
-    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToWriteConflict.load());
+    EXPECT_EQ(1, stats->numBucketReopeningsFailedDueToWriteConflict.load());
 }
 
 TEST_F(BucketCatalogTest, ReopeningFailedDueToHashCollision) {
@@ -2322,7 +2322,7 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToHashCollision) {
     ASSERT_NOT_OK(
         _reopenBucket(*autoColl, compressedBucketDoc, boost::none, boost::none, invalidKey));
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
-    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToHashCollision.load());
+    EXPECT_EQ(1, stats->numBucketReopeningsFailedDueToHashCollision.load());
 }
 
 TEST_F(BucketCatalogTest, ReopeningFailedDueToMarkedFrozen) {
@@ -2346,7 +2346,7 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToMarkedFrozen) {
     registry.bucketStates[bucketId] = {BucketState::kFrozen};
 
     ASSERT_NOT_OK(_reopenBucket(*autoColl, compressedBucketDoc.copy()));
-    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMarkedFrozen.load());
+    EXPECT_EQ(1, stats->numBucketReopeningsFailedDueToMarkedFrozen.load());
 }
 
 TEST_F(BucketCatalogTest, ReopeningFailedDueToMinMaxCalculation) {
@@ -2374,7 +2374,7 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToMinMaxCalculation) {
                       boost::none,
                       boost::optional<internal::BucketDocumentValidator>{alwaysPassValidator}));
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
-    ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMinMaxCalculation.load());
+    EXPECT_EQ(1, stats->numBucketReopeningsFailedDueToMinMaxCalculation.load());
 }
 
 using BucketCatalogTestDeathTest = BucketCatalogTest;
@@ -2439,11 +2439,11 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
         ExecutionStatsController(collectionStats, sideBucketCatalog->globalExecutionStats);
 
     // Ensure we start out with no buckets archived or closed due to memory pressure.
-    ASSERT_EQ(0, collectionStats->numBucketsArchivedDueToMemoryThreshold.load());
-    ASSERT_EQ(0, collectionStats->numBucketsClosedDueToMemoryThreshold.load());
-    ASSERT_EQ(
+    EXPECT_EQ(0, collectionStats->numBucketsArchivedDueToMemoryThreshold.load());
+    EXPECT_EQ(0, collectionStats->numBucketsClosedDueToMemoryThreshold.load());
+    EXPECT_EQ(
         0, sideBucketCatalog->globalExecutionStats.numBucketsArchivedDueToMemoryThreshold.load());
-    ASSERT_EQ(0,
+    EXPECT_EQ(0,
               sideBucketCatalog->globalExecutionStats.numBucketsClosedDueToMemoryThreshold.load());
 
     // Set the catalog memory usage to be above the memory usage threshold.
@@ -2459,11 +2459,11 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     // particular execution we should expect not to close any buckets, but we should archive one.
     internal::expireIdleBuckets(*sideBucketCatalog, stripe, stripeLock, dummyUUID, statsController);
 
-    ASSERT_EQ(1, collectionStats->numBucketsArchivedDueToMemoryThreshold.load());
-    ASSERT_EQ(
+    EXPECT_EQ(1, collectionStats->numBucketsArchivedDueToMemoryThreshold.load());
+    EXPECT_EQ(
         1, sideBucketCatalog->globalExecutionStats.numBucketsArchivedDueToMemoryThreshold.load());
-    ASSERT_EQ(0, collectionStats->numBucketsClosedDueToMemoryThreshold.load());
-    ASSERT_EQ(0,
+    EXPECT_EQ(0, collectionStats->numBucketsClosedDueToMemoryThreshold.load());
+    EXPECT_EQ(0,
               sideBucketCatalog->globalExecutionStats.numBucketsClosedDueToMemoryThreshold.load());
 
     // Clears the list of idle buckets - usually this is done within the expire idle buckets
@@ -2478,43 +2478,43 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
                                        getMemoryUsage(*sideBucketCatalog) + +1);
     internal::expireIdleBuckets(*sideBucketCatalog, stripe, stripeLock, dummyUUID, statsController);
 
-    ASSERT_EQ(1, collectionStats->numBucketsArchivedDueToMemoryThreshold.load());
-    ASSERT_EQ(
+    EXPECT_EQ(1, collectionStats->numBucketsArchivedDueToMemoryThreshold.load());
+    EXPECT_EQ(
         1, sideBucketCatalog->globalExecutionStats.numBucketsArchivedDueToMemoryThreshold.load());
-    ASSERT_EQ(1, collectionStats->numBucketsClosedDueToMemoryThreshold.load());
-    ASSERT_EQ(1,
+    EXPECT_EQ(1, collectionStats->numBucketsClosedDueToMemoryThreshold.load());
+    EXPECT_EQ(1,
               sideBucketCatalog->globalExecutionStats.numBucketsClosedDueToMemoryThreshold.load());
 }
 
 TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSize) {
     auto [effectiveMaxSize, cacheDerivedBucketMaxSize] = internal::getCacheDerivedBucketMaxSize(
         /*storageCacheSizeBytes=*/128 * 1000 * 1000, /*workloadCardinality=*/1000);
-    ASSERT_EQ(effectiveMaxSize, 64 * 1000);
-    ASSERT_EQ(cacheDerivedBucketMaxSize, 64 * 1000);
+    EXPECT_EQ(effectiveMaxSize, 64 * 1000);
+    EXPECT_EQ(cacheDerivedBucketMaxSize, 64 * 1000);
 
     std::tie(effectiveMaxSize, cacheDerivedBucketMaxSize) = internal::getCacheDerivedBucketMaxSize(
         /*storageCacheSizeBytes=*/0, /*workloadCardinality=*/1000);
-    ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMinSize.load());
-    ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMinSize.load());
+    EXPECT_EQ(effectiveMaxSize, gTimeseriesBucketMinSize.load());
+    EXPECT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMinSize.load());
 
     std::tie(effectiveMaxSize, cacheDerivedBucketMaxSize) = internal::getCacheDerivedBucketMaxSize(
         /*storageCacheSizeBytes=*/128 * 1000 * 1000, /*workloadCardinality=*/0);
-    ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMaxSize);
-    ASSERT_EQ(cacheDerivedBucketMaxSize, INT_MAX);
+    EXPECT_EQ(effectiveMaxSize, gTimeseriesBucketMaxSize);
+    EXPECT_EQ(cacheDerivedBucketMaxSize, INT_MAX);
 }
 
 TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSizeRespectsAbsoluteMax) {
     auto [effectiveMaxSize, cacheDerivedBucketMaxSize] = internal::getCacheDerivedBucketMaxSize(
         /*storageCacheSizeBytes=*/gTimeseriesBucketMaxSize * 10, /*workloadCardinality=*/1);
-    ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMaxSize);
-    ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMaxSize * 5);
+    EXPECT_EQ(effectiveMaxSize, gTimeseriesBucketMaxSize);
+    EXPECT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMaxSize * 5);
 }
 
 TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSizeRespectsAbsoluteMin) {
     auto [effectiveMaxSize, cacheDerivedBucketMaxSize] = internal::getCacheDerivedBucketMaxSize(
         /*storageCacheSizeBytes=*/1, /*workloadCardinality=*/1);
-    ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMinSize.load());
-    ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMinSize.load());
+    EXPECT_EQ(effectiveMaxSize, gTimeseriesBucketMinSize.load());
+    EXPECT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMinSize.load());
 }
 
 TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
@@ -2562,7 +2562,7 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
     // succeeding.
     auto batch2 = _insertOneWithoutReopening(
         _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "B"));
-    ASSERT_NE(nextBucketId, batch2->bucketId) << batch2->toBSON();
+    EXPECT_NE(nextBucketId, batch2->bucketId) << batch2->toBSON();
     // We should check that the bucketID that we failed to create is not stored in the stripe.
     ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(nextBucketId));
 }
@@ -2579,7 +2579,7 @@ TEST_F(BucketCatalogTest, WriteConflictIfPrepareCommitOnClearedBucket) {
 
     // Preparing fails on a cleared bucket and aborts the batch.
     auto status = prepareCommit(*_bucketCatalog, batch, _getCollator(_ns1));
-    ASSERT_EQ(status.code(), ErrorCodes::TimeseriesBucketCleared);
+    EXPECT_EQ(status.code(), ErrorCodes::TimeseriesBucketCleared);
 }
 
 TEST_F(BucketCatalogTest, WriteConflictIfDirectWriteOnPreparedBucket) {
@@ -2608,7 +2608,7 @@ TEST_F(BucketCatalogTest, DirectWritesCanStack) {
     auto bucketState = getBucketState(_bucketCatalog->bucketStateRegistry, batch->bucketId);
     ASSERT(bucketState);
     ASSERT(std::holds_alternative<int>(*bucketState));
-    ASSERT_EQ(std::get<int>(*bucketState), 2);
+    EXPECT_EQ(std::get<int>(*bucketState), 2);
 
     directWriteFinish(_bucketCatalog->bucketStateRegistry, batch->bucketId);
     directWriteFinish(_bucketCatalog->bucketStateRegistry, batch->bucketId);
@@ -2617,7 +2617,7 @@ TEST_F(BucketCatalogTest, DirectWritesCanStack) {
     bucketState = getBucketState(_bucketCatalog->bucketStateRegistry, batch->bucketId);
     ASSERT(bucketState);
     ASSERT(std::holds_alternative<BucketState>(*bucketState));
-    ASSERT_EQ(std::get<BucketState>(*bucketState), BucketState::kCleared);
+    EXPECT_EQ(std::get<BucketState>(*bucketState), BucketState::kCleared);
 }
 
 TEST_F(BucketCatalogTest, FindOpenBucketsEmptyCatalog) {
@@ -2663,7 +2663,7 @@ TEST_F(BucketCatalogTest, FindOpenBucketsReturnsBucket) {
                                   WithLock::withoutLock(),
                                   batchedInsertCtx.key);
     ASSERT_EQ(1, openBuckets.size());
-    ASSERT_EQ(&bucket, openBuckets[0]);
+    EXPECT_EQ(&bucket, openBuckets[0]);
 }
 
 TEST_F(BucketCatalogTest, CheckBucketStateAndCleanupWithBucketWithDirectWrite) {
@@ -2799,7 +2799,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementNone) {
                                  measurementTimestamp,
                                  _stringDataComparatorUnused,
                                  batchedInsertCtx.stats);
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kNone);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kNone);
 
     auto rolloverReason = determineBucketRolloverForMeasurement(*_bucketCatalog,
                                                                 _measurement,
@@ -2810,8 +2810,8 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementNone) {
                                                                 bucket,
                                                                 batchedInsertCtx.stats);
 
-    ASSERT_EQ(rolloverReason, RolloverReason::kNone);
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kNone);
+    EXPECT_EQ(rolloverReason, RolloverReason::kNone);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kNone);
 }
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeForward) {
@@ -2839,7 +2839,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeForward) {
                                  measurementTimestamp,
                                  _stringDataComparatorUnused,
                                  batchedInsertCtx.stats);
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kNone);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kNone);
 
     auto forwardTimestamp = bucket.minTime + Seconds(*timeseriesOptions.getBucketMaxSpanSeconds());
     auto timeForwardMeasurement = BSON(_timeField << forwardTimestamp << _metaField << _metaValue);
@@ -2852,8 +2852,8 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeForward) {
                                                                 bucket,
                                                                 batchedInsertCtx.stats);
 
-    ASSERT_EQ(rolloverReason, RolloverReason::kTimeForward);
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kTimeForward);
+    EXPECT_EQ(rolloverReason, RolloverReason::kTimeForward);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kTimeForward);
 }
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeBackward) {
@@ -2881,7 +2881,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeBackward) {
                                  measurementTimestamp,
                                  _stringDataComparatorUnused,
                                  batchedInsertCtx.stats);
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kNone);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kNone);
 
     auto backwardTimestamp = bucket.minTime - Seconds(1);
     auto timeBackwardMeasurement =
@@ -2895,8 +2895,8 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementTimeBackward) {
                                                                 bucket,
                                                                 batchedInsertCtx.stats);
 
-    ASSERT_EQ(rolloverReason, RolloverReason::kTimeBackward);
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kTimeBackward);
+    EXPECT_EQ(rolloverReason, RolloverReason::kTimeBackward);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kTimeBackward);
 }
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCount) {
@@ -2925,7 +2925,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCount) {
                                  _stringDataComparatorUnused,
                                  batchedInsertCtx.stats);
     bucket.numMeasurements = gTimeseriesBucketMaxCount;
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kNone);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kNone);
 
     auto rolloverReason = determineBucketRolloverForMeasurement(*_bucketCatalog,
                                                                 _measurement,
@@ -2936,8 +2936,8 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCount) {
                                                                 bucket,
                                                                 batchedInsertCtx.stats);
 
-    ASSERT_EQ(rolloverReason, RolloverReason::kCount);
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kCount);
+    EXPECT_EQ(rolloverReason, RolloverReason::kCount);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kCount);
 }
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSize) {
@@ -2967,7 +2967,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSize) {
                                  batchedInsertCtx.stats);
     bucket.size = gTimeseriesBucketMaxSize;
     bucket.numMeasurements = gTimeseriesBucketMinCount;
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kNone);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kNone);
 
     auto rolloverReason = determineBucketRolloverForMeasurement(*_bucketCatalog,
                                                                 _measurement,
@@ -2978,8 +2978,8 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSize) {
                                                                 bucket,
                                                                 batchedInsertCtx.stats);
 
-    ASSERT_EQ(rolloverReason, RolloverReason::kSize);
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kSize);
+    EXPECT_EQ(rolloverReason, RolloverReason::kSize);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kSize);
 }
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCachePressure) {
@@ -3009,7 +3009,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCachePressure) {
                                  batchedInsertCtx.stats);
     bucket.size = gTimeseriesBucketMaxSize;
     bucket.numMeasurements = gTimeseriesBucketMinCount;
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kNone);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kNone);
 
     auto rolloverReason = determineBucketRolloverForMeasurement(*_bucketCatalog,
                                                                 _measurement,
@@ -3020,8 +3020,8 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementCachePressure) {
                                                                 bucket,
                                                                 batchedInsertCtx.stats);
 
-    ASSERT_EQ(rolloverReason, RolloverReason::kCachePressure);
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kCachePressure);
+    EXPECT_EQ(rolloverReason, RolloverReason::kCachePressure);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kCachePressure);
 }
 
 TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSchemaChange) {
@@ -3057,7 +3057,7 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSchemaChange) {
     auto updateStatus = bucket.schema.update(
         measurementSchema1, timeseriesOptions.getMetaField(), _stringDataComparatorUnused);
     invariant(updateStatus == Schema::UpdateStatus::Updated);
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kNone);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kNone);
 
     auto rolloverReason = determineBucketRolloverForMeasurement(*_bucketCatalog,
                                                                 measurementSchema2,
@@ -3068,8 +3068,8 @@ TEST_F(BucketCatalogTest, determineBucketRolloverForMeasurementSchemaChange) {
                                                                 bucket,
                                                                 batchedInsertCtx.stats);
 
-    ASSERT_EQ(rolloverReason, RolloverReason::kSchemaChange);
-    ASSERT_EQ(bucket.rolloverReason, RolloverReason::kSchemaChange);
+    EXPECT_EQ(rolloverReason, RolloverReason::kSchemaChange);
+    EXPECT_EQ(bucket.rolloverReason, RolloverReason::kSchemaChange);
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
@@ -3111,8 +3111,8 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOpen) {
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(1, potentialBuckets.size());
-    ASSERT_EQ(&bucket, potentialBuckets[0]);
-    ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
+    EXPECT_EQ(&bucket, potentialBuckets[0]);
+    EXPECT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
@@ -3155,8 +3155,8 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftClose) {
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(1, potentialBuckets.size());
-    ASSERT_EQ(&bucket, potentialBuckets[0]);
-    ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
+    EXPECT_EQ(&bucket, potentialBuckets[0]);
+    EXPECT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftCloseNotSelected) {
@@ -3198,8 +3198,8 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsSoftCloseNotSelected) {
                                    allowQueryBasedReopening,
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
-    ASSERT_EQ(0, potentialBuckets.size());
-    ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kDisallow);
+    EXPECT_EQ(0, potentialBuckets.size());
+    EXPECT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kDisallow);
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
@@ -3242,8 +3242,8 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsArchive) {
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(1, potentialBuckets.size());
-    ASSERT_EQ(&bucket, potentialBuckets[0]);
-    ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
+    EXPECT_EQ(&bucket, potentialBuckets[0]);
+    EXPECT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
 }
 
 TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
@@ -3290,9 +3290,9 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsHardClose) {
                                        allowQueryBasedReopening,
                                        bucketOpenedDueToMetadata);
         ASSERT(!bucketOpenedDueToMetadata);
-        ASSERT_EQ(0, potentialBuckets.size());
+        EXPECT_EQ(0, potentialBuckets.size());
         ASSERT(_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.empty());
-        ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kDisallow);
+        EXPECT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kDisallow);
     }
 }
 
@@ -3345,9 +3345,9 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsUncommitted) {
 
         // No results returned. Do not close the bucket because of uncommitted batches.
         ASSERT(!bucketOpenedDueToMetadata);
-        ASSERT_EQ(0, potentialBuckets.size());
+        EXPECT_EQ(0, potentialBuckets.size());
         ASSERT(!_bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.empty());
-        ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kDisallow);
+        EXPECT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kDisallow);
     }
 }
 
@@ -3401,9 +3401,9 @@ TEST_F(BucketCatalogTest, FindAndRolloverOpenBucketsOrder) {
                                    bucketOpenedDueToMetadata);
     ASSERT(!bucketOpenedDueToMetadata);
     ASSERT_EQ(2, potentialBuckets.size());
-    ASSERT_EQ(&bucket1, potentialBuckets[0]);
-    ASSERT_EQ(&bucket2, potentialBuckets[1]);
-    ASSERT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
+    EXPECT_EQ(&bucket1, potentialBuckets[0]);
+    EXPECT_EQ(&bucket2, potentialBuckets[1]);
+    EXPECT_EQ(allowQueryBasedReopening, AllowQueryBasedReopening::kAllow);
 }
 
 TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
@@ -3447,11 +3447,11 @@ TEST_F(BucketCatalogTest, GetEligibleBucketAllocateBucket) {
                                          AllowQueryBasedReopening::kAllow,
                                          batchedInsertCtx.stats,
                                          bucketOpenedDueToMetadata);
-        ASSERT_EQ(0, bucket.size);
-        ASSERT_EQ(RolloverReason::kNone, bucket.rolloverReason);
-        ASSERT_EQ(1,
+        EXPECT_EQ(0, bucket.size);
+        EXPECT_EQ(RolloverReason::kNone, bucket.rolloverReason);
+        EXPECT_EQ(1,
                   _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.size());
-        ASSERT_EQ(1,
+        EXPECT_EQ(1,
                   _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.size());
         ASSERT(bucketOpenedDueToMetadata);
     }
@@ -3486,8 +3486,8 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
                                  _stringDataComparatorUnused,
                                  batchedInsertCtx.stats);
 
-    ASSERT_EQ(1, _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.size());
-    ASSERT_EQ(1, _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.size());
+    EXPECT_EQ(1, _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.size());
+    EXPECT_EQ(1, _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.size());
 
     {
         std::unique_lock<std::mutex> stripeLock(
@@ -3509,11 +3509,11 @@ TEST_F(BucketCatalogTest, GetEligibleBucketOpenBucket) {
                               AllowQueryBasedReopening::kAllow,
                               batchedInsertCtx.stats,
                               bucketOpenedDueToMetadata);
-        ASSERT_EQ(&bucketAllocated, &bucketFound);
-        ASSERT_EQ(RolloverReason::kNone, bucketFound.rolloverReason);
-        ASSERT_EQ(1,
+        EXPECT_EQ(&bucketAllocated, &bucketFound);
+        EXPECT_EQ(RolloverReason::kNone, bucketFound.rolloverReason);
+        EXPECT_EQ(1,
                   _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsByKey.size());
-        ASSERT_EQ(1,
+        EXPECT_EQ(1,
                   _bucketCatalog->stripes[batchedInsertCtx.stripeNumber]->openBucketsById.size());
         ASSERT(!bucketOpenedDueToMetadata);
     }
@@ -4182,7 +4182,7 @@ TEST_F(BucketCatalogTest, StageInsertBatchHandlesRolloverMixed) {
         std::vector<std::vector<BSONObj>>({batchOfMeasurements,
                                            batchOfMeasurementsWithCount,
                                            batchOfMeasurementsWithTimeForward}));
-    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+    EXPECT_EQ(mixedRolloverReasonsMeasurements.size(),
               batchOfMeasurements.size() + batchOfMeasurementsWithCount.size() +
                   batchOfMeasurementsWithTimeForward.size());
 
@@ -4227,7 +4227,7 @@ TEST_F(BucketCatalogTest, StageInsertBatchHandlesRolloverMixedWithNoMeta) {
     std::vector<BSONObj> mixedRolloverReasonsMeasurements =
         _getFlattenedVector(std::vector<std::vector<BSONObj>>{
             batchOfMeasurementsWithSize, batchOfMeasurements, batchOfMeasurementsWithSchemaChange});
-    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+    EXPECT_EQ(mixedRolloverReasonsMeasurements.size(),
               batchOfMeasurementsWithSize.size() + batchOfMeasurements.size() +
                   batchOfMeasurementsWithSchemaChange.size());
 
@@ -4277,7 +4277,7 @@ TEST_F(BucketCatalogTest, StageInsertBatchHandlesRolloverReasonMixedWithCachePre
         std::vector<std::vector<BSONObj>>{batchOfMeasurements,
                                           batchOfMeasurementsWithTimeForward,
                                           batchOfMeasurementsWithCachePressure});
-    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+    EXPECT_EQ(mixedRolloverReasonsMeasurements.size(),
               batchOfMeasurements.size() + batchOfMeasurementsWithTimeForward.size() +
                   batchOfMeasurementsWithCachePressure.size());
 
@@ -4652,7 +4652,7 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed
         _getFlattenedVector(std::vector<std::vector<BSONObj>>({batchOfMeasurementsWithCount,
                                                                batchOfMeasurementsWithSchemaChange,
                                                                batchOfMeasurements}));
-    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+    EXPECT_EQ(mixedRolloverReasonsMeasurements.size(),
               batchOfMeasurementsWithCount.size() + batchOfMeasurementsWithSchemaChange.size() +
                   batchOfMeasurements.size());
 
@@ -4717,7 +4717,7 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed
     std::vector<BSONObj> mixedRolloverReasonsMeasurements =
         _getFlattenedVector(std::vector<std::vector<BSONObj>>{
             batchOfMeasurementsWithSize, batchOfMeasurements, batchOfMeasurementsWithTimeForward});
-    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+    EXPECT_EQ(mixedRolloverReasonsMeasurements.size(),
               batchOfMeasurementsWithSize.size() + batchOfMeasurements.size() +
                   batchOfMeasurementsWithTimeForward.size());
 
@@ -4779,7 +4779,7 @@ TEST_F(BucketCatalogTest, StageInsertBatchIntoEligibleBucketHandlesRolloverMixed
         _getFlattenedVector(std::vector<std::vector<BSONObj>>{batchOfMeasurementsWithSchemaChange,
                                                               batchOfMeasurementsWithCachePressure,
                                                               batchOfMeasurements});
-    ASSERT_EQ(mixedRolloverReasonsMeasurements.size(),
+    EXPECT_EQ(mixedRolloverReasonsMeasurements.size(),
               batchOfMeasurementsWithSchemaChange.size() +
                   batchOfMeasurementsWithCachePressure.size() + batchOfMeasurements.size());
 
@@ -5388,16 +5388,16 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsSimpleOneFullBucket) {
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
-    ASSERT_TRUE(swWriteBatches.isOK());
-    ASSERT_TRUE(errorsAndIndices.empty());
+    EXPECT_TRUE(swWriteBatches.isOK());
+    EXPECT_TRUE(errorsAndIndices.empty());
 
     auto& writeBatches = swWriteBatches.getValue();
-    ASSERT_EQ(writeBatches.size(), 1);
+    EXPECT_EQ(writeBatches.size(), 1);
 
     for (size_t i = 0; i < writeBatches.size(); i++) {
-        ASSERT_EQ(writeBatches[i]->isReopened, false);
-        ASSERT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
-        ASSERT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
+        EXPECT_EQ(writeBatches[i]->isReopened, false);
+        EXPECT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
+        EXPECT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
     }
 }
 
@@ -5428,16 +5428,16 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsOneMeta) {
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
-    ASSERT_TRUE(swWriteBatches.isOK());
-    ASSERT_TRUE(errorsAndIndices.empty());
+    EXPECT_TRUE(swWriteBatches.isOK());
+    EXPECT_TRUE(errorsAndIndices.empty());
 
     auto& writeBatches = swWriteBatches.getValue();
-    ASSERT_EQ(writeBatches.size(), 2);
+    EXPECT_EQ(writeBatches.size(), 2);
 
     for (size_t i = 0; i < writeBatches.size(); i++) {
-        ASSERT_EQ(writeBatches[i]->isReopened, false);
-        ASSERT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
-        ASSERT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
+        EXPECT_EQ(writeBatches[i]->isReopened, false);
+        EXPECT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
+        EXPECT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
     }
 }
 
@@ -5471,16 +5471,16 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetas) {
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
-    ASSERT_TRUE(swWriteBatches.isOK());
-    ASSERT_TRUE(errorsAndIndices.empty());
+    EXPECT_TRUE(swWriteBatches.isOK());
+    EXPECT_TRUE(errorsAndIndices.empty());
 
     auto& writeBatches = swWriteBatches.getValue();
-    ASSERT_EQ(writeBatches.size(), 2);
+    EXPECT_EQ(writeBatches.size(), 2);
 
     for (size_t i = 0; i < writeBatches.size(); i++) {
-        ASSERT_EQ(writeBatches[i]->isReopened, false);
-        ASSERT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
-        ASSERT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
+        EXPECT_EQ(writeBatches[i]->isReopened, false);
+        EXPECT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
+        EXPECT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
     }
 }
 
@@ -5512,16 +5512,16 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsMultipleBucketsMultipleMetasInt
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
-    ASSERT_TRUE(swWriteBatches.isOK());
-    ASSERT_TRUE(errorsAndIndices.empty());
+    EXPECT_TRUE(swWriteBatches.isOK());
+    EXPECT_TRUE(errorsAndIndices.empty());
 
     auto& writeBatches = swWriteBatches.getValue();
-    ASSERT_EQ(writeBatches.size(), 2);
+    EXPECT_EQ(writeBatches.size(), 2);
 
     for (size_t i = 0; i < writeBatches.size(); i++) {
-        ASSERT_EQ(writeBatches[i]->isReopened, false);
-        ASSERT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
-        ASSERT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
+        EXPECT_EQ(writeBatches[i]->isReopened, false);
+        EXPECT_EQ(writeBatches[i]->bucketIsSortedByTime, true);
+        EXPECT_EQ(writeBatches[i]->opId, _opCtx->getOpID());
     }
 }
 
@@ -5552,8 +5552,8 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsAll) {
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
-    ASSERT_FALSE(swWriteBatches.isOK());
-    ASSERT_EQ(errorsAndIndices.size(), 2);
+    EXPECT_FALSE(swWriteBatches.isOK());
+    EXPECT_EQ(errorsAndIndices.size(), 2);
 }
 
 TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsSome) {
@@ -5589,11 +5589,11 @@ TEST_F(BucketCatalogTest, PrepareInsertsBadMeasurementsSome) {
                                                   AllowQueryBasedReopening::kAllow,
                                                   errorsAndIndices);
 
-    ASSERT_FALSE(swWriteBatches.isOK());
+    EXPECT_FALSE(swWriteBatches.isOK());
     ASSERT_EQ(errorsAndIndices.size(), 2);
 
-    ASSERT_EQ(errorsAndIndices[0].index, 0);
-    ASSERT_EQ(errorsAndIndices[1].index, 4);
+    EXPECT_EQ(errorsAndIndices[0].index, 0);
+    EXPECT_EQ(errorsAndIndices[1].index, 4);
 }
 
 TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexNoMeta) {
@@ -5636,8 +5636,8 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexNoMeta) {
     ASSERT_EQ(writeBatches.size(), 1);
 
     auto writeBatch = writeBatches.front();
-    ASSERT_EQ(writeBatch->measurements.size(), numDocsToStage);
-    ASSERT_EQ(stdx::unordered_set<size_t>(writeBatch->userBatchIndices.begin(),
+    EXPECT_EQ(writeBatch->measurements.size(), numDocsToStage);
+    EXPECT_EQ(stdx::unordered_set<size_t>(writeBatch->userBatchIndices.begin(),
                                           writeBatch->userBatchIndices.end()),
               expectedIndices);
 }
@@ -5679,7 +5679,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexWithMeta) {
                                                   errorsAndIndices);
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
-    ASSERT_EQ(writeBatches.size(), 3);
+    EXPECT_EQ(writeBatches.size(), 3);
 
     stdx::unordered_set<size_t> actualIndices;
     for (auto& batch : writeBatches) {
@@ -5688,7 +5688,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsStartIndexWithMeta) {
         }
     }
 
-    ASSERT_EQ(actualIndices, expectedIndices);
+    EXPECT_EQ(actualIndices, expectedIndices);
 }
 
 TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryNoMeta) {
@@ -5734,8 +5734,8 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryNoMeta) {
     ASSERT_EQ(writeBatches.size(), 1);
 
     auto writeBatch = writeBatches.front();
-    ASSERT_EQ(writeBatch->measurements.size(), docsToRetry.size());
-    ASSERT_EQ(stdx::unordered_set<size_t>(writeBatch->userBatchIndices.begin(),
+    EXPECT_EQ(writeBatch->measurements.size(), docsToRetry.size());
+    EXPECT_EQ(stdx::unordered_set<size_t>(writeBatch->userBatchIndices.begin(),
                                           writeBatch->userBatchIndices.end()),
               stdx::unordered_set<size_t>(docsToRetry.begin(), docsToRetry.end()));
 }
@@ -5780,7 +5780,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryWithMeta) {
 
     ASSERT_OK(swWriteBatches);
     auto writeBatches = swWriteBatches.getValue();
-    ASSERT_EQ(writeBatches.size(), 3);
+    EXPECT_EQ(writeBatches.size(), 3);
 
     stdx::unordered_set<size_t> actualIndices;
     for (auto& batch : writeBatches) {
@@ -5789,7 +5789,7 @@ TEST_F(BucketCatalogTest, PrepareInsertsToBucketsRespectsDocsToRetryWithMeta) {
         }
     }
 
-    ASSERT_EQ(actualIndices, stdx::unordered_set<size_t>(docsToRetry.begin(), docsToRetry.end()));
+    EXPECT_EQ(actualIndices, stdx::unordered_set<size_t>(docsToRetry.begin(), docsToRetry.end()));
 }
 
 TEST_F(BucketCatalogTest, CreateOrderedPotentialBucketsVectorWithoutAnyBuckets) {
@@ -5956,29 +5956,29 @@ TEST_F(BucketCatalogTest, ExecutionStatsNumActiveBucketsSentinel) {
     auto& collStats = *collStatsVec[0];
     auto& globalStats = _bucketCatalog->globalExecutionStats;
 
-    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
-    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+    EXPECT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
+    EXPECT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
 
     // Set an initial value for the stats.
     stats.incNumActiveBuckets(5);
-    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), 5);
-    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 5);
+    EXPECT_EQ(collStats.numActiveBuckets.loadRelaxed(), 5);
+    EXPECT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 5);
 
     // Removing collection's 'numActiveBuckets' should also set it to the sentinel value.
     constexpr long long kNumActiveBucketsSentinel = std::numeric_limits<long long>::min();
     removeCollectionExecutionGauges(globalStats, collStats);
-    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), kNumActiveBucketsSentinel);
-    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+    EXPECT_EQ(collStats.numActiveBuckets.loadRelaxed(), kNumActiveBucketsSentinel);
+    EXPECT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
 
     // Check no increment can be done anymore.
     stats.incNumActiveBuckets();
-    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), kNumActiveBucketsSentinel);
-    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+    EXPECT_EQ(collStats.numActiveBuckets.loadRelaxed(), kNumActiveBucketsSentinel);
+    EXPECT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
 
     // Check no decrement can be done anymore.
     stats.decNumActiveBuckets();
-    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), kNumActiveBucketsSentinel);
-    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+    EXPECT_EQ(collStats.numActiveBuckets.loadRelaxed(), kNumActiveBucketsSentinel);
+    EXPECT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
 
     // Reset all stats.
     collStats.numActiveBuckets.swap(0);
@@ -5994,20 +5994,20 @@ TEST_F(BucketCatalogTest, ExecutionStatsNumActiveBucketsNonNegative) {
     auto& collStats = *collStatsVec[0];
     auto& globalStats = _bucketCatalog->globalExecutionStats;
 
-    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
-    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+    EXPECT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
+    EXPECT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
 
     // Cannot decrement 'numActiveBuckets' below 0.
     stats.decNumActiveBuckets();
-    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
-    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+    EXPECT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
+    EXPECT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
 
     // Global and collection stats should decrement by the same value.
     globalStats.numActiveBuckets.fetchAndAddRelaxed(1);
-    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 1);
+    EXPECT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 1);
     stats.decNumActiveBuckets();
-    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
-    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 1);
+    EXPECT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
+    EXPECT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 1);
 
     // Reset all stats.
     collStats.numActiveBuckets.swap(0);

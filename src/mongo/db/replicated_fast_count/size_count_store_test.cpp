@@ -114,7 +114,7 @@ TEST_P(SizeCountStoreTest, WriteUpdateExistingEntry) {
     const SizeCountStore::Entry updatedEntry{.timestamp = initialEntry.timestamp + 1,
                                              .size = initialEntry.size - 2,
                                              .count = initialEntry.count - 1};
-    ASSERT_NE(initialEntry, updatedEntry);
+    EXPECT_NE(initialEntry, updatedEntry);
 
     test_helpers::insertSizeCountEntry(operationContext(), store, uuid, updatedEntry);
     const auto result = store.read(operationContext(), uuid);

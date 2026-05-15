@@ -67,6 +67,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 1);
+    ASSERT_TRUE(deltas.contains(uuid));
     EXPECT_EQ(deltas[uuid].sizeCount.size, 0);
     EXPECT_EQ(deltas[uuid].sizeCount.count, 0);
 
@@ -80,6 +81,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, IncrementZeros) {
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 1);
+    ASSERT_TRUE(deltas.contains(uuid));
     EXPECT_EQ(deltas[uuid].sizeCount.size, 0);
     EXPECT_EQ(deltas[uuid].sizeCount.count, 0);
 }
@@ -102,6 +104,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, NegativeResult) {
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 1);
+    ASSERT_TRUE(deltas.contains(uuid));
     EXPECT_EQ(deltas[uuid].sizeCount.size, -200);
     EXPECT_EQ(deltas[uuid].sizeCount.count, -10);
 }
@@ -166,8 +169,10 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentEqualSet) {
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 2);
+    ASSERT_TRUE(deltas.contains(uuid1));
     EXPECT_EQ(deltas[uuid1].sizeCount.size, 205);
     EXPECT_EQ(deltas[uuid1].sizeCount.count, 11);
+    ASSERT_TRUE(deltas.contains(uuid2));
     EXPECT_EQ(deltas[uuid2].sizeCount.size, 150);
     EXPECT_EQ(deltas[uuid2].sizeCount.count, 15);
 }
@@ -201,6 +206,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSubset) {
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 1);
+    ASSERT_TRUE(deltas.contains(uuid1));
     EXPECT_EQ(deltas[uuid1].sizeCount.size, 205);
     EXPECT_EQ(deltas[uuid1].sizeCount.count, 11);
 }
@@ -229,8 +235,10 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentSuperset) {
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 2);
+    ASSERT_TRUE(deltas.contains(uuid1));
     EXPECT_EQ(deltas[uuid1].sizeCount.size, 205);
     EXPECT_EQ(deltas[uuid1].sizeCount.count, 11);
+    ASSERT_TRUE(deltas.contains(uuid2));
     EXPECT_EQ(deltas[uuid2].sizeCount.size, 50);
     EXPECT_EQ(deltas[uuid2].sizeCount.count, 10);
 }
@@ -265,6 +273,7 @@ TEST_F(ReadAndIncrementSizeCountsTest, ReadDocumentsDisjointSet) {
     readAndIncrementSizeCounts(operationContext(), deltas);
 
     EXPECT_EQ(deltas.size(), 1);
+    ASSERT_TRUE(deltas.contains(uuid3));
     EXPECT_EQ(deltas[uuid3].sizeCount.size, 5);
     EXPECT_EQ(deltas[uuid3].sizeCount.count, 1);
 }
@@ -313,8 +322,8 @@ TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaForInsert) {
     ASSERT(extractedSizeCount.has_value());
 
     // Insert means count increases by 1.
-    ASSERT_EQ(1, extractedSizeCount->count);
-    ASSERT_EQ(sizeDelta, extractedSizeCount->size);
+    EXPECT_EQ(1, extractedSizeCount->count);
+    EXPECT_EQ(sizeDelta, extractedSizeCount->size);
 }
 
 TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaForUpdate) {
@@ -325,8 +334,8 @@ TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaForUpdate) {
     ASSERT(extractedSizeCount.has_value());
 
     // Updates imply no new documents, count delta is 0.
-    ASSERT_EQ(0, extractedSizeCount->count);
-    ASSERT_EQ(sizeDelta, extractedSizeCount->size);
+    EXPECT_EQ(0, extractedSizeCount->count);
+    EXPECT_EQ(sizeDelta, extractedSizeCount->size);
 }
 
 TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaForDelete) {
@@ -337,8 +346,8 @@ TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaForDelete) {
     ASSERT(extractedSizeCount.has_value());
 
     // Delete implies one less document.
-    ASSERT_EQ(-1, extractedSizeCount->count);
-    ASSERT_EQ(sizeDelta, extractedSizeCount->size);
+    EXPECT_EQ(-1, extractedSizeCount->count);
+    EXPECT_EQ(sizeDelta, extractedSizeCount->size);
 }
 
 TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenAbsentFromOplogEntry) {
@@ -353,7 +362,7 @@ TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenAbsentFromOplogEntry) {
     }}};
     const auto extractedSizeCount =
         replicated_fast_count::extractSizeCountDeltaForOp(insertOpNoSizeMetadata);
-    ASSERT_FALSE(insertOpNoSizeMetadata.getSizeMetadata().has_value());
+    EXPECT_FALSE(insertOpNoSizeMetadata.getSizeMetadata().has_value());
 }
 
 TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenAbsentAndIncompatibleOpType) {
@@ -368,7 +377,7 @@ TEST_F(ExtractSizeCountDeltaTest, NoSizeCountDeltaWhenAbsentAndIncompatibleOpTyp
     }}};
     const auto extractedSizeCount =
         replicated_fast_count::extractSizeCountDeltaForOp(commandOpNoSizeMetadata);
-    ASSERT_FALSE(commandOpNoSizeMetadata.getSizeMetadata().has_value());
+    EXPECT_FALSE(commandOpNoSizeMetadata.getSizeMetadata().has_value());
 }
 
 TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaOnUnsupportedOpType) {
@@ -389,7 +398,7 @@ TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaOnNonEligibleNss) {
         makeOplogEntryWithSizeMetadata(localNss, repl::OpTypeEnum::kNoop, 400 /* sizeDelta */);
 
     // Even though the oplog entry carries size metadata, ineligible namespaces should be skipped.
-    ASSERT_FALSE(replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry).has_value());
+    EXPECT_FALSE(replicated_fast_count::extractSizeCountDeltaForOp(oplogEntry).has_value());
 }
 
 TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaOnNonEligibleNssWithoutSizeMetadata) {
@@ -406,7 +415,7 @@ TEST_F(ExtractSizeCountDeltaTest, ExtractSizeCountDeltaOnNonEligibleNssWithoutSi
     }}};
 
     // Local namespace without sizeMetadata shouldn't throw an error.
-    ASSERT_FALSE(replicated_fast_count::extractSizeCountDeltaForOp(insertOpLocalNs).has_value());
+    EXPECT_FALSE(replicated_fast_count::extractSizeCountDeltaForOp(insertOpLocalNs).has_value());
 }
 
 // ===========================================================================
@@ -482,7 +491,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsIns
     };
 
     // Confirm this starts with an empty collection.
-    ASSERT_EQ(CollectionSizeCount{},
+    EXPECT_EQ(CollectionSizeCount{},
               replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss1));
     {
         // Insert documents and confirm the aggregation.
@@ -500,9 +509,9 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsIns
     // Validate extracted deltas for first round of applyOps.
     const auto deltas0 = replicated_fast_count_test_helpers::extractSizeCountDeltasForApplyOps(
         replicated_fast_count_test_helpers::getLatestApplyOpsForNss(_opCtx, _nss1));
-    ASSERT_EQ(1u, deltas0.size());
+    EXPECT_EQ(1u, deltas0.size());
     ASSERT_TRUE(deltas0.contains(_uuid1));
-    ASSERT_EQ(totalCollSizeCount0, deltas0.at(_uuid1));
+    EXPECT_EQ(totalCollSizeCount0, deltas0.at(_uuid1));
 
     // Insert documents into a non-empty collection to demonstrate correct delta computation.
     const std::vector<BSONObj> docsNewInserts{
@@ -522,9 +531,9 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsIns
     // Validate extracted deltas for second round of applyOps.
     const auto deltas1 = replicated_fast_count_test_helpers::extractSizeCountDeltasForApplyOps(
         replicated_fast_count_test_helpers::getLatestApplyOpsForNss(_opCtx, _nss1));
-    ASSERT_EQ(1u, deltas1.size());
+    EXPECT_EQ(1u, deltas1.size());
     ASSERT_TRUE(deltas1.contains(_uuid1));
-    ASSERT_EQ(expectedDeltas1, deltas1.at(_uuid1));
+    EXPECT_EQ(expectedDeltas1, deltas1.at(_uuid1));
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsUpdatesSingleUUID) {
@@ -562,9 +571,9 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsUpd
 
     const auto deltas = replicated_fast_count_test_helpers::extractSizeCountDeltasForApplyOps(
         replicated_fast_count_test_helpers::getLatestApplyOpsForNss(_opCtx, _nss1));
-    ASSERT_EQ(1u, deltas.size());
+    EXPECT_EQ(1u, deltas.size());
     ASSERT_TRUE(deltas.contains(_uuid1));
-    ASSERT_EQ(expectedDeltas, deltas.at(_uuid1));
+    EXPECT_EQ(expectedDeltas, deltas.at(_uuid1));
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsDeletesSingleUUID) {
@@ -604,9 +613,9 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsDel
 
     const auto deltas = replicated_fast_count_test_helpers::extractSizeCountDeltasForApplyOps(
         replicated_fast_count_test_helpers::getLatestApplyOpsForNss(_opCtx, _nss1));
-    ASSERT_EQ(1u, deltas.size());
+    EXPECT_EQ(1u, deltas.size());
     ASSERT_TRUE(deltas.contains(_uuid1));
-    ASSERT_EQ(expectedDeltas, deltas.at(_uuid1));
+    EXPECT_EQ(expectedDeltas, deltas.at(_uuid1));
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsMultiOpsSingleUUID) {
@@ -635,15 +644,15 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsMul
     // Expected Result: Only an updated doc0 exists in the collection.
     const auto expectedDeltas =
         replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss1);
-    ASSERT_EQ(1, expectedDeltas.count);
-    ASSERT_NE(expectedDeltas.size, doc0.objsize());
+    EXPECT_EQ(1, expectedDeltas.count);
+    EXPECT_NE(expectedDeltas.size, doc0.objsize());
 
     // Deltas correctly account for inserts, update, and delete which impact each other.
     const auto deltas = replicated_fast_count_test_helpers::extractSizeCountDeltasForApplyOps(
         replicated_fast_count_test_helpers::getLatestApplyOpsForNss(_opCtx, _nss1));
-    ASSERT_EQ(1u, deltas.size());
+    EXPECT_EQ(1u, deltas.size());
     ASSERT_TRUE(deltas.contains(_uuid1));
-    ASSERT_EQ(expectedDeltas, deltas.at(_uuid1));
+    EXPECT_EQ(expectedDeltas, deltas.at(_uuid1));
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsMultiUUID) {
@@ -652,9 +661,9 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsMul
     const BSONObj doc2 = BSON("_id" << 1 << "x" << "0" << "y" << 1);
 
     // Both collections begin empty.
-    ASSERT_EQ(CollectionSizeCount{},
+    EXPECT_EQ(CollectionSizeCount{},
               replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss1));
-    ASSERT_EQ(CollectionSizeCount{},
+    EXPECT_EQ(CollectionSizeCount{},
               replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss2));
 
     {
@@ -673,19 +682,19 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForApplyOpsMul
         replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss1);
     const auto expectedDeltas2 =
         replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss2);
-    ASSERT_EQ(expectedDeltas1.count, 1);
-    ASSERT_EQ(expectedDeltas1.size, doc1.objsize());
-    ASSERT_EQ(expectedDeltas2.count, 1);
-    ASSERT_EQ(expectedDeltas2.size, doc2.objsize());
+    EXPECT_EQ(expectedDeltas1.count, 1);
+    EXPECT_EQ(expectedDeltas1.size, doc1.objsize());
+    EXPECT_EQ(expectedDeltas2.count, 1);
+    EXPECT_EQ(expectedDeltas2.size, doc2.objsize());
 
     // Extract applyOps deltas and verify.
     auto deltas = replicated_fast_count_test_helpers::extractSizeCountDeltasForApplyOps(
         replicated_fast_count_test_helpers::getLatestApplyOpsForNss(_opCtx, _nss1));
-    ASSERT_EQ(deltas.size(), 2u);
+    EXPECT_EQ(deltas.size(), 2u);
     ASSERT_TRUE(deltas.contains(_uuid1));
     ASSERT_TRUE(deltas.contains(_uuid2));
-    ASSERT_EQ(deltas.at(_uuid1), expectedDeltas1);
-    ASSERT_EQ(deltas.at(_uuid2), expectedDeltas2);
+    EXPECT_EQ(deltas.at(_uuid1), expectedDeltas1);
+    EXPECT_EQ(deltas.at(_uuid2), expectedDeltas2);
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest,
@@ -808,11 +817,11 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, ExtractSizeCountDeltaForNestedApply
     const auto deltas =
         replicated_fast_count_test_helpers::extractSizeCountDeltasForApplyOps(applyOpsEntry);
 
-    ASSERT_EQ(deltas.size(), 2u);
+    EXPECT_EQ(deltas.size(), 2u);
     ASSERT_TRUE(deltas.contains(_uuid1));
     ASSERT_TRUE(deltas.contains(_uuid2));
-    ASSERT_EQ(deltas.at(_uuid1), expectedDeltasNss1);
-    ASSERT_EQ(deltas.at(_uuid2), expectedDeltasNss2);
+    EXPECT_EQ(deltas.at(_uuid1), expectedDeltasNss1);
+    EXPECT_EQ(deltas.at(_uuid2), expectedDeltasNss2);
 }
 
 TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateWithNoPriorState) {
@@ -836,7 +845,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateWithNoPriorState) 
     SizeCountDeltas sizeCountDeltas;
     extractSizeCountDeltasForApplyOps(applyOpsEntry, boost::none, sizeCountDeltas);
 
-    ASSERT_EQ(sizeCountDeltas.size(), 1u);
+    EXPECT_EQ(sizeCountDeltas.size(), 1u);
     ASSERT_TRUE(sizeCountDeltas.contains(_uuid1));
     EXPECT_EQ(sizeCountDeltas.at(_uuid1).sizeCount, (CollectionSizeCount{.size = 0, .count = 0}));
     EXPECT_EQ(sizeCountDeltas.at(_uuid1).state, DDLState::kCreated);
@@ -869,7 +878,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateAfterDrop) {
     SizeCountDeltas sizeCountDeltas;
     extractSizeCountDeltasForApplyOps(applyOpsEntry, boost::none, sizeCountDeltas);
 
-    ASSERT_EQ(sizeCountDeltas.size(), 1u);
+    EXPECT_EQ(sizeCountDeltas.size(), 1u);
     ASSERT_TRUE(sizeCountDeltas.contains(_uuid1));
     EXPECT_EQ(sizeCountDeltas.at(_uuid1).sizeCount, (CollectionSizeCount{.size = 0, .count = 0}));
     EXPECT_EQ(sizeCountDeltas.at(_uuid1).state, DDLState::kDroppedAndRecreated);
@@ -904,7 +913,7 @@ TEST_F(ExtractSizeCountDeltaForApplyOpsTest, FromMigrateCreateAfterDropThenInser
     SizeCountDeltas sizeCountDeltas;
     extractSizeCountDeltasForApplyOps(applyOpsEntry, boost::none, sizeCountDeltas);
 
-    ASSERT_EQ(sizeCountDeltas.size(), 1u);
+    EXPECT_EQ(sizeCountDeltas.size(), 1u);
     ASSERT_TRUE(sizeCountDeltas.contains(_uuid1));
     EXPECT_EQ(sizeCountDeltas.at(_uuid1).sizeCount,
               (CollectionSizeCount{.size = document.objsize(), .count = 1}));
@@ -1007,7 +1016,7 @@ void assertExpectedAggregateDelta(const AggregateDeltaExpectation& expected,
     // Also correct when filtered explicitly by 'uuid'
     const auto filteredDeltas = aggregateSizeCountDeltasInOplog(oplogCursor, seekAfterTS, uuid);
     ASSERT_TRUE(filteredDeltas.deltas.contains(uuid));
-    ASSERT_EQ(expected.delta, filteredDeltas.deltas.at(uuid).sizeCount);
+    EXPECT_EQ(expected.delta, filteredDeltas.deltas.at(uuid).sizeCount);
     EXPECT_EQ(filteredDeltas.lastTimestamp, expected.lastTimestamp);
 }
 
@@ -1310,7 +1319,7 @@ TEST_F(AggregateSizeCountFromOplogTest, ForwardCursorRespectsOplogVisibilityTime
     const auto result = aggregateSizeCountDeltasInOplog(*cursor, Timestamp::min());
 
     // Only the ts1 entry was visible; ts2 must not appear in the deltas.
-    ASSERT_EQ(result.deltas.size(), 1u);
+    EXPECT_EQ(result.deltas.size(), 1u);
     ASSERT_TRUE(result.deltas.count(collA.uuid));
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.size, 10);
     EXPECT_EQ(result.deltas.at(collA.uuid).sizeCount.count, 1);
@@ -2128,7 +2137,7 @@ TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionInsertAndDrop) {
 
     const auto result = aggregateSizeCountDeltasInOplog(oplogCursor, Timestamp::min());
 
-    ASSERT_FALSE(result.deltas.contains(collA.uuid));
+    EXPECT_FALSE(result.deltas.contains(collA.uuid));
 }
 
 TEST_F(AggregateSizeCountFromOplogTest, ImportCollectionFilterWithMatchingUUID) {

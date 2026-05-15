@@ -220,7 +220,7 @@ void IndexBuilderInterceptorTest::testSingleOpIsSavedToSideWritesTable(
     int64_t numKeys = 0;
     ASSERT_OK(interceptor->sideWrite(
         operationContext(), *_coll.get(), entry, {keyString}, {}, {}, op, &numKeys));
-    ASSERT_EQ(1, numKeys);
+    EXPECT_EQ(1, numKeys);
     wuow.commit();
 
     BufBuilder bufBuilder;
@@ -367,7 +367,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTable) {
     keyStringView.serializeWithoutRecordId(builder);
     std::string ksWithoutRid(builder.buf(), builder.len());
     auto duplicates = getDuplicateKeyTableContents(indexBuildInfo);
-    ASSERT_EQ(duplicates[0], ksWithoutRid);
+    EXPECT_EQ(duplicates[0], ksWithoutRid);
 }
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTablePrimaryDriven) {
@@ -393,7 +393,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToDuplicateKeyTablePrimar
     keyStringView.serializeWithoutRecordId(builder);
     std::string ksWithoutRid(builder.buf(), builder.len());
     auto duplicates = getDuplicateKeyTableContents(indexBuildInfo);
-    ASSERT_EQ(duplicates[0], ksWithoutRid);
+    EXPECT_EQ(duplicates[0], ksWithoutRid);
 }
 
 TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven) {
@@ -436,7 +436,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -452,11 +452,11 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsDrainedIntoIndexPrimaryDriven)
 
     // Check that the key was inserted into the index.
     ASSERT(indexCursor->seekForKeyString(ru, keyString.getView()));
-    ASSERT_FALSE(indexCursor->nextKeyString(ru));
+    EXPECT_FALSE(indexCursor->nextKeyString(ru));
 
     // Check that the side write table is empty since the side write was removed.
     auto sideWrites = getSideWritesTableContents(indexBuildInfo);
-    ASSERT_EQ(0, sideWrites.size());
+    EXPECT_EQ(0, sideWrites.size());
 
     if (capturer.canReadMetrics()) {
         EXPECT_EQ(
@@ -517,7 +517,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 {},
                                                 &numInserted));
-        ASSERT_EQ(numInserted, 1);
+        EXPECT_EQ(numInserted, 1);
         wuow.commit();
     }
 
@@ -533,7 +533,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
                                          {},
                                          IndexBuildInterceptor::Op::kDelete,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -546,11 +546,11 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
 
     // Check that the index is now empty since the key was removed.
     auto indexCursor = indexAccessMethod->newCursor(operationContext(), ru);
-    ASSERT_FALSE(indexCursor->nextKeyString(ru));
+    EXPECT_FALSE(indexCursor->nextKeyString(ru));
 
     // Check that the side write table is empty since the side write was removed.
     auto sideWrites = getSideWritesTableContents(indexBuildInfo);
-    ASSERT_EQ(0, sideWrites.size());
+    EXPECT_EQ(0, sideWrites.size());
 
     if (capturer.canReadMetrics()) {
         EXPECT_EQ(
@@ -575,9 +575,9 @@ TEST_F(IndexBuilderInterceptorTest, DeferredTableCreation) {
     const auto entry = getIndexEntry("a_1");
 
     // The side writes table should exist immediately but the others should not
-    ASSERT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
-    ASSERT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
-    ASSERT_FALSE(hasTable(*indexBuildInfo.constraintViolationsIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
+    EXPECT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
+    EXPECT_FALSE(hasTable(*indexBuildInfo.constraintViolationsIdent));
 
     {
         WriteUnitOfWork wuow(operationContext());
@@ -587,9 +587,9 @@ TEST_F(IndexBuilderInterceptorTest, DeferredTableCreation) {
     }
 
     // The skipped records table should now exist, but the duplicate key table still doesn't
-    ASSERT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
-    ASSERT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
-    ASSERT_FALSE(hasTable(*indexBuildInfo.constraintViolationsIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
+    EXPECT_FALSE(hasTable(*indexBuildInfo.constraintViolationsIdent));
 
     {
         key_string::HeapBuilder ksBuilder(key_string::Version::kLatestVersion);
@@ -602,19 +602,19 @@ TEST_F(IndexBuilderInterceptorTest, DeferredTableCreation) {
     }
 
     // All three should now exist
-    ASSERT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
-    ASSERT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
-    ASSERT_TRUE(hasTable(*indexBuildInfo.constraintViolationsIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.constraintViolationsIdent));
 }
 
 TEST_F(IndexBuilderInterceptorTest, ImmediateTableCreation) {
     auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     auto interceptor =
         createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
-    ASSERT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
-    ASSERT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
     // Index isn't unique so no duplicate key table
-    ASSERT_FALSE(indexBuildInfo.constraintViolationsIdent);
+    EXPECT_FALSE(indexBuildInfo.constraintViolationsIdent);
 }
 
 TEST_F(IndexBuilderInterceptorTest, ImmediateTableCreationUnique) {
@@ -622,9 +622,9 @@ TEST_F(IndexBuilderInterceptorTest, ImmediateTableCreationUnique) {
         buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}, unique: true}"));
     auto interceptor =
         createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
-    ASSERT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
-    ASSERT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
-    ASSERT_TRUE(hasTable(*indexBuildInfo.constraintViolationsIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.constraintViolationsIdent));
 }
 
 using IndexBuilderInterceptorTestDeathTest = IndexBuilderInterceptorTest;
@@ -670,9 +670,9 @@ TEST_F(IndexBuilderInterceptorTest, OpenExistingPreservesExistingData) {
                                       LazyRecordStore::CreateMode::openExisting,
                                       getIndexEntry("a_1")->descriptor()->unique());
 
-    ASSERT_EQ(1, getSideWritesTableContents(indexBuildInfo).size());
-    ASSERT_EQ(1, getSkippedRecordsTableContents(indexBuildInfo).size());
-    ASSERT_EQ(1, getDuplicateKeyTableContents(indexBuildInfo).size());
+    EXPECT_EQ(1, getSideWritesTableContents(indexBuildInfo).size());
+    EXPECT_EQ(1, getSkippedRecordsTableContents(indexBuildInfo).size());
+    EXPECT_EQ(1, getDuplicateKeyTableContents(indexBuildInfo).size());
 }
 
 TEST_F(IndexBuilderInterceptorTest, DropTemporaryTables) {
@@ -681,18 +681,18 @@ TEST_F(IndexBuilderInterceptorTest, DropTemporaryTables) {
     auto interceptor =
         createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
 
-    ASSERT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
-    ASSERT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
-    ASSERT_TRUE(hasTable(*indexBuildInfo.constraintViolationsIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.constraintViolationsIdent));
 
     interceptor->dropTemporaryTables(operationContext(), StorageEngine::Immediate{});
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
 
     // Idents still exist in WiredTiger because the drop is deferred to the reaper.
-    ASSERT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
-    ASSERT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
-    ASSERT_TRUE(hasTable(*indexBuildInfo.constraintViolationsIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.sideWritesIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.skippedRecordsIdent));
+    EXPECT_TRUE(hasTable(*indexBuildInfo.constraintViolationsIdent));
 
     // Force reaping
     ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(),
@@ -703,9 +703,9 @@ TEST_F(IndexBuilderInterceptorTest, DropTemporaryTables) {
         operationContext(), *indexBuildInfo.constraintViolationsIdent));
 
     // Table must now be dropped
-    ASSERT_FALSE(hasTable(*indexBuildInfo.sideWritesIdent));
-    ASSERT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
-    ASSERT_FALSE(hasTable(*indexBuildInfo.constraintViolationsIdent));
+    EXPECT_FALSE(hasTable(*indexBuildInfo.sideWritesIdent));
+    EXPECT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
+    EXPECT_FALSE(hasTable(*indexBuildInfo.constraintViolationsIdent));
 }
 
 TEST_F(IndexBuilderInterceptorTest, DropTemporaryTablesOnDeferredTableIsNoOp) {
@@ -713,13 +713,13 @@ TEST_F(IndexBuilderInterceptorTest, DropTemporaryTablesOnDeferredTableIsNoOp) {
     auto interceptor =
         createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::deferred);
 
-    ASSERT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
+    EXPECT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
 
     // Dropping should not crash even though some tables were never created.
     ASSERT_NO_THROW(
         interceptor->dropTemporaryTables(operationContext(), StorageEngine::Immediate{}));
 
-    ASSERT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
+    EXPECT_FALSE(hasTable(*indexBuildInfo.skippedRecordsIdent));
 }
 
 TEST_F(IndexBuilderInterceptorTest, GetTableAfterDropReturnsNull) {
@@ -729,11 +729,11 @@ TEST_F(IndexBuilderInterceptorTest, GetTableAfterDropReturnsNull) {
                         *indexBuildInfo.sideWritesIdent,
                         LazyRecordStore::CreateMode::immediate);
 
-    ASSERT_TRUE(lrs.tableExists());
+    EXPECT_TRUE(lrs.tableExists());
 
     lrs.drop(operationContext(), StorageEngine::Immediate{});
 
-    ASSERT_FALSE(lrs.tableExists());
+    EXPECT_FALSE(lrs.tableExists());
 }
 
 /**
@@ -801,7 +801,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainSideWriteGeneratesNoContainerOpsWithout
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -823,11 +823,11 @@ TEST_F(IndexBuilderInterceptorTest, DrainSideWriteGeneratesNoContainerOpsWithout
 
     // No container operations should have been fired — non-PDIB builds don't use
     // container writes, so the OpObserver is never notified.
-    ASSERT_EQ(observer->inserts.size(), insertsBefore);
-    ASSERT_EQ(observer->deletes.size(), deletesBefore);
+    EXPECT_EQ(observer->inserts.size(), insertsBefore);
+    EXPECT_EQ(observer->deletes.size(), deletesBefore);
 
     // Verify side writes table is empty after draining.
-    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
 }
 
 TEST_F(IndexBuilderInterceptorTest, DrainInsertSideWriteGeneratesContainerOpsPrimaryDriven) {
@@ -855,7 +855,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainInsertSideWriteGeneratesContainerOpsPri
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -871,11 +871,11 @@ TEST_F(IndexBuilderInterceptorTest, DrainInsertSideWriteGeneratesContainerOpsPri
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     // Expect exactly one container insert (index) and one container delete (side writes table).
-    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
-    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+    EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
+    EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
 
     // Verify side writes table is empty and the key was inserted into the index.
-    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
     auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
     auto indexCursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
     ASSERT(indexCursor->seekForKeyString(ru, keyString.getView()));
@@ -910,7 +910,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteSideWriteGeneratesContainerOpsPri
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 {},
                                                 &numInserted));
-        ASSERT_EQ(numInserted, 1);
+        EXPECT_EQ(numInserted, 1);
         wuow.commit();
     }
 
@@ -926,7 +926,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteSideWriteGeneratesContainerOpsPri
                                          {},
                                          IndexBuildInterceptor::Op::kDelete,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -942,16 +942,16 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteSideWriteGeneratesContainerOpsPri
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     // No container inserts should be fired for a delete-only drain.
-    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
+    EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
 
     // Expect two container deletes: one for the index key, one for the side writes table.
-    ASSERT_EQ(observer->countDeletesFor(entry->getIdent(), deletesBefore), 1u);
-    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+    EXPECT_EQ(observer->countDeletesFor(entry->getIdent(), deletesBefore), 1u);
+    EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
 
     // Verify side writes table is empty and the key was removed from the index.
-    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
     auto indexCursor = indexAccessMethod->newCursor(operationContext(), ru);
-    ASSERT_FALSE(indexCursor->seekForKeyString(ru, keyString.getView()));
+    EXPECT_FALSE(indexCursor->seekForKeyString(ru, keyString.getView()));
 }
 
 TEST_F(IndexBuilderInterceptorTest, DrainEmptySideWritesTableGeneratesNoContainerOpsPrimaryDriven) {
@@ -977,8 +977,8 @@ TEST_F(IndexBuilderInterceptorTest, DrainEmptySideWritesTableGeneratesNoContaine
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     // No container operations should be fired for an empty drain.
-    ASSERT_EQ(observer->inserts.size(), insertsBefore);
-    ASSERT_EQ(observer->deletes.size(), deletesBefore);
+    EXPECT_EQ(observer->inserts.size(), insertsBefore);
+    EXPECT_EQ(observer->deletes.size(), deletesBefore);
 }
 
 TEST_F(IndexBuilderInterceptorTest, DrainMultipleSideWritesGeneratesContainerOpsPrimaryDriven) {
@@ -1007,7 +1007,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleSideWritesGeneratesContainerOps
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -1023,13 +1023,13 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleSideWritesGeneratesContainerOps
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     // Each side write should produce one index insert and one side-table delete.
-    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore),
+    EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore),
               static_cast<size_t>(kNumSideWrites));
-    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore),
+    EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore),
               static_cast<size_t>(kNumSideWrites));
 
     // Verify side writes table is empty and all keys are in the index.
-    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
 
     auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
     auto indexCursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
@@ -1071,7 +1071,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 {},
                                                 &numInserted));
-        ASSERT_EQ(numInserted, 1);
+        EXPECT_EQ(numInserted, 1);
         wuow.commit();
     }
 
@@ -1087,7 +1087,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -1103,7 +1103,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {},
                                          IndexBuildInterceptor::Op::kDelete,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -1121,16 +1121,16 @@ TEST_F(IndexBuilderInterceptorTest,
     std::string indexIdent = entry->getIdent();
 
     // One insert side write → one index insert; one delete side write → one index delete.
-    ASSERT_EQ(observer->countInsertsFor(indexIdent, insertsBefore), 1u);
-    ASSERT_EQ(observer->countDeletesFor(indexIdent, deletesBefore), 1u);
+    EXPECT_EQ(observer->countInsertsFor(indexIdent, insertsBefore), 1u);
+    EXPECT_EQ(observer->countDeletesFor(indexIdent, deletesBefore), 1u);
     // Two side writes cleaned up → two side-table deletes.
-    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 2u);
+    EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 2u);
 
     // Verify the insert key is now in the index and the delete key is gone.
     auto indexCursor = indexAccessMethod->newCursor(operationContext(), ru);
     ASSERT(indexCursor->seekForKeyString(ru, insertKeyString.getView()));
     indexCursor = indexAccessMethod->newCursor(operationContext(), ru);
-    ASSERT_FALSE(indexCursor->seekForKeyString(ru, deleteKeyString.getView()));
+    EXPECT_FALSE(indexCursor->seekForKeyString(ru, deleteKeyString.getView()));
 }
 
 TEST_F(IndexBuilderInterceptorTest, DrainMultipleBatchesGeneratesCorrectContainerOpsPrimaryDriven) {
@@ -1162,7 +1162,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleBatchesGeneratesCorrectContaine
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -1178,13 +1178,13 @@ TEST_F(IndexBuilderInterceptorTest, DrainMultipleBatchesGeneratesCorrectContaine
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     // Each side write should produce one index insert and one side-table delete.
-    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore),
+    EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore),
               static_cast<size_t>(kNumSideWrites));
-    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore),
+    EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore),
               static_cast<size_t>(kNumSideWrites));
 
     // Verify side writes table is empty and all keys are in the index.
-    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
 
     auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
     auto indexCursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
@@ -1226,7 +1226,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 {},
                                                 &numInserted));
-        ASSERT_EQ(numInserted, 1);
+        EXPECT_EQ(numInserted, 1);
         wuow.commit();
     }
 
@@ -1242,7 +1242,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -1262,16 +1262,16 @@ TEST_F(IndexBuilderInterceptorTest,
     // Verify the drain produced the expected container operations:
     //   - 2 inserts: one into the index, one into the constraint violations table
     //   - 1 delete: removing the consumed side write
-    ASSERT_EQ(observerPtr->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
-    ASSERT_EQ(
+    EXPECT_EQ(observerPtr->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
+    EXPECT_EQ(
         observerPtr->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore), 1u);
-    ASSERT_EQ(observerPtr->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+    EXPECT_EQ(observerPtr->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
 
     // Verify the duplicate was recorded in the constraint violations table.
-    ASSERT_EQ(1, getDuplicateKeyTableContents(indexBuildInfo).size());
+    EXPECT_EQ(1, getDuplicateKeyTableContents(indexBuildInfo).size());
 
     // Verify the side writes table is empty after draining.
-    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
 
     // Verify both keys (original and duplicate) are in the index.
     auto indexCursor = indexAccessMethod->newCursor(operationContext(), ru);
@@ -1306,7 +1306,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -1323,15 +1323,15 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     // Same as non-unique: one CI for the index, one CD for the side writes table.
-    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
-    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+    EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
+    EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
 
     // No writes to the constraint violations table.
-    ASSERT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
+    EXPECT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
               0u);
 
-    ASSERT_EQ(0, getDuplicateKeyTableContents(indexBuildInfo).size());
-    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getDuplicateKeyTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
 }
 
 TEST_F(IndexBuilderInterceptorTest, DrainDeleteOnUniqueIndexGeneratesContainerOpsPrimaryDriven) {
@@ -1364,7 +1364,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteOnUniqueIndexGeneratesContainerOp
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 {},
                                                 &numInserted));
-        ASSERT_EQ(numInserted, 1);
+        EXPECT_EQ(numInserted, 1);
         wuow.commit();
     }
 
@@ -1380,7 +1380,7 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteOnUniqueIndexGeneratesContainerOp
                                          {},
                                          IndexBuildInterceptor::Op::kDelete,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -1395,10 +1395,10 @@ TEST_F(IndexBuilderInterceptorTest, DrainDeleteOnUniqueIndexGeneratesContainerOp
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     // Expect two container deletes: one for the index key, one for the side writes table.
-    ASSERT_EQ(observer->countDeletesFor(entry->getIdent(), deletesBefore), 1u);
-    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+    EXPECT_EQ(observer->countDeletesFor(entry->getIdent(), deletesBefore), 1u);
+    EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
 
-    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
 }
 
 TEST_F(IndexBuilderInterceptorTest,
@@ -1434,7 +1434,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 {},
                                                 &numInserted));
-        ASSERT_EQ(numInserted, 1);
+        EXPECT_EQ(numInserted, 1);
         wuow.commit();
     }
 
@@ -1450,7 +1450,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -1467,15 +1467,15 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     // The duplicate key is still inserted into the index, but not recorded as a violation.
-    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
-    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+    EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 1u);
+    EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
 
     // No writes to the constraint violations table.
-    ASSERT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
+    EXPECT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
               0u);
 
-    ASSERT_EQ(0, getDuplicateKeyTableContents(indexBuildInfo).size());
-    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getDuplicateKeyTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
 }
 
 TEST_F(IndexBuilderInterceptorTest,
@@ -1511,7 +1511,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 {},
                                                 &numInserted));
-        ASSERT_EQ(numInserted, 1);
+        EXPECT_EQ(numInserted, 1);
         wuow.commit();
     }
 
@@ -1527,7 +1527,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -1544,14 +1544,14 @@ TEST_F(IndexBuilderInterceptorTest,
                                           InsertDeleteOptions{.dupsAllowed = true},
                                           IndexBuildInterceptor::TrackDuplicates::kTrack,
                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield);
-    ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
+    EXPECT_EQ(status.code(), ErrorCodes::DuplicateKey);
 
     // No container ops should have been generated for the failed drain — the error is returned
     // before the container_write::insert() call.
-    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
-    ASSERT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
+    EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
+    EXPECT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
               0u);
-    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 0u);
+    EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 0u);
 }
 
 TEST_F(IndexBuilderInterceptorTest,
@@ -1586,7 +1586,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 {},
                                                 &numInserted));
-        ASSERT_EQ(numInserted, 1);
+        EXPECT_EQ(numInserted, 1);
         wuow.commit();
     }
 
@@ -1602,7 +1602,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -1624,14 +1624,14 @@ TEST_F(IndexBuilderInterceptorTest,
     // which is silently converted to OK. No actual index insert op is generated because the key
     // was already there. No constraint violation is recorded — this is the key distinction from
     // the different-RecordId duplicate case.
-    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
-    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
+    EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
+    EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 1u);
 
-    ASSERT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
+    EXPECT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
               0u);
 
-    ASSERT_EQ(0, getDuplicateKeyTableContents(indexBuildInfo).size());
-    ASSERT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getDuplicateKeyTableContents(indexBuildInfo).size());
+    EXPECT_EQ(0, getSideWritesTableContents(indexBuildInfo).size());
 }
 
 TEST_F(IndexBuilderInterceptorTest,
@@ -1666,7 +1666,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                                 InsertDeleteOptions{.dupsAllowed = true},
                                                 {},
                                                 &numInserted));
-        ASSERT_EQ(numInserted, 1);
+        EXPECT_EQ(numInserted, 1);
         wuow.commit();
     }
 
@@ -1682,7 +1682,7 @@ TEST_F(IndexBuilderInterceptorTest,
                                          {},
                                          IndexBuildInterceptor::Op::kInsert,
                                          &numKeys));
-        ASSERT_EQ(1, numKeys);
+        EXPECT_EQ(1, numKeys);
         wuow.commit();
     }
 
@@ -1698,13 +1698,13 @@ TEST_F(IndexBuilderInterceptorTest,
                                           InsertDeleteOptions{.dupsAllowed = true},
                                           IndexBuildInterceptor::TrackDuplicates::kNoTrack,
                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield);
-    ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
+    EXPECT_EQ(status.code(), ErrorCodes::DuplicateKey);
 
     // No container ops — error fires before any writes.
-    ASSERT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
-    ASSERT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
+    EXPECT_EQ(observer->countInsertsFor(entry->getIdent(), insertsBefore), 0u);
+    EXPECT_EQ(observer->countInsertsFor(*indexBuildInfo.constraintViolationsIdent, insertsBefore),
               0u);
-    ASSERT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 0u);
+    EXPECT_EQ(observer->countDeletesFor(*indexBuildInfo.sideWritesIdent, deletesBefore), 0u);
 }
 
 }  // namespace

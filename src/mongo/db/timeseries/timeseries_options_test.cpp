@@ -95,7 +95,7 @@ TEST(TimeseriesOptionsTest, RoundTimestampToGranularity) {
         ASSERT_OK(inputDate);
         auto roundedDate =
             timeseries::roundTimestampToGranularity(inputDate.getValue(), granularity);
-        ASSERT_EQ(dateToISOStringUTC(roundedDate), expectedOutput);
+        EXPECT_EQ(dateToISOStringUTC(roundedDate), expectedOutput);
     }
 }
 
@@ -135,7 +135,7 @@ TEST(TimeseriesOptionsTest, RoundTimestampBySeconds) {
         ASSERT_OK(inputDate);
         auto roundedDate =
             timeseries::roundTimestampBySeconds(inputDate.getValue(), roundingSeconds);
-        ASSERT_EQ(dateToISOStringUTC(roundedDate), expectedOutput);
+        EXPECT_EQ(dateToISOStringUTC(roundedDate), expectedOutput);
     }
 }
 
@@ -205,13 +205,13 @@ TEST(TimeseriesOptionsTest, ExtendedRangeRoundTimestamp) {
         Date_t inputDate = parse(input);
         auto roundedDate = timeseries::roundTimestampBySeconds(inputDate, roundingSeconds);
         // We should always round down
-        ASSERT_LTE(roundedDate, inputDate);
+        EXPECT_LE(roundedDate, inputDate);
         // The rounding amount should be less than the rounding seconds
-        ASSERT_LT((inputDate - roundedDate).count(), roundingSeconds * 1000);
+        EXPECT_LT((inputDate - roundedDate).count(), roundingSeconds * 1000);
         // Ensure that we've rounded to an even number according to our rounding seconds
-        ASSERT_EQ(durationCount<Seconds>(roundedDate.toDurationSinceEpoch()) % roundingSeconds, 0);
+        EXPECT_EQ(durationCount<Seconds>(roundedDate.toDurationSinceEpoch()) % roundingSeconds, 0);
         // Validate the expected output
-        ASSERT_EQ(format(roundedDate), expectedOutput);
+        EXPECT_EQ(format(roundedDate), expectedOutput);
     }
 }
 
@@ -241,7 +241,7 @@ TEST(TimeseriesOptionsTest, ExtendedRoundMilliTimestampBySeconds) {
 
     for (const auto& [roundingSeconds, input, expectedOutput] : testCases) {
         auto roundedDate = timeseries::roundTimestampBySeconds(input, roundingSeconds);
-        ASSERT_EQ(roundedDate, expectedOutput);
+        EXPECT_EQ(roundedDate, expectedOutput);
     }
 }
 
@@ -259,21 +259,21 @@ TEST(TimeseriesOptionsTest, AreTimeseriesBucketsFixed) {
 
     {
         const auto parametersChanged = false;
-        ASSERT_TRUE(timeseries::areTimeseriesBucketsFixed(optionsEqualAndNone, parametersChanged))
+        EXPECT_TRUE(timeseries::areTimeseriesBucketsFixed(optionsEqualAndNone, parametersChanged))
             << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=none, "
             << "BucketingParametersChanged=false implies buckets should be fixed.";
     }
 
     {
         const auto parametersChanged = false;
-        ASSERT_TRUE(timeseries::areTimeseriesBucketsFixed(optionsEqualNotNone, parametersChanged))
+        EXPECT_TRUE(timeseries::areTimeseriesBucketsFixed(optionsEqualNotNone, parametersChanged))
             << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=value, "
             << "BucketingParametersChanged=false implies buckets should be fixed.";
     }
 
     {
         const auto parametersChanged = false;
-        ASSERT_FALSE(
+        EXPECT_FALSE(
             timeseries::areTimeseriesBucketsFixed(optionsMaxSpanAndNone, parametersChanged))
             << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=none, "
             << "BucketingParametersChanged=false implies buckets should not be fixed.";
@@ -281,7 +281,7 @@ TEST(TimeseriesOptionsTest, AreTimeseriesBucketsFixed) {
 
     {
         const auto parametersChanged = false;
-        ASSERT_FALSE(
+        EXPECT_FALSE(
             timeseries::areTimeseriesBucketsFixed(optionsNoneAndRounding, parametersChanged))
             << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=value, "
             << "BucketingParametersChanged=false implies buckets should not be fixed.";
@@ -289,28 +289,28 @@ TEST(TimeseriesOptionsTest, AreTimeseriesBucketsFixed) {
 
     {
         const auto parametersChanged = false;
-        ASSERT_FALSE(
+        EXPECT_FALSE(
             timeseries::areTimeseriesBucketsFixed(optionsValuesNotEqual, parametersChanged))
             << "BucketMaxSpanSeconds=value1, BucketRoundingSeconds=value2, "
             << "BucketingParametersChanged=false implies buckets should not be fixed.";
     }
     {
         const auto parametersChanged = true;
-        ASSERT_FALSE(timeseries::areTimeseriesBucketsFixed(optionsEqualAndNone, parametersChanged))
+        EXPECT_FALSE(timeseries::areTimeseriesBucketsFixed(optionsEqualAndNone, parametersChanged))
             << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=none, "
             << "BucketingParametersChanged=true implies buckets should not be fixed.";
     }
 
     {
         const auto parametersChanged = true;
-        ASSERT_FALSE(timeseries::areTimeseriesBucketsFixed(optionsEqualNotNone, parametersChanged))
+        EXPECT_FALSE(timeseries::areTimeseriesBucketsFixed(optionsEqualNotNone, parametersChanged))
             << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=value, "
             << "BucketingParametersChanged=true implies buckets should not be fixed.";
     }
 
     {
         const auto parametersChanged = true;
-        ASSERT_FALSE(
+        EXPECT_FALSE(
             timeseries::areTimeseriesBucketsFixed(optionsMaxSpanAndNone, parametersChanged))
             << "BucketMaxSpanSeconds=value, BucketRoundingSeconds=none, "
             << "BucketingParametersChanged=true implies buckets should not be fixed.";
@@ -318,7 +318,7 @@ TEST(TimeseriesOptionsTest, AreTimeseriesBucketsFixed) {
 
     {
         const auto parametersChanged = true;
-        ASSERT_FALSE(
+        EXPECT_FALSE(
             timeseries::areTimeseriesBucketsFixed(optionsNoneAndRounding, parametersChanged))
             << "BucketMaxSpanSeconds=none, BucketRoundingSeconds=value, "
             << "BucketingParametersChanged=true implies buckets should not be fixed.";
@@ -326,7 +326,7 @@ TEST(TimeseriesOptionsTest, AreTimeseriesBucketsFixed) {
 
     {
         const auto parametersChanged = true;
-        ASSERT_FALSE(
+        EXPECT_FALSE(
             timeseries::areTimeseriesBucketsFixed(optionsValuesNotEqual, parametersChanged))
             << "BucketMaxSpanSeconds=value1, BucketRoundingSeconds=value2, "
             << "BucketingParametersChanged=true implies buckets should not be fixed.";
@@ -337,7 +337,7 @@ TEST(TimeseriesOptionsTest, BSONColumnMemEstimationCalculations) {
     // The calculations for BSONColumn memory estimation in bson_validate.cpp rely on the defaults
     // for some server parameters. If these change, we also need to recalculate and potentially
     // adjust the memory threshold of the 'bsonMaxExpandedMemUsage' parameter.
-    ASSERT_EQ(gTimeseriesBucketMinCount, 10);
+    EXPECT_EQ(gTimeseriesBucketMinCount, 10);
 }
 
 }  // namespace mongo

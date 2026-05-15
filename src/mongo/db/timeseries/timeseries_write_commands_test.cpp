@@ -76,12 +76,12 @@ protected:
         DBDirectClient client(_opCtx);
         auto insertResponse =
             client.insertAcknowledged(_nsNoMeta, {BSON(_timeField << DATENOW << "a" << 1)});
-        ASSERT_EQUALS(ErrorCodes::InvalidOptions, getStatusFromWriteCommandReply(insertResponse));
+        EXPECT_EQ(ErrorCodes::InvalidOptions, getStatusFromWriteCommandReply(insertResponse));
         auto updateResponse =
             client.updateAcknowledged(_nsNoMeta, fromjson("{a: 1}"), fromjson("{$set: {a: 2}}"));
-        ASSERT_EQUALS(ErrorCodes::InvalidOptions, getStatusFromWriteCommandReply(updateResponse));
+        EXPECT_EQ(ErrorCodes::InvalidOptions, getStatusFromWriteCommandReply(updateResponse));
         auto deleteResponse = client.removeAcknowledged(_nsNoMeta, fromjson("{a: 1}"));
-        ASSERT_EQUALS(ErrorCodes::InvalidOptions, getStatusFromWriteCommandReply(deleteResponse));
+        EXPECT_EQ(ErrorCodes::InvalidOptions, getStatusFromWriteCommandReply(deleteResponse));
     }
 };
 

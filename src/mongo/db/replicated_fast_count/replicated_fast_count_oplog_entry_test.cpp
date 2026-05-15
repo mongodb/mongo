@@ -49,10 +49,10 @@ TEST(InitReplicatedFastCountO2Test, ParseSuccess) {
     auto obj = makeInitReplicatedFastCountO2("metadata_ident", 1, "timestamps_ident", 2);
     auto parsed = InitReplicatedFastCountO2::parse(obj);
 
-    ASSERT_EQ(parsed.getFastCountMetadataStoreIdent(), "metadata_ident");
-    ASSERT_EQ(parsed.getFastCountMetadataStoreKeyFormat(), 1);
-    ASSERT_EQ(parsed.getFastCountMetadataStoreTimestampsIdent(), "timestamps_ident");
-    ASSERT_EQ(parsed.getFastCountMetadataStoreTimestampsKeyFormat(), 2);
+    EXPECT_EQ(parsed.getFastCountMetadataStoreIdent(), "metadata_ident");
+    EXPECT_EQ(parsed.getFastCountMetadataStoreKeyFormat(), 1);
+    EXPECT_EQ(parsed.getFastCountMetadataStoreTimestampsIdent(), "timestamps_ident");
+    EXPECT_EQ(parsed.getFastCountMetadataStoreTimestampsKeyFormat(), 2);
 }
 
 TEST(InitReplicatedFastCountO2Test, ParseMissingMetadataIdent) {
@@ -97,10 +97,10 @@ TEST(InitReplicatedFastCountO2Test, RoundTrip) {
     auto serialized = bob.obj();
 
     auto reparsed = InitReplicatedFastCountO2::parse(serialized);
-    ASSERT_EQ(reparsed.getFastCountMetadataStoreIdent(), "md_ident");
-    ASSERT_EQ(reparsed.getFastCountMetadataStoreKeyFormat(), 0);
-    ASSERT_EQ(reparsed.getFastCountMetadataStoreTimestampsIdent(), "ts_ident");
-    ASSERT_EQ(reparsed.getFastCountMetadataStoreTimestampsKeyFormat(), 1);
+    EXPECT_EQ(reparsed.getFastCountMetadataStoreIdent(), "md_ident");
+    EXPECT_EQ(reparsed.getFastCountMetadataStoreKeyFormat(), 0);
+    EXPECT_EQ(reparsed.getFastCountMetadataStoreTimestampsIdent(), "ts_ident");
+    EXPECT_EQ(reparsed.getFastCountMetadataStoreTimestampsKeyFormat(), 1);
 }
 
 }  // namespace

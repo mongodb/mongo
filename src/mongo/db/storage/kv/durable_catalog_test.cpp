@@ -301,7 +301,7 @@ protected:
         unittest::assertGet(durable_catalog::createCollection(
             operationContext(), catalogId, nss, generatedIdent, {}, mdbCatalog));
         ident = getMDBCatalog()->getEntry(catalogId).ident;
-        ASSERT_EQ(generatedIdent, ident);
+        EXPECT_EQ(generatedIdent, ident);
 
         IndexDescriptor descriptor{"",
                                    BSON(IndexDescriptor::kKeyPatternFieldName
@@ -731,7 +731,7 @@ public:
             Lock::GlobalLock globalLock{operationContext(), MODE_IX};
             // First confirm that we can observe the multikey write set by the other thread.
             MultikeyPaths paths;
-            ASSERT_TRUE(collection->isIndexMultikey(
+            EXPECT_TRUE(collection->isIndexMultikey(
                 operationContext(), indexEntry->descriptor()->indexName(), &paths));
             assertMultikeyPathsAreEqual(paths, first);
 
@@ -781,8 +781,8 @@ TEST_F(DurableCatalogTest, SinglePhaseIndexBuild) {
     auto indexEntry = createIndex(BSON("a" << 1));
     auto collection = getCollection();
 
-    ASSERT_FALSE(collection->isIndexReady(indexEntry->descriptor()->indexName()));
-    ASSERT_FALSE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
+    EXPECT_FALSE(collection->isIndexReady(indexEntry->descriptor()->indexName()));
+    EXPECT_FALSE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
 
     {
         Lock::DBLock dbLk(operationContext(), collection->ns().dbName(), MODE_IX);
@@ -796,8 +796,8 @@ TEST_F(DurableCatalogTest, SinglePhaseIndexBuild) {
     }
 
     collection = getCollection();
-    ASSERT_TRUE(collection->isIndexReady(indexEntry->descriptor()->indexName()));
-    ASSERT_FALSE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
+    EXPECT_TRUE(collection->isIndexReady(indexEntry->descriptor()->indexName()));
+    EXPECT_FALSE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
 }
 
 TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
@@ -805,8 +805,8 @@ TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
     auto indexEntry = createIndex(BSON("a" << 1), IndexNames::BTREE, twoPhase);
     auto collection = getCollection();
 
-    ASSERT_FALSE(collection->isIndexReady(indexEntry->descriptor()->indexName()));
-    ASSERT_TRUE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
+    EXPECT_FALSE(collection->isIndexReady(indexEntry->descriptor()->indexName()));
+    EXPECT_TRUE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
 
     {
         Lock::DBLock dbLk(operationContext(), collection->ns().dbName(), MODE_IX);
@@ -820,8 +820,8 @@ TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
     }
 
     collection = getCollection();
-    ASSERT_TRUE(collection->isIndexReady(indexEntry->descriptor()->indexName()));
-    ASSERT_FALSE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
+    EXPECT_TRUE(collection->isIndexReady(indexEntry->descriptor()->indexName()));
+    EXPECT_FALSE(collection->getIndexBuildUUID(indexEntry->descriptor()->indexName()));
 }
 
 DEATH_TEST_REGEX_F(DurableCatalogTestDeathTest,
@@ -876,14 +876,14 @@ TEST_F(ImportCollectionTest, ImportCollection) {
 
     // Validate the catalog entry for the imported collection.
     auto entry = getMDBCatalog()->getEntry(importResult.catalogId);
-    ASSERT_EQ(entry.nss, nss);
-    ASSERT_EQ(entry.ident, ident);
-    ASSERT_EQ(getMDBCatalog()->getIndexIdent(
+    EXPECT_EQ(entry.nss, nss);
+    EXPECT_EQ(entry.ident, ident);
+    EXPECT_EQ(getMDBCatalog()->getIndexIdent(
                   operationContext(), importResult.catalogId, IndexConstants::kIdIndexName),
               idxIdent);
 
     // Test that a collection UUID is generated for import.
-    ASSERT_NE(md->options.uuid.value(), importResult.uuid);
+    EXPECT_NE(md->options.uuid.value(), importResult.uuid);
     // Substitute in the generated UUID and check that the rest of fields in the catalog entry
     // match.
     md->options.uuid = importResult.uuid;
@@ -932,7 +932,7 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
         RecordId catalogId = collection->getCatalogId();
         ASSERT(durable_catalog::getParsedCatalogEntry(operationContext(), catalogId, mdbCatalog)
                    ->metadata->timeseriesBucketsMayHaveMixedSchemaData);
-        ASSERT_FALSE(
+        EXPECT_FALSE(
             *durable_catalog::getParsedCatalogEntry(operationContext(), catalogId, mdbCatalog)
                  ->metadata->timeseriesBucketsMayHaveMixedSchemaData);
     }
@@ -950,14 +950,14 @@ TEST_F(DurableCatalogTest, CreateCollectionCatalogEntryHasCorrectTenantNamespace
                           ->lookupCollectionByNamespace(operationContext(), nss);
     RecordId catalogId = collection->getCatalogId();
     auto mdbCatalog = getMDBCatalog();
-    ASSERT_EQ(mdbCatalog->getEntry(catalogId).nss.tenantId(), nss.tenantId());
-    ASSERT_EQ(mdbCatalog->getEntry(catalogId).nss, nss);
+    EXPECT_EQ(mdbCatalog->getEntry(catalogId).nss.tenantId(), nss.tenantId());
+    EXPECT_EQ(mdbCatalog->getEntry(catalogId).nss, nss);
 
     Lock::GlobalLock globalLock{operationContext(), MODE_IS};
-    ASSERT_EQ(durable_catalog::getParsedCatalogEntry(operationContext(), catalogId, mdbCatalog)
+    EXPECT_EQ(durable_catalog::getParsedCatalogEntry(operationContext(), catalogId, mdbCatalog)
                   ->metadata->nss.tenantId(),
               nss.tenantId());
-    ASSERT_EQ(durable_catalog::getParsedCatalogEntry(operationContext(), catalogId, mdbCatalog)
+    EXPECT_EQ(durable_catalog::getParsedCatalogEntry(operationContext(), catalogId, mdbCatalog)
                   ->metadata->nss,
               nss);
 
@@ -1001,37 +1001,37 @@ TEST_F(DurableCatalogTest, ScanForCatalogEntryByNssBasic) {
     auto catalogEntryThird =
         durable_catalog::scanForCatalogEntryByNss(operationContext(), nssThird, mdbCatalog);
     ASSERT(catalogEntryThird != boost::none);
-    ASSERT_EQ(nssThird, catalogEntryThird->metadata->nss);
-    ASSERT_EQ(catalogIdAndUUIDThird.uuid, catalogEntryThird->metadata->options.uuid);
-    ASSERT_EQ(durable_catalog::getParsedCatalogEntry(
+    EXPECT_EQ(nssThird, catalogEntryThird->metadata->nss);
+    EXPECT_EQ(catalogIdAndUUIDThird.uuid, catalogEntryThird->metadata->options.uuid);
+    EXPECT_EQ(durable_catalog::getParsedCatalogEntry(
                   operationContext(), catalogIdAndUUIDThird.catalogId, mdbCatalog)
                   ->metadata->nss,
               nssThird);
-    ASSERT_EQ(mdbCatalog->getEntry(catalogIdAndUUIDThird.catalogId).nss, nssThird);
+    EXPECT_EQ(mdbCatalog->getEntry(catalogIdAndUUIDThird.catalogId).nss, nssThird);
 
     auto catalogEntrySecond =
         durable_catalog::scanForCatalogEntryByNss(operationContext(), nssSecond, mdbCatalog);
     ASSERT(catalogEntrySecond != boost::none);
-    ASSERT_EQ(nssSecond, catalogEntrySecond->metadata->nss);
-    ASSERT_EQ(catalogIdAndUUIDSecond.uuid, catalogEntrySecond->metadata->options.uuid);
+    EXPECT_EQ(nssSecond, catalogEntrySecond->metadata->nss);
+    EXPECT_EQ(catalogIdAndUUIDSecond.uuid, catalogEntrySecond->metadata->options.uuid);
     ASSERT(catalogEntrySecond->metadata->options.timeseries);
-    ASSERT_EQ(durable_catalog::getParsedCatalogEntry(
+    EXPECT_EQ(durable_catalog::getParsedCatalogEntry(
                   operationContext(), catalogIdAndUUIDSecond.catalogId, mdbCatalog)
                   ->metadata->nss,
               nssSecond);
-    ASSERT_EQ(mdbCatalog->getEntry(catalogIdAndUUIDSecond.catalogId).nss, nssSecond);
+    EXPECT_EQ(mdbCatalog->getEntry(catalogIdAndUUIDSecond.catalogId).nss, nssSecond);
 
     auto catalogEntryFirst =
         durable_catalog::scanForCatalogEntryByNss(operationContext(), nssFirst, mdbCatalog);
     ASSERT(catalogEntryFirst != boost::none);
-    ASSERT_EQ(nssFirst, catalogEntryFirst->metadata->nss);
-    ASSERT_EQ(catalogIdAndUUIDFirst.uuid, catalogEntryFirst->metadata->options.uuid);
-    ASSERT_EQ(nssFirst.tenantId(), catalogEntryFirst->metadata->nss.tenantId());
-    ASSERT_EQ(durable_catalog::getParsedCatalogEntry(
+    EXPECT_EQ(nssFirst, catalogEntryFirst->metadata->nss);
+    EXPECT_EQ(catalogIdAndUUIDFirst.uuid, catalogEntryFirst->metadata->options.uuid);
+    EXPECT_EQ(nssFirst.tenantId(), catalogEntryFirst->metadata->nss.tenantId());
+    EXPECT_EQ(durable_catalog::getParsedCatalogEntry(
                   operationContext(), catalogIdAndUUIDFirst.catalogId, mdbCatalog)
                   ->metadata->nss,
               nssFirst);
-    ASSERT_EQ(mdbCatalog->getEntry(catalogIdAndUUIDFirst.catalogId).nss, nssFirst);
+    EXPECT_EQ(mdbCatalog->getEntry(catalogIdAndUUIDFirst.catalogId).nss, nssFirst);
 
     auto catalogEntryDoesNotExist = durable_catalog::scanForCatalogEntryByNss(
         operationContext(),
@@ -1056,9 +1056,9 @@ TEST_F(DurableCatalogTest, CreateCollectionSucceedsWithDropPendingIdent) {
         wuow.commit();
     }
     auto parsedEntry = mdbCatalog->getEntry(catalogId);
-    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
-    ASSERT_EQUALS(nss, parsedEntry.nss);
-    ASSERT_EQUALS(ident, parsedEntry.ident);
+    EXPECT_EQ(catalogId, parsedEntry.catalogId);
+    EXPECT_EQ(nss, parsedEntry.nss);
+    EXPECT_EQ(ident, parsedEntry.ident);
 
     // Remove the catalog entry to simulate the first phase of a two phase collection drop. This
     // mimics a scenario where a 'create' operation with replicated catalog identifiers is applied,
@@ -1080,9 +1080,9 @@ TEST_F(DurableCatalogTest, CreateCollectionSucceedsWithDropPendingIdent) {
         wuow.commit();
     }
     parsedEntry = mdbCatalog->getEntry(catalogId);
-    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
-    ASSERT_EQUALS(nss, parsedEntry.nss);
-    ASSERT_EQUALS(ident, parsedEntry.ident);
+    EXPECT_EQ(catalogId, parsedEntry.catalogId);
+    EXPECT_EQ(nss, parsedEntry.nss);
+    EXPECT_EQ(ident, parsedEntry.ident);
 }
 
 TEST_F(DurableCatalogTest, CreateCollectionSucceedsWithIdentNotInCatalog) {
@@ -1103,7 +1103,7 @@ TEST_F(DurableCatalogTest, CreateCollectionSucceedsWithIdentNotInCatalog) {
         ASSERT_OK(mdbCatalog->removeEntry(opCtx, catalogId));
         wuow.commit();
     }
-    ASSERT_FALSE(mdbCatalog->getEntry_forTest(catalogId));
+    EXPECT_FALSE(mdbCatalog->getEntry_forTest(catalogId));
 
     // Creating the collection again should drop and recreate the table
     {
@@ -1115,9 +1115,9 @@ TEST_F(DurableCatalogTest, CreateCollectionSucceedsWithIdentNotInCatalog) {
     }
 
     auto parsedEntry = mdbCatalog->getEntry(catalogId);
-    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
-    ASSERT_EQUALS(nss, parsedEntry.nss);
-    ASSERT_EQUALS(ident, parsedEntry.ident);
+    EXPECT_EQ(catalogId, parsedEntry.catalogId);
+    EXPECT_EQ(nss, parsedEntry.nss);
+    EXPECT_EQ(ident, parsedEntry.ident);
 }
 
 TEST_F(DurableCatalogTest, CreateCollectionRemovesPriorDocumentsAfterRecreate) {
@@ -1139,9 +1139,9 @@ TEST_F(DurableCatalogTest, CreateCollectionRemovesPriorDocumentsAfterRecreate) {
         wuow.commit();
     }
     auto parsedEntry = mdbCatalog->getEntry(catalogId);
-    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
-    ASSERT_EQUALS(nss, parsedEntry.nss);
-    ASSERT_EQUALS(ident, parsedEntry.ident);
+    EXPECT_EQ(catalogId, parsedEntry.catalogId);
+    EXPECT_EQ(nss, parsedEntry.nss);
+    EXPECT_EQ(ident, parsedEntry.ident);
 
 
     // 2. Insert a document into the newly created collection.
@@ -1185,9 +1185,9 @@ TEST_F(DurableCatalogTest, CreateCollectionRemovesPriorDocumentsAfterRecreate) {
         wuow.commit();
     }
     parsedEntry = mdbCatalog->getEntry(catalogId);
-    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
-    ASSERT_EQUALS(nss, parsedEntry.nss);
-    ASSERT_EQUALS(ident, parsedEntry.ident);
+    EXPECT_EQ(catalogId, parsedEntry.catalogId);
+    EXPECT_EQ(nss, parsedEntry.nss);
+    EXPECT_EQ(ident, parsedEntry.ident);
 
     // 5. Confirm documents inserted before catalog drop are now gone.
     {
@@ -1215,15 +1215,15 @@ TEST_F(DurableCatalogTest, CreateCollectionWithFailsExistingIdentButDifferentCat
         wuow.commit();
     }
     const auto parsedEntry = mdbCatalog->getEntry(catalogId);
-    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
-    ASSERT_EQUALS(nss, parsedEntry.nss);
-    ASSERT_EQUALS(ident, parsedEntry.ident);
+    EXPECT_EQ(catalogId, parsedEntry.catalogId);
+    EXPECT_EQ(nss, parsedEntry.nss);
+    EXPECT_EQ(ident, parsedEntry.ident);
 
     {
         auto collection = acquireCollectionForWrite(opCtx, nss);
         auto newCatalogId = mdbCatalog->reserveCatalogId(operationContext());
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_EQUALS(
+        EXPECT_EQ(
             ErrorCodes::ObjectAlreadyExists,
             durable_catalog::createCollection(
                 opCtx, newCatalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog)
@@ -1247,7 +1247,7 @@ TEST_F(DurableCatalogTest, CreateCollectionWithCatalogIdentifierSucceedsAfterRol
         auto recordStore = unittest::assertGet(durable_catalog::createCollection(
             opCtx, catalogId, nss, ident, CollectionOptions{.uuid = UUID::gen()}, mdbCatalog));
     }
-    ASSERT_FALSE(mdbCatalog->getEntry_forTest(catalogId));
+    EXPECT_FALSE(mdbCatalog->getEntry_forTest(catalogId));
 
     {
         auto collection = acquireCollectionForWrite(opCtx, nss);
@@ -1257,9 +1257,9 @@ TEST_F(DurableCatalogTest, CreateCollectionWithCatalogIdentifierSucceedsAfterRol
         wuow.commit();
     }
     const auto parsedEntry = mdbCatalog->getEntry(catalogId);
-    ASSERT_EQUALS(catalogId, parsedEntry.catalogId);
-    ASSERT_EQUALS(nss, parsedEntry.nss);
-    ASSERT_EQUALS(ident, parsedEntry.ident);
+    EXPECT_EQ(catalogId, parsedEntry.catalogId);
+    EXPECT_EQ(nss, parsedEntry.nss);
+    EXPECT_EQ(ident, parsedEntry.ident);
 }
 
 TEST_F(DurableCatalogTest, CreateTableToleratesExistingIdent) {
@@ -1292,13 +1292,13 @@ TEST_F(DurableCatalogTest, CreateTableToleratesExistingIdent) {
     wuow.commit();
 
     auto cursor = rs->getCursor(opCtx, ru);
-    ASSERT_FALSE(cursor->next());
+    EXPECT_FALSE(cursor->next());
 }
 
 TEST_F(DurableCatalogTest, RollingBackCreateIndexAddsIdentToReaper) {
     const auto ident = generateNewIndexIdent(ns());
 
-    ASSERT_EQUALS(0U, storageEngine()->getNumDropPendingIdents());
+    EXPECT_EQ(0U, storageEngine()->getNumDropPendingIdents());
 
     {
         WriteUnitOfWork wuow(operationContext());
@@ -1310,13 +1310,13 @@ TEST_F(DurableCatalogTest, RollingBackCreateIndexAddsIdentToReaper) {
                                                ident));
     }
 
-    ASSERT_EQUALS(1U, storageEngine()->getNumDropPendingIdents());
+    EXPECT_EQ(1U, storageEngine()->getNumDropPendingIdents());
 }
 
 TEST_F(DurableCatalogTest, CreateIndexRemovesIdentFromDropPending) {
     const auto ident = generateNewIndexIdent(ns());
 
-    ASSERT_EQUALS(0U, storageEngine()->getNumDropPendingIdents());
+    EXPECT_EQ(0U, storageEngine()->getNumDropPendingIdents());
 
     {
         WriteUnitOfWork wuow(operationContext());
@@ -1328,7 +1328,7 @@ TEST_F(DurableCatalogTest, CreateIndexRemovesIdentFromDropPending) {
                                                ident));
     }
 
-    ASSERT_EQUALS(1U, storageEngine()->getNumDropPendingIdents());
+    EXPECT_EQ(1U, storageEngine()->getNumDropPendingIdents());
 
     {
         WriteUnitOfWork wuow(operationContext());
@@ -1341,7 +1341,7 @@ TEST_F(DurableCatalogTest, CreateIndexRemovesIdentFromDropPending) {
         wuow.commit();
     }
 
-    ASSERT_EQUALS(0U, storageEngine()->getNumDropPendingIdents());
+    EXPECT_EQ(0U, storageEngine()->getNumDropPendingIdents());
 }
 
 TEST_F(DurableCatalogTest, CreateIndexSucceedsIfIdentExistsButIsNotInCatalog) {
@@ -1373,13 +1373,13 @@ TEST_F(DurableCatalogTest, CreateIndexFailsIfIdentExistsAndIsInCatalog) {
     auto entry = createIndex(BSON("a" << 1));
 
     WriteUnitOfWork wuow(operationContext());
-    ASSERT_EQUALS(ErrorCodes::ObjectAlreadyExists,
-                  durable_catalog::createIndex(operationContext(),
-                                               catalogId(),
-                                               ns(),
-                                               {.uuid = uuid()},
-                                               indexDescriptor(BSON("a" << 1)).toIndexConfig(),
-                                               entry->getIdent()));
+    EXPECT_EQ(ErrorCodes::ObjectAlreadyExists,
+              durable_catalog::createIndex(operationContext(),
+                                           catalogId(),
+                                           ns(),
+                                           {.uuid = uuid()},
+                                           indexDescriptor(BSON("a" << 1)).toIndexConfig(),
+                                           entry->getIdent()));
 }
 
 }  // namespace

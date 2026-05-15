@@ -157,24 +157,24 @@ TEST_F(BatchedWriteContextTest, TestAcceptedBatchOperationsSucceeds) {
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     auto op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
     bwc.addBatchedOperation(opCtx, op);
-    ASSERT_FALSE(ops->isEmpty());
-    ASSERT_EQ(ops->numOperations(), 1U);
+    EXPECT_FALSE(ops->isEmpty());
+    EXPECT_EQ(ops->numOperations(), 1U);
 
     op = repl::MutableOplogEntry::makeInsertOperation(
         nss, UUID::gen(), BSON("a" << 0), BSON("_id" << 1));
     bwc.addBatchedOperation(opCtx, op);
-    ASSERT_EQ(ops->numOperations(), 2U);
+    EXPECT_EQ(ops->numOperations(), 2U);
 
     op = repl::MutableOplogEntry::makeInsertOperation(
         nss, UUID::gen(), BSON("a" << 1), BSON("_id" << 2));
     bwc.addBatchedOperation(opCtx, op);
-    ASSERT_EQ(ops->numOperations(), 3U);
+    EXPECT_EQ(ops->numOperations(), 3U);
 
     op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
     op.setChangeStreamPreImageRecordingMode(
         repl::ReplOperation::ChangeStreamPreImageRecordingMode::kPreImagesCollection);
     bwc.addBatchedOperation(opCtx, op);
-    ASSERT_EQ(ops->numOperations(), 4U);
+    EXPECT_EQ(ops->numOperations(), 4U);
 
     // Batched write committing is handled outside of the batched write context and involves the
     // oplog so it is not necessary to commit the WriteUnitOfWork in this test.
@@ -221,7 +221,7 @@ TEST_F(BatchedWriteContextTest, TestDDLFailsWithCRUDOpsInBatch) {
     // DDL assertion should fail because CRUD ops are already in the batch.
     ASSERT_THROWS_WITH_CHECK(
         bwc.assertNoMixedBatchedOps(/*isDDL=*/true), DBException, [](const DBException& ex) {
-            ASSERT_EQUALS(ex.code(), 12073500);
+            EXPECT_EQ(ex.code(), 12073500);
             assertionCount.tripwire.subtractAndFetch(1);
         });
 }
@@ -240,7 +240,7 @@ TEST_F(BatchedWriteContextTest, TestCRUDFailsAfterDDL) {
     // CRUD assertion should fail because DDL has occurred.
     ASSERT_THROWS_WITH_CHECK(
         bwc.assertNoMixedBatchedOps(/*isDDL=*/false), DBException, [](const DBException& ex) {
-            ASSERT_EQUALS(ex.code(), 12073501);
+            EXPECT_EQ(ex.code(), 12073501);
             assertionCount.tripwire.subtractAndFetch(1);
         });
 }

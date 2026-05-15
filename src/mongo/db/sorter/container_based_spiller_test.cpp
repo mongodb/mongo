@@ -518,19 +518,19 @@ TEST_F(SortedContainerWriterTest, ContainerWriterUsesNextKeyForContainerEntries)
     writer.addAlreadySorted(k2, v2);
 
     ASSERT_EQ(container.entries().size(), 2U);
-    ASSERT_EQ(container.entries()[0].first, startingKey);
-    ASSERT_EQ(container.entries()[1].first, startingKey + 1);
+    EXPECT_EQ(container.entries()[0].first, startingKey);
+    EXPECT_EQ(container.entries()[1].first, startingKey + 1);
 
     BufBuilder expected;
     expected.reset();
     k1.serializeForSorter(expected);
     v1.serializeForSorter(expected);
-    ASSERT_EQ(container.entries()[0].second, std::string(expected.buf(), expected.len()));
+    EXPECT_EQ(container.entries()[0].second, std::string(expected.buf(), expected.len()));
 
     expected.reset();
     k2.serializeForSorter(expected);
     v2.serializeForSorter(expected);
-    ASSERT_EQ(container.entries()[1].second, std::string(expected.buf(), expected.len()));
+    EXPECT_EQ(container.entries()[1].second, std::string(expected.buf(), expected.len()));
 
     exhaustIterators<IntWrapper, IntWrapper>(writer);
 }
@@ -557,7 +557,7 @@ TEST_F(SortedContainerWriterTest, GetBufferSizeReflectsAverageEntrySize) {
 
     // Before any spills, buffer size is 0. In production getBufferSize() is only consulted after
     // the first spill.
-    ASSERT_EQ(storage.getBufferSize(), 0);
+    EXPECT_EQ(storage.getBufferSize(), 0);
 
     // Write two IntWrapper+IntWrapper entries (4 + 4 = 8 bytes each serialized).
     SortOptions opts;
@@ -567,15 +567,15 @@ TEST_F(SortedContainerWriterTest, GetBufferSizeReflectsAverageEntrySize) {
     writer->addAlreadySorted(IntWrapper{3}, IntWrapper{4});
 
     // Average entry size = 16 / 2 = 8, plus per-cursor overhead.
-    ASSERT_EQ(storage.getBufferSize(), 8 + Storage::kPerCursorOverheadBytes);
+    EXPECT_EQ(storage.getBufferSize(), 8 + Storage::kPerCursorOverheadBytes);
 
     // Spilled bytes should have propagated to the tracker. The container-based sorter does not
     // compress in the sorter layer, so `bytesSpilled` and `bytesSpilledUncompressed` match.
-    ASSERT_EQ(stats.bytesSpilledUncompressed(), 16);
-    ASSERT_EQ(stats.bytesSpilled(), 16);
-    ASSERT_EQ(stats.numSpilledEntries(), 2);
-    ASSERT_EQ(this->sorterTracker.bytesSpilledUncompressed.load(), 16);
-    ASSERT_EQ(this->sorterTracker.bytesSpilled.load(), 16);
+    EXPECT_EQ(stats.bytesSpilledUncompressed(), 16);
+    EXPECT_EQ(stats.bytesSpilled(), 16);
+    EXPECT_EQ(stats.numSpilledEntries(), 2);
+    EXPECT_EQ(this->sorterTracker.bytesSpilledUncompressed.load(), 16);
+    EXPECT_EQ(this->sorterTracker.bytesSpilled.load(), 16);
 }
 
 TEST_F(SortedContainerWriterTest, GetBufferSizeEdgeCases) {
@@ -601,7 +601,7 @@ TEST_F(SortedContainerWriterTest, GetBufferSizeEdgeCases) {
                         sorter::kLatestChecksumVersion);
         stats.addSpilledDataSizeUncompressed(0);
         stats.incrementNumSpilledEntries();
-        ASSERT_EQ(storage.getBufferSize(), Storage::kPerCursorOverheadBytes);
+        EXPECT_EQ(storage.getBufferSize(), Storage::kPerCursorOverheadBytes);
     }
 
     // Non-divisible total: 10 bytes across 3 entries truncates to 3 (not 4), plus overhead. The
@@ -621,7 +621,7 @@ TEST_F(SortedContainerWriterTest, GetBufferSizeEdgeCases) {
         stats.incrementNumSpilledEntries();
         stats.addSpilledDataSizeUncompressed(3);
         stats.incrementNumSpilledEntries();
-        ASSERT_EQ(storage.getBufferSize(), 3 + Storage::kPerCursorOverheadBytes);
+        EXPECT_EQ(storage.getBufferSize(), 3 + Storage::kPerCursorOverheadBytes);
     }
 }
 
@@ -650,8 +650,8 @@ TEST_F(SortedContainerWriterTest, ContainerWriterStoresEmptyValueForZeroLengthSe
     writer.addAlreadySorted(NullValue{}, NullValue{});
 
     ASSERT_EQ(container.entries().size(), 1U);
-    ASSERT_EQ(container.entries()[0].first, startingKey);
-    ASSERT_TRUE(container.entries()[0].second.empty());
+    EXPECT_EQ(container.entries()[0].first, startingKey);
+    EXPECT_TRUE(container.entries()[0].second.empty());
 
     exhaustIterators<NullValue, NullValue>(writer);
 }
@@ -683,12 +683,12 @@ TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) 
     writer.addAlreadySorted(key, NullValue{});
 
     ASSERT_EQ(container.entries().size(), 1U);
-    ASSERT_EQ(container.entries()[0].first, startingKey);
+    EXPECT_EQ(container.entries()[0].first, startingKey);
 
     BufBuilder expected;
     key.serializeForSorter(expected);
     NullValue{}.serializeForSorter(expected);
-    ASSERT_EQ(container.entries()[0].second, std::string(expected.buf(), expected.len()));
+    EXPECT_EQ(container.entries()[0].second, std::string(expected.buf(), expected.len()));
 
     exhaustIterators<IntWrapper, NullValue>(writer);
 }
@@ -1292,7 +1292,7 @@ TEST_F(SortedContainerWriterTest, ReconstructPartiallyExhaustedIterator) {
         EXPECT_EQ(gotK, k);
         EXPECT_EQ(gotV, v);
     }
-    ASSERT_FALSE(firstIter->more());
+    EXPECT_FALSE(firstIter->more());
 
     auto range = firstIter->getRange();
     ASSERT_TRUE(range.getCurrent().has_value());
@@ -1363,7 +1363,7 @@ TEST(ContainerIteratorTest, RecoverCursorAfterAbandoningSnapshot) {
     EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{4, 4}));
     ASSERT_TRUE(iter.more());
     EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{5, 5}));
-    ASSERT_FALSE(iter.more());
+    EXPECT_FALSE(iter.more());
 }
 
 }  // namespace

@@ -298,7 +298,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
     const auto docCount = 122;
     client.insertExpiredDocs(nss, "x", 120);
     client.insertExpiredDocs(nss, "y", 2);
-    ASSERT_EQ(client.count(nss), docCount);
+    EXPECT_EQ(client.count(nss), docCount);
 
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
@@ -309,16 +309,16 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
-    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
-    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount * 2);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
+    EXPECT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount * 2);
 
     // The query planner can report more docs examined in case of write conflict retries or when
     // checking if document still matches after yielding.
-    ASSERT_GTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
-    ASSERT_LTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + 2 * docCount);
-    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys + docCount);
+    EXPECT_GE(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    EXPECT_LE(getTTLExaminedDocuments(), initTTLExaminedDocuments + 2 * docCount);
+    EXPECT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys + docCount);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
@@ -333,7 +333,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
     createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
 
     client.insertExpiredDocs(nss, "x", 100);
-    ASSERT_EQ(client.count(nss), 100);
+    EXPECT_EQ(client.count(nss), 100);
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx());
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
@@ -349,16 +349,16 @@ TEST_F(TTLTest, TTLPassSingleCollectionSecondaryDoesNothing) {
     doTTLPassForTest(Date_t::now());
 
     // No documents are removed, no passes are incremented.
-    ASSERT_EQ(client.count(nss), 100);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses);
-    ASSERT_EQ(getTTLSubPasses(), initTTLSubPasses);
-    ASSERT_EQ(getTTLDurationMicros(), initTTLDurationMicros);
-    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
-    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
+    EXPECT_EQ(client.count(nss), 100);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses);
+    EXPECT_EQ(getTTLSubPasses(), initTTLSubPasses);
+    EXPECT_EQ(getTTLDurationMicros(), initTTLDurationMicros);
+    EXPECT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
+    EXPECT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 
     // The query planner only reports docs/keys examined to find documents to delete.
-    ASSERT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments);
-    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
+    EXPECT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments);
+    EXPECT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
@@ -376,7 +376,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
 
     const auto docCount = 100;
     client.insertExpiredDocs(nss, "_id", docCount);
-    ASSERT_EQ(client.count(nss), docCount);
+    EXPECT_EQ(client.count(nss), docCount);
 
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
@@ -387,19 +387,19 @@ TEST_F(TTLTest, TTLPassSingleCollectionClusteredIndexes) {
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
 
     // For a clustered collection without additional indexes, 0 keys deleted is valid.
-    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
-    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
+    EXPECT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
+    EXPECT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 
     // The query planner can report more docs examined in case of write conflict retries or when
     // checking if document still matches after yielding.
-    ASSERT_GTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
-    ASSERT_LTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + 2 * docCount);
+    EXPECT_GE(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    EXPECT_LE(getTTLExaminedDocuments(), initTTLExaminedDocuments + 2 * docCount);
     // For a clustered collection without additional indexes, 0 keys examined is valid.
-    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
+    EXPECT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
@@ -419,7 +419,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
     const auto docCount = 100;
     client.insertExpiredDocs(nss, "_id", 50);
     client.insertExpiredDocs(nss, "foo", 50);
-    ASSERT_EQ(client.count(nss), docCount);
+    EXPECT_EQ(client.count(nss), docCount);
 
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
@@ -430,20 +430,20 @@ TEST_F(TTLTest, TTLPassSingleCollectionMixedIndexes) {
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
 
     // For a clustered collection with 1 additional index, 1 deleted key per document is valid.
-    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
-    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount);
+    EXPECT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
+    EXPECT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount);
 
     // The query planner can report more docs examined in case of write conflict retries or when
     // checking if document still matches after yielding.
-    ASSERT_GTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
-    ASSERT_LTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + 2 * docCount);
+    EXPECT_GE(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    EXPECT_LE(getTTLExaminedDocuments(), initTTLExaminedDocuments + 2 * docCount);
     // As the index on _id is clustered, only the keys examined on the foo index are counted.
-    ASSERT_GTE(getTTLExaminedKeys(), initTTLExaminedKeys + 50);
-    ASSERT_LTE(getTTLExaminedKeys(), initTTLExaminedKeys + 100);
+    EXPECT_GE(getTTLExaminedKeys(), initTTLExaminedKeys + 50);
+    EXPECT_LE(getTTLExaminedKeys(), initTTLExaminedKeys + 100);
 }
 
 TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
@@ -458,7 +458,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
 
     const auto docCount = 50000;
     client.insertExpiredDocs(nss, "foo", 50000);
-    ASSERT_EQ(client.count(nss), docCount);
+    EXPECT_EQ(client.count(nss), docCount);
 
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
@@ -469,16 +469,16 @@ TEST_F(TTLTest, TTLPassSingleCollectionMultipleDeletes) {
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
-    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
-    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + docCount);
+    EXPECT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys + docCount);
 
     // The query planner can report more docs examined in case of write conflict retries or when
     // checking if document still matches after yielding.
-    ASSERT_GTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
-    ASSERT_LTE(getTTLExaminedDocuments(), initTTLExaminedDocuments + 2 * docCount);
-    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys + docCount);
+    EXPECT_GE(getTTLExaminedDocuments(), initTTLExaminedDocuments + docCount);
+    EXPECT_LE(getTTLExaminedDocuments(), initTTLExaminedDocuments + 2 * docCount);
+    EXPECT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys + docCount);
 }
 
 TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
@@ -506,7 +506,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
     // to go past `now-maxSpanSeconds`, all the inserted documents should be deleted by TTL.
     Date_t timeseriesStartTime = now - Seconds(maxSpanSeconds * 2) - Seconds(1);
     client.insertTimeseriesDocs(nss, timeField, timeseriesStartTime, Seconds(1), documents);
-    ASSERT_EQ(client.count(nss), documents);
+    EXPECT_EQ(client.count(nss), documents);
 
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
@@ -517,18 +517,18 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleDelete) {
     doTTLPassForTest(now);
 
     // Everything should be deleted.
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
 
     // For a (timeseries) clustered collection without additional indexes, 0 keys deleted is valid.
     // In this case, the number of documents deleted is the number of timeseries buckets (i.e. 2)
-    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + 2);
-    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
+    EXPECT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments + 2);
+    EXPECT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 
     // The query planner only reports docs/keys examined to find documents to delete.
     // For a clustered collection without additional indexes, 0 keys examined is valid.
-    ASSERT_GT(getTTLExaminedDocuments(), initTTLExaminedDocuments);
-    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
+    EXPECT_GT(getTTLExaminedDocuments(), initTTLExaminedDocuments);
+    EXPECT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
 }
 
 TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
@@ -551,7 +551,7 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
     Date_t now = Date_t::now();
     // Insert documents starting at now, no documents is then eligible for deletion.
     client.insertTimeseriesDocs(nss, timeField, now, Seconds(1), documents);
-    ASSERT_EQ(client.count(nss), documents);
+    EXPECT_EQ(client.count(nss), documents);
 
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
@@ -560,10 +560,10 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesSimpleUneligible) {
     doTTLPassForTest(now);
 
     // All documents remain after the TTL pass.
-    ASSERT_EQ(client.count(nss), documents);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
-    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
-    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
+    EXPECT_EQ(client.count(nss), documents);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
+    EXPECT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 }
 
 TEST_F(TTLTest, TTLPassSingleTimeseriesBucketMaxSpan) {
@@ -591,13 +591,13 @@ TEST_F(TTLTest, TTLPassSingleTimeseriesBucketMaxSpan) {
     // roundingSeconds documents being inserted into a bucket eligible for deletion.
     client.insertTimeseriesDocs(
         nss, timeField, now - Seconds(maxSpanSeconds), Seconds(1), documents);
-    ASSERT_EQ(client.count(nss), documents);
+    EXPECT_EQ(client.count(nss), documents);
 
     auto initTTLPasses = getTTLPasses();
     doTTLPassForTest(now);
 
-    ASSERT_GTE(client.count(nss), documents - maxSpanSeconds + options.expireAfterSeconds.value());
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_GE(client.count(nss), documents - maxSpanSeconds + options.expireAfterSeconds.value());
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
 }
 
 TEST_F(TTLTest, TTLPassTimeseriesExtendedPrior1970Delete) {
@@ -627,14 +627,14 @@ TEST_F(TTLTest, TTLPassTimeseriesExtendedPrior1970Delete) {
     // Typically an opobserver marks the collection as extended range if needed. We don't have that
     // in this unit test so we set it here.
     client.setTimeseriesExtendedRange(nss);
-    ASSERT_EQ(client.count(nss), 3);
+    EXPECT_EQ(client.count(nss), 3);
 
     auto initTTLPasses = getTTLPasses();
     doTTLPassForTest(now);
 
     // We should delete two documents, the one prior to 1970 and the other eligible doc.
-    ASSERT_EQ(client.count(nss), 1);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(client.count(nss), 1);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
 }
 
 TEST_F(TTLTest, TTLPassTimeseriesExtendedAfter2038Delete) {
@@ -663,14 +663,14 @@ TEST_F(TTLTest, TTLPassTimeseriesExtendedAfter2038Delete) {
     // Typically an opobserver marks the collection as extended range if needed. We don't have that
     // in this unit test so we set it here.
     client.setTimeseriesExtendedRange(nss);
-    ASSERT_EQ(client.count(nss), 2);
+    EXPECT_EQ(client.count(nss), 2);
 
     const auto initTTLPasses = getTTLPasses();
     doTTLPassForTest(now);
 
     // The document with time 1940 should remain.
-    ASSERT_EQ(client.count(nss), 1);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(client.count(nss), 1);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
 }
 
 TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
@@ -689,7 +689,7 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
     createIndex(nss, spec);
 
     client.insertExpiredDocs(nss, "foo", 100);
-    ASSERT_EQ(client.count(nss), 100);
+    EXPECT_EQ(client.count(nss), 100);
 
     const auto initTTLPasses = getTTLPasses();
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
@@ -701,17 +701,17 @@ TEST_F(TTLTest, TTLPassCollectionWithoutExpiration) {
     doTTLPassForTest(Date_t::now());
 
     // No documents are removed.
-    ASSERT_EQ(client.count(nss), 100);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
-    ASSERT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
-    ASSERT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
+    EXPECT_EQ(client.count(nss), 100);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(getTTLDeletedDocuments(), initTTLDeletedDocuments);
+    EXPECT_EQ(getTTLDeletedKeys(), initTTLDeletedKeys);
 
     // The query planner only reports docs/keys examined to find documents to delete.
-    ASSERT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments);
-    ASSERT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
+    EXPECT_EQ(getTTLExaminedDocuments(), initTTLExaminedDocuments);
+    EXPECT_EQ(getTTLExaminedKeys(), initTTLExaminedKeys);
 
     // A non-TTL index doesn't contribute to the number of skipped invalid TTL indexes.
-    ASSERT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);
+    EXPECT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);
 }
 
 
@@ -739,8 +739,8 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
     client.insertExpiredDocs(nss1, "x", xExpiredDocsNss1);
     client.insertExpiredDocs(nss1, "y", yExpiredDocsNss1);
 
-    ASSERT_EQ(client.count(nss0), xExpiredDocsNss0);
-    ASSERT_EQ(client.count(nss1), xExpiredDocsNss1 + yExpiredDocsNss1);
+    EXPECT_EQ(client.count(nss0), xExpiredDocsNss0);
+    EXPECT_EQ(client.count(nss1), xExpiredDocsNss1 + yExpiredDocsNss1);
 
     auto initTTLPasses = getTTLPasses();
     auto initTTLDeletedDocuments = getTTLDeletedDocuments();
@@ -749,12 +749,12 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
-    ASSERT_EQ(client.count(nss0), 0);
-    ASSERT_EQ(client.count(nss1), 0);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
-    ASSERT_EQ(getTTLDeletedDocuments(),
+    EXPECT_EQ(client.count(nss0), 0);
+    EXPECT_EQ(client.count(nss1), 0);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(getTTLDeletedDocuments(),
               xExpiredDocsNss0 + xExpiredDocsNss1 + yExpiredDocsNss1 + initTTLDeletedDocuments);
-    ASSERT_EQ(getTTLDeletedKeys(),
+    EXPECT_EQ(getTTLDeletedKeys(),
               xExpiredDocsNss0 + ((xExpiredDocsNss1 + yExpiredDocsNss1) * 2) + initTTLDeletedKeys);
 }
 
@@ -794,15 +794,15 @@ TEST_F(TTLTest, TTLSingleSubPass) {
     client.insertExpiredDocs(nss, "y", yExpiredDocs);
 
     auto currentCount = client.count(nss);
-    ASSERT_EQ(currentCount, xExpiredDocs + yExpiredDocs);
+    EXPECT_EQ(currentCount, xExpiredDocs + yExpiredDocs);
 
     bool moreWork = doTTLSubPassForTest(opCtx(), Date_t::now());
 
     // A sub-pass removes all expired document provided it does not reach
     // 'ttlMonitorSubPassTargetSecs'.
-    ASSERT_FALSE(moreWork);
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLSubPasses(), nInitialSubPasses + 1);
+    EXPECT_FALSE(moreWork);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLSubPasses(), nInitialSubPasses + 1);
 }
 
 TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
@@ -857,31 +857,31 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
     client.insertExpiredDocs(nss, "y", yExpiredDocs);
 
     auto currentCount = client.count(nss);
-    ASSERT_EQ(currentCount, xExpiredDocs + yExpiredDocs);
+    EXPECT_EQ(currentCount, xExpiredDocs + yExpiredDocs);
 
     bool moreWork = true;
 
     // Issue first subpass.
     {
         moreWork = doTTLSubPassForTest(opCtx(), Date_t::now());
-        ASSERT_TRUE(moreWork);
+        EXPECT_TRUE(moreWork);
 
         // Since there were less than ttlIndexDeleteTargetDocs yExpiredDocs, expect all of the
         // yExpired docs removed.
         auto expectedDocsRemoved = yExpiredDocs + ttlIndexDeleteTargetDocs;
         auto newCount = client.count(nss);
-        ASSERT_EQ(newCount, currentCount - expectedDocsRemoved);
+        EXPECT_EQ(newCount, currentCount - expectedDocsRemoved);
         currentCount = newCount;
     }
 
     while ((moreWork = doTTLSubPassForTest(opCtx(), Date_t::now())) == true) {
         auto newCount = client.count(nss);
-        ASSERT_EQ(newCount, currentCount - ttlIndexDeleteTargetDocs);
+        EXPECT_EQ(newCount, currentCount - ttlIndexDeleteTargetDocs);
         currentCount = newCount;
     }
 
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLSubPasses(), nExpectedTotalSubPasses);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLSubPasses(), nExpectedTotalSubPasses);
 }
 
 TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
@@ -925,7 +925,7 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
     client.insertExpiredDocs(nss, "y", yExpiredDocs0);
 
     auto initialNDocuments = client.count(nss);
-    ASSERT_EQ(initialNDocuments, xExpiredDocs + yExpiredDocs0);
+    EXPECT_EQ(initialNDocuments, xExpiredDocs + yExpiredDocs0);
 
     auto nSubPasses = getTTLSubPasses();
     bool moreWork = true;
@@ -933,15 +933,15 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
     // Issue first subpass.
     {
         moreWork = doTTLSubPassForTest(opCtx(), Date_t::now());
-        ASSERT_EQ(getTTLSubPasses(), ++nSubPasses);
+        EXPECT_EQ(getTTLSubPasses(), ++nSubPasses);
 
-        ASSERT_TRUE(moreWork);
+        EXPECT_TRUE(moreWork);
 
         // Since there were less than ttlIndexDeleteTargetDocs yExpiredDocs0, expect all of the
         // yExpired docs removed.
         auto expectedDocsRemoved = yExpiredDocs0 + ttlIndexDeleteTargetDocs;
 
-        ASSERT_EQ(client.count(nss), initialNDocuments - expectedDocsRemoved);
+        EXPECT_EQ(client.count(nss), initialNDocuments - expectedDocsRemoved);
     }
 
     // While the TTL index on 'y' is exhausted (all expired documents have been removed in the first
@@ -957,13 +957,13 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
 
     auto nDocumentsBeforeInsert = client.count(nss);
     client.insertExpiredDocs(nss, "y", yExpiredDocs1);
-    ASSERT_EQ(client.count(nss), nDocumentsBeforeInsert + yExpiredDocs1);
+    EXPECT_EQ(client.count(nss), nDocumentsBeforeInsert + yExpiredDocs1);
 
     while (doTTLSubPassForTest(opCtx(), Date_t::now())) {
     }
 
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLSubPasses(), expectedTotalSubPasses);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLSubPasses(), expectedTotalSubPasses);
 }
 
 // Tests that, between sub-passes, newly added TTL indexes are not ignored.
@@ -1015,21 +1015,21 @@ TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
     client.insertExpiredDocs(nss, "z", zDocs);
 
     auto currentCount = client.count(nss);
-    ASSERT_EQ(currentCount, xExpiredDocs + yExpiredDocs + zDocs);
+    EXPECT_EQ(currentCount, xExpiredDocs + yExpiredDocs + zDocs);
 
     bool moreWork = true;
 
     // Issue first subpass.
     {
         moreWork = doTTLSubPassForTest(opCtx(), Date_t::now());
-        ASSERT_TRUE(moreWork);
+        EXPECT_TRUE(moreWork);
 
         // Since there were less than ttlIndexDeleteTargetDocs yExpiredDocs, expect all of the
         // yExpired docs removed.
         auto expectedDocsRemoved = yExpiredDocs + ttlIndexDeleteTargetDocs;
         auto newCount = client.count(nss);
 
-        ASSERT_EQ(newCount, currentCount - expectedDocsRemoved);
+        EXPECT_EQ(newCount, currentCount - expectedDocsRemoved);
 
         currentCount = newCount;
     }
@@ -1042,8 +1042,8 @@ TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
         moreWork = doTTLSubPassForTest(opCtx(), Date_t::now());
     } while (moreWork);
 
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLSubPasses(), 5 + nInitialSubPasses);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLSubPasses(), 5 + nInitialSubPasses);
 }
 
 // Simple test using the ttlmonitor's internal thread to exercise the scheduling logic.
@@ -1061,7 +1061,7 @@ TEST_F(TTLTest, TTLRunMonitorThread) {
     createIndex(nss, BSON("x" << 1), "testIndexX", Seconds(1));
 
     client.insertExpiredDocs(nss, "x", 100);
-    ASSERT_EQ(client.count(nss), 100);
+    EXPECT_EQ(client.count(nss), 100);
 
     // Let the monitor run a pass.
     auto initTTLPasses = getTTLPasses();
@@ -1078,9 +1078,9 @@ TEST_F(TTLTest, TTLRunMonitorThread) {
     std::this_thread::sleep_for(Milliseconds(1000).toSystemDuration());
 
     // All expired documents are removed.
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_GT(getTTLPasses(), initTTLPasses);  // More than one may have been run
-    ASSERT_GT(getTTLDurationMicros(), initTTLDurationMicros);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_GT(getTTLPasses(), initTTLPasses);  // More than one may have been run
+    EXPECT_GT(getTTLDurationMicros(), initTTLDurationMicros);
 }
 
 // Values smaller than int32_t::max() are valid for secondary TTL indexes.
@@ -1098,7 +1098,7 @@ TEST_F(TTLTest, TTLDoubleFitsIntoInt32) {
     const auto nDocs = 10;
     Seconds expireAfterSecondsRounded(5);
     client.insertExpiredDocs(nss, "foo", nDocs, expireAfterSecondsRounded);
-    ASSERT_EQ(client.count(nss), nDocs);
+    EXPECT_EQ(client.count(nss), nDocs);
 
     const auto initTTLPasses = getTTLPasses();
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
@@ -1107,11 +1107,11 @@ TEST_F(TTLTest, TTLDoubleFitsIntoInt32) {
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
-    ASSERT_EQ(getTTLDeletedDocuments(), nDocs + initTTLDeletedDocuments);
-    ASSERT_EQ(getTTLDeletedKeys(), nDocs + initTTLDeletedKeys);
-    ASSERT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(getTTLDeletedDocuments(), nDocs + initTTLDeletedDocuments);
+    EXPECT_EQ(getTTLDeletedKeys(), nDocs + initTTLDeletedKeys);
+    EXPECT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);
 }
 
 TEST_F(TTLTest, TTLMinDoubleFitsIntoInt32) {
@@ -1127,16 +1127,16 @@ TEST_F(TTLTest, TTLMinDoubleFitsIntoInt32) {
     createIndex(nss, validSpec);
     const auto nDocs = 10;
     client.insertExpiredDocs(nss, "foo", nDocs);
-    ASSERT_EQ(client.count(nss), nDocs);
+    EXPECT_EQ(client.count(nss), nDocs);
 
     const auto initTTLPasses = getTTLPasses();
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
-    ASSERT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);
 }
 
 TEST_F(TTLTest, TTLkExpireAfterSecondsForInactiveTTLIndexIsValid) {
@@ -1155,16 +1155,16 @@ TEST_F(TTLTest, TTLkExpireAfterSecondsForInactiveTTLIndexIsValid) {
     createIndex(nss, validSpec);
     const auto nDocs = 10;
     client.insertExpiredDocs(nss, "foo", nDocs, expireAfterSeconds);
-    ASSERT_EQ(client.count(nss), nDocs);
+    EXPECT_EQ(client.count(nss), nDocs);
 
     const auto initTTLPasses = getTTLPasses();
     const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
     doTTLPassForTest(Date_t::now());
 
     // All expired documents are removed.
-    ASSERT_EQ(client.count(nss), 0);
-    ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
-    ASSERT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);
+    EXPECT_EQ(client.count(nss), 0);
+    EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
+    EXPECT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips);
 }
 
 // Tests invalid TTL indexes are skipped for document deletion. Theoretically, there should never be
@@ -1185,7 +1185,7 @@ protected:
 
         const int nDocs = 10;
         client.insertExpiredDocs(nss, "foo", nDocs);
-        ASSERT_EQ(client.count(nss), nDocs);
+        EXPECT_EQ(client.count(nss), nDocs);
 
         const auto initTTLPasses = getTTLPasses();
         const auto initInvalidTTLIndexSkips = getInvalidTTLIndexSkips();
@@ -1193,11 +1193,11 @@ protected:
         doTTLPassForTest(Date_t::now());
 
         // No documents are removed.
-        ASSERT_EQ(client.count(nss), nDocs);
-        ASSERT_EQ(getTTLPasses(), initTTLPasses + 1);
+        EXPECT_EQ(client.count(nss), nDocs);
+        EXPECT_EQ(getTTLPasses(), initTTLPasses + 1);
 
         // Metrics track an invalid TTL index was skipped during the pass.
-        ASSERT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips + 1);
+        EXPECT_EQ(getInvalidTTLIndexSkips(), initInvalidTTLIndexSkips + 1);
     }
 };
 

@@ -94,9 +94,9 @@ void BucketCatalogInternalTest::_rolloverWithRolloverReason(RolloverReason reaso
 
 void BucketCatalogInternalTest::_testRolloverWithRolloverReasonUpdatesStats(RolloverReason reason,
                                                                             StringData stat) {
-    ASSERT_EQ(0, _getExecutionStat(_uuid1, stat));
+    EXPECT_EQ(0, _getExecutionStat(_uuid1, stat));
     _rolloverWithRolloverReason(reason);
-    ASSERT_EQ(1, _getExecutionStat(_uuid1, stat));
+    EXPECT_EQ(1, _getExecutionStat(_uuid1, stat));
 }
 
 TEST_F(BucketCatalogInternalTest, UpdateRolloverStats) {
@@ -104,43 +104,43 @@ TEST_F(BucketCatalogInternalTest, UpdateRolloverStats) {
     ExecutionStatsController stats(_collectionStats, _globalStats);
 
     // Ensure that both the globalStats and collectionStats are initially all set to 0.
-    ASSERT_EQ(_globalStats.numBucketsClosedDueToTimeForward.load(), 0);
-    ASSERT_EQ(_globalStats.numBucketsArchivedDueToTimeBackward.load(), 0);
-    ASSERT_EQ(_globalStats.numBucketsClosedDueToCount.load(), 0);
-    ASSERT_EQ(_globalStats.numBucketsClosedDueToCachePressure.load(), 0);
-    ASSERT_EQ(_globalStats.numBucketsClosedDueToSize.load(), 0);
-    ASSERT_EQ(_globalStats.numBucketsClosedDueToSchemaChange.load(), 0);
+    EXPECT_EQ(_globalStats.numBucketsClosedDueToTimeForward.load(), 0);
+    EXPECT_EQ(_globalStats.numBucketsArchivedDueToTimeBackward.load(), 0);
+    EXPECT_EQ(_globalStats.numBucketsClosedDueToCount.load(), 0);
+    EXPECT_EQ(_globalStats.numBucketsClosedDueToCachePressure.load(), 0);
+    EXPECT_EQ(_globalStats.numBucketsClosedDueToSize.load(), 0);
+    EXPECT_EQ(_globalStats.numBucketsClosedDueToSchemaChange.load(), 0);
 
-    ASSERT_EQ(_collectionStats->numBucketsClosedDueToTimeForward.load(), 0);
-    ASSERT_EQ(_collectionStats->numBucketsArchivedDueToTimeBackward.load(), 0);
-    ASSERT_EQ(_collectionStats->numBucketsClosedDueToCount.load(), 0);
-    ASSERT_EQ(_collectionStats->numBucketsClosedDueToCachePressure.load(), 0);
-    ASSERT_EQ(_collectionStats->numBucketsClosedDueToSize.load(), 0);
-    ASSERT_EQ(_collectionStats->numBucketsClosedDueToSchemaChange.load(), 0);
+    EXPECT_EQ(_collectionStats->numBucketsClosedDueToTimeForward.load(), 0);
+    EXPECT_EQ(_collectionStats->numBucketsArchivedDueToTimeBackward.load(), 0);
+    EXPECT_EQ(_collectionStats->numBucketsClosedDueToCount.load(), 0);
+    EXPECT_EQ(_collectionStats->numBucketsClosedDueToCachePressure.load(), 0);
+    EXPECT_EQ(_collectionStats->numBucketsClosedDueToSize.load(), 0);
+    EXPECT_EQ(_collectionStats->numBucketsClosedDueToSchemaChange.load(), 0);
 
     internal::updateRolloverStats(stats, RolloverReason::kTimeForward);
-    ASSERT_EQ(_globalStats.numBucketsClosedDueToTimeForward.load(), 1);
-    ASSERT_EQ(_collectionStats->numBucketsClosedDueToTimeForward.load(), 1);
+    EXPECT_EQ(_globalStats.numBucketsClosedDueToTimeForward.load(), 1);
+    EXPECT_EQ(_collectionStats->numBucketsClosedDueToTimeForward.load(), 1);
 
     internal::updateRolloverStats(stats, RolloverReason::kTimeBackward);
-    ASSERT_EQ(_globalStats.numBucketsArchivedDueToTimeBackward.load(), 1);
-    ASSERT_EQ(_collectionStats->numBucketsArchivedDueToTimeBackward.load(), 1);
+    EXPECT_EQ(_globalStats.numBucketsArchivedDueToTimeBackward.load(), 1);
+    EXPECT_EQ(_collectionStats->numBucketsArchivedDueToTimeBackward.load(), 1);
 
     internal::updateRolloverStats(stats, RolloverReason::kCount);
-    ASSERT_EQ(_globalStats.numBucketsClosedDueToCount.load(), 1);
-    ASSERT_EQ(_collectionStats->numBucketsClosedDueToCount.load(), 1);
+    EXPECT_EQ(_globalStats.numBucketsClosedDueToCount.load(), 1);
+    EXPECT_EQ(_collectionStats->numBucketsClosedDueToCount.load(), 1);
 
     internal::updateRolloverStats(stats, RolloverReason::kCachePressure);
-    ASSERT_EQ(_globalStats.numBucketsClosedDueToCachePressure.load(), 1);
-    ASSERT_EQ(_collectionStats->numBucketsClosedDueToCachePressure.load(), 1);
+    EXPECT_EQ(_globalStats.numBucketsClosedDueToCachePressure.load(), 1);
+    EXPECT_EQ(_collectionStats->numBucketsClosedDueToCachePressure.load(), 1);
 
     internal::updateRolloverStats(stats, RolloverReason::kSize);
-    ASSERT_EQ(_globalStats.numBucketsClosedDueToSize.load(), 1);
-    ASSERT_EQ(_collectionStats->numBucketsClosedDueToSize.load(), 1);
+    EXPECT_EQ(_globalStats.numBucketsClosedDueToSize.load(), 1);
+    EXPECT_EQ(_collectionStats->numBucketsClosedDueToSize.load(), 1);
 
     internal::updateRolloverStats(stats, RolloverReason::kSchemaChange);
-    ASSERT_EQ(_globalStats.numBucketsClosedDueToSchemaChange.load(), 1);
-    ASSERT_EQ(_collectionStats->numBucketsClosedDueToSchemaChange.load(), 1);
+    EXPECT_EQ(_globalStats.numBucketsClosedDueToSchemaChange.load(), 1);
+    EXPECT_EQ(_collectionStats->numBucketsClosedDueToSchemaChange.load(), 1);
 }
 
 TEST_F(BucketCatalogInternalTest, RolloverUpdatesRolloverStats) {

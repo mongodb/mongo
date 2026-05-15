@@ -164,21 +164,21 @@ const char* BinaryReopenTest::control(std::vector<uint64_t> blocks, uint8_t scal
 
 TEST_F(BinaryReopenTest, EstimateLastValue) {
     // Block with zeros return zero
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block1Zero})), V{0});
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block1Zero})), V{0});
 
     // Skips before a value does not affect the last value
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block6Skip, block6Skip1Two})), V{2});
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block6Skip, block6Skip1Two})), V{2});
 
     // Block ending with skips returns last non-skip value
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block1Zero, block6Skip})), V{0});
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block5Two, block6Skip})), V{2});
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block3One1Skip, block6Skip})), V{1});
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block1Zero, block6Skip})), V{0});
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block5Two, block6Skip})), V{2});
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block3One1Skip, block6Skip})), V{1});
 
     // Block ending with 60 or more skips return none even if value exists before the skips
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block5Two, block60Skip})), V{boost::none});
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block5Two, block60Skip, block6Skip})),
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block5Two, block60Skip})), V{boost::none});
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block5Two, block60Skip, block6Skip})),
               V{boost::none});
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block5Two,
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block5Two,
                                                    block6Skip,
                                                    block6Skip,
                                                    block6Skip,
@@ -192,7 +192,7 @@ TEST_F(BinaryReopenTest, EstimateLastValue) {
               V{boost::none});
 
     // Block ending with 59 or fewer skips returns last non-skip value
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block5Two,
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block5Two,
                                                    block6Skip,
                                                    block6Skip,
                                                    block6Skip,
@@ -210,7 +210,7 @@ TEST_F(BinaryReopenTest, EstimateLastValue) {
               V{2});
 
     // Block with skips only returns none
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block6Skip,
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block6Skip,
                                                    block6Skip,
                                                    block6Skip,
                                                    block6Skip,
@@ -221,7 +221,7 @@ TEST_F(BinaryReopenTest, EstimateLastValue) {
                                                    block6Skip,
                                                    block6Skip})),
               V{boost::none});
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block6Skip,
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block6Skip,
                                                    block6Skip,
                                                    block6Skip,
                                                    block6Skip,
@@ -236,13 +236,13 @@ TEST_F(BinaryReopenTest, EstimateLastValue) {
                                                    block1Skip,
                                                    block1Skip})),
               V{boost::none});
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block1Skip})), V{boost::none});
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block1Skip})), V{boost::none});
 
     // Block with RLE returns zero regardless of what's before it
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block1RLE})), V{0});
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block1One, block1RLE})), V{0});
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block1Zero, block1RLE})), V{0});
-    ASSERT_EQ(estimateLastValue<uint64_t>(control({block1Skip, block1RLE})), V{0});
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block1RLE})), V{0});
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block1One, block1RLE})), V{0});
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block1Zero, block1RLE})), V{0});
+    EXPECT_EQ(estimateLastValue<uint64_t>(control({block1Skip, block1RLE})), V{0});
 }
 
 TEST_F(BinaryReopenTest, FindOverflow) {
@@ -254,103 +254,103 @@ TEST_F(BinaryReopenTest, FindOverflow) {
 
     // Basic case of a single simple8b block with skip does not overflow
     res = findOverflowHelper(control({block1Skip}), V{boost::none});
-    ASSERT_EQ(res.overflowIndex, kInvalidIndex);
-    ASSERT_EQ(res.lastValue, V{boost::none});  // last value is unchanged when there is no overflow
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, kInvalidIndex);
+    EXPECT_EQ(res.lastValue, V{boost::none});  // last value is unchanged when there is no overflow
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // Basic case of a single simple8b block with values does not overflow
     res = findOverflowHelper(control({block5Two}), V{0});
-    ASSERT_EQ(res.overflowIndex, kInvalidIndex);
-    ASSERT_EQ(res.lastValue, V{0});  // last value is unchanged when there is no overflow
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, kInvalidIndex);
+    EXPECT_EQ(res.lastValue, V{0});  // last value is unchanged when there is no overflow
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // Two blocks with identical values does not overflow if there is a block that could have all
     // fit in
     res = findOverflowHelper(control({block5Two, block5Two}),
                              V{0});  // Different value for RLE disables RLE mode
-    ASSERT_EQ(res.overflowIndex, kInvalidIndex);
-    ASSERT_EQ(res.lastValue, V{0});  // last value is unchanged when there is no overflow
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, kInvalidIndex);
+    EXPECT_EQ(res.lastValue, V{0});  // last value is unchanged when there is no overflow
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // Two blocks with over 60 values that are different cannot fit in a single block so we overflow
     // at index 0.
     res = findOverflowHelper(control({block5Two, block60Zero}), V{0});
-    ASSERT_EQ(res.overflowIndex, 0);
-    ASSERT_EQ(res.lastValue, V{2});  // last value in block that overflowed
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, 0);
+    EXPECT_EQ(res.lastValue, V{2});  // last value in block that overflowed
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // Three blocks with over 60 values that are different cannot fit in a single block so we
     // overflow at index 1.
     res = findOverflowHelper(control({block5Two, block5Two, block60Zero}), V{0});
-    ASSERT_EQ(res.overflowIndex, 1);
-    ASSERT_EQ(res.lastValue, V{2});  // last value in block that overflowed
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, 1);
+    EXPECT_EQ(res.lastValue, V{2});  // last value in block that overflowed
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // Changing the last value does not affect the overflow point as RLE is not in play
     res = findOverflowHelper(control({block5Two, block5Two, block60Zero}), V{2});
-    ASSERT_EQ(res.overflowIndex, 1);
-    ASSERT_EQ(res.lastValue, V{2});  // last value in block that overflowed
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, 1);
+    EXPECT_EQ(res.lastValue, V{2});  // last value in block that overflowed
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // Without RLE we can only fit 30 '1' values in a single block, so overflow happens at index
     // 1 even though values are identical
     res = findOverflowHelper(control({block5Two, blockFullOne, blockFullOne}), V{0});
-    ASSERT_EQ(res.overflowIndex, 1);
-    ASSERT_EQ(res.lastValue, V{1});  // last value in block that overflowed
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, 1);
+    EXPECT_EQ(res.lastValue, V{1});  // last value in block that overflowed
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // With RLE overflow happens in first block with a different value
     res = findOverflowHelper(control({block5Two, blockFullOne, blockFullOne}), V{1});
-    ASSERT_EQ(res.overflowIndex, 0);
-    ASSERT_EQ(res.lastValue, V{2});  // last value in block that overflowed
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, 0);
+    EXPECT_EQ(res.lastValue, V{2});  // last value in block that overflowed
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // No overflow if the values are all identical and RLE is in play
     res = findOverflowHelper(control({blockFullOne, blockFullOne}), V{1});
-    ASSERT_EQ(res.overflowIndex, kInvalidIndex);
-    ASSERT_EQ(res.lastValue, V{1});  // last value in block that overflowed
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, kInvalidIndex);
+    EXPECT_EQ(res.lastValue, V{1});  // last value in block that overflowed
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // With RLE block and all values are identical the overflow happens before the RLE block
     res = findOverflowHelper(control({block5Two, block1RLE, block5Two}), V{2});
-    ASSERT_EQ(res.overflowIndex, 0);
-    ASSERT_EQ(res.lastValue, V{2});  // last value in block that overflowed
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, 0);
+    EXPECT_EQ(res.lastValue, V{2});  // last value in block that overflowed
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // With RLE block and values are different before and after RLE the overflow happens at the RLE
     // block
     res = findOverflowHelper(control({blockFullOne, block1RLE, block5Two}), V{2});
-    ASSERT_EQ(res.overflowIndex, 1);
-    ASSERT_EQ(res.lastValue, V{1});  // last value in block that overflowed
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, 1);
+    EXPECT_EQ(res.lastValue, V{1});  // last value in block that overflowed
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // With RLE block and values are different before and after RLE the overflow happens at the last
     // RLE block
     res = findOverflowHelper(control({blockFullOne, block16RLE, block1RLE, block5Two}), V{2});
-    ASSERT_EQ(res.overflowIndex, 2);
-    ASSERT_EQ(res.lastValue, V{1});  // last value in block that overflowed
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.overflowIndex, 2);
+    EXPECT_EQ(res.lastValue, V{1});  // last value in block that overflowed
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 
     // Only RLE returns no overflow but pending RLE at the last RLE block
     res = findOverflowHelper(control({block16RLE, block1RLE}), V{2});
-    ASSERT_EQ(res.overflowIndex, kInvalidIndex);
-    ASSERT_EQ(res.lastValue, V{2});  // last value in block that overflowed
-    ASSERT_EQ(res.pendingRLEindex, 1);
+    EXPECT_EQ(res.overflowIndex, kInvalidIndex);
+    EXPECT_EQ(res.lastValue, V{2});  // last value in block that overflowed
+    EXPECT_EQ(res.pendingRLEindex, 1);
 
     // RLE followed by non-RLE compatible with last value returns no overflow but pending RLE at
     // the last RLE block
     res = findOverflowHelper(control({block16RLE, block1RLE, block5Two}), V{2});
-    ASSERT_EQ(res.overflowIndex, kInvalidIndex);
-    ASSERT_EQ(res.lastValue, V{2});  // last value in block that overflowed
-    ASSERT_EQ(res.pendingRLEindex, 1);
+    EXPECT_EQ(res.overflowIndex, kInvalidIndex);
+    EXPECT_EQ(res.lastValue, V{2});  // last value in block that overflowed
+    EXPECT_EQ(res.pendingRLEindex, 1);
 
     // RLE followed by non-RLE not compatible with last value returns overflow at the
     // non-RLE block
     res = findOverflowHelper(control({block16RLE, block1RLE, block5Two}), V{1});
-    ASSERT_EQ(res.overflowIndex, 1);
-    ASSERT_EQ(res.lastValue,
+    EXPECT_EQ(res.overflowIndex, 1);
+    EXPECT_EQ(res.lastValue,
               V{1});  // last value is left unchanged when it cannot be determined due to RLE
-    ASSERT_EQ(res.pendingRLEindex, kInvalidIndex);
+    EXPECT_EQ(res.pendingRLEindex, kInvalidIndex);
 }
 
 TEST_F(BinaryReopenTest, FindLastNonRLE) {
@@ -358,60 +358,60 @@ TEST_F(BinaryReopenTest, FindLastNonRLE) {
 
     // Single non-RLE returns index 0 and the last value in the block
     res = findLastNonRLE<uint64_t>(control({block1Zero}));
-    ASSERT_EQ(res.index, 0);
-    ASSERT_EQ(res.lastValue, V{0});
+    EXPECT_EQ(res.index, 0);
+    EXPECT_EQ(res.lastValue, V{0});
 
     // Single non-RLE returns index 0 and the last value in the block
     res = findLastNonRLE<uint64_t>(control({block2Zero1Skip}));
-    ASSERT_EQ(res.index, 0);
-    ASSERT_EQ(res.lastValue, V{boost::none});
+    EXPECT_EQ(res.index, 0);
+    EXPECT_EQ(res.lastValue, V{boost::none});
 
     // Single non-RLE returns index 0 and the last value in the block
     res = findLastNonRLE<uint64_t>(control({block6Skip1Two}));
-    ASSERT_EQ(res.index, 0);
-    ASSERT_EQ(res.lastValue, V{2});
+    EXPECT_EQ(res.index, 0);
+    EXPECT_EQ(res.lastValue, V{2});
 
     // Multiple non-RLE blocks returns index to last block and the last value in that block
     res = findLastNonRLE<uint64_t>(control({blockFullOne, block6Skip1Two}));
-    ASSERT_EQ(res.index, 1);
-    ASSERT_EQ(res.lastValue, V{2});
+    EXPECT_EQ(res.index, 1);
+    EXPECT_EQ(res.lastValue, V{2});
 
     // RLE at the end is skipped. Position and last value to prior non-RLE block is returned
     res = findLastNonRLE<uint64_t>(control({blockFullOne, block1RLE}));
-    ASSERT_EQ(res.index, 0);
-    ASSERT_EQ(res.lastValue, V{1});
+    EXPECT_EQ(res.index, 0);
+    EXPECT_EQ(res.lastValue, V{1});
 
     // RLE at the end is skipped. Position and last value to prior non-RLE block is returned
     res = findLastNonRLE<uint64_t>(control({block1RLE, blockFullOne, block16RLE, block1RLE}));
-    ASSERT_EQ(res.index, 1);
-    ASSERT_EQ(res.lastValue, V{1});
+    EXPECT_EQ(res.index, 1);
+    EXPECT_EQ(res.lastValue, V{1});
 
     // Only RLE blocks returns invalid index and last value of 0
     res = findLastNonRLE<uint64_t>(control({block1RLE}));
-    ASSERT_EQ(res.index, kInvalidIndex);
-    ASSERT_EQ(res.lastValue, V{0});
+    EXPECT_EQ(res.index, kInvalidIndex);
+    EXPECT_EQ(res.lastValue, V{0});
 
     // Only RLE blocks returns invalid index and last value of 0
     res = findLastNonRLE<uint64_t>(control({block16RLE, block1RLE}));
-    ASSERT_EQ(res.index, kInvalidIndex);
-    ASSERT_EQ(res.lastValue, V{0});
+    EXPECT_EQ(res.index, kInvalidIndex);
+    EXPECT_EQ(res.lastValue, V{0});
 
     // Index parameter limits the search to before that index
     res =
         findLastNonRLE<uint64_t>(control({block6Skip1Two, blockFullOne, block16RLE, block1RLE}), 0);
-    ASSERT_EQ(res.index, 0);
-    ASSERT_EQ(res.lastValue, V{2});
+    EXPECT_EQ(res.index, 0);
+    EXPECT_EQ(res.lastValue, V{2});
 
     // Index parameter limits the search to before that index
     res = findLastNonRLE<uint64_t>(control({blockFullOne, block6Skip1Two, blockFullOne}), 1);
-    ASSERT_EQ(res.index, 1);
-    ASSERT_EQ(res.lastValue, V{2});
+    EXPECT_EQ(res.index, 1);
+    EXPECT_EQ(res.lastValue, V{2});
 
     // Index parameter limits the search to before that index
     res = findLastNonRLE<uint64_t>(
         control({blockFullOne, block6Skip1Two, block16RLE, block1RLE, blockFullOne}), 3);
-    ASSERT_EQ(res.index, 1);
-    ASSERT_EQ(res.lastValue, V{2});
+    EXPECT_EQ(res.index, 1);
+    EXPECT_EQ(res.lastValue, V{2});
 }
 
 TEST_F(BinaryReopenTest, Overflow) {
@@ -453,26 +453,26 @@ TEST_F(BinaryReopenTest, Overflow) {
     // Single control without overflow
     controls = {control({block5Two})};
     OverflowPoint<uint64_t> point = overflowHelper(controls);
-    ASSERT_EQ(point.control(), controls[0]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{0});             // Last is defined as 0 when there is no overflow
-    ASSERT_FALSE(point.allValuesIdentical());  // this is never set unless RLE is involved
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[0]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[0]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{0});             // Last is defined as 0 when there is no overflow
+    EXPECT_FALSE(point.allValuesIdentical());  // this is never set unless RLE is involved
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[0]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 
     // Single control with overflow at index 0
     controls = {control({block5Two, block60Zero})};
     point = overflowHelper(controls);
-    ASSERT_EQ(point.control(), controls[0]);
-    ASSERT_TRUE(point.overflow());
-    ASSERT_EQ(point.index(), 0);
-    ASSERT_EQ(point.last(), V{2});             // Last value in block that caused overflow
-    ASSERT_FALSE(point.allValuesIdentical());  // this is never set unless RLE is involved
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[0]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[0]);
+    EXPECT_TRUE(point.overflow());
+    EXPECT_EQ(point.index(), 0);
+    EXPECT_EQ(point.last(), V{2});             // Last value in block that caused overflow
+    EXPECT_FALSE(point.allValuesIdentical());  // this is never set unless RLE is involved
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[0]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 
     // Two controls with overflow in the first control at the second to last index position
     controls = {control({
@@ -495,14 +495,14 @@ TEST_F(BinaryReopenTest, Overflow) {
                 }),
                 control({block5Two})};
     point = overflowHelper(controls);
-    ASSERT_EQ(point.control(), controls[0]);
-    ASSERT_TRUE(point.overflow());
-    ASSERT_EQ(point.index(), 14);
-    ASSERT_EQ(point.last(), V{1});             // Last value in block that caused overflow
-    ASSERT_FALSE(point.allValuesIdentical());  // this is never set unless RLE is involved
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[0]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
+    EXPECT_EQ(point.control(), controls[0]);
+    EXPECT_TRUE(point.overflow());
+    EXPECT_EQ(point.index(), 14);
+    EXPECT_EQ(point.last(), V{1});             // Last value in block that caused overflow
+    EXPECT_FALSE(point.allValuesIdentical());  // this is never set unless RLE is involved
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[0]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
 
     // Two controls with overflow in the first control at last index position is treated as no
     // overflow with the second control returned.
@@ -524,38 +524,38 @@ TEST_F(BinaryReopenTest, Overflow) {
                          blockFullOne}),
                 control({block5Two})};
     point = overflowHelper(controls);
-    ASSERT_EQ(point.control(), controls[1]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{1});             // Last value in block that caused overflow
-    ASSERT_FALSE(point.allValuesIdentical());  // this is never set unless RLE is involved
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[1]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[1]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{1});             // Last value in block that caused overflow
+    EXPECT_FALSE(point.allValuesIdentical());  // this is never set unless RLE is involved
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[1]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 
     // Single control with RLE only returns no overflow with last value of 0
     controls = {control({block1RLE})};
     point = overflowHelper(controls);
-    ASSERT_EQ(point.control(), controls[0]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{0});  // Last is defined as 0 when there is no overflow
-    ASSERT_TRUE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[0]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[0]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{0});  // Last is defined as 0 when there is no overflow
+    EXPECT_TRUE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[0]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 
     // Only RLE can span more than one control which yields the same result
     controls = {fullRLEControl(), control({block16RLE, block1RLE})};
     point = overflowHelper(controls);
-    ASSERT_EQ(point.control(), controls[0]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{0});  // Last is defined as 0 when there is no overflow
-    ASSERT_TRUE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[0]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
+    EXPECT_EQ(point.control(), controls[0]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{0});  // Last is defined as 0 when there is no overflow
+    EXPECT_TRUE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[0]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
 
     // RLE spanning more than one control followed by blocks containing only zeros also yields the
     // same result
@@ -564,14 +564,14 @@ TEST_F(BinaryReopenTest, Overflow) {
                 fullRLEControl(),
                 control({block16RLE, block1RLE, block60Zero})};
     point = overflowHelper(controls);
-    ASSERT_EQ(point.control(), controls[0]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{0});  // Last is defined as 0 when there is no overflow
-    ASSERT_TRUE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[0]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 3);
+    EXPECT_EQ(point.control(), controls[0]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{0});  // Last is defined as 0 when there is no overflow
+    EXPECT_TRUE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[0]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 3);
 
     // Value followed by RLE spanning more than one control is overflow at the index before the RLE
     // starts
@@ -593,14 +593,14 @@ TEST_F(BinaryReopenTest, Overflow) {
                          block16RLE}),
                 control({block16RLE, block1RLE})};
     point = overflowHelper(controls);
-    ASSERT_EQ(point.control(), controls[0]);
-    ASSERT_TRUE(point.overflow());
-    ASSERT_EQ(point.index(), 2);
-    ASSERT_EQ(point.last(), V{1});  // Last value in block that caused overflow
-    ASSERT_TRUE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[0]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
+    EXPECT_EQ(point.control(), controls[0]);
+    EXPECT_TRUE(point.overflow());
+    EXPECT_EQ(point.index(), 2);
+    EXPECT_EQ(point.last(), V{1});  // Last value in block that caused overflow
+    EXPECT_TRUE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[0]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
 
     // Value followed by RLE spanning more than one control is overflow at the index before the
     // RLE starts as long as the value after RLE is the same as before RLE
@@ -622,14 +622,14 @@ TEST_F(BinaryReopenTest, Overflow) {
                          block16RLE}),
                 control({block16RLE, block1RLE, block1One})};
     point = overflowHelper(controls);
-    ASSERT_EQ(point.control(), controls[0]);
-    ASSERT_TRUE(point.overflow());
-    ASSERT_EQ(point.index(), 2);
-    ASSERT_EQ(point.last(), V{1});  // Last value in block that caused overflow
-    ASSERT_TRUE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[0]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
+    EXPECT_EQ(point.control(), controls[0]);
+    EXPECT_TRUE(point.overflow());
+    EXPECT_EQ(point.index(), 2);
+    EXPECT_EQ(point.last(), V{1});  // Last value in block that caused overflow
+    EXPECT_TRUE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[0]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
 
     // When value before RLE is different from the value after RLE the overflow happens at the
     // last RLE block
@@ -652,27 +652,27 @@ TEST_F(BinaryReopenTest, Overflow) {
                 fullRLEControl(),
                 control({block16RLE, block1RLE, block5Two})};
     point = overflowHelper(controls);
-    ASSERT_EQ(point.control(), controls[2]);
-    ASSERT_TRUE(point.overflow());
-    ASSERT_EQ(point.index(), 1);
-    ASSERT_EQ(point.last(), V{1});  // Last value in block that caused overflow
-    ASSERT_FALSE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[2]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[2]);
+    EXPECT_TRUE(point.overflow());
+    EXPECT_EQ(point.index(), 1);
+    EXPECT_EQ(point.last(), V{1});  // Last value in block that caused overflow
+    EXPECT_FALSE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[2]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 
     // When the stream starts with RLE but the value after RLE is not zero then the overflow happens
     // at the last RLE block
     controls = {fullRLEControl(), fullRLEControl(), control({block16RLE, block1RLE, block5Two})};
     point = overflowHelper(controls);
-    ASSERT_EQ(point.control(), controls[2]);
-    ASSERT_TRUE(point.overflow());
-    ASSERT_EQ(point.index(), 1);
-    ASSERT_EQ(point.last(), V{0});             // Last value in block that caused overflow
-    ASSERT_FALSE(point.allValuesIdentical());  // this is never set unless RLE is involved
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[2]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[2]);
+    EXPECT_TRUE(point.overflow());
+    EXPECT_EQ(point.index(), 1);
+    EXPECT_EQ(point.last(), V{0});             // Last value in block that caused overflow
+    EXPECT_FALSE(point.allValuesIdentical());  // this is never set unless RLE is involved
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[2]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 }
 
 TEST_F(BinaryReopenTest, OverflowScaled) {
@@ -726,14 +726,14 @@ TEST_F(BinaryReopenTest, OverflowScaled) {
                         0),
                 control({block5Two}, Simple8bTypeUtil::kMemoryAsInteger)};
     OverflowPoint<uint64_t> point = overflowHelper(1.0, controls);
-    ASSERT_EQ(point.control(), controls[1]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{1});
-    ASSERT_FALSE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[1]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[1]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{1});
+    EXPECT_FALSE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[1]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 
     // Same but the last value before rescale is skip
     controls = {control({blockFullOne,
@@ -755,14 +755,14 @@ TEST_F(BinaryReopenTest, OverflowScaled) {
                         0),
                 control({block5Two}, Simple8bTypeUtil::kMemoryAsInteger)};
     point = overflowHelper(1.0, controls);
-    ASSERT_EQ(point.control(), controls[1]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{boost::none});
-    ASSERT_FALSE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[1]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[1]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{boost::none});
+    EXPECT_FALSE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[1]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 
     // Same but there are RLE before the rescale
     controls = {control({blockFullOne,
@@ -784,14 +784,14 @@ TEST_F(BinaryReopenTest, OverflowScaled) {
                         0),
                 control({block5Two}, Simple8bTypeUtil::kMemoryAsInteger)};
     point = overflowHelper(1.0, controls);
-    ASSERT_EQ(point.control(), controls[1]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{1});
-    ASSERT_FALSE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[1]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[1]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{1});
+    EXPECT_FALSE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[1]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 
     // Same but there are only RLE before the rescale
     controls = {control({block16RLE,
@@ -813,14 +813,14 @@ TEST_F(BinaryReopenTest, OverflowScaled) {
                         0),
                 control({block5Two}, Simple8bTypeUtil::kMemoryAsInteger)};
     point = overflowHelper(1.0, controls);
-    ASSERT_EQ(point.control(), controls[1]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{0});
-    ASSERT_FALSE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[1]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[1]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{0});
+    EXPECT_FALSE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[1]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 
     // RLE can be before and after the rescale
     controls = {control({blockFullOne,
@@ -842,14 +842,14 @@ TEST_F(BinaryReopenTest, OverflowScaled) {
                         0),
                 control({block16RLE}, Simple8bTypeUtil::kMemoryAsInteger)};
     point = overflowHelper(1.0, controls);
-    ASSERT_EQ(point.control(), controls[1]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{1});
-    ASSERT_FALSE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[1]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[1]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{1});
+    EXPECT_FALSE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[1]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 
     // Block before rescale is not full but it is not possible to scale the first value with scale
     // factor kMemoryAsInteger with scale factor 0 so we also treat this as a no overflow but return
@@ -857,29 +857,29 @@ TEST_F(BinaryReopenTest, OverflowScaled) {
     controls = {control({blockFullOne, blockFullOne, blockFullOne}, 0),
                 control({block5Two}, Simple8bTypeUtil::kMemoryAsInteger)};
     point = overflowHelper(1.0, controls);
-    ASSERT_EQ(point.control(), controls[1]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{1});
-    ASSERT_FALSE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[1]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[1]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{1});
+    EXPECT_FALSE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[1]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 
     // Last value before rescale can be scaled with the next scale factor and all values fit in
     // pending without causing overflow. We then report the first control with a binary offset to
     // the control byte after the scaling.
     controls = {control({blockFullOne, blockFullOne, blockFullOne}, 1), control({block5Two}, 0)};
     point = overflowHelper(1.0, controls);
-    ASSERT_EQ(point.control(), controls[0]);
-    ASSERT_TRUE(point.overflow());
-    ASSERT_EQ(point.index(), 2);
-    ASSERT_EQ(point.last(), V{1});
-    ASSERT_FALSE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[1]);
-    ASSERT_EQ(point.lastControlOffset(),
+    EXPECT_EQ(point.control(), controls[0]);
+    EXPECT_TRUE(point.overflow());
+    EXPECT_EQ(point.index(), 2);
+    EXPECT_EQ(point.last(), V{1});
+    EXPECT_FALSE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[1]);
+    EXPECT_EQ(point.lastControlOffset(),
               numSimple8bBlocksForControlByte(*controls[0]) * sizeof(uint64_t) + 1);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
 
     // Like above but we have a large amount of RLE after the rescale. The result is basically the
     // same, but we report a larger offset and more values remaining.
@@ -903,46 +903,46 @@ TEST_F(BinaryReopenTest, OverflowScaled) {
                         0),
                 control({block16RLE, block16RLE, blockFullOne}, 0)};
     point = overflowHelper(1.0, controls);
-    ASSERT_EQ(point.control(), controls[0]);
-    ASSERT_TRUE(point.overflow());
-    ASSERT_EQ(point.index(), 2);
-    ASSERT_EQ(point.last(), V{1});
-    ASSERT_FALSE(point.allValuesIdentical());  // Values are not identical even if we have a large
+    EXPECT_EQ(point.control(), controls[0]);
+    EXPECT_TRUE(point.overflow());
+    EXPECT_EQ(point.index(), 2);
+    EXPECT_EQ(point.last(), V{1});
+    EXPECT_FALSE(point.allValuesIdentical());  // Values are not identical even if we have a large
                                                // amont of RLE because the scaling is different
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[2]);
-    ASSERT_EQ(point.lastControlOffset(),
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[2]);
+    EXPECT_EQ(point.lastControlOffset(),
               (numSimple8bBlocksForControlByte(*controls[0]) + kMaxNumSimple8bPerControl) *
                       sizeof(uint64_t) +
                   2);  // binary offset to the third control byte
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 2);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 2);
 
     // Same but with RLE on both sides of the scaling
     controls = {control({blockFullOne, blockFullOne, block16RLE}, 1), control({block1RLE}, 0)};
     point = overflowHelper(1.0, controls);
-    ASSERT_EQ(point.control(), controls[0]);
-    ASSERT_TRUE(point.overflow());
-    ASSERT_EQ(point.index(), 2);
-    ASSERT_EQ(point.last(), V{1});
-    ASSERT_FALSE(point.allValuesIdentical());  // Values are not identical even if we have a large
+    EXPECT_EQ(point.control(), controls[0]);
+    EXPECT_TRUE(point.overflow());
+    EXPECT_EQ(point.index(), 2);
+    EXPECT_EQ(point.last(), V{1});
+    EXPECT_FALSE(point.allValuesIdentical());  // Values are not identical even if we have a large
                                                // amont of RLE because the scaling is different
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[1]);
-    ASSERT_EQ(point.lastControlOffset(),
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[1]);
+    EXPECT_EQ(point.lastControlOffset(),
               numSimple8bBlocksForControlByte(*controls[0]) * sizeof(uint64_t) +
                   1);  // binary offset to the second control byte
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 1);
 
     // Last value before rescale can be scaled with the next scale factor but all values cannot fit
     // in pending without causing overflow. This case is also treated as no overflow
     controls = {control({blockFullOne, blockFullOne, block5Two}, 1),
                 control({blockFullOne, block1One}, 0)};
     point = overflowHelper(1.0, controls);
-    ASSERT_EQ(point.control(), controls[1]);
-    ASSERT_FALSE(point.overflow());
-    ASSERT_EQ(point.index(), kInvalidIndex);
-    ASSERT_EQ(point.last(), V{2});
-    ASSERT_FALSE(point.allValuesIdentical());
-    ASSERT_EQ(point.lastControl(), (uint8_t)*controls[1]);
-    ASSERT_EQ(point.lastControlOffset(), 0);
-    ASSERT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
+    EXPECT_EQ(point.control(), controls[1]);
+    EXPECT_FALSE(point.overflow());
+    EXPECT_EQ(point.index(), kInvalidIndex);
+    EXPECT_EQ(point.last(), V{2});
+    EXPECT_FALSE(point.allValuesIdentical());
+    EXPECT_EQ(point.lastControl(), (uint8_t)*controls[1]);
+    EXPECT_EQ(point.lastControlOffset(), 0);
+    EXPECT_EQ(std::distance(point.remaining().begin(), point.remaining().end()), 0);
 }
 }  // namespace mongo::bsoncolumn::internal

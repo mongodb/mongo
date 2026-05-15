@@ -77,8 +77,8 @@ std::vector<HostAndPort> generateCommitReadyMembers(size_t numMembers) {
 }
 
 void checkIfEqual(IndexBuildEntry lhs, IndexBuildEntry rhs) {
-    ASSERT_EQ(lhs.getBuildUUID(), rhs.getBuildUUID());
-    ASSERT_EQ(lhs.getCollectionUUID(), rhs.getCollectionUUID());
+    EXPECT_EQ(lhs.getBuildUUID(), rhs.getBuildUUID());
+    EXPECT_EQ(lhs.getCollectionUUID(), rhs.getCollectionUUID());
 
     BSONObj commitQuorumOptionsBsonLHS = lhs.getCommitQuorum().toBSON();
     BSONObj commitQuorumOptionsBsonRHS = rhs.getCommitQuorum().toBSON();
@@ -86,15 +86,15 @@ void checkIfEqual(IndexBuildEntry lhs, IndexBuildEntry rhs) {
 
     auto lhsIndexNames = lhs.getIndexNames();
     auto rhsIndexNames = rhs.getIndexNames();
-    ASSERT_TRUE(std::equal(lhsIndexNames.begin(), lhsIndexNames.end(), rhsIndexNames.begin()));
+    EXPECT_TRUE(std::equal(lhsIndexNames.begin(), lhsIndexNames.end(), rhsIndexNames.begin()));
 
     if (lhs.getCommitReadyMembers() && rhs.getCommitReadyMembers()) {
         auto lhsMembers = lhs.getCommitReadyMembers().value();
         auto rhsMembers = rhs.getCommitReadyMembers().value();
-        ASSERT_TRUE(std::equal(lhsMembers.begin(), lhsMembers.end(), rhsMembers.begin()));
+        EXPECT_TRUE(std::equal(lhsMembers.begin(), lhsMembers.end(), rhsMembers.begin()));
     } else {
-        ASSERT_FALSE(lhs.getCommitReadyMembers());
-        ASSERT_FALSE(rhs.getCommitReadyMembers());
+        EXPECT_FALSE(lhs.getCommitReadyMembers());
+        EXPECT_FALSE(rhs.getCommitReadyMembers());
     }
 }
 
@@ -135,7 +135,7 @@ TEST_F(IndexBuildEntryHelpersTest, AddIndexBuildEntry) {
     ASSERT_OK(addIndexBuildEntry(operationContext(), _firstEntry));
 
     Status status = addIndexBuildEntry(operationContext(), _firstEntry);
-    ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
+    EXPECT_EQ(status.code(), ErrorCodes::DuplicateKey);
 
     ASSERT_OK(addIndexBuildEntry(operationContext(), _secondEntry));
     ASSERT_OK(addIndexBuildEntry(operationContext(), _thirdEntry));
@@ -151,11 +151,11 @@ TEST_F(IndexBuildEntryHelpersTest, RemoveIndexBuildEntry) {
 
     // Remove an entry with an incorrect index build UUID.
     Status status = removeIndexBuildEntry(operationContext(), UUID::gen());
-    ASSERT_EQUALS(status, ErrorCodes::NoMatchingDocument);
+    EXPECT_EQ(status, ErrorCodes::NoMatchingDocument);
 
     ASSERT_OK(removeIndexBuildEntry(operationContext(), _firstEntry.getBuildUUID()));
     status = removeIndexBuildEntry(operationContext(), _firstEntry.getBuildUUID());
-    ASSERT_EQUALS(status, ErrorCodes::NoMatchingDocument);
+    EXPECT_EQ(status, ErrorCodes::NoMatchingDocument);
 
     ASSERT_OK(removeIndexBuildEntry(operationContext(), _secondEntry.getBuildUUID()));
 }
@@ -166,11 +166,11 @@ TEST_F(IndexBuildEntryHelpersTest, CommitQuorum) {
     {
         StatusWith<CommitQuorumOptions> statusWith =
             getCommitQuorum(operationContext(), UUID::gen());
-        ASSERT_EQUALS(statusWith.getStatus(), ErrorCodes::NoMatchingDocument);
+        EXPECT_EQ(statusWith.getStatus(), ErrorCodes::NoMatchingDocument);
 
         Status status =
             setCommitQuorum_forTest(operationContext(), UUID::gen(), CommitQuorumOptions(1));
-        ASSERT_EQUALS(status.code(), ErrorCodes::NoMatchingDocument);
+        EXPECT_EQ(status.code(), ErrorCodes::NoMatchingDocument);
     }
 
     {

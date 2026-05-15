@@ -55,7 +55,7 @@ protected:
         NamespaceString nss = NamespaceString::createNamespaceString_forTest("test");
         auto compressionResult = timeseries::compressBucket(obj, "time", nss, true);
         ASSERT_TRUE(compressionResult.compressedBucket.has_value());
-        ASSERT_FALSE(compressionResult.decompressionFailed);
+        EXPECT_FALSE(compressionResult.decompressionFailed);
 
         test(compressionResult.compressedBucket.value());
     }
@@ -123,28 +123,28 @@ TEST_F(TimeseriesDottedPathSupportTest, HaveArrayAlongBucketPath) {
 
     runTest(input, [this](const BSONObj& obj) {
         // Non-data fields should always be false
-        ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "control"));
-        ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "control.version"));
-        ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "bogus"));
+        EXPECT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "control"));
+        EXPECT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "control.version"));
+        EXPECT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "bogus"));
 
-        ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data"));
-        ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.a"));
-        ASSERT_FALSE(
+        EXPECT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data"));
+        EXPECT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.a"));
+        EXPECT_FALSE(
             tdps::haveArrayAlongBucketDataPath(obj, "data.b"));  // bucket expansion hides array
-        ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.c"));
-        ASSERT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.d"));
-        ASSERT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.e"));
-        ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.f"));
-        ASSERT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.f.a"));
-        ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.g"));
-        ASSERT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.g.a"));
-        ASSERT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.g.a.a"));
-        ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.h.a.b"));
-        ASSERT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.i"));
-        ASSERT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.i.a"));
+        EXPECT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.c"));
+        EXPECT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.d"));
+        EXPECT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.e"));
+        EXPECT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.f"));
+        EXPECT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.f.a"));
+        EXPECT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.g"));
+        EXPECT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.g.a"));
+        EXPECT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.g.a.a"));
+        EXPECT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.h.a.b"));
+        EXPECT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.i"));
+        EXPECT_TRUE(tdps::haveArrayAlongBucketDataPath(obj, "data.i.a"));
 
         // Should not check dotted field names
-        ASSERT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.j.k.a"));
+        EXPECT_FALSE(tdps::haveArrayAlongBucketDataPath(obj, "data.j.k.a"));
     });
 }
 
@@ -252,96 +252,96 @@ TEST_F(TimeseriesDottedPathSupportTest, fieldContainsArrayData) {
         constexpr auto maybe = tdps::Decision::Maybe;
 
         // a: {min: double, max: bool},
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "a"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "a"));
 
         // b: {min: bool, max: bool}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "b"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "b"));
 
         // c: {min: double, max: double}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "c"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "c"));
 
         // d: {min: double, max: array}
-        ASSERT_NE(no, tdps::fieldContainsArrayData(obj, "d"));
+        EXPECT_NE(no, tdps::fieldContainsArrayData(obj, "d"));
 
         // e: {min: array, max: bool}
-        ASSERT_NE(no, tdps::fieldContainsArrayData(obj, "e"));
+        EXPECT_NE(no, tdps::fieldContainsArrayData(obj, "e"));
 
         // f: {min: array, max: array}
-        ASSERT_NE(no, tdps::fieldContainsArrayData(obj, "f"));
+        EXPECT_NE(no, tdps::fieldContainsArrayData(obj, "f"));
 
         // g: {min: double, max: object}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "g"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "g"));
         // g.a: {min: double.eoo, max: object.bool}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "g.a"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "g.a"));
         // g.b: {min: double.eoo, max: object.double}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "g.b"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "g.b"));
         // g.c: {min: double.eoo, max: object.array}
-        ASSERT_NE(no, tdps::fieldContainsArrayData(obj, "g.c"));
+        EXPECT_NE(no, tdps::fieldContainsArrayData(obj, "g.c"));
         // g.d: {min: double.eoo, max: object.eoo}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "g.d"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "g.d"));
 
         // h: {min: object, max: bool}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "h"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "h"));
         // h.a: {min: object.bool, max: bool.eoo}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "h.a"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "h.a"));
         // h.b: {min: object.double, max: bool.eoo}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "h.b"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "h.b"));
         // h.c: {min: object.array, max: bool.eoo}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "h.c"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "h.c"));
         // h.d: {min: object.eoo, max: bool.eoo}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "h.d"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "h.d"));
 
         // i: {min: object, max: object}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "i"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "i"));
         // i.a: {min: object.double, max: object.bool}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.a"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.a"));
         // i.b: {min: object.array, max: object.array}
-        ASSERT_NE(no, tdps::fieldContainsArrayData(obj, "i.b"));
+        EXPECT_NE(no, tdps::fieldContainsArrayData(obj, "i.b"));
         // i.c: {min: object.bool, max: object.bool}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "i.c"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "i.c"));
         // i.d: {min: object.object, max: object.object}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "i.d"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "i.d"));
         // i.d.a: {min: object.object.double, max: object.object.bool}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.d.a"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.d.a"));
         // i.e: {min: object.object, max: object.object}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "i.e"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "i.e"));
         // i.e.a: {min: object.object.double, max: object.object.object}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "i.e.a"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "i.e.a"));
         // i.f: {min: object.double, max: object.object}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "i.f"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "i.f"));
         // i.f.a: {min: object.double.eoo, max: object.object.double}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "i.f.a"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "i.f.a"));
         // i.f.b: {min: object.double.eoo, max: object.object.object}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "i.f.b"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "i.f.b"));
         // i.f.c: {min: object.double.eoo, max: object.object.object}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "i.f.c"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "i.f.c"));
         // i.f.c.a: {min: object.double.eoo.eoo, max: object.object.object.double}
-        ASSERT_NE(yes, tdps::fieldContainsArrayData(obj, "i.f.c.a"));
+        EXPECT_NE(yes, tdps::fieldContainsArrayData(obj, "i.f.c.a"));
         // i.f.c.b: {min: object.double.eoo.eoo, max: object.object.object.bool}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.f.c.b"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.f.c.b"));
         // i.f.d: {min: object.double.eoo, max: object.object.array}
-        ASSERT_NE(no, tdps::fieldContainsArrayData(obj, "i.f.d"));
+        EXPECT_NE(no, tdps::fieldContainsArrayData(obj, "i.f.d"));
         // i.f.e: {min: object.double.eoo, max: object.object.bool}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.f.e"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.f.e"));
         // i.g: {min: object.object, max: object.bool}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g"));
         // i.g.a: {min: object.object.double, max: object.bool.eoo}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.a"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.a"));
         // i.g.b: {min: object.object.object, max: object.bool.eoo}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.b"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.b"));
         // i.g.c: {min: object.object.object, max: object.bool.eoo}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.c"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.c"));
         // i.g.c.a: {min: object.object.object.double, max: object.bool.eoo.eoo}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.c.a"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.c.a"));
         // i.g.c.b: {min: object.object.object.bool, max: object.bool.eoo.eoo}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.c.b"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.c.b"));
         // i.g.d: {min: object.object.array, max: object.bool.eoo}
-        ASSERT_NE(no, tdps::fieldContainsArrayData(obj, "i.g.d"));
+        EXPECT_NE(no, tdps::fieldContainsArrayData(obj, "i.g.d"));
         // i.g.e: {min: object.object.bool, max: object.bool.eoo}
-        ASSERT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.e"));
+        EXPECT_EQ(maybe, tdps::fieldContainsArrayData(obj, "i.g.e"));
 
         // Should not check dotted field names
-        ASSERT_EQ(no, tdps::fieldContainsArrayData(obj, "j.k"));
+        EXPECT_EQ(no, tdps::fieldContainsArrayData(obj, "j.k"));
     });
 }
 
@@ -419,15 +419,15 @@ TEST_F(TimeseriesDottedPathSupportTest, ExtractAllElementsAlongBucketPath) {
                 expected.emplace(el);
             }
 
-            ASSERT_EQ(actual.size(), expected.size())
+            EXPECT_EQ(actual.size(), expected.size())
                 << "Expected path '" << path << "' to yield " << expectedStorage << " from " << obj;
 
             auto actualIt = actual.begin();
             auto expectedIt = expected.begin();
             while (actualIt != actual.end() && expectedIt != expected.end()) {
-                ASSERT_FALSE(actualIt->eoo());
-                ASSERT_FALSE(expectedIt->eoo());
-                ASSERT_EQ(actualIt->woCompare(*expectedIt, 0), 0);
+                EXPECT_FALSE(actualIt->eoo());
+                EXPECT_FALSE(expectedIt->eoo());
+                EXPECT_EQ(actualIt->woCompare(*expectedIt, 0), 0);
                 actualIt++;
                 expectedIt++;
             }

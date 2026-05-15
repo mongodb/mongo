@@ -69,20 +69,20 @@ TEST_F(PrepareConflictTrackerTest, BeginAndEndPrepareConflict) {
     _pct->beginPrepareConflict(*_tickSource);
     _pct->endPrepareConflict(*_tickSource);
 
-    ASSERT_EQ(PrepareConflictTracker::getGlobalNumPrepareConflicts(), 1);
+    EXPECT_EQ(PrepareConflictTracker::getGlobalNumPrepareConflicts(), 1);
     // 0 Because we did not advance the mock timer.
-    ASSERT_EQ(_pct->getThisOpPrepareConflictDuration(), Milliseconds(0));
+    EXPECT_EQ(_pct->getThisOpPrepareConflictDuration(), Milliseconds(0));
 }
 
 TEST_F(PrepareConflictTrackerTest, PrepareConflictCheckTimings) {
     _pct->beginPrepareConflict(*_tickSource);
     _tickSource->advance(Milliseconds(1000));
     _pct->updatePrepareConflict(*_tickSource);
-    ASSERT_EQ(_pct->getThisOpPrepareConflictDuration(), Milliseconds(1000));
+    EXPECT_EQ(_pct->getThisOpPrepareConflictDuration(), Milliseconds(1000));
     _pct->endPrepareConflict(*_tickSource);
-    ASSERT_EQ(PrepareConflictTracker::getGlobalWaitingForPrepareConflictsMicros(), 1000000);
-    ASSERT_EQ(PrepareConflictTracker::getGlobalNumPrepareConflicts(), 1);
-    ASSERT_EQ(_pct->getThisOpPrepareConflictDuration(), Milliseconds(1000));
+    EXPECT_EQ(PrepareConflictTracker::getGlobalWaitingForPrepareConflictsMicros(), 1000000);
+    EXPECT_EQ(PrepareConflictTracker::getGlobalNumPrepareConflicts(), 1);
+    EXPECT_EQ(_pct->getThisOpPrepareConflictDuration(), Milliseconds(1000));
 }
 
 // Check that multiple prepare conflicts are tracked appropriately.
@@ -92,19 +92,19 @@ TEST_F(PrepareConflictTrackerTest, ManyPrepareConflictsWithUpdates) {
     auto expectedDurationMillis = Milliseconds(0);
     for (int i = 1; i <= 5; i++) {
         _pct->beginPrepareConflict(*_tickSource);
-        ASSERT_EQ(PrepareConflictTracker::getGlobalNumPrepareConflicts(), i);
+        EXPECT_EQ(PrepareConflictTracker::getGlobalNumPrepareConflicts(), i);
         for (int j = 1; j <= 5; j++) {
             _tickSource->advance(Milliseconds(200));
             expectedDurationMillis += Milliseconds(200);
             _pct->updatePrepareConflict(*_tickSource);
-            ASSERT_EQ(_pct->getThisOpPrepareConflictDuration(), expectedDurationMillis);
+            EXPECT_EQ(_pct->getThisOpPrepareConflictDuration(), expectedDurationMillis);
         }
         _pct->endPrepareConflict(*_tickSource);
         // Include the delay from the last test.
-        ASSERT_EQ(PrepareConflictTracker::getGlobalWaitingForPrepareConflictsMicros(),
+        EXPECT_EQ(PrepareConflictTracker::getGlobalWaitingForPrepareConflictsMicros(),
                   (expectedDurationMillis.count()) * 1000);
-        ASSERT_EQ(_pct->getThisOpPrepareConflictCount(), i);
-        ASSERT_EQ(_pct->getThisOpPrepareConflictDuration(), expectedDurationMillis);
+        EXPECT_EQ(_pct->getThisOpPrepareConflictCount(), i);
+        EXPECT_EQ(_pct->getThisOpPrepareConflictDuration(), expectedDurationMillis);
     }
 }
 

@@ -170,7 +170,7 @@ TEST_F(CappedCollectionTest, SeekOplogWithReadTimestamp) {
                                    SeekableRecordCursor::BoundInclusion::kInclude); \
         if (expectedInclusiveNum > 0) {                                             \
             ASSERT(record);                                                         \
-            ASSERT_EQ(expectedInclusiveNum, record->id.getLong() - oneSec);         \
+            EXPECT_EQ(expectedInclusiveNum, record->id.getLong() - oneSec);         \
         } else {                                                                    \
             ASSERT(!record);                                                        \
         }                                                                           \
@@ -178,7 +178,7 @@ TEST_F(CappedCollectionTest, SeekOplogWithReadTimestamp) {
                               SeekableRecordCursor::BoundInclusion::kExclude);      \
         if (expectedExclusiveNum > 0) {                                             \
             ASSERT(record);                                                         \
-            ASSERT_EQ(expectedExclusiveNum, record->id.getLong() - oneSec);         \
+            EXPECT_EQ(expectedExclusiveNum, record->id.getLong() - oneSec);         \
         } else {                                                                    \
             ASSERT(!record);                                                        \
         }                                                                           \

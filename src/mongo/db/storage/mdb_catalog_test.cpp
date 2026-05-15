@@ -105,7 +105,7 @@ public:
             configObj.getObjectField("md").getBoolField("recordIdsReplicated");
         bool actualRecordIdsReplicated =
             parseCatalogEntryMetaDataFromCatalog(nss, configObj)->recordIdsReplicated;
-        ASSERT_EQ(expectedRecordIdsReplicated, actualRecordIdsReplicated);
+        EXPECT_EQ(expectedRecordIdsReplicated, actualRecordIdsReplicated);
     }
 
     BSONObj buildOrphanedCatalogEntryObjAndNs(const std::string& ident,
@@ -143,8 +143,8 @@ TEST_F(MDBCatalogTest, BuildCatalogEntryObjAndNsEquivalence) {
     NamespaceString nss;
     std::string ns;
     BSONObj actual = buildOrphanedCatalogEntryObjAndNs("test-Ident", true, &nss, &ns, uuid);
-    ASSERT_EQ(expectedNss, nss);
-    ASSERT_EQ(expectedNs, ns);
+    EXPECT_EQ(expectedNss, nss);
+    EXPECT_EQ(expectedNs, ns);
     ASSERT(possessesAllRelevantElements(expected, actual));
 }
 

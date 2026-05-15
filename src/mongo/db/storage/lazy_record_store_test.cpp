@@ -44,11 +44,11 @@ TEST_F(LazyRecordStoreTest, DeferredDoesNotCreateTableUntilAccess) {
     auto ident = _storageEngine->generateNewInternalIdent();
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::deferred);
-    ASSERT_FALSE(lrs.tableExists());
+    EXPECT_FALSE(lrs.tableExists());
 
     auto& rs = lrs.getOrCreateTable(opCtx.get());
-    ASSERT_TRUE(lrs.tableExists());
-    ASSERT_EQ(&lrs.getTableOrThrow(), &rs);
+    EXPECT_TRUE(lrs.tableExists());
+    EXPECT_EQ(&lrs.getTableOrThrow(), &rs);
 }
 
 TEST_F(LazyRecordStoreTest, ImmediateCreatesTableRightAway) {
@@ -56,7 +56,7 @@ TEST_F(LazyRecordStoreTest, ImmediateCreatesTableRightAway) {
     auto ident = _storageEngine->generateNewInternalIdent();
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::immediate);
-    ASSERT_TRUE(lrs.tableExists());
+    EXPECT_TRUE(lrs.tableExists());
 }
 
 TEST_F(LazyRecordStoreTest, GetOrCreateTableIsIdempotent) {
@@ -66,7 +66,7 @@ TEST_F(LazyRecordStoreTest, GetOrCreateTableIsIdempotent) {
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::deferred);
     auto& rs1 = lrs.getOrCreateTable(opCtx.get());
     auto& rs2 = lrs.getOrCreateTable(opCtx.get());
-    ASSERT_EQ(&rs1, &rs2);
+    EXPECT_EQ(&rs1, &rs2);
 }
 
 TEST_F(LazyRecordStoreTest, DropResetsToUninitialized) {
@@ -74,10 +74,10 @@ TEST_F(LazyRecordStoreTest, DropResetsToUninitialized) {
     auto ident = _storageEngine->generateNewInternalIdent();
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::immediate);
-    ASSERT_TRUE(lrs.tableExists());
+    EXPECT_TRUE(lrs.tableExists());
 
     lrs.drop(opCtx.get(), StorageEngine::Immediate{});
-    ASSERT_FALSE(lrs.tableExists());
+    EXPECT_FALSE(lrs.tableExists());
 }
 
 TEST_F(LazyRecordStoreTest, DropOnDeferredIsNoOp) {
@@ -86,7 +86,7 @@ TEST_F(LazyRecordStoreTest, DropOnDeferredIsNoOp) {
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::deferred);
     lrs.drop(opCtx.get(), StorageEngine::Immediate{});
-    ASSERT_FALSE(lrs.tableExists());
+    EXPECT_FALSE(lrs.tableExists());
 }
 
 TEST_F(LazyRecordStoreTest, OpenExistingOpensExistingTable) {
@@ -98,7 +98,7 @@ TEST_F(LazyRecordStoreTest, OpenExistingOpensExistingTable) {
     }
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::openExisting);
-    ASSERT_TRUE(lrs.tableExists());
+    EXPECT_TRUE(lrs.tableExists());
 }
 
 TEST_F(LazyRecordStoreTest, GetTableOrThrowSucceedsWhenTableExists) {
@@ -107,7 +107,7 @@ TEST_F(LazyRecordStoreTest, GetTableOrThrowSucceedsWhenTableExists) {
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::immediate);
     ASSERT_NO_THROW(lrs.getTableOrThrow());
-    ASSERT_EQ(&lrs.getTableOrThrow(), &lrs.getOrCreateTable(opCtx.get()));
+    EXPECT_EQ(&lrs.getTableOrThrow(), &lrs.getOrCreateTable(opCtx.get()));
 }
 
 TEST_F(LazyRecordStoreTest, GetTableOrThrowFailsWhenTableDoesNotExist) {
@@ -116,7 +116,7 @@ TEST_F(LazyRecordStoreTest, GetTableOrThrowFailsWhenTableDoesNotExist) {
 
     LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::deferred);
     ASSERT_THROWS_WITH_CHECK(lrs.getTableOrThrow(), DBException, [](const DBException& ex) {
-        ASSERT_EQ(ex.code(), 12129700);
+        EXPECT_EQ(ex.code(), 12129700);
         assertionCount.tripwire.subtractAndFetch(1);
     });
 }

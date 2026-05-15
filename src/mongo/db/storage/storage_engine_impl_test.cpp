@@ -127,7 +127,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorRunning) {
     if (!_storageEngine->getEngine()->supportsRecoveryTimestamp())
         return;
 
-    ASSERT_TRUE(_storageEngine->getTimestampMonitor()->isRunning_forTestOnly());
+    EXPECT_TRUE(_storageEngine->getTimestampMonitor()->isRunning_forTestOnly());
 }
 
 TEST_F(TimestampKVEngineTest, TimestampListeners) {

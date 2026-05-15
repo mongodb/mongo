@@ -146,7 +146,7 @@ const double cappedCollectionSize = 8192.0;
 TEST_F(CappedUtilsTest, ConvertToCappedReturnsNamespaceNotFoundIfCollectionIsMissing) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     auto opCtx = makeOpCtx();
-    ASSERT_FALSE(collectionExists(opCtx.get(), nss));
+    EXPECT_FALSE(collectionExists(opCtx.get(), nss));
     ASSERT_THROWS_CODE(convertToCapped(opCtx.get(), nss, 1000.0, false /*fromMigrate*/),
                        DBException,
                        ErrorCodes::NamespaceNotFound);
@@ -158,12 +158,12 @@ TEST_F(CappedUtilsTest, ConvertToCappedUpdatesCollectionOptionsOnSuccess) {
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storage->createCollection(opCtx.get(), nss, {}));
     auto options = getCollectionOptions(opCtx.get(), nss);
-    ASSERT_FALSE(options.capped);
+    EXPECT_FALSE(options.capped);
 
     convertToCapped(opCtx.get(), nss, cappedCollectionSize, false /*fromMigrate*/);
     options = getCollectionOptions(opCtx.get(), nss);
-    ASSERT_TRUE(options.capped);
-    ASSERT_APPROX_EQUAL(cappedCollectionSize, options.cappedSize, 0.001)
+    EXPECT_TRUE(options.capped);
+    EXPECT_NEAR(cappedCollectionSize, options.cappedSize, 0.001)
         << "unexpected capped collection size: " << options.toBSON();
 }
 

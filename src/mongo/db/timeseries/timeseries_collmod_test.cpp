@@ -91,15 +91,15 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModCommandTranslation) {
 
     ASSERT(collModBuckets);
     ASSERT((*collModBuckets->getValidator()).binaryEqual(BSON("a" << "1")));
-    ASSERT_EQ(*(collModBuckets->getValidationLevel()), ValidationLevelEnum::strict);
-    ASSERT_EQ(*(collModBuckets->getValidationAction()), ValidationActionEnum::errorAndLog);
-    ASSERT_EQ(collModBuckets->getViewOn(), "test.view"_sd);
+    EXPECT_EQ(*(collModBuckets->getValidationLevel()), ValidationLevelEnum::strict);
+    EXPECT_EQ(*(collModBuckets->getValidationAction()), ValidationActionEnum::errorAndLog);
+    EXPECT_EQ(collModBuckets->getViewOn(), "test.view"_sd);
     ASSERT((*collModBuckets->getPipeline())[0].binaryEqual(BSON("$match" << BSON("a" << 1))));
-    ASSERT_EQ(collModBuckets->getChangeStreamPreAndPostImages()->getEnabled(), true);
-    ASSERT_EQ(std::get<int64_t>(*(collModBuckets->getExpireAfterSeconds())), 100);
-    ASSERT_EQ(*(collModBuckets->getTimeseries()->getGranularity()), BucketGranularityEnum::Seconds);
-    ASSERT_EQ(*(collModBuckets->getTimeseriesBucketsMayHaveMixedSchemaData()), true);
-    ASSERT_EQ(*(collModBuckets->getDryRun()), true);
+    EXPECT_EQ(collModBuckets->getChangeStreamPreAndPostImages()->getEnabled(), true);
+    EXPECT_EQ(std::get<int64_t>(*(collModBuckets->getExpireAfterSeconds())), 100);
+    EXPECT_EQ(*(collModBuckets->getTimeseries()->getGranularity()), BucketGranularityEnum::Seconds);
+    EXPECT_EQ(*(collModBuckets->getTimeseriesBucketsMayHaveMixedSchemaData()), true);
+    EXPECT_EQ(*(collModBuckets->getDryRun()), true);
 }
 
 // Collmods that specify an index should have that index correctly translated to timeseries buckets
@@ -220,7 +220,7 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
             MODE_IS);
         // Assert the bucketing parameters have changed on the collection.
         ASSERT_TRUE(collectionAcquisition.exists());
-        ASSERT_TRUE(
+        EXPECT_TRUE(
             *collectionAcquisition.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
     }
     _addNsToValidate(testNss);
@@ -281,7 +281,7 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationAndV
             MODE_IS);
         // Assert the bucketing parameters have changed on the collection.
         ASSERT_TRUE(collectionAcquisition.exists());
-        ASSERT_TRUE(
+        EXPECT_TRUE(
             *collectionAcquisition.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
     }
     _addNsToValidate(testNss);
@@ -311,7 +311,7 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationNotT
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
         ASSERT_TRUE(collectionAcquisition.exists());
-        ASSERT_FALSE(collectionAcquisition.getCollectionPtr()->getTimeseriesOptions());
+        EXPECT_FALSE(collectionAcquisition.getCollectionPtr()->getTimeseriesOptions());
     }
     _addNsToValidate(testNss);
 }

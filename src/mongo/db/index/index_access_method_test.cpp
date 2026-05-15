@@ -77,8 +77,8 @@ TEST(IndexAccessMethodSetDifference, EmptyInputsShouldHaveNoDifference) {
     KeyStringSet left;
     KeyStringSet right;
     auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
-    ASSERT_EQ(0UL, diff.first.size());
-    ASSERT_EQ(0UL, diff.second.size());
+    EXPECT_EQ(0UL, diff.first.size());
+    EXPECT_EQ(0UL, diff.second.size());
 }
 
 TEST(IndexAccessMethodSetDifference, EmptyLeftShouldHaveNoDifference) {
@@ -86,8 +86,8 @@ TEST(IndexAccessMethodSetDifference, EmptyLeftShouldHaveNoDifference) {
     auto right = makeKeyStringSet({BSON("" << 0)});
 
     auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
-    ASSERT_EQ(0UL, diff.first.size());
-    ASSERT_EQ(1UL, diff.second.size());
+    EXPECT_EQ(0UL, diff.first.size());
+    EXPECT_EQ(1UL, diff.second.size());
 }
 
 TEST(IndexAccessMethodSetDifference, EmptyRightShouldReturnAllOfLeft) {
@@ -95,8 +95,8 @@ TEST(IndexAccessMethodSetDifference, EmptyRightShouldReturnAllOfLeft) {
     KeyStringSet right;
 
     auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
-    ASSERT_EQ(2UL, diff.first.size());
-    ASSERT_EQ(0UL, diff.second.size());
+    EXPECT_EQ(2UL, diff.first.size());
+    EXPECT_EQ(0UL, diff.second.size());
 }
 
 TEST(IndexAccessMethodSetDifference, IdenticalSetsShouldHaveNoDifference) {
@@ -104,8 +104,8 @@ TEST(IndexAccessMethodSetDifference, IdenticalSetsShouldHaveNoDifference) {
     auto right = makeKeyStringSet({BSON("" << 0), BSON("" << "string"), BSON("" << BSONNULL)});
 
     auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
-    ASSERT_EQ(0UL, diff.first.size());
-    ASSERT_EQ(0UL, diff.second.size());
+    EXPECT_EQ(0UL, diff.first.size());
+    EXPECT_EQ(0UL, diff.second.size());
 }
 
 //
@@ -116,8 +116,8 @@ void assertDistinct(BSONObj left, BSONObj right) {
     auto leftSet = makeKeyStringSet({left});
     auto rightSet = makeKeyStringSet({right});
     auto diff = SortedDataIndexAccessMethod::setDifference(leftSet, rightSet);
-    ASSERT_EQ(1UL, diff.first.size());
-    ASSERT_EQ(1UL, diff.second.size());
+    EXPECT_EQ(1UL, diff.first.size());
+    EXPECT_EQ(1UL, diff.second.size());
 }
 
 TEST(IndexAccessMethodSetDifference, ZerosOfDifferentTypesAreNotEquivalent) {
@@ -126,8 +126,8 @@ TEST(IndexAccessMethodSetDifference, ZerosOfDifferentTypesAreNotEquivalent) {
     const BSONObj doubleObj = BSON("" << static_cast<double>(0.0));
 
     // These should compare equal with woCompare(), but should not be treated equal by the index.
-    ASSERT_EQ(0, intObj.woCompare(longObj));
-    ASSERT_EQ(0, longObj.woCompare(doubleObj));
+    EXPECT_EQ(0, intObj.woCompare(longObj));
+    EXPECT_EQ(0, longObj.woCompare(doubleObj));
 
     assertDistinct(intObj, longObj);
     assertDistinct(intObj, doubleObj);
@@ -140,7 +140,7 @@ TEST(IndexAccessMethodSetDifference, ZerosOfDifferentTypesAreNotEquivalent) {
 
     const BSONObj decimalObj = fromjson("{'': NumberDecimal('0')}");
 
-    ASSERT_EQ(0, doubleObj.woCompare(decimalObj));
+    EXPECT_EQ(0, doubleObj.woCompare(decimalObj));
 
     assertDistinct(intObj, decimalObj);
     assertDistinct(longObj, decimalObj);
@@ -165,32 +165,32 @@ TEST(IndexAccessMethodSetDifference, ShouldDetectOneDifferenceAmongManySimilarit
                                    BSON("" << BSON("sub" << "document")),
                                    BSON("" << BSON_ARRAY(1 << "hi" << 42))});
     auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
-    ASSERT_EQUALS(1UL, diff.first.size());
-    ASSERT_EQUALS(1UL, diff.second.size());
+    EXPECT_EQ(1UL, diff.first.size());
+    EXPECT_EQ(1UL, diff.second.size());
 }
 
 TEST(IndexAccessMethodSetDifference, SingleObjInLeftShouldFindCorrespondingObjInRight) {
     auto left = makeKeyStringSet({BSON("" << 2)});
     auto right = makeKeyStringSet({BSON("" << 1), BSON("" << 2), BSON("" << 3)});
     auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
-    ASSERT_EQUALS(0UL, diff.first.size());
-    ASSERT_EQUALS(2UL, diff.second.size());
+    EXPECT_EQ(0UL, diff.first.size());
+    EXPECT_EQ(2UL, diff.second.size());
 }
 
 TEST(IndexAccessMethodSetDifference, SingleObjInRightShouldFindCorrespondingObjInLeft) {
     auto left = makeKeyStringSet({BSON("" << 1), BSON("" << 2), BSON("" << 3)});
     auto right = makeKeyStringSet({BSON("" << 2)});
     auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
-    ASSERT_EQUALS(2UL, diff.first.size());
-    ASSERT_EQUALS(0UL, diff.second.size());
+    EXPECT_EQ(2UL, diff.first.size());
+    EXPECT_EQ(0UL, diff.second.size());
 }
 
 TEST(IndexAccessMethodSetDifference, LeftSetAllSmallerThanRightShouldBeDisjoint) {
     auto left = makeKeyStringSet({BSON("" << 1), BSON("" << 2), BSON("" << 3)});
     auto right = makeKeyStringSet({BSON("" << 4), BSON("" << 5), BSON("" << 6)});
     auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
-    ASSERT_EQUALS(3UL, diff.first.size());
-    ASSERT_EQUALS(3UL, diff.second.size());
+    EXPECT_EQ(3UL, diff.first.size());
+    EXPECT_EQ(3UL, diff.second.size());
     for (auto&& obj : diff.first) {
         ASSERT(left.find(obj) != left.end());
     }
@@ -203,8 +203,8 @@ TEST(IndexAccessMethodSetDifference, LeftSetAllLargerThanRightShouldBeDisjoint) 
     auto left = makeKeyStringSet({BSON("" << 4), BSON("" << 5), BSON("" << 6)});
     auto right = makeKeyStringSet({BSON("" << 1), BSON("" << 2), BSON("" << 3)});
     auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
-    ASSERT_EQUALS(3UL, diff.first.size());
-    ASSERT_EQUALS(3UL, diff.second.size());
+    EXPECT_EQ(3UL, diff.first.size());
+    EXPECT_EQ(3UL, diff.second.size());
     for (auto&& obj : diff.first) {
         ASSERT(left.find(obj) != left.end());
     }
@@ -218,8 +218,8 @@ TEST(IndexAccessMethodSetDifference, ShouldNotReportOverlapsFromNonDisjointSets)
     auto right = makeKeyStringSet(
         {BSON("" << -1), BSON("" << 1), BSON("" << 3), BSON("" << 4), BSON("" << 7)});
     auto diff = SortedDataIndexAccessMethod::setDifference(left, right);
-    ASSERT_EQUALS(2UL, diff.first.size());   // 0, 6.
-    ASSERT_EQUALS(3UL, diff.second.size());  // -1, 3, 7.
+    EXPECT_EQ(2UL, diff.first.size());   // 0, 6.
+    EXPECT_EQ(3UL, diff.second.size());  // -1, 3, 7.
     for (auto&& keyString : diff.first) {
         ASSERT(left.find(keyString) != left.end());
         // Make sure it's not in the intersection.
@@ -267,17 +267,17 @@ TEST_F(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto status =
         indexAccessMethod->insertKeys(opCtx, ru, coll, indexEntry, keys, options, {}, &numInserted);
-    ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
-    ASSERT_EQ(numInserted, 0);
-    ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
+    EXPECT_EQ(status.code(), ErrorCodes::DuplicateKey);
+    EXPECT_EQ(numInserted, 0);
+    EXPECT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
               initDuplicateKeyErrors + 1);
 
     // Skips the check on duplicates when constraints are not enforced.
     opCtx->setEnforceConstraints(false);
     ASSERT_OK(indexAccessMethod->insertKeys(
         opCtx, ru, coll, indexEntry, keys, options, {}, &numInserted));
-    ASSERT_EQ(numInserted, 2);
-    ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
+    EXPECT_EQ(numInserted, 2);
+    EXPECT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
               initDuplicateKeyErrors + 1);
 }
 
@@ -310,9 +310,9 @@ TEST_F(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
     // Disallows new duplicates in a regular index and rejects the insert.
     auto status =
         indexAccessMethod->insertKeys(opCtx, ru, coll, indexEntry, keys, options, {}, &numInserted);
-    ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
-    ASSERT_EQ(numInserted, 0);
-    ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
+    EXPECT_EQ(status.code(), ErrorCodes::DuplicateKey);
+    EXPECT_EQ(numInserted, 0);
+    EXPECT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
               initDuplicateKeyErrors + 1);
 }
 
@@ -352,19 +352,19 @@ TEST_F(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
     // Inserts two keys.
     ASSERT_OK(indexAccessMethod->insertKeys(
         opCtx, ru, coll, indexEntry, key1, options, {}, &numInserted));
-    ASSERT_EQ(numInserted, 1);
+    EXPECT_EQ(numInserted, 1);
     ASSERT_OK(indexAccessMethod->insertKeys(
         opCtx, ru, coll, indexEntry, key2_old, options, {}, &numInserted));
-    ASSERT_EQ(numInserted, 1);
-    ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(), initDuplicateKeyErrors);
+    EXPECT_EQ(numInserted, 1);
+    EXPECT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(), initDuplicateKeyErrors);
 
     // Disallows new duplicates in a regular index and rejects the update.
     auto status =
         indexAccessMethod->doUpdate(opCtx, ru, coll, indexEntry, ticket, &numInserted, &numDeleted);
-    ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
-    ASSERT_EQ(numInserted, 0);
-    ASSERT_EQ(numDeleted, 0);
-    ASSERT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
+    EXPECT_EQ(status.code(), ErrorCodes::DuplicateKey);
+    EXPECT_EQ(numInserted, 0);
+    EXPECT_EQ(numDeleted, 0);
+    EXPECT_EQ(SortedDataIndexAccessMethod::getDuplicateKeyErrors_forTest(),
               initDuplicateKeyErrors + 1);
 }
 

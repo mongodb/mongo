@@ -52,7 +52,7 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, NoCollectionNotFound) {
         NamespaceString::createNamespaceString_forTest("test.nonexistentColl");
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
         _opCtx, collThatDoesntExist, /*expectedUUID=*/boost::none);
-    ASSERT(!preConditions.exists());
+    EXPECT_FALSE(preConditions.exists());
 }
 
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, NonTimeseriesCollection) {
@@ -60,9 +60,9 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, NonTimeseriesCollection) {
     uassertStatusOK(createCollection(_opCtx, cmd));
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
         _opCtx, nonTsNss, /*expectedUUID=*/boost::none);
-    ASSERT(preConditions.exists());
-    ASSERT(!preConditions.isTimeseriesCollection());
-    ASSERT(!preConditions.isViewlessTimeseriesCollection());
+    EXPECT_TRUE(preConditions.exists());
+    EXPECT_FALSE(preConditions.isTimeseriesCollection());
+    EXPECT_FALSE(preConditions.isViewlessTimeseriesCollection());
 }
 
 // TODO SERVER-123350: Remove this test once 9.0 is last LTS.
@@ -78,11 +78,11 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, LegacyTimeseriesCollection) {
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
         _opCtx, viewfulTsNss, /*expectedUUID=*/boost::none);
 
-    ASSERT(preConditions.exists());
-    ASSERT(preConditions.isTimeseriesCollection());
-    ASSERT(!preConditions.isViewlessTimeseriesCollection());
-    ASSERT(preConditions.wasNssTranslated());
-    ASSERT_EQ(preConditions.getTargetNs(viewfulTsNss), viewfulTsSystemBucketsNss);
+    EXPECT_TRUE(preConditions.exists());
+    EXPECT_TRUE(preConditions.isTimeseriesCollection());
+    EXPECT_FALSE(preConditions.isViewlessTimeseriesCollection());
+    EXPECT_TRUE(preConditions.wasNssTranslated());
+    EXPECT_EQ(preConditions.getTargetNs(viewfulTsNss), viewfulTsSystemBucketsNss);
 }
 
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, ViewlessTimeseriesCollection) {
@@ -97,10 +97,10 @@ TEST_F(TimeseriesCollectionPreConditionsUtilTest, ViewlessTimeseriesCollection) 
     auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
         _opCtx, viewlessTsNss, /*expectedUUID=*/boost::none);
 
-    ASSERT(preConditions.exists());
-    ASSERT(preConditions.isTimeseriesCollection());
-    ASSERT(preConditions.isViewlessTimeseriesCollection());
-    ASSERT(!preConditions.wasNssTranslated());
+    EXPECT_TRUE(preConditions.exists());
+    EXPECT_TRUE(preConditions.isTimeseriesCollection());
+    EXPECT_TRUE(preConditions.isViewlessTimeseriesCollection());
+    EXPECT_FALSE(preConditions.wasNssTranslated());
 }
 
 TEST_F(TimeseriesCollectionPreConditionsUtilTest, CollectionCreatedAfterPreConditionsCreated) {

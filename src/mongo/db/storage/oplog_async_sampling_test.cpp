@@ -86,11 +86,11 @@ protected:
         Date_t wallTime = Date_t::fromMillisSinceEpoch(t);
         BSONObj objTemplate = BSON("ts" << opTime << "wall" << wallTime << "str"
                                         << "");
-        ASSERT_LTE(objTemplate.objsize(), size);
+        EXPECT_LE(objTemplate.objsize(), size);
         std::string str(size - objTemplate.objsize(), fill);
 
         BSONObj obj = BSON("ts" << opTime << "wall" << wallTime << "str" << str);
-        ASSERT_EQ(size, obj.objsize());
+        EXPECT_EQ(size, obj.objsize());
 
         return obj;
     }
@@ -166,13 +166,13 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeBeginMarke
     auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     ASSERT(oplogTruncateMarkers);
 
-    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
+    EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
 
     // Continue finishing the initial scan / sample
     oplogTruncateMarkers = beginMarkerCreation(opCtx, *rs);
 
     // Confirm that some truncate markers were generated.
-    ASSERT_LT(0U, oplogTruncateMarkers->numMarkers());
+    EXPECT_LT(0U, oplogTruncateMarkers->numMarkers());
 }  // namespace repl
 
 // In async mode, during startup but before sampling finishes,
@@ -194,7 +194,7 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeInProgress
     ASSERT(oplogTruncateMarkers);
 
     // Confirm that we are in InProgress state since sampling/scanning has not begun.
-    ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::InProgress,
+    EXPECT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::InProgress,
               oplogTruncateMarkers->getMarkersCreationMethod());
 
     // Continue finishing the initial scan / sample
@@ -239,13 +239,13 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeSampling) 
     ASSERT(oplogTruncateMarkers);
 
     // Confirm that we can in fact sample
-    ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::Sampling,
+    EXPECT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::Sampling,
               oplogTruncateMarkers->getMarkersCreationMethod());
     // Confirm that some truncate markers were generated.
-    ASSERT_GTE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
+    EXPECT_GE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
     auto truncateMarkersBefore = oplogTruncateMarkers->numMarkers();
-    ASSERT_GT(truncateMarkersBefore, 0U);
-    ASSERT_GT(oplogTruncateMarkers->currentBytes_forTest(), 0);
+    EXPECT_GT(truncateMarkersBefore, 0U);
+    EXPECT_GT(oplogTruncateMarkers->currentBytes_forTest(), 0);
 }
 
 // In async mode, markers are not created during createOplogTruncateMarkers (which instead
@@ -262,9 +262,9 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_AsynchronousModeCreateOplo
     auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     ASSERT(oplogTruncateMarkers);
 
-    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+    EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
+    EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+    EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
 }
 
 // When oplogSamplingAsyncEnabled is false, AttachedPersistenceProvider turns off async marker
@@ -284,7 +284,7 @@ TEST_F(AsyncOplogTruncationTest, OplogTruncateMarkers_SynchronousPathWhenAsyncDi
     AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
     auto oplogTruncateMarkers = OplogTruncateMarkers::createOplogTruncateMarkers(opCtx, *rs);
     ASSERT(oplogTruncateMarkers);
-    ASSERT_LT(0U, oplogTruncateMarkers->numMarkers());
+    EXPECT_LT(0U, oplogTruncateMarkers->numMarkers());
 }
 
 // Test that oplog cap maintainer thread kills the truncation markers if it instantiated them for
@@ -319,7 +319,7 @@ TEST_F(AsyncOplogTruncationTest, ShutdownKillsMarkersAndClearsLocalOplogInfo) {
         }
     }
     ASSERT(installedMarkers) << "Thread did not install truncate markers within timeout";
-    ASSERT_FALSE(installedMarkers->isDead());
+    EXPECT_FALSE(installedMarkers->isDead());
     hangFp->waitForTimesEntered(timesEnteredBefore + 1);
 
     // Keep our own reference to the installed markers so we can observe isDead() after
@@ -329,11 +329,11 @@ TEST_F(AsyncOplogTruncationTest, ShutdownKillsMarkersAndClearsLocalOplogInfo) {
 
     // 1. The markers instance we captured was kill()'d during shutdown(). A killed markers
     //    object is the signal that any waiter in awaitHas...OrDead should unwind via _isDead.
-    ASSERT_TRUE(installedMarkers->isDead());
+    EXPECT_TRUE(installedMarkers->isDead());
 
     // 2. The LocalOplogInfo slot has been nulled out, so any post-stepdown getTruncateMarkers()
     //    call (e.g. from the oplog write path's invariant check) sees no markers.
-    ASSERT_FALSE(LocalOplogInfo::get(getOperationContext())->getTruncateMarkers());
+    EXPECT_FALSE(LocalOplogInfo::get(getOperationContext())->getTruncateMarkers());
 
     hangFp->setMode(FailPoint::off);
 }
@@ -375,7 +375,7 @@ TEST_F(AsyncOplogTruncationTest, ShutdownRacesWithLiveCapMaintainerThread) {
         LOGV2(12511002, "Installed markers", "waitMs"_attr = waitMs - 2);
 
         ASSERT(installedMarkers) << "i=" << i << ": thread did not install markers within timeout";
-        ASSERT_FALSE(installedMarkers->isDead()) << "i=" << i;
+        EXPECT_FALSE(installedMarkers->isDead()) << "i=" << i;
 
         if (kIterationDelayMillis[i] > 0) {
             sleepmillis(kIterationDelayMillis[i]);
@@ -387,11 +387,11 @@ TEST_F(AsyncOplogTruncationTest, ShutdownRacesWithLiveCapMaintainerThread) {
         // Regardless of which state the thread was in when shutdown() landed, the three
         // end-state invariants must hold: kill() ran on the markers, LocalOplogInfo was
         // nulled out, and the thread has cleanly joined.
-        ASSERT_TRUE(installedMarkers->isDead())
+        EXPECT_TRUE(installedMarkers->isDead())
             << "i=" << i << " delayMs=" << kIterationDelayMillis[i];
-        ASSERT_FALSE(LocalOplogInfo::get(getOperationContext())->getTruncateMarkers())
+        EXPECT_FALSE(LocalOplogInfo::get(getOperationContext())->getTruncateMarkers())
             << "i=" << i << " delayMs=" << kIterationDelayMillis[i];
-        ASSERT_FALSE(threadRaw->running()) << "i=" << i << " delayMs=" << kIterationDelayMillis[i];
+        EXPECT_FALSE(threadRaw->running()) << "i=" << i << " delayMs=" << kIterationDelayMillis[i];
     }
 }
 

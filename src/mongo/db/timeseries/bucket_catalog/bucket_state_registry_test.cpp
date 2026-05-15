@@ -102,7 +102,7 @@ public:
                                              time,
                                              nullptr,
                                              info.stats);
-        ASSERT_FALSE(hasBeenCleared(*ptr));
+        EXPECT_FALSE(hasBeenCleared(*ptr));
         return *ptr;
     }
 
@@ -200,33 +200,33 @@ TEST_F(BucketStateRegistryTest, TransitionsFromUntrackedState) {
     // Start with an untracked bucket in the registry.
     auto& bucket = createBucket(info1, date);
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
     // We expect a no-op when attempting to stop tracking an already untracked bucket.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
     // We expect a no-op when clearing an untracked bucket.
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
     // We expect transition to 'kNormal' to succeed.
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
     // Reset the state.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
     // We expect direct writes to succeed on untracked buckets.
     addDirectWrite(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
     // Reset the state.
     removeDirectWrite(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
     // We expect transition to 'kFrozen' to succeed.
     freezeBucket(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 }
 
 using BucketStateRegistryTestDeathTest = BucketStateRegistryTest;
@@ -234,17 +234,17 @@ DEATH_TEST_F(BucketStateRegistryTestDeathTest, CannotPrepareAnUntrackedBucket, "
     // Start with an untracked bucket in the registry.
     auto& bucket = createBucket(info1, date);
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
     // We expect to invariant when attempting to prepare an untracked bucket.
-    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+    EXPECT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
                 StateChangeSuccessful::kNo);
 }
 
 DEATH_TEST_F(BucketStateRegistryTestDeathTest, CannotInitializeAnUnclearedBucket, "invariant") {
     // Start with a 'kNormal' bucket in the registry.
     auto& bucket = createBucket(info1, date);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
     // We expect initialize to invariant.
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
@@ -253,153 +253,153 @@ DEATH_TEST_F(BucketStateRegistryTestDeathTest, CannotInitializeAnUnclearedBucket
 TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
     // Start with a 'kNormal' bucket in the registry.
     auto& bucket = createBucket(info1, date);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
     // We can stop tracking a 'kNormal' bucket.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
     // Reset the state.
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
 
     // We expect transition to 'kPrepared' to succeed.
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
     // Reset the state.
     (void)unprepareBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
     // We expect transition to 'kClear' to succeed.
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
     // Reset the state.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
     // We expect direct writes to succeed on 'kNormal' buckets.
     addDirectWrite(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
     // Reset the state.
     removeDirectWrite(bucketStateRegistry, bucket.bucketId);
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
     // We expect transition to 'kFrozen' to succeed.
     freezeBucket(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromClearedState) {
     // Start with a 'kCleared' bucket in the registry.
     auto& bucket = createBucket(info1, date);
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
     // We expect transition to 'kCleared' to succeed.
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
     // We can stop tracking a 'kCleared' bucket.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
     // Reset the state.
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
     // We expect transition to 'kNormal' to succeed.
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId).code());
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
     // Reset the state.
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
     // We expect transition to 'kPrepared' to fail.
-    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+    EXPECT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
                 StateChangeSuccessful::kNo);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
     // We expect direct writes to succeed on 'kCleared' buckets.
     addDirectWrite(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
     // Reset the state.
     removeDirectWrite(bucketStateRegistry, bucket.bucketId);
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
 
     // We expect transition to 'kFrozen' to succeed.
     freezeBucket(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromFrozenState) {
     // Start with a 'kFrozen' bucket in the registry.
     auto& bucket = createBucket(info1, date);
     freezeBucket(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 
     // We expect transition to 'kCleared' to fail.
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 
     // We expect transition to 'kPrepared' to fail.
-    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+    EXPECT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
                 StateChangeSuccessful::kNo);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 
     // We expect direct writes leave the state as 'kFrozen'.
     addDirectWrite(bucketStateRegistry, bucket.bucketId);
-    ASSERT_FALSE(doesBucketHaveDirectWrite(bucket.bucketId));
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+    EXPECT_FALSE(doesBucketHaveDirectWrite(bucket.bucketId));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 
     // We cannot untrack a 'kFrozen' bucket.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 
     // We cannot initialize bucket state for a bucket that is already frozen.
     auto status = initializeBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.code(), ErrorCodes::TimeseriesBucketFrozen);
+    EXPECT_EQ(status.code(), ErrorCodes::TimeseriesBucketFrozen);
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromPreparedState) {
     // Start with a 'kPrepared' bucket in the registry.
     auto& bucket = createBucket(info1, date);
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
     // We expect direct writes to fail and leave the state as 'kPrepared'.
     (void)addDirectWrite(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
     // We expect unpreparing bucket will transition the bucket state to 'kNormal'.
     unprepareBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
     // Reset the state.
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
     // We expect transition to 'kCleared' to succeed and update the state as 'kPreparedAndCleared'.
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
     // Reset the state.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
     // We can untrack a 'kPrepared' bucket
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
     // Reset the state.
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
     // We expect transition to 'kFrozen' to succeed.
     freezeBucket(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
 }
 
 DEATH_TEST_F(BucketStateRegistryTestDeathTest, CannotInitializeAPreparedBucket, "invariant") {
@@ -407,7 +407,7 @@ DEATH_TEST_F(BucketStateRegistryTestDeathTest, CannotInitializeAPreparedBucket, 
     auto& bucket = createBucket(info1, date);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
     // We expect to invariant when attempting to prepare an 'kPrepared' bucket.
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
@@ -418,7 +418,7 @@ DEATH_TEST_F(BucketStateRegistryTestDeathTest, CannotPrepareAnAlreadyPreparedBuc
     auto& bucket = createBucket(info1, date);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
     // We expect to invariant when attempting to prepare an untracked bucket.
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
 }
@@ -428,46 +428,46 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndClearedState) {
     auto& bucket = createBucket(info1, date);
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
 
     // We expect transition to 'kPrepared' to fail.
-    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+    EXPECT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
                 StateChangeSuccessful::kNo);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
 
     // We expect direct writes to fail and leave the state as 'kPreparedAndCleared'.
     (void)addDirectWrite(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
 
     // We expect clearing the bucket state will not affect the state.
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
 
     // We expect untracking 'kPreparedAndCleared' buckets to remove the state.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
     // Reset the state.
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
-    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+    EXPECT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
                 StateChangeSuccessful::kYes);
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
 
     // We expect unpreparing 'kPreparedAndCleared' buckets to transition to 'kCleared'.
     unprepareBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
     // Reset the state.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
-    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+    EXPECT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
                 StateChangeSuccessful::kYes);
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
 
     // We expect transition to 'kFrozen' to succeed.
     freezeBucket(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndFrozenState) {
@@ -475,147 +475,147 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndFrozenState) {
     auto& bucket = createBucket(info1, date);
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
     freezeBucket(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
     auto& bucket2 = createBucket(info2, date);
     (void)prepareBucketState(bucketStateRegistry, bucket2.bucketId);
     freezeBucket(bucketStateRegistry, bucket2.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket2.bucketId, BucketState::kPreparedAndFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket2.bucketId, BucketState::kPreparedAndFrozen));
 
     // We expect transition to 'kPrepared' to fail.
-    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+    EXPECT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
                 StateChangeSuccessful::kNo);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
 
     // We expect direct writes to fail and leave the state as 'kPreparedAndCleared'.
     (void)addDirectWrite(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
 
     // We expect clearing the bucket state will not affect the state.
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
 
     // We expect untracking 'kPreparedAndFrozen' buckets to transition the state to 'kFrozen'.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 
     // We expect unpreparing 'kPreparedAndCleared' buckets to transition to 'kFrozen'.
     unprepareBucketState(bucketStateRegistry, bucket2.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket2.bucketId, BucketState::kFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket2.bucketId, BucketState::kFrozen));
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromDirectWriteState) {
     // Start with a bucket with a direct write in the registry.
     auto& bucket = createBucket(info1, date);
     auto bucketState = addDirectWrite(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
     auto originalDirectWriteCount = std::get<DirectWriteCounter>(bucketState);
 
     // We expect future direct writes to add-on.
     bucketState = addDirectWrite(bucketStateRegistry, bucket.bucketId);
     auto newDirectWriteCount = std::get<DirectWriteCounter>(bucketState);
-    ASSERT_GT(newDirectWriteCount, originalDirectWriteCount);
+    EXPECT_GT(newDirectWriteCount, originalDirectWriteCount);
 
     // We expect untracking to leave the state unaffected.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
 
     // We expect transition to 'kNormal' to return a WriteConflict.
-    ASSERT_EQ(initializeBucketState(bucketStateRegistry, bucket.bucketId),
+    EXPECT_EQ(initializeBucketState(bucketStateRegistry, bucket.bucketId),
               ErrorCodes::WriteConflict);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
 
     // We expect transition to 'kCleared' to leave the state unaffected.
     clearBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
 
     // We expect transition to 'kPrepared' to leave the state unaffected.
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
 
     // We expect transition to 'kFrozen' to succeed.
     freezeBucket(bucketStateRegistry, bucket.bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+    EXPECT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 }
 
 TEST_F(BucketStateRegistryTest, EraAdvancesAsExpected) {
     // When allocating new buckets, we expect their era value to match the BucketCatalog's era.
-    ASSERT_EQ(getCurrentEra(bucketStateRegistry), 0);
+    EXPECT_EQ(getCurrentEra(bucketStateRegistry), 0);
     auto& bucket1 = createBucket(info1, date);
-    ASSERT_EQ(getCurrentEra(bucketStateRegistry), 0);
-    ASSERT_EQ(bucket1.lastChecked, 0);
+    EXPECT_EQ(getCurrentEra(bucketStateRegistry), 0);
+    EXPECT_EQ(bucket1.lastChecked, 0);
 
     // When clearing buckets, we expect the BucketCatalog's era value to increase while the cleared
     // bucket era values should remain unchanged.
     clear(*this, uuid1);
-    ASSERT_EQ(getCurrentEra(bucketStateRegistry), 1);
-    ASSERT_EQ(bucket1.lastChecked, 0);
+    EXPECT_EQ(getCurrentEra(bucketStateRegistry), 1);
+    EXPECT_EQ(bucket1.lastChecked, 0);
 
     // When clearing buckets of one namespace, we expect the era of buckets of any other namespace
     // to not change.
     auto& bucket2 = createBucket(info1, date);
     auto& bucket3 = createBucket(info2, date);
-    ASSERT_EQ(getCurrentEra(bucketStateRegistry), 1);
-    ASSERT_EQ(bucket2.lastChecked, 1);
-    ASSERT_EQ(bucket3.lastChecked, 1);
+    EXPECT_EQ(getCurrentEra(bucketStateRegistry), 1);
+    EXPECT_EQ(bucket2.lastChecked, 1);
+    EXPECT_EQ(bucket3.lastChecked, 1);
     clear(*this, uuid1);
-    ASSERT_EQ(getCurrentEra(bucketStateRegistry), 2);
-    ASSERT_EQ(bucket3.lastChecked, 1);
-    ASSERT_EQ(bucket1.lastChecked, 0);
-    ASSERT_EQ(bucket2.lastChecked, 1);
+    EXPECT_EQ(getCurrentEra(bucketStateRegistry), 2);
+    EXPECT_EQ(bucket3.lastChecked, 1);
+    EXPECT_EQ(bucket1.lastChecked, 0);
+    EXPECT_EQ(bucket2.lastChecked, 1);
 
     // Era also advances when clearing by OID
     clearById(uuid1, OID());
-    ASSERT_EQ(getCurrentEra(bucketStateRegistry), 4);
+    EXPECT_EQ(getCurrentEra(bucketStateRegistry), 4);
 }
 
 TEST_F(BucketStateRegistryTest, EraCountMapUpdatedCorrectly) {
     // Creating a bucket in a new era should add a counter for that era to the map.
     auto& bucket1 = createBucket(info1, date);
-    ASSERT_EQ(bucket1.lastChecked, 0);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 1);
+    EXPECT_EQ(bucket1.lastChecked, 0);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 1);
     clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket1);
 
     // When the last bucket in an era is destructed, the counter in the map should be removed.
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 0);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 0);
 
     // If there are still buckets in the era, however, the counter should still exist in the
     // map.
     auto& bucket2 = createBucket(info1, date);
     auto& bucket3 = createBucket(info2, date);
-    ASSERT_EQ(bucket2.lastChecked, 1);
-    ASSERT_EQ(bucket3.lastChecked, 1);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 2);
+    EXPECT_EQ(bucket2.lastChecked, 1);
+    EXPECT_EQ(bucket3.lastChecked, 1);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 2);
     clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket3);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 1);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 1);
 
     // A bucket in one era being destroyed and the counter decrementing should not affect a
     // different era's counter.
     auto& bucket4 = createBucket(info2, date);
-    ASSERT_EQ(bucket4.lastChecked, 2);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 2), 1);
+    EXPECT_EQ(bucket4.lastChecked, 2);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 2), 1);
     clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket4);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 2), 0);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 1);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 2), 0);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 1);
 }
 
 TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
     auto& bucket1 = createBucket(info1, date);
     auto& bucket2 = createBucket(info2, date);
-    ASSERT_EQ(bucket1.lastChecked, 0);
-    ASSERT_EQ(bucket2.lastChecked, 0);
+    EXPECT_EQ(bucket1.lastChecked, 0);
+    EXPECT_EQ(bucket2.lastChecked, 0);
 
     // After a clear operation, _isMemberOfClearedSet returns whether a particular bucket was
     // cleared or not. It also advances the bucket's era up to the most recent era.
-    ASSERT_FALSE(cannotAccessBucket(bucket1));
-    ASSERT_FALSE(cannotAccessBucket(bucket2));
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 2);
+    EXPECT_FALSE(cannotAccessBucket(bucket1));
+    EXPECT_FALSE(cannotAccessBucket(bucket2));
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 2);
     clear(*this, uuid2);
-    ASSERT_FALSE(cannotAccessBucket(bucket1));
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 1);
-    ASSERT_EQ(bucket1.lastChecked, 1);
+    EXPECT_FALSE(cannotAccessBucket(bucket1));
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 1);
+    EXPECT_EQ(bucket1.lastChecked, 1);
     ASSERT(cannotAccessBucket(bucket2));
 
     // Sanity check that all this still works with multiple buckets in a namespace being cleared.
@@ -623,131 +623,131 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
     bucket3.rolloverReason =
         RolloverReason::kTimeBackward;  // Rollover before opening another bucket
     auto& bucket4 = createBucket(info2, date);
-    ASSERT_EQ(bucket3.lastChecked, 1);
-    ASSERT_EQ(bucket4.lastChecked, 1);
+    EXPECT_EQ(bucket3.lastChecked, 1);
+    EXPECT_EQ(bucket4.lastChecked, 1);
     clear(*this, uuid2);
     ASSERT(cannotAccessBucket(bucket3));
     ASSERT(cannotAccessBucket(bucket4));
     auto& bucket5 = createBucket(info2, date);
-    ASSERT_EQ(bucket5.lastChecked, 2);
+    EXPECT_EQ(bucket5.lastChecked, 2);
     clear(*this, uuid2);
     ASSERT(cannotAccessBucket(bucket5));
     // _isMemberOfClearedSet should be able to advance a bucket by multiple eras.
-    ASSERT_EQ(bucket1.lastChecked, 1);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 1);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 3), 0);
-    ASSERT_FALSE(cannotAccessBucket(bucket1));
-    ASSERT_EQ(bucket1.lastChecked, 3);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 0);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 3), 1);
+    EXPECT_EQ(bucket1.lastChecked, 1);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 1);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 3), 0);
+    EXPECT_FALSE(cannotAccessBucket(bucket1));
+    EXPECT_EQ(bucket1.lastChecked, 3);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 0);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 3), 1);
 
     // _isMemberOfClearedSet works even if the bucket wasn't cleared in the most recent clear.
     clear(*this, uuid1);
     auto& bucket6 = createBucket(info2, date);
-    ASSERT_EQ(bucket6.lastChecked, 4);
+    EXPECT_EQ(bucket6.lastChecked, 4);
     clear(*this, uuid2);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 3), 1);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 4), 1);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 3), 1);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 4), 1);
     ASSERT(cannotAccessBucket(bucket1));
     ASSERT(cannotAccessBucket(bucket6));
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 3), 0);
-    ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 4), 0);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 3), 0);
+    EXPECT_EQ(getBucketCountForEra(bucketStateRegistry, 4), 0);
 }
 
 TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
     auto& bucket1 = createBucket(info1, date);
     auto& bucket2 = createBucket(info2, date);
-    ASSERT_EQ(bucket1.lastChecked, 0);
-    ASSERT_EQ(bucket2.lastChecked, 0);
-    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 0);
+    EXPECT_EQ(bucket1.lastChecked, 0);
+    EXPECT_EQ(bucket2.lastChecked, 0);
+    EXPECT_EQ(getClearedSetsCount(bucketStateRegistry), 0);
     clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket1);
     // Era 0 still has non-zero count after this clear because bucket2 is still in era 0.
-    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
+    EXPECT_EQ(getClearedSetsCount(bucketStateRegistry), 1);
     clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket2);
     // Bucket2 gets deleted, which makes era 0's count decrease to 0, then clear registry gets
     // cleaned.
-    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 0);
+    EXPECT_EQ(getClearedSetsCount(bucketStateRegistry), 0);
 
     auto& bucket3 = createBucket(info1, date);
     auto& bucket4 = createBucket(info2, date);
-    ASSERT_EQ(bucket3.lastChecked, 2);
-    ASSERT_EQ(bucket4.lastChecked, 2);
+    EXPECT_EQ(bucket3.lastChecked, 2);
+    EXPECT_EQ(bucket4.lastChecked, 2);
     clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket3);
     // Era 2 still has bucket4 in it, so its count remains non-zero.
-    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
+    EXPECT_EQ(getClearedSetsCount(bucketStateRegistry), 1);
     auto& bucket5 = createBucket(info1, date);
     bucket4.rolloverReason =
         RolloverReason::kTimeBackward;  // Rollover before opening another bucket
     auto& bucket6 = createBucket(info2, date);
-    ASSERT_EQ(bucket5.lastChecked, 3);
-    ASSERT_EQ(bucket6.lastChecked, 3);
+    EXPECT_EQ(bucket5.lastChecked, 3);
+    EXPECT_EQ(bucket6.lastChecked, 3);
     clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket5);
 
-    ASSERT_EQ(bucket4.lastChecked, 2);
+    EXPECT_EQ(bucket4.lastChecked, 2);
     // Eras 2 and 3 still have bucket4 and bucket6 in them respectively, so their counts remain
     // non-zero.
-    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 2);
+    EXPECT_EQ(getClearedSetsCount(bucketStateRegistry), 2);
 
     clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket4);
     checkAndRemoveClearedBucket(bucket6);
     // Eras 2 and 3 have their counts become 0 because bucket4 and bucket6 are cleared. The clear
     // registry is emptied.
-    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 0);
+    EXPECT_EQ(getClearedSetsCount(bucketStateRegistry), 0);
 
     auto& bucket7 = createBucket(info1, date);
     auto& bucket8 = createBucket(info3, date);
-    ASSERT_EQ(bucket7.lastChecked, 5);
-    ASSERT_EQ(bucket8.lastChecked, 5);
+    EXPECT_EQ(bucket7.lastChecked, 5);
+    EXPECT_EQ(bucket8.lastChecked, 5);
     clear(*this, uuid3);
     checkAndRemoveClearedBucket(bucket8);
     // Era 5 still has bucket7 in it so its count remains non-zero.
-    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
+    EXPECT_EQ(getClearedSetsCount(bucketStateRegistry), 1);
     auto& bucket9 = createBucket(info2, date);
-    ASSERT_EQ(bucket9.lastChecked, 6);
+    EXPECT_EQ(bucket9.lastChecked, 6);
     clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket9);
     // Era 6's count becomes 0. Since era 5 is the smallest era with non-zero count, no clear ops
     // are removed.
-    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 2);
+    EXPECT_EQ(getClearedSetsCount(bucketStateRegistry), 2);
     auto& bucket10 = createBucket(info3, date);
-    ASSERT_EQ(bucket10.lastChecked, 7);
+    EXPECT_EQ(bucket10.lastChecked, 7);
     clear(*this, uuid3);
     checkAndRemoveClearedBucket(bucket10);
     // Era 7's count becomes 0. Since era 5 is the smallest era with non-zero count, no clear ops
     // are removed.
-    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 3);
+    EXPECT_EQ(getClearedSetsCount(bucketStateRegistry), 3);
     clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket7);
     // Era 5's count becomes 0. No eras with non-zero counts remain, so all clear ops are removed.
-    ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 0);
+    EXPECT_EQ(getClearedSetsCount(bucketStateRegistry), 0);
 }
 
 TEST_F(BucketStateRegistryTest, HasBeenClearedToleratesGapsInRegistry) {
     auto& bucket1 = createBucket(info1, date);
-    ASSERT_EQ(bucket1.lastChecked, 0);
+    EXPECT_EQ(bucket1.lastChecked, 0);
     clearById(uuid1, OID());
-    ASSERT_EQ(getCurrentEra(bucketStateRegistry), 2);
+    EXPECT_EQ(getCurrentEra(bucketStateRegistry), 2);
     clear(*this, uuid1);
-    ASSERT_EQ(getCurrentEra(bucketStateRegistry), 3);
-    ASSERT_TRUE(hasBeenCleared(bucket1));
+    EXPECT_EQ(getCurrentEra(bucketStateRegistry), 3);
+    EXPECT_TRUE(hasBeenCleared(bucket1));
 
     auto& bucket2 = createBucket(info2, date);
-    ASSERT_EQ(bucket2.lastChecked, 3);
+    EXPECT_EQ(bucket2.lastChecked, 3);
     clearById(uuid1, OID());
     clearById(uuid1, OID());
     clearById(uuid1, OID());
-    ASSERT_EQ(getCurrentEra(bucketStateRegistry), 9);
-    ASSERT_TRUE(hasBeenCleared(bucket1));
-    ASSERT_FALSE(hasBeenCleared(bucket2));
+    EXPECT_EQ(getCurrentEra(bucketStateRegistry), 9);
+    EXPECT_TRUE(hasBeenCleared(bucket1));
+    EXPECT_FALSE(hasBeenCleared(bucket2));
     clear(*this, uuid2);
-    ASSERT_EQ(getCurrentEra(bucketStateRegistry), 10);
-    ASSERT_TRUE(hasBeenCleared(bucket1));
-    ASSERT_TRUE(hasBeenCleared(bucket2));
+    EXPECT_EQ(getCurrentEra(bucketStateRegistry), 10);
+    EXPECT_TRUE(hasBeenCleared(bucket1));
+    EXPECT_TRUE(hasBeenCleared(bucket2));
 }
 
 TEST_F(BucketStateRegistryTest, ArchivingBucketStopsTrackingState) {
@@ -757,7 +757,7 @@ TEST_F(BucketStateRegistryTest, ArchivingBucketStopsTrackingState) {
     internal::archiveBucket(
         *this, *stripes[info1.stripeNumber], WithLock::withoutLock(), bucket, stats(bucket));
     auto state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT_EQ(state, boost::none);
+    EXPECT_EQ(state, boost::none);
 }
 
 TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
@@ -782,16 +782,16 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
 TEST_F(BucketStateRegistryTest, DirectWriteStartInitializesBucketState) {
     auto bucketId = BucketId{uuid1, OID(), 0};
     directWriteStart(bucketStateRegistry, bucketId);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucketId));
 }
 
 TEST_F(BucketStateRegistryTest, DirectWriteFinishRemovesBucketState) {
     auto bucketId = BucketId{uuid1, OID(), 0};
     directWriteStart(bucketStateRegistry, bucketId);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
     directWriteFinish(bucketStateRegistry, bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucketId, boost::none));
 }
 
 TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
@@ -804,25 +804,25 @@ TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
     // If no direct write has been initiated, the direct write counter should be 0.
     auto state = getBucketState(bucketStateRegistry, bucketId);
     ASSERT_TRUE(state.has_value());
-    ASSERT_TRUE(holds_alternative<BucketState>(*state));
+    EXPECT_TRUE(holds_alternative<BucketState>(*state));
 
     // Start a direct write and ensure the counter is incremented correctly.
     while (dwCounter < 4) {
         directWriteStart(bucketStateRegistry, bucketId);
         dwCounter++;
-        ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
+        EXPECT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     while (dwCounter > 1) {
         directWriteFinish(bucketStateRegistry, bucketId);
         dwCounter--;
-        ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
+        EXPECT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     // When the number of direct writes reaches 0, we should clear the bucket.
     directWriteFinish(bucketStateRegistry, bucketId);
-    ASSERT_FALSE(doesBucketHaveDirectWrite(bucketId));
-    ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kCleared));
+    EXPECT_FALSE(doesBucketHaveDirectWrite(bucketId));
+    EXPECT_TRUE(doesBucketStateMatch(bucketId, BucketState::kCleared));
 }
 
 TEST_F(BucketStateRegistryTest, ConflictingDirectWrites) {
@@ -830,21 +830,21 @@ TEST_F(BucketStateRegistryTest, ConflictingDirectWrites) {
     // engine layer, we expect the directWriteStart/Finish pairs to work successfully.
     BucketId bucketId{uuid1, OID(), 0};
     auto state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT_FALSE(state.has_value());
+    EXPECT_FALSE(state.has_value());
 
     // First direct write initializes state as untracked.
     directWriteStart(bucketStateRegistry, bucketId);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
     directWriteStart(bucketStateRegistry, bucketId);
 
     // First finish does not remove the state from the registry.
     directWriteFinish(bucketStateRegistry, bucketId);
-    ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
+    EXPECT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
     // Second one removes it.
     directWriteFinish(bucketStateRegistry, bucketId);
-    ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
+    EXPECT_TRUE(doesBucketStateMatch(bucketId, boost::none));
 }
 
 TEST_F(BucketStateRegistryTest, LargeNumberOfDirectWritesInTransaction) {
@@ -852,22 +852,22 @@ TEST_F(BucketStateRegistryTest, LargeNumberOfDirectWritesInTransaction) {
     // it gracefully.
     BucketId bucketId{uuid1, OID(), 0};
     auto state = getBucketState(bucketStateRegistry, bucketId);
-    ASSERT_FALSE(state.has_value());
+    EXPECT_FALSE(state.has_value());
 
     int numDirectWrites = 100'000;
 
     for (int i = 0; i < numDirectWrites; ++i) {
         directWriteStart(bucketStateRegistry, bucketId);
-        ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
+        EXPECT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     for (int i = 0; i < numDirectWrites; ++i) {
-        ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
+        EXPECT_TRUE(doesBucketHaveDirectWrite(bucketId));
         directWriteFinish(bucketStateRegistry, bucketId);
     }
 
-    ASSERT_FALSE(doesBucketHaveDirectWrite(bucketId));
-    ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
+    EXPECT_FALSE(doesBucketHaveDirectWrite(bucketId));
+    EXPECT_TRUE(doesBucketStateMatch(bucketId, boost::none));
 }
 
 }  // namespace

@@ -401,7 +401,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
         const auto& doc = docsWithSuitableBuckets[i];
         auto result = _findSuitableBucket(_ns1, tsOptions, doc);
         ASSERT_FALSE(result.isEmpty());
-        ASSERT_EQ(bucketDocs[i]["_id"].OID(), result["_id"].OID());
+        EXPECT_EQ(bucketDocs[i]["_id"].OID(), result["_id"].OID());
     }
 
     // Verify that documents without a meta field are only eligible to be inserted into buckets with
@@ -436,7 +436,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
 
         auto result = _findSuitableBucket(_ns1, tsOptions, metalessDoc);
         ASSERT_FALSE(result.isEmpty());
-        ASSERT_EQ(metalessBucket["_id"].OID(), result["_id"].OID());
+        EXPECT_EQ(metalessBucket["_id"].OID(), result["_id"].OID());
     }
 
     std::vector<BSONObj> docsWithoutSuitableBuckets = {
@@ -546,7 +546,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableCompressedBucketForMeasurement) {
     // Verify that we can find a suitable bucket to insert into.
     auto result = _findSuitableBucket(_ns1, tsOptions, docWithSuitableBucket);
     ASSERT_FALSE(result.isEmpty());
-    ASSERT_EQ(bucketDoc["_id"].OID(), result["_id"].OID());
+    EXPECT_EQ(bucketDoc["_id"].OID(), result["_id"].OID());
 }
 
 }  // namespace

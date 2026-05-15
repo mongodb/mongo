@@ -169,7 +169,7 @@ TEST_F(StorageRepairObserverTest, DataModified) {
 
     ASSERT(repairObserver->isDone());
     ASSERT(repairObserver->isDataInvalidated());
-    ASSERT_EQ(1U, repairObserver->getModifications().size());
+    EXPECT_EQ(1U, repairObserver->getModifications().size());
 
     assertReplConfigValid(false);
 }
@@ -199,7 +199,7 @@ TEST_F(StorageRepairObserverTest, DataValidAfterBenignModification) {
 
     ASSERT(repairObserver->isDone());
     ASSERT(!repairObserver->isDataInvalidated());
-    ASSERT_EQ(1U, repairObserver->getModifications().size());
+    EXPECT_EQ(1U, repairObserver->getModifications().size());
 
     assertReplConfigValid(true);
 }
@@ -228,7 +228,7 @@ TEST_F(StorageRepairObserverTest, DataModifiedDoesNotCreateReplConfigOnStandalon
 
     ASSERT(repairObserver->isDone());
     ASSERT(repairObserver->isDataInvalidated());
-    ASSERT_EQ(1U, repairObserver->getModifications().size());
+    EXPECT_EQ(1U, repairObserver->getModifications().size());
     ASSERT(!hasReplConfig());
 }
 
@@ -277,7 +277,7 @@ TEST_F(StorageRepairObserverTest, RepairCompleteAfterRestart) {
 
     repairObserver->onRepairDone(opCtx.get(), [this]() { invalidateReplConfig(); });
     ASSERT(repairObserver->isDone());
-    ASSERT_EQ(1U, repairObserver->getModifications().size());
+    EXPECT_EQ(1U, repairObserver->getModifications().size());
 
     repairObserver = reset();
     ASSERT(!repairObserver->isIncomplete());

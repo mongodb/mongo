@@ -193,7 +193,7 @@ TEST_F(ReplicatedFastCountManagerMetricsTest, MetadataMutexRegisteredWithObserva
 
     const BSONObj report = ObservableMutexRegistry::get().report(false);
     const StringData name = "ReplicatedFastCountManager::_metadataMutex";
-    ASSERT_TRUE(report.hasField(name)) << "Missing " << name << " in " << report;
+    EXPECT_TRUE(report.hasField(name)) << "Missing " << name << " in " << report;
     const BSONObj exclusive =
         report.getObjectField(name).getObjectField(ObservableMutexRegistry::kExclusiveFieldName);
     EXPECT_GT(exclusive.getIntField(ObservableMutexRegistry::kTotalAcquisitionsFieldName), 0);

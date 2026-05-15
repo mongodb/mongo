@@ -56,72 +56,72 @@ uint8_t scaleIndexForMultiplier(double multiplier) {
 
 void assertDecimal128Equal(Decimal128 val) {
     int128_t encodeResult = Simple8bTypeUtil::encodeDecimal128(val);
-    ASSERT_EQUALS(absl::Int128High64(encodeResult), val.getValue().high64);
-    ASSERT_EQUALS(absl::Int128Low64(encodeResult), val.getValue().low64);
+    EXPECT_EQ(absl::Int128High64(encodeResult), val.getValue().high64);
+    EXPECT_EQ(absl::Int128Low64(encodeResult), val.getValue().low64);
     Decimal128 decodeResult = Simple8bTypeUtil::decodeDecimal128(encodeResult);
-    ASSERT_TRUE(decodeResult == val);
+    EXPECT_TRUE(decodeResult == val);
 }
 
 void assertBinaryEqual(char* val, size_t size, int128_t expected) {
     boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeBinary(val, size);
-    ASSERT_EQUALS(*encodeResult, expected);
+    EXPECT_EQ(*encodeResult, expected);
 
     // Initialize to something non zero so we can verify that we did not write out of bounds
     char charPtr[17];
     char unused = 'x';
     memset(charPtr, unused, sizeof(charPtr));
     Simple8bTypeUtil::decodeBinary(*encodeResult, charPtr, size);
-    ASSERT_EQUALS(std::memcmp(charPtr, val, size), 0);
-    ASSERT_EQUALS(charPtr[size], unused);
+    EXPECT_EQ(std::memcmp(charPtr, val, size), 0);
+    EXPECT_EQ(charPtr[size], unused);
 }
 
 void assertStringEqual(StringData val, int128_t expected) {
     boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeString(val);
-    ASSERT_EQUALS(*encodeResult, expected);
+    EXPECT_EQ(*encodeResult, expected);
 
     Simple8bTypeUtil::SmallString decodeResult = Simple8bTypeUtil::decodeString(*encodeResult);
-    ASSERT_EQUALS(val.size(), decodeResult.size);
-    ASSERT_EQUALS(std::memcmp(val.data(), decodeResult.str.data(), val.size()), 0);
+    EXPECT_EQ(val.size(), decodeResult.size);
+    EXPECT_EQ(std::memcmp(val.data(), decodeResult.str.data(), val.size()), 0);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodePositiveSignedInt) {
     int64_t signedVal = 1;
     uint64_t unsignedVal = Simple8bTypeUtil::encodeInt64(signedVal);
-    ASSERT_EQUALS(unsignedVal, 2);
+    EXPECT_EQ(unsignedVal, 2);
     int64_t decodedSignedVal = Simple8bTypeUtil::decodeInt64(unsignedVal);
-    ASSERT_EQUALS(decodedSignedVal, signedVal);
+    EXPECT_EQ(decodedSignedVal, signedVal);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodeNegativeSignedInt) {
     int64_t signedVal = -1;
     uint64_t unsignedVal = Simple8bTypeUtil::encodeInt64(signedVal);
-    ASSERT_EQUALS(unsignedVal, 0x1);
+    EXPECT_EQ(unsignedVal, 0x1);
     int64_t decodedSignedVal = Simple8bTypeUtil::decodeInt64(unsignedVal);
-    ASSERT_EQUALS(decodedSignedVal, signedVal);
+    EXPECT_EQ(decodedSignedVal, signedVal);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodeMaxPositiveSignedInt) {
     int64_t signedVal = std::numeric_limits<int64_t>::max();
     uint64_t unsignedVal = Simple8bTypeUtil::encodeInt64(signedVal);
-    ASSERT_EQUALS(unsignedVal, 0xFFFFFFFFFFFFFFFE);
+    EXPECT_EQ(unsignedVal, 0xFFFFFFFFFFFFFFFE);
     int64_t decodedSignedVal = Simple8bTypeUtil::decodeInt64(unsignedVal);
-    ASSERT_EQUALS(decodedSignedVal, signedVal);
+    EXPECT_EQ(decodedSignedVal, signedVal);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodeMaxNegativeSignedInt) {
     int64_t signedVal = std::numeric_limits<int64_t>::lowest();
     uint64_t unsignedVal = Simple8bTypeUtil::encodeInt64(signedVal);
-    ASSERT_EQUALS(unsignedVal, 0xFFFFFFFFFFFFFFFF);
+    EXPECT_EQ(unsignedVal, 0xFFFFFFFFFFFFFFFF);
     int64_t decodedSignedVal = Simple8bTypeUtil::decodeInt64(unsignedVal);
-    ASSERT_EQUALS(decodedSignedVal, signedVal);
+    EXPECT_EQ(decodedSignedVal, signedVal);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodeZero) {
     int64_t signedVal = 0;
     uint64_t unsignedVal = Simple8bTypeUtil::encodeInt64(signedVal);
-    ASSERT_EQUALS(unsignedVal, 0x0);
+    EXPECT_EQ(unsignedVal, 0x0);
     int64_t decodedSignedVal = Simple8bTypeUtil::decodeInt64(unsignedVal);
-    ASSERT_EQUALS(decodedSignedVal, signedVal);
+    EXPECT_EQ(decodedSignedVal, signedVal);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodePositiveInt) {
@@ -131,9 +131,9 @@ TEST(Simple8bTypeUtil, EncodeAndDecodePositiveInt) {
     //  Right shifted 0..000000000000
     //  xor = 0..0100110100100 = 0x9A4
     uint64_t unsignedVal = Simple8bTypeUtil::encodeInt64(signedVal);
-    ASSERT_EQUALS(unsignedVal, 0x9A4);
+    EXPECT_EQ(unsignedVal, 0x9A4);
     int64_t decodedSignedVal = Simple8bTypeUtil::decodeInt64(unsignedVal);
-    ASSERT_EQUALS(decodedSignedVal, signedVal);
+    EXPECT_EQ(decodedSignedVal, signedVal);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodeNegativeInt) {
@@ -143,138 +143,138 @@ TEST(Simple8bTypeUtil, EncodeAndDecodeNegativeInt) {
     //  Right shifted 0..000000000001
     //  xor = 0..0100110100101 = 0x9A3
     uint64_t unsignedVal = Simple8bTypeUtil::encodeInt64(signedVal);
-    ASSERT_EQUALS(unsignedVal, 0x9A3);
+    EXPECT_EQ(unsignedVal, 0x9A3);
     int64_t decodedSignedVal = Simple8bTypeUtil::decodeInt64(unsignedVal);
-    ASSERT_EQUALS(decodedSignedVal, signedVal);
+    EXPECT_EQ(decodedSignedVal, signedVal);
 }
 
 TEST(Simple8bTypeUtil, DecimalPositiveValue) {
     double val = 1.0;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(1));
+    EXPECT_EQ(scalar.value(), scaleIndexForMultiplier(1));
     boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.value(), 1);
+    EXPECT_EQ(encodeResult.value(), 1);
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
-    ASSERT_EQUALS(val, decodeResult);
+    EXPECT_EQ(val, decodeResult);
 }
 
 TEST(Simple8bTypeUtil, EightDigitDecimalValue) {
     double val = 1.12345678;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100000000));
+    EXPECT_EQ(scalar.value(), scaleIndexForMultiplier(100000000));
     boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.value(), 112345678);
+    EXPECT_EQ(encodeResult.value(), 112345678);
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
-    ASSERT_EQUALS(val, decodeResult);
+    EXPECT_EQ(val, decodeResult);
 }
 
 TEST(Simple8bTypeUtil, TwoDigitDecimalValue) {
     double val = 1.12;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100));
+    EXPECT_EQ(scalar.value(), scaleIndexForMultiplier(100));
     boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.value(), 112);
+    EXPECT_EQ(encodeResult.value(), 112);
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
-    ASSERT_EQUALS(val, decodeResult);
+    EXPECT_EQ(val, decodeResult);
 }
 
 TEST(Simple8bTypeUtil, FloatExceedDigitsValue) {
     double val = 1.123456789;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
-    ASSERT_FALSE(scalar);
+    EXPECT_FALSE(scalar);
 }
 
 TEST(Simple8bTypeUtil, SparseDecimalValue) {
     double val = 1.00000001;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100000000));
+    EXPECT_EQ(scalar.value(), scaleIndexForMultiplier(100000000));
     boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.value(), 100000001);
+    EXPECT_EQ(encodeResult.value(), 100000001);
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
-    ASSERT_EQUALS(val, decodeResult);
+    EXPECT_EQ(val, decodeResult);
 }
 
 TEST(Simple8bTypeUtil, RoundingDecimalValue) {
     double val = 1.455454;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100000000));
+    EXPECT_EQ(scalar.value(), scaleIndexForMultiplier(100000000));
     boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.value(), 145545400);
+    EXPECT_EQ(encodeResult.value(), 145545400);
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
-    ASSERT_EQUALS(val, decodeResult);
+    EXPECT_EQ(val, decodeResult);
 }
 
 TEST(Simple8bTypeUtil, AllNines) {
     double val = 1.99999999;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100000000));
+    EXPECT_EQ(scalar.value(), scaleIndexForMultiplier(100000000));
     boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.value(), 199999999);
+    EXPECT_EQ(encodeResult.value(), 199999999);
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
-    ASSERT_EQUALS(val, decodeResult);
+    EXPECT_EQ(val, decodeResult);
 }
 
 TEST(Simple8bTypeUtil, 3DigitValue) {
     double val = 123.123;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(10000));
+    EXPECT_EQ(scalar.value(), scaleIndexForMultiplier(10000));
     boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.value(), (1231230));
+    EXPECT_EQ(encodeResult.value(), (1231230));
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
-    ASSERT_EQUALS(val, decodeResult);
+    EXPECT_EQ(val, decodeResult);
 }
 
 TEST(Simple8bTypeUtil, RoundingTooShortShouldFail) {
     double val = 1.9876543;
     boost::optional<int64_t> encodeResult =
         Simple8bTypeUtil::encodeDouble(val, scaleIndexForMultiplier(10000));
-    ASSERT_FALSE(encodeResult);
+    EXPECT_FALSE(encodeResult);
 }
 
 TEST(Simple8bTypeUtil, TestNaNAndInfinity) {
     double val = std::numeric_limits<double>::quiet_NaN();
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
-    ASSERT_FALSE(scalar);
+    EXPECT_FALSE(scalar);
     boost::optional<int64_t> result =
         Simple8bTypeUtil::encodeDouble(val, scaleIndexForMultiplier(100000000));
-    ASSERT_FALSE(result.has_value());
+    EXPECT_FALSE(result.has_value());
     val = std::numeric_limits<double>::infinity();
     scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
-    ASSERT_FALSE(scalar);
+    EXPECT_FALSE(scalar);
     result = Simple8bTypeUtil::encodeDouble(val, scaleIndexForMultiplier(100000000));
-    ASSERT_FALSE(result.has_value());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST(Simple8bTypeUtil, TestMaxDoubleShouldFail) {
     double val = std::numeric_limits<double>::max();
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
-    ASSERT_FALSE(scalar);
+    EXPECT_FALSE(scalar);
     boost::optional<int64_t> result =
         Simple8bTypeUtil::encodeDouble(val, scaleIndexForMultiplier(100000000));
-    ASSERT_FALSE(result.has_value());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST(Simple8bTypeUtil, TestMinDoubleShouldFail) {
     double val = std::numeric_limits<double>::lowest();
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
-    ASSERT_FALSE(scalar);
+    EXPECT_FALSE(scalar);
     boost::optional<int64_t> result =
         Simple8bTypeUtil::encodeDouble(val, scaleIndexForMultiplier(100000000));
-    ASSERT_FALSE(result.has_value());
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST(Simple8bTypeUtil, InterpretAsMemory) {
@@ -294,13 +294,13 @@ TEST(Simple8bTypeUtil, InterpretAsMemory) {
 
         int64_t valInt;
         memcpy(&valInt, &val, sizeof(valInt));
-        ASSERT_EQ(*result, valInt);
+        EXPECT_EQ(*result, valInt);
 
         // Some of the special values above does not compare equal with themselves (signaling NaN).
         // Verify that we end up with the same memory after decoding
         double decoded =
             Simple8bTypeUtil::decodeDouble(*result, Simple8bTypeUtil::kMemoryAsInteger);
-        ASSERT_EQ(memcmp(&decoded, &val, sizeof(val)), 0);
+        EXPECT_EQ(memcmp(&decoded, &val, sizeof(val)), 0);
     }
 }
 
@@ -309,39 +309,39 @@ TEST(Simple8bTypeUtil, TestMaxInt) {
     double val = std::pow(2, 53);
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(1));
+    EXPECT_EQ(scalar.value(), scaleIndexForMultiplier(1));
     boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
     // Handle negative case
-    ASSERT_EQUALS(encodeResult.value(), int64_t(val));
+    EXPECT_EQ(encodeResult.value(), int64_t(val));
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
-    ASSERT_EQUALS(val, decodeResult);
+    EXPECT_EQ(val, decodeResult);
 }
 
 TEST(Simple8bTypeUtil, NegativeValue) {
     double val = -123.123;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(10000));
+    EXPECT_EQ(scalar.value(), scaleIndexForMultiplier(10000));
     boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
     // Handle negative case
-    ASSERT_EQUALS(encodeResult.value(), -1231230);
+    EXPECT_EQ(encodeResult.value(), -1231230);
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
-    ASSERT_EQUALS(val, decodeResult);
+    EXPECT_EQ(val, decodeResult);
 }
 
 TEST(Simple8bTypeUtil, NegativeSixDecimalValue) {
     double val = -123.123456;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100000000));
+    EXPECT_EQ(scalar.value(), scaleIndexForMultiplier(100000000));
     boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
     // Handle negative case by subtracting 1
-    ASSERT_EQUALS(encodeResult.value(), -12312345600);
+    EXPECT_EQ(encodeResult.value(), -12312345600);
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
-    ASSERT_EQUALS(val, decodeResult);
+    EXPECT_EQ(val, decodeResult);
 }
 
 TEST(Simple8bTypeUtil, TestMinInt) {
@@ -349,13 +349,13 @@ TEST(Simple8bTypeUtil, TestMinInt) {
     double val = -std::pow(2, 53);
     boost::optional<std::uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(1));
+    EXPECT_EQ(scalar.value(), scaleIndexForMultiplier(1));
     boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
     // Handle negative case
-    ASSERT_EQUALS(encodeResult.value(), int64_t(val));
+    EXPECT_EQ(encodeResult.value(), int64_t(val));
     double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
-    ASSERT_EQUALS(val, decodeResult);
+    EXPECT_EQ(val, decodeResult);
 }
 
 TEST(Simple8bTypeUtil, TestObjectId) {
@@ -363,44 +363,44 @@ TEST(Simple8bTypeUtil, TestObjectId) {
     int64_t encodedObjId = Simple8bTypeUtil::encodeObjectId(objId);
 
     int64_t expectedEncodedObjId = 0x1122AA33BB44CC;
-    ASSERT_EQUALS(encodedObjId, expectedEncodedObjId);
+    EXPECT_EQ(encodedObjId, expectedEncodedObjId);
 
     OID actualObjId = Simple8bTypeUtil::decodeObjectId(encodedObjId, objId.getInstanceUnique());
-    ASSERT_EQUALS(objId, actualObjId);
+    EXPECT_EQ(objId, actualObjId);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodePositiveSignedInt128) {
     int128_t signedVal = 1;
     uint128_t unsignedVal = Simple8bTypeUtil::encodeInt128(signedVal);
-    ASSERT_EQUALS(unsignedVal, 2);
+    EXPECT_EQ(unsignedVal, 2);
     int128_t decodedSignedVal = Simple8bTypeUtil::decodeInt128(unsignedVal);
-    ASSERT_EQUALS(decodedSignedVal, signedVal);
+    EXPECT_EQ(decodedSignedVal, signedVal);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodeNegativeSignedInt128) {
     int128_t signedVal = -1;
     uint128_t unsignedVal = Simple8bTypeUtil::encodeInt128(signedVal);
-    ASSERT_EQUALS(unsignedVal, 0x1);
+    EXPECT_EQ(unsignedVal, 0x1);
     int128_t decodedSignedVal = Simple8bTypeUtil::decodeInt128(unsignedVal);
-    ASSERT_EQUALS(decodedSignedVal, signedVal);
+    EXPECT_EQ(decodedSignedVal, signedVal);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodeMaxPositiveSignedInt128) {
     int128_t signedVal = std::numeric_limits<int128_t>::max();
     uint128_t unsignedVal = Simple8bTypeUtil::encodeInt128(signedVal);
     uint128_t expectedVal = absl::MakeInt128(0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFE);
-    ASSERT_EQUALS(unsignedVal, expectedVal);
+    EXPECT_EQ(unsignedVal, expectedVal);
     int128_t decodedSignedVal = Simple8bTypeUtil::decodeInt128(unsignedVal);
-    ASSERT_EQUALS(decodedSignedVal, signedVal);
+    EXPECT_EQ(decodedSignedVal, signedVal);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodeMaxNegativeSignedInt128) {
     int128_t signedVal = std::numeric_limits<int128_t>::min();
     uint128_t unsignedVal = Simple8bTypeUtil::encodeInt128(signedVal);
     uint128_t expectedVal = absl::MakeInt128(0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF);
-    ASSERT_EQUALS(unsignedVal, expectedVal);
+    EXPECT_EQ(unsignedVal, expectedVal);
     int128_t decodedSignedVal = Simple8bTypeUtil::decodeInt128(unsignedVal);
-    ASSERT_EQUALS(decodedSignedVal, signedVal);
+    EXPECT_EQ(decodedSignedVal, signedVal);
 }
 
 TEST(Simple8bTypeUtil, Decimal128Base) {
@@ -460,7 +460,7 @@ TEST(Simple8bTypeUtil, LargeChar) {
 TEST(Simple8bTypeUtil, OversizedBinary) {
     char arr[17] = "aaaaabbbbbcccccd";
     auto encoded = Simple8bTypeUtil::encodeBinary(arr, sizeof(arr));
-    ASSERT_FALSE(encoded);
+    EXPECT_FALSE(encoded);
 }
 
 TEST(Simple8bTypeUtil, LeadingAndTrailingZeros) {
@@ -507,11 +507,11 @@ TEST(Simple8bTypeUtil, OddCharString) {
 
 TEST(Simple8bTypeUtil, OversizdString) {
     boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeString("aaaaabbbbbcccccdd"_sd);
-    ASSERT_FALSE(encodeResult);
+    EXPECT_FALSE(encodeResult);
 }
 
 TEST(Simple8bTypeUtil, BrokenString) {
     StringData val("\0a", 3);
     boost::optional<int128_t> encodeResult = Simple8bTypeUtil::encodeString(val);
-    ASSERT_FALSE(encodeResult);
+    EXPECT_FALSE(encodeResult);
 }

@@ -119,7 +119,7 @@ const BSONObj bucketWithDuplicateIndexFieldNames = mongo::fromjson(R"({
 void assertNoDuplicateIndexFieldNames(const BSONObj& column) {
     size_t curIdx = 0;
     for (const auto elemIt : column) {
-        ASSERT_EQ(std::to_string(curIdx++), elemIt.fieldName());
+        EXPECT_EQ(std::to_string(curIdx++), elemIt.fieldName());
     }
 }
 
@@ -132,7 +132,7 @@ TEST(TimeseriesBucketCompression, BasicRoundtrip) {
 
     // Compression will re-order data fields, moving the timeField to the front.
     UnorderedFieldsBSONObjComparator comparator;
-    ASSERT_EQ(0, comparator.compare(decompressed.value(), sampleBucket));
+    EXPECT_EQ(0, comparator.compare(decompressed.value(), sampleBucket));
 }
 
 TEST(TimeseriesBucketCompression, RoundtripWithDuplicateIndexFieldNames) {
@@ -150,10 +150,10 @@ TEST(TimeseriesBucketCompression, RoundtripWithDuplicateIndexFieldNames) {
     UnorderedFieldsBSONObjComparator comparator;
 
     // Decompression rewrites index field names, so the objects will not match.
-    ASSERT_NE(0, comparator.compare(decompressed.value(), bucketWithDuplicateIndexFieldNames));
+    EXPECT_NE(0, comparator.compare(decompressed.value(), bucketWithDuplicateIndexFieldNames));
 
     // Check that we have 4 measurements in the decompressed bucket.
-    ASSERT_EQ(4,
+    EXPECT_EQ(4,
               decompressed->getObjectField(timeseries::kBucketDataFieldName)
                   .getObjectField(timeFieldName)
                   .nFields());
@@ -165,7 +165,7 @@ TEST(TimeseriesBucketCompression, RoundtripWithDuplicateIndexFieldNames) {
 
 TEST(TimeseriesBucketCompression, CannotDecompressUncompressedBucket) {
     auto decompressed = timeseries::decompressBucket(sampleBucket);
-    ASSERT_FALSE(decompressed.has_value());
+    EXPECT_FALSE(decompressed.has_value());
 }
 
 TEST(TimeseriesBucketCompression, CompressAlreadyCompressedBucket) {
@@ -180,8 +180,8 @@ TEST(TimeseriesBucketCompression, CompressAlreadyCompressedBucket) {
                                    NamespaceString::createNamespaceString_forTest("test.foo"),
                                    false);
     ASSERT_TRUE(res.compressedBucket.has_value());
-    ASSERT_EQ(compressed.compressedBucket->objsize(), res.compressedBucket->objsize());
-    ASSERT_EQ(memcmp(compressed.compressedBucket->objdata(),
+    EXPECT_EQ(compressed.compressedBucket->objsize(), res.compressedBucket->objsize());
+    EXPECT_EQ(memcmp(compressed.compressedBucket->objdata(),
                      res.compressedBucket->objdata(),
                      compressed.compressedBucket->objsize()),
               0);

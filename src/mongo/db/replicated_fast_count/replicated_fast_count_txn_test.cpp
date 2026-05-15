@@ -258,7 +258,7 @@ TEST_F(ReplicatedFastCountTxnTest,
     // Continue and commit the transaction.
     continueAndCommitTxn(sessionId, txnNumber, [&](OperationContext* opCtx2) {
         AutoGetCollection coll(opCtx2, _nss1, LockMode::MODE_IX);
-        ASSERT_EQ(coll->uuid(), *uuid);
+        EXPECT_EQ(coll->uuid(), *uuid);
 
         {
             WriteUnitOfWork wuow{opCtx2};
@@ -396,9 +396,9 @@ TEST_F(ReplicatedFastCountTxnTest, ApplyOpsOplogEntryContainsSizeDeltaMetadata) 
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
 
     // Both collections begin empty.
-    ASSERT_EQ(CollectionSizeCount{},
+    EXPECT_EQ(CollectionSizeCount{},
               replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss1));
-    ASSERT_EQ(CollectionSizeCount{},
+    EXPECT_EQ(CollectionSizeCount{},
               replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss2));
 
     std::vector<replicated_fast_count_test_helpers::OpValidationSpec> expectedOps{};
@@ -487,17 +487,17 @@ TEST_F(ReplicatedFastCountTxnTest, ApplyOpsOplogEntryContainsSizeDeltaMetadata) 
     const auto deltas =
         replicated_fast_count_test_helpers::extractSizeCountDeltasForApplyOps(applyOpsOplogEntry);
     // 2 UUIDs had replicated size count information updated from the transaction.
-    ASSERT_EQ(2u, deltas.size());
+    EXPECT_EQ(2u, deltas.size());
 
     const auto expectedDeltasColl1 =
         replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss1);
     ASSERT_TRUE(deltas.contains(_uuid1));
-    ASSERT_EQ(expectedDeltasColl1, deltas.at(_uuid1));
+    EXPECT_EQ(expectedDeltasColl1, deltas.at(_uuid1));
 
     const auto expectedDeltasColl2 =
         replicated_fast_count_test_helpers::scanForAccurateSizeCount(_opCtx, _nss2);
     ASSERT_TRUE(deltas.contains(_uuid2));
-    ASSERT_EQ(expectedDeltasColl2, deltas.at(_uuid2));
+    EXPECT_EQ(expectedDeltasColl2, deltas.at(_uuid2));
 }
 
 
@@ -620,7 +620,7 @@ protected:
 
     void assertSizeMetadata(const std::vector<MultiOpSizeMetadata>& actual,
                             std::vector<ExpectedSizeEntry> expected) {
-        ASSERT_EQ(actual.size(), expected.size());
+        EXPECT_EQ(actual.size(), expected.size());
         std::unordered_map<UUID, const MultiOpSizeMetadata*, UUID::Hash> byUuid;
         for (const auto& entry : actual) {
             byUuid[entry.getUuid()] = &entry;

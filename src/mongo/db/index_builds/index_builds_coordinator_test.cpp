@@ -88,7 +88,7 @@ void IndexBuildsCoordinatorTest::createCollectionWithDuplicateDocs(OperationCont
         wuow.commit();
     }
 
-    ASSERT_EQ(collection.getCollectionPtr()->getIndexCatalog()->numIndexesTotal(), 1);
+    EXPECT_EQ(collection.getCollectionPtr()->getIndexCatalog()->numIndexesTotal(), 1);
 }
 
 // Helper to refetch the Collection from the catalog in order to see any changes made to it
@@ -117,7 +117,7 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundUniqueEnforce) {
                            opCtx, collection.uuid(), spec, indexConstraints, fromMigrate),
                        AssertionException,
                        ErrorCodes::DuplicateKey);
-    ASSERT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 1);
+    EXPECT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 1);
 }
 
 TEST_F(IndexBuildsCoordinatorTest, ForegroundUniqueRelax) {
@@ -137,7 +137,7 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundUniqueRelax) {
     auto fromMigrate = false;
     ASSERT_DOES_NOT_THROW(indexBuildsCoord->createIndex(
         opCtx, collection.uuid(), spec, indexConstraints, fromMigrate));
-    ASSERT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
+    EXPECT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
 }
 
 TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexAlreadyExists) {
@@ -157,12 +157,12 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexAlreadyExists) {
     auto uuid = collection.uuid();
     ASSERT_DOES_NOT_THROW(
         indexBuildsCoord->createIndex(opCtx, uuid, spec, indexConstraints, fromMigrate));
-    ASSERT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
+    EXPECT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
 
     // Should silently return if the index already exists.
     ASSERT_DOES_NOT_THROW(
         indexBuildsCoord->createIndex(opCtx, uuid, spec, indexConstraints, fromMigrate));
-    ASSERT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
+    EXPECT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
 }
 
 TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictEnforce) {
@@ -184,13 +184,13 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictEnforce) {
     auto uuid = collection.uuid();
     ASSERT_DOES_NOT_THROW(
         indexBuildsCoord->createIndex(opCtx, uuid, spec1, indexConstraints, fromMigrate));
-    ASSERT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
+    EXPECT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
 
     ASSERT_THROWS_CODE(
         indexBuildsCoord->createIndex(opCtx, uuid, spec2, indexConstraints, fromMigrate),
         AssertionException,
         ErrorCodes::IndexOptionsConflict);
-    ASSERT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
+    EXPECT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
 }
 
 TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictRelax) {
@@ -212,12 +212,12 @@ TEST_F(IndexBuildsCoordinatorTest, ForegroundIndexOptionsConflictRelax) {
     auto uuid = collection.uuid();
     ASSERT_DOES_NOT_THROW(
         indexBuildsCoord->createIndex(opCtx, uuid, spec1, indexConstraints, fromMigrate));
-    ASSERT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
+    EXPECT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
 
     // Should silently return in relax mode even if there are index option conflicts.
     ASSERT_DOES_NOT_THROW(
         indexBuildsCoord->createIndex(opCtx, uuid, spec2, indexConstraints, fromMigrate));
-    ASSERT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
+    EXPECT_EQ(coll(opCtx, nss)->getIndexCatalog()->numIndexesTotal(), 2);
 }
 
 TEST_F(IndexBuildsCoordinatorTest, GetNumIndexesTotalReturnsCatalogCount) {
@@ -622,9 +622,9 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
                                                               UUID::gen(),
                                                               singlePhaseOptions));
 
-    ASSERT_TRUE(
+    EXPECT_TRUE(
         indexBuildsCoord->inProgForCollection(twoPhaseUUID, IndexBuildProtocol::kPrimaryDriven));
-    ASSERT_TRUE(
+    EXPECT_TRUE(
         indexBuildsCoord->inProgForCollection(singlePhaseUUID, IndexBuildProtocol::kSinglePhase));
 
     indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
@@ -640,17 +640,17 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
 
     singlePhaseFuture.wait();
     auto catalogStats = singlePhaseFuture.get();
-    ASSERT_GTE(catalogStats.numIndexesAfter, catalogStats.numIndexesBefore);
+    EXPECT_GE(catalogStats.numIndexesAfter, catalogStats.numIndexesBefore);
 
     // Both indexes should no longer exist after one completes and the other is aborted.
     indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(
         opCtx, twoPhaseUUID, IndexBuildProtocol::kTwoPhase);
-    ASSERT_FALSE(
+    EXPECT_FALSE(
         indexBuildsCoord->inProgForCollection(twoPhaseUUID, IndexBuildProtocol::kTwoPhase));
 
     indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(
         opCtx, singlePhaseUUID, IndexBuildProtocol::kSinglePhase);
-    ASSERT_FALSE(
+    EXPECT_FALSE(
         indexBuildsCoord->inProgForCollection(singlePhaseUUID, IndexBuildProtocol::kSinglePhase));
 }
 

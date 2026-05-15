@@ -60,7 +60,7 @@ TEST(EnsureSufficientDiskSpaceForSpillingTest, InsufficientSpace) {
     // The error message must include both byte counts for diagnosability.
     const int64_t minRequired = 500LL * 1024 * 1024;
     auto status = checkDiskSpace(minRequired - 1, minRequired);
-    ASSERT_EQ(status.code(), ErrorCodes::OutOfDiskSpace);
+    EXPECT_EQ(status.code(), ErrorCodes::OutOfDiskSpace);
     ASSERT_STRING_CONTAINS(status.reason(), std::to_string(minRequired - 1));
     ASSERT_STRING_CONTAINS(status.reason(), std::to_string(minRequired));
 }

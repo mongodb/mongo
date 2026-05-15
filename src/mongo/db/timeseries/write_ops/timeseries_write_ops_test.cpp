@@ -129,9 +129,9 @@ TEST_F(TimeseriesWriteOpsTest, BatchInsertMissingCollection) {
                                                    OperationSource::kTimeseriesInsert,
                                                    &fixer,
                                                    &result);
-    ASSERT_FALSE(shouldInsertMore);
+    EXPECT_FALSE(shouldInsertMore);
     ASSERT_EQ(1, result.results.size());
-    ASSERT_EQ(ErrorCodes::NamespaceNotFound, result.results[0].getStatus());
+    EXPECT_EQ(ErrorCodes::NamespaceNotFound, result.results[0].getStatus());
 
     result.results.clear();
     insertStatements.push_back(InsertStatement{fromjson("{_id: 1, foo: 2}")});
@@ -146,9 +146,9 @@ TEST_F(TimeseriesWriteOpsTest, BatchInsertMissingCollection) {
                                                    OperationSource::kTimeseriesInsert,
                                                    &fixer,
                                                    &result);
-    ASSERT_FALSE(shouldInsertMore);
+    EXPECT_FALSE(shouldInsertMore);
     ASSERT_EQ(1, result.results.size());
-    ASSERT_EQ(ErrorCodes::NamespaceNotFound, result.results[0].getStatus());
+    EXPECT_EQ(ErrorCodes::NamespaceNotFound, result.results[0].getStatus());
 }
 
 TEST_F(TimeseriesWriteOpsTest, PerformInsertsNoCollection) {
@@ -159,9 +159,9 @@ TEST_F(TimeseriesWriteOpsTest, PerformInsertsNoCollection) {
     auto source = OperationSource::kTimeseriesInsert;
     auto writeResult =
         write_ops_exec::performInserts(_opCtx, request, /*preConditions=*/boost::none, source);
-    ASSERT_FALSE(writeResult.canContinue);
+    EXPECT_FALSE(writeResult.canContinue);
     ASSERT_EQ(1, writeResult.results.size());
-    ASSERT_EQ(ErrorCodes::NamespaceNotFound, writeResult.results[0].getStatus());
+    EXPECT_EQ(ErrorCodes::NamespaceNotFound, writeResult.results[0].getStatus());
 }
 
 TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesDeletesNoCollection) {
@@ -173,9 +173,9 @@ TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesDeletesNoCollection) {
     auto source = OperationSource::kTimeseriesDelete;
     auto writeResult =
         write_ops_exec::performDeletes(_opCtx, request, /*preConditions=*/boost::none, source);
-    ASSERT_FALSE(writeResult.canContinue);
+    EXPECT_FALSE(writeResult.canContinue);
     ASSERT_EQ(1, writeResult.results.size());
-    ASSERT_EQ(8555700, writeResult.results[0].getStatus().code());
+    EXPECT_EQ(8555700, writeResult.results[0].getStatus().code());
 }
 
 TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesWritesNoCollection) {

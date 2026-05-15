@@ -145,20 +145,20 @@ TEST_F(InMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
     auto iteratorToSpill = makeInMemIterator(data, spiller);
     ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(expectedIterator, iteratorToSpill, 3);
 
-    ASSERT_TRUE(iteratorToSpill->spillable());
+    EXPECT_TRUE(iteratorToSpill->spillable());
     auto spilledIterator = iteratorToSpill->spill(opts, IWSorter::Settings{});
-    ASSERT_FALSE(spilledIterator->spillable());
+    EXPECT_FALSE(spilledIterator->spillable());
     ASSERT_ITERATORS_EQUIVALENT(expectedIterator, spilledIterator);
 
-    ASSERT_EQ(sorterTracker.spilledRanges.loadRelaxed(), 1);
-    ASSERT_EQ(sorterTracker.spilledKeyValuePairs.loadRelaxed(), 7);
-    ASSERT_EQ(sorterTracker.bytesSpilledUncompressed.loadRelaxed(), 56);
-    ASSERT_LT(sorterTracker.bytesSpilled.loadRelaxed(), 100);
-    ASSERT_GT(sorterTracker.bytesSpilled.loadRelaxed(), 0);
+    EXPECT_EQ(sorterTracker.spilledRanges.loadRelaxed(), 1);
+    EXPECT_EQ(sorterTracker.spilledKeyValuePairs.loadRelaxed(), 7);
+    EXPECT_EQ(sorterTracker.bytesSpilledUncompressed.loadRelaxed(), 56);
+    EXPECT_LT(sorterTracker.bytesSpilled.loadRelaxed(), 100);
+    EXPECT_GT(sorterTracker.bytesSpilled.loadRelaxed(), 0);
 
-    ASSERT_EQ(sorterFileStats.bytesSpilledUncompressed(), 56);
-    ASSERT_LT(sorterFileStats.bytesSpilled(), 100);
-    ASSERT_GT(sorterFileStats.bytesSpilled(), 0);
+    EXPECT_EQ(sorterFileStats.bytesSpilledUncompressed(), 56);
+    EXPECT_LT(sorterFileStats.bytesSpilled(), 100);
+    EXPECT_GT(sorterFileStats.bytesSpilled(), 0);
 }
 
 class ContainerInMemIterTest : public ServiceContextMongoDTest {
@@ -179,13 +179,13 @@ TEST_F(ContainerInMemIterTest, SpillDoesNotChangeResultAndUpdateStatistics) {
     auto iteratorToSpill = makeInMemIterator(data, spiller);
     ASSERT_ITERATORS_EQUIVALENT_FOR_N_STEPS(expectedIterator, iteratorToSpill, 3);
 
-    ASSERT_TRUE(iteratorToSpill->spillable());
+    EXPECT_TRUE(iteratorToSpill->spillable());
     auto spilledIterator = iteratorToSpill->spill(opts, IWSorter::Settings{});
-    ASSERT_FALSE(spilledIterator->spillable());
+    EXPECT_FALSE(spilledIterator->spillable());
     ASSERT_ITERATORS_EQUIVALENT(expectedIterator, spilledIterator);
 
-    ASSERT_EQ(sorterTracker.spilledRanges.loadRelaxed(), 1);
-    ASSERT_EQ(sorterTracker.spilledKeyValuePairs.loadRelaxed(), 7);
+    EXPECT_EQ(sorterTracker.spilledRanges.loadRelaxed(), 1);
+    EXPECT_EQ(sorterTracker.spilledKeyValuePairs.loadRelaxed(), 7);
 }
 
 /**
@@ -321,9 +321,9 @@ DEATH_TEST_F(MakeFromExistingRangesDeathTest, NullSpiller, "this->_spiller != nu
         sorterBeforeShutdown->add(pairInsertedBeforeShutdown.first,
                                   pairInsertedBeforeShutdown.second);
         state = sorterBeforeShutdown->persistDataForShutdown();
-        ASSERT_FALSE(state.storageIdentifier.empty());
-        ASSERT_EQUALS(1U, state.ranges.size()) << state.ranges.size();
-        ASSERT_EQ(1, sorterBeforeShutdown->stats().numSorted());
+        EXPECT_FALSE(state.storageIdentifier.empty());
+        EXPECT_EQ(1U, state.ranges.size()) << state.ranges.size();
+        EXPECT_EQ(1, sorterBeforeShutdown->stats().numSorted());
     }
 
     // On restart, reconstruct sorter from persisted state.
@@ -413,8 +413,8 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, CorruptedStorage) {
         /*settings=*/{});
 
     // The number of spills is set when NoLimitSorter is constructed from existing ranges.
-    ASSERT_EQ(ranges.size(), sorter->stats().spilledRanges());
-    ASSERT_EQ(0, sorter->stats().numSorted());
+    EXPECT_EQ(ranges.size(), sorter->stats().spilledRanges());
+    EXPECT_EQ(0, sorter->stats().numSorted());
 
     // Error reading storage.
     ASSERT_THROWS_CODE(sorter->done(), DBException, TypeParam::kCorruptedStorageErrorCode);
@@ -444,9 +444,9 @@ TYPED_TEST(MakeFromExistingRangesTest, RoundTrip) {
         sorterBeforeShutdown->add(pairInsertedBeforeShutdown.first,
                                   pairInsertedBeforeShutdown.second);
         state = sorterBeforeShutdown->persistDataForShutdown();
-        ASSERT_FALSE(state.storageIdentifier.empty());
-        ASSERT_EQUALS(1U, state.ranges.size()) << state.ranges.size();
-        ASSERT_EQ(1, sorterBeforeShutdown->stats().numSorted());
+        EXPECT_FALSE(state.storageIdentifier.empty());
+        EXPECT_EQ(1U, state.ranges.size()) << state.ranges.size();
+        EXPECT_EQ(1, sorterBeforeShutdown->stats().numSorted());
     }
 
     // On restart, reconstruct sorter from persisted state.
@@ -463,14 +463,14 @@ TYPED_TEST(MakeFromExistingRangesTest, RoundTrip) {
         /*settings=*/{});
 
     // The number of spills is set when NoLimitSorter is constructed from existing ranges.
-    ASSERT_EQ(state.ranges.size(), sorter->stats().spilledRanges());
+    EXPECT_EQ(state.ranges.size(), sorter->stats().spilledRanges());
 
     // Ensure that the restored sorter can accept additional data.
     IWPair pairInsertedAfterStartup(2, 200);
     sorter->add(pairInsertedAfterStartup.first, pairInsertedAfterStartup.second);
 
     // Technically this sorter has not sorted anything.
-    ASSERT_EQ(0, sorter->stats().numSorted());
+    EXPECT_EQ(0, sorter->stats().numSorted());
 
     // Read data from sorter.
     {
@@ -478,19 +478,19 @@ TYPED_TEST(MakeFromExistingRangesTest, RoundTrip) {
 
         ASSERT(iter->more());
         auto pair1 = iter->next();
-        ASSERT_EQUALS(pairInsertedBeforeShutdown.first, pair1.first)
+        EXPECT_EQ(pairInsertedBeforeShutdown.first, pair1.first)
             << pair1.first << "/" << pair1.second;
-        ASSERT_EQUALS(pairInsertedBeforeShutdown.second, pair1.second)
+        EXPECT_EQ(pairInsertedBeforeShutdown.second, pair1.second)
             << pair1.first << "/" << pair1.second;
 
         ASSERT(iter->more());
         auto pair2 = iter->next();
-        ASSERT_EQUALS(pairInsertedAfterStartup.first, pair2.first)
+        EXPECT_EQ(pairInsertedAfterStartup.first, pair2.first)
             << pair2.first << "/" << pair2.second;
-        ASSERT_EQUALS(pairInsertedAfterStartup.second, pair2.second)
+        EXPECT_EQ(pairInsertedAfterStartup.second, pair2.second)
             << pair2.first << "/" << pair2.second;
 
-        ASSERT_FALSE(iter->more());
+        EXPECT_FALSE(iter->more());
     }
 }
 
@@ -535,16 +535,16 @@ TYPED_TEST(MakeFromExistingRangesTest, NextWithDeferredValues) {
     ASSERT(iter->more());
     IntWrapper key1 = iter->nextWithDeferredValue();
     IntWrapper value1 = iter->getDeferredValue();
-    ASSERT_EQUALS(pair1.first, key1);
-    ASSERT_EQUALS(pair1.second, value1);
+    EXPECT_EQ(pair1.first, key1);
+    EXPECT_EQ(pair1.second, value1);
 
     ASSERT(iter->more());
     IntWrapper key2 = iter->nextWithDeferredValue();
     IntWrapper value2 = iter->getDeferredValue();
-    ASSERT_EQUALS(pair2.first, key2);
-    ASSERT_EQUALS(pair2.second, value2);
+    EXPECT_EQ(pair2.first, key2);
+    EXPECT_EQ(pair2.second, value2);
 
-    ASSERT_FALSE(iter->more());
+    EXPECT_FALSE(iter->more());
 }
 
 TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsTracksMergedSpillBatches) {
@@ -575,9 +575,9 @@ TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsTracksMergedSpillBatches) {
                          kNumTargetedSpills,
                          kMaxSpillsPerMerge);
 
-    ASSERT_LTE(spiller->iterators().size(), kNumTargetedSpills);
-    ASSERT_EQ(sorterStats.mergedSpills(), kExpectedMergedSpills);
-    ASSERT_EQ(tracker.mergedSpills.loadRelaxed(), kExpectedMergedSpills);
+    EXPECT_LE(spiller->iterators().size(), kNumTargetedSpills);
+    EXPECT_EQ(sorterStats.mergedSpills(), kExpectedMergedSpills);
+    EXPECT_EQ(tracker.mergedSpills.loadRelaxed(), kExpectedMergedSpills);
 }
 
 TYPED_TEST(MakeFromExistingRangesTest, MergeSpillsRejectsDisjointRanges) {
@@ -636,8 +636,8 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, ChecksumVersion) {
                                      /*settings=*/{});
         sorter->add(1, -1);
         auto state = sorter->persistDataForShutdown();
-        ASSERT_EQUALS(state.ranges[0].getChecksumVersion(), sorter::kLatestChecksumVersion);
-        ASSERT_EQUALS(state.ranges[0].getChecksum(), 1921809301);
+        EXPECT_EQ(state.ranges[0].getChecksumVersion(), sorter::kLatestChecksumVersion);
+        EXPECT_EQ(state.ranges[0].getChecksum(), 1921809301);
     }
 
     // Setting checksum version to v1 results in using v1 but getChecksumVersion() returning none
@@ -650,8 +650,8 @@ TYPED_TEST(FileBasedMakeFromExistingRangesTest, ChecksumVersion) {
             /*settings=*/{});
         sorter->add(1, -1);
         auto state = sorter->persistDataForShutdown();
-        ASSERT_EQUALS(state.ranges[0].getChecksumVersion(), boost::none);
-        ASSERT_EQUALS(state.ranges[0].getChecksum(), 4121002018);
+        EXPECT_EQ(state.ranges[0].getChecksumVersion(), boost::none);
+        EXPECT_EQ(state.ranges[0].getChecksum(), 4121002018);
     }
 }
 
@@ -882,9 +882,9 @@ public:
             Doc prev = docs[i - 1];
             Doc curr = docs[i];
             if (ascending) {
-                ASSERT_LTE(prev.time, curr.time);
+                EXPECT_LE(prev.time, curr.time);
             } else {
-                ASSERT_GTE(prev.time, curr.time);
+                EXPECT_GE(prev.time, curr.time);
             }
         }
     }
@@ -1024,13 +1024,13 @@ TYPED_TEST(BoundedSorterTest, WrongInput) {
     auto output = this->sort(input);
     ASSERT_EQ(output.size(), 7);
 
-    ASSERT_EQ(output[0].time, 3);
-    ASSERT_EQ(output[1].time, 4);
-    ASSERT_EQ(output[2].time, 1);  // Out of order.
-    ASSERT_EQ(output[3].time, 5);
-    ASSERT_EQ(output[4].time, 10);
-    ASSERT_EQ(output[5].time, 15);
-    ASSERT_EQ(output[6].time, 16);
+    EXPECT_EQ(output[0].time, 3);
+    EXPECT_EQ(output[1].time, 4);
+    EXPECT_EQ(output[2].time, 1);  // Out of order.
+    EXPECT_EQ(output[3].time, 5);
+    EXPECT_EQ(output[4].time, 10);
+    EXPECT_EQ(output[5].time, 15);
+    EXPECT_EQ(output[6].time, 16);
 
     // Test that by default, bad input like this would be detected.
     this->sorter = this->makeAsc({});
@@ -1076,7 +1076,7 @@ TYPED_TEST(BoundedSorterTest, SpillSorted) {
     });
     this->assertSorted(output);
 
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 3);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 3);
 }
 
 TYPED_TEST(BoundedSorterTest, SpillSortedExceptOne) {
@@ -1098,7 +1098,7 @@ TYPED_TEST(BoundedSorterTest, SpillSortedExceptOne) {
     });
     this->assertSorted(output);
 
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 3);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 3);
 }
 
 TYPED_TEST(BoundedSorterTest, SpillAlmostSorted) {
@@ -1121,7 +1121,7 @@ TYPED_TEST(BoundedSorterTest, SpillAlmostSorted) {
     });
     this->assertSorted(output);
 
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 2);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 2);
 }
 
 TYPED_TEST(BoundedSorterTest, SpillWrongInput) {
@@ -1148,15 +1148,15 @@ TYPED_TEST(BoundedSorterTest, SpillWrongInput) {
     auto output = this->sort(input);
     ASSERT_EQ(output.size(), 7);
 
-    ASSERT_EQ(output[0].time, 3);
-    ASSERT_EQ(output[1].time, 4);
-    ASSERT_EQ(output[2].time, 1);  // Out of order.
-    ASSERT_EQ(output[3].time, 5);
-    ASSERT_EQ(output[4].time, 10);
-    ASSERT_EQ(output[5].time, 15);
-    ASSERT_EQ(output[6].time, 16);
+    EXPECT_EQ(output[0].time, 3);
+    EXPECT_EQ(output[1].time, 4);
+    EXPECT_EQ(output[2].time, 1);  // Out of order.
+    EXPECT_EQ(output[3].time, 5);
+    EXPECT_EQ(output[4].time, 10);
+    EXPECT_EQ(output[5].time, 15);
+    EXPECT_EQ(output[6].time, 16);
 
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 2);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 2);
 
 
     // Test that by default, bad input like this would be detected.
@@ -1187,10 +1187,10 @@ TYPED_TEST(BoundedSorterTest, LimitNoSpill) {
         2);
     this->assertSorted(output);
     // Also check that the correct values made it into the top K.
-    ASSERT_EQ(output[0].time, 0);
-    ASSERT_EQ(output[1].time, 3);
+    EXPECT_EQ(output[0].time, 0);
+    EXPECT_EQ(output[1].time, 3);
 
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 0);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 0);
 }
 
 TYPED_TEST(BoundedSorterTest, LimitSpill) {
@@ -1215,11 +1215,11 @@ TYPED_TEST(BoundedSorterTest, LimitSpill) {
         3);
     this->assertSorted(output);
     // Also check that the correct values made it into the top K.
-    ASSERT_EQ(output[0].time, 0);
-    ASSERT_EQ(output[1].time, 3);
-    ASSERT_EQ(output[2].time, 10);
+    EXPECT_EQ(output[0].time, 0);
+    EXPECT_EQ(output[1].time, 3);
+    EXPECT_EQ(output[2].time, 10);
 
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 1);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 1);
 }
 
 TYPED_TEST(BoundedSorterTest, ForceSpill) {
@@ -1264,11 +1264,11 @@ TYPED_TEST(BoundedSorterTest, ForceSpill) {
     }
     ASSERT(this->sorter->getState() == S::State::kDone);
 
-    ASSERT_EQ(output.size(), input.size());
+    EXPECT_EQ(output.size(), input.size());
     this->assertSorted(output);
 
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 5);
-    ASSERT_EQ(this->sorter->stats().spilledKeyValuePairs(), 13);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 5);
+    EXPECT_EQ(this->sorter->stats().spilledKeyValuePairs(), 13);
 }
 
 TYPED_TEST(BoundedSorterTest, DescSorted) {
@@ -1345,13 +1345,13 @@ TYPED_TEST(BoundedSorterTest, DescWrongInput) {
     auto output = this->sort(input);
     ASSERT_EQ(output.size(), 7);
 
-    ASSERT_EQ(output[0].time, 16);
-    ASSERT_EQ(output[1].time, 14);
-    ASSERT_EQ(output[2].time, 15);  // Out of order.
-    ASSERT_EQ(output[3].time, 10);
-    ASSERT_EQ(output[4].time, 5);
-    ASSERT_EQ(output[5].time, 3);
-    ASSERT_EQ(output[6].time, 1);
+    EXPECT_EQ(output[0].time, 16);
+    EXPECT_EQ(output[1].time, 14);
+    EXPECT_EQ(output[2].time, 15);  // Out of order.
+    EXPECT_EQ(output[3].time, 10);
+    EXPECT_EQ(output[4].time, 5);
+    EXPECT_EQ(output[5].time, 3);
+    EXPECT_EQ(output[6].time, 1);
 
     // Test that by default, bad input like this would be detected.
     this->sorter = this->makeDesc({});
@@ -1452,8 +1452,8 @@ TYPED_TEST(BoundedSorterTest, CompoundLimit) {
             2);
         this->assertSorted(output);
         // Also check that the correct values made it into the top K.
-        ASSERT_EQ(output[0].time, 1001);
-        ASSERT_EQ(output[1].time, 1004);
+        EXPECT_EQ(output[0].time, 1001);
+        EXPECT_EQ(output[1].time, 1004);
 
         this->sorter->restart();
         output = this->sort(
@@ -1497,8 +1497,8 @@ TYPED_TEST(BoundedSorterTest, CompoundLimit) {
             },
             2);
         // Also check that the correct values made it into the top K.
-        ASSERT_EQ(output[0].time, 1);
-        ASSERT_EQ(output[1].time, 4);
+        EXPECT_EQ(output[0].time, 1);
+        EXPECT_EQ(output[1].time, 4);
 
         this->sorter->restart();
         output = this->sort(
@@ -1518,17 +1518,17 @@ TYPED_TEST(BoundedSorterTest, CompoundSpill) {
     this->sorter = this->makeAsc(options, this->storage().makeSpiller(options, spillDir.path()));
 
     // When each partition is small enough, we don't spill.
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 0);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 0);
     auto output = this->sort({
         {1001},
         {1007},
     });
     this->assertSorted(output);
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 0);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 0);
 
     // If any individual partition is large enough, we do spill.
     this->sorter->restart();
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 0);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 0);
     output = this->sort({
         {1},
         {5},
@@ -1543,17 +1543,17 @@ TYPED_TEST(BoundedSorterTest, CompoundSpill) {
         {7},
     });
     this->assertSorted(output);
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 1);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 1);
 
     // If later partitions are small again, they don't spill.
     this->sorter->restart();
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 1);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 1);
     output = this->sort({
         {11},
         {17},
     });
     this->assertSorted(output);
-    ASSERT_EQ(this->sorter->stats().spilledRanges(), 1);
+    EXPECT_EQ(this->sorter->stats().spilledRanges(), 1);
 }
 
 TYPED_TEST(BoundedSorterTest, LargeSpill) {
@@ -1574,7 +1574,7 @@ TYPED_TEST(BoundedSorterTest, LargeSpill) {
     }
 
     this->assertSorted(this->sort(input));
-    ASSERT_GTE(this->sorter->stats().spilledRanges(), 1);
+    EXPECT_GE(this->sorter->stats().spilledRanges(), 1);
 }
 template <typename Traits>
 class SpillerMergeDiskSpaceTest : public MakeFromExistingRangesTypedTestBase<Traits> {

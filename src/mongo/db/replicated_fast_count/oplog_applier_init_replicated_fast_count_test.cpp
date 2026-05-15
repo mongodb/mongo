@@ -69,8 +69,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountCreatesRecordStores) {
     // Verify idents do not exist before applying the oplog entry.
     {
         auto ru = storageEngine->newRecoveryUnit();
-        ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+        EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
     }
 
     auto op =
@@ -87,8 +87,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountCreatesRecordStores) {
     // Verify both idents now exist.
     {
         auto ru = storageEngine->newRecoveryUnit();
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
     }
 }
 
@@ -109,8 +109,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountWithKeyFormatLong) {
     ASSERT_OK(runOpSteadyState(op));
 
     auto ru = storageEngine->newRecoveryUnit();
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
 }
 
 TEST_F(OplogApplierImplTest, InitReplicatedFastCountWithKeyFormatString) {
@@ -130,8 +130,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountWithKeyFormatString) {
     ASSERT_OK(runOpSteadyState(op));
 
     auto ru = storageEngine->newRecoveryUnit();
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-    ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
 }
 
 // TODO SERVER-122317 Test that this behavior only holds when the idents are empty.
@@ -162,8 +162,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountSucceedsWhenIdentsAlreadyExi
 
     {
         auto ru = storageEngine->newRecoveryUnit();
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
     }
 
     // Applying the oplog entry should succeed even though idents already exist.
@@ -180,8 +180,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountSucceedsWhenIdentsAlreadyExi
 
     {
         auto ru = storageEngine->newRecoveryUnit();
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
     }
 }
 
@@ -202,8 +202,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountRejectsInvalidMetadataKeyFor
 
     // Neither ident should have been created.
     auto ru = storageEngine->newRecoveryUnit();
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
 }
 
 TEST_F(OplogApplierImplTest, InitReplicatedFastCountRejectsInvalidTimestampsKeyFormat) {
@@ -223,8 +223,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountRejectsInvalidTimestampsKeyF
 
     // Metadata ident should not exist because KeyFormats are validated before creation.
     auto ru = storageEngine->newRecoveryUnit();
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
 }
 
 TEST_F(OplogApplierImplTest, InitReplicatedFastCountMissingO2Field) {
@@ -252,7 +252,7 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountMissingMetadataIdentField) {
 
     // Timestamp ident should not have been created.
     auto ru = storageEngine->newRecoveryUnit();
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
 }
 
 TEST_F(OplogApplierImplTest, InitReplicatedFastCountMissingTimestampsIdentField) {
@@ -272,7 +272,7 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountMissingTimestampsIdentField)
 
     // Metadata ident should not have been created.
     auto ru = storageEngine->newRecoveryUnit();
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
 }
 
 TEST_F(OplogApplierImplTest, InitReplicatedFastCountRejectsDuplicateIdents) {
@@ -292,7 +292,7 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountRejectsDuplicateIdents) {
 
     // Neither ident should have been created.
     auto ru = storageEngine->newRecoveryUnit();
-    ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, sharedIdent));
+    EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, sharedIdent));
 }
 
 TEST_F(OplogApplierImplTest, InitReplicatedFastCountCreatesTimestampsWhenOnlyEmptyMetadataExists) {
@@ -316,8 +316,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountCreatesTimestampsWhenOnlyEmp
 
     {
         auto ru = storageEngine->newRecoveryUnit();
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
     }
 
     auto op =
@@ -335,8 +335,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountCreatesTimestampsWhenOnlyEmp
     // ident.
     {
         auto ru = storageEngine->newRecoveryUnit();
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
     }
 }
 
@@ -361,8 +361,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountCreatesMetadataWhenOnlyEmpty
 
     {
         auto ru = storageEngine->newRecoveryUnit();
-        ASSERT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+        EXPECT_FALSE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
     }
 
     auto op =
@@ -380,8 +380,8 @@ TEST_F(OplogApplierImplTest, InitReplicatedFastCountCreatesMetadataWhenOnlyEmpty
     // timestamps ident.
     {
         auto ru = storageEngine->newRecoveryUnit();
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
-        ASSERT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, metadataIdent));
+        EXPECT_TRUE(storageEngine->getEngine()->hasIdent(*ru, timestampsIdent));
     }
 }
 

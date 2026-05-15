@@ -71,9 +71,9 @@ TEST_F(SpillTableTest, InsertRecords) {
     for (auto&& record : records) {
         auto next = cursor->next();
         ASSERT_TRUE(next);
-        ASSERT_EQ(next->data.size(), record.data.size());
+        EXPECT_EQ(next->data.size(), record.data.size());
     }
-    ASSERT_FALSE(cursor->next());
+    EXPECT_FALSE(cursor->next());
 }
 
 TEST_F(SpillTableTest, InsertRecordsWriteConflict) {
@@ -92,9 +92,9 @@ TEST_F(SpillTableTest, InsertRecordsWriteConflict) {
     for (auto&& record : records) {
         auto next = cursor->next();
         ASSERT_TRUE(next);
-        ASSERT_EQ(next->data.size(), record.data.size());
+        EXPECT_EQ(next->data.size(), record.data.size());
     }
-    ASSERT_FALSE(cursor->next());
+    EXPECT_FALSE(cursor->next());
 }
 
 TEST_F(SpillTableTest, InsertRecordsRandomWriteConflicts) {
@@ -114,9 +114,9 @@ TEST_F(SpillTableTest, InsertRecordsRandomWriteConflicts) {
     for (auto&& record : records) {
         auto next = cursor->next();
         ASSERT_TRUE(next);
-        ASSERT_EQ(next->data.size(), record.data.size());
+        EXPECT_EQ(next->data.size(), record.data.size());
     }
-    ASSERT_FALSE(cursor->next());
+    EXPECT_FALSE(cursor->next());
 }
 
 TEST_F(SpillTableTest, ImmediatelyBelowDiskSpaceThreshold) {
@@ -128,14 +128,14 @@ TEST_F(SpillTableTest, ImmediatelyBelowDiskSpaceThreshold) {
     auto obj = BSON("a" << 1);
     std::vector<Record> records{{RecordId(), {obj.objdata(), obj.objsize()}}};
 
-    ASSERT_EQ(spillTable->insertRecords(opCtx.get(), &records), ErrorCodes::OutOfDiskSpace);
-    ASSERT_EQ(spillTable->updateRecord(opCtx.get(), RecordId{1}, obj.objdata(), obj.objsize()),
+    EXPECT_EQ(spillTable->insertRecords(opCtx.get(), &records), ErrorCodes::OutOfDiskSpace);
+    EXPECT_EQ(spillTable->updateRecord(opCtx.get(), RecordId{1}, obj.objdata(), obj.objsize()),
               ErrorCodes::OutOfDiskSpace);
     ASSERT_THROWS_CODE(spillTable->deleteRecord(opCtx.get(), RecordId{1}),
                        DBException,
                        ErrorCodes::OutOfDiskSpace);
-    ASSERT_EQ(spillTable->truncate(opCtx.get()), ErrorCodes::OutOfDiskSpace);
-    ASSERT_EQ(spillTable->rangeTruncate(opCtx.get(), RecordId::minLong(), RecordId::maxLong()),
+    EXPECT_EQ(spillTable->truncate(opCtx.get()), ErrorCodes::OutOfDiskSpace);
+    EXPECT_EQ(spillTable->rangeTruncate(opCtx.get(), RecordId::minLong(), RecordId::maxLong()),
               ErrorCodes::OutOfDiskSpace);
 }
 
@@ -159,13 +159,13 @@ TEST_F(SpillTableTest, LaterBelowDiskSpaceThreshold) {
     FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << thresholdBytes - 1)};
     DiskSpaceMonitor::get(opCtx->getServiceContext())->runAllActions(opCtx.get());
 
-    ASSERT_EQ(spillTable->insertRecords(opCtx.get(), &records), ErrorCodes::OutOfDiskSpace);
-    ASSERT_EQ(spillTable->updateRecord(opCtx.get(), rid, obj.objdata(), obj.objsize()),
+    EXPECT_EQ(spillTable->insertRecords(opCtx.get(), &records), ErrorCodes::OutOfDiskSpace);
+    EXPECT_EQ(spillTable->updateRecord(opCtx.get(), rid, obj.objdata(), obj.objsize()),
               ErrorCodes::OutOfDiskSpace);
     ASSERT_THROWS_CODE(
         spillTable->deleteRecord(opCtx.get(), rid), DBException, ErrorCodes::OutOfDiskSpace);
-    ASSERT_EQ(spillTable->truncate(opCtx.get()), ErrorCodes::OutOfDiskSpace);
-    ASSERT_EQ(spillTable->rangeTruncate(opCtx.get(), rid, rid), ErrorCodes::OutOfDiskSpace);
+    EXPECT_EQ(spillTable->truncate(opCtx.get()), ErrorCodes::OutOfDiskSpace);
+    EXPECT_EQ(spillTable->rangeTruncate(opCtx.get(), rid, rid), ErrorCodes::OutOfDiskSpace);
 }
 
 TEST_F(SpillTableTest, SpillTableDroppedOnDestruction) {
@@ -177,7 +177,7 @@ TEST_F(SpillTableTest, SpillTableDroppedOnDestruction) {
 
     auto spillTable = makeSpillTable(opCtx.get(), KeyFormat::String, kThresholdBytes);
     auto ident = std::string(spillTable->ident());
-    ASSERT_TRUE(spillIdentExists(opCtx.get(), ident));
+    EXPECT_TRUE(spillIdentExists(opCtx.get(), ident));
 
     std::vector<Record> records(1);
     records[0].id = RecordId(kRecordId);
@@ -188,11 +188,11 @@ TEST_F(SpillTableTest, SpillTableDroppedOnDestruction) {
 
     records[0].data = RecordData();
     ASSERT_TRUE(spillTable->findRecord(opCtx.get(), records[0].id, &records[0].data));
-    ASSERT_EQ(0, memcmp(kPayload.data(), records[0].data.data(), kPayload.size()));
+    EXPECT_EQ(0, memcmp(kPayload.data(), records[0].data.data(), kPayload.size()));
 
     spillTable.reset();
 
-    ASSERT_FALSE(spillIdentExists(opCtx.get(), ident));
+    EXPECT_FALSE(spillIdentExists(opCtx.get(), ident));
 }
 
 TEST_F(StorageEngineTest, TestSpillTableDropRetries) {
@@ -200,7 +200,7 @@ TEST_F(StorageEngineTest, TestSpillTableDropRetries) {
     auto spillTable = makeSpillTable(opCtx.get(), KeyFormat::Long, 1024 * 1024 * 100);
 
     const auto initialStatus = _storageEngine->getStatus(opCtx.get());
-    ASSERT_EQ(0, initialStatus.getField("dropSpillTableRetries").Long());
+    EXPECT_EQ(0, initialStatus.getField("dropSpillTableRetries").Long());
 
     // Start a thread that tries to drop the spill table and use a barrier to synchronize the
     // thread, it needs to clean up after the cursors to avoid a deadlock
@@ -234,7 +234,7 @@ TEST_F(StorageEngineTest, TestSpillTableDropRetries) {
 
     cursor->detachFromOperationContext();
 
-    ASSERT_GT(retries, 0);
+    EXPECT_GT(retries, 0);
 }
 
 }  // namespace

@@ -128,10 +128,10 @@ TEST_F(StorageEngineTest, DirectWritesInsertTest) {
 
     ASSERT_OK(intOut);
     ASSERT_OK(strOut);
-    ASSERT_EQ(value.size(), intOut.getValue().capacity());
-    ASSERT_EQ(value.size(), strOut.getValue().capacity());
-    ASSERT_EQ(0, std::memcmp(value.data(), intOut.getValue().get(), value.size()));
-    ASSERT_EQ(0, std::memcmp(value.data(), strOut.getValue().get(), value.size()));
+    EXPECT_EQ(value.size(), intOut.getValue().capacity());
+    EXPECT_EQ(value.size(), strOut.getValue().capacity());
+    EXPECT_EQ(0, std::memcmp(value.data(), intOut.getValue().get(), value.size()));
+    EXPECT_EQ(0, std::memcmp(value.data(), strOut.getValue().get(), value.size()));
 }
 
 TEST_F(StorageEngineTest, DirectWritesDeleteTest) {
@@ -166,10 +166,10 @@ TEST_F(StorageEngineTest, DirectWritesDeleteTest) {
 
     ASSERT_OK(intOut);
     ASSERT_OK(strOut);
-    ASSERT_EQ(value.size(), intOut.getValue().capacity());
-    ASSERT_EQ(value.size(), strOut.getValue().capacity());
-    ASSERT_EQ(0, std::memcmp(value.data(), intOut.getValue().get(), value.size()));
-    ASSERT_EQ(0, std::memcmp(value.data(), strOut.getValue().get(), value.size()));
+    EXPECT_EQ(value.size(), intOut.getValue().capacity());
+    EXPECT_EQ(value.size(), strOut.getValue().capacity());
+    EXPECT_EQ(0, std::memcmp(value.data(), intOut.getValue().get(), value.size()));
+    EXPECT_EQ(0, std::memcmp(value.data(), strOut.getValue().get(), value.size()));
 
 
     // Perform deletes.
@@ -183,10 +183,10 @@ TEST_F(StorageEngineTest, DirectWritesDeleteTest) {
     // Check for successful deletes.
     auto s1 = storage_engine_direct_crud::get(*_storageEngine, *ru, intIdent, intKey);
     ASSERT_NOT_OK(s1);
-    ASSERT_EQ(ErrorCodes::NoSuchKey, s1.getStatus().code());
+    EXPECT_EQ(ErrorCodes::NoSuchKey, s1.getStatus().code());
     auto s2 = storage_engine_direct_crud::get(*_storageEngine, *ru, strIdent, strKey);
     ASSERT_NOT_OK(s2);
-    ASSERT_EQ(ErrorCodes::NoSuchKey, s2.getStatus().code());
+    EXPECT_EQ(ErrorCodes::NoSuchKey, s2.getStatus().code());
 }
 
 
@@ -226,11 +226,11 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
         auto s1 =
             storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value1);
         ASSERT_NOT_OK(s1);
-        ASSERT_EQ(ErrorCodes::KeyExists, s1.code());
+        EXPECT_EQ(ErrorCodes::KeyExists, s1.code());
         auto s2 =
             storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value1);
         ASSERT_NOT_OK(s2);
-        ASSERT_EQ(ErrorCodes::KeyExists, s2.code());
+        EXPECT_EQ(ErrorCodes::KeyExists, s2.code());
     }
 
 
@@ -240,11 +240,11 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
         auto s1 =
             storage_engine_direct_crud::insert(*_storageEngine, *ru, intIdent, intKey, value2);
         ASSERT_NOT_OK(s1);
-        ASSERT_EQ(ErrorCodes::KeyExists, s1.code());
+        EXPECT_EQ(ErrorCodes::KeyExists, s1.code());
         auto s2 =
             storage_engine_direct_crud::insert(*_storageEngine, *ru, strIdent, strKey, value2);
         ASSERT_NOT_OK(s2);
-        ASSERT_EQ(ErrorCodes::KeyExists, s2.code());
+        EXPECT_EQ(ErrorCodes::KeyExists, s2.code());
     }
 
     // Deleting non-existent keys will return NoSuchKey.
@@ -253,12 +253,12 @@ TEST_F(StorageEngineTest, DirectWritesFailures) {
         auto s1 =
             storage_engine_direct_crud::remove(*_storageEngine, *ru, intIdent, nonExistentIntKey);
         ASSERT_NOT_OK(s1);
-        ASSERT_EQ(ErrorCodes::NoSuchKey, s1.code());
+        EXPECT_EQ(ErrorCodes::NoSuchKey, s1.code());
 
         auto s2 =
             storage_engine_direct_crud::remove(*_storageEngine, *ru, strIdent, nonExistentStrKey);
         ASSERT_NOT_OK(s2);
-        ASSERT_EQ(ErrorCodes::NoSuchKey, s2.code());
+        EXPECT_EQ(ErrorCodes::NoSuchKey, s2.code());
     }
 }
 
@@ -336,26 +336,26 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
         createCollTable(opCtx.get(), NamespaceString::createNamespaceString_forTest("db.coll2")));
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToRestart.size());
 
     auto identsVec = getAllKVEngineIdents(opCtx.get());
     auto idents = std::set<std::string, std::less<>>(identsVec.begin(), identsVec.end());
 
     // There are two idents. `_mdb_catalog` and the ident for `db.coll1`.
-    ASSERT_EQUALS(static_cast<const unsigned long>(2), idents.size());
-    ASSERT_TRUE(idents.find(collInfo.ident) != idents.end());
-    ASSERT_TRUE(idents.find(ident::kMdbCatalog) != idents.end());
+    EXPECT_EQ(static_cast<const unsigned long>(2), idents.size());
+    EXPECT_TRUE(idents.find(collInfo.ident) != idents.end());
+    EXPECT_TRUE(idents.find(ident::kMdbCatalog) != idents.end());
 
     // Drop the `db.coll1` table, while leaving the MDBCatalog entry.
     ASSERT_OK(dropIdent(*shard_role_details::getRecoveryUnit(opCtx.get()),
                         collInfo.ident,
                         /*identHasSizeInfo=*/true));
-    ASSERT_EQUALS(static_cast<const unsigned long>(1), getAllKVEngineIdents(opCtx.get()).size());
+    EXPECT_EQ(static_cast<const unsigned long>(1), getAllKVEngineIdents(opCtx.get()).size());
 
     // Reconciling this should result in an error.
     auto reconcileStatus = reconcile(opCtx.get());
     ASSERT_NOT_OK(reconcileStatus.getStatus());
-    ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, reconcileStatus.getStatus());
+    EXPECT_EQ(ErrorCodes::UnrecoverableRollbackError, reconcileStatus.getStatus());
 }
 
 TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
@@ -402,14 +402,14 @@ TEST_F(StorageEngineTest, InternalRecordStoreClustered) {
                                               data,
                                               strlen(data),
                                               Timestamp());
-    ASSERT_TRUE(s.isOK());
+    EXPECT_TRUE(s.isOK());
     wuow.commit();
 
     // Read the record back.
     RecordData rd;
     ASSERT_TRUE(
         rs->findRecord(opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), rid, &rd));
-    ASSERT_EQ(0, memcmp(data, rd.data(), strlen(data)));
+    EXPECT_EQ(0, memcmp(data, rd.data(), strlen(data)));
 }
 
 TEST_F(StorageEngineTest, InternalRecordStoreReuseOrErrorExistingIdent) {
@@ -424,7 +424,7 @@ TEST_F(StorageEngineTest, InternalRecordStoreReuseOrErrorExistingIdent) {
     auto reused = _storageEngine->makeInternalRecordStore(opCtx.get(), ident, KeyFormat::Long);
     ASSERT(reused);
     auto cursor = reused->getCursor(opCtx.get(), retryRu);
-    ASSERT_FALSE(cursor->next());
+    EXPECT_FALSE(cursor->next());
     wuow.commit();
 }
 
@@ -441,7 +441,7 @@ protected:
             Lock::GlobalLock lk(opCtx, MODE_IS);
             ret = makeTemporary(opCtx);
         }
-        ASSERT_TRUE(identExists(opCtx, ret->getIdent()));
+        EXPECT_TRUE(identExists(opCtx, ret->getIdent()));
         return ret;
     }
 
@@ -454,7 +454,7 @@ protected:
         ASSERT_OK(_storageEngine->getEngine()->createRecordStore(
             provider, ru, NamespaceString{}, ident, RecordStore::Options{}));
         wuow.commit();
-        ASSERT_TRUE(identExists(opCtx, ident));
+        EXPECT_TRUE(identExists(opCtx, ident));
     }
 
     std::unique_ptr<RecordStore> makeSpillTable(OperationContext* opCtx) {
@@ -462,7 +462,7 @@ protected:
         auto spillEngine = opCtx->getServiceContext()->getStorageEngine()->getSpillEngine();
         auto spillTable = spillEngine->makeInternalRecordStore(
             *spillEngine->newRecoveryUnit(), ident::generateNewInternalIdent(), KeyFormat::Long);
-        ASSERT_TRUE(spillIdentExists(opCtx, spillTable->getIdent()));
+        EXPECT_TRUE(spillIdentExists(opCtx, spillTable->getIdent()));
         return spillTable;
     }
 
@@ -514,7 +514,7 @@ protected:
                                         Timestamp()));
             wuow.commit();
         }
-        ASSERT_TRUE(identExists(opCtx, ret->getIdent()));
+        EXPECT_TRUE(identExists(opCtx, ret->getIdent()));
         return ret;
     }
 
@@ -552,12 +552,12 @@ TEST_F(StorageEngineReconcileTest, ReconcileDropsAllIdentsForUncleanShutdown) {
     // Reconcile will drop all temporary idents when starting up after an unclean shutdown.
     auto reconcileResult = unittest::assertGet(reconcileAfterUncleanShutdown(opCtx.get()));
 
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
-    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToRestart.size());
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToResume.size());
+    EXPECT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
+    EXPECT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
+    EXPECT_FALSE(identExists(opCtx.get(), necessaryRs->getIdent()));
+    EXPECT_FALSE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
 }
 
 TEST_F(StorageEngineReconcileTest, ReconcileKeepsFastCountIdentsForUncleanShutdown) {
@@ -569,8 +569,8 @@ TEST_F(StorageEngineReconcileTest, ReconcileKeepsFastCountIdentsForUncleanShutdo
     // Replicated fast count idents must survive reconciliation after an unclean shutdown.
     auto reconcileResult = unittest::assertGet(reconcileAfterUncleanShutdown(opCtx.get()));
 
-    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStore));
-    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStoreTimestamps));
+    EXPECT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStore));
+    EXPECT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStoreTimestamps));
 }
 
 TEST_F(StorageEngineReconcileTest, ReconcileKeepsFastCountIdentsForCleanShutdown) {
@@ -582,8 +582,8 @@ TEST_F(StorageEngineReconcileTest, ReconcileKeepsFastCountIdentsForCleanShutdown
     // Replicated fast count idents must survive reconciliation after a clean shutdown.
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
 
-    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStore));
-    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStoreTimestamps));
+    EXPECT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStore));
+    EXPECT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStoreTimestamps));
 }
 
 TEST_F(StorageEngineReconcileTest, StartupRecoveryKeepsFastCountIdentsForUncleanShutdown) {
@@ -598,8 +598,8 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryKeepsFastCountIdentsForUnclean
                                                 StorageEngine::LastShutdownState::kUnclean);
 
     // Replicated fast count idents must survive full startup recovery after an unclean shutdown.
-    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStore));
-    ASSERT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStoreTimestamps));
+    EXPECT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStore));
+    EXPECT_TRUE(identExists(opCtx.get(), ident::kFastCountMetadataStoreTimestamps));
 }
 
 TEST_F(StorageEngineReconcileTest, ReconcileOnlyKeepsNecessaryIdentsForCleanShutdown) {
@@ -615,17 +615,17 @@ TEST_F(StorageEngineReconcileTest, ReconcileOnlyKeepsNecessaryIdentsForCleanShut
 
     // After clean shutdown, an internal ident should be kept if-and-only-if it is needed to resume
     // an index build.
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
-    ASSERT_EQUALS(1UL, reconcileResult.indexBuildsToResume.size());
-    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToRestart.size());
+    EXPECT_EQ(1UL, reconcileResult.indexBuildsToResume.size());
+    EXPECT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
+    EXPECT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
+    EXPECT_TRUE(identExists(opCtx.get(), necessaryRs->getIdent()));
+    EXPECT_TRUE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
 }
 
 void createTempFile(const boost::filesystem::path& path) {
     std::ofstream file(path.string());
-    ASSERT_TRUE(boost::filesystem::exists(path));
+    EXPECT_TRUE(boost::filesystem::exists(path));
 }
 
 TEST_F(StorageEngineReconcileTest, StartupRecoveryForUncleanShutdown) {
@@ -644,11 +644,11 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryForUncleanShutdown) {
                                                 StorageEngine::LastShutdownState::kUnclean);
 
     // Reconcile will drop all temporary idents when starting up after an unclean shutdown.
-    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
-    ASSERT_FALSE(spillIdentExists(opCtx.get(), spillTable->getIdent()));
+    EXPECT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
+    EXPECT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
+    EXPECT_FALSE(identExists(opCtx.get(), necessaryRs->getIdent()));
+    EXPECT_FALSE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
+    EXPECT_FALSE(spillIdentExists(opCtx.get(), spillTable->getIdent()));
 }
 
 // Abort the two-phase index build since it hangs in vote submission, because we are not running
@@ -658,7 +658,7 @@ void abortIndexBuild(OperationContext* opCtx, const UUID& buildUUID) {
     // Pretend initial sync mode, otherwise abort is not allowed as a Secondary.
     ASSERT_OK(
         repl::ReplicationCoordinator::get(opCtx)->setFollowerMode(repl::MemberState::RS_STARTUP2));
-    ASSERT_TRUE(IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByBuildUUID(
+    EXPECT_TRUE(IndexBuildsCoordinator::get(opCtx)->abortIndexBuildByBuildUUID(
         opCtx,
         buildUUID,
         IndexBuildAction::kInitialSyncAbort,
@@ -691,17 +691,17 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexForCleanShutdown
                                                 StorageEngine::LastShutdownState::kClean);
 
     // tempDir is cleared except for files for resumable builds.
-    ASSERT_TRUE(boost::filesystem::exists(tempDir));
-    ASSERT_TRUE(boost::filesystem::exists(indexFile));
-    ASSERT_FALSE(boost::filesystem::exists(irrelevantFile));
+    EXPECT_TRUE(boost::filesystem::exists(tempDir));
+    EXPECT_TRUE(boost::filesystem::exists(indexFile));
+    EXPECT_FALSE(boost::filesystem::exists(irrelevantFile));
 
     // After clean shutdown, an internal ident should be kept if-and-only-if it is needed to resume
     // an index build.
-    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), indexIdent));
+    EXPECT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
+    EXPECT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
+    EXPECT_TRUE(identExists(opCtx.get(), necessaryRs->getIdent()));
+    EXPECT_TRUE(identExists(opCtx.get(), skippedRecordRs->getIdent()));
+    EXPECT_TRUE(identExists(opCtx.get(), indexIdent));
 }
 
 TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexFallbackToRestart) {
@@ -732,14 +732,14 @@ TEST_F(StorageEngineReconcileTest, StartupRecoveryResumableIndexFallbackToRestar
     startup_recovery::repairAndRecoverDatabases(opCtx.get(),
                                                 StorageEngine::LastShutdownState::kClean);
 
-    ASSERT_TRUE(boost::filesystem::exists(tempDir));
+    EXPECT_TRUE(boost::filesystem::exists(tempDir));
     // When resumable index build fails its temp file is removed.
-    ASSERT_FALSE(boost::filesystem::exists(indexFile));
+    EXPECT_FALSE(boost::filesystem::exists(indexFile));
 
-    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
-    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->getIdent()));
-    ASSERT_TRUE(identExists(opCtx.get(), indexIdent));
+    EXPECT_FALSE(identExists(opCtx.get(), irrelevantRs->getIdent()));
+    EXPECT_FALSE(identExists(opCtx.get(), resumableIndexRs->getIdent()));
+    EXPECT_TRUE(identExists(opCtx.get(), necessaryRs->getIdent()));
+    EXPECT_TRUE(identExists(opCtx.get(), indexIdent));
 }
 
 TEST_F(StorageEngineReconcileTest, StartupRecoveryRestartIndexForCleanShutdown) {
@@ -770,7 +770,7 @@ TEST_F(StorageEngineTest, StartupRecoveryBuildMissingIdIndex) {
     auto coll = CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), ns);
     ASSERT(coll);
     // _id index is missing initially.
-    ASSERT_FALSE(coll->getIndexCatalog()->findIdIndex(opCtx.get()));
+    EXPECT_FALSE(coll->getIndexCatalog()->findIdIndex(opCtx.get()));
     startup_recovery::repairAndRecoverDatabases(opCtx.get(),
                                                 StorageEngine::LastShutdownState::kClean);
     coll = CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), ns);
@@ -791,7 +791,7 @@ TEST_F(StorageEngineTest, StartupRecoveryClearLocalTempCollections) {
                                                 StorageEngine::LastShutdownState::kClean);
     auto coll = CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), ns);
     // The local temp collection is removed.
-    ASSERT_FALSE(coll);
+    EXPECT_FALSE(coll);
 }
 
 TEST_F(StorageEngineTest, InternalRecordStoreDoesNotTrackSizeAdjustments) {
@@ -808,11 +808,11 @@ TEST_F(StorageEngineTest, InternalRecordStoreDoesNotTrackSizeAdjustments) {
                                                   data,
                                                   strlen(data),
                                                   Timestamp());
-        ASSERT_TRUE(s.isOK());
+        EXPECT_TRUE(s.isOK());
         wuow.commit();
 
-        ASSERT_EQ(rs->numRecords(), 0);
-        ASSERT_EQ(rs->dataSize(), 0);
+        EXPECT_EQ(rs->numRecords(), 0);
+        EXPECT_EQ(rs->dataSize(), 0);
     };
 
     // Create the internal record store and get its ident.
@@ -930,8 +930,8 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
     ASSERT(!identExists(opCtx.get(), indexIdent));
 
     // There are no two-phase builds to resume or restart.
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToRestart.size());
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToResume.size());
 }
 
 TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
@@ -979,20 +979,20 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
     ASSERT(identExists(opCtx.get(), indexIdentB));
 
     // Only one index build should be indicated as needing to be restarted.
-    ASSERT_EQUALS(1UL, reconcileResult.indexBuildsToRestart.size());
+    ASSERT_EQ(1UL, reconcileResult.indexBuildsToRestart.size());
     auto& [toRestartBuildUUID, toRestart] = *reconcileResult.indexBuildsToRestart.begin();
-    ASSERT_EQ(buildUUID, toRestartBuildUUID);
+    EXPECT_EQ(buildUUID, toRestartBuildUUID);
 
     // Both specs should be listed within the same build.
     auto& specsAndIdents = toRestart.indexSpecsAndIdents;
     ASSERT_EQ(2UL, specsAndIdents.size());
-    ASSERT_EQ(indexA, std::get<BSONObj>(specsAndIdents[0])["name"].str());
-    ASSERT_EQ(indexB, std::get<BSONObj>(specsAndIdents[1])["name"].str());
-    ASSERT_EQ(indexIdentA, std::get<std::string>(specsAndIdents[0]));
-    ASSERT_EQ(indexIdentB, std::get<std::string>(specsAndIdents[1]));
+    EXPECT_EQ(indexA, std::get<BSONObj>(specsAndIdents[0])["name"].str());
+    EXPECT_EQ(indexB, std::get<BSONObj>(specsAndIdents[1])["name"].str());
+    EXPECT_EQ(indexIdentA, std::get<std::string>(specsAndIdents[0]));
+    EXPECT_EQ(indexIdentB, std::get<std::string>(specsAndIdents[1]));
 
     // There should be no index builds to resume.
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToResume.size());
 }
 
 #ifndef _WIN32  // WiredTiger does not support orphan file recovery on Windows.
@@ -1019,7 +1019,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     ASSERT(identExists(opCtx.get(), collInfo.ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
     StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get(), callbackMock);
-    ASSERT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
+    EXPECT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 #endif
 
@@ -1037,13 +1037,13 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     // Reconcile would normally return an error if a collection existed with a missing ident in the
     // storage engine. When in a repair context, that should not be the case.
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToRestart.size());
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToResume.size());
 
     ASSERT(!identExists(opCtx.get(), collInfo.ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
     StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get(), callbackMock);
-    ASSERT_EQ(0U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
+    EXPECT_EQ(0U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 
 TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
@@ -1080,7 +1080,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     ASSERT(collectionExists(opCtx.get(), orphanNs));
 
     StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get(), callbackMock);
-    ASSERT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
+    EXPECT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
 }
 
 TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
@@ -1111,7 +1111,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     }
     // reconcileCatalogAndIdents() drops orphaned idents.
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
+    EXPECT_EQ(0UL, reconcileResult.indexBuildsToRestart.size());
 
     ASSERT(!identExists(opCtx.get(), collInfo.ident));
     auto identNs = collInfo.ident;
@@ -1128,7 +1128,7 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     const NamespaceString coll2Ns = NamespaceString::createNamespaceString_forTest("db.coll2");
     createCollection(opCtx.get(), coll1Ns);
     ASSERT(collectionExists(opCtx.get(), coll1Ns));
-    ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
+    EXPECT_FALSE(collectionExists(opCtx.get(), coll2Ns));
 
     LOGV2(5781102, "Starting up storage engine in alternate location");
     const auto oldPath = storageGlobalParams.dbpath;
@@ -1155,12 +1155,12 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
     StorageEngineTest::_storageEngine = getServiceContext()->getStorageEngine();
     // Alternate storage location should have no collections.
-    ASSERT_FALSE(collectionExists(opCtx.get(), coll1Ns));
-    ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
+    EXPECT_FALSE(collectionExists(opCtx.get(), coll1Ns));
+    EXPECT_FALSE(collectionExists(opCtx.get(), coll2Ns));
 
     createCollection(opCtx.get(), coll2Ns);
-    ASSERT_FALSE(collectionExists(opCtx.get(), coll1Ns));
-    ASSERT_TRUE(collectionExists(opCtx.get(), coll2Ns));
+    EXPECT_FALSE(collectionExists(opCtx.get(), coll1Ns));
+    EXPECT_TRUE(collectionExists(opCtx.get(), coll2Ns));
 
     LOGV2(5781104, "Starting up storage engine in original location");
     StorageControl::stopStorageControls(
@@ -1182,8 +1182,8 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     getGlobalServiceContext()->getStorageEngine()->notifyStorageStartupRecoveryComplete();
     ASSERT(StorageEngine::LastShutdownState::kClean == lastShutdownState);
     StorageEngineTest::_storageEngine = getServiceContext()->getStorageEngine();
-    ASSERT_TRUE(collectionExists(opCtx.get(), coll1Ns));
-    ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
+    EXPECT_TRUE(collectionExists(opCtx.get(), coll1Ns));
+    EXPECT_FALSE(collectionExists(opCtx.get(), coll2Ns));
 }
 
 TEST_F(StorageEngineTest, IdentMissingForNonReadyIndex) {
@@ -1213,7 +1213,7 @@ TEST_F(StorageEngineTest, IdentMissingForNonReadyIndex) {
         _storageEngine->getMDBCatalog()->getIndexIdent(opCtx.get(), coll.catalogId, indexName);
     ASSERT_OK(dropIdent(
         *shard_role_details::getRecoveryUnit(opCtx.get()), indexIdent, /*identHasSizeInfo=*/true));
-    ASSERT_FALSE(identExists(opCtx.get(), indexIdent));
+    EXPECT_FALSE(identExists(opCtx.get(), indexIdent));
 
     // Since the index build never completed, startup repair should treat a missing ident
     // identically to an incomplete index and restart it.
@@ -1230,7 +1230,7 @@ TEST_F(StorageEngineTest, IdentMissingForNonReadyIndex) {
         opCtx.get(), indexName, IndexCatalog::InclusionPolicy::kUnfinished);
     ASSERT(indexEntry);
     // Even though the index was rebuilt it's not ready due to that it's waiting for commit quorum
-    ASSERT_FALSE(indexEntry->isReady());
+    EXPECT_FALSE(indexEntry->isReady());
 
     // Creating the IndexAccessMethod initially failed due to the ident not existing, but needs to
     // have been created at some point later or anything which tries to use the recovered index

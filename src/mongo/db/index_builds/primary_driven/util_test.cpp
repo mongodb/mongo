@@ -155,7 +155,7 @@ protected:
     }
 
     std::vector<IndexBuildInfo> makeIndexes(const std::vector<std::string>& keys) {
-        ASSERT_FALSE(keys.empty());
+        EXPECT_FALSE(keys.empty());
         std::vector<IndexBuildInfo> indexes;
         indexes.reserve(keys.size());
         for (size_t i = 0; i < keys.size(); ++i) {
@@ -235,7 +235,7 @@ TEST_F(UtilTest, Start) {
     EXPECT_EQ(args.ns, ns);
     EXPECT_EQ(args.collUUID, collUUID);
     EXPECT_EQ(args.buildUUID, buildUUID);
-    EXPECT_EQ(args.indexes.size(), indexes.size());
+    ASSERT_EQ(args.indexes.size(), indexes.size());
     for (size_t i = 0; i < indexes.size(); ++i) {
         ASSERT_BSONOBJ_EQ(args.indexes[i].spec, indexes[i].spec);
         EXPECT_EQ(args.indexes[i].indexIdent, indexes[i].indexIdent);
@@ -309,7 +309,7 @@ TEST_F(UtilTest, Commit) {
     const auto usageStats =
         CollectionIndexUsageTrackerDecoration::getUsageStats(coll.getCollectionPtr().get());
     for (auto&& index : indexes) {
-        ASSERT_TRUE(usageStats.count(index.getIndexName()));
+        EXPECT_TRUE(usageStats.count(index.getIndexName()));
     }
 
     ASSERT_TRUE(opObserver().lastCommitArgs);
@@ -317,11 +317,11 @@ TEST_F(UtilTest, Commit) {
     EXPECT_EQ(args.ns, ns);
     EXPECT_EQ(args.collUUID, collUUID);
     EXPECT_EQ(args.buildUUID, buildUUID);
-    EXPECT_EQ(args.indexes.size(), 2);
+    ASSERT_EQ(args.indexes.size(), 2);
     ASSERT_BSONOBJ_EQ(args.indexes[0].spec, indexes[0].spec);
     ASSERT_BSONOBJ_EQ(args.indexes[1].spec, indexes[1].spec);
-    ASSERT_FALSE(args.multikey[0]);
-    ASSERT_TRUE(args.multikey[1]);
+    EXPECT_FALSE(args.multikey[0]);
+    EXPECT_TRUE(args.multikey[1]);
     EXPECT_FALSE(args.fromMigrate);
     EXPECT_FALSE(args.isTimeseries);
 }
@@ -366,7 +366,7 @@ TEST_F(UtilTest, Abort) {
     auto& engine = *operationContext()->getServiceContext()->getStorageEngine()->getEngine();
     auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
     for (size_t i = 0; i < indexes.size(); ++i) {
-        ASSERT_FALSE(coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
+        EXPECT_FALSE(coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
             operationContext(), indexes[i].getIndexName(), IndexCatalog::InclusionPolicy::kReady));
 
         EXPECT_FALSE(engine.hasIdent(ru, indexes[i].indexIdent));
@@ -382,10 +382,10 @@ TEST_F(UtilTest, Abort) {
     EXPECT_EQ(args.ns, ns);
     EXPECT_EQ(args.collUUID, collUUID);
     EXPECT_EQ(args.buildUUID, buildUUID);
-    EXPECT_EQ(args.indexes.size(), 2);
+    ASSERT_EQ(args.indexes.size(), 2);
     ASSERT_BSONOBJ_EQ(args.indexes[0].spec, indexes[0].spec);
     ASSERT_BSONOBJ_EQ(args.indexes[1].spec, indexes[1].spec);
-    ASSERT_EQ(args.cause, cause);
+    EXPECT_EQ(args.cause, cause);
     EXPECT_FALSE(args.fromMigrate);
     EXPECT_FALSE(args.isTimeseries);
 }
@@ -508,17 +508,16 @@ TEST_F(UtilTest, ResumeInfoSynthesizesMissingRecord) {
 
     auto resumeState =
         resumeInfo(operationContext(), collUUID, buildUUID, indexes, validResumableIndexBuildIdent);
-    ASSERT_EQUALS(buildUUID, resumeState.getBuildUUID());
-    ASSERT_EQUALS(IndexBuildPhaseEnum::kInitialized, resumeState.getPhase());
-    ASSERT_EQUALS(collUUID, resumeState.getCollectionUUID());
+    EXPECT_EQ(buildUUID, resumeState.getBuildUUID());
+    EXPECT_EQ(IndexBuildPhaseEnum::kInitialized, resumeState.getPhase());
+    EXPECT_EQ(collUUID, resumeState.getCollectionUUID());
     for (size_t i = 0; i < indexes.size(); ++i) {
-        ASSERT_EQUALS(*indexes[i].sideWritesIdent,
-                      resumeState.getIndexes()[i].getSideWritesTable());
-        ASSERT_EQUALS(*indexes[i].constraintViolationsIdent,
-                      *resumeState.getIndexes()[i].getDuplicateKeyTrackerTable());
-        ASSERT_EQUALS(*indexes[i].skippedRecordsIdent,
-                      *resumeState.getIndexes()[i].getSkippedRecordTrackerTable());
-        ASSERT_EQUALS(*indexes[i].sorterIdent, *resumeState.getIndexes()[i].getStorageIdentifier());
+        EXPECT_EQ(*indexes[i].sideWritesIdent, resumeState.getIndexes()[i].getSideWritesTable());
+        EXPECT_EQ(*indexes[i].constraintViolationsIdent,
+                  *resumeState.getIndexes()[i].getDuplicateKeyTrackerTable());
+        EXPECT_EQ(*indexes[i].skippedRecordsIdent,
+                  *resumeState.getIndexes()[i].getSkippedRecordTrackerTable());
+        EXPECT_EQ(*indexes[i].sorterIdent, *resumeState.getIndexes()[i].getStorageIdentifier());
     }
 }
 
@@ -535,17 +534,16 @@ TEST_F(UtilTest, ResumeInfoParsesSuccessfully) {
 
     auto resumeState =
         resumeInfo(operationContext(), collUUID, buildUUID, indexes, validResumableIndexBuildIdent);
-    ASSERT_EQUALS(buildUUID, resumeState.getBuildUUID());
-    ASSERT_EQUALS(IndexBuildPhaseEnum::kCollectionScan, resumeState.getPhase());
-    ASSERT_EQUALS(collUUID, resumeState.getCollectionUUID());
+    EXPECT_EQ(buildUUID, resumeState.getBuildUUID());
+    EXPECT_EQ(IndexBuildPhaseEnum::kCollectionScan, resumeState.getPhase());
+    EXPECT_EQ(collUUID, resumeState.getCollectionUUID());
     for (size_t i = 0; i < indexes.size(); ++i) {
-        ASSERT_EQUALS(*indexes[i].sideWritesIdent,
-                      resumeState.getIndexes()[i].getSideWritesTable());
-        ASSERT_EQUALS(*indexes[i].constraintViolationsIdent,
-                      *resumeState.getIndexes()[i].getDuplicateKeyTrackerTable());
-        ASSERT_EQUALS(*indexes[i].skippedRecordsIdent,
-                      *resumeState.getIndexes()[i].getSkippedRecordTrackerTable());
-        ASSERT_EQUALS(*indexes[i].sorterIdent, *resumeState.getIndexes()[i].getStorageIdentifier());
+        EXPECT_EQ(*indexes[i].sideWritesIdent, resumeState.getIndexes()[i].getSideWritesTable());
+        EXPECT_EQ(*indexes[i].constraintViolationsIdent,
+                  *resumeState.getIndexes()[i].getDuplicateKeyTrackerTable());
+        EXPECT_EQ(*indexes[i].skippedRecordsIdent,
+                  *resumeState.getIndexes()[i].getSkippedRecordTrackerTable());
+        EXPECT_EQ(*indexes[i].sorterIdent, *resumeState.getIndexes()[i].getStorageIdentifier());
     }
 }
 
@@ -611,7 +609,7 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesOutOfRangeKeys) {
     auto remainingKeys = getSorterKeys(opCtx, container);
     EXPECT_EQ(remainingKeys.size(), 5u);
     for (int64_t expected = 3; expected < 8; ++expected) {
-        ASSERT_TRUE(std::find(remainingKeys.begin(), remainingKeys.end(), expected) !=
+        EXPECT_TRUE(std::find(remainingKeys.begin(), remainingKeys.end(), expected) !=
                     remainingKeys.end());
     }
 }
@@ -715,7 +713,7 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesAcrossBatches) {
     auto remainingKeys = getSorterKeys(opCtx, container);
     EXPECT_EQ(remainingKeys.size(), 5u);
     for (int64_t expected = 1; expected < 6; ++expected) {
-        ASSERT_TRUE(std::find(remainingKeys.begin(), remainingKeys.end(), expected) !=
+        EXPECT_TRUE(std::find(remainingKeys.begin(), remainingKeys.end(), expected) !=
                     remainingKeys.end());
     }
 }

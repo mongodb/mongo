@@ -315,7 +315,7 @@ TEST_P(KeyStringBuilderTest, NumberOrderLots) {
         for (size_t j = 0; j < numbers.size(); j++) {
             const key_string::Builder& a = *KeyStringBuilders[i];
             const key_string::Builder& b = *KeyStringBuilders[j];
-            ASSERT_EQUALS(a.compare(b), -b.compare(a));
+            EXPECT_EQ(a.compare(b), -b.compare(a));
 
             if (a.compare(b) !=
                 compareNumbers(numbers[i].firstElement(), numbers[j].firstElement())) {
@@ -325,8 +325,8 @@ TEST_P(KeyStringBuilderTest, NumberOrderLots) {
                       "numbers_j"_attr = numbers[j]);
             }
 
-            ASSERT_EQUALS(a.compare(b),
-                          compareNumbers(numbers[i].firstElement(), numbers[j].firstElement()));
+            EXPECT_EQ(a.compare(b),
+                      compareNumbers(numbers[i].firstElement(), numbers[j].firstElement()));
         }
     }
 }

@@ -118,7 +118,7 @@ public:
                                                  insertedData.length(),
                                                  timestampToUse);
         ASSERT_OK(recordIdStatus);
-        ASSERT_EQ(recordIdStatus.getValue(), recordId);
+        EXPECT_EQ(recordIdStatus.getValue(), recordId);
         auto now = Date_t::fromMillisSinceEpoch(timestampToUse.asInt64());
         testMarkers.updateCurrentMarkerAfterInsertOnCommit(
             opCtx, insertedData.length(), recordId, now, 1, /*oplogSamplingAsyncEnabled*/ false);
@@ -167,8 +167,8 @@ public:
                 totalBytes += numBytes;
             }
         }
-        ASSERT_EQ(totalBytes, 66'000);
-        ASSERT_EQ(totalRecords, 3'000);
+        EXPECT_EQ(totalBytes, 66'000);
+        EXPECT_EQ(totalRecords, 3'000);
         return {totalBytes, totalRecords};
     }
 };
@@ -254,14 +254,14 @@ void normalTest(CollectionMarkersTest* fixture, std::string collectionName) {
 
     auto marker = testMarkers->peekOldestMarkerIfNeeded(opCtx.get());
     ASSERT_TRUE(marker);
-    ASSERT_EQ(marker->lastRecord, insertedRecordId);
-    ASSERT_EQ(marker->bytes, dataLength);
-    ASSERT_EQ(marker->wallTime, now);
-    ASSERT_EQ(marker->records, 1);
+    EXPECT_EQ(marker->lastRecord, insertedRecordId);
+    EXPECT_EQ(marker->bytes, dataLength);
+    EXPECT_EQ(marker->wallTime, now);
+    EXPECT_EQ(marker->records, 1);
 
     testMarkers->popOldestMarker();
 
-    ASSERT_FALSE(testMarkers->peekOldestMarkerIfNeeded(opCtx.get()));
+    EXPECT_FALSE(testMarkers->peekOldestMarkerIfNeeded(opCtx.get()));
 };
 
 TEST_F(CollectionMarkersTest, NormalUsage) {
@@ -281,21 +281,21 @@ TEST_F(CollectionMarkersTest, NormalCollectionPartialMarkerUsage) {
     auto [insertedRecordId, now] =
         insertElementWithCollectionMarkerUpdate(opCtx.get(), collNs, *testMarkers, dataLength);
 
-    ASSERT_FALSE(testMarkers->peekOldestMarkerIfNeeded(opCtx.get()));
+    EXPECT_FALSE(testMarkers->peekOldestMarkerIfNeeded(opCtx.get()));
 
     testMarkers->setExpirePartialMarker(false);
     testMarkers->createPartialMarkerIfNecessary(opCtx.get());
-    ASSERT_FALSE(testMarkers->peekOldestMarkerIfNeeded(opCtx.get()));
+    EXPECT_FALSE(testMarkers->peekOldestMarkerIfNeeded(opCtx.get()));
 
     testMarkers->setExpirePartialMarker(true);
     testMarkers->createPartialMarkerIfNecessary(opCtx.get());
     auto marker = testMarkers->peekOldestMarkerIfNeeded(opCtx.get());
     ASSERT_TRUE(marker);
 
-    ASSERT_EQ(marker->lastRecord, insertedRecordId);
-    ASSERT_EQ(marker->bytes, dataLength);
-    ASSERT_EQ(marker->wallTime, now);
-    ASSERT_EQ(marker->records, 1);
+    EXPECT_EQ(marker->lastRecord, insertedRecordId);
+    EXPECT_EQ(marker->bytes, dataLength);
+    EXPECT_EQ(marker->wallTime, now);
+    EXPECT_EQ(marker->records, 1);
 }
 
 // Insert records into a collection and verify the number of markers that are created.
@@ -312,53 +312,53 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
     {
         auto opCtx = fixture->getClient()->makeOperationContext();
 
-        ASSERT_EQ(0U, testMarkers->numMarkers());
+        EXPECT_EQ(0U, testMarkers->numMarkers());
 
         // Inserting a record smaller than 'minBytesPerMarker' shouldn't create a new collection
         // marker.
         auto insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 99, Timestamp(1, 1), RecordId(1, 1));
-        ASSERT_EQ(insertedRecordId, RecordId(1, 1));
-        ASSERT_EQ(0U, testMarkers->numMarkers());
-        ASSERT_EQ(1, testMarkers->currentRecords_forTest());
-        ASSERT_EQ(99, testMarkers->currentBytes_forTest());
+        EXPECT_EQ(insertedRecordId, RecordId(1, 1));
+        EXPECT_EQ(0U, testMarkers->numMarkers());
+        EXPECT_EQ(1, testMarkers->currentRecords_forTest());
+        EXPECT_EQ(99, testMarkers->currentBytes_forTest());
 
         // Inserting another record such that their combined size exceeds 'minBytesPerMarker' should
         // cause a new marker to be created.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 51, Timestamp(1, 2), RecordId(1, 2));
-        ASSERT_EQ(insertedRecordId, RecordId(1, 2));
-        ASSERT_EQ(1U, testMarkers->numMarkers());
-        ASSERT_EQ(0, testMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, testMarkers->currentBytes_forTest());
+        EXPECT_EQ(insertedRecordId, RecordId(1, 2));
+        EXPECT_EQ(1U, testMarkers->numMarkers());
+        EXPECT_EQ(0, testMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, testMarkers->currentBytes_forTest());
 
         // Inserting a record such that the combined size of this record and the previously inserted
         // one exceed 'minBytesPerMarker' shouldn't cause a new marker to be created because we've
         // started filling a new marker.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 50, Timestamp(1, 3), RecordId(1, 3));
-        ASSERT_EQ(insertedRecordId, RecordId(1, 3));
-        ASSERT_EQ(1U, testMarkers->numMarkers());
-        ASSERT_EQ(1, testMarkers->currentRecords_forTest());
-        ASSERT_EQ(50, testMarkers->currentBytes_forTest());
+        EXPECT_EQ(insertedRecordId, RecordId(1, 3));
+        EXPECT_EQ(1U, testMarkers->numMarkers());
+        EXPECT_EQ(1, testMarkers->currentRecords_forTest());
+        EXPECT_EQ(50, testMarkers->currentBytes_forTest());
 
         // Inserting a record such that the combined size of this record and the previously inserted
         // one is exactly equal to 'minBytesPerMarker' should cause a new marker to be created.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 50, Timestamp(1, 4), RecordId(1, 4));
-        ASSERT_EQ(insertedRecordId, RecordId(1, 4));
-        ASSERT_EQ(2U, testMarkers->numMarkers());
-        ASSERT_EQ(0, testMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, testMarkers->currentBytes_forTest());
+        EXPECT_EQ(insertedRecordId, RecordId(1, 4));
+        EXPECT_EQ(2U, testMarkers->numMarkers());
+        EXPECT_EQ(0, testMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, testMarkers->currentBytes_forTest());
 
         // Inserting a single record that exceeds 'minBytesPerMarker' should cause a new marker to
         // be created.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 101, Timestamp(1, 5), RecordId(1, 5));
-        ASSERT_EQ(insertedRecordId, RecordId(1, 5));
-        ASSERT_EQ(3U, testMarkers->numMarkers());
-        ASSERT_EQ(0, testMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, testMarkers->currentBytes_forTest());
+        EXPECT_EQ(insertedRecordId, RecordId(1, 5));
+        EXPECT_EQ(3U, testMarkers->numMarkers());
+        EXPECT_EQ(0, testMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, testMarkers->currentBytes_forTest());
     }
 }
 
@@ -386,41 +386,41 @@ void ascendingOrderTest(CollectionMarkersTest* fixture, std::string collectionNa
     {
         auto opCtx = fixture->getClient()->makeOperationContext();
 
-        ASSERT_EQ(0U, testMarkers->numMarkers());
+        EXPECT_EQ(0U, testMarkers->numMarkers());
         auto insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 50, Timestamp(2, 2), RecordId(2, 2));
-        ASSERT_EQ(insertedRecordId, RecordId(2, 2));
-        ASSERT_EQ(0U, testMarkers->numMarkers());
-        ASSERT_EQ(1, testMarkers->currentRecords_forTest());
-        ASSERT_EQ(50, testMarkers->currentBytes_forTest());
+        EXPECT_EQ(insertedRecordId, RecordId(2, 2));
+        EXPECT_EQ(0U, testMarkers->numMarkers());
+        EXPECT_EQ(1, testMarkers->currentRecords_forTest());
+        EXPECT_EQ(50, testMarkers->currentBytes_forTest());
 
         // Inserting a record that has a smaller RecordId than the previously inserted record should
         // be able to create a new marker when no markers already exist.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 50, Timestamp(2, 1), RecordId(2, 1));
-        ASSERT_EQ(insertedRecordId, RecordId(2, 1));
-        ASSERT_EQ(1U, testMarkers->numMarkers());
-        ASSERT_EQ(0, testMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, testMarkers->currentBytes_forTest());
+        EXPECT_EQ(insertedRecordId, RecordId(2, 1));
+        EXPECT_EQ(1U, testMarkers->numMarkers());
+        EXPECT_EQ(0, testMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, testMarkers->currentBytes_forTest());
 
         // However, inserting a record that has a smaller RecordId than most recently created
         // marker's last record shouldn't cause a new marker to be created, even if the size of the
         // inserted record exceeds 'minBytesPerMarker'.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 100, Timestamp(1, 1), RecordId(1, 1));
-        ASSERT_EQ(insertedRecordId, RecordId(1, 1));
-        ASSERT_EQ(1U, testMarkers->numMarkers());
-        ASSERT_EQ(1, testMarkers->currentRecords_forTest());
-        ASSERT_EQ(100, testMarkers->currentBytes_forTest());
+        EXPECT_EQ(insertedRecordId, RecordId(1, 1));
+        EXPECT_EQ(1U, testMarkers->numMarkers());
+        EXPECT_EQ(1, testMarkers->currentRecords_forTest());
+        EXPECT_EQ(100, testMarkers->currentBytes_forTest());
 
         // Inserting a record that has a larger RecordId than the most recently created marker's
         // last record should then cause a new marker to be created.
         insertedRecordId = fixture->insertWithSpecificTimestampAndRecordId(
             opCtx.get(), collNs, *testMarkers, 50, Timestamp(2, 3), RecordId(2, 3));
-        ASSERT_EQ(insertedRecordId, RecordId(2, 3));
-        ASSERT_EQ(2U, testMarkers->numMarkers());
-        ASSERT_EQ(0, testMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, testMarkers->currentBytes_forTest());
+        EXPECT_EQ(insertedRecordId, RecordId(2, 3));
+        EXPECT_EQ(2U, testMarkers->numMarkers());
+        EXPECT_EQ(0, testMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, testMarkers->currentBytes_forTest());
     }
 }
 
@@ -452,14 +452,14 @@ TEST_F(CollectionMarkersTest, ScanningMarkerCreation) {
 
         auto result = CollectionTruncateMarkers::createMarkersByScanning(
             opCtx.get(), *iterator, kMinBytes, getIdAndWallTime);
-        ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
-        ASSERT_GTE(result.timeTaken, Microseconds(0));
-        ASSERT_EQ(result.leftoverRecordsBytes, kElementSize);
-        ASSERT_EQ(result.leftoverRecordsCount, 1);
-        ASSERT_EQ(result.markers.size(), 51 / 2);
+        EXPECT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+        EXPECT_GE(result.timeTaken, Microseconds(0));
+        EXPECT_EQ(result.leftoverRecordsBytes, kElementSize);
+        EXPECT_EQ(result.leftoverRecordsCount, 1);
+        EXPECT_EQ(result.markers.size(), 51 / 2);
         for (const auto& marker : result.markers) {
-            ASSERT_EQ(marker.bytes, kElementSize * 2);
-            ASSERT_EQ(marker.records, 2);
+            EXPECT_EQ(marker.bytes, kElementSize * 2);
+            EXPECT_EQ(marker.records, 2);
         }
     }
 }
@@ -483,23 +483,23 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
     auto result = CollectionTruncateMarkers::createFromCollectionIterator(
         opCtx.get(), *iterator, kMinBytesPerMarker, false /* forceScanning */, getIdAndWallTime);
 
-    ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
-    ASSERT_GTE(result.timeTaken, Microseconds(0));
+    EXPECT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
+    EXPECT_GE(result.timeTaken, Microseconds(0));
     const auto& firstMarker = result.markers.front();
     auto recordCount = firstMarker.records;
     auto recordBytes = firstMarker.bytes;
-    ASSERT_EQ(result.leftoverRecordsBytes, totalBytes % kMinBytesPerMarker);
-    ASSERT_EQ(result.leftoverRecordsCount, totalRecords % kRecordsPerMarker);
-    ASSERT_GT(recordCount, 0);
-    ASSERT_GT(recordBytes, 0);
-    ASSERT_EQ(result.markers.size(), kNumMarkers);
+    EXPECT_EQ(result.leftoverRecordsBytes, totalBytes % kMinBytesPerMarker);
+    EXPECT_EQ(result.leftoverRecordsCount, totalRecords % kRecordsPerMarker);
+    EXPECT_GT(recordCount, 0);
+    EXPECT_GT(recordBytes, 0);
+    EXPECT_EQ(result.markers.size(), kNumMarkers);
     for (const auto& marker : result.markers) {
-        ASSERT_EQ(marker.bytes, recordBytes);
-        ASSERT_EQ(marker.records, recordCount);
+        EXPECT_EQ(marker.bytes, recordBytes);
+        EXPECT_EQ(marker.records, recordCount);
     }
 
-    ASSERT_EQ(recordBytes * kNumMarkers + result.leftoverRecordsBytes, totalBytes);
-    ASSERT_EQ(recordCount * kNumMarkers + result.leftoverRecordsCount, totalRecords);
+    EXPECT_EQ(recordBytes * kNumMarkers + result.leftoverRecordsBytes, totalBytes);
+    EXPECT_EQ(recordCount * kNumMarkers + result.leftoverRecordsCount, totalRecords);
 }
 
 // Test that initial marker creation works as expected when forcing scanning to be used.
@@ -524,8 +524,8 @@ TEST_F(CollectionMarkersTest, ForceScanningMarkerCreation) {
                                                                           true /* forceScanning */,
                                                                           getIdAndWallTime);
 
-    ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
-    ASSERT_GTE(result.timeTaken, Microseconds(0));
+    EXPECT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+    EXPECT_GE(result.timeTaken, Microseconds(0));
 
     auto iteratorBaseline = CollectionTruncateMarkers::makeIterator(
         opCtx.get(), coll->getRecordStore(), nullptr, boost::none);
@@ -533,12 +533,12 @@ TEST_F(CollectionMarkersTest, ForceScanningMarkerCreation) {
         opCtx.get(), *iteratorBaseline, kMinBytesPerMarker, getIdAndWallTime);
 
     ASSERT_EQ(result.markers.size(), baseline.markers.size());
-    ASSERT_EQ(result.leftoverRecordsBytes, baseline.leftoverRecordsBytes);
-    ASSERT_EQ(result.leftoverRecordsCount, baseline.leftoverRecordsCount);
+    EXPECT_EQ(result.leftoverRecordsBytes, baseline.leftoverRecordsBytes);
+    EXPECT_EQ(result.leftoverRecordsCount, baseline.leftoverRecordsCount);
     for (size_t i = 0; i < result.markers.size(); ++i) {
-        ASSERT_EQ(result.markers[i].bytes, baseline.markers[i].bytes);
-        ASSERT_EQ(result.markers[i].records, baseline.markers[i].records);
-        ASSERT_EQ(result.markers[i].lastRecord, baseline.markers[i].lastRecord);
+        EXPECT_EQ(result.markers[i].bytes, baseline.markers[i].bytes);
+        EXPECT_EQ(result.markers[i].records, baseline.markers[i].records);
+        EXPECT_EQ(result.markers[i].lastRecord, baseline.markers[i].lastRecord);
     }
 
     int64_t markerBytesSum = 0;
@@ -547,8 +547,8 @@ TEST_F(CollectionMarkersTest, ForceScanningMarkerCreation) {
         markerBytesSum += marker.bytes;
         markerRecordsSum += marker.records;
     }
-    ASSERT_EQ(markerBytesSum + result.leftoverRecordsBytes, totalBytes);
-    ASSERT_EQ(markerRecordsSum + result.leftoverRecordsCount, totalRecords);
+    EXPECT_EQ(markerBytesSum + result.leftoverRecordsBytes, totalBytes);
+    EXPECT_EQ(markerRecordsSum + result.leftoverRecordsCount, totalRecords);
 }
 
 // Test that initial marker creation works as expected when forcing scanning to be used.
@@ -581,14 +581,14 @@ TEST_F(CollectionMarkersTest, ForceScanningMarkerCreationSpecificValues) {
     auto result = CollectionTruncateMarkers::createFromCollectionIterator(
         opCtx.get(), *iterator, kMinBytes, true /* forceScanning */, getIdAndWallTime);
 
-    ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
-    ASSERT_GTE(result.timeTaken, Microseconds(0));
-    ASSERT_EQ(result.leftoverRecordsBytes, kLeftoverBytes);
-    ASSERT_EQ(result.leftoverRecordsCount, kLeftoverRecords);
-    ASSERT_EQ(result.markers.size(), kExpectedMarkers);
+    EXPECT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+    EXPECT_GE(result.timeTaken, Microseconds(0));
+    EXPECT_EQ(result.leftoverRecordsBytes, kLeftoverBytes);
+    EXPECT_EQ(result.leftoverRecordsCount, kLeftoverRecords);
+    EXPECT_EQ(result.markers.size(), kExpectedMarkers);
     for (const auto& marker : result.markers) {
-        ASSERT_EQ(marker.bytes, kElementSize * kRecordsPerMarker);
-        ASSERT_EQ(marker.records, kRecordsPerMarker);
+        EXPECT_EQ(marker.bytes, kElementSize * kRecordsPerMarker);
+        EXPECT_EQ(marker.records, kRecordsPerMarker);
     }
 }
 
@@ -620,8 +620,8 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
                                                        getIdAndWallTime,
                                                        &mockTickSource);
     logs.stop();
-    ASSERT_GT(logs.countTextContaining("Collection sampling progress"), 0);
-    ASSERT_EQUALS(logs.countTextContaining("Collection sampling complete"), 1);
+    EXPECT_GT(logs.countTextContaining("Collection sampling progress"), 0);
+    EXPECT_EQ(logs.countTextContaining("Collection sampling complete"), 1);
 }
 
 // Test that cursors will yield periodically, and (since the yield drops the snapshot) that the
@@ -646,7 +646,7 @@ TEST_F(CollectionMarkersTest, CursorYieldsAndIgnoresNewRecords) {
         hasYielded.store(true);
     });
 
-    ASSERT_FALSE(hasYielded.load());
+    EXPECT_FALSE(hasYielded.load());
 
     size_t seenRecords = 0;
     while (!hasYielded.load()) {
@@ -663,8 +663,8 @@ TEST_F(CollectionMarkersTest, CursorYieldsAndIgnoresNewRecords) {
         ++seenRecords;
     }
 
-    ASSERT_EQ(seenRecords, initialRecords);
-    ASSERT_LT(static_cast<long long>(seenRecords), coll->getRecordStore()->numRecords());
+    EXPECT_EQ(seenRecords, initialRecords);
+    EXPECT_LT(static_cast<long long>(seenRecords), coll->getRecordStore()->numRecords());
 }
 
 // Test that random cursors will yield periodically. Since random cursors will see records added
@@ -689,7 +689,7 @@ TEST_F(CollectionMarkersTest, CursorYieldWithRandomCursor) {
         hasYielded.store(true);
     });
 
-    ASSERT_FALSE(hasYielded.load());
+    EXPECT_FALSE(hasYielded.load());
 
     while (!hasYielded.load()) {
         mockTickSource.advance(Milliseconds(11));
@@ -730,7 +730,7 @@ TEST_F(CollectionMarkersTest, CursorYieldSerialCursorHandlesTruncate) {
         hasYielded.store(true);
     });
 
-    ASSERT_FALSE(hasYielded.load());
+    EXPECT_FALSE(hasYielded.load());
 
     size_t seenRecords = 0;
     while (!hasYielded.load()) {
@@ -748,7 +748,7 @@ TEST_F(CollectionMarkersTest, CursorYieldSerialCursorHandlesTruncate) {
     }
 
     // Since we truncated we won't see later records
-    ASSERT_LT(seenRecords, initialRecords);
+    EXPECT_LT(seenRecords, initialRecords);
 }
 
 // Test that yielding a random cursor handles the collection being truncated from underneath it.
@@ -778,13 +778,13 @@ TEST_F(CollectionMarkersTest, CursorYieldRandomCursorHandlesTruncate) {
     });
 
     // When we truncate underneath the random cursor it will return nullopt.
-    ASSERT_FALSE(hasYielded.load());
+    EXPECT_FALSE(hasYielded.load());
     while (iterator->getNextRandom()) {
         mockTickSource.advance(Milliseconds(11));
         // Have a real sleep so that the yield thread has a chance to catch up.
         opCtx->sleepFor(Milliseconds(1));
     }
-    ASSERT_TRUE(hasYielded.load());
+    EXPECT_TRUE(hasYielded.load());
     yieldNotifier.join();
 }
 
@@ -829,7 +829,7 @@ TEST_F(CollectionMarkersTest, SamplingWorksWithTruncate) {
     opCtx->sleepFor(Milliseconds{1});
 
     // When we truncate underneath the random cursor it will return nullopt.
-    ASSERT_FALSE(hasYielded.load());
+    EXPECT_FALSE(hasYielded.load());
 
     CollectionTruncateMarkers::createMarkersBySampling(opCtx.get(),
                                                        *iterator,
@@ -837,7 +837,7 @@ TEST_F(CollectionMarkersTest, SamplingWorksWithTruncate) {
                                                        /*estimatedBytesPerMarker=*/1,
                                                        getIdAndWallTime);
 
-    ASSERT_TRUE(hasYielded.load());
+    EXPECT_TRUE(hasYielded.load());
     yieldNotifier.join();
 }
 
@@ -882,12 +882,12 @@ TEST_F(CollectionMarkersTest, ScanningWorksWithTruncate) {
     opCtx->sleepFor(Milliseconds{1});
 
     // When we truncate underneath the random cursor it will return nullopt.
-    ASSERT_FALSE(hasYielded.load());
+    EXPECT_FALSE(hasYielded.load());
 
     CollectionTruncateMarkers::createMarkersByScanning(
         opCtx.get(), *iterator, /*estimatedBytesPerMarker=*/1, getIdAndWallTime);
 
-    ASSERT_TRUE(hasYielded.load());
+    EXPECT_TRUE(hasYielded.load());
     yieldNotifier.join();
 }
 
@@ -898,11 +898,11 @@ void checkMarker(const RecordId& expected,
                  Date_t expiryTime) {
     auto marker = CollectionTruncateMarkers::newestExpiredRecord(opCtx, rs, pin, expiryTime);
     // the first three of these are always the same regardless of the record store contents:
-    ASSERT_EQ(0, marker->records);
-    ASSERT_EQ(0, marker->bytes);
-    ASSERT_EQ(expiryTime, marker->wallTime);
+    EXPECT_EQ(0, marker->records);
+    EXPECT_EQ(0, marker->bytes);
+    EXPECT_EQ(expiryTime, marker->wallTime);
     // this is the assertion that might ever fail, so add some info about the other inputs
-    ASSERT_EQ(expected, marker->lastRecord) << " with expiry=" << expiryTime << " and pin=" << pin;
+    EXPECT_EQ(expected, marker->lastRecord) << " with expiry=" << expiryTime << " and pin=" << pin;
 }
 
 TEST_F(CollectionMarkersTest, TimeBasedMarkerConstruction) {
@@ -915,10 +915,10 @@ TEST_F(CollectionMarkersTest, TimeBasedMarkerConstruction) {
     // no truncatable record if oplog is empty
     {
         AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
-        ASSERT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
+        EXPECT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
             opCtx.get(), *coll->getRecordStore(), RecordId(), wallTime));
         Timestamp ts(durationCount<Seconds>(wallTime.toDurationSinceEpoch()), 0);
-        ASSERT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
+        EXPECT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
             opCtx.get(), *coll->getRecordStore(), RecordId(ts.getSecs(), 0), wallTime));
     }
     // for this test we need real sequence numbers
@@ -937,7 +937,7 @@ TEST_F(CollectionMarkersTest, TimeBasedMarkerConstruction) {
                                                   insertedData.length(),
                                                   ts);
             ASSERT_OK(recordIdStatus);
-            ASSERT_EQ(recordId, recordIdStatus.getValue());
+            EXPECT_EQ(recordId, recordIdStatus.getValue());
             elements.emplace_back(recordId, wallTime);
             pins.emplace_back(RecordId(ts.getSecs() + 1, 0));
             wallTime += Seconds(2);
@@ -990,13 +990,13 @@ TEST_F(CollectionMarkersTest, TimeBasedMarkerConstruction) {
     }
     // corner cases not covered in the above for loops:
     // no truncatable record if expiry time is older than oldest record
-    ASSERT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
+    EXPECT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
         opCtx.get(), rs, RecordId(), elements.at(0).wallTime - Seconds(1)));
     // no truncatable record if oplog is all pinned
-    ASSERT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
+    EXPECT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
         opCtx.get(), rs, elements.at(0).recordId, wallTime + Seconds(25)));
     // no truncatable record if all but one oplog entry is pinned, but not as an exact match
-    ASSERT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
+    EXPECT_FALSE(CollectionTruncateMarkers::newestExpiredRecord(
         opCtx.get(), rs, pins.at(0), wallTime + Seconds(25)));
 }
 
@@ -1024,7 +1024,7 @@ TEST_F(CollectionMarkersTest,
 
     // Assert that we should have created a marker here.
     ASSERT_EQ(testMarkers->getMarkersForTest().size(), 1UL);
-    ASSERT_EQ(testMarkers->getMarkersForTest().back().lastRecord, recordA);
+    EXPECT_EQ(testMarkers->getMarkersForTest().back().lastRecord, recordA);
 
     // Advance _highestRecordId to B without adding any more bytes/records.
     testMarkers->testUpdateCurrentMarker(/*bytesAdded*/ 0,
@@ -1036,7 +1036,7 @@ TEST_F(CollectionMarkersTest,
     // We should not have created another marker here since counters are zero and we didn't call
     // create partial marker if needed.
     ASSERT_EQ(testMarkers->getMarkersForTest().size(), 1UL);
-    ASSERT_EQ(testMarkers->getMarkersForTest().back().lastRecord, recordA);
+    EXPECT_EQ(testMarkers->getMarkersForTest().back().lastRecord, recordA);
 
     // Expire the partial marker and call to create a new one if needed which should trigger partial
     // marker creation that covers B.
@@ -1045,8 +1045,8 @@ TEST_F(CollectionMarkersTest,
 
     // We should have created a new partial marker with zero counters.
     ASSERT_EQ(testMarkers->getMarkersForTest().size(), 2UL);
-    ASSERT_EQ(testMarkers->getMarkersForTest().back().lastRecord, recordB);
-    ASSERT_EQ(testMarkers->getMarkersForTest().back().bytes, 0);
-    ASSERT_EQ(testMarkers->getMarkersForTest().back().records, 0);
+    EXPECT_EQ(testMarkers->getMarkersForTest().back().lastRecord, recordB);
+    EXPECT_EQ(testMarkers->getMarkersForTest().back().bytes, 0);
+    EXPECT_EQ(testMarkers->getMarkersForTest().back().records, 0);
 }
 }  // namespace mongo

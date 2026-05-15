@@ -64,7 +64,7 @@ void buildDupKeyErrorStatusProducesExpectedErrorObject(
     auto dupKeyStatus = buildDupKeyErrorStatus(
         keyValue, collNss, indexName, keyPattern, BSONObj{}, std::move(foundValue));
     ASSERT_NOT_OK(dupKeyStatus);
-    ASSERT_EQUALS(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
+    EXPECT_EQ(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
 
     auto extraInfo = dupKeyStatus.extraInfo<DuplicateKeyErrorInfo>();
     ASSERT(extraInfo);
@@ -155,7 +155,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorMessageIncludesCollationAndHexEncoded
 
     auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, collation);
     ASSERT_NOT_OK(dupKeyStatus);
-    ASSERT_EQUALS(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
+    EXPECT_EQ(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
 
     ASSERT(dupKeyStatus.reason().find("collation:") != std::string::npos);
 
@@ -181,7 +181,7 @@ TEST(IndexEntryComparison, BuildDupKeyErrorMessageHexEncodesInvalidUTF8ForIndexW
     auto keyValue = BSON("" << "\xc0\x16");
     auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, BSONObj{});
     ASSERT_NOT_OK(dupKeyStatus);
-    ASSERT_EQUALS(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
+    EXPECT_EQ(dupKeyStatus.code(), ErrorCodes::DuplicateKey);
 
     // We expect to find a hex-encoded version of the illegal UTF-8 byte sequence inside the error
     // string.

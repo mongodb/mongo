@@ -42,102 +42,102 @@ TEST(InterleavedSchemaTest, FlatObject) {
     auto ref = BSON("a" << 1 << "b" << 2);
     InterleavedSchema schema(ref, BSONType::object, false);
 
-    ASSERT_EQ(schema.scalarCount(), 2);
+    EXPECT_EQ(schema.scalarCount(), 2);
 
     auto& e = schema.entries();
     ASSERT_EQ(e.size(), 4);  // Enter, Scalar(a), Scalar(b), Exit
 
-    ASSERT_EQ(e[0].op, Op::kEnterSubObj);
-    ASSERT_EQ(e[0].fieldName, ""_sd);
-    ASSERT_EQ(e[0].type, BSONType::object);
+    EXPECT_EQ(e[0].op, Op::kEnterSubObj);
+    EXPECT_EQ(e[0].fieldName, ""_sd);
+    EXPECT_EQ(e[0].type, BSONType::object);
 
-    ASSERT_EQ(e[1].op, Op::kScalar);
-    ASSERT_EQ(e[1].fieldName, "a"_sd);
-    ASSERT_EQ(e[1].stateIdx, 0);
+    EXPECT_EQ(e[1].op, Op::kScalar);
+    EXPECT_EQ(e[1].fieldName, "a"_sd);
+    EXPECT_EQ(e[1].stateIdx, 0);
 
-    ASSERT_EQ(e[2].op, Op::kScalar);
-    ASSERT_EQ(e[2].fieldName, "b"_sd);
-    ASSERT_EQ(e[2].stateIdx, 1);
+    EXPECT_EQ(e[2].op, Op::kScalar);
+    EXPECT_EQ(e[2].fieldName, "b"_sd);
+    EXPECT_EQ(e[2].stateIdx, 1);
 
-    ASSERT_EQ(e[3].op, Op::kExitSubObj);
+    EXPECT_EQ(e[3].op, Op::kExitSubObj);
 }
 
 TEST(InterleavedSchemaTest, NestedObject) {
     auto ref = BSON("a" << 1 << "obj" << BSON("b" << 2 << "c" << 3));
     InterleavedSchema schema(ref, BSONType::object, false);
 
-    ASSERT_EQ(schema.scalarCount(), 3);
+    EXPECT_EQ(schema.scalarCount(), 3);
 
     auto& e = schema.entries();
     // Enter(root), Scalar(a,0), Enter(obj), Scalar(b,1), Scalar(c,2), Exit(obj), Exit(root)
     ASSERT_EQ(e.size(), 7);
 
-    ASSERT_EQ(e[0].op, Op::kEnterSubObj);
-    ASSERT_EQ(e[1].op, Op::kScalar);
-    ASSERT_EQ(e[1].fieldName, "a"_sd);
-    ASSERT_EQ(e[1].stateIdx, 0);
+    EXPECT_EQ(e[0].op, Op::kEnterSubObj);
+    EXPECT_EQ(e[1].op, Op::kScalar);
+    EXPECT_EQ(e[1].fieldName, "a"_sd);
+    EXPECT_EQ(e[1].stateIdx, 0);
 
-    ASSERT_EQ(e[2].op, Op::kEnterSubObj);
-    ASSERT_EQ(e[2].fieldName, "obj"_sd);
-    ASSERT_EQ(e[2].type, BSONType::object);
+    EXPECT_EQ(e[2].op, Op::kEnterSubObj);
+    EXPECT_EQ(e[2].fieldName, "obj"_sd);
+    EXPECT_EQ(e[2].type, BSONType::object);
 
-    ASSERT_EQ(e[3].op, Op::kScalar);
-    ASSERT_EQ(e[3].stateIdx, 1);
-    ASSERT_EQ(e[4].op, Op::kScalar);
-    ASSERT_EQ(e[4].stateIdx, 2);
+    EXPECT_EQ(e[3].op, Op::kScalar);
+    EXPECT_EQ(e[3].stateIdx, 1);
+    EXPECT_EQ(e[4].op, Op::kScalar);
+    EXPECT_EQ(e[4].stateIdx, 2);
 
-    ASSERT_EQ(e[5].op, Op::kExitSubObj);
-    ASSERT_EQ(e[5].fieldName, "obj"_sd);
-    ASSERT_EQ(e[6].op, Op::kExitSubObj);
-    ASSERT_EQ(e[6].fieldName, ""_sd);
+    EXPECT_EQ(e[5].op, Op::kExitSubObj);
+    EXPECT_EQ(e[5].fieldName, "obj"_sd);
+    EXPECT_EQ(e[6].op, Op::kExitSubObj);
+    EXPECT_EQ(e[6].fieldName, ""_sd);
 }
 
 TEST(InterleavedSchemaTest, DeepNesting) {
     auto ref = BSON("a" << BSON("b" << BSON("c" << BSON("d" << 1)) << "e" << 2) << "f" << 3);
     InterleavedSchema schema(ref, BSONType::object, false);
 
-    ASSERT_EQ(schema.scalarCount(), 3);
+    EXPECT_EQ(schema.scalarCount(), 3);
 
     // Verify stateIdx is sequential across depth: d=0, e=1, f=2
     auto& e = schema.entries();
     int scalarsSeen = 0;
     for (auto& entry : e) {
         if (entry.op == Op::kScalar) {
-            ASSERT_EQ(entry.stateIdx, scalarsSeen);
+            EXPECT_EQ(entry.stateIdx, scalarsSeen);
             scalarsSeen++;
         }
     }
-    ASSERT_EQ(scalarsSeen, 3);
+    EXPECT_EQ(scalarsSeen, 3);
 }
 
 TEST(InterleavedSchemaTest, EmptySubObject) {
     auto ref = BSON("obj" << BSONObj());
     InterleavedSchema schema(ref, BSONType::object, false);
 
-    ASSERT_EQ(schema.scalarCount(), 0);
+    EXPECT_EQ(schema.scalarCount(), 0);
 
     auto& e = schema.entries();
     // Enter(root), Enter(obj), Exit(obj), Exit(root)
     ASSERT_EQ(e.size(), 4);
 
-    ASSERT_EQ(e[1].op, Op::kEnterSubObj);
-    ASSERT_EQ(e[1].fieldName, "obj"_sd);
-    ASSERT_TRUE(e[1].allowEmpty);
+    EXPECT_EQ(e[1].op, Op::kEnterSubObj);
+    EXPECT_EQ(e[1].fieldName, "obj"_sd);
+    EXPECT_TRUE(e[1].allowEmpty);
 
-    ASSERT_EQ(e[2].op, Op::kExitSubObj);
-    ASSERT_TRUE(e[2].allowEmpty);
+    EXPECT_EQ(e[2].op, Op::kExitSubObj);
+    EXPECT_TRUE(e[2].allowEmpty);
 }
 
 TEST(InterleavedSchemaTest, EmptyRootObject) {
     InterleavedSchema schema(BSONObj(), BSONType::object, false);
 
-    ASSERT_EQ(schema.scalarCount(), 0);
+    EXPECT_EQ(schema.scalarCount(), 0);
 
     auto& e = schema.entries();
     ASSERT_EQ(e.size(), 2);  // Enter + Exit
-    ASSERT_EQ(e[0].op, Op::kEnterSubObj);
-    ASSERT_TRUE(e[0].allowEmpty);
-    ASSERT_EQ(e[1].op, Op::kExitSubObj);
+    EXPECT_EQ(e[0].op, Op::kEnterSubObj);
+    EXPECT_TRUE(e[0].allowEmpty);
+    EXPECT_EQ(e[1].op, Op::kExitSubObj);
 }
 
 TEST(InterleavedSchemaTest, ArraysFlagTrue) {
@@ -150,10 +150,10 @@ TEST(InterleavedSchemaTest, ArraysFlagTrue) {
     for (auto& entry : e) {
         if (entry.fieldName == "arr"_sd && entry.op == Op::kEnterSubObj) {
             foundArrayEnter = true;
-            ASSERT_EQ(entry.type, BSONType::array);
+            EXPECT_EQ(entry.type, BSONType::array);
         }
     }
-    ASSERT_TRUE(foundArrayEnter);
+    EXPECT_TRUE(foundArrayEnter);
 }
 
 TEST(InterleavedSchemaTest, ArraysFlagFalse) {
@@ -165,11 +165,11 @@ TEST(InterleavedSchemaTest, ArraysFlagFalse) {
     bool foundArrayScalar = false;
     for (auto& entry : e) {
         if (entry.fieldName == "arr"_sd) {
-            ASSERT_EQ(entry.op, Op::kScalar);
+            EXPECT_EQ(entry.op, Op::kScalar);
             foundArrayScalar = true;
         }
     }
-    ASSERT_TRUE(foundArrayScalar);
+    EXPECT_TRUE(foundArrayScalar);
 }
 
 TEST(InterleavedSchemaTest, RootTypeArray) {
@@ -177,8 +177,8 @@ TEST(InterleavedSchemaTest, RootTypeArray) {
     InterleavedSchema schema(ref, BSONType::array, false);
 
     auto& e = schema.entries();
-    ASSERT_EQ(e[0].op, Op::kEnterSubObj);
-    ASSERT_EQ(e[0].type, BSONType::array);
+    EXPECT_EQ(e[0].op, Op::kEnterSubObj);
+    EXPECT_EQ(e[0].type, BSONType::array);
 }
 
 }  // namespace

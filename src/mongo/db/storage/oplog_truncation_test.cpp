@@ -89,11 +89,11 @@ protected:
         Date_t wallTime = Date_t::fromMillisSinceEpoch(t);
         BSONObj objTemplate = BSON("ts" << opTime << "wall" << wallTime << "str"
                                         << "");
-        ASSERT_LTE(objTemplate.objsize(), size);
+        EXPECT_LE(objTemplate.objsize(), size);
         std::string str(size - objTemplate.objsize(), fill);
 
         BSONObj obj = BSON("ts" << opTime << "wall" << wallTime << "str" << str);
-        ASSERT_EQ(size, obj.objsize());
+        EXPECT_EQ(size, obj.objsize());
 
         return obj;
     }
@@ -173,44 +173,44 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CreateNewMarker) {
 
     oplogTruncateMarkers->setMinBytesPerMarker(100);
 
-    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
+    EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
 
     // Inserting a record smaller than 'minBytesPerTruncateMarker' shouldn't create a new oplog
     // truncate marker.
     insertOplog(1, 99);
-    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
-    ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(99, oplogTruncateMarkers->currentBytes_forTest());
+    EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
+    EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+    EXPECT_EQ(99, oplogTruncateMarkers->currentBytes_forTest());
 
     // Inserting another record such that their combined size exceeds
     // 'minBytesPerTruncateMarker' should cause a new truncate marker to be created.
     insertOplog(2, 51);
-    ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+    EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+    EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+    EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
 
     // Inserting a record such that the combined size of this record and the previously inserted
     // one exceed 'minBytesPerTruncateMarker' shouldn't cause a new truncate marker to be
     // created because we've started filling a new truncate marker.
     insertOplog(3, 50);
-    ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-    ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
+    EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+    EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+    EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
 
     // Inserting a record such that the combined size of this record and the previously inserted
     // one is exactly equal to 'minBytesPerTruncateMarker' should cause a new truncate marker to
     // be created.
     insertOplog(4, 50);
-    ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+    EXPECT_EQ(2U, oplogTruncateMarkers->numMarkers());
+    EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+    EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
 
     // Inserting a single record that exceeds 'minBytesPerTruncateMarker' should cause a new
     // truncate marker to be created.
     insertOplog(5, 101);
-    ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+    EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
+    EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+    EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
 }
 
 /**
@@ -237,20 +237,20 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Truncate) {
         insertOplog(t, size);
     }
 
-    ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-    ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(size, oplogTruncateMarkers->currentBytes_forTest());
+    EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+    EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+    EXPECT_EQ(size, oplogTruncateMarkers->currentBytes_forTest());
 
-    ASSERT_EQ(count, rs->numRecords());
-    ASSERT_EQ(size * count, rs->dataSize());
+    EXPECT_EQ(count, rs->numRecords());
+    EXPECT_EQ(size * count, rs->dataSize());
 
     ASSERT_OK(storage.truncateCollection(opCtx, oplogNs));
 
-    ASSERT_EQ(0, rs->dataSize());
-    ASSERT_EQ(0, rs->numRecords());
-    ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+    EXPECT_EQ(0, rs->dataSize());
+    EXPECT_EQ(0, rs->numRecords());
+    EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
+    EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+    EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
 }
 
 /**
@@ -276,9 +276,9 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_UpdateRecord) {
     auto obj2 = insertOplog(2, 50);
     storage.oplogDiskLocRegister(opCtx, Timestamp{1, 2}, true);
 
-    ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-    ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-    ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
+    EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+    EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+    EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
 
     // Attempts to grow the records should fail.
     {
@@ -312,9 +312,9 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_UpdateRecord) {
         TimestampedBSONObj update2 = {BSON("$set" << changed2), {}};
         ASSERT_OK(storage.updateSingleton(opCtx, oplogNs, BSON("ts" << obj2["ts"]), update2));
 
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 }
 
@@ -349,11 +349,11 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
         insertOplog(9, 150);
         storage.oplogDiskLocRegister(opCtx, Timestamp{1, 9}, true);
 
-        ASSERT_EQ(9, rs->numRecords());
-        ASSERT_EQ(2600, rs->dataSize());
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(3, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(300, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(9, rs->numRecords());
+        EXPECT_EQ(2600, rs->dataSize());
+        EXPECT_EQ(2U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(3, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(300, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Make sure all are visible.
@@ -372,11 +372,11 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);
 
-        ASSERT_EQ(7, rs->numRecords());
-        ASSERT_EQ(2350, rs->dataSize());
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(7, rs->numRecords());
+        EXPECT_EQ(2350, rs->dataSize());
+        EXPECT_EQ(2U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Truncate data using an inclusive RecordId that refers to the 'lastRecord' of a full truncate
@@ -393,11 +393,11 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
         oplogTruncateMarkers->updateMarkersAfterCappedTruncateAfter(
             result.recordsRemoved, result.bytesRemoved, result.firstRemovedId);
 
-        ASSERT_EQ(5, rs->numRecords());
-        ASSERT_EQ(1950, rs->dataSize());
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(3, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(750, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(5, rs->numRecords());
+        EXPECT_EQ(1950, rs->dataSize());
+        EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(3, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(750, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Now test the high level truncateOplogToTimestamp API.
@@ -407,11 +407,11 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // being filled.
     {
         recovery.truncateOplogToTimestamp(opCtx, Timestamp(1, 3));
-        ASSERT_EQ(3, rs->numRecords());
-        ASSERT_EQ(1400, rs->dataSize());
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(200, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(3, rs->numRecords());
+        EXPECT_EQ(1400, rs->dataSize());
+        EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(200, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Truncate data using a non-inclusive RecordId that refers to the 'lastRecord' of a full
@@ -419,22 +419,22 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // The truncate marker should remain intact.
     {
         recovery.truncateOplogToTimestamp(opCtx, Timestamp(1, 2));
-        ASSERT_EQ(2, rs->numRecords());
-        ASSERT_EQ(1200, rs->dataSize());
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(2, rs->numRecords());
+        EXPECT_EQ(1200, rs->dataSize());
+        EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Truncate data using a non-inclusive RecordId that exists inside a full truncate marker. The
     // truncate marker should become the one currently being filled.
     {
         recovery.truncateOplogToTimestamp(opCtx, Timestamp(1, 1));
-        ASSERT_EQ(1, rs->numRecords());
-        ASSERT_EQ(400, rs->dataSize());
-        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(400, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(1, rs->numRecords());
+        EXPECT_EQ(400, rs->dataSize());
+        EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(400, oplogTruncateMarkers->currentBytes_forTest());
     }
 }
 
@@ -463,11 +463,11 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         insertOplog(2, 110);
         insertOplog(3, 120);
 
-        ASSERT_EQ(3, rs->numRecords());
-        ASSERT_EQ(330, rs->dataSize());
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(3, rs->numRecords());
+        EXPECT_EQ(330, rs->dataSize());
+        EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Fail to truncate the truncate marker when cappedMaxSize is exceeded, but the persisted
@@ -478,14 +478,14 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
         auto truncatedUpTo = oplog_truncation::reclaimOplog(opCtx, *rs, mayTruncateUpTo);
 
-        ASSERT_EQ(RecordId(), truncatedUpTo);
-        ASSERT_EQ(Timestamp(1, 1), rs->oplog()->getEarliestTimestamp(ru).getValue());
+        EXPECT_EQ(RecordId(), truncatedUpTo);
+        EXPECT_EQ(Timestamp(1, 1), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        ASSERT_EQ(3, rs->numRecords());
-        ASSERT_EQ(330, rs->dataSize());
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(3, rs->numRecords());
+        EXPECT_EQ(330, rs->dataSize());
+        EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Truncate a truncate marker when cappedMaxSize is exceeded.
@@ -494,14 +494,14 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
         auto truncatedUpTo = oplog_truncation::reclaimOplog(opCtx, *rs, mayTruncateUpTo);
 
-        ASSERT_EQ(RecordId(1, 1), truncatedUpTo);
-        ASSERT_EQ(Timestamp(1, 2), rs->oplog()->getEarliestTimestamp(ru).getValue());
+        EXPECT_EQ(RecordId(1, 1), truncatedUpTo);
+        EXPECT_EQ(Timestamp(1, 2), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        ASSERT_EQ(2, rs->numRecords());
-        ASSERT_EQ(230, rs->dataSize());
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(2, rs->numRecords());
+        EXPECT_EQ(230, rs->dataSize());
+        EXPECT_EQ(2U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     {
@@ -509,11 +509,11 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         insertOplog(5, 140);
         insertOplog(6, 50);
 
-        ASSERT_EQ(5, rs->numRecords());
-        ASSERT_EQ(550, rs->dataSize());
-        ASSERT_EQ(4U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(5, rs->numRecords());
+        EXPECT_EQ(550, rs->dataSize());
+        EXPECT_EQ(4U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Truncate multiple truncate markers if necessary.
@@ -522,14 +522,14 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
         auto truncatedUpTo = oplog_truncation::reclaimOplog(opCtx, *rs, mayTruncateUpTo);
 
-        ASSERT_EQ(RecordId(1, 4), truncatedUpTo);
-        ASSERT_EQ(Timestamp(1, 5), rs->oplog()->getEarliestTimestamp(ru).getValue());
+        EXPECT_EQ(RecordId(1, 4), truncatedUpTo);
+        EXPECT_EQ(Timestamp(1, 5), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        ASSERT_EQ(2, rs->numRecords());
-        ASSERT_EQ(190, rs->dataSize());
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(2, rs->numRecords());
+        EXPECT_EQ(190, rs->dataSize());
+        EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // No-op if dataSize <= cappedMaxSize.
@@ -538,14 +538,14 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
         auto truncatedUpTo = oplog_truncation::reclaimOplog(opCtx, *rs, mayTruncateUpTo);
 
-        ASSERT_EQ(RecordId(), truncatedUpTo);
-        ASSERT_EQ(Timestamp(1, 5), rs->oplog()->getEarliestTimestamp(ru).getValue());
+        EXPECT_EQ(RecordId(), truncatedUpTo);
+        EXPECT_EQ(Timestamp(1, 5), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        ASSERT_EQ(2, rs->numRecords());
-        ASSERT_EQ(190, rs->dataSize());
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(2, rs->numRecords());
+        EXPECT_EQ(190, rs->dataSize());
+        EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Don't truncate the last truncate marker before the truncate point, even if the truncate point
@@ -554,25 +554,25 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         insertOplog(7, 190);
         insertOplog(9, 120);
 
-        ASSERT_EQ(4, rs->numRecords());
-        ASSERT_EQ(500, rs->dataSize());
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(4, rs->numRecords());
+        EXPECT_EQ(500, rs->dataSize());
+        EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
     {
         advanceStableTimestamp(Timestamp(1, 8));
         auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
         auto truncatedUpTo = oplog_truncation::reclaimOplog(opCtx, *rs, mayTruncateUpTo);
 
-        ASSERT_EQ(RecordId(1, 5), truncatedUpTo);
-        ASSERT_EQ(Timestamp(1, 6), rs->oplog()->getEarliestTimestamp(ru).getValue());
+        EXPECT_EQ(RecordId(1, 5), truncatedUpTo);
+        EXPECT_EQ(Timestamp(1, 6), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        ASSERT_EQ(3, rs->numRecords());
-        ASSERT_EQ(360, rs->dataSize());
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(3, rs->numRecords());
+        EXPECT_EQ(360, rs->dataSize());
+        EXPECT_EQ(2U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Don't truncate entire oplog.
@@ -580,11 +580,11 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         insertOplog(10, 90);
         insertOplog(11, 210);
 
-        ASSERT_EQ(5, rs->numRecords());
-        ASSERT_EQ(660, rs->dataSize());
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(5, rs->numRecords());
+        EXPECT_EQ(660, rs->dataSize());
+        EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     {
@@ -592,14 +592,14 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
         auto truncatedUpTo = oplog_truncation::reclaimOplog(opCtx, *rs, mayTruncateUpTo);
 
-        ASSERT_EQ(RecordId(1, 9), truncatedUpTo);
-        ASSERT_EQ(Timestamp(1, 10), rs->oplog()->getEarliestTimestamp(ru).getValue());
+        EXPECT_EQ(RecordId(1, 9), truncatedUpTo);
+        EXPECT_EQ(Timestamp(1, 10), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        ASSERT_EQ(2, rs->numRecords());
-        ASSERT_EQ(300, rs->dataSize());
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(2, rs->numRecords());
+        EXPECT_EQ(300, rs->dataSize());
+        EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // OK to truncate all truncate markers if there are records in the oplog that are before or at
@@ -608,25 +608,25 @@ TEST_F(OplogTruncationTest, ReclaimTruncateMarkers) {
         // Use timestamp (1, 13) as we can't commit at the stable timestamp (1, 12).
         insertOplog(13, 90);
 
-        ASSERT_EQ(3, rs->numRecords());
-        ASSERT_EQ(390, rs->dataSize());
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(90, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(3, rs->numRecords());
+        EXPECT_EQ(390, rs->dataSize());
+        EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(90, oplogTruncateMarkers->currentBytes_forTest());
     }
     {
         advanceStableTimestamp(Timestamp(1, 13));
         auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
         auto truncatedUpTo = oplog_truncation::reclaimOplog(opCtx, *rs, mayTruncateUpTo);
 
-        ASSERT_EQ(RecordId(1, 11), truncatedUpTo);
-        ASSERT_EQ(Timestamp(1, 13), rs->oplog()->getEarliestTimestamp(ru).getValue());
+        EXPECT_EQ(RecordId(1, 11), truncatedUpTo);
+        EXPECT_EQ(Timestamp(1, 13), rs->oplog()->getEarliestTimestamp(ru).getValue());
 
-        ASSERT_EQ(1, rs->numRecords());
-        ASSERT_EQ(90, rs->dataSize());
-        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(90, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(1, rs->numRecords());
+        EXPECT_EQ(90, rs->dataSize());
+        EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(90, oplogTruncateMarkers->currentBytes_forTest());
     }
 }
 
@@ -656,11 +656,11 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_TestReclaimOverPreviouslyTrunca
         insertOplog(2, 110);
         insertOplog(3, 120);
 
-        ASSERT_EQ(3, rs->numRecords());
-        ASSERT_EQ(330, rs->dataSize());
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(3, rs->numRecords());
+        EXPECT_EQ(330, rs->dataSize());
+        EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     {
@@ -674,9 +674,9 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_TestReclaimOverPreviouslyTrunca
         LocalOplogInfo::get(opCtx)->setTruncateMarkers(oplogTruncateMarkers);
         wuow.commit();
 
-        ASSERT_EQ(0, rs->numRecords());
-        ASSERT_EQ(0, rs->dataSize());
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, rs->numRecords());
+        EXPECT_EQ(0, rs->dataSize());
+        EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
     }
 
     {
@@ -684,11 +684,11 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_TestReclaimOverPreviouslyTrunca
         insertOplog(5, 110);
         insertOplog(6, 120);
 
-        ASSERT_EQ(3, rs->numRecords());
-        ASSERT_EQ(330, rs->dataSize());
-        ASSERT_EQ(6U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(3, rs->numRecords());
+        EXPECT_EQ(330, rs->dataSize());
+        EXPECT_EQ(6U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     {
@@ -696,9 +696,9 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_TestReclaimOverPreviouslyTrunca
         auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
         auto truncatedUpTo = oplog_truncation::reclaimOplog(opCtx, *rs, mayTruncateUpTo);
 
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(2U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 }
 
@@ -731,7 +731,7 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsyncUpdateToMaxSize) {
         insertOplog(2, 110);
         insertOplog(3, 120);
 
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
     }
 
     {
@@ -749,7 +749,7 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsyncUpdateToMaxSize) {
         LocalOplogInfo::get(opCtx)->setTruncateMarkers(oplogTruncateMarkers);
         wuow.commit();
 
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(3U, oplogTruncateMarkers->numMarkers());
     }
 
     {
@@ -757,7 +757,7 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_AsyncUpdateToMaxSize) {
         insertOplog(5, 110);
         insertOplog(6, 120);
 
-        ASSERT_EQ(4U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(4U, oplogTruncateMarkers->numMarkers());
     }
 }
 
@@ -778,33 +778,33 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_AscendingOrder) {
     oplogTruncateMarkers->setMinBytesPerMarker(100);
 
     {
-        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
         insertOplog(2, 2, 50);  // Timestamp(2, 2)
-        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(0U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
 
         // Inserting a record that has a smaller RecordId than the previously inserted record should
         // be able to create a new truncate marker when no truncate markers already exist.
         insertOplog(2, 1, 50);  // Timestamp(2, 1)
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
 
         // However, inserting a record that has a smaller RecordId than most recently created
         // truncate marker's last record shouldn't cause a new truncate marker to be created, even
         // if the size of the inserted record exceeds 'minBytesPerTruncateMarker'.
         insertOplog(1, 100);  // Timestamp(1, 1)
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(100, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(1U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(100, oplogTruncateMarkers->currentBytes_forTest());
 
         // Inserting a record that has a larger RecordId than the most recently created truncate
         // marker's last record should then cause a new truncate marker to be created.
         insertOplog(2, 3, 50);  // Timestamp(2, 3)
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
+        EXPECT_EQ(2U, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        EXPECT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 }
 
@@ -838,17 +838,17 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning)
     ASSERT(oplogTruncateMarkers);
 
     // Confirm that small oplogs are processed by scanning.
-    ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::Scanning,
+    EXPECT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::Scanning,
               oplogTruncateMarkers->getMarkersCreationMethod());
-    ASSERT_GTE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
+    EXPECT_GE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
     auto numMarkers = oplogTruncateMarkers->numMarkers();
-    ASSERT_EQ(numMarkers, 0U);
+    EXPECT_EQ(numMarkers, 0U);
 
     // A forced scan over the RecordStore should force the 'currentBytes' to be accurate in the
     // truncate markers as well as the RecordStore's 'numRecords' and 'dataSize'.
-    ASSERT_EQ(oplogTruncateMarkers->currentBytes_forTest(), realNumRecords * realSizePerRecord);
-    ASSERT_EQ(rs->dataSize(), realNumRecords * realSizePerRecord);
-    ASSERT_EQ(rs->numRecords(), realNumRecords);
+    EXPECT_EQ(oplogTruncateMarkers->currentBytes_forTest(), realNumRecords * realSizePerRecord);
+    EXPECT_EQ(rs->dataSize(), realNumRecords * realSizePerRecord);
+    EXPECT_EQ(rs->numRecords(), realNumRecords);
 }
 
 // Ensure that if we sample and create duplicate oplog truncate markers, perform truncation
@@ -884,19 +884,19 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Duplicates) {
     auto oplogTruncateMarkers = LocalOplogInfo::get(opCtx)->getTruncateMarkers();
     ASSERT(oplogTruncateMarkers);
 
-    ASSERT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::Sampling,
+    EXPECT_EQ(CollectionTruncateMarkers::MarkersCreationMethod::Sampling,
               oplogTruncateMarkers->getMarkersCreationMethod());
-    ASSERT_GTE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
+    EXPECT_GE(oplogTruncateMarkers->getCreationProcessingTime().count(), 0);
     auto truncateMarkersBefore = oplogTruncateMarkers->numMarkers();
-    ASSERT_GT(truncateMarkersBefore, 0U);
-    ASSERT_GT(oplogTruncateMarkers->currentBytes_forTest(), 0);
+    EXPECT_GT(truncateMarkersBefore, 0U);
+    EXPECT_GT(oplogTruncateMarkers->currentBytes_forTest(), 0);
 
     {
         // Reclaiming should do nothing because the data size is still under the maximum.
         advanceStableTimestamp(Timestamp(1, 4));
         auto mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
         oplog_truncation::reclaimOplog(opCtx, *rs, mayTruncateUpTo);
-        ASSERT_EQ(truncateMarkersBefore, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(truncateMarkersBefore, oplogTruncateMarkers->numMarkers());
 
         // Reduce the oplog size to ensure we create a truncate marker and truncate on the next
         // insert.
@@ -917,11 +917,11 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_Duplicates) {
         advanceStableTimestamp(Timestamp(1, 6));
         mayTruncateUpTo = RecordId(engine->getPinnedOplog().asULL());
         oplog_truncation::reclaimOplog(opCtx, *rs, mayTruncateUpTo);
-        ASSERT_EQ(1, oplogTruncateMarkers->numMarkers());
+        EXPECT_EQ(1, oplogTruncateMarkers->numMarkers());
 
         // The original oplog should have rolled over and the size and count should be accurate.
-        ASSERT_EQ(1, rs->numRecords());
-        ASSERT_EQ(100, rs->dataSize());
+        EXPECT_EQ(1, rs->numRecords());
+        EXPECT_EQ(100, rs->dataSize());
     }
 }
 
@@ -929,9 +929,9 @@ TEST_F(OplogTruncationTest, OplogTruncateMarkers_NewestExpiredWallTime) {
     storageGlobalParams.oplogMinRetentionHours.store(24.0);
     Date_t expected = Date_t::now() - Hours(24);
     Date_t actual = OplogTruncateMarkers::newestExpiredWallTime(getOperationContext());
-    ASSERT_APPROX_EQUAL(expected.toMillisSinceEpoch(), actual.toMillisSinceEpoch(), 1000);
+    EXPECT_NEAR(expected.toMillisSinceEpoch(), actual.toMillisSinceEpoch(), 1000);
     storageGlobalParams.oplogMinRetentionHours.store(0.0);
-    ASSERT_EQ(Date_t(), OplogTruncateMarkers::newestExpiredWallTime(getOperationContext()));
+    EXPECT_EQ(Date_t(), OplogTruncateMarkers::newestExpiredWallTime(getOperationContext()));
 }
 
 }  // namespace repl

@@ -125,7 +125,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatch) {
                     "b":{"0":1,"1":2,"2":3}}})");
 
     UnorderedFieldsBSONObjComparator comparator;
-    ASSERT_EQ(0, comparator.compare(newDoc, bucketDoc));
+    EXPECT_EQ(0, comparator.compare(newDoc, bucketDoc));
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatchWithMeta) {
@@ -157,7 +157,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatchWithMeta) {
                     "b":{"0":1,"1":2,"2":3}}})");
 
     UnorderedFieldsBSONObjComparator comparator;
-    ASSERT_EQ(0, comparator.compare(newDoc, bucketDoc));
+    EXPECT_EQ(0, comparator.compare(newDoc, bucketDoc));
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatch) {
@@ -178,7 +178,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatch) {
     // makeNewDocumentForWrite() can return the uncompressed bucket if an error was encountered
     // during compression. Check that compression was successful.
     ASSERT(!bucketDoc.compressionFailed);
-    ASSERT_EQ(timeseries::kTimeseriesControlCompressedSortedVersion,
+    EXPECT_EQ(timeseries::kTimeseriesControlCompressedSortedVersion,
               bucketDoc.compressedBucket->getObjectField(timeseries::kBucketControlFieldName)
                   .getIntField(timeseries::kBucketControlVersionFieldName));
 
@@ -197,7 +197,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatch) {
                     "b":{"0":1,"1":2,"2":3}}})");
 
     UnorderedFieldsBSONObjComparator comparator;
-    ASSERT_EQ(0, comparator.compare(*decompressedDoc, expectedDoc));
+    EXPECT_EQ(0, comparator.compare(*decompressedDoc, expectedDoc));
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatchWithMeta) {
@@ -218,7 +218,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatchWithMeta) {
     // makeNewDocumentForWrite() can return the uncompressed bucket if an error was encountered
     // during compression. Check that compression was successful.
     ASSERT(!bucketDoc.compressionFailed);
-    ASSERT_EQ(timeseries::kTimeseriesControlCompressedSortedVersion,
+    EXPECT_EQ(timeseries::kTimeseriesControlCompressedSortedVersion,
               bucketDoc.compressedBucket->getObjectField(timeseries::kBucketControlFieldName)
                   .getIntField(timeseries::kBucketControlVersionFieldName));
 
@@ -238,7 +238,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatchWithMeta) {
                     "b":{"0":1,"1":2,"2":3}}})");
 
     UnorderedFieldsBSONObjComparator comparator;
-    ASSERT_EQ(0, comparator.compare(*decompressedDoc, expectedDoc));
+    EXPECT_EQ(0, comparator.compare(*decompressedDoc, expectedDoc));
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurements) {
@@ -274,7 +274,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurements) {
                     "b":{"0":1,"1":2,"2":3}}})");
 
     UnorderedFieldsBSONObjComparator comparator;
-    ASSERT_EQ(0, comparator.compare(newDoc, bucketDoc));
+    EXPECT_EQ(0, comparator.compare(newDoc, bucketDoc));
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurementsWithMeta) {
@@ -307,7 +307,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurementsWithMeta) {
                     "b":{"0":1,"1":2,"2":3}}})");
 
     UnorderedFieldsBSONObjComparator comparator;
-    ASSERT_EQ(0, comparator.compare(newDoc, bucketDoc));
+    EXPECT_EQ(0, comparator.compare(newDoc, bucketDoc));
 }
 
 /**
@@ -367,7 +367,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpFromBatch) {
     // The update command request should return the document diff of the batch applied on the pre
     // image.
     UnorderedFieldsBSONObjComparator comparator;
-    ASSERT_EQ(0, comparator.compare(updates[0].getU().getDiff(), expectedDiff));
+    EXPECT_EQ(0, comparator.compare(updates[0].getU().getDiff(), expectedDiff));
 }
 
 /**
@@ -435,7 +435,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpFromBatchWit
     // The update command request should return the document diff of the batch applied on the pre
     // image.
     UnorderedFieldsBSONObjComparator comparator;
-    ASSERT_EQ(0, comparator.compare(updates[0].getU().getDiff(), expectedDiff));
+    EXPECT_EQ(0, comparator.compare(updates[0].getU().getDiff(), expectedDiff));
 }
 
 TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
@@ -486,7 +486,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
     {
         Snapshotted<BSONObj> doc;
         bool found = autoColl->findDoc(_opCtx, recordId, &doc);
-        ASSERT_FALSE(found);
+        EXPECT_FALSE(found);
     }
 }
 
@@ -548,9 +548,9 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
         Snapshotted<BSONObj> doc;
         bool found = autoColl->findDoc(_opCtx, recordId, &doc);
 
-        ASSERT_TRUE(found);
+        EXPECT_TRUE(found);
         UnorderedFieldsBSONObjComparator comparator;
-        ASSERT_EQ(0, comparator.compare(doc.value(), replaceDoc));
+        EXPECT_EQ(0, comparator.compare(doc.value(), replaceDoc));
     }
 }
 
@@ -620,12 +620,12 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDeleteAndInsert) {
     {
         Snapshotted<BSONObj> doc;
         bool found = autoColl->findDoc(_opCtx, recordId1, &doc);
-        ASSERT_FALSE(found);
+        EXPECT_FALSE(found);
 
         found = autoColl->findDoc(_opCtx, recordId2, &doc);
-        ASSERT_TRUE(found);
+        EXPECT_TRUE(found);
         UnorderedFieldsBSONObjComparator comparator;
-        ASSERT_EQ(0, comparator.compare(doc.value(), bucketDoc2));
+        EXPECT_EQ(0, comparator.compare(doc.value(), bucketDoc2));
     }
 }
 
@@ -720,17 +720,17 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
     {
         Snapshotted<BSONObj> doc;
         bool found = autoColl->findDoc(_opCtx, recordId1, &doc);
-        ASSERT_TRUE(found);
+        EXPECT_TRUE(found);
         UnorderedFieldsBSONObjComparator comparator;
-        ASSERT_EQ(0, comparator.compare(doc.value(), replaceDoc));
+        EXPECT_EQ(0, comparator.compare(doc.value(), replaceDoc));
 
         found = autoColl->findDoc(_opCtx, recordId2, &doc);
-        ASSERT_TRUE(found);
-        ASSERT_EQ(0, comparator.compare(doc.value(), bucketDoc2));
+        EXPECT_TRUE(found);
+        EXPECT_EQ(0, comparator.compare(doc.value(), bucketDoc2));
 
         found = autoColl->findDoc(_opCtx, recordId3, &doc);
-        ASSERT_TRUE(found);
-        ASSERT_EQ(0, comparator.compare(doc.value(), bucketDoc3));
+        EXPECT_TRUE(found);
+        EXPECT_EQ(0, comparator.compare(doc.value(), bucketDoc3));
     }
 }
 
@@ -806,7 +806,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
                                   .getObjectField(kBucketControlMinFieldName)
                                   .getField("time")
                                   .Date();
-        ASSERT_NE(remainingMeasurementMinTime, controlMinTime);
+        EXPECT_NE(remainingMeasurementMinTime, controlMinTime);
         CompressionResult compressionResult = compressBucket(uncompressedReplaceDoc,
                                                              _timeField,
                                                              _nsNoMeta,
@@ -816,9 +816,9 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
         Snapshotted<BSONObj> doc;
         bool found = autoColl->findDoc(_opCtx, recordId, &doc);
 
-        ASSERT_TRUE(found);
+        EXPECT_TRUE(found);
         UnorderedFieldsBSONObjComparator comparator;
-        ASSERT_EQ(0, comparator.compare(doc.value(), replaceDoc));
+        EXPECT_EQ(0, comparator.compare(doc.value(), replaceDoc));
     }
 
     // Deletes the last measurement from the bucket.
@@ -836,7 +836,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
     {
         Snapshotted<BSONObj> doc;
         bool found = autoColl->findDoc(_opCtx, recordId, &doc);
-        ASSERT_FALSE(found);
+        EXPECT_FALSE(found);
     }
 }
 
@@ -881,7 +881,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
             minTime));
-        ASSERT_EQ(bucketIds.size(), 1);
+        EXPECT_EQ(bucketIds.size(), 1);
     }
 
     // Checks only one measurement is left in the original bucket and a new document was inserted.
@@ -897,11 +897,11 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
         Snapshotted<BSONObj> doc;
         bool found = autoColl->findDoc(_opCtx, recordId, &doc);
 
-        ASSERT_TRUE(found);
+        EXPECT_TRUE(found);
         UnorderedFieldsBSONObjComparator comparator;
-        ASSERT_EQ(0, comparator.compare(doc.value(), replaceDoc));
+        EXPECT_EQ(0, comparator.compare(doc.value(), replaceDoc));
 
-        ASSERT_EQ(2, autoColl->numRecords(_opCtx));
+        EXPECT_EQ(2, autoColl->numRecords(_opCtx));
     }
 }
 
@@ -949,7 +949,7 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
             minTime));
-        ASSERT_EQ(bucketIds.size(), 1);
+        EXPECT_EQ(bucketIds.size(), 1);
     }
 
     // Updates another measurement. No new bucket should be created.
@@ -968,7 +968,7 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
             minTime));
-        ASSERT_EQ(bucketIds.size(), 1);
+        EXPECT_EQ(bucketIds.size(), 1);
     }
 
     // Updates the last measurement with different schema. One more bucket is created.
@@ -987,7 +987,7 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds,
             minTime));
-        ASSERT_EQ(bucketIds.size(), 2);
+        EXPECT_EQ(bucketIds.size(), 2);
     }
 }
 

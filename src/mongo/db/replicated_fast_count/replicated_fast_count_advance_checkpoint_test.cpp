@@ -103,7 +103,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, InitialCheckpoint) {
 
     const auto tsStoreRes = timestampStore.read(opCtx);
     ASSERT_TRUE(tsStoreRes.has_value());
-    ASSERT_EQ(ts1, *tsStoreRes);
+    EXPECT_EQ(ts1, *tsStoreRes);
 }
 
 // Test: `advanceCheckpoint` is a no-op for the `SizeCountStore` when both stores are empty and
@@ -154,7 +154,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, AdvancesExistingSizeCountAndTim
 
     const auto tsStoreRes = timestampStore.read(opCtx);
     ASSERT_TRUE(tsStoreRes.has_value());
-    ASSERT_EQ(Timestamp(1, 3), *tsStoreRes);
+    EXPECT_EQ(Timestamp(1, 3), *tsStoreRes);
 }
 
 // Test: If no oplog entries contained replicated size count information since the last
@@ -230,7 +230,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TimestampUpdatedForSum0SizeCoun
 
     const auto tsStoreRes = timestampStore.read(opCtx);
     ASSERT_TRUE(tsStoreRes.has_value());
-    ASSERT_EQ(Timestamp(1, 3), *tsStoreRes);
+    EXPECT_EQ(Timestamp(1, 3), *tsStoreRes);
 }
 
 // Test: `advanceCheckpoint` correctly tracks size and count for multiple user collections
@@ -264,7 +264,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TrackTwoUserCollections) {
 
     const auto tsStoreRes = timestampStore.read(opCtx);
     ASSERT_TRUE(tsStoreRes.has_value());
-    ASSERT_EQ(largestValidAsOf, *tsStoreRes);
+    EXPECT_EQ(largestValidAsOf, *tsStoreRes);
 }
 
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
@@ -307,7 +307,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
     // checkpoint advancement.
     const auto tsStoreRes = timestampStore.read(opCtx);
     ASSERT_TRUE(tsStoreRes.has_value());
-    ASSERT_EQ(Timestamp(1, 3), *tsStoreRes);
+    EXPECT_EQ(Timestamp(1, 3), *tsStoreRes);
 }
 
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
@@ -362,7 +362,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 
     const auto tsAfterFirstAdvance = timestampStore.read(opCtx);
     ASSERT_TRUE(tsAfterFirstAdvance.has_value());
-    ASSERT_EQ(userWriteTs, *tsAfterFirstAdvance);
+    EXPECT_EQ(userWriteTs, *tsAfterFirstAdvance);
 }
 
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
@@ -376,7 +376,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 
     const auto tsAfterFirstAdvance = timestampStore.read(opCtx);
     ASSERT_TRUE(tsAfterFirstAdvance.has_value());
-    ASSERT_EQ(userWriteTs, *tsAfterFirstAdvance);
+    EXPECT_EQ(userWriteTs, *tsAfterFirstAdvance);
 
     const auto fastCountStoreNss =
         NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
@@ -406,7 +406,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest,
 
     const auto tsAfterSecondAdvance = timestampStore.read(opCtx);
     ASSERT_TRUE(tsAfterSecondAdvance.has_value());
-    ASSERT_EQ(userWriteTs, *tsAfterSecondAdvance);
+    EXPECT_EQ(userWriteTs, *tsAfterSecondAdvance);
 }
 
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest, CollectionCreationAddsEntry) {
@@ -601,7 +601,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeAppliesNegativeDel
 
     const auto tsStoreRes = timestampStore.read(opCtx);
     ASSERT_TRUE(tsStoreRes.has_value());
-    ASSERT_EQ(Timestamp(1, 2), *tsStoreRes);
+    EXPECT_EQ(Timestamp(1, 2), *tsStoreRes);
 }
 
 // Test: Inserts followed by a truncateRange for the same collection accumulate correctly.
@@ -771,7 +771,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, TruncateRangeInsideNestedApplyO
 }
 
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogFastCountEntryPersistedOnCheckpoint) {
-    ASSERT_FALSE(sizeCountStore.read(opCtx, getOplogUuid(opCtx)).has_value());
+    EXPECT_FALSE(sizeCountStore.read(opCtx, getOplogUuid(opCtx)).has_value());
 
     const auto entry1 =
         test_helpers::makeOplogEntry(Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, 10);
@@ -792,7 +792,7 @@ TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogFastCountEntryPersistedOnC
 }
 
 TEST_F(ReplicatedFastCountAdvanceCheckpointTest, OplogFastCountEntryMultipleCheckpoints) {
-    ASSERT_FALSE(sizeCountStore.read(opCtx, getOplogUuid(opCtx)).has_value());
+    EXPECT_FALSE(sizeCountStore.read(opCtx, getOplogUuid(opCtx)).has_value());
 
     const auto entry1 =
         test_helpers::makeOplogEntry(Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, 10);

@@ -48,32 +48,32 @@ TEST(ActionDurationMetricsTest, ActionDurationTimer) {
         tickSource.advance(Milliseconds(10));
 
         // Metrics are only advanced when the RAII type is destructed.
-        ASSERT_EQ(counter, Milliseconds(0));
+        EXPECT_EQ(counter, Milliseconds(0));
     }
 
-    ASSERT_EQ(counter, Milliseconds(10));
+    EXPECT_EQ(counter, Milliseconds(10));
 
     // Advancing time while there's no RAII type in scope has no effect.
     tickSource.advance(Milliseconds(1000));
-    ASSERT_EQ(counter, Milliseconds(10));
+    EXPECT_EQ(counter, Milliseconds(10));
 
     {
         ActionDurationTimer<Milliseconds> actionTimer(&tickSource, callback);
         tickSource.advance(Milliseconds(25));
-        ASSERT_EQ(counter, Milliseconds(10));
+        EXPECT_EQ(counter, Milliseconds(10));
     }
 
-    ASSERT_EQ(counter, Milliseconds(35));
+    EXPECT_EQ(counter, Milliseconds(35));
 
     {
         // Dismissing doesn't execute the callback.
         ActionDurationTimer<Milliseconds> actionTimer(&tickSource, callback);
         tickSource.advance(Milliseconds(50));
-        ASSERT_EQ(counter, Milliseconds(35));
+        EXPECT_EQ(counter, Milliseconds(35));
         actionTimer.dismiss();
     }
 
-    ASSERT_EQ(counter, Milliseconds(35));
+    EXPECT_EQ(counter, Milliseconds(35));
 }
 
 }  // namespace

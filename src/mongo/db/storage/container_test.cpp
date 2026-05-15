@@ -72,9 +72,9 @@ void runContainerTest(KeyFormat keyFormat, Key key1, Key key2) {
         auto cursor = container.getCursor(ru);
         auto found1 = cursor->find(key1);
         ASSERT_TRUE(found1);
-        ASSERT_EQ(std::string(found1->data(), found1->size()), value1);
+        EXPECT_EQ(std::string(found1->data(), found1->size()), value1);
         auto found2 = cursor->find(key2);
-        ASSERT_FALSE(found2);
+        EXPECT_FALSE(found2);
     }
     {
         StorageWriteTransaction txn(ru);
@@ -84,10 +84,10 @@ void runContainerTest(KeyFormat keyFormat, Key key1, Key key2) {
         auto cursor = container.getCursor(ru);
         auto found1 = cursor->find(key1);
         ASSERT_TRUE(found1);
-        ASSERT_EQ(std::string(found1->data(), found1->size()), value1);
+        EXPECT_EQ(std::string(found1->data(), found1->size()), value1);
         auto found2 = cursor->find(key2);
         ASSERT_TRUE(found2);
-        ASSERT_EQ(std::string(found2->data(), found2->size()), value2);
+        EXPECT_EQ(std::string(found2->data(), found2->size()), value2);
     }
     {
         auto cursor = container.getCursor(ru);
@@ -145,10 +145,10 @@ void runContainerTest(KeyFormat keyFormat, Key key1, Key key2) {
 
         auto cursor = container.getCursor(ru);
         auto found1 = cursor->find(key1);
-        ASSERT_FALSE(found1);
+        EXPECT_FALSE(found1);
         auto found2 = cursor->find(key2);
         ASSERT_TRUE(found2);
-        ASSERT_EQ(std::string(found2->data(), found2->size()), value2);
+        EXPECT_EQ(std::string(found2->data(), found2->size()), value2);
     }
 }
 

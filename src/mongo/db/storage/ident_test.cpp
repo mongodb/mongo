@@ -43,20 +43,20 @@ protected:
     // Asserts the 'ident' is a 'collection' ident as opposed to a specialized table
     // ident such as an 'internal' ident or orphaned ident.
     void assertIsCollectionIdent(const std::string& ident) {
-        ASSERT_TRUE(ident::isCollectionIdent(ident)) << "ident: " << ident;
-        ASSERT_TRUE(ident::isCollectionOrIndexIdent(ident)) << "ident: " << ident;
+        EXPECT_TRUE(ident::isCollectionIdent(ident)) << "ident: " << ident;
+        EXPECT_TRUE(ident::isCollectionOrIndexIdent(ident)) << "ident: " << ident;
 
-        ASSERT_FALSE(ident::isInternalIdent(ident)) << "ident: " << ident;
-        ASSERT_FALSE(ident::isInternalIdent(ident, "arbitraryInternalIdentStem"_sd))
+        EXPECT_FALSE(ident::isInternalIdent(ident)) << "ident: " << ident;
+        EXPECT_FALSE(ident::isInternalIdent(ident, "arbitraryInternalIdentStem"_sd))
             << "ident: " << ident;
     }
 
     void assertIsIndexIdent(const std::string& ident) {
-        ASSERT_FALSE(ident::isCollectionIdent(ident)) << "ident: " << ident;
-        ASSERT_TRUE(ident::isCollectionOrIndexIdent(ident)) << "ident: " << ident;
+        EXPECT_FALSE(ident::isCollectionIdent(ident)) << "ident: " << ident;
+        EXPECT_TRUE(ident::isCollectionOrIndexIdent(ident)) << "ident: " << ident;
 
-        ASSERT_FALSE(ident::isInternalIdent(ident)) << "ident: " << ident;
-        ASSERT_FALSE(ident::isInternalIdent(ident, "arbitraryInternalIdentStem"_sd))
+        EXPECT_FALSE(ident::isInternalIdent(ident)) << "ident: " << ident;
+        EXPECT_FALSE(ident::isInternalIdent(ident, "arbitraryInternalIdentStem"_sd))
             << "ident: " << ident;
     }
 };
@@ -69,7 +69,7 @@ TEST_F(IdentGenerationTest, CollectionIdentsAreUnique) {
             ident::generateNewCollectionIdent(kTestDB, directoryPerDB, directoryForIndexes);
         const auto identRun1 =
             ident::generateNewCollectionIdent(kTestDB, directoryPerDB, directoryForIndexes);
-        ASSERT_NE(identRun0, identRun1) << "directoryPerDB: " << directoryPerDB
+        EXPECT_NE(identRun0, identRun1) << "directoryPerDB: " << directoryPerDB
                                         << ", directoryForIndexes: " << directoryForIndexes;
     };
 
@@ -128,7 +128,7 @@ TEST_F(IdentGenerationTest, IndexIdentsAreUnique) {
             ident::generateNewIndexIdent(kTestDB, directoryPerDB, directoryForIndexes);
         const auto identRun1 =
             ident::generateNewIndexIdent(kTestDB, directoryPerDB, directoryForIndexes);
-        ASSERT_NE(identRun0, identRun1) << "directoryPerDB: " << directoryPerDB
+        EXPECT_NE(identRun0, identRun1) << "directoryPerDB: " << directoryPerDB
                                         << ", directoryForIndexes: " << directoryForIndexes;
     };
 
@@ -182,169 +182,169 @@ TEST_F(IdentGenerationTest, LegacyIndexIdentsYieldIsIndexIdentTrue) {
 TEST_F(IdentGenerationTest, InternalIdentsAreGeneratedAndClassifiedCorrectly) {
     // By default, an internal ident is generated with an empty ident stem.
     const auto defaultInternalIdent = ident::generateNewInternalIdent();
-    ASSERT_TRUE(ident::isInternalIdent(defaultInternalIdent)) << "ident: " << defaultInternalIdent;
+    EXPECT_TRUE(ident::isInternalIdent(defaultInternalIdent)) << "ident: " << defaultInternalIdent;
 
     // Validate 'generateNewInternalIdent()' yields a unique internal ident each time.
     const auto defaultInternalIdent2 = ident::generateNewInternalIdent();
-    ASSERT_NE(defaultInternalIdent, defaultInternalIdent2);
-    ASSERT_TRUE(ident::isInternalIdent(defaultInternalIdent2))
+    EXPECT_NE(defaultInternalIdent, defaultInternalIdent2);
+    EXPECT_TRUE(ident::isInternalIdent(defaultInternalIdent2))
         << "ident: " << defaultInternalIdent2;
 
     const auto specificIdentStem = "specificInternalIdentCategory"_sd;
 
     // 'defaultInternalIdent' wasn't generated with 'specificIdentStem', and doesn't fall under the
     // same ident category as internal idents with 'specificIdentStem'.
-    ASSERT_FALSE(ident::isInternalIdent(defaultInternalIdent, specificIdentStem))
+    EXPECT_FALSE(ident::isInternalIdent(defaultInternalIdent, specificIdentStem))
         << "ident: " << defaultInternalIdent;
 
     const auto internalIdentWithStem = ident::generateNewInternalIdent(specificIdentStem);
-    ASSERT_TRUE(ident::isInternalIdent(internalIdentWithStem))
+    EXPECT_TRUE(ident::isInternalIdent(internalIdentWithStem))
         << "ident: " << internalIdentWithStem;
-    ASSERT_TRUE(ident::isInternalIdent(internalIdentWithStem, specificIdentStem))
+    EXPECT_TRUE(ident::isInternalIdent(internalIdentWithStem, specificIdentStem))
         << "ident: " << internalIdentWithStem;
 }
 
 TEST_F(IdentGenerationTest, ValidIndexIdents) {
     // Default format. one vs two - hits different codepaths
-    ASSERT_TRUE(ident::isValidIdent("index-0"));
-    ASSERT_TRUE(ident::isValidIdent("index-0-1"));
-    ASSERT_TRUE(ident::isValidIdent("index-0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("index-0"));
+    EXPECT_TRUE(ident::isValidIdent("index-0-1"));
+    EXPECT_TRUE(ident::isValidIdent("index-0-1-2"));
 
     // directoryForIndexes
-    ASSERT_TRUE(ident::isValidIdent("index/0"));
-    ASSERT_TRUE(ident::isValidIdent("index/0-1"));
-    ASSERT_TRUE(ident::isValidIdent("index/0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("index/0"));
+    EXPECT_TRUE(ident::isValidIdent("index/0-1"));
+    EXPECT_TRUE(ident::isValidIdent("index/0-1-2"));
 
     // directoryPerDB
-    ASSERT_TRUE(ident::isValidIdent("db.name/index-0"));
-    ASSERT_TRUE(ident::isValidIdent("db.name/index-0-1"));
-    ASSERT_TRUE(ident::isValidIdent("db.name/index-0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/index-0"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/index-0-1"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/index-0-1-2"));
 
     // directoryPerDB where dbName is "index"
-    ASSERT_TRUE(ident::isValidIdent("index/index-0"));
-    ASSERT_TRUE(ident::isValidIdent("index/index-0-1"));
-    ASSERT_TRUE(ident::isValidIdent("index/index-0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("index/index-0"));
+    EXPECT_TRUE(ident::isValidIdent("index/index-0-1"));
+    EXPECT_TRUE(ident::isValidIdent("index/index-0-1-2"));
 
     // directoryPerDB where dbName is "collection"
-    ASSERT_TRUE(ident::isValidIdent("collection/index-0"));
-    ASSERT_TRUE(ident::isValidIdent("collection/index-0-1"));
+    EXPECT_TRUE(ident::isValidIdent("collection/index-0"));
+    EXPECT_TRUE(ident::isValidIdent("collection/index-0-1"));
 
     // directoryPerDB where dbName is "internal"
-    ASSERT_TRUE(ident::isValidIdent("internal/index-0"));
-    ASSERT_TRUE(ident::isValidIdent("internal/index-0-1"));
+    EXPECT_TRUE(ident::isValidIdent("internal/index-0"));
+    EXPECT_TRUE(ident::isValidIdent("internal/index-0-1"));
 
     // directoryForIndexes plus directoryPerDB
-    ASSERT_TRUE(ident::isValidIdent("db.name/index/0"));
-    ASSERT_TRUE(ident::isValidIdent("db.name/index/0-1"));
-    ASSERT_TRUE(ident::isValidIdent("db.name/index/0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/index/0"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/index/0-1"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/index/0-1-2"));
 
     // directoryForIndexes plus directoryPerDB where dbName is "index"
-    ASSERT_TRUE(ident::isValidIdent("index/index/0"));
-    ASSERT_TRUE(ident::isValidIdent("index/index/0-1"));
-    ASSERT_TRUE(ident::isValidIdent("index/index/0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("index/index/0"));
+    EXPECT_TRUE(ident::isValidIdent("index/index/0-1"));
+    EXPECT_TRUE(ident::isValidIdent("index/index/0-1-2"));
 
     // dbName with some escaped characters
-    ASSERT_TRUE(ident::isValidIdent(".00.01.02/index/0"));
+    EXPECT_TRUE(ident::isValidIdent(".00.01.02/index/0"));
 }
 
 TEST_F(IdentGenerationTest, ValidCollectionIdents) {
     // Default format. one vs two - hits different codepaths
-    ASSERT_TRUE(ident::isValidIdent("collection-0"));
-    ASSERT_TRUE(ident::isValidIdent("collection-0-1"));
-    ASSERT_TRUE(ident::isValidIdent("collection-0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("collection-0"));
+    EXPECT_TRUE(ident::isValidIdent("collection-0-1"));
+    EXPECT_TRUE(ident::isValidIdent("collection-0-1-2"));
 
     // directoryForIndexes
-    ASSERT_TRUE(ident::isValidIdent("collection/0"));
-    ASSERT_TRUE(ident::isValidIdent("collection/0-1"));
-    ASSERT_TRUE(ident::isValidIdent("collection/0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("collection/0"));
+    EXPECT_TRUE(ident::isValidIdent("collection/0-1"));
+    EXPECT_TRUE(ident::isValidIdent("collection/0-1-2"));
 
     // directoryPerDB
-    ASSERT_TRUE(ident::isValidIdent("db.name/collection-0"));
-    ASSERT_TRUE(ident::isValidIdent("db.name/collection-0-1"));
-    ASSERT_TRUE(ident::isValidIdent("db.name/collection-0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/collection-0"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/collection-0-1"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/collection-0-1-2"));
 
     // directoryPerDB where dbName is "index"
-    ASSERT_TRUE(ident::isValidIdent("index/collection-0"));
-    ASSERT_TRUE(ident::isValidIdent("index/collection-0-1"));
-    ASSERT_TRUE(ident::isValidIdent("index/collection-0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("index/collection-0"));
+    EXPECT_TRUE(ident::isValidIdent("index/collection-0-1"));
+    EXPECT_TRUE(ident::isValidIdent("index/collection-0-1-2"));
 
     // directoryForIndexes plus directoryPerDB
-    ASSERT_TRUE(ident::isValidIdent("db.name/collection/0"));
-    ASSERT_TRUE(ident::isValidIdent("db.name/collection/0-1"));
-    ASSERT_TRUE(ident::isValidIdent("db.name/collection/0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/collection/0"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/collection/0-1"));
+    EXPECT_TRUE(ident::isValidIdent("db.name/collection/0-1-2"));
 
     // directoryForIndexes plus directoryPerDB where dbName is "index"
-    ASSERT_TRUE(ident::isValidIdent("index/collection/0"));
-    ASSERT_TRUE(ident::isValidIdent("index/collection/0-1"));
-    ASSERT_TRUE(ident::isValidIdent("index/collection/0-1-2"));
+    EXPECT_TRUE(ident::isValidIdent("index/collection/0"));
+    EXPECT_TRUE(ident::isValidIdent("index/collection/0-1"));
+    EXPECT_TRUE(ident::isValidIdent("index/collection/0-1-2"));
 
     // The special hardcoded collection idents
-    ASSERT_TRUE(ident::isValidIdent(ident::kMdbCatalog));
-    ASSERT_TRUE(ident::isValidIdent(ident::kSizeStorer));
+    EXPECT_TRUE(ident::isValidIdent(ident::kMdbCatalog));
+    EXPECT_TRUE(ident::isValidIdent(ident::kSizeStorer));
 }
 
 TEST_F(IdentGenerationTest, IdentDirectoryForCollectionIdents) {
     const auto identDefault = ident::generateNewCollectionIdent(
         kTestDB, false /* directoryPerDB */, false /* directoryForIndexes */);
 
-    ASSERT_EQ(ident::getDirectory(identDefault), ""_sd);
+    EXPECT_EQ(ident::getDirectory(identDefault), ""_sd);
 
     const auto identDirectoryPerDB = ident::generateNewCollectionIdent(
         kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */);
     const auto dbComponent = ident::createDBNamePathComponent(kTestDB);
-    ASSERT_EQ(ident::getDirectory(identDirectoryPerDB), StringData{dbComponent});
+    EXPECT_EQ(ident::getDirectory(identDirectoryPerDB), StringData{dbComponent});
 
     const auto identDirectoryForIndexes = ident::generateNewCollectionIdent(
         kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
-    ASSERT_EQ(ident::getDirectory(identDirectoryForIndexes), "collection"_sd);
+    EXPECT_EQ(ident::getDirectory(identDirectoryForIndexes), "collection"_sd);
 
     const auto identDirectoryPerDBAndIndexes = ident::generateNewCollectionIdent(
         kTestDB, true /* directoryPerDB */, true /* directoryForIndexes */);
     const auto dbComponentWithCollection = dbComponent + "/collection";
-    ASSERT_EQ(ident::getDirectory(identDirectoryPerDBAndIndexes),
+    EXPECT_EQ(ident::getDirectory(identDirectoryPerDBAndIndexes),
               StringData{dbComponentWithCollection});
 }
 
 TEST_F(IdentGenerationTest, IdentDirectoryForSpecialIdents) {
-    ASSERT_EQ(ident::getDirectory(ident::kMdbCatalog), ""_sd);
-    ASSERT_EQ(ident::getDirectory(ident::kSizeStorer), ""_sd);
+    EXPECT_EQ(ident::getDirectory(ident::kMdbCatalog), ""_sd);
+    EXPECT_EQ(ident::getDirectory(ident::kSizeStorer), ""_sd);
 }
 
 TEST_F(IdentGenerationTest, InvalidIdents) {
     // empty ident
-    ASSERT_FALSE(ident::isValidIdent(""));
+    EXPECT_FALSE(ident::isValidIdent(""));
     // no separators
-    ASSERT_FALSE(ident::isValidIdent("index"));
+    EXPECT_FALSE(ident::isValidIdent("index"));
     // no tag after separator
-    ASSERT_FALSE(ident::isValidIdent("index-"));
-    ASSERT_FALSE(ident::isValidIdent("index/"));
+    EXPECT_FALSE(ident::isValidIdent("index-"));
+    EXPECT_FALSE(ident::isValidIdent("index/"));
     // invalid stem
-    ASSERT_FALSE(ident::isValidIdent("foo-0"));
-    ASSERT_FALSE(ident::isValidIdent("foo/0"));
+    EXPECT_FALSE(ident::isValidIdent("foo-0"));
+    EXPECT_FALSE(ident::isValidIdent("foo/0"));
     // invalid stem after dbname
-    ASSERT_FALSE(ident::isValidIdent("db/foo-0"));
-    ASSERT_FALSE(ident::isValidIdent("db/foo/0"));
+    EXPECT_FALSE(ident::isValidIdent("db/foo-0"));
+    EXPECT_FALSE(ident::isValidIdent("db/foo/0"));
     // too many path components
-    ASSERT_FALSE(ident::isValidIdent("db/index/a/b"));
+    EXPECT_FALSE(ident::isValidIdent("db/index/a/b"));
     // invalid path components
-    ASSERT_FALSE(ident::isValidIdent("./index/a"));
-    ASSERT_FALSE(ident::isValidIdent("../index/a"));
-    ASSERT_FALSE(ident::isValidIdent("/index/a"));
-    ASSERT_FALSE(ident::isValidIdent("db/./a"));
-    ASSERT_FALSE(ident::isValidIdent("db/../a"));
-    ASSERT_FALSE(ident::isValidIdent("db/index/."));
-    ASSERT_FALSE(ident::isValidIdent("db/index/.."));
-    ASSERT_FALSE(ident::isValidIdent("db/index/\\a"));
-    ASSERT_FALSE(ident::isValidIdent("db/index/:a"));
+    EXPECT_FALSE(ident::isValidIdent("./index/a"));
+    EXPECT_FALSE(ident::isValidIdent("../index/a"));
+    EXPECT_FALSE(ident::isValidIdent("/index/a"));
+    EXPECT_FALSE(ident::isValidIdent("db/./a"));
+    EXPECT_FALSE(ident::isValidIdent("db/../a"));
+    EXPECT_FALSE(ident::isValidIdent("db/index/."));
+    EXPECT_FALSE(ident::isValidIdent("db/index/.."));
+    EXPECT_FALSE(ident::isValidIdent("db/index/\\a"));
+    EXPECT_FALSE(ident::isValidIdent("db/index/:a"));
     // dbname containing characters that should have been escaped
-    ASSERT_FALSE(ident::isValidIdent("db[name]/index/a"));
+    EXPECT_FALSE(ident::isValidIdent("db[name]/index/a"));
 }
 
 TEST_F(IdentGenerationTest, IdentDirectoryRejectsInvalidIdents) {
-    ASSERT_FALSE(ident::isValidIdent(""));
+    EXPECT_FALSE(ident::isValidIdent(""));
     ASSERT_THROWS_CODE(ident::getDirectory(""), DBException, 11558900);
 
-    ASSERT_FALSE(ident::isValidIdent("db/index\\collection-0"));
+    EXPECT_FALSE(ident::isValidIdent("db/index\\collection-0"));
     ASSERT_THROWS_CODE(ident::getDirectory("index\\collection-0"), DBException, 11558900);
 }
 
@@ -352,29 +352,29 @@ TEST_F(IdentGenerationTest, ValidInternalIndexBuildIdent) {
     const auto testValidInternalIndexBuildIdents = [&](std::string indexIdent) {
         auto sorterStem = "sorter";
         auto sorterIdent = ident::generateNewInternalIndexBuildIdent(sorterStem, indexIdent);
-        ASSERT_TRUE(ident::isInternalIdent(sorterIdent, sorterStem)) << "ident: " << sorterIdent;
-        ASSERT_TRUE(ident::isValidIdent(sorterIdent)) << "ident: " << sorterIdent;
+        EXPECT_TRUE(ident::isInternalIdent(sorterIdent, sorterStem)) << "ident: " << sorterIdent;
+        EXPECT_TRUE(ident::isValidIdent(sorterIdent)) << "ident: " << sorterIdent;
 
         auto sideWritesStem = "sideWrites";
         auto sideWritesIdent =
             ident::generateNewInternalIndexBuildIdent(sideWritesStem, indexIdent);
-        ASSERT_TRUE(ident::isInternalIdent(sideWritesIdent, sideWritesStem))
+        EXPECT_TRUE(ident::isInternalIdent(sideWritesIdent, sideWritesStem))
             << "ident: " << sideWritesIdent;
-        ASSERT_TRUE(ident::isValidIdent(sideWritesIdent)) << "ident: " << sideWritesIdent;
+        EXPECT_TRUE(ident::isValidIdent(sideWritesIdent)) << "ident: " << sideWritesIdent;
 
         auto skippedRecordsStem = "skippedRecords";
         auto skippedRecordsIdent =
             ident::generateNewInternalIndexBuildIdent(skippedRecordsStem, indexIdent);
-        ASSERT_TRUE(ident::isInternalIdent(skippedRecordsIdent, skippedRecordsStem))
+        EXPECT_TRUE(ident::isInternalIdent(skippedRecordsIdent, skippedRecordsStem))
             << "ident: " << skippedRecordsIdent;
-        ASSERT_TRUE(ident::isValidIdent(skippedRecordsIdent)) << "ident: " << skippedRecordsIdent;
+        EXPECT_TRUE(ident::isValidIdent(skippedRecordsIdent)) << "ident: " << skippedRecordsIdent;
 
         auto constraintViolationsStem = "constraintViolations";
         auto constraintViolationsIdent =
             ident::generateNewInternalIndexBuildIdent(constraintViolationsStem, indexIdent);
-        ASSERT_TRUE(ident::isInternalIdent(constraintViolationsIdent, constraintViolationsStem))
+        EXPECT_TRUE(ident::isInternalIdent(constraintViolationsIdent, constraintViolationsStem))
             << "ident: " << constraintViolationsIdent;
-        ASSERT_TRUE(ident::isValidIdent(constraintViolationsIdent))
+        EXPECT_TRUE(ident::isValidIdent(constraintViolationsIdent))
             << "ident: " << constraintViolationsIdent;
     };
 
