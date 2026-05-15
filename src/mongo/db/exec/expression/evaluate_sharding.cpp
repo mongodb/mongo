@@ -55,6 +55,8 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 
+#include <algorithm>
+
 namespace mongo {
 
 namespace exec::expression {
@@ -357,56 +359,35 @@ private:
      * Returns a 'Value' that is a vector of 'BSONObj' that contains the index keys documents.
      */
     Value _generateReply(const KeyStringSet& keyStrings) const {
-        // This helper accepts the key string 'keyString' and returns a 'BSONObj' that maps a field
-        // names to its index key.
+        auto wildcardIt =
+            std::find_if(_fieldNames.begin(), _fieldNames.end(), [](const char* name) {
+                return WildcardNames::isWildcardFieldName(StringData{name});
+            });
+
+        tassert(12308100,
+                "Expected wildcard field name iff index type is wildcard",
+                (wildcardIt != _fieldNames.end()) ==
+                    (_indexDescriptor->getIndexType() == IndexType::INDEX_WILDCARD));
+
+        // Returns a BSONObj mapping field names to their index key values for one key string.
         auto buildObjectFromKeyString = [&](const auto& keyString) {
             auto keyStringObj = key_string::toBson(keyString, Ordering::make(BSONObj()));
             BSONObjBuilder keyObjectBuilder;
 
-            switch (_indexDescriptor->getIndexType()) {
-                //
-                // A wild card key string is of the following format:
-                // {'': <field name>, '': <key value>}.
-                // The 'keyStringObj' itself contains the field name and the key. As such build a
-                // new 'BSONObj' that directly maps a field name and its index key.
-                //
-                case IndexType::INDEX_WILDCARD: {
-                    boost::optional<std::string> fieldName;
-                    boost::optional<BSONElement> keyStringElem;
-
-                    BSONObjIterator keyStringObjIter = BSONObjIterator(keyStringObj);
-                    if (keyStringObjIter.more()) {
-                        fieldName = keyStringObjIter.next().String();
-                    }
-                    if (keyStringObjIter.more()) {
-                        keyStringElem = keyStringObjIter.next();
-                    }
-
-                    invariant(!keyStringObjIter.more());
-
-                    if (fieldName && keyStringElem) {
-                        keyObjectBuilder << *fieldName << *keyStringElem;
-                    }
-                    break;
-                }
-
-                //
-                // For all other index types, each 'BSONElement' field of the 'keyStringObj' has a
-                // one-to-one mapping with the elements of the '_fieldNames'. This one-to-one
-                // property is utilized to builds a new 'BSONObj' that has keys from 'fieldNames'
-                // and values from key string 'BSONElement'.
-                //
-                default: {
-                    auto fieldNamesIter = _fieldNames.begin();
-                    for (auto&& keyStringElem : keyStringObj) {
-                        keyObjectBuilder << *fieldNamesIter << keyStringElem;
-                        ++fieldNamesIter;
-                    }
-
-                    invariant(fieldNamesIter == _fieldNames.end());
-                    break;
+            BSONObjIterator it(keyStringObj);
+            for (const char* name : _fieldNames) {
+                tassert(12308101, "Key string has fewer elements than expected", it.more());
+                if (WildcardNames::isWildcardFieldName(StringData{name})) {
+                    // Wildcard fields consume two elements.
+                    const StringData path = it.next().checkAndGetStringData();
+                    tassert(
+                        12308102, "Key string has missing element after wildcard path", it.more());
+                    keyObjectBuilder << path << it.next();
+                } else {
+                    keyObjectBuilder << name << it.next();
                 }
             }
+            tassert(12308103, "Key string has more elements than expected", !it.more());
 
             return keyObjectBuilder.obj();
         };
