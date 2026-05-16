@@ -3008,16 +3008,6 @@ export class ReplSetTest {
         // the number of connection attempts.
         options.setParameter.numInitialSyncConnectAttempts = options.setParameter.numInitialSyncConnectAttempts || 60;
 
-        // Reduce the initiating-set optimization threshold so it doesn't fire broadly in tests. The
-        // default threshold (3600s) would trigger for every freshly-initiated test replica set. With
-        // threshold=0, the shortcut only fires when `diff <= 0` (i.e. the sync source's stable
-        // recovery TS has not advanced past the initiating-set entry timestamp). NOTE: this still
-        // fires when stable TS == earliest TS (diff=0). Tests that check beginApplyingTimestamp or
-        // oplog batch sizes may need to explicitly disable the feature entirely via
-        // setParameter: {initialSyncWaitForSyncSourceLastStableRecoveryTs: false}.
-        options.setParameter.initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs =
-            options.setParameter.initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs || 0;
-
         // The default time for stepdown and quiesce mode in response to SIGTERM is 15 seconds.
         // Reduce this to 100ms for faster shutdown.
         options.setParameter.shutdownTimeoutMillisForSignaledShutdown =
@@ -3069,15 +3059,6 @@ export class ReplSetTest {
             ) === -1;
         if (olderThan81) {
             delete options.setParameter.performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert;
-        }
-
-        const olderThan90 =
-            MongoRunner.compareBinVersions(
-                MongoRunner.getBinVersionFor(options.binVersion),
-                MongoRunner.getBinVersionFor("9.0"),
-            ) === -1;
-        if (olderThan90) {
-            delete options.setParameter.initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs;
         }
 
         if (tojson(options) != tojson({})) jsTest.log.info({options});

@@ -160,7 +160,6 @@ public:
         kCheckingSourceRollback,
         kDeterminingStartOpTime,
         kFetchingFCV,
-        kWaitingForSyncSourceStableTs,
         kCloningData,
         kDeterminingStopTimestamp,
         kApplyingOplog,
@@ -402,18 +401,6 @@ private:
      *    _fcvFetcherCallback()
      *         |
      *         |
-     *         V
-     *    _earliestOplogEntryForInitiatingSetCallback()
-     *         |
-     *         |
-     *         V
-     *   _checkIfInitiatingSet()
-     *         |
-     *         |
-     *         V
-     *    _initializeOplogFetcherAndDbCloners()
-     *         |
-     *         |
      *         +------------------------------+
      *         |                              |
      *         |                              |
@@ -545,55 +532,6 @@ private:
                              OpTime& beginFetchingOpTime);
 
     /**
-     * Fetcher callback that receives the sync source's earliest oplog entry and determines
-     * whether that entry is the "initiating set" noop written when the replica set was first
-     * created.  The result is stored in `_initialSyncState` and then a `replSetGetStatus`
-     * command is issued to the sync source; the response is handled by
-     * `_initiatingSetStableTimestampCallback`.
-     *
-     * Only reached when `initialSyncWaitForSyncSourceLastStableRecoveryTs` is enabled.
-     * Transitions the sync phase to `Phase::kWaitingForSyncSourceStableTs`.
-     */
-    void _earliestOplogEntryForInitiatingSetCallback(
-        const StatusWith<Fetcher::QueryResponse>& result,
-        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-        const OpTime& beginFetchingOpTime);
-
-    /**
-     * Remote-command callback that receives `replSetGetStatus` from the sync source,
-     * determines whether or not we are initiating the replica set, and updates
-     * `_initialSyncState` accordingly.
-     *
-     * Initiating set case — skips the stable-timestamp wait and begins cloning from the
-     * initiating-set entry's timestamp when both conditions hold:
-     *   - The earliest oplog entry IS the "initiating set" noop, AND
-     *   - `lastStableRecoveryTimestamp - earliestOplogEntryTimestamp <=
-     *     initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs`
-     * In this case `beginApplyingTimestamp` and `beginFetchingTimestamp` are reset to the
-     * initiating-set entry's timestamp (with term = kUninitializedTerm).
-     *
-     * Non-initiating case — when the conditions above are not met, records the retry
-     * deadline in
-     * `_initialSyncState->waitForSyncSourceStableTimestampAdvanceMaxRetryDeadline` and
-     * proceeds with the original `beginFetchingOpTime`.
-     * (Full retry loop is tracked in SERVER-125965.)
-     *
-     * Scheduled by `_earliestOplogEntryForInitiatingSetCallback`.
-     */
-    void _initiatingSetStableTimestampCallback(
-        const executor::TaskExecutor::RemoteCommandCallbackArgs& callbackArgs,
-        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-        const OpTime& beginFetchingOpTime);
-
-    /**
-     * Initializes the oplog fetcher and database cloners.
-     */
-    void _initializeOplogFetcherAndDbCloners(
-        const executor::TaskExecutor::CallbackArgs& callbackArgs,
-        std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-        const OpTime& beginFetchingOpTime);
-
-    /**
      * Callback for oplog fetcher.
      */
     void _oplogFetcherCallback(const Status& status,
@@ -715,16 +653,6 @@ private:
     void _clearRetriableError(WithLock lk);
 
     /**
-     * Checks the embedded status inside the callback args and current data replicator shutdown
-     * state. Returns true if the status is OK, otherwise returns false. If false, cancels the
-     * initial sync attempt and resets the initial sync state.
-     */
-    bool _checkForShutdownAndHandleError(std::unique_lock<std::mutex>& lk,
-                                         const executor::TaskExecutor::CallbackArgs& callbackArgs,
-                                         std::shared_ptr<OnCompletionGuard> onCompletionGuard,
-                                         const std::string& errorMsg);
-
-    /**
      * Checks the given status (or embedded status inside the callback args) and current data
      * replicator shutdown state. If the given status is not OK or if we are shutting down, returns
      * a new error status that should be passed to _finishCallback. The reason in the new error
@@ -824,12 +752,6 @@ private:
     // Handle returned from RollbackChecker::checkForRollback().
     RollbackChecker::CallbackHandle _getLastRollbackIdHandle;  // (M)
 
-    // Handle to currently scheduled _initializeOplogFetcherAndDbCloners() task.
-    executor::TaskExecutor::CallbackHandle _initializeOplogFetcherAndDbClonersHandle;  // (M)
-
-    // Handle used for waiting for stable timestamp to advance on sync source.
-    executor::TaskExecutor::CallbackHandle _waitForSyncSourceStableTimestampHandle;  // (M)
-
     // Handle to currently scheduled _getNextApplierBatchCallback() task.
     executor::TaskExecutor::CallbackHandle _getNextApplierBatchHandle;  // (M)
 
@@ -841,7 +763,6 @@ private:
     std::unique_ptr<Fetcher> _beginFetchingOpTimeFetcher;  // (S)
     std::unique_ptr<Fetcher> _lastOplogEntryFetcher;       // (S)
     std::unique_ptr<Fetcher> _fCVFetcher;                  // (S)
-    std::unique_ptr<Fetcher> _earliestOplogEntryFetcher;   // (S)
     std::unique_ptr<MultiApplier> _applier;                // (M)
     HostAndPort _syncSource;                               // (M)
     std::unique_ptr<DBClientConnection> _client;           // (M)

@@ -29,7 +29,6 @@ function _testSecondaryMetricsHelper(
     baseOpsReceived,
     baseOpsWritten,
     baseOpsBytes,
-    baseOpsNetwork,
 ) {
     let ss = secondary.getDB("test").serverStatus();
     jsTestLog(`Secondary ${secondary.host} metrics: ${tojson(ss.metrics)}`);
@@ -37,14 +36,12 @@ function _testSecondaryMetricsHelper(
     assert(ss.metrics.repl.network.readersCreated > 0, "no (oplog) readers created");
     assert(ss.metrics.repl.network.getmores.num > 0, "no getmores");
     assert(ss.metrics.repl.network.getmores.totalMillis > 0, "no getmores time");
-    // network.ops includes entries fetched during initial sync oplog application, which may
-    // exceed apply.ops when initial sync fetches from an earlier timestamp (e.g. when the
-    // sync source was recently initiated, the initial sync node will fetch and apply from the initiating set oplog
-    // entry). Use the network.ops baseline captured at test setup time so the assertion is self-consistent.
+    // The first oplog entry may or may not make it into network.ops now that we have two
+    // n ops (initiate and new primary) before steady replication starts.
     // Sometimes, we disconnect from our sync source and since our find is a gte query, we may
     // double count an oplog entry, so we need some wiggle room for that.
-    assert.lte(ss.metrics.repl.network.ops, opCount + baseOpsNetwork + 5, "wrong number of ops retrieved");
-    assert.gte(ss.metrics.repl.network.ops, opCount + baseOpsNetwork, "wrong number of ops retrieved");
+    assert.lte(ss.metrics.repl.network.ops, opCount + baseOpsApplied + 5, "wrong number of ops retrieved");
+    assert.gte(ss.metrics.repl.network.ops, opCount + baseOpsApplied, "wrong number of ops retrieved");
     assert(ss.metrics.repl.network.bytes > 0, "zero or missing network bytes");
 
     assert.gt(ss.metrics.repl.network.replSetUpdatePosition.num, 0, "no update position commands sent");
@@ -90,15 +87,7 @@ function _testSecondaryMetricsHelper(
 
 // Metrics are racy, e.g. repl.buffer.apply.count could over- or under-reported briefly. Retry on
 // error.
-function testSecondaryMetrics(
-    secondary,
-    opCount,
-    baseOpsApplied,
-    baseOpsReceived,
-    baseOpsWritten,
-    baseOpsBytes,
-    baseOpsNetwork,
-) {
+function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceived, baseOpsWritten, baseOpsBytes) {
     assert.soon(() => {
         try {
             _testSecondaryMetricsHelper(
@@ -108,7 +97,6 @@ function testSecondaryMetrics(
                 baseOpsReceived,
                 baseOpsWritten,
                 baseOpsBytes,
-                baseOpsNetwork,
             );
             return true;
         } catch (exc) {
@@ -164,9 +152,6 @@ let secondaryBaseOplogOpsWritten = FeatureFlagUtil.isPresentAndEnabled(secondary
     ? ss.metrics.repl.write.batchSize
     : undefined;
 let secondaryBaseOplogBytes = ss.metrics.repl.apply.bytes;
-// network.ops includes initial-sync oplog fetcher entries, which may exceed apply.ops when the
-// sync source was recently initiated and beginFetchingTimestamp is moved to the initiate noop.
-let secondaryBaseOplogOpsNetwork = ss.metrics.repl.network.ops;
 
 // Disable batching of inserts so each one creates an oplog entry.
 assert.commandWorked(testDB.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 1}));
@@ -185,7 +170,6 @@ testSecondaryMetrics(
     secondaryBaseOplogOpsReceived,
     secondaryBaseOplogOpsWritten,
     secondaryBaseOplogBytes,
-    secondaryBaseOplogOpsNetwork,
 );
 
 let options = {writeConcern: {w: 2}, multi: true, upsert: true};
@@ -198,7 +182,6 @@ testSecondaryMetrics(
     secondaryBaseOplogOpsReceived,
     secondaryBaseOplogOpsWritten,
     secondaryBaseOplogBytes,
-    secondaryBaseOplogOpsNetwork,
 );
 
 // Test that the number of oplog getMore requested by the secondary and processed by the primary has

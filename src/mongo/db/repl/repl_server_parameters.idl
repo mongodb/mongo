@@ -751,50 +751,6 @@ server_parameters:
         default: 30000
         redact: false
 
-    initialSyncWaitForSyncSourceLastStableRecoveryTs:
-        description: >-
-            If true, during initial sync, we will wait for the sync source to advance its lastStableRecoveryTimestamp
-            to our beginApplyingTimestamp before starting collection cloning. This is to prevent a bug where we may miss
-            documents during collection clone if our sync source restarts. Please see SERVER-113184 for more details.
-            IMPORTANT: Turning this server parameter off will introduce risk for inconsistent data after initial sync.
-            Only turn this off if initial sync is unable to wait for sync source propagation, and run data consistency
-            validation after initial sync completes.
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: initialSyncWaitForSyncSourceLastStableRecoveryTs
-        default: true
-        redact: false
-
-    initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs:
-        description: >-
-            The amount of time in seconds that the node will wait for the node's sync source to advance its lastStableRecoveryTimestamp
-            to our beginApplyingTimestamp. No effect if 'initialSyncWaitForSyncSourceLastStableRecoveryTs' is set to false. Default
-            wait period of 10 minutes.
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs
-        default:
-            expr: 60 * 10
-        validator:
-            gte: 0
-        redact: false
-
-    initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs:
-        description: >-
-            If the earliest oplog entry on the sync source is the "initiating set" entry and the
-            sync source's lastStableRecoveryTimestamp is within this many seconds of that entry,
-            initial sync skips waiting for the stable recovery timestamp to advance. This covers the
-            case where the replica set was just created and the sync source has not yet had time to
-            advance its stable recovery timestamp far from the initiating set timestamp. Default is
-            1 hour. No effect if 'initialSyncWaitForSyncSourceLastStableRecoveryTs' is set to false.
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs
-        default: 3600
-        validator:
-            gte: 0
-        redact: false
-
 feature_flags:
     featureFlagSecondaryIndexChecksInDbCheck:
         description: When enabled, dbCheck runs document and secondary index consistency checks in addition to replica set data consistency checks.

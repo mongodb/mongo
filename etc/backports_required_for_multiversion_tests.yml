@@ -53,16 +53,6 @@ last-continuous:
       ticket: SERVER-120318
     - test_file: jstests/sharding/chunk_migration_maxkey_boundary.js
       ticket: SERVER-121533
-    - test_file: jstests/replsets/initial_sync_test_fixture_test.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp_no_oplog_application.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_commit_prepared_transaction.js
-      ticket: SERVER-113184
   suites: null
 last-lts:
   all:
@@ -754,14 +744,4 @@ last-lts:
       ticket: SERVER-91075
     - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/range/two_sided_find.js
       ticket: SERVER-91075
-    - test_file: jstests/replsets/initial_sync_test_fixture_test.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp_no_oplog_application.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_commit_prepared_transaction.js
-      ticket: SERVER-113184
   suites: null
