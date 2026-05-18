@@ -36,7 +36,8 @@ output: {
                 "a:1": {
                     "declaringScope": "scope:0",
                     "metadata": {
-                        "array": false
+                        "array": false,
+                        "constant": 1
                     },
                     "dependencies": []
                 }

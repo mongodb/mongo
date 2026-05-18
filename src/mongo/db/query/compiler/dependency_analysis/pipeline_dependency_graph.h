@@ -31,12 +31,14 @@
 
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
 
+#include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::pipeline::dependency_graph {
@@ -115,6 +117,18 @@ public:
      * arrays. If nullptr, the path is assumed to originate from the pipeline input.
      */
     bool canPathBeArray(DocumentSource* stage, PathRef path) const;
+
+    /**
+     * Returns the constant value of 'path' visible to 'stage' (i.e., as it appears in the input
+     * document to 'stage'), if statically known. If 'stage' is nullptr, returns the value visible
+     * at the end of the pipeline. Constants are not tracked for fields originating from the
+     * pipeline input.
+     *
+     * A `missing()` Value means the path is provably absent. Returns boost::none when the value is
+     * not statically known, which includes the case where resolving the path would have to
+     * traverse an array element.
+     */
+    boost::optional<Value> getConstant(DocumentSource* stage, PathRef path) const;
 
     /**
      * Returns the dependency graph for the sub-pipeline of the given stage (e.g. $lookup,

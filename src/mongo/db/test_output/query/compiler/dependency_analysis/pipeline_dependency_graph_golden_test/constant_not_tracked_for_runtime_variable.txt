@@ -1,16 +1,9 @@
-VARIATION SimpleSet
+VARIATION ConstantNotTrackedForRuntimeVariable
 input: {
     "pipeline": [
         {
             "$set": {
-                "a": {
-                    "$const": "foo"
-                }
-            }
-        },
-        {
-            "$match": {
-                "a": "foo"
+                "a": "$$NOW"
             }
         }
     ]
@@ -26,21 +19,11 @@ output: {
                 },
                 "a:1": {
                     "declaringScope": "scope:0",
-                    "metadata": {
-                        "array": false,
-                        "constant": "foo"
-                    },
                     "dependencies": []
                 }
             }
         },
         "dependencies": []
-    },
-    "$match:1": {
-        "scope:0": "scope:0",
-        "dependencies": [
-            "a:1"
-        ]
     }
 }
 

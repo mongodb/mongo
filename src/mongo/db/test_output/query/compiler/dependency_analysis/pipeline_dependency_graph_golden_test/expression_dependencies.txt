@@ -60,21 +60,24 @@ output: {
                 "a:1": {
                     "declaringScope": "scope:0",
                     "metadata": {
-                        "array": false
+                        "array": false,
+                        "constant": 1
                     },
                     "dependencies": []
                 },
                 "b:2": {
                     "declaringScope": "scope:0",
                     "metadata": {
-                        "array": false
+                        "array": false,
+                        "constant": 1
                     },
                     "dependencies": []
                 },
                 "c:3": {
                     "declaringScope": "scope:0",
                     "metadata": {
-                        "array": false
+                        "array": false,
+                        "constant": 1
                     },
                     "dependencies": []
                 }

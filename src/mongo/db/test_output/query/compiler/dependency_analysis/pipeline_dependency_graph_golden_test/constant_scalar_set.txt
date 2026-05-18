@@ -1,4 +1,4 @@
-VARIATION Swap
+VARIATION ConstantScalarSet
 input: {
     "pipeline": [
         {
@@ -7,20 +7,14 @@ input: {
                     "$const": 1
                 },
                 "b": {
-                    "$const": 1
+                    "$const": "foo"
+                },
+                "c": {
+                    "$const": true
+                },
+                "d": {
+                    "$const": null
                 }
-            }
-        },
-        {
-            "$set": {
-                "a": "$b",
-                "b": "$a"
-            }
-        },
-        {
-            "$match": {
-                "a": 1,
-                "b": 1
             }
         }
     ]
@@ -46,55 +40,29 @@ output: {
                     "declaringScope": "scope:0",
                     "metadata": {
                         "array": false,
-                        "constant": 1
+                        "constant": "foo"
+                    },
+                    "dependencies": []
+                },
+                "c:3": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false,
+                        "constant": true
+                    },
+                    "dependencies": []
+                },
+                "d:4": {
+                    "declaringScope": "scope:0",
+                    "metadata": {
+                        "array": false,
+                        "constant": null
                     },
                     "dependencies": []
                 }
             }
         },
         "dependencies": []
-    },
-    "$set:1": {
-        "scope:1": {
-            "exhaustiveScope": "scope:-1",
-            "fields": {
-                "<missing>:3": {
-                    "declaringScope": "scope:1",
-                    "dependencies": []
-                },
-                "a:4": {
-                    "declaringScope": "scope:1",
-                    "metadata": {
-                        "array": false,
-                        "constant": 1
-                    },
-                    "dependencies": [
-                        "b:2"
-                    ]
-                },
-                "b:5": {
-                    "declaringScope": "scope:1",
-                    "metadata": {
-                        "array": false,
-                        "constant": 1
-                    },
-                    "dependencies": [
-                        "a:1"
-                    ]
-                }
-            }
-        },
-        "dependencies": [
-            "a:1",
-            "b:2"
-        ]
-    },
-    "$match:2": {
-        "scope:1": "scope:1",
-        "dependencies": [
-            "a:4",
-            "b:5"
-        ]
     }
 }
 

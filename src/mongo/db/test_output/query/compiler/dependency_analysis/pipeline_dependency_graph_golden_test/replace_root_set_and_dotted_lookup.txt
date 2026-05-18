@@ -59,7 +59,8 @@ output: {
                             "b:4": {
                                 "declaringScope": "scope:2",
                                 "metadata": {
-                                    "array": false
+                                    "array": false,
+                                    "constant": 1
                                 },
                                 "dependencies": []
                             }

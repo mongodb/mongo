@@ -1,16 +1,15 @@
-VARIATION SimpleSet
+VARIATION ConstantArrayLiteral
 input: {
     "pipeline": [
         {
             "$set": {
                 "a": {
-                    "$const": "foo"
+                    "$const": [
+                        1,
+                        2,
+                        3
+                    ]
                 }
-            }
-        },
-        {
-            "$match": {
-                "a": "foo"
             }
         }
     ]
@@ -27,20 +26,17 @@ output: {
                 "a:1": {
                     "declaringScope": "scope:0",
                     "metadata": {
-                        "array": false,
-                        "constant": "foo"
+                        "constant": [
+                            1,
+                            2,
+                            3
+                        ]
                     },
                     "dependencies": []
                 }
             }
         },
         "dependencies": []
-    },
-    "$match:1": {
-        "scope:0": "scope:0",
-        "dependencies": [
-            "a:1"
-        ]
     }
 }
 

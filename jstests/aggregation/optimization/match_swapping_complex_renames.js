@@ -233,3 +233,13 @@ runTest({
         expectedCount: 2,
     },
 });
+
+runTest({
+    name: "$set scalar + $addFields deeper left-dotted rename {'a.b.c': '$x'}",
+    pipeline: [{$set: {a: 1}}, {$addFields: {"a.b.c": "$x"}}, {$match: {"a.b.c": 42}}],
+    positive: {
+        docs: [{x: 42}, {x: 99}, {x: 42}],
+        index: {x: 1},
+        expectedCount: 2,
+    },
+});

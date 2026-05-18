@@ -31,6 +31,8 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
@@ -40,6 +42,7 @@
 #include <vector>
 
 #include <absl/strings/str_split.h>
+#include <boost/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -319,8 +322,6 @@ struct Scope {
  *
  * FieldMetadata is stored within every Field node in the graph. Since Field nodes are pretty
  * numerous, we try to keep the size of this struct as small as possible.
- *
- * TODO(SERVER-119392): Implement constant propagation
  */
 struct FieldMetadata {
     bool isDefault() const {
@@ -339,6 +340,14 @@ struct FieldMetadata {
      * guaranteed to be absent.
      */
     bool knownToBeMissing : 1 {false};
+
+    /**
+     * True if a constant value for this field is statically known. The actual Value is stored in
+     * `Impl::_constants` keyed by the field's FieldId. This bit is an optimization to skip the
+     * side-table lookup when no constant is tracked. Invariant: 'hasConstant' is true iff the
+     * field's FieldId is in `_constants` (asserted in 'getConstantForField()').
+     */
+    bool hasConstant : 1 {false};
 };
 
 // It's fine to change the assert and increase the size of the FieldMetadata, but there should be a
@@ -424,6 +433,13 @@ static_assert(document_transformation::DescribesDocumentTransformation<DocumentS
 void updateMetadataForMissingValue(FieldMetadata& metadata) {
     metadata.canFieldBeArray = false;
     metadata.knownToBeMissing = true;
+    metadata.hasConstant = false;
+}
+
+void updateMetadataForConstant(FieldMetadata& metadata, const Value& value) {
+    metadata.hasConstant = true;
+    metadata.canFieldBeArray = value.isArray();
+    metadata.knownToBeMissing = false;
 }
 
 /**
@@ -621,9 +637,16 @@ public:
                     auto suffix = skipPathComponents(path, prefix.size() + 1);
                     return _canPathBeArray(buildDottedPath(*alias, suffix));
                 }
-                // TODO(SERVER-119392): If our field is shadowed by another, and we know the value
-                // for that shadowing field, we can determine if the result can be array. For
-                // example, if {$set: {a: 1}}, then a.b cannot be array (it is missing).
+                // Walk the shadowing field's constant if it's array-free.
+                if (!canPrefixContainArrays(prefix)) {
+                    if (auto parent = getConstantForField(fieldId)) {
+                        if (auto constant = walkConstant(
+                                *std::move(parent),
+                                ParsedPathView(parsedPath).subspan(prefix.size() + 1))) {
+                            return constant->isArray();
+                        }
+                    }
+                }
                 return true;
             }
             case FieldMatchType::kMissing:
@@ -638,6 +661,50 @@ public:
         }
 
         MONGO_UNREACHABLE_TASSERT(12266805);
+    }
+
+    boost::optional<Value> getConstant(DocumentSource* ds, PathRef path) const {
+        auto stageId = getPreviousStageId(ds);
+        if (!stageId) {
+            return boost::none;
+        }
+
+        auto scopeId = _stages[stageId].scope;
+        auto parsedPath = parsePath(path);
+
+        FieldList prefix;
+        auto [fieldId, type] = lookupField(scopeId, parsedPath, &prefix);
+
+        // An array anywhere in the prefix means the path may not resolve to a single value.
+        if (canPrefixContainArrays(prefix)) {
+            return boost::none;
+        }
+
+        switch (type) {
+            case FieldMatchType::kExact:
+                if (auto c = getConstantForField(fieldId)) {
+                    return c;
+                }
+                if (_fields[fieldId].metadata.knownToBeMissing) {
+                    return Value();
+                }
+                return boost::none;
+            case FieldMatchType::kShadowed:
+                if (auto c = getConstantForField(fieldId)) {
+                    return walkConstant(*std::move(c),
+                                        ParsedPathView(parsedPath).subspan(prefix.size() + 1));
+                }
+                return boost::none;
+            case FieldMatchType::kMissing:
+                if (_fields[fieldId].metadata.knownToBeMissing) {
+                    return Value();
+                }
+                return boost::none;
+            case FieldMatchType::kBaseDocument:
+                return boost::none;
+        }
+
+        MONGO_UNREACHABLE_TASSERT(11939201);
     }
 
     const DependencyGraph* getSubpipelineGraph(DocumentSource* ds) const {
@@ -925,13 +992,25 @@ private:
         bool shadowedByParent = parentDeclaringScope && !parentEmbeddedScope &&
             parentBaseField != _scopes[parentDeclaringScope].missingField;
 
-        // If the parent field is defined but has no embedded scope, it's a scalar or an unknown
-        // value that shadows any subpath. That is, the subfield that is being included is either
-        // not known or is known to not exist. We currently don't properly distinguish between the
-        // two, so we declare the field to avoid incorrect dependency tracking.
-        // TODO(SERVER-119392): Track whether or not the parent field is known to be a scalar.
+        // Parent is a leaf (scalar / missing / unknown) that shadows the subpath. If we know
+        // the parent's constant, walk it to tighten the included field's metadata and constant.
         if (shadowedByParent) {
-            declareField(scope, path, ModifiedPrefixPolicy::kPreserveArrays, {parentBaseField});
+            boost::optional<Value> constant;
+            if (auto parent = getConstantForField(parentBaseField)) {
+                constant = walkConstant(*std::move(parent), subPath);
+            }
+            FieldMetadata metadata{};
+            if (constant && constant->missing()) {
+                updateMetadataForMissingValue(metadata);
+            }
+            declareField(scope,
+                         path,
+                         ModifiedPrefixPolicy::kPreserveArrays,
+                         {parentBaseField},
+                         std::move(metadata));
+            if (constant) {
+                setConstant(scope, path, *std::move(constant));
+            }
             return;
         }
 
@@ -1015,6 +1094,62 @@ private:
     const ParsedPath* getAlias(FieldId fieldId) const {
         auto it = _aliases.find(fieldId);
         return it != _aliases.end() ? &it->second : nullptr;
+    }
+
+    /// Record 'value' as the known constant for the leaf of 'path' in 'scope'. Must be called
+    /// immediately after 'declareField(scope, path, ...)' — the leaf is read from
+    /// '_fields.getLastId()' to avoid re-walking the path. The 'scope' / 'path' parameters are
+    /// only used for a debug cross-check against 'lookupField'. No-op for missing values; callers
+    /// use 'updateMetadataForMissingValue()' to mark a field known-missing.
+    void setConstant(ScopeId scope, ParsedPathView path, Value value) {
+        if (value.missing()) {
+            return;
+        }
+        auto leafFieldId = _fields.getLastId();
+        tassert(11939203, "Expected to have at least one Field", leafFieldId);
+        dassert(lookupField(scope, path).fieldId == leafFieldId);
+        updateMetadataForConstant(_fields[leafFieldId].metadata, value);
+        _constants[leafFieldId] = std::move(value);
+    }
+
+    /// Returns the field's known constant Value, or boost::none if none is tracked.
+    /// 'knownToBeMissing' is separate — check the field's metadata for that.
+    boost::optional<Value> getConstantForField(FieldId fieldId) const {
+        if (!fieldId || !_fields[fieldId].metadata.hasConstant) {
+            return boost::none;
+        }
+        auto it = _constants.find(fieldId);
+        tassert(11939202, "hasConstant=true but field not in _constants", it != _constants.end());
+        return it->second;
+    }
+
+    /// Walk 'value' for each interned-id component in 'path'. Returns Value() (missing)
+    /// when a scalar is hit mid-walk, boost::none when not statically determinable
+    /// (empty path, array traversal, unknown/non-interned name, FieldRef-malformed component).
+    boost::optional<Value> walkConstant(Value value, ParsedPathView path) const {
+        if (path.empty()) {
+            return boost::none;
+        }
+        for (auto&& fieldNameId : path) {
+            if (fieldNameId && _strings.get(fieldNameId).empty()) {
+                // Malformed dotted paths (e.g. "a.") produce an interned empty component:
+                // conservatively treat the path as unknown.
+                return boost::none;
+            }
+            if (value.isArray()) {
+                // We bail on arrays for simplicity.
+                // TODO(SERVER-126809): We could do something smarter here.
+                return boost::none;
+            }
+            if (!value.isObject()) {
+                return Value();
+            }
+            if (!fieldNameId) {
+                return boost::none;
+            }
+            value = value.getDocument()[_strings.get(fieldNameId)];
+        }
+        return value;
     }
 
     /**
@@ -1174,12 +1309,16 @@ private:
                     auto parsedPath = internPath(p.getPath());
                     FieldDependencies deps{};
                     FieldMetadata metadata{};
+                    boost::optional<Value> constant;
                     if (p.isRemoved()) {
                         updateMetadataForMissingValue(metadata);
                     } else {
                         metadata.canFieldBeArray = p.canLeafBeArray();
                         if (auto expr = p.getExpression()) {
                             deps = processExpressionDependencies(*expr, parentScope);
+                            if (auto* c = dynamic_cast<const ExpressionConstant*>(expr.get())) {
+                                constant = c->getValue();
+                            }
                         } else {
                             // If the modification is not determined by an expression, we cannot get
                             // more precise dependency information. The stage dependencies will
@@ -1193,6 +1332,9 @@ private:
                                  p.getPrefixPolicy(),
                                  std::move(deps),
                                  std::move(metadata));
+                    if (constant) {
+                        setConstant(scopeId, parsedPath, *std::move(constant));
+                    }
                 },
                 [&](const RenamePath& p) {
                     maybeDeclareInheritedScope();
@@ -1203,6 +1345,7 @@ private:
                     FieldDependencies deps;
                     bool isBaseDocumentField = false;
                     ParsedPath aliasCollectionPath;
+                    boost::optional<Value> constant;
 
                     if (parentScope) {
                         // The found field could be either:
@@ -1232,6 +1375,7 @@ private:
                                 if (auto* alias = getAlias(oldPathField)) {
                                     aliasCollectionPath = *alias;
                                 }
+                                constant = getConstantForField(oldPathField);
                                 break;
                             }
                             case FieldMatchType::kMissing: {
@@ -1258,6 +1402,17 @@ private:
                                         !_fields[oldPathField].metadata.canFieldBeArray) {
                                         metadata.canFieldBeArray =
                                             _canPathBeArray(buildDottedPath(aliasCollectionPath));
+                                    }
+                                }
+                                // Walk the shadowing constant for the suffix when array-free.
+                                if (!canPrefixContainArrays(prefix)) {
+                                    if (auto parent = getConstantForField(oldPathField)) {
+                                        constant = walkConstant(*std::move(parent),
+                                                                ParsedPathView(parsedOldPath)
+                                                                    .subspan(prefix.size() + 1));
+                                        if (constant) {
+                                            metadata.canFieldBeArray = constant->isArray();
+                                        }
                                     }
                                 }
                                 break;
@@ -1291,6 +1446,9 @@ private:
                         auto [leafFieldId, _] = lookupField(scopeId, parsedNewPath);
                         tassert(12193201, "Missing leafFieldId", leafFieldId);
                         _aliases[leafFieldId] = std::move(aliasCollectionPath);
+                    }
+                    if (constant) {
+                        setConstant(scopeId, parsedNewPath, *std::move(constant));
                     }
                 },
             },
@@ -1526,8 +1684,10 @@ private:
         // Invalidate all nodes originating from the given stage.
         auto [invalidScope, invalidField] = earliestDescendants(invalidStage);
 
-        // Clean up aliases for invalidated fields.
+        // Clean up constants and aliases for invalidated fields.
         absl::erase_if(_aliases,
+                       [invalidField](const auto& entry) { return entry.first >= invalidField; });
+        absl::erase_if(_constants,
                        [invalidField](const auto& entry) { return entry.first >= invalidField; });
 
 
@@ -1606,6 +1766,9 @@ private:
     // (directly or transitively through other aliases).
     absl::flat_hash_map<FieldId, ParsedPath> _aliases;
 
+    // Side table of known constant Values, keyed by FieldId.
+    absl::flat_hash_map<FieldId, Value> _constants;
+
     // Owns the immediate sub-pipeline dependency graphs for stages in this pipeline.
     std::vector<std::unique_ptr<DependencyGraph>> _subpipelineGraphs;
 
@@ -1640,6 +1803,10 @@ DeclaringStageResult DependencyGraph::getDeclaringStageIncludingSubpipelines(Doc
 
 bool DependencyGraph::canPathBeArray(DocumentSource* ds, PathRef path) const {
     return _impl->canPathBeArray(ds, path);
+}
+
+boost::optional<Value> DependencyGraph::getConstant(DocumentSource* ds, PathRef path) const {
+    return _impl->getConstant(ds, path);
 }
 
 const DependencyGraph* DependencyGraph::getSubpipelineGraph(DocumentSource* ds) const {
@@ -1786,7 +1953,7 @@ private:
             serializeScope(field.embeddedScope, bob);
         }
         if (!field.metadata.isDefault()) {
-            serializeMetadata(field.metadata, bob);
+            serializeMetadata(fieldId, field.metadata, bob);
         }
         if (auto* alias = _graph.getAlias(fieldId)) {
             bob.append("collectionAlias", _graph.buildDottedPath(*alias));
@@ -1794,13 +1961,16 @@ private:
         serializeDependencies(field.dependencies, bob);
     }
 
-    void serializeMetadata(const FieldMetadata& metadata, BSONObjBuilder& bob) {
+    void serializeMetadata(FieldId fieldId, const FieldMetadata& metadata, BSONObjBuilder& bob) {
         BSONObjBuilder metaBuilder = bob.subobjStart("metadata");
         if (!metadata.canFieldBeArray) {
             metaBuilder.append("array", false);
         }
         if (metadata.knownToBeMissing) {
             metaBuilder.append("missing", true);
+        }
+        if (auto constant = _graph.getConstantForField(fieldId)) {
+            constant->addToBsonObj(&metaBuilder, "constant");
         }
     }
 

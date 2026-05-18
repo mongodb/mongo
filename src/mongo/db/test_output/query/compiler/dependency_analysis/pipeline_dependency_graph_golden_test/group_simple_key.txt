@@ -40,7 +40,8 @@ output: {
                 "x:1": {
                     "declaringScope": "scope:0",
                     "metadata": {
-                        "array": false
+                        "array": false,
+                        "constant": 1
                     },
                     "dependencies": []
                 }
@@ -59,7 +60,8 @@ output: {
                 "_id:3": {
                     "declaringScope": "scope:1",
                     "metadata": {
-                        "array": false
+                        "array": false,
+                        "constant": 1
                     },
                     "dependencies": [
                         "x:1"

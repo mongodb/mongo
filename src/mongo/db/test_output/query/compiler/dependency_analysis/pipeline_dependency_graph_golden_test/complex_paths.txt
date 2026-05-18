@@ -71,14 +71,16 @@ output: {
                 "a:1": {
                     "declaringScope": "scope:0",
                     "metadata": {
-                        "array": false
+                        "array": false,
+                        "constant": 1
                     },
                     "dependencies": []
                 },
                 "b:2": {
                     "declaringScope": "scope:0",
                     "metadata": {
-                        "array": false
+                        "array": false,
+                        "constant": 1
                     },
                     "dependencies": []
                 },
@@ -94,7 +96,8 @@ output: {
                             "c:5": {
                                 "declaringScope": "scope:1",
                                 "metadata": {
-                                    "array": false
+                                    "array": false,
+                                    "constant": 1
                                 },
                                 "dependencies": []
                             }
@@ -130,14 +133,16 @@ output: {
                             "a:9": {
                                 "declaringScope": "scope:3",
                                 "metadata": {
-                                    "array": false
+                                    "array": false,
+                                    "constant": 1
                                 },
                                 "dependencies": []
                             },
                             "b:10": {
                                 "declaringScope": "scope:3",
                                 "metadata": {
-                                    "array": false
+                                    "array": false,
+                                    "constant": 1
                                 },
                                 "dependencies": []
                             }
@@ -172,7 +177,8 @@ output: {
                                         "b:15": {
                                             "declaringScope": "scope:5",
                                             "metadata": {
-                                                "array": false
+                                                "array": false,
+                                                "constant": 1
                                             },
                                             "dependencies": []
                                         }
@@ -194,7 +200,8 @@ output: {
                 "c:16": {
                     "declaringScope": "scope:2",
                     "metadata": {
-                        "array": false
+                        "array": false,
+                        "constant": 1
                     },
                     "dependencies": []
                 }
@@ -235,7 +242,8 @@ output: {
                                         "a:22": {
                                             "declaringScope": "scope:8",
                                             "metadata": {
-                                                "array": false
+                                                "array": false,
+                                                "constant": 1
                                             },
                                             "dependencies": []
                                         }
@@ -270,14 +278,16 @@ output: {
                             "a:25": {
                                 "declaringScope": "scope:9",
                                 "metadata": {
-                                    "array": false
+                                    "array": false,
+                                    "constant": 1
                                 },
                                 "dependencies": []
                             },
                             "b:26": {
                                 "declaringScope": "scope:9",
                                 "metadata": {
-                                    "array": false
+                                    "array": false,
+                                    "constant": 1
                                 },
                                 "dependencies": []
                             }

@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -1451,8 +1452,8 @@ TEST_F(PipelineDependencyGraphTest, CanRedefinedBaseFieldBeArray) {
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "b"));
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "b.b"));
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "b.a"));
-        // TODO(SERVER-119392): This should pass.
-        // ASSERT_FALSE(graph->canPathBeArray(nullptr, "b.b.b"));
+        // 'b.b.b' is shadowed by scalar 'b.b = 1'; walking its constant yields missing.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "b.b.b"));
     });
 }
 
@@ -2072,6 +2073,238 @@ TEST_F(PipelineDependencyGraphTest, LookupDeepAsPartialPreservation) {
         ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.b.d"), stages[0]);
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantScalarLiteral) {
+    setPipeline("[{$set: {a: 1}}]");
+    runTest([&] {
+        auto c = graph->getConstant(nullptr, "a");
+        ASSERT_TRUE(c.has_value());
+        ASSERT_VALUE_EQ(*c, Value(1));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantStringLiteral) {
+    setPipeline("[{$set: {a: 'hello'}}]");
+    runTest([&] {
+        auto c = graph->getConstant(nullptr, "a");
+        ASSERT_TRUE(c.has_value());
+        ASSERT_VALUE_EQ(*c, Value("hello"_sd));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantSubpathOfScalarIsMissing) {
+    setPipeline("[{$set: {a: 1}}]");
+    runTest([&] {
+        auto c = graph->getConstant(nullptr, "a.b");
+        ASSERT_TRUE(c.has_value());
+        ASSERT_TRUE(c->missing());
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantObjectLiteralCapturesLeafConstants) {
+    pathArrayness->addPath("a", {}, false);
+    pathArrayness->addPath("a.b", {}, false);
+    pathArrayness->addPath("a.c", {}, false);
+    setPipeline("[{$set: {a: {b: 1, c: 'two'}}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->getConstant(nullptr, "a").has_value());
+
+        auto ab = graph->getConstant(nullptr, "a.b");
+        ASSERT_TRUE(ab.has_value());
+        ASSERT_VALUE_EQ(*ab, Value(1));
+
+        auto ac = graph->getConstant(nullptr, "a.c");
+        ASSERT_TRUE(ac.has_value());
+        ASSERT_VALUE_EQ(*ac, Value("two"_sd));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantNestedObjectLiteralReachesLeaf) {
+    pathArrayness->addPath("a", {}, false);
+    pathArrayness->addPath("a.b", {}, false);
+    pathArrayness->addPath("a.b.c", {}, false);
+    setPipeline("[{$set: {a: {b: {c: 99}}}}]");
+    runTest([&] {
+        auto abc = graph->getConstant(nullptr, "a.b.c");
+        ASSERT_TRUE(abc.has_value());
+        ASSERT_VALUE_EQ(*abc, Value(99));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantArrayLiteralCaptured) {
+    setOptimizedPipeline("[{$set: {a: [1, 2, 3]}}]");
+    runTest([&] {
+        auto a = graph->getConstant(nullptr, "a");
+        ASSERT_TRUE(a.has_value());
+        ASSERT_VALUE_EQ(*a, Value(std::vector<Value>{Value(1), Value(2), Value(3)}));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantNestedArrayCapturedButSubpathsAreNot) {
+    setOptimizedPipeline("[{$set: {a: [[1, 2], [3, 4]]}}]");
+    runTest([&] {
+        auto a = graph->getConstant(nullptr, "a");
+        ASSERT_TRUE(a.has_value());
+        ASSERT_VALUE_EQ(*a,
+                        Value(std::vector<Value>{Value(std::vector<Value>{Value(1), Value(2)}),
+                                                 Value(std::vector<Value>{Value(3), Value(4)})}));
+        ASSERT_FALSE(graph->getConstant(nullptr, "a.0").has_value());
+        ASSERT_FALSE(graph->getConstant(nullptr, "a.x").has_value());
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantArrayOfObjectsCapturedButSubpathsAreNot) {
+    setOptimizedPipeline("[{$set: {a: [{b: 1}, {b: 2}]}}]");
+    runTest([&] {
+        auto a = graph->getConstant(nullptr, "a");
+        ASSERT_TRUE(a.has_value());
+        ASSERT_VALUE_EQ(
+            *a, Value(std::vector<Value>{Value(Document{{"b", 1}}), Value(Document{{"b", 2}})}));
+        ASSERT_FALSE(graph->getConstant(nullptr, "a.b").has_value());
+        ASSERT_FALSE(graph->getConstant(nullptr, "a.b.c").has_value());
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantDottedPathSet) {
+    pathArrayness->addPath("a", {}, false);
+    pathArrayness->addPath("a.b", {}, false);
+    pathArrayness->addPath("a.b.c", {}, false);
+    setPipeline("[{$set: {'a.b.c': 42}}]");
+    runTest([&] {
+        auto abc = graph->getConstant(nullptr, "a.b.c");
+        ASSERT_TRUE(abc.has_value());
+        ASSERT_VALUE_EQ(*abc, Value(42));
+
+        auto abcx = graph->getConstant(nullptr, "a.b.c.x");
+        ASSERT_TRUE(abcx.has_value());
+        ASSERT_TRUE(abcx->missing());
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantDottedPathSetWithoutPrefixArraynessIsNotTrusted) {
+    setPipeline("[{$set: {'a.b.c': 42}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->getConstant(nullptr, "a.b.c").has_value());
+        ASSERT_FALSE(graph->getConstant(nullptr, "a.b.c.x").has_value());
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantPropagatesThroughSimpleRename) {
+    setPipeline(
+        "[{$set: {a: 1}},"
+        " {$set: {b: '$a'}}]");
+    runTest([&] {
+        auto b = graph->getConstant(nullptr, "b");
+        ASSERT_TRUE(b.has_value());
+        ASSERT_VALUE_EQ(*b, Value(1));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantPropagatesThroughDottedRename) {
+    pathArrayness->addPath("a", {}, false);
+    pathArrayness->addPath("a.b", {}, false);
+    setPipeline(
+        "[{$set: {'a.b': 7}},"
+        " {$set: {c: '$a.b'}}]");
+    runTest([&] {
+        auto c = graph->getConstant(nullptr, "c");
+        ASSERT_TRUE(c.has_value());
+        ASSERT_VALUE_EQ(*c, Value(7));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantRenameOfMissingSubpath) {
+    setPipeline(
+        "[{$set: {a: 1}},"
+        " {$set: {b: '$a.x'}}]");
+    runTest([&] { ASSERT_FALSE(graph->canPathBeArray(nullptr, "b")); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantLiteralExpression) {
+    setPipeline("[{$set: {a: {$literal: '$x'}}}]");
+    runTest([&] {
+        auto a = graph->getConstant(nullptr, "a");
+        ASSERT_TRUE(a.has_value());
+        ASSERT_VALUE_EQ(*a, Value("$x"_sd));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantNoConstantForRuntimeVariable) {
+    setPipeline("[{$set: {a: '$$NOW'}}]");
+    runTest([&] { ASSERT_FALSE(graph->getConstant(nullptr, "a").has_value()); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantNoConstantForFieldReference) {
+    setPipeline("[{$set: {a: '$x'}}]");
+    runTest([&] { ASSERT_FALSE(graph->getConstant(nullptr, "a").has_value()); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantPartialObjectIsNotTracked) {
+    // ExpressionObject with a non-constant child does not fold to ExpressionConstant.
+    setPipeline("[{$set: {a: {b: 1, c: '$x'}}}]");
+    runTest([&] { ASSERT_FALSE(graph->getConstant(nullptr, "a").has_value()); });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantDroppedWhenLeafRedeclared) {
+    setPipeline(
+        "[{$set: {a: 1}},"
+        " {$set: {a: 2}}]");
+    runTest([&] {
+        auto a = graph->getConstant(nullptr, "a");
+        ASSERT_TRUE(a.has_value());
+        ASSERT_VALUE_EQ(*a, Value(2));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, GetConstantNoneForBaseDocument) {
+    setPipeline("[{$set: {a: 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->getConstant(nullptr, "b").has_value());
+        // No previous stage relative to the first stage.
+        ASSERT_FALSE(graph->getConstant(stages.front().get(), "a").has_value());
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, IncludeFieldShadowedByObjectConstant) {
+    pathArrayness->addPath("a", {}, false);
+    pathArrayness->addPath("a.b", {}, false);
+    setPipeline(
+        "[{$set: {a: {$literal: {b: 7, c: 'x'}}}},"
+        " {$project: {'a.b': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b"));
+        auto ab = graph->getConstant(nullptr, "a.b");
+        ASSERT_TRUE(ab.has_value());
+        ASSERT_VALUE_EQ(*ab, Value(7));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, IncludeFieldShadowedByObjectConstantMissingSubpath) {
+    pathArrayness->addPath("a", {}, false);
+    pathArrayness->addPath("a.x", {}, false);
+    setPipeline(
+        "[{$set: {a: {$literal: {b: 7}}}},"
+        " {$project: {'a.x': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.x"));
+        auto ax = graph->getConstant(nullptr, "a.x");
+        ASSERT_TRUE(ax.has_value());
+        ASSERT_TRUE(ax->missing());
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CanPathBeArrayDeepScalarShadow) {
+    pathArrayness->addPath("a", {}, false);
+    pathArrayness->addPath("a.b", {}, false);
+    pathArrayness->addPath("a.b.c", {}, false);
+    setPipeline("[{$set: {'a.b.c': 1}}]");
+    runTest([&] {
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d.e"));
     });
 }
 

@@ -1,18 +1,15 @@
-VARIATION ComplexRename
+VARIATION ConstantDottedPath
 input: {
     "pipeline": [
         {
             "$set": {
                 "a": {
                     "b": {
-                        "$const": 1
+                        "c": {
+                            "$const": 42
+                        }
                     }
                 }
-            }
-        },
-        {
-            "$set": {
-                "c": "$a.b"
             }
         }
     ]
@@ -37,11 +34,26 @@ output: {
                             },
                             "b:3": {
                                 "declaringScope": "scope:1",
-                                "metadata": {
-                                    "array": false,
-                                    "constant": 1
+                                "scope:2": {
+                                    "exhaustiveScope": "scope:-1",
+                                    "fields": {
+                                        "<missing>:4": {
+                                            "declaringScope": "scope:2",
+                                            "dependencies": []
+                                        },
+                                        "c:5": {
+                                            "declaringScope": "scope:2",
+                                            "metadata": {
+                                                "array": false,
+                                                "constant": 42
+                                            },
+                                            "dependencies": []
+                                        }
+                                    }
                                 },
-                                "dependencies": []
+                                "dependencies": [
+                                    "c:5"
+                                ]
                             }
                         }
                     },
@@ -53,27 +65,6 @@ output: {
         },
         "dependencies": [
             "<base document>:-1"
-        ]
-    },
-    "$set:1": {
-        "scope:2": {
-            "exhaustiveScope": "scope:-1",
-            "fields": {
-                "<missing>:4": {
-                    "declaringScope": "scope:2",
-                    "dependencies": []
-                },
-                "a:1": "a:1",
-                "c:5": {
-                    "declaringScope": "scope:2",
-                    "dependencies": [
-                        "b:3"
-                    ]
-                }
-            }
-        },
-        "dependencies": [
-            "b:3"
         ]
     }
 }

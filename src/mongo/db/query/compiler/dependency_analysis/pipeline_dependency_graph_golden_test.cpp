@@ -506,5 +506,53 @@ TEST_F(PipelineDependencyGraphGoldenTest, LookupDottedAsPrefixCannotBeArray) {
     });
 }
 
+TEST_F(PipelineDependencyGraphGoldenTest, ConstantScalarSet) {
+    runVariation({
+        .name = "ConstantScalarSet",
+        .pipeline = "[{$set: {a: 1, b: 'foo', c: true, d: null}}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ConstantDottedPath) {
+    runVariation({
+        .name = "ConstantDottedPath",
+        .pipeline = "[{$set: {'a.b.c': 42}}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ConstantPropagatedThroughRename) {
+    runVariation({
+        .name = "ConstantPropagatedThroughRename",
+        .pipeline = "[{$set: {a: 7}},"
+                    " {$set: {b: '$a'}},"
+                    " {$set: {c: '$b'}}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ConstantNotTrackedForRuntimeVariable) {
+    runVariation({
+        .name = "ConstantNotTrackedForRuntimeVariable",
+        .pipeline = "[{$set: {a: '$$NOW'}}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ConstantArrayLiteral) {
+    // $literal forces an ExpressionConstant so the array is captured as a constant Value (whereas
+    // a plain `[1,2,3]` parses as ExpressionArray, which would only fold to a constant after
+    // 'optimize()' — the fixture parses with 'kOptionsMinimal' and skips optimize).
+    runVariation({
+        .name = "ConstantArrayLiteral",
+        .pipeline = "[{$set: {a: {$literal: [1, 2, 3]}}}]",
+    });
+}
+
+TEST_F(PipelineDependencyGraphGoldenTest, ConstantOverwritten) {
+    runVariation({
+        .name = "ConstantOverwritten",
+        .pipeline = "[{$set: {a: 1}},"
+                    " {$set: {a: 2}}]",
+    });
+}
+
 }  // namespace
 }  // namespace mongo::pipeline::dependency_graph
