@@ -46,6 +46,11 @@ from buildscripts.resmokelib.testing.suite import Suite
 from buildscripts.resmokelib.utils import runtime_recorder
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
 from buildscripts.util.download_utils import get_s3_client
+from buildscripts.util.golden_test_config import (
+    GOLDEN_TEST_CONFIG_PATH_ENV,
+    GOLDEN_TEST_OUTPUT_ROOT_PATTERN_ENV,
+    GoldenTestConfig,
+)
 from buildscripts.util.teststats import HistoricTaskData
 
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
@@ -89,6 +94,39 @@ class TestRunner(Subcommand):
                 "Failed to flush all logs within a reasonable amount of time, "
                 "treating logs as incomplete"
             )
+
+    def _setup_golden_test(self):
+        """Pre-calculate the golden test output root pattern so that all golden tests
+        end up in the same directory.
+
+        Each jstest is executed in its own mongo shell subprocess. The C++
+        golden test framework reads ``outputRootPattern`` from the YAML config
+        pointed to by ``GOLDEN_TEST_CONFIG_PATH`` and replaces each ``%`` in
+        the basename with a random hex digit. Because that substitution happens
+        once per process, each test would otherwise produce its own
+        UUID-suffixed output directory.
+        """
+        if GOLDEN_TEST_OUTPUT_ROOT_PATTERN_ENV in os.environ:
+            return
+
+        golden_test_cfg_path = os.environ.get(GOLDEN_TEST_CONFIG_PATH_ENV)
+        if not golden_test_cfg_path:
+            return
+
+        golden_test_cfg = GoldenTestConfig.from_yaml_file(golden_test_cfg_path)
+        if not golden_test_cfg.outputRootPattern or "%" not in golden_test_cfg.outputRootPattern:
+            return
+
+        # Substitute `%` placeholders only in the file name, mirroring `fs::unique_path(filename)`
+        # on the C++ side.
+        parent_dir, file_name = os.path.split(golden_test_cfg.outputRootPattern)
+        file_name_uuid = "".join(
+            random.choice("0123456789abcdef") if c == "%" else c for c in file_name
+        )
+
+        # Store the calculated value in the `GOLDEN_TEST_OUTPUT_ROOT_PATTERN` variable so
+        # that the C++ code can reference it.
+        os.environ[GOLDEN_TEST_OUTPUT_ROOT_PATTERN_ENV] = os.path.join(parent_dir, file_name_uuid)
 
     def execute(self):
         """Execute the 'run' subcommand."""
@@ -203,6 +241,8 @@ class TestRunner(Subcommand):
 
     def run_tests(self):
         """Run the suite and tests specified."""
+        self._setup_golden_test()
+
         # This code path should only execute when resmoke is running from a workload container.
         if config.REQUIRES_WORKLOAD_CONTAINER_SETUP:
             self._setup_workload_container()

@@ -231,9 +231,13 @@ GoldenTestOptions GoldenTestOptions::parseEnvironment() {
     GoldenTestOptions opts;
     po::options_description desc_env;
     boost::optional<std::string> configPath;
+    boost::optional<std::string> outputRootPatternOverride;
     desc_env.add_options()  //
         ("config_path",
-         po::value<std::string>()->notifier([&configPath](auto v) { configPath = v; }));
+         po::value<std::string>()->notifier([&configPath](auto v) { configPath = v; }))  //
+        ("output_root_pattern",
+         po::value<std::string>()->notifier(
+             [&outputRootPatternOverride](auto v) { outputRootPatternOverride = v; }));
 
     po::variables_map vm_env;
     po::store(po::parse_environment(desc_env, "GOLDEN_TEST_"), vm_env);
@@ -252,6 +256,14 @@ GoldenTestOptions GoldenTestOptions::parseEnvironment() {
         if (diffCmdNode && diffCmdNode.IsScalar()) {
             opts.diffCmd = diffCmdNode.as<std::string>();
         }
+    }
+
+    // GOLDEN_TEST_OUTPUT_ROOT_PATTERN takes precedence over any value loaded from the YAML config.
+    // This allows resmoke.py to pre-resolve a single output root pattern and share it across all
+    // mongo shell subprocesses of one invocation, so every jstest writes its actual results under
+    // the same UUID-suffixed directory.
+    if (outputRootPatternOverride) {
+        opts.outputRootPattern = *outputRootPatternOverride;
     }
 
     return opts;

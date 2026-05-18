@@ -265,6 +265,9 @@ struct GoldenTestOptions {
      *  - GOLDEN_TEST_CONFIG_PATH: (optional) specifies the yaml config file.
      *    See config file reference:
      * docs/golden_data_test_framework.md#appendix---config-file-reference
+     *  - GOLDEN_TEST_OUTPUT_ROOT_PATTERN: (optional) overrides the `outputRootPattern` value
+     *    loaded from the yaml config. Intended to let resmoke.py pre-resolve a single output
+     *    root and share it across all golden tests in one invocation.
      */
     static GoldenTestOptions parseEnvironment();
 

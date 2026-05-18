@@ -40,7 +40,10 @@ filters:
       - 10gen/devprod-test-infrastructure
   - "golden_test.py":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-optimization-correctness
+  - "util/golden_test_config.py":
+    approvers:
+      - 10gen/query-optimization-correctness
   - "evergreen_gen_streams*":
     approvers:
       - 10gen/streams-engine

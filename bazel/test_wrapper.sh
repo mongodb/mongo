@@ -2,6 +2,7 @@
 
 # Golden tests are currently incompatible with Bazel Remote Execution
 unset GOLDEN_TEST_CONFIG_PATH
+unset GOLDEN_TEST_OUTPUT_ROOT_PATTERN
 
 is_ppc64le() {
     local -r arch="$(uname -m)"

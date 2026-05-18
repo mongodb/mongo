@@ -11,6 +11,7 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts/ciconfig",
+        "//buildscripts/util",
         dependency(
             "requests",
             group = "core",

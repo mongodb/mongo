@@ -12,6 +12,7 @@ py_library(
         "expansions.py",
         "fileops.py",
         "generate_co_jira_map.py",
+        "golden_test_config.py",
         "oauth.py",
         "read_config.py",
         "runcommand.py",

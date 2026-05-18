@@ -21,7 +21,7 @@ import click
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from buildscripts.util.fileops import read_yaml_file
+from buildscripts.util.golden_test_config import GoldenTestConfig
 
 assert sys.version_info >= (3, 7)
 
@@ -41,25 +41,6 @@ class AppError(Exception):
     """Application execution error."""
 
     pass
-
-
-class GoldenTestConfig(object):
-    """Represents the golden test configuration.
-
-    See: docs/golden_data_test_framework.md#appendix---config-file-reference
-    """
-
-    def __init__(self, iterable=(), **kwargs):
-        """Initialize the fields."""
-        self.__dict__.update(iterable, **kwargs)
-
-    outputRootPattern: str
-    diffCmd: str
-
-    @classmethod
-    def from_yaml_file(cls, path: str) -> "GoldenTestConfig":
-        """Read the golden test configuration from the given file."""
-        return cls(**read_yaml_file(path))
 
 
 class OutputPaths(object):
@@ -250,7 +231,7 @@ class GoldenTestApp(object):
 
     def setup_linux(self):
         # Create config file
-        config_path = os.path.join(os.path.expanduser("~"), ".golden_test_config.yml")
+        config_path = GoldenTestConfig.default_config_path()
         if not os.path.isfile(config_path):
             print(f"Creating {config_path}")
             config_contents = (
