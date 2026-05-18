@@ -1285,8 +1285,13 @@ TEST_F(PipelineDependencyGraphTest, DottedPathAfterBaseField) {
         "{$set: { 'a.b.a': 1 }}]");
 
     runTest([&] {
-        // TODO(SERVER-126001): a.x was modified by the first stage
-        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.x"), nullptr) << graph->toDebugString();
+        // The a.x seen from the first stage is whatever a.x comes from the base document.
+        ASSERT_EQUALS(graph->getDeclaringStage(stages[0].get(), "a.x"), nullptr);
+        // The a.x seen from the second stage is non-existent erased by the first stage.
+        ASSERT_EQUALS(graph->getDeclaringStage(stages[1].get(), "a.x"), stages[0]);
+        // The a.x seen from the second stage is still the non-existent erased by the first stage.
+        ASSERT_EQUALS(graph->getDeclaringStage(stages[2].get(), "a.x"), stages[1]);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "a.x"), stages[1]);
     });
 }
 

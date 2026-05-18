@@ -99,7 +99,7 @@ output: {
                 "a:7": {
                     "declaringScope": "scope:3",
                     "scope:4": {
-                        "exhaustiveScope": "scope:-1",
+                        "exhaustiveScope": "scope:2",
                         "fields": {
                             "<missing>:8": {
                                 "declaringScope": "scope:4",

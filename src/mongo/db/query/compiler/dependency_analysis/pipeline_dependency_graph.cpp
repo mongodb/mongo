@@ -922,8 +922,8 @@ private:
                 // Previous field is a leaf in a non-exhaustive scope -> this new scope
                 return embeddedScope;
             }
-            // TODO(SERVER-126001): We should not return none here.
-            return ScopeId::none();
+            // The parent's scope is the exhaustive scope.
+            return parentEmbeddedScope;
         }();
 
         return {exhaustiveEmbeddedScope, parentEmbeddedScope};
