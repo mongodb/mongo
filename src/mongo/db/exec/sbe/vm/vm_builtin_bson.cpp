@@ -35,12 +35,12 @@ namespace vm {
 value::TagValueMaybeOwned ByteCode::builtinTypeMatch(ArityType arity) {
     tassert(11080053, "Unexpected arity value", arity == 2);
 
-    auto [inputOwn, inputTag, inputVal] = getFromStack(0);
-    auto [typeMaskOwn, typeMaskTag, typeMaskVal] = getFromStack(1);
+    auto input = viewFromStack(0);
+    auto typeMask = viewFromStack(1);
 
-    if (inputTag != value::TypeTags::Nothing && typeMaskTag == value::TypeTags::NumberInt32) {
-        auto typeMask = static_cast<uint32_t>(value::bitcastTo<int32_t>(typeMaskVal));
-        bool matches = static_cast<bool>(getBSONTypeMask(inputTag) & typeMask);
+    if (input.tag != value::TypeTags::Nothing && typeMask.tag == value::TypeTags::NumberInt32) {
+        auto typeMaskVal = static_cast<uint32_t>(value::bitcastTo<int32_t>(typeMask.value));
+        bool matches = static_cast<bool>(getBSONTypeMask(input.tag) & typeMaskVal);
 
         return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(matches)};
     }
@@ -51,15 +51,15 @@ value::TagValueMaybeOwned ByteCode::builtinTypeMatch(ArityType arity) {
 value::TagValueMaybeOwned ByteCode::builtinFillType(ArityType arity) {
     tassert(11080052, "Unexpected arity value", arity == 3);
 
-    auto [inputOwned, inputTag, inputVal] = getFromStack(0);
-    auto [typeMaskOwned, typeMaskTag, typeMaskVal] = getFromStack(1);
+    auto input = viewFromStack(0);
+    auto typeMaskView = viewFromStack(1);
 
-    if (typeMaskTag != value::TypeTags::NumberInt32 || inputTag == value::TypeTags::Nothing) {
+    if (typeMaskView.tag != value::TypeTags::NumberInt32 || input.tag == value::TypeTags::Nothing) {
         return {true, value::TypeTags::Nothing, value::Value{0u}};
     }
-    uint32_t typeMask = static_cast<uint32_t>(value::bitcastTo<int32_t>(typeMaskVal));
+    uint32_t typeMask = static_cast<uint32_t>(value::bitcastTo<int32_t>(typeMaskView.value));
 
-    if (static_cast<bool>(getBSONTypeMask(inputTag) & typeMask)) {
+    if (static_cast<bool>(getBSONTypeMask(input.tag) & typeMask)) {
         // Return the fill value.
         return value::TagValueMaybeOwned::fromRaw(moveFromStack(2));
     } else {

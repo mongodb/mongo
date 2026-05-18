@@ -33,9 +33,9 @@ namespace mongo {
 namespace sbe {
 namespace vm {
 value::TagValueMaybeOwned ByteCode::builtinCoerceToBool(ArityType arity) {
-    auto [operandOwned, operandTag, operandVal] = getFromStack(0);
+    auto operand = viewFromStack(0);
 
-    auto [tag, val] = value::coerceToBool(operandTag, operandVal);
+    auto [tag, val] = value::coerceToBool(operand.tag, operand.value);
 
     return {false, tag, val};
 }

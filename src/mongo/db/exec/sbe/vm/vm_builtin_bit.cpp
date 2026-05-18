@@ -36,25 +36,25 @@ namespace vm {
 value::TagValueMaybeOwned ByteCode::builtinBitTestPosition(ArityType arity) {
     tassert(11080056, "Unexpected arity value", arity == 3);
 
-    auto [ownedMask, maskTag, maskValue] = getFromStack(0);
-    auto [ownedInput, valueTag, value] = getFromStack(1);
+    auto mask = viewFromStack(0);
+    auto input = viewFromStack(1);
 
     // Carries a flag to indicate the desired testing behavior this was invoked under. The testing
     // behavior is used to determine if we need to bail out of the bit position comparison early in
     // the depending if a bit is found to be set or unset.
-    auto [_, tagBitTestBehavior, valueBitTestBehavior] = getFromStack(2);
+    auto bitTestBehaviorView = viewFromStack(2);
     tassert(11086808,
             "Unexpected BitTestBehavior type",
-            tagBitTestBehavior == value::TypeTags::NumberInt32);
+            bitTestBehaviorView.tag == value::TypeTags::NumberInt32);
 
-    if (!value::isArray(maskTag) || !value::isBinData(valueTag)) {
+    if (!value::isArray(mask.tag) || !value::isBinData(input.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto bitPositions = value::getArrayView(maskValue);
-    auto binDataSize = static_cast<int64_t>(value::getBSONBinDataSize(valueTag, value));
-    auto binData = value::getBSONBinData(valueTag, value);
-    auto bitTestBehavior = BitTestBehavior{value::bitcastTo<int32_t>(valueBitTestBehavior)};
+    auto bitPositions = value::getArrayView(mask.value);
+    auto binDataSize = static_cast<int64_t>(value::getBSONBinDataSize(input.tag, input.value));
+    auto binData = value::getBSONBinData(input.tag, input.value);
+    auto bitTestBehavior = BitTestBehavior{value::bitcastTo<int32_t>(bitTestBehaviorView.value)};
 
     auto isBitSet = false;
     for (size_t idx = 0; idx < bitPositions->size(); ++idx) {
@@ -99,32 +99,32 @@ value::TagValueMaybeOwned ByteCode::builtinBitTestPosition(ArityType arity) {
 
 value::TagValueMaybeOwned ByteCode::builtinBitTestZero(ArityType arity) {
     tassert(11080055, "Unexpected arity value", arity == 2);
-    auto [maskOwned, maskTag, maskValue] = getFromStack(0);
-    auto [inputOwned, inputTag, inputValue] = getFromStack(1);
+    auto mask = viewFromStack(0);
+    auto input = viewFromStack(1);
 
-    if ((maskTag != value::TypeTags::NumberInt32 && maskTag != value::TypeTags::NumberInt64) ||
-        (inputTag != value::TypeTags::NumberInt32 && inputTag != value::TypeTags::NumberInt64)) {
+    if ((mask.tag != value::TypeTags::NumberInt32 && mask.tag != value::TypeTags::NumberInt64) ||
+        (input.tag != value::TypeTags::NumberInt32 && input.tag != value::TypeTags::NumberInt64)) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto maskNum = value::numericCast<int64_t>(maskTag, maskValue);
-    auto inputNum = value::numericCast<int64_t>(inputTag, inputValue);
+    auto maskNum = value::numericCast<int64_t>(mask.tag, mask.value);
+    auto inputNum = value::numericCast<int64_t>(input.tag, input.value);
     auto result = (maskNum & inputNum) == 0;
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
 }
 
 value::TagValueMaybeOwned ByteCode::builtinBitTestMask(ArityType arity) {
     tassert(11080054, "Unexpected arity value", arity == 2);
-    auto [maskOwned, maskTag, maskValue] = getFromStack(0);
-    auto [inputOwned, inputTag, inputValue] = getFromStack(1);
+    auto mask = viewFromStack(0);
+    auto input = viewFromStack(1);
 
-    if ((maskTag != value::TypeTags::NumberInt32 && maskTag != value::TypeTags::NumberInt64) ||
-        (inputTag != value::TypeTags::NumberInt32 && inputTag != value::TypeTags::NumberInt64)) {
+    if ((mask.tag != value::TypeTags::NumberInt32 && mask.tag != value::TypeTags::NumberInt64) ||
+        (input.tag != value::TypeTags::NumberInt32 && input.tag != value::TypeTags::NumberInt64)) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto maskNum = value::numericCast<int64_t>(maskTag, maskValue);
-    auto inputNum = value::numericCast<int64_t>(inputTag, inputValue);
+    auto maskNum = value::numericCast<int64_t>(mask.tag, mask.value);
+    auto inputNum = value::numericCast<int64_t>(input.tag, input.value);
     auto result = (maskNum & inputNum) == maskNum;
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
 }

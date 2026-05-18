@@ -36,22 +36,22 @@ namespace vm {
 std::pair<SortSpec*, CollatorInterface*> ByteCode::generateSortKeyHelper(ArityType arity) {
     tassert(11080009, "Unexpected arity value", arity == 2 || arity == 3);
 
-    auto [ssOwned, ssTag, ssVal] = getFromStack(0);
-    auto [objOwned, objTag, objVal] = getFromStack(1);
-    if (ssTag != value::TypeTags::sortSpec || !value::isObject(objTag)) {
+    auto ssView = viewFromStack(0);
+    auto objView = viewFromStack(1);
+    if (ssView.tag != value::TypeTags::sortSpec || !value::isObject(objView.tag)) {
         return {nullptr, nullptr};
     }
 
     CollatorInterface* collator{nullptr};
     if (arity == 3) {
-        auto [collatorOwned, collatorTag, collatorVal] = getFromStack(2);
-        if (collatorTag != value::TypeTags::collator) {
+        auto collatorView = viewFromStack(2);
+        if (collatorView.tag != value::TypeTags::collator) {
             return {nullptr, nullptr};
         }
-        collator = value::getCollatorView(collatorVal);
+        collator = value::getCollatorView(collatorView.value);
     }
 
-    auto ss = value::getSortSpecView(ssVal);
+    auto ss = value::getSortSpecView(ssView.value);
     return {ss, collator};
 }
 
@@ -76,8 +76,8 @@ value::TagValueMaybeOwned ByteCode::builtinGenerateSortKey(ArityType arity) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto [objOwned, objTag, objVal] = getFromStack(1);
-    auto bsonObj = [objTag = objTag, objVal = objVal]() {
+    auto objView = viewFromStack(1);
+    auto bsonObj = [objTag = objView.tag, objVal = objView.value]() {
         if (objTag == value::TypeTags::bsonObject) {
             return BSONObj{value::bitcastTo<const char*>(objVal)};
         } else if (objTag == value::TypeTags::Object) {
@@ -97,15 +97,15 @@ value::TagValueMaybeOwned ByteCode::builtinGenerateSortKey(ArityType arity) {
 value::TagValueMaybeOwned ByteCode::builtinSortKeyComponentVectorGetElement(ArityType arity) {
     tassert(11080008, "Unexpected arity value", arity == 2);
 
-    auto [sortVecOwned, sortVecTag, sortVecVal] = getFromStack(0);
-    auto [idxOwned, idxTag, idxVal] = getFromStack(1);
-    if (sortVecTag != value::TypeTags::sortKeyComponentVector ||
-        idxTag != value::TypeTags::NumberInt32) {
+    auto sortVec = viewFromStack(0);
+    auto idx = viewFromStack(1);
+    if (sortVec.tag != value::TypeTags::sortKeyComponentVector ||
+        idx.tag != value::TypeTags::NumberInt32) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto* sortObj = value::getSortKeyComponentVectorView(sortVecVal);
-    const auto idxInt32 = value::bitcastTo<int32_t>(idxVal);
+    auto* sortObj = value::getSortKeyComponentVectorView(sortVec.value);
+    const auto idxInt32 = value::bitcastTo<int32_t>(idx.value);
 
     tassert(11086803,
             "Unexpected idx parameter value",
@@ -117,11 +117,11 @@ value::TagValueMaybeOwned ByteCode::builtinSortKeyComponentVectorGetElement(Arit
 value::TagValueMaybeOwned ByteCode::builtinSortKeyComponentVectorToArray(ArityType arity) {
     tassert(11080007, "Unexpected arity value", arity == 1);
 
-    auto [sortVecOwned, sortVecTag, sortVecVal] = getFromStack(0);
-    if (sortVecTag != value::TypeTags::sortKeyComponentVector) {
+    auto sortVecView = viewFromStack(0);
+    if (sortVecView.tag != value::TypeTags::sortKeyComponentVector) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto* sortVec = value::getSortKeyComponentVectorView(sortVecVal);
+    auto* sortVec = value::getSortKeyComponentVectorView(sortVecView.value);
 
     if (sortVec->elts.size() == 1) {
         auto [tag, val] = sortVec->elts[0];
@@ -203,9 +203,9 @@ value::TagValueMaybeOwned ByteCode::builtinGetSortKey(ArityType arity) {
 
     CollatorInterface* collator = nullptr;
     if (arity == 2) {
-        auto [_, collTag, collVal] = getFromStack(1);
-        if (collTag == value::TypeTags::collator) {
-            collator = value::getCollatorView(collVal);
+        auto collView = viewFromStack(1);
+        if (collView.tag == value::TypeTags::collator) {
+            collator = value::getCollatorView(collView.value);
         }
     }
 
