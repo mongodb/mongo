@@ -636,7 +636,7 @@ last-lts:
       ticket: SERVER-89744
     - test_file: jstests/sharding/resharding_error_during_critical_section.js
       ticket: SERVER-114005
-    - test_file: jstests/sharding/resharding_index_builds_repl_lag.js
+    - test_file: jstests/sharding/index_builds/resharding_index_builds_repl_lag.js
       ticket: SERVER-103566
     - test_file: jstests/sharding/resharding_oplog_fetcher_repl_lag.js
       ticket: SERVER-103554
