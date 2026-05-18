@@ -87,8 +87,8 @@ TEST_F(SBEBuiltinDateAddTest, ComputesDateAdd) {
 
     int64_t startInstant = 1435006000;
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset_raw(
-        false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
+    timezoneDBAccessor.reset(value::TagValueView{
+        value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get())});
     startDateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(startInstant));
     auto [unitTag, unitVal] = value::makeNewString("minute");
     unitAccessor.reset(unitTag, unitVal);
@@ -138,8 +138,8 @@ TEST_F(SBEBuiltinDateAddTest, ReturnsNothingDateAdd) {
     auto compiledExpr = compileExpression(*dateAddExpr);
 
     auto tzdb = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset_raw(
-        false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
+    timezoneDBAccessor.reset(value::TagValueView{
+        value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get())});
 
     // Invalid startDate.
     auto [invalidDateTag, invalidDateVal] = value::makeNewString("my birthday");

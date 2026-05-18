@@ -111,36 +111,37 @@ TEST_F(SBEArraySetConversionTest, ArrayToSetExpression) {
 
     // Test with Array on first variant
     BSONArray bsonArr1 = BSON_ARRAY(1 << 1 << 2 << 1 << 2);
-    auto [arr1Tag, arr1Val] = convertFromBSONArray(bsonArr1);
-    inputAccessor.reset_raw(true, arr1Tag, arr1Val);
+    auto arr1 = value::TagValueOwned::fromRaw(convertFromBSONArray(bsonArr1));
+    inputAccessor.reset(std::move(arr1));
     runAndAssertExpression(compiledArrayToSet.get(), BSON_ARRAY(1 << 2));
 
     // Test with bsonArray on first variant
-    inputAccessor.reset_raw(
-        false, value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bsonArr1.objdata()));
+    inputAccessor.reset(value::TagValueView{value::TypeTags::bsonArray,
+                                            value::bitcastFrom<const char*>(bsonArr1.objdata())});
     runAndAssertExpression(compiledArrayToSet.get(), BSON_ARRAY(1 << 2));
 
     // Test with Array on second variant
     BSONArray bsonArr2 =
         BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2) << BSON("x" << 1) << "Y");
-    auto [arr2Tag, arr2Val] = convertFromBSONArray(bsonArr2);
-    inputAccessor.reset_raw(true, arr2Tag, arr2Val);
+    auto arr2 = value::TagValueOwned::fromRaw(convertFromBSONArray(bsonArr2));
+    inputAccessor.reset(std::move(arr2));
     runAndAssertExpression(compiledArrayToSet.get(),
                            BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2) << "Y"));
 
     // Test with bsonArray on second variant
-    inputAccessor.reset_raw(
-        false, value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bsonArr2.objdata()));
+    inputAccessor.reset(value::TagValueView{value::TypeTags::bsonArray,
+                                            value::bitcastFrom<const char*>(bsonArr2.objdata())});
     runAndAssertExpression(compiledArrayToSet.get(),
                            BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2) << "Y"));
 
     // Test with empty array
-    auto [emptyArrTag, emptyArrVal] = value::makeNewArray();
-    inputAccessor.reset_raw(true, emptyArrTag, emptyArrVal);
+    auto emptyArr = value::TagValueOwned::fromRaw(value::makeNewArray());
+    inputAccessor.reset(std::move(emptyArr));
     runAndAssertExpression(compiledArrayToSet.get(), BSONArray());
 
     // Test when input is not array Type
-    inputAccessor.reset_raw(false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    inputAccessor.reset(
+        value::TagValueView{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42)});
     runAndAssertNothing(compiledArrayToSet.get());
 }
 
@@ -165,36 +166,37 @@ TEST_F(SBEArraySetConversionTest, CollArrayToSetExpression) {
 
     // Test with Array on first variant
     BSONArray bsonArr1 = BSON_ARRAY(1 << 1 << 2 << 1 << 2);
-    auto [arr1Tag, arr1Val] = convertFromBSONArray(bsonArr1);
-    inputAccessor.reset_raw(true, arr1Tag, arr1Val);
+    auto arr1 = value::TagValueOwned::fromRaw(convertFromBSONArray(bsonArr1));
+    inputAccessor.reset(std::move(arr1));
     runAndAssertExpression(compiledArrayToSet.get(), BSON_ARRAY(1 << 2));
 
     // Test with bsonArray on first variant
-    inputAccessor.reset_raw(
-        false, value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bsonArr1.objdata()));
+    inputAccessor.reset(value::TagValueView{value::TypeTags::bsonArray,
+                                            value::bitcastFrom<const char*>(bsonArr1.objdata())});
     runAndAssertExpression(compiledArrayToSet.get(), BSON_ARRAY(1 << 2));
 
     // Test with Array on second variant
     BSONArray bsonArr2 =
         BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2) << BSON("x" << 1) << "Y");
-    auto [arr2Tag, arr2Val] = convertFromBSONArray(bsonArr2);
-    inputAccessor.reset_raw(true, arr2Tag, arr2Val);
+    auto arr2 = value::TagValueOwned::fromRaw(convertFromBSONArray(bsonArr2));
+    inputAccessor.reset(std::move(arr2));
     runAndAssertExpression(compiledArrayToSet.get(),
                            BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2)));
 
     // Test with bsonArray on second variant
-    inputAccessor.reset_raw(
-        false, value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bsonArr2.objdata()));
+    inputAccessor.reset(value::TagValueView{value::TypeTags::bsonArray,
+                                            value::bitcastFrom<const char*>(bsonArr2.objdata())});
     runAndAssertExpression(compiledArrayToSet.get(),
                            BSON_ARRAY(BSON("x" << 1) << "y" << BSON("x" << 2)));
 
     // Test with empty array
-    auto [emptyArrTag, emptyArrVal] = value::makeNewArray();
-    inputAccessor.reset_raw(true, emptyArrTag, emptyArrVal);
+    auto emptyArr = value::TagValueOwned::fromRaw(value::makeNewArray());
+    inputAccessor.reset(std::move(emptyArr));
     runAndAssertExpression(compiledArrayToSet.get(), BSONArray());
 
     // Test when input is not array Type
-    inputAccessor.reset_raw(false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    inputAccessor.reset(
+        value::TagValueView{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42)});
     runAndAssertNothing(compiledArrayToSet.get());
 }
 }  // namespace mongo::sbe

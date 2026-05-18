@@ -2413,11 +2413,13 @@ public:
                 sbe::value::getStringView(nextInputTag, nextInputVal) == "MISSING"_sd) {
                 _inputAccessor.reset();
             } else {
-                auto [copyTag, copyVal] = sbe::value::copyValue(nextInputTag, nextInputVal);
-                _inputAccessor.reset_raw(true, copyTag, copyVal);
+                auto copy = sbe::value::TagValueOwned::fromRaw(
+                    sbe::value::copyValue(nextInputTag, nextInputVal));
+                _inputAccessor.reset(std::move(copy));
             }
 
-            auto [outputTag, outputVal] = runCompiledExpression(code);
+            _aggAccessor.reset(sbe::value::TagValueOwned::fromRaw(runCompiledExpression(code)));
+            auto [outputTag, outputVal] = _aggAccessor.getViewOfValue();
 
             // Validate that the output value equals the expected value, and then put the output
             // value into the slot that holds the accumulation state.
@@ -2447,8 +2449,6 @@ public:
                       "index"_attr = index);
                 FAIL("accumulator did not have expected value");
             }
-
-            _aggAccessor.reset_raw(true, outputTag, outputVal);
 
             inputEnumerator.advance();
             expectedEnumerator.advance();
@@ -2536,13 +2536,12 @@ public:
             auto fieldName = sbe::bson::fieldNameAndLength(bsonElt);
 
             // Convert the BSON value to an SBE value and put it inside the input slot.
-            auto [tag, val] =
-                sbe::bson::convertToOwned(bsonElt, bsonEnd, fieldName.size()).releaseToRaw();
-            _inputAccessor.reset_raw(true, tag, val);
+            auto input = sbe::bson::convertToOwned(bsonElt, bsonEnd, fieldName.size());
+            _inputAccessor.reset(std::move(input));
 
             // Run the agg function, and put the result in the slot holding the aggregate value.
-            auto [outputTag, outputVal] = runCompiledExpression(code.get());
-            _aggAccessor.reset_raw(true, outputTag, outputVal);
+            auto output = sbe::value::TagValueOwned::fromRaw(runCompiledExpression(code.get()));
+            _aggAccessor.reset(std::move(output));
 
             bsonElt = sbe::bson::advance(bsonElt, fieldName.size());
         }
@@ -2622,15 +2621,15 @@ public:
         auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
         auto finalizeCompiledExpr = compileExpression(*finalizeExpr);
 
-        auto [mergeStateTag, mergeStateVal] = convertFromBSONArray(mergeState);
-        _aggAccessor.reset_raw(true, mergeStateTag, mergeStateVal);
+        auto mergeStateOwned = sbe::value::TagValueOwned::fromRaw(convertFromBSONArray(mergeState));
+        _aggAccessor.reset(std::move(mergeStateOwned));
 
-        auto [inputStateTag, inputStateVal] = convertFromBSONArray(inputState);
-        _inputAccessor.reset_raw(true, inputStateTag, inputStateVal);
+        auto inputStateOwned = sbe::value::TagValueOwned::fromRaw(convertFromBSONArray(inputState));
+        _inputAccessor.reset(std::move(inputStateOwned));
 
-        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-        _aggAccessor.reset_raw(true, resultTag, resultVal);
-        std::tie(resultTag, resultVal) = runCompiledExpression(finalizeCompiledExpr.get());
+        auto result = sbe::value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+        _aggAccessor.reset(std::move(result));
+        auto [resultTag, resultVal] = runCompiledExpression(finalizeCompiledExpr.get());
 
         auto [compareTag, compareVal] =
             sbe::value::compareValue(resultTag,
@@ -2660,16 +2659,16 @@ public:
         auto finalExpr =
             sbe::makeFunction(aggFinalize, sbe::makeVariable(aggSlot), std::move(sortSpecConstant));
 
-        auto [mergeStateTag, mergeStateVal] = convertFromBSONArray(mergeState);
-        _aggAccessor.reset_raw(true, mergeStateTag, mergeStateVal);
+        auto mergeStateOwned = sbe::value::TagValueOwned::fromRaw(convertFromBSONArray(mergeState));
+        _aggAccessor.reset(std::move(mergeStateOwned));
 
-        auto [inputStateTag, inputStateVal] = convertFromBSONArray(inputState);
-        _inputAccessor.reset_raw(true, inputStateTag, inputStateVal);
+        auto inputStateOwned = sbe::value::TagValueOwned::fromRaw(convertFromBSONArray(inputState));
+        _inputAccessor.reset(std::move(inputStateOwned));
 
         auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
 
-        auto [newAccTag, newAccVal] = runCompiledExpression(compiledExpr.get());
-        _aggAccessor.reset_raw(true, newAccTag, newAccVal);
+        auto newAcc = sbe::value::TagValueOwned::fromRaw(runCompiledExpression(compiledExpr.get()));
+        _aggAccessor.reset(std::move(newAcc));
 
         auto compiledFinalExpr = compileExpression(*finalExpr);
 

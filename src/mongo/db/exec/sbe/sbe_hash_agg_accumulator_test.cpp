@@ -192,21 +192,23 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminal) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 10 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 90 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(90));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(90)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator, which we expect it to ignore.
     auto [tagInput, valInput] = value::makeSmallString(":/");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 990 to the accumulator.
     std::tie(tagInput, valInput) = value::makeCopyDecimal(Decimal128(200));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -221,11 +223,13 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminal) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 10 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 90 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(90));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(90)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -264,11 +268,13 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminalSpille
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 40 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(40));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(40)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -276,11 +282,13 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminalSpille
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 400 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(400));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(400)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 4,000 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4000));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4000)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -293,12 +301,12 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminalSpille
 
     // Input 40,000 to the accumulator.
     auto [tagInput, valInput] = value::makeCopyDecimal(Decimal128(40000));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 400,000 to the accumulator.
-    inAccessor().reset_raw(
-        false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(400000));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(400000)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -313,7 +321,7 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminalSpille
 
     while (!isMockSpillStorageEmpty()) {
         std::tie(tagRecovered, valRecovered) = consumePartialAggregateFromMockSpillStorage();
-        spillAccessor().reset_raw(true, tagRecovered, valRecovered);
+        spillAccessor().reset(value::TagValueOwned{tagRecovered, valRecovered});
         accumulator.merge(bytecode, mergedAggregateAccessor);
     }
 
@@ -341,21 +349,23 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartial) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 10 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 90 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(90));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(90)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator, which we expect it to ignore.
     auto [tagInput, valInput] = value::makeSmallString(":/");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 990 to the accumulator.
     std::tie(tagInput, valInput) = value::makeCopyDecimal(Decimal128(200));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -377,11 +387,13 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartial) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 10 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 90 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(90));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(90)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -432,11 +444,13 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartialSpilled
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 40 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(40));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(40)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -444,11 +458,13 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartialSpilled
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 400 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(400));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(400)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 4,000 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4000));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4000)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -461,12 +477,12 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartialSpilled
 
     // Input 40,000 to the accumulator.
     auto [tagInput, valInput] = value::makeCopyDecimal(Decimal128(40000));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 400,000 to the accumulator.
-    inAccessor().reset_raw(
-        false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(400000));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(400000)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -481,7 +497,7 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartialSpilled
 
     while (!isMockSpillStorageEmpty()) {
         std::tie(tagRecovered, valRecovered) = consumePartialAggregateFromMockSpillStorage();
-        spillAccessor().reset_raw(true, tagRecovered, valRecovered);
+        spillAccessor().reset(value::TagValueOwned{tagRecovered, valRecovered});
         accumulator.merge(bytecode, mergedAggregateAccessor);
     }
 
@@ -541,39 +557,43 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulator) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(2));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(2)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
     auto [tagInput, valInput] = value::makeSmallString("3");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
     std::tie(tagInput, valInput) = value::makeCopyDecimal(Decimal128(4));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 2 to the accumulator.
     std::tie(tagInput, valInput) = value::makeCopyDecimal(Decimal128(2));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate string to the accumulator.
     std::tie(tagInput, valInput) = value::makeSmallString("3");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 4 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -587,15 +607,18 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulator) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 10 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -633,27 +656,27 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorWithCollator) {
 
     // Input an accurate string to the accumulator.
     auto [tagInput, valInput] = value::makeNewString("mY codE NEVer has anY buGs");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a second accurate string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("I doN't nEed TO bACK up My data");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate (up to the collation) of the first string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("my code never has any bugs");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate (up to the collation) of the second string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("i don't need to back up my data");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input an exact duplicate of the first string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("mY codE NEVer has anY buGs");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -674,21 +697,23 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
     auto [tagInput, valInput] = value::makeCopyDecimal(Decimal128(2));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("3");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -696,15 +721,18 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(2));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(2)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 2 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -716,12 +744,13 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("3");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -736,7 +765,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
 
     while (!isMockSpillStorageEmpty()) {
         std::tie(tagRecovered, valRecovered) = consumePartialAggregateFromMockSpillStorage();
-        spillAccessor().reset_raw(true, tagRecovered, valRecovered);
+        spillAccessor().reset(value::TagValueOwned{tagRecovered, valRecovered});
         accumulator.merge(bytecode, mergedAggregateAccessor);
     }
 
@@ -761,12 +790,12 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorWithCollatorSpilled) {
 
     // Input an accurate string to the accumulator.
     auto [tagInput, valInput] = value::makeNewString("mY codE NEVer has anY buGs");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a second accurate string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("I doN't nEed TO bACK up My data");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -775,7 +804,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorWithCollatorSpilled) {
 
     // Input a duplicate (up to the collation) of the first string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("my code never has any bugs");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -784,13 +813,13 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorWithCollatorSpilled) {
 
     // Input a duplicate (up to the collation) of the second string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("i don't need to back up my data");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a third string to the accumulator.
     std::tie(tagInput, valInput) =
         value::makeNewString("thIS BuG iS ProBaBlY causeD By The cOMPiLEr");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -805,7 +834,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorWithCollatorSpilled) {
 
     while (!isMockSpillStorageEmpty()) {
         std::tie(tagRecovered, valRecovered) = consumePartialAggregateFromMockSpillStorage();
-        spillAccessor().reset_raw(true, tagRecovered, valRecovered);
+        spillAccessor().reset(value::TagValueOwned{tagRecovered, valRecovered});
         accumulator.merge(bytecode, mergedAggregateAccessor);
     }
 
@@ -834,23 +863,23 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorEnforcesCap) {
 
     // Input a 64-byte string to the accumulator.
     auto [tagInput, valInput] = value::makeNewString(std::string(64, 'a'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a second 64-byte string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(64, 'b'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate of the first string. This addition should not exceed the cap, because it
     // does not add a new element.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(64, 'a'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a third string to the accumulator, which we expect to overflow the cap.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(64, 'c'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT_THROWS_CODE(accumulator.accumulate(bytecode, accumulatorState()),
                        DBException,
                        ErrorCodes::ExceededMemoryLimit);
@@ -869,12 +898,12 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorEnforcesCapSpilled) {
 
     // Input a 64-byte string to the accumulator.
     auto [tagInput, valInput] = value::makeNewString(std::string(64, 'a'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a second 64-byte string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(64, 'b'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -883,7 +912,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorEnforcesCapSpilled) {
 
     // Input a duplicate of the first string.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(64, 'a'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -892,12 +921,12 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorEnforcesCapSpilled) {
 
     // Input a duplicate of the second string.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(64, 'b'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a third string to the accumulator, which will overflow the cap during merging.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(64, 'c'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -912,7 +941,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorEnforcesCapSpilled) {
 
     while (true) {
         std::tie(tagRecovered, valRecovered) = consumePartialAggregateFromMockSpillStorage();
-        spillAccessor().reset_raw(true, tagRecovered, valRecovered);
+        spillAccessor().reset(value::TagValueOwned{tagRecovered, valRecovered});
 
         if (isMockSpillStorageEmpty()) {
             // This is the last partial aggregate, which we expect to exceed the cap.
@@ -938,26 +967,28 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulator) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(2));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(2)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
     auto [tagInput, valInput] = value::makeSmallString("3");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
     std::tie(tagInput, valInput) = value::makeCopyDecimal(Decimal128(4));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input an array into the accumulator.
     std::tie(tagInput, valInput) = value::makeNewArray();
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
     value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
                                              value::bitcastFrom<int64_t>(5));
@@ -980,11 +1011,13 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulator) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input another 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -1027,17 +1060,18 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
     auto [tagInput, valInput] = value::makeCopyDecimal(Decimal128(2));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("3");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1045,12 +1079,13 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(4));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(4)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input an array to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewArray();
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
     value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
                                              value::bitcastFrom<int64_t>(5));
@@ -1065,12 +1100,13 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 6 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(6));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(6)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("7");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1085,7 +1121,7 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
 
     while (!isMockSpillStorageEmpty()) {
         std::tie(tagRecovered, valRecovered) = consumePartialAggregateFromMockSpillStorage();
-        spillAccessor().reset_raw(true, tagRecovered, valRecovered);
+        spillAccessor().reset(value::TagValueOwned{tagRecovered, valRecovered});
         accumulator.merge(bytecode, mergedAggregateAccessor);
     }
 
@@ -1116,17 +1152,17 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEnforcesCap) {
 
     // Input a 64-byte string to the accumulator.
     auto [tagInput, valInput] = value::makeNewString(std::string(64, 'a'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a second 64-byte string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(64, 'b'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a third string to the accumulator, which we expect to overflow the cap.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(64, 'c'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT_THROWS_CODE(accumulator.accumulate(bytecode, accumulatorState()),
                        DBException,
                        ErrorCodes::ExceededMemoryLimit);
@@ -1144,12 +1180,12 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEnforcesCapSpilled) {
 
     // Input a 32-byte string to the accumulator.
     auto [tagInput, valInput] = value::makeNewString(std::string(32, 'a'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a second 32-byte string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(32, 'a'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1158,12 +1194,12 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEnforcesCapSpilled) {
 
     // Input a third 32-byte string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(32, 'a'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a fourth 32-byte string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(32, 'a'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1172,7 +1208,7 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEnforcesCapSpilled) {
 
     // Input a fifth string to the accumulator, which will overflow the cap during merging.
     std::tie(tagInput, valInput) = value::makeNewString(std::string(64, 'a'));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1187,7 +1223,7 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorEnforcesCapSpilled) {
 
     while (true) {
         std::tie(tagRecovered, valRecovered) = consumePartialAggregateFromMockSpillStorage();
-        spillAccessor().reset_raw(true, tagRecovered, valRecovered);
+        spillAccessor().reset(value::TagValueOwned{tagRecovered, valRecovered});
 
         if (isMockSpillStorageEmpty()) {
             // This is the last partial aggregate, which we expect to exceed the cap.
@@ -1214,18 +1250,19 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulator) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
     auto [tagInput, valInput] = value::makeNewString(
         "I am a very important value that will surely be saved by the accumulator!");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input an array into the accumulator.
     std::tie(tagInput, valInput) = value::makeNewArray();
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
     value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
                                              value::bitcastFrom<int64_t>(5));
@@ -1244,11 +1281,12 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulator) {
 
     // Input a string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("First among equals");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input another 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -1288,12 +1326,12 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulatorSpilled) {
 
     // Input 1 to the accumulator.
     auto [tagInput, valInput] = value::makeCopyDecimal(Decimal128(1));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("2");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1301,12 +1339,13 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 3 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(3));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(3)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input an array to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewArray();
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
     value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
                                              value::bitcastFrom<int64_t>(4));
@@ -1321,12 +1360,13 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 6 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(5));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(5)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("6");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1341,7 +1381,7 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulatorSpilled) {
 
     while (!isMockSpillStorageEmpty()) {
         std::tie(tagRecovered, valRecovered) = consumePartialAggregateFromMockSpillStorage();
-        spillAccessor().reset_raw(true, tagRecovered, valRecovered);
+        spillAccessor().reset(value::TagValueOwned{tagRecovered, valRecovered});
         accumulator.merge(bytecode, mergedAggregateAccessor);
     }
 
@@ -1368,17 +1408,18 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminal) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
     auto [tagInput, valInput] = value::makeNewString("Every value counts.");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input an array into the accumulator.
     std::tie(tagInput, valInput) = value::makeNewArray();
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
     value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
                                              value::bitcastFrom<int64_t>(3));
@@ -1397,11 +1438,12 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminal) {
 
     // Input a string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("Another day, another value.");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input another 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -1452,19 +1494,21 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminalLargeValue) {
     accumulator.initialize(bytecode, accumulatorState());
 
     for (int64_t i = 0; i < unusuallyLargeNumberOfDocuments - 2; ++i) {
-        inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+        inAccessor().reset(
+            value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
         accumulator.accumulate(bytecode, accumulatorState());
     }
 #else
-    accumulatorState().reset_raw(false,
-                                 value::TypeTags::NumberInt64,
-                                 value::bitcastFrom<int32_t>(unusuallyLargeNumberOfDocuments - 2));
+    accumulatorState().reset(
+        value::TagValueView{value::TypeTags::NumberInt64,
+                            value::bitcastFrom<int32_t>(unusuallyLargeNumberOfDocuments - 2)});
 #endif
 
     // Add the last two values for real.
     for (int64_t i = unusuallyLargeNumberOfDocuments - 2; i < unusuallyLargeNumberOfDocuments;
          ++i) {
-        inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+        inAccessor().reset(
+            value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
         accumulator.accumulate(bytecode, accumulatorState());
     }
 
@@ -1486,11 +1530,13 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminalSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1498,11 +1544,13 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminalSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 3 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1515,7 +1563,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminalSpilled) {
 
     // Input 5 to the accumulator.
     auto [tagInput, valInput] = value::makeCopyDecimal(Decimal128(5));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1530,7 +1578,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminalSpilled) {
 
     while (!isMockSpillStorageEmpty()) {
         std::tie(tagRecovered, valRecovered) = consumePartialAggregateFromMockSpillStorage();
-        spillAccessor().reset_raw(true, tagRecovered, valRecovered);
+        spillAccessor().reset(value::TagValueOwned{tagRecovered, valRecovered});
         accumulator.merge(bytecode, mergedAggregateAccessor);
     }
 
@@ -1558,17 +1606,18 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartial) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
     auto [tagInput, valInput] = value::makeNewString("Every value counts.");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input an array into the accumulator.
     std::tie(tagInput, valInput) = value::makeNewArray();
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
     value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
                                              value::bitcastFrom<int64_t>(3));
@@ -1592,11 +1641,12 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartial) {
 
     // Input a string to the accumulator.
     std::tie(tagInput, valInput) = value::makeNewString("Another day, another value.");
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input another 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -1648,11 +1698,13 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartialSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1660,11 +1712,13 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartialSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 3 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
-    inAccessor().reset_raw(false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4));
+    inAccessor().reset(
+        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1677,7 +1731,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartialSpilled) {
 
     // Input 5 to the accumulator.
     auto [tagInput, valInput] = value::makeCopyDecimal(Decimal128(5));
-    inAccessor().reset_raw(true, tagInput, valInput);
+    inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1692,7 +1746,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartialSpilled) {
 
     while (!isMockSpillStorageEmpty()) {
         std::tie(tagRecovered, valRecovered) = consumePartialAggregateFromMockSpillStorage();
-        spillAccessor().reset_raw(true, tagRecovered, valRecovered);
+        spillAccessor().reset(value::TagValueOwned{tagRecovered, valRecovered});
         accumulator.merge(bytecode, mergedAggregateAccessor);
     }
 

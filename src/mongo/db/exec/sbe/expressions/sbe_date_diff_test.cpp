@@ -171,9 +171,9 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
 
     // Setup timezone database.
     auto timezoneDatabase = std::make_unique<TimeZoneDatabase>();
-    timezoneDBAccessor.reset_raw(false,
-                                 value::TypeTags::timeZoneDB,
-                                 value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get()));
+    timezoneDBAccessor.reset(
+        value::TagValueView{value::TypeTags::timeZoneDB,
+                            value::bitcastFrom<TimeZoneDatabase*>(timezoneDatabase.get())});
 
     struct TestCase {
         std::pair<value::TypeTags, value::Value> startDate;
@@ -333,13 +333,16 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
         int testNumber{0};
         for (auto&& testCase : testCases) {
             // Values will be freed after running block tests.
-            startDateAccessor.reset_raw(false, testCase.startDate.first, testCase.startDate.second);
-            endDateAccessor.reset_raw(false, testCase.endDate.first, testCase.endDate.second);
-            unitAccessor.reset_raw(false, testCase.unit.first, testCase.unit.second);
-            timezoneAccessor.reset_raw(false, testCase.timezone.first, testCase.timezone.second);
+            startDateAccessor.reset(
+                value::TagValueView{testCase.startDate.first, testCase.startDate.second});
+            endDateAccessor.reset(
+                value::TagValueView{testCase.endDate.first, testCase.endDate.second});
+            unitAccessor.reset(value::TagValueView{testCase.unit.first, testCase.unit.second});
+            timezoneAccessor.reset(
+                value::TagValueView{testCase.timezone.first, testCase.timezone.second});
             if (testCase.startOfWeek) {
-                startOfWeekAccessor.reset_raw(
-                    false, testCase.startOfWeek->first, testCase.startOfWeek->second);
+                startOfWeekAccessor.reset(
+                    value::TagValueView{testCase.startOfWeek->first, testCase.startOfWeek->second});
             }
 
             // Execute the "dateDiff" function.

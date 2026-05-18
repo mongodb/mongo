@@ -192,13 +192,13 @@ TEST_F(SBEReplaceOneExprTest, BsonStrings) {
 
     auto bindSlots = [&](const BSONObj& bson) {
         auto inputVal = value::bitcastFrom<const char*>(bson["in"].value());
-        inputAccessor.reset_raw(false, value::TypeTags::bsonString, inputVal);
+        inputAccessor.reset(value::TagValueView{value::TypeTags::bsonString, inputVal});
 
         auto findVal = value::bitcastFrom<const char*>(bson["find"].value());
-        findAccessor.reset_raw(false, value::TypeTags::bsonString, findVal);
+        findAccessor.reset(value::TagValueView{value::TypeTags::bsonString, findVal});
 
         auto replaceVal = value::bitcastFrom<const char*>(bson["replace"].value());
-        replaceAccessor.reset_raw(false, value::TypeTags::bsonString, replaceVal);
+        replaceAccessor.reset(value::TagValueView{value::TypeTags::bsonString, replaceVal});
     };
 
     // Test find and replace string.

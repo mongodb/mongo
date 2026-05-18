@@ -450,10 +450,10 @@ TEST_F(AbtToSbeExpression, LowerComparisonCollation) {
     auto compiledExpr = compileExpression(*expr);
 
     auto checkCmp3w = [&](StringData lhs, StringData rhs, int result) {
-        auto [lhsTag, lhsValue] = sbe::value::makeNewString(lhs);
-        lhsAccessor.reset_raw(true, lhsTag, lhsValue);
-        auto [rhsTag, rhsValue] = sbe::value::makeNewString(rhs);
-        rhsAccessor.reset_raw(true, rhsTag, rhsValue);
+        auto lhsStr = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString(lhs));
+        lhsAccessor.reset(std::move(lhsStr));
+        auto rhsStr = sbe::value::TagValueOwned::fromRaw(sbe::value::makeNewString(rhs));
+        rhsAccessor.reset(std::move(rhsStr));
 
         auto [tag, value] = runCompiledExpression(compiledExpr.get());
         sbe::value::ValueGuard guard(tag, value);

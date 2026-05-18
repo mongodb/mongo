@@ -85,7 +85,7 @@ public:
         auto inputAccessor = _env->getAccessor(_inputSlotId);
         for (auto keepRunning : state) {
             for (auto [inputTag, inputVal] : inputs) {
-                inputAccessor->reset_raw(false, inputTag, inputVal);
+                inputAccessor->reset(value::TagValueView{inputTag, inputVal});
                 auto value = vm.run(&code);
             }
             benchmark::ClobberMemory();
@@ -124,9 +124,9 @@ public:
         auto collatorSlot = _env->getSlotIfExists("collator"_sd);
         if (collatorSlot) {
             _env->getAccessor(*collatorSlot)
-                ->reset_raw(false,
-                            value::TypeTags::collator,
-                            value::bitcastFrom<const CollatorInterface*>(collator));
+                ->reset(
+                    value::TagValueView{value::TypeTags::collator,
+                                        value::bitcastFrom<const CollatorInterface*>(collator)});
             return *collatorSlot;
         }
         return _env->registerSlot("collator"_sd,
