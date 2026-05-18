@@ -118,8 +118,8 @@ PlanState GenericScanStage::getNext() {
 
     if (_state->recordIdSlot) {
         _recordId = std::move(nextRecord->id);
-        _recordIdAccessor.reset_raw(
-            false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_recordId));
+        _recordIdAccessor.reset(value::TagValueView{value::TypeTags::RecordId,
+                                                    value::bitcastFrom<RecordId*>(&_recordId)});
     }
 
     if (!_scanFieldAccessors.empty()) {

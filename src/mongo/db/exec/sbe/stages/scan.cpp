@@ -601,8 +601,8 @@ PlanState ScanStage::getNext() {
         if (_havePassedScanEndRecordId) {
             return trackPlanState(PlanState::IS_EOF);
         }
-        _recordIdAccessor.reset_raw(
-            false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_recordId));
+        _recordIdAccessor.reset(value::TagValueView{value::TypeTags::RecordId,
+                                                    value::bitcastFrom<RecordId*>(&_recordId)});
     }
 
     if (!_scanFieldAccessors.empty()) {

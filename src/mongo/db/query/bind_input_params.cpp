@@ -321,7 +321,7 @@ private:
 
         // Reset the guard and store 'owned/tag/val' into 'accessor'.
         guard.reset();
-        accessor->reset_raw(owned, tag, val);
+        accessor->reset(sbe::value::TagValueMaybeOwned::fromRaw(owned, tag, val));
     }
 
     boost::optional<sbe::value::SlotId> getSlotId(

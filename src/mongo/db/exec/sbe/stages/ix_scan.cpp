@@ -127,8 +127,8 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
     }
 
     if (_indexKeySlot) {
-        _recordAccessor.reset_raw(
-            false, value::TypeTags::keyString, value::bitcastFrom<value::KeyStringEntry*>(&_key));
+        _recordAccessor.reset(value::TagValueView{
+            value::TypeTags::keyString, value::bitcastFrom<value::KeyStringEntry*>(&_key)});
     }
 
     if (_snapshotIdSlot) {
@@ -292,8 +292,8 @@ PlanState IndexScanStageBaseImpl<Derived>::getNext() {
 
     if (_recordIdSlot) {
         auto nextRid = _nextKeyString.getRecordId();
-        _recordIdAccessor.reset_raw(
-            false, value::TypeTags::RecordId, value::bitcastFrom<const RecordId*>(nextRid));
+        _recordIdAccessor.reset(value::TagValueView{value::TypeTags::RecordId,
+                                                    value::bitcastFrom<const RecordId*>(nextRid)});
     }
 
     if (_snapshotIdSlot) {

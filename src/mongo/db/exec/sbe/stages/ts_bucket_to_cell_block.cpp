@@ -225,8 +225,8 @@ void TsBucketToCellBlockStage::doSaveState() {
         // and will not need to be decompressed again.
         auto [cellBlockTag, cellBlockVal] = _blocksOutAccessor[i].getViewOfValue();
 
-        auto [cpyTag, cpyVal] = value::copyValue(cellBlockTag, cellBlockVal);
-        _blocksOutAccessor[i].reset_raw(true, cpyTag, cpyVal);
+        _blocksOutAccessor[i].reset(
+            value::TagValueOwned{value::copyValue(cellBlockTag, cellBlockVal)});
     }
 
     if (_metaOutSlotId) {
@@ -242,7 +242,7 @@ void TsBucketToCellBlockStage::initCellBlocks() {
     if (_metaOutSlotId) {
         auto metaElt = bucketObj[timeseries::kBucketMetaFieldName];
         auto [metaTag, metaVal] = bson::convertToView(metaElt);
-        _metaOutAccessor.reset_raw(false, metaTag, metaVal);
+        _metaOutAccessor.reset(value::TagValueView{metaTag, metaVal});
     }
 
     auto [nMeasurements, tsBlocks, cellBlocks] = _pathExtractor.extractCellBlocks(bucketObj);
@@ -251,19 +251,17 @@ void TsBucketToCellBlockStage::initCellBlocks() {
             "Number of cell blocks doesn't match the number of accessors",
             cellBlocks.size() == _blocksOutAccessor.size());
     for (size_t i = 0; i < cellBlocks.size(); ++i) {
-        _blocksOutAccessor[i].reset_raw(
-            true,
-            value::TypeTags::cellBlock,
-            value::bitcastFrom<value::CellBlock*>(cellBlocks[i].release()));
+        _blocksOutAccessor[i].reset(
+            value::TagValueOwned{value::TypeTags::cellBlock,
+                                 value::bitcastFrom<value::CellBlock*>(cellBlocks[i].release())});
     }
 
     // Initialize an all-1s bitset.
-    _bitmapOutAccessor.reset_raw(
-        true,
+    _bitmapOutAccessor.reset(value::TagValueOwned{
         value::TypeTags::valueBlock,
         value::bitcastFrom<value::ValueBlock*>(
             std::make_unique<value::MonoBlock>(
                 nMeasurements, value::TypeTags::Boolean, value::bitcastFrom<bool>(true))
-                .release()));
+                .release())});
 }
 }  // namespace mongo::sbe

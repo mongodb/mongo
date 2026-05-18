@@ -322,8 +322,7 @@ private:
                                key_string::Discriminator::kExclusiveBefore);
         kb.appendDiscriminator(key_string::Discriminator::kExclusiveBefore);
 
-        auto [copyTag, copyVal] = value::makeKeyString(kb.getValueCopy());
-        _seekKeyLowHolder.reset_raw(true, copyTag, copyVal);
+        _seekKeyLowHolder.reset(value::TagValueOwned{value::makeKeyString(kb.getValueCopy())});
     };
 
     std::unique_ptr<EExpression> _seekKeyLow;
