@@ -8,6 +8,10 @@
  *   featureFlagExtensionsAPI,
  * ]
  */
+// mongod fasserts on extension load failure, raising SIGABRT signal.
+// This flag must remain true at test end so resmoke cleans up the dump in its post-test scan.
+TestData.cleanUpCoreDumpsFromExpectedCrash = true;
+
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {

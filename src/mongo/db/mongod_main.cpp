@@ -736,9 +736,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     // Since extensions modify the global parserMap, which is not thread-safe, they must be loaded
     // prior to starting the FTDC background thread (which reads from the parserMap) to avoid a data
     // race.
-    if (!extension::host::loadExtensions(serverGlobalParams.extensions)) {
-        exitCleanly(ExitCode::badOptions);
-    }
+    fassert(126502, extension::host::loadExtensions(serverGlobalParams.extensions));
 
     startMongoDFTDC(serviceContext);
 

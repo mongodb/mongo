@@ -223,25 +223,31 @@ export function withExtensionsAndMongot(
  * Verifies that starting mongod or mongos with the given options fails as expected.
  */
 export function checkExtensionFailsToLoad({options, st, validateExitCode = true}) {
-    function tryStartup(startupFn) {
+    function tryStartup(startupFn, expectedExitCode) {
         try {
             startupFn();
             assert(false, "Expected startup to fail but it succeeded");
         } catch (e) {
             assert(e instanceof MongoRunner.StopError, e);
             if (validateExitCode) {
-                assert.eq(e.returnCode, MongoRunner.EXIT_BADOPTIONS, e);
+                assert.eq(e.returnCode, expectedExitCode, e);
             }
         }
     }
-    // Test mongod.
+    // On Linux, mongod fasserts on extension load failure (SIGABRT). On non-Linux, extensions are
+    // rejected at option parsing (badOptions). Callers must set
+    // TestData.cleanUpCoreDumpsFromExpectedCrash = true at their test's top level so resmoke
+    // cleans up any resulting core dump in its post-test scan.
+    const mongodExpectedExitCode = isPlatformCompatibleWithExtensions()
+        ? MongoRunner.EXIT_ABORT
+        : MongoRunner.EXIT_BADOPTIONS;
     tryStartup(() => {
         const conn = MongoRunner.runMongod(options);
         MongoRunner.stopMongod(conn);
-    });
-    // Test mongos.
+    }, mongodExpectedExitCode);
+    // mongos returns badOptions on extension load failure.
     tryStartup(() => {
         const conn = MongoRunner.runMongos(Object.assign({configdb: st.configRS.getURL()}, options));
         MongoRunner.stopMongos(conn);
-    });
+    }, MongoRunner.EXIT_BADOPTIONS);
 }
