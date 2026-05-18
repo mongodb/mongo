@@ -28,7 +28,7 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
       __wt_atomic_load_enum_relaxed(&session->dhandle->type) == WT_DHANDLE_TYPE_TIERED_TREE)
         return (false);
 
-    if (__wt_tsan_suppress_load_uint64(&S2C(session)->prefetch_queue_count) >
+    if (__wt_tsan_suppress_load_uint64(&S2C(session)->prefetch.queue_count) >
       WT_MAX_PREFETCH_QUEUE) {
         WT_STAT_CONN_INCR(session, prefetch_skipped_queue_full);
         return (false);

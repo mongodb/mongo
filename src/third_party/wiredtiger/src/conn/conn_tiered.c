@@ -20,6 +20,36 @@
 #endif
 
 /*
+ * __wti_conn_tiered_init --
+ *     Initialize the WT_CONN_TIERED structure.
+ */
+int
+__wti_conn_tiered_init(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+    TAILQ_INIT(&conn->tiered.tieredqh); /* Tiered work unit list */
+    WT_RET(__wt_spin_init(session, &conn->tiered.tiered_lock, "tiered work unit list"));
+    WT_RET(__wt_spin_init(session, &conn->tiered.flush_tier_lock, "flush tier"));
+    return (0);
+}
+
+/*
+ * __wti_conn_tiered_destroy --
+ *     Destroy the WT_CONN_TIERED structure.
+ */
+void
+__wti_conn_tiered_destroy(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+    __wt_spin_destroy(session, &conn->tiered.tiered_lock);
+    __wt_spin_destroy(session, &conn->tiered.flush_tier_lock);
+}
+
+/*
  * __tiered_server_run_chk --
  *     Check to decide if the tiered storage server should continue running.
  */
@@ -360,7 +390,7 @@ __tier_storage_copy(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
     /* There is nothing to do until the checkpoint after the flush completes. */
-    if (!__wt_atomic_load_bool_relaxed(&conn->flush_ckpt_complete))
+    if (!__wt_atomic_load_bool_relaxed(&conn->tiered.flush_ckpt_complete))
         return (0);
     entry = NULL;
     for (;;) {
@@ -436,13 +466,13 @@ __tiered_server(void *arg)
     WT_CLEAR(tmp);
 
     /* Condition timeout is in microseconds. */
-    cond_time = conn->tiered_interval * WT_MILLION;
+    cond_time = conn->tiered.interval * WT_MILLION;
     time_start = __wt_clock(session);
     signalled = false;
     for (;;) {
         /* Wait until the next event. */
         __wt_cond_wait_signal(
-          session, conn->tiered_cond, cond_time, __tiered_server_run_chk, &signalled);
+          session, conn->tiered.cond, cond_time, __tiered_server_run_chk, &signalled);
 
         /* Check if we're quitting or being reconfigured. */
         if (!__tiered_server_run_chk(session))
@@ -456,7 +486,7 @@ __tiered_server(void *arg)
          *  - Perform any shared storage processing after flushing.
          *  - Remove any cached objects that are aged out.
          */
-        if (timediff >= conn->tiered_interval || signalled) {
+        if (timediff >= conn->tiered.interval || signalled) {
             msg = "tier_storage_copy";
             WT_ERR(__tier_storage_copy(session));
             msg = "tier_storage_finish";
@@ -496,12 +526,12 @@ __wti_tiered_storage_create(WT_SESSION_IMPL *session, bool disagg)
     }
 
     /* Start the internal thread. */
-    WT_ERR(__wt_cond_alloc(session, "flush tier", &conn->flush_cond));
-    WT_ERR(__wt_cond_alloc(session, "storage server", &conn->tiered_cond));
+    WT_ERR(__wt_cond_alloc(session, "flush tier", &conn->tiered.flush_cond));
+    WT_ERR(__wt_cond_alloc(session, "storage server", &conn->tiered.cond));
     FLD_SET(conn->server_flags, WT_CONN_SERVER_TIERED);
 
-    WT_ERR(__wt_open_internal_session(conn, "tiered-server", true, 0, 0, &conn->tiered_session));
-    session = conn->tiered_session;
+    WT_ERR(__wt_open_internal_session(conn, "tiered-server", true, 0, 0, &conn->tiered.session));
+    session = conn->tiered.session;
 
     /*
      * Check for objects that are not flushed on the first flush_tier call. We cannot do that work
@@ -510,8 +540,8 @@ __wti_tiered_storage_create(WT_SESSION_IMPL *session, bool disagg)
      */
     F_SET_ATOMIC_32(conn, WT_CONN_TIERED_FIRST_FLUSH);
     /* Start the thread. */
-    WT_ERR(__wt_thread_create(session, &conn->tiered_tid, __tiered_server, session));
-    conn->tiered_tid_set = true;
+    WT_ERR(__wt_thread_create(session, &conn->tiered.tid, __tiered_server, session));
+    conn->tiered.tid_set = true;
 
     if (0) {
 err:
@@ -538,32 +568,32 @@ __wti_tiered_storage_destroy(WT_SESSION_IMPL *session, bool final_flush)
      * Stop the internal server thread. If there is unfinished work, we will recover it on startup
      * just as if there had been a system failure.
      */
-    if (conn->flush_cond != NULL)
-        __wt_cond_signal(session, conn->flush_cond);
-    if (final_flush && conn->tiered_cond != NULL) {
-        __wt_cond_signal(session, conn->tiered_cond);
+    if (conn->tiered.flush_cond != NULL)
+        __wt_cond_signal(session, conn->tiered.flush_cond);
+    if (final_flush && conn->tiered.cond != NULL) {
+        __wt_cond_signal(session, conn->tiered.cond);
         __wt_tiered_flush_work_wait(session, 30);
     }
     FLD_CLR(conn->server_flags, WT_CONN_SERVER_TIERED);
-    if (conn->tiered_tid_set) {
-        WT_ASSERT(session, conn->tiered_cond != NULL);
-        __wt_cond_signal(session, conn->tiered_cond);
-        WT_TRET(__wt_thread_join(session, &conn->tiered_tid));
-        conn->tiered_tid_set = false;
-        while ((entry = TAILQ_FIRST(&conn->tieredqh)) != NULL) {
-            TAILQ_REMOVE(&conn->tieredqh, entry, q);
+    if (conn->tiered.tid_set) {
+        WT_ASSERT(session, conn->tiered.cond != NULL);
+        __wt_cond_signal(session, conn->tiered.cond);
+        WT_TRET(__wt_thread_join(session, &conn->tiered.tid));
+        conn->tiered.tid_set = false;
+        while ((entry = TAILQ_FIRST(&conn->tiered.tieredqh)) != NULL) {
+            TAILQ_REMOVE(&conn->tiered.tieredqh, entry, q);
             __wt_tiered_work_free(session, entry);
         }
     }
-    if (conn->tiered_session != NULL) {
-        WT_TRET(__wt_session_close_internal(conn->tiered_session));
-        conn->tiered_session = NULL;
+    if (conn->tiered.session != NULL) {
+        WT_TRET(__wt_session_close_internal(conn->tiered.session));
+        conn->tiered.session = NULL;
     }
 
     /* Destroy all condition variables after threads have stopped. */
-    __wt_cond_destroy(session, &conn->tiered_cond);
+    __wt_cond_destroy(session, &conn->tiered.cond);
     /* The flush condition variable must be last because any internal thread could be using it. */
-    __wt_cond_destroy(session, &conn->flush_cond);
+    __wt_cond_destroy(session, &conn->tiered.flush_cond);
 
     return (ret);
 }

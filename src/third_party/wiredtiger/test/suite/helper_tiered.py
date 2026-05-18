@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import datetime, inspect, os, random, wiredtiger
+import os, wiredtiger
 
 # These routines help run the various storage sources. They are required to manage
 # generation of storage source specific configurations.
@@ -38,18 +38,11 @@ def get_auth_token(storage_source):
     if storage_source == 'dir_store':
         # Fake a secret token.
         auth_token = "Secret"
-    if storage_source == 'azure_store':
-        if (os.getenv('AZURE_STORAGE_CONNECTION_STRING') != None):
-            auth_token = '\"' + os.getenv('AZURE_STORAGE_CONNECTION_STRING') + '\"'
-    if storage_source == 'gcp_store':
-        auth_token = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
     return auth_token
 
 # Buckets configured for the storage source.
 buckets = {
     "dir_store": ['bucket1', 'bucket2'],
-    "gcp_store": ["gcptestext-us", "gcptestext-ap"],
-    "azure_store": ["azuretestext-us", "azuretestext-ap"]
 }
 
 # Get name of the bucket at specified index in the list.
@@ -89,30 +82,6 @@ def get_check(storage_source, tc, base, n):
     tc.set_key(str(n))
     storage_source.assertEqual(tc.search(), wiredtiger.WT_NOTFOUND)
 
-# Generate a unique object prefix for cloud store tests.
-def generate_prefix(random_prefix = '', test_name = ''):
-    # Generates a unique prefix to be used with the object keys, eg:
-    # "s3test/python/2022-31-01-16-34-10/623843294--".
-    # Do not change this prefix pattern without checking with the release manager,
-    # as the cloud buckets may have lifecycle rules tied to it.
-    # Group all the python test objects under s3test/python/
-    prefix = 's3test/python/'
-    # Group each test run together by random number and date. If a random prefix isn't provided
-    # generate a new one now.
-    if random_prefix is None:
-        random_prefix = str(random.randrange(1, 2147483646))
-    prefix += datetime.datetime.now().strftime('%Y-%m-%d-%H-%M') + '--' + random_prefix +'/'
-    # Group all scenarios from the same test under the same test name.
-    prefix += test_name + '/'
-
-    # Generate a random number to differentiate object files for tests that use multiple bucket
-    # prefixes. It is important to generate unique prefixes for different tests in the same class,
-    # so that the database namespace do not collide.
-    # Range up to int32_max, matches that of C++'s std::default_random_engine
-    prefix += str(random.randrange(1, 2147483646)) + '--'
-
-    return prefix
-
 def gen_tiered_storage_sources(random_prefix='', test_name='', tiered_only=False, tiered_shared=False):
     tiered_storage_sources = [
         ('dir_store', dict(is_tiered = True,
@@ -126,29 +95,6 @@ def gen_tiered_storage_sources(random_prefix='', test_name='', tiered_only=False
             bucket_prefix2 = 'pfx2_',
             num_ops=100,
             ss_name = 'dir_store')),
-        ('gcp_store', dict(is_tiered = True,
-            is_tiered_shared = tiered_shared,
-            is_local_storage = False,
-            has_cache = False,
-            auth_token = get_auth_token('gcp_store'),
-            bucket = get_bucket_name('gcp_store', 0),
-            bucket1 = get_bucket_name('gcp_store', 1),
-            bucket_prefix = generate_prefix(random_prefix, test_name),
-            bucket_prefix1 = generate_prefix(random_prefix, test_name),
-            bucket_prefix2 = generate_prefix(random_prefix, test_name),
-            num_ops=100,
-            ss_name = 'gcp_store')),
-        ('azure_store', dict(is_tiered = True,
-            is_tiered_shared = tiered_shared,
-            is_local_storage = False,
-            auth_token = get_auth_token('azure_store'),
-            bucket = get_bucket_name('azure_store', 0),
-            bucket1 = get_bucket_name('azure_store', 1),
-            bucket_prefix = generate_prefix(random_prefix, test_name),
-            bucket_prefix1 = generate_prefix(random_prefix, test_name),
-            bucket_prefix2 = generate_prefix(random_prefix, test_name),
-            num_ops=100,
-            ss_name = 'azure_store')),
         # This must be the last item as we separate the non-tiered from the tiered items later on.
         ('non_tiered', dict(is_tiered = False)),
     ]
@@ -256,34 +202,5 @@ class TieredConfigMixin:
         extlist.extension('storage_sources', self.ss_name + config)
 
     def download_objects(self, bucket_name, prefix):
-        if (not self.is_tiered or self.is_local_storage):
-            return
-
-        # Create a directory within the test directory to download the objects to.
-        object_files_path = 'objects/'
-        if not os.path.exists(object_files_path):
-            os.makedirs(object_files_path)
-
-        if (self.ss_name == 'gcp_store'):
-            from google.cloud import storage
-
-            storage_client = storage.Client()
-            blobs = storage_client.list_blobs(bucket_name, prefix=prefix)
-
-            for blob in blobs:
-                file_path = object_files_path + '/' + blob.name.split('/')[-1]
-                blob.download_to_filename(file_path)
-        elif (self.ss_name == 'azure_store'):
-            from azure.storage.blob import BlobServiceClient
-
-            blob_service_client = BlobServiceClient.from_connection_string(self.auth_token.strip('\"'))
-            container_client = blob_service_client.get_container_client(container=bucket_name)
-            blob_list = container_client.list_blobs(name_starts_with=prefix)
-
-            for blob in blob_list:
-                file_path = object_files_path + '/' + blob.name.split('/')[-1]
-                with open(file=file_path, mode="wb") as download_file:
-                    download_file.write(container_client.download_blob(blob.name).readall())
-        else:
-            raise Exception("Storage source does not exist within the download object function")
+        pass
 

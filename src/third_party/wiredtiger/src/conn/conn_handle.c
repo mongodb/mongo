@@ -20,17 +20,20 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
 
     session = conn->default_session;
 
-    TAILQ_INIT(&conn->dhqh);         /* Data handle list */
-    TAILQ_INIT(&conn->dlhqh);        /* Library list */
-    TAILQ_INIT(&conn->dsrcqh);       /* Data source list */
-    TAILQ_INIT(&conn->fhqh);         /* File list */
-    TAILQ_INIT(&conn->collqh);       /* Collator list */
-    TAILQ_INIT(&conn->compqh);       /* Compressor list */
-    TAILQ_INIT(&conn->encryptqh);    /* Encryptor list */
-    TAILQ_INIT(&conn->pagelogqh);    /* Page log list */
-    TAILQ_INIT(&conn->storagesrcqh); /* Storage source list */
-    TAILQ_INIT(&conn->tieredqh);     /* Tiered work unit list */
-    TAILQ_INIT(&conn->pfqh);         /* Pre-fetch reference list */
+    TAILQ_INIT(&conn->dhqh);   /* Data handle list */
+    TAILQ_INIT(&conn->dlhqh);  /* Library list */
+    TAILQ_INIT(&conn->dsrcqh); /* Data source list */
+    TAILQ_INIT(&conn->fhqh);   /* File list */
+    WT_RET(__wti_conn_prefetch_init(session));
+
+    /* Tiered storage. */
+    WT_RET(__wti_conn_tiered_init(session));
+
+    /* I/O capacity subsystem. */
+    __wti_conn_capacity_init(session);
+
+    /* Extension interface lists. */
+    WT_RET(__wti_conn_ext_init(session));
 
     /* Disaggregated storage. */
     TAILQ_INIT(&conn->disaggregated_storage.shared_metadata_qh);
@@ -50,16 +53,11 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     WT_RET(__wt_spin_init(session, &conn->background_compact.lock, "background compact"));
     WT_RET(__wt_spin_init(
       session, &conn->disaggregated_storage.shared_metadata_queue_lock, "update shared metadata"));
-    WT_RET(__wt_spin_init(session, &conn->encryptor_lock, "encryptor"));
     WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
-    WT_RET(__wt_spin_init(session, &conn->flush_tier_lock, "flush tier"));
     WT_SPIN_INIT_TRACKED(session, &conn->metadata_lock, metadata);
     WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
     WT_SPIN_INIT_SESSION_TRACKED(session, &conn->schema_lock, schema);
-    WT_RET(__wt_spin_init(session, &conn->storage_lock, "tiered storage"));
-    WT_RET(__wt_spin_init(session, &conn->tiered_lock, "tiered work unit list"));
     WT_RET(__wt_spin_init(session, &conn->turtle_lock, "turtle file"));
-    WT_RET(__wt_spin_init(session, &conn->prefetch_lock, "prefetch"));
 
     /* Read-write locks */
     WT_RET(__wt_rwlock_init(session, &conn->log_mgr.debug_log_retention_lock));
@@ -115,18 +113,23 @@ __wti_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_spin_destroy(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
     __wt_rwlock_destroy(session, &conn->log_mgr.debug_log_retention_lock);
     __wt_rwlock_destroy(session, &conn->dhandle_lock);
-    __wt_spin_destroy(session, &conn->encryptor_lock);
     __wt_spin_destroy(session, &conn->fh_lock);
-    __wt_spin_destroy(session, &conn->flush_tier_lock);
     __wt_rwlock_destroy(session, &conn->hot_backup_lock);
     __wt_spin_destroy(session, &conn->metadata_lock);
     __wt_spin_destroy(session, &conn->reconfig_lock);
     __wt_spin_destroy(session, &conn->schema_lock);
-    __wt_spin_destroy(session, &conn->storage_lock);
     __wt_rwlock_destroy(session, &conn->table_lock);
-    __wt_spin_destroy(session, &conn->tiered_lock);
     __wt_spin_destroy(session, &conn->turtle_lock);
-    __wt_spin_destroy(session, &conn->prefetch_lock);
+    __wti_conn_prefetch_destroy(session);
+
+    /* Tiered storage. */
+    __wti_conn_tiered_destroy(session);
+
+    /* I/O capacity subsystem. */
+    __wti_conn_capacity_destroy(session);
+
+    /* Extension interface lists. */
+    __wti_conn_ext_destroy(session);
 
     /* Free allocated hash buckets. */
     __wt_free(session, conn->blockhash);

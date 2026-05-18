@@ -50,7 +50,7 @@ __wti_tiered_bucket_config(
     bstorage = new = NULL;
     conn = S2C(session);
 
-    __wt_spin_lock(session, &conn->storage_lock);
+    __wt_spin_lock(session, &conn->ext.storage_lock);
 
     WT_ERR(__wt_schema_open_storage_source(session, &name, &nstorage));
     if (nstorage == NULL) {
@@ -128,7 +128,7 @@ err:
         }
         __wt_free(session, new);
     }
-    __wt_spin_unlock(session, &conn->storage_lock);
+    __wt_spin_unlock(session, &conn->ext.storage_lock);
     __wt_scr_free(session, &buf);
     return (ret);
 }
@@ -167,7 +167,7 @@ __wt_tiered_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
 
     /* Set up the rest of the tiered storage configuration. c*/
     WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.interval", &cval));
-    conn->tiered_interval = (uint64_t)cval.val;
+    conn->tiered.interval = (uint64_t)cval.val;
 
     WT_ASSERT(session, WT_CONN_TIERED_STORAGE_ENABLED(conn));
     WT_STAT_CONN_SET(session, tiered_retention, conn->bstorage->retain_secs);

@@ -344,6 +344,7 @@ worker(void *arg)
     uint32_t rand_val, total_table_count;
     uint8_t *op, *op_end;
     int measure_latency, nmodify, ret, truncated;
+    uint32_t retry_count;
     char *index_buf, *index_del_buf, *key_buf, *value, *value_buf;
     char buf[512];
     bool use_txn;
@@ -513,7 +514,9 @@ worker(void *arg)
         measure_latency = opts->sample_interval != 0 && trk != NULL && trk->ops != 0 &&
           (trk->ops % opts->sample_rate == 0);
         start = __wt_clock(NULL);
+        retry_count = 0;
 
+retry:
         cursor->set_key(cursor, key_buf);
         switch (*op) {
         case WORKER_READ:
@@ -690,20 +693,32 @@ worker(void *arg)
                 break;
 
 op_err:
-            if (ret == WT_ROLLBACK && use_txn) {
-                /*
-                 * If we are running with explicit transactions configured and we hit a WT_ROLLBACK,
-                 * then we should rollback the current transaction and attempt to continue. This
-                 * does break the guarantee of insertion order in cases of ordered inserts, as we
-                 * aren't retrying here.
-                 */
-                if ((ret = session->rollback_transaction(session, NULL)) != 0) {
-                    lprintf(wtperf, ret, 0, "Failed rollback_transaction");
-                    goto err;
+            if (ret == WT_ROLLBACK) {
+                if (use_txn) {
+                    if ((ret = session->rollback_transaction(session, NULL)) != 0) {
+                        lprintf(wtperf, ret, 0, "Failed rollback_transaction");
+                        goto err;
+                    }
+                    if ((ret = session->begin_transaction(session, NULL)) != 0) {
+                        lprintf(wtperf, ret, 0, "Worker begin transaction failed");
+                        goto err;
+                    }
                 }
-                if ((ret = session->begin_transaction(session, NULL)) != 0) {
-                    lprintf(wtperf, ret, 0, "Worker begin transaction failed");
-                    goto err;
+                if (opts->retry_writes) {
+                    if (++retry_count > 1000) {
+                        lprintf(wtperf, WT_ERROR, 0,
+                          "Exceeded maximum retry limit of 1000 retries on write conflict, key: %s",
+                          key_buf);
+                        goto err;
+                    }
+                    /*
+                     * Exponential backoff with noise to break live lock: without a delay, all
+                     * threads retrying the same hot key stay synchronized and keep conflicting with
+                     * each other indefinitely. The backoff grows up to ~1ms.
+                     */
+                    (void)usleep((useconds_t)(WT_MIN(1ULL << retry_count, 1000) +
+                      __wt_random(&thread->rnd) % 100));
+                    goto retry;
                 }
                 break;
             }

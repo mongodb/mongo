@@ -16,6 +16,10 @@
 #define WTI_EVICT_WALK_BASE 300         /* Pages tracked across file visits */
 #define WTI_EVICT_WALK_INCR 100         /* Pages added each walk */
 
+/* True if there are eviction worker threads beyond the server thread itself. */
+#define WT_EVICT_HAS_WORKERS(s) \
+    (__wt_atomic_load_uint32_relaxed(&S2C(s)->evict_config.threads.current_threads) > 1)
+
 /*
  * WTI_EVICT_ENTRY --
  *	Encapsulation of an eviction candidate.
@@ -49,9 +53,28 @@ struct __wti_evict_queue {
 
 /* DO NOT EDIT: automatically built by prototypes.py: BEGIN */
 
+extern bool __wti_evict_push_candidate(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue,
+  WTI_EVICT_ENTRY *evict_entry, WT_REF *ref) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_evict_app_assist_worker(WT_SESSION_IMPL *session, bool busy, bool readonly,
   bool interruptible) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern void __wti_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref);
+extern int __wti_evict_clear_all_walks_and_saved_tree(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_evict_clear_walk_and_saved_tree_if_current_locked(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_evict_lock_handle_list(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_evict_lru_walk(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_evict_page(WT_SESSION_IMPL *session, bool is_server)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_evict_walk(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __wti_evict_queue_clear_page(WT_SESSION_IMPL *session, WT_REF *ref);
+extern void __wti_evict_queue_clear_page_locked(
+  WT_SESSION_IMPL *session, WT_REF *ref, bool exclude_urgent);
+extern void __wti_evict_set_saved_walk_tree(WT_SESSION_IMPL *session, WT_DATA_HANDLE *new_dhandle);
 static WT_INLINE bool __wti_evict_hs_dirty(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wti_evict_readgen_is_soon_or_wont_need(uint64_t *readgen)

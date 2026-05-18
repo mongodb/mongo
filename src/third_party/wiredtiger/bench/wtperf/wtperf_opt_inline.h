@@ -142,6 +142,8 @@ DEF_OPT_AS_BOOL(
 DEF_OPT_AS_UINT32(random_range, 0,
   "if non zero choose a value from within this range as the key for insert operations")
 DEF_OPT_AS_BOOL(random_value, 0, "generate random content for the value")
+DEF_OPT_AS_BOOL(
+  retry_writes, 0, "retry write operations that fail with WT_ROLLBACK instead of skipping them")
 DEF_OPT_AS_BOOL(range_partition, 0, "partition data by range (vs hash)")
 DEF_OPT_AS_UINT32(read_range, 0,
   "read a sequential range of keys upon each read operation. This value tells us how many keys "

@@ -45,23 +45,13 @@ class PerfStatCollection:
 
     def find_stats(self, test_home: str):
         for stat in self.to_report:
-            matched = []
-            for filename in stat.stat_files:
-                test_stat_path = create_test_stat_path(test_home, filename)
-                try:
-                    values = stat.find_stat(test_stat_path=test_stat_path)
-                except (FileNotFoundError, IndexError):
-                    # Missing some files is fine since the stat should exist in exactly one file.
-                    continue
-                if values:
-                    matched.append(values)
-            if len(matched) > 1:
-                raise RuntimeError(
-                    f"Stat '{stat.short_label}' matched in more than one file: {stat.stat_files}")
-            if len(matched) == 0:
-                raise RuntimeError(
-                    f"Stat '{stat.short_label}' hasn't been found in any of files: {stat.stat_files}")
-            stat.add_values(values=matched[0])
+            values = []
+            for f in stat.stat_files:
+                v = stat.find_stat(create_test_stat_path(test_home, f))
+                if v and values:
+                    raise RuntimeError(f"Stat '{stat.short_label}' matched in more than one file: {stat.stat_files}")
+                values = v or values
+            stat.add_values(values=values)
 
 
     @staticmethod

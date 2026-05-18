@@ -58,6 +58,9 @@ class PerfStat:
             self.values.append(converted_value)
 
     def find_stat(self, test_stat_path: str):
+        if not os.path.exists(test_stat_path):
+            return []
+
         matches = []
         for line in open(test_stat_path):
             match = re.search(self.pattern, line)
@@ -104,8 +107,13 @@ class PerfStatMinMax(PerfStat):
 class PerfStatCount(PerfStat):
     def find_stat(self, test_stat_path: str):
         """Return the total number of times a pattern matched"""
+
+        paths = glob.glob(test_stat_path)
+        if not paths:
+            return []
+
+        test_stat_path = paths[0]
         total = 0
-        test_stat_path = glob.glob(test_stat_path)[0]
         for line in open(test_stat_path):
             match = re.search(self.pattern, line)
             if match:
@@ -122,6 +130,8 @@ class PerfStatLatency(PerfStat):
         self.ops = ops
 
     def find_stat(self, test_stat_path: str):
+        if not os.path.exists(test_stat_path):
+            return []
         values = []
         for line in open(test_stat_path):
             as_dict = json.loads(line)
@@ -181,6 +191,8 @@ class PerfStatMonitorAvg(PerfStat):
         self.field = field
 
     def find_stat(self, test_stat_path: str):
+        if not os.path.exists(test_stat_path):
+            return []
         values = []
         for line in open(test_stat_path):
             as_dict = json.loads(line)

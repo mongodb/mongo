@@ -353,11 +353,7 @@ functions:
           ${GNU_CXX_VERSION|} \
           ${CLANG_C_VERSION|} \
           ${CLANG_CXX_VERSION|} \
-          ${ENABLE_AZURE|} \
           ${ENABLE_CPPSUITE|} \
-          ${ENABLE_GCP|} \
-          ${IMPORT_AZURE_SDK|} \
-          ${IMPORT_GCP_SDK|} \
           ${SPINLOCK_TYPE|} \
           ${ENABLE_COLORIZE_OUTPUT|-DENABLE_COLORIZE_OUTPUT=0} \
           ${CC_OPTIMIZE_LEVEL|}"

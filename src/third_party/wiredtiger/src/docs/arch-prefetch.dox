@@ -100,7 +100,7 @@ has processed the leaf page.
 
 Pre-fetch is a highly concurrent module and we rely on a few mechanisms to ensure
 that it runs smoothly with the rest of the system.
-- A connection level lock \c prefetch_lock is used for the pre-fetch queue, and is
+- A connection level lock \c prefetch.lock is used for the pre-fetch queue, and is
 needed when adding and removing \c WT_PREFETCH_QUEUE_ENTRY items from it.
 - Whenever we modify a \c ref structure, e.g. when adding it to the pre-fetch queue
 and setting the corresponding \c WT_REF_FLAG_PREFETCH flag, it must be in the

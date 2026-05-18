@@ -177,7 +177,7 @@ of the documentation.
 - @subpage arch-toc-mem-disk
     - @ref arch-block
     - @ref arch-data-file
-    - @ref arch-cloud-storage-extension
+
     - @ref arch-prefetch
     - @ref arch-tiered-storage
 
@@ -310,10 +310,6 @@ The block manager manages the reading and writing of disk blocks.
 @subpage arch-data-file
 
 The format of the data file is given by structures in \c block.h .
-
-@subpage arch-cloud-storage-extension
-
-The cloud storage source extension which manage the flushing of the data files to and reading from different cloud object stores.
 
 @subpage arch-prefetch
 

@@ -488,7 +488,7 @@ descend:
     if (eviction && __wt_ref_is_root(current)) {
         if (--retry > 0)
             goto restart;
-        else if (S2C(session)->evict_sample_inmem && !sample_inmem_page) {
+        else if (S2C(session)->evict_config.sample_inmem && !sample_inmem_page) {
             sample_inmem_page = true;
             goto restart;
         }

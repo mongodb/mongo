@@ -40,7 +40,7 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
 
         // Set the eviction server as running.
-        conn_impl->evict_server_running = true;
+        conn_impl->evict_config.server_running = true;
         // The eviction sever is running, but the application is busy and the cache is less than 100
         // percent full.
         conn_impl->cache_size = 10 * 1024 * 1024;

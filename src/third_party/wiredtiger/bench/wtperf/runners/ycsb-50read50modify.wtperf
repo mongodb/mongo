@@ -11,6 +11,7 @@ table_config="type=file"
 key_sz=100
 value_sz=1024
 icount=30000000
+retry_writes=true
 run_time=1800
 sess_config="isolation=snapshot"
 threads=((count=8,reads=1),(count=8,modify=1,ops_per_txn=1))

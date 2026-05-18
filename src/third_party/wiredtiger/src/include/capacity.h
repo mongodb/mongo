@@ -45,7 +45,7 @@ typedef enum {
 #define WT_CAP_LOG 30
 #define WT_CAP_READ 55
 
-struct __wt_capacity {
+struct __wt_throttle {
     uint64_t ckpt;            /* Bytes/sec checkpoint capacity */
     uint64_t evict;           /* Bytes/sec eviction capacity */
     uint64_t log;             /* Bytes/sec logging capacity */

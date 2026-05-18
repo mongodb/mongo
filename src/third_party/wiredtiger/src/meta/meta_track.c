@@ -336,8 +336,8 @@ err:
      * Wake up the sweep thread: particularly for the in-memory storage engine, we want to reclaim
      * space immediately.
      */
-    if (did_drop && S2C(session)->sweep_cond != NULL)
-        __wt_cond_signal(session, S2C(session)->sweep_cond);
+    if (did_drop && S2C(session)->sweep.cond != NULL)
+        __wt_cond_signal(session, S2C(session)->sweep.cond);
 
     if (ret != 0)
         WT_RET_PANIC(session, ret, "failed to apply or unroll all tracked operations");

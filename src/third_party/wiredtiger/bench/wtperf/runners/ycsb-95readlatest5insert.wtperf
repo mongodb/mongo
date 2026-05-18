@@ -10,6 +10,7 @@ table_config="type=file"
 key_sz=100
 value_sz=1024
 icount=30000000
+retry_writes=true
 run_time=1800
 select_latest=true
 threads=((count=16,reads=95,inserts=5))

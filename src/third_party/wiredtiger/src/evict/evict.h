@@ -148,7 +148,8 @@ struct __wt_evict {
     (WT_EVICT_CACHE_CLEAN_HARD | WT_EVICT_CACHE_DIRTY_HARD | WT_EVICT_CACHE_UPDATES_HARD)
     uint32_t flags;
     bool evict_tune_stable; /* Are we stable? */
-    bool use_npos_in_pass; /* Cached value of conn->evict_use_npos for the run of eviction server */
+    bool use_npos_in_pass;  /* Cached value of conn->evict_config.use_npos for the run of eviction
+                               server */
 };
 
 /* Flags used with __wt_evict */

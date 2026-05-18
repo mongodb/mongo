@@ -132,6 +132,7 @@ find [a-z]* -name '*.[ch]' \
     -o -name '*.py' \
     -o -name '*.swig' |
     sed	-e '/Makefile.in/d' \
+    -e '/^build\//d' \
     -e '/^cmake\//d' \
     -e '/checksum\/power8\//d' \
     -e '/checksum\/zseries\//d' \

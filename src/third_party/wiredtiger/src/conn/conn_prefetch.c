@@ -9,6 +9,34 @@
 #include "wt_internal.h"
 
 /*
+ * __wti_conn_prefetch_init --
+ *     Initialize the WT_CONN_PREFETCH structure.
+ */
+int
+__wti_conn_prefetch_init(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+    TAILQ_INIT(&conn->prefetch.pfqh); /* Pre-fetch reference list */
+    WT_RET(__wt_spin_init(session, &conn->prefetch.lock, "prefetch"));
+    return (0);
+}
+
+/*
+ * __wti_conn_prefetch_destroy --
+ *     Destroy the WT_CONN_PREFETCH structure.
+ */
+void
+__wti_conn_prefetch_destroy(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+    __wt_spin_destroy(session, &conn->prefetch.lock);
+}
+
+/*
  * __prefetch_thread_chk --
  *     Check to decide if the pre-fetch thread should continue running.
  */
@@ -38,23 +66,23 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     F_SET(session, WT_SESSION_PREFETCH_THREAD);
 
     if (FLD_ISSET(conn->server_flags, WT_CONN_SERVER_PREFETCH))
-        __wt_cond_wait(session, conn->prefetch_threads.wait_cond, WT_THOUSAND * WT_THOUSAND, NULL);
+        __wt_cond_wait(session, conn->prefetch.threads.wait_cond, WT_THOUSAND * WT_THOUSAND, NULL);
 
-    while (!TAILQ_EMPTY(&conn->pfqh)) {
+    while (!TAILQ_EMPTY(&conn->prefetch.pfqh)) {
         /* Encourage races. */
         __wt_timing_stress(session, WT_TIMING_STRESS_PREFETCH_1, NULL);
 
-        __wt_spin_lock(session, &conn->prefetch_lock);
-        pe = TAILQ_FIRST(&conn->pfqh);
+        __wt_spin_lock(session, &conn->prefetch.lock);
+        pe = TAILQ_FIRST(&conn->prefetch.pfqh);
 
         /* If there is no work for the thread to do - return back to the thread pool */
         if (pe == NULL) {
-            __wt_spin_unlock(session, &conn->prefetch_lock);
+            __wt_spin_unlock(session, &conn->prefetch.lock);
             break;
         }
 
-        TAILQ_REMOVE(&conn->pfqh, pe, q);
-        __wt_tsan_suppress_sub_uint64(&conn->prefetch_queue_count, 1);
+        TAILQ_REMOVE(&conn->prefetch.pfqh, pe, q);
+        __wt_tsan_suppress_sub_uint64(&conn->prefetch.queue_count, 1);
 
         /*
          * If the cache is getting close to its eviction clean trigger, don't attempt to pre-fetch
@@ -65,7 +93,7 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
          */
         if (__wt_evict_clean_pressure(session)) {
             F_CLR_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH);
-            __wt_spin_unlock(session, &conn->prefetch_lock);
+            __wt_spin_unlock(session, &conn->prefetch.lock);
             __wt_free(session, pe);
             continue;
         }
@@ -81,7 +109,7 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 
         WT_PREFETCH_ASSERT(
           session, F_ISSET_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH), prefetch_skipped_no_flag_set);
-        __wt_spin_unlock(session, &conn->prefetch_lock);
+        __wt_spin_unlock(session, &conn->prefetch.lock);
 
         /*
          * It's a weird case, but if verify is utilizing prefetch and encounters a corrupted block,
@@ -137,19 +165,19 @@ __wti_prefetch_create(WT_SESSION_IMPL *session, const char *cfg[])
      * as well, in preparation for the functionality being runtime configurable.
      */
     WT_RET(__wt_config_gets(session, cfg, "prefetch.available", &cval));
-    conn->prefetch_available = cval.val != 0;
+    conn->prefetch.available = cval.val != 0;
 
     /*
      * Pre-fetch functionality isn't runtime configurable, so don't bother starting utility threads
      * if it isn't available.
      */
-    if (!conn->prefetch_available)
+    if (!conn->prefetch.available)
         return (0);
 
     FLD_SET(conn->server_flags, WT_CONN_SERVER_PREFETCH);
 
     session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
-    WT_ERR(__wt_thread_group_create(session, &conn->prefetch_threads, "prefetch-server",
+    WT_ERR(__wt_thread_group_create(session, &conn->prefetch.threads, "prefetch-server",
       WT_PREFETCH_THREAD_COUNT, WT_PREFETCH_THREAD_COUNT, session_flags, __prefetch_thread_chk,
       __prefetch_thread_run, NULL));
     return (0);
@@ -181,7 +209,7 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
     if (__wt_evict_clean_pressure(session))
         return (EBUSY);
 
-    __wt_spin_lock(session, &conn->prefetch_lock);
+    __wt_spin_lock(session, &conn->prefetch.lock);
     /* Don't queue pages for trees that have eviction disabled. */
     if (S2BT(session)->evict_disabled > 0)
         WT_ERR(EBUSY);
@@ -217,10 +245,10 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
     F_SET_ATOMIC_8(ref, WT_REF_FLAG_PREFETCH);
     /* Unlock the ref. */
     WT_REF_SET_STATE(ref, WT_REF_DISK);
-    TAILQ_INSERT_TAIL(&conn->pfqh, pe, q);
-    __wt_tsan_suppress_add_uint64(&conn->prefetch_queue_count, 1);
-    __wt_spin_unlock(session, &conn->prefetch_lock);
-    __wt_cond_signal(session, conn->prefetch_threads.wait_cond);
+    TAILQ_INSERT_TAIL(&conn->prefetch.pfqh, pe, q);
+    __wt_tsan_suppress_add_uint64(&conn->prefetch.queue_count, 1);
+    __wt_spin_unlock(session, &conn->prefetch.lock);
+    __wt_cond_signal(session, conn->prefetch.threads.wait_cond);
 
     return (0);
 
@@ -228,7 +256,7 @@ err:
     /* Unlock the ref. */
     WT_REF_SET_STATE(ref, WT_REF_DISK);
 done:
-    __wt_spin_unlock(session, &conn->prefetch_lock);
+    __wt_spin_unlock(session, &conn->prefetch.lock);
     return (ret);
 }
 
@@ -250,20 +278,20 @@ __wt_conn_prefetch_clear_tree(WT_SESSION_IMPL *session, bool all)
     WT_ASSERT_ALWAYS(session, all || dhandle != NULL,
       "Pre-fetch needs to save a valid dhandle when clearing the queue for a btree");
 
-    __wt_spin_lock(session, &conn->prefetch_lock);
+    __wt_spin_lock(session, &conn->prefetch.lock);
 
     /* Empty the queue of the relevant pages, or all of them if specified. */
-    TAILQ_FOREACH_SAFE(pe, &conn->pfqh, q, pe_tmp)
+    TAILQ_FOREACH_SAFE(pe, &conn->prefetch.pfqh, q, pe_tmp)
     {
         if (all || pe->dhandle == dhandle) {
-            TAILQ_REMOVE(&conn->pfqh, pe, q);
+            TAILQ_REMOVE(&conn->prefetch.pfqh, pe, q);
             F_CLR_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH);
             __wt_free(session, pe);
-            __wt_tsan_suppress_sub_uint64(&conn->prefetch_queue_count, 1);
+            __wt_tsan_suppress_sub_uint64(&conn->prefetch.queue_count, 1);
         }
     }
     if (all)
-        WT_ASSERT(session, conn->prefetch_queue_count == 0);
+        WT_ASSERT(session, conn->prefetch.queue_count == 0);
 
     /*
      * Give up the lock, consumers of the queue shouldn't see pages relevant to them. Additionally
@@ -271,7 +299,7 @@ __wt_conn_prefetch_clear_tree(WT_SESSION_IMPL *session, bool all)
      * important that the flag is checked after locking the prefetch queue lock. If not then threads
      * may not note that the tree is closed for prefetch.
      */
-    __wt_spin_unlock(session, &conn->prefetch_lock);
+    __wt_spin_unlock(session, &conn->prefetch.lock);
 
     /*
      * If we are only clearing refs from a certain tree, wait for any other concurrent pre-fetch
@@ -306,11 +334,11 @@ __wti_prefetch_destroy(WT_SESSION_IMPL *session)
     WT_TRET(__wt_conn_prefetch_clear_tree(session, true));
 
     /* Let any running threads finish up. */
-    __wt_cond_signal(session, conn->prefetch_threads.wait_cond);
+    __wt_cond_signal(session, conn->prefetch.threads.wait_cond);
 
-    __wt_writelock(session, &conn->prefetch_threads.lock);
+    __wt_writelock(session, &conn->prefetch.threads.lock);
 
-    WT_RET(__wt_thread_group_destroy(session, &conn->prefetch_threads));
+    WT_RET(__wt_thread_group_destroy(session, &conn->prefetch.threads));
 
     return (ret);
 }

@@ -425,9 +425,8 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
     "calls to checkpoint that are flush_tier, if tiered storage enabled (percentage)", 0x0, 0, 50,
     100, V_GLOBAL_TIERED_STORAGE_FLUSH_FREQUENCY},
 
-  {"tiered_storage.storage_source",
-    "storage source used (azure_store | dir_store | gcp_store | none | off)", C_IGNORE | C_STRING,
-    0, 0, 0, V_GLOBAL_TIERED_STORAGE_STORAGE_SOURCE},
+  {"tiered_storage.storage_source", "storage source used (dir_store | none | off)",
+    C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_TIERED_STORAGE_STORAGE_SOURCE},
 
   {"transaction.implicit", "implicit, without timestamps, transactions (percentage)", 0, 0, 100,
     100, V_GLOBAL_TRANSACTION_IMPLICIT},

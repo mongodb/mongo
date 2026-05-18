@@ -842,7 +842,7 @@ __wt_evict_app_assist_worker_check(
 
     /* It is not safe to proceed if the eviction server threads aren't setup yet. */
     WT_CONNECTION_IMPL *conn = S2C(session);
-    if (!__wt_atomic_load_bool_relaxed(&conn->evict_server_running))
+    if (!__wt_atomic_load_bool_relaxed(&conn->evict_config.server_running))
         return (0);
 
     /* Checkpoint reconciliation workers cannot participate in eviction. */
@@ -976,4 +976,77 @@ __wt_evict_clear_npos(WT_BTREE *btree)
 {
     btree->evict_pos = WT_NPOS_INVALID;
     btree->evict_saved_ref_check = 0;
+}
+
+/*
+ * __evict_list_clear --
+ *     Clear an entry in the LRU eviction list.
+ */
+static WT_INLINE void
+__evict_list_clear(WT_SESSION_IMPL *session, WTI_EVICT_ENTRY *e)
+{
+    if (e->ref != NULL) {
+        WT_ASSERT(session, F_ISSET_ATOMIC_16(e->ref->page, WT_PAGE_EVICT_LRU));
+        F_CLR_ATOMIC_16(e->ref->page, WT_PAGE_EVICT_LRU | WT_PAGE_EVICT_LRU_URGENT);
+    }
+    e->ref = NULL;
+    e->btree = (WT_BTREE *)WT_DEBUG_POINT;
+}
+
+/*
+ * __evict_queue_empty --
+ *     Is the queue empty? Note that the eviction server is pessimistic and treats a half full queue
+ *     as empty.
+ */
+static WT_INLINE bool
+__evict_queue_empty(WTI_EVICT_QUEUE *queue, bool server_check)
+{
+    uint32_t candidates, used;
+
+    if (queue->evict_current == NULL)
+        return (true);
+
+    /* The eviction server only considers half of the candidates. */
+    candidates = queue->evict_candidates;
+    if (server_check && candidates > 1)
+        candidates /= 2;
+    used = (uint32_t)(queue->evict_current - queue->evict_queue);
+    return (used >= candidates);
+}
+
+/*
+ * __evict_queue_full --
+ *     Is the queue full (i.e., it has been populated with candidates and none of them have been
+ *     evicted yet)?
+ */
+static WT_INLINE bool
+__evict_queue_full(WTI_EVICT_QUEUE *queue)
+{
+    return (queue->evict_current == queue->evict_queue && queue->evict_candidates != 0);
+}
+
+/*
+ * __evict_page_updates_candidate --
+ *     Check whether evicting the page will help reduce tracked updates usage.
+ */
+static WT_INLINE bool
+__evict_page_updates_candidate(WT_PAGE *page)
+{
+    if (page == NULL || page->modify == NULL)
+        return (false);
+
+    /*
+     * Internal pages don't track bytes_updates, but still need to be evicted when updates pressure
+     * is active. Evicting and reconciling an internal page frees the underlying disk blocks of any
+     * fast-truncate children whose deletions have become globally visible.
+     */
+    if (WT_PAGE_IS_INTERNAL(page))
+        return (true);
+
+    /*
+     * For leaf pages, only queue the page if it has non-zero tracked update bytes. Freshly-split
+     * child pages start at zero, and evicting a page with no tracked update bytes does not reduce
+     * updates cache pressure.
+     */
+    return (page->modify->bytes_updates != 0);
 }

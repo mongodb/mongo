@@ -321,11 +321,7 @@ functions:
           ${GNU_CXX_VERSION|} \
           ${CLANG_C_VERSION|} \
           ${CLANG_CXX_VERSION|} \
-          ${ENABLE_AZURE|} \
           ${ENABLE_CPPSUITE|} \
-          ${ENABLE_GCP|} \
-          ${IMPORT_AZURE_SDK|} \
-          ${IMPORT_GCP_SDK|} \
           ${SPINLOCK_TYPE|} \
           ${ENABLE_COLORIZE_OUTPUT|-DENABLE_COLORIZE_OUTPUT=0} \
           ${CC_OPTIMIZE_LEVEL|} \
@@ -551,41 +547,6 @@ functions:
           ${PREPARE_TEST_ENV}
           ../../../tools/run_parallel.sh 'nice ./recovery-test.sh "${data_validation_stress_test_args} ${run_test_checkpoint_args}" WT_TEST.$t test_checkpoint' ${validation_stress_num_runs|120}
 
-  "run tiered storage test":
-    - command: shell.exec
-      params:
-        working_dir: "wiredtiger/cmake_build"
-        shell: bash
-        script: |
-          set -o errexit
-          ${PREPARE_TEST_ENV}
-
-          # Set the Azure credentials using config variable.
-          export AZURE_STORAGE_CONNECTION_STRING="${azure_sdk_ext_access_key}"
-
-          # GCP requires a path to a credentials file for authorization. To not expose the private
-          # information within the file, we use a placeholder private variable which are replaced
-          # in the command line with the evergreen expansion variables and stored in a temporary
-          # file.
-          file=$(mktemp --suffix ".json")
-
-          # Use '|' as the delimiter instead of default behavior because the private key contains
-          # slash characters.
-          sed -e 's|gcp_project_id|${gcp_sdk_ext_project_id}|'                      \
-              -e 's|gcp_private_key|'"${gcp_sdk_ext_private_key}"'|'                \
-              -e 's|gcp_private_id|${gcp_sdk_ext_private_key_id}|'                  \
-              -e 's|gcp_client_email|${gcp_sdk_ext_client_email}|'                  \
-              -e 's|gcp_client_id|${gcp_sdk_ext_client_id}|'                        \
-              -e 's|gcp_client_x509_cert_url|${gcp_sdk_ext_client_x509_cert_url}|'  ../test/evergreen/gcp_auth.json > $file
-          export GOOGLE_APPLICATION_CREDENTIALS="$file"
-
-          virtualenv -p python3 venv
-          source venv/bin/activate
-          pip3 install azure-storage-blob==12.20.0
-          pip3 install google-cloud-storage==2.17.0
-
-          # Run Python testing for all tiered tests.
-          python3 ../test/suite/run.py ${ignore_stdout} -j $(nproc) ${tiered_storage_test_name}
   "compile wiredtiger docs":
     - command: shell.exec
       params:
@@ -1501,17 +1462,6 @@ functions:
         WIREDTIGER_CONFIG="$EXT" ./wt -h ${workdir}/${data_dir} list
         WIREDTIGER_CONFIG="$EXT" ./wt -h ${workdir}/${data_dir} verify
 
-  "install gcp dependencies":
-    - command: shell.exec
-      type: setup
-      params:
-        working_dir: "wiredtiger"
-        shell: bash
-        script: |
-          set -o errexit
-          . test/evergreen/find_cmake.sh
-          . test/evergreen/install_gcp_dependencies.sh $CMAKE
-
   "split stress test":
     command: shell.exec
     params:
@@ -1573,16 +1523,6 @@ variables:
     <<: *configure_flags_with_builtins
     ENABLE_SHARED: -DENABLE_SHARED=0
     ENABLE_STATIC: -DENABLE_STATIC=1
-
-  # Configure flags for tiered storage Azure extension.
-  - &configure_flags_tiered_storage_azure
-    ENABLE_AZURE: -DENABLE_AZURE=1
-    IMPORT_AZURE_SDK: -DIMPORT_AZURE_SDK=external
-
-  # Configure flags for tiered storage GCP extension.
-  - &configure_flags_tiered_storage_gcp
-    ENABLE_GCP: -DENABLE_GCP=1
-    IMPORT_GCP_SDK: -DIMPORT_GCP_SDK=external
 
   # Configure flags for address sanitizer for stable mongodb toolchain clang (include builtins).
   - &configure_flags_asan_mongodb_stable_clang_with_builtins
@@ -1827,6 +1767,9 @@ tasks:
   # Base compile task on posix flavors
   - name: compile
     tags: ["pull_request"]
+    depends_on: &s-all-dep
+      - name: s-all
+        variant: ubuntu2004
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -1834,6 +1777,7 @@ tasks:
       - func: "cleanup"
 
   - name: compile-develop
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger develop"
@@ -1843,6 +1787,7 @@ tasks:
   # production build with --disable-shared
   - name: compile-production-disable-shared
     tags: ["pull_request", "pull_request_compilers"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -1854,6 +1799,7 @@ tasks:
   # production build with --disable-static
   - name: compile-production-disable-static
     tags: ["pull_request", "pull_request_compilers"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -1864,6 +1810,7 @@ tasks:
 
   - name: compile-gcc
     tags: ["pull_request", "pull_request_compilers"]
+    depends_on: *s-all-dep
     commands:
       - command: expansions.update
         params:
@@ -1896,6 +1843,7 @@ tasks:
 
   - name: compile-clang
     tags: ["pull_request", "pull_request_compilers"]
+    depends_on: *s-all-dep
     commands:
       - command: expansions.update
         params:
@@ -1943,6 +1891,7 @@ tasks:
   # is often pre-processed out.
   - name: compile-uncommon-build-flags
     tags: ["pull_request", "pull_request_compilers"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -1964,6 +1913,7 @@ tasks:
           HAVE_UNITTEST: -DHAVE_UNITTEST=1
 
   - name: make-check-test
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -1971,6 +1921,7 @@ tasks:
 
   # This task is the same as make-check-test but fits for lower specs by allowing a bigger timeout.
   - name: make-check-test-low-perf
+    depends_on: *s-all-dep
     commands:
       - command: timeout.update
         params:
@@ -1986,6 +1937,7 @@ tasks:
 
   - name: lang-python-test
     tags: ["pull_request", "python"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -1995,6 +1947,7 @@ tasks:
 
   - name: examples-c-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2004,6 +1957,7 @@ tasks:
 
   - name: examples-c-production-disable-shared-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2015,6 +1969,7 @@ tasks:
 
   - name: examples-c-production-disable-static-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2026,6 +1981,7 @@ tasks:
 
   - name: checkpoint-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2036,6 +1992,7 @@ tasks:
 
   - name: checkpoint-test-disagg-leader
     tags: ["stress-test-disagg"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2045,6 +2002,7 @@ tasks:
           directory: test/checkpoint
 
   - name: checkpoint-test-long-running
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2055,6 +2013,7 @@ tasks:
 
   - name: cursor-order-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2064,6 +2023,7 @@ tasks:
 
   - name: fops-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2073,6 +2033,7 @@ tasks:
 
   - name: format-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2082,6 +2043,7 @@ tasks:
 
   - name: huge-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2091,6 +2053,7 @@ tasks:
 
   - name: manydbs-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2100,6 +2063,7 @@ tasks:
 
   - name: packing-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2109,6 +2073,7 @@ tasks:
 
   - name: readonly-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2118,6 +2083,7 @@ tasks:
 
   - name: salvage-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2127,6 +2093,7 @@ tasks:
 
   - name: thread-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2136,6 +2103,7 @@ tasks:
 
   - name: bench-wtperf-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2145,6 +2113,7 @@ tasks:
 
   - name: catch2-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2162,6 +2131,7 @@ tasks:
 
   - name: catch2-assertions
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2427,6 +2397,7 @@ tasks:
   # Start of csuite test tasks
   - name: csuite-tests-fast
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2436,6 +2407,7 @@ tasks:
           ctest_extra_args: -LE "long_running|check_disagg" ${ctest_extra_args} -j ${num_jobs}
 
   - name: csuite-random-abort-lazyfs
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2452,6 +2424,7 @@ tasks:
             ./smoke_lazyfs.sh
 
   - name: csuite-schema-abort-lazyfs
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2468,6 +2441,7 @@ tasks:
             ./smoke_lazyfs.sh
 
   - name: csuite-timestamp-abort-lazyfs
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -2506,6 +2480,7 @@ tasks:
   - name: csuite-long-running
     # Set 6 hours timeout (60 * 60 * 6 = 21600)
     exec_timeout_secs: 21600
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -3931,6 +3906,7 @@ tasks:
 
   - name: compatibility-test-suite-daily
     tags: ["python"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4001,6 +3977,7 @@ tasks:
             test/compatibility/compatibility_test_for_releases.sh -i
 
   - name: generate-datafile-little-endian
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4053,6 +4030,7 @@ tasks:
       - func: "verify wt datafiles"
 
   - name: generate-datafile-big-endian
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4106,6 +4084,7 @@ tasks:
 
   - name: clang-analyzer
     tags: ["lint"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - command: shell.exec
@@ -4178,6 +4157,7 @@ tasks:
 
   - name: syscall-linux
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4192,6 +4172,7 @@ tasks:
             WT_BUILDDIR=$(pwd)/../../cmake_build LD_LIBRARY_PATH=$WT_BUILDDIR ${python_binary|python3} syscall.py --verbose --preserve
 
   - name: checkpoint-filetypes-test
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4423,76 +4404,8 @@ tasks:
 
       - func: "code coverage publish report"
 
-  - name: azure-gcp-tiered-storage-extensions-test
-    tags: ["python"]
-    commands:
-      - func: "get project"
-      - func: "install gcp dependencies"
-      - func: "compile wiredtiger"
-        vars:
-          <<: [*configure_flags_tiered_storage_azure, *configure_flags_tiered_storage_gcp]
-      - func: "run tiered storage test"
-        vars:
-          # Set this in case of a core to get the correct python binary.
-          python_binary: $(pwd)/venv/bin/python3
-          tiered_storage_test_name: tiered
-  - name: azure-gcp-tiered-catch2-unittest-test
-    tags: ["tiered_unittest"]
-    commands:
-      - func: "get project"
-      - func: "install gcp dependencies"
-      - func: "compile wiredtiger"
-        vars:
-          <<: [*configure_flags_tiered_storage_azure, *configure_flags_tiered_storage_gcp]
-          HAVE_UNITTEST: -DHAVE_UNITTEST=1
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          shell: bash
-          script: |
-            set -o errexit
-            # Set the Azure credentials using config variable.
-            export AZURE_STORAGE_CONNECTION_STRING="${azure_sdk_ext_access_key}"
-
-            # GCP requires a path to a credentials file for authorization. To not expose the private
-            # information within the file, we use a placeholder private variable which are replaced
-            # in the command line with the evergreen expansion variables and stored in a temporary
-            # file.
-            file=$(mktemp --suffix ".json")
-
-            # Use '|' as the delimiter instead of default behavior because the private key contains
-            # slash characters.
-            sed -e 's|gcp_project_id|${gcp_sdk_ext_project_id}|'                      \
-                -e 's|gcp_private_key|'"${gcp_sdk_ext_private_key}"'|'                \
-                -e 's|gcp_private_id|${gcp_sdk_ext_private_key_id}|'                  \
-                -e 's|gcp_client_email|${gcp_sdk_ext_client_email}|'                  \
-                -e 's|gcp_client_id|${gcp_sdk_ext_client_id}|'                        \
-                -e 's|gcp_client_x509_cert_url|${gcp_sdk_ext_client_x509_cert_url}|'  ../test/evergreen/gcp_auth.json > $file
-            export GOOGLE_APPLICATION_CREDENTIALS="$file"
-            set -o verbose
-            ${PREPARE_TEST_ENV}
-
-            # Run Azure extension unit testing.
-            ext/storage_sources/azure_store/test/run_azure_unit_tests
-
-            # Run GCP extension unit testing.
-            ext/storage_sources/gcp_store/test/run_gcp_unit_tests
-
-  - name: azure-gcp-tiered-test-small
-    tags: ["python"]
-    commands:
-      - func: "get project"
-      - func: "install gcp dependencies"
-      - func: "compile wiredtiger"
-        vars:
-          <<: [*configure_flags_tiered_storage_azure, *configure_flags_tiered_storage_gcp]
-      - func: "run tiered storage test"
-        vars:
-          # Set this in case of a core to get the correct python binary.
-          python_binary: $(pwd)/venv/bin/python3
-          tiered_storage_test_name: tiered06
-
   - name: spinlock-gcc-test
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4506,6 +4419,7 @@ tasks:
           test_format_extra_args: runs.rows=1000000:2500000
 
   - name: spinlock-pthread-adaptive-test
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4646,6 +4560,7 @@ tasks:
 
   - name: format-mirror-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4655,6 +4570,7 @@ tasks:
           trace_args: -T all
 
   - name: format-msan-test
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4665,6 +4581,7 @@ tasks:
 
   - name: format-stress-pull-request-test
     tags: ["pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4674,6 +4591,7 @@ tasks:
           format_test_script_args: -t 10 rows=10000 ops=50000
 
   - name: format-smoke-test
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4687,6 +4605,7 @@ tasks:
           test_format_extra_args: -C "verbose=(checkpoint_cleanup:1)"
 
   - name: format-asan-smoke-test
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4720,6 +4639,7 @@ tasks:
           times: 3
 
   - name: format-wtperf-test
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4768,6 +4688,7 @@ tasks:
 
   - name: tsan-playground-test
     exec_timeout_secs: 86400
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -4976,6 +4897,7 @@ tasks:
             ./run_format_configs.sh -j ${num_jobs}
 
   - name: static-wt-build-test
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5008,6 +4930,7 @@ tasks:
   - name: checkpoint-stress-test
     tags: ["stress-test-1"]
     exec_timeout_secs: 86400
+    depends_on: *s-all-dep
     commands:
       - command: timeout.update
         params:
@@ -5024,6 +4947,7 @@ tasks:
 
   - name: checkpoint-stress-test-tiered
     exec_timeout_secs: 86400
+    depends_on: *s-all-dep
     commands:
       - command: timeout.update
         params:
@@ -5041,6 +4965,7 @@ tasks:
   - name: precise-checkpoint-stress-test
     tags: ["stress-test-1"]
     exec_timeout_secs: 86400
+    depends_on: *s-all-dep
     commands:
       - command: timeout.update
         params:
@@ -5059,6 +4984,7 @@ tasks:
 
   - name: precise-checkpoint-stress-test-tiered
     exec_timeout_secs: 86400
+    depends_on: *s-all-dep
     commands:
       - command: timeout.update
         params:
@@ -5078,6 +5004,7 @@ tasks:
   - name: skiplist-stress-test
     tags: ["stress-test-1", "stress-test-zseries-1"]
     exec_timeout_secs: 3600 # 1 hour
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5097,6 +5024,7 @@ tasks:
     tags: ["stress-test-1", "stress-test-ppc-1", "stress-test-zseries-1"]
     # Set 5 hours timeout (60 * 60 * 5)
     exec_timeout_secs: 18000
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5104,6 +5032,7 @@ tasks:
 
   - name: model-unit-test
     tags: ["pull_request", "model_checking"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5119,6 +5048,7 @@ tasks:
 
   - name: model-test-failure-workloads
     tags: ["model_checking", "pull_request"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5134,6 +5064,7 @@ tasks:
 
   - name: model-test-long
     tags: ["model_checking"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5143,6 +5074,7 @@ tasks:
 
   - name: model-test-long-disagg
     tags: ["model_checking"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5152,6 +5084,7 @@ tasks:
 
   - name: model-test-long-random-config
     tags: ["model_checking"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5161,6 +5094,7 @@ tasks:
 
   - name: model-test-long-random-config-disagg
     tags: ["model_checking"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5170,6 +5104,7 @@ tasks:
 
   - name: model-test-long-with-coverage
     tags: ["model_checking"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - command: expansions.update
@@ -5210,6 +5145,7 @@ tasks:
     tags: ["stress-test-zseries-1"]
     # Set 2.5 hours timeout (60 * 60 * 2.5)
     exec_timeout_secs: 9000
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5226,6 +5162,7 @@ tasks:
     tags: ["stress-test-ppc-1"]
     # Set 2.5 hours timeout (60 * 60 * 2.5)
     exec_timeout_secs: 9000
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5401,6 +5338,7 @@ tasks:
           times: 1
 
   - name: format-abort-recovery-stress-test
+    depends_on: *s-all-dep
     commands:
       # Allow 30 minutes beyond test runtime because recovery under load can cause the test to
       # run longer.
@@ -5418,6 +5356,7 @@ tasks:
   - name: format-predictable-test
     # Set 2.5 hour timeout (60 * 60 * 2.5)
     exec_timeout_secs: 9000
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5430,6 +5369,7 @@ tasks:
   - name: schema-abort-predictable-test
     # Set 20 minute timeout (60 * 20)
     exec_timeout_secs: 1200
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5440,6 +5380,7 @@ tasks:
           times: 5
 
   - name: checkpoint-filetypes-predictable-test
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -6878,6 +6819,7 @@ tasks:
 
   - name: debug-have-diagnostic
     tags: ["antithesis"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -6885,6 +6827,7 @@ tasks:
 
   - name: release-with-debug-have-diagnostic
     tags: ["antithesis"]
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"

@@ -385,7 +385,7 @@ __drop_tiered(
      * remove the work. So hold the tiered lock for the duration so that the worker thread cannot
      * race and process work for this handle.
      */
-    __wt_spin_lock(session, &conn->tiered_lock);
+    __wt_spin_lock(session, &conn->tiered.tiered_lock);
     /*
      * Close all btree handles associated with this table. This must be done after we're done using
      * the tiered structure because that is from the dhandle.
@@ -481,7 +481,7 @@ __drop_tiered(
      */
     __wt_verbose(session, WT_VERB_TIERED, "DROP_TIERED: remove work for %p", (void *)tiered);
     __wt_tiered_remove_work(session, tiered, true);
-    __wt_spin_unlock(session, &conn->tiered_lock);
+    __wt_spin_unlock(session, &conn->tiered.tiered_lock);
 
     ret = __wt_metadata_remove(session, uri);
 
@@ -489,7 +489,7 @@ err:
     if (got_dhandle)
         WT_TRET(__wt_session_release_dhandle(session));
     __wt_free(session, name);
-    __wt_spin_unlock_if_owned(session, &conn->tiered_lock);
+    __wt_spin_unlock_if_owned(session, &conn->tiered.tiered_lock);
     return (ret);
 }
 

@@ -248,17 +248,17 @@ __wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
     if (evict_threads_min > evict_threads_max)
         WT_RET_MSG(
           session, EINVAL, "eviction=(threads_min) cannot be greater than eviction=(threads_max)");
-    conn->evict_threads_max = evict_threads_max;
-    conn->evict_threads_min = evict_threads_min;
+    conn->evict_config.threads_max = evict_threads_max;
+    conn->evict_config.threads_min = evict_threads_min;
 
     WT_RET(__wt_config_gets(session, cfg, "eviction.evict_sample_inmem", &cval));
-    conn->evict_sample_inmem = cval.val != 0;
+    conn->evict_config.sample_inmem = cval.val != 0;
 
     WT_RET(__wt_config_gets(session, cfg, "eviction.evict_use_softptr", &cval));
-    __wt_atomic_store_bool_relaxed(&conn->evict_use_npos, cval.val != 0);
+    __wt_atomic_store_bool_relaxed(&conn->evict_config.use_npos, cval.val != 0);
 
     WT_RET(__wt_config_gets(session, cfg, "eviction.legacy_page_visit_strategy", &cval));
-    conn->evict_legacy_page_visit_strategy = cval.val != 0;
+    conn->evict_config.legacy_page_visit_strategy = cval.val != 0;
 
     /* Retrieve the wait time and convert from milliseconds */
     WT_RET(__wt_config_gets(session, cfg, "cache_max_wait_ms", &cval));
@@ -309,8 +309,9 @@ __wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
      * part of creating the connection workers.
      */
     if (reconfig)
-        WT_RET(__wt_thread_group_resize(session, &conn->evict_threads, conn->evict_threads_min,
-          conn->evict_threads_max, WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL));
+        WT_RET(__wt_thread_group_resize(session, &conn->evict_config.threads,
+          conn->evict_config.threads_min, conn->evict_config.threads_max,
+          WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL));
 
     return (0);
 }
@@ -515,7 +516,7 @@ __wt_evict_stats_init(WT_SESSION_IMPL *session)
     WT_STATP_CONN_SET(session, stats, eviction_empty_score, evict->evict_empty_score);
 
     WT_STATP_CONN_SET(session, stats, eviction_active_workers,
-      __wt_atomic_load_uint32_relaxed(&conn->evict_threads.current_threads));
+      __wt_atomic_load_uint32_relaxed(&conn->evict_config.threads.current_threads));
     WT_STATP_CONN_SET(session, stats, eviction_stable_state_workers,
       __wt_atomic_load_uint32_relaxed(&evict->evict_tune_workers_best));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_attempts_to_queue_page,
@@ -530,7 +531,7 @@ __wt_evict_stats_init(WT_SESSION_IMPL *session)
      * The number of files with active walks ~= number of hazard pointers in the walk session. Note:
      * reading without locking.
      */
-    if (__wt_atomic_load_bool_relaxed(&conn->evict_server_running))
+    if (__wt_atomic_load_bool_relaxed(&conn->evict_config.server_running))
         WT_STATP_CONN_SET(
           session, stats, eviction_walks_active, evict->walk_session->hazards.num_active);
 

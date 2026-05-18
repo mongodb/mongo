@@ -827,7 +827,7 @@ __wt_session_dhandle_sweep(WT_SESSION_IMPL *session)
      * Periodically sweep for dead handles; if we've swept recently, don't do it again.
      */
     __wt_seconds(session, &now);
-    if (now - __wt_atomic_load_uint64_relaxed(&session->last_sweep) < conn->sweep_interval)
+    if (now - __wt_atomic_load_uint64_relaxed(&session->last_sweep) < conn->sweep.interval)
         return;
     __wt_atomic_store_uint64_relaxed(&session->last_sweep, now);
 
@@ -845,7 +845,7 @@ __wt_session_dhandle_sweep(WT_SESSION_IMPL *session)
         if (dhandle != session->dhandle &&
           __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) == 0 &&
           (WT_DHANDLE_INACTIVE(dhandle) || F_ISSET(dhandle, WT_DHANDLE_OUTDATED) ||
-            (dhandle->timeofdeath != 0 && now - dhandle->timeofdeath > conn->sweep_idle_time)) &&
+            (dhandle->timeofdeath != 0 && now - dhandle->timeofdeath > conn->sweep.idle_time)) &&
           (!WT_DHANDLE_BTREE(dhandle) ||
             FLD_ISSET(dhandle->advisory_flags, WT_DHANDLE_ADVISORY_EVICTED))) {
             WT_STAT_CONN_INCR(session, dh_session_handles);

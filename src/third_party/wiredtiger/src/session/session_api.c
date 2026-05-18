@@ -487,7 +487,7 @@ __session_config_prefetch(WT_SESSION_IMPL *session, WT_CONF *conf)
      */
     if (__wt_conf_getones(session, conf, Prefetch.enabled, &cval) == 0) {
         if (cval.val) {
-            if (!S2C(session)->prefetch_available) {
+            if (!S2C(session)->prefetch.available) {
                 F_CLR(session, WT_SESSION_PREFETCH_ENABLED);
                 WT_RET_MSG(session, EINVAL,
                   "pre-fetching cannot be enabled for the session if pre-fetching is configured as "
@@ -2673,7 +2673,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
     if (F_ISSET(conn, WT_CONN_CACHE_CURSORS))
         F_SET(session_ret, WT_SESSION_CACHE_CURSORS);
 
-    if (conn->prefetch_auto_on)
+    if (conn->prefetch.auto_on)
         F_SET(session_ret, WT_SESSION_PREFETCH_ENABLED);
     else
         F_CLR(session_ret, WT_SESSION_PREFETCH_ENABLED);
