@@ -56,6 +56,10 @@ struct InitialSyncState {
     Timestamp stopTimestamp;  // Referred to as minvalid, or the place we can transition states.
     Timer timer;              // Timer for timing how long each initial sync attempt takes.
     size_t appliedOps = 0;
+
+    bool earliestOplogEntryIsInitiatingSet = false;
+    Timestamp earliestOplogEntryTimestamp;
+    Date_t waitForSyncSourceStableTimestampAdvanceMaxRetryDeadline;
 };
 
 }  // namespace repl
