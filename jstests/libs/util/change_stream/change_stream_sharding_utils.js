@@ -71,12 +71,6 @@ function getCurrentClusterTime(conn, dbName) {
  * @returns {ShardingTest} The configured sharding test
  */
 function createShardingTest(mongos = 1, shards = 3, rsNodes = 1, configShard = false, mongosOptions = {}) {
-    const isMultiversion =
-        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-    // TODO (SERVER-125025): remove the failpoint.
-    const failpointSetParameter = isMultiversion
-        ? {}
-        : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
     const stOptions = {
         shards: shards,
         mongos: mongos,
@@ -86,7 +80,6 @@ function createShardingTest(mongos = 1, shards = 3, rsNodes = 1, configShard = f
             setParameter: {
                 writePeriodicNoops: true,
                 periodicNoopIntervalSecs: 1,
-                ...failpointSetParameter,
             },
         },
         other: {
