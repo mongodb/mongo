@@ -152,8 +152,6 @@ private:
     // Stats
     CollectionScanStats _specificStats;
 
-    bool _useSeek = false;
-
     // Coordinates waiting for oplog visibility. Must be initialized if we are doing an oplog scan,
     // boost::none otherwise.
     boost::optional<OplogWaitConfig> _oplogWaitConfig;
