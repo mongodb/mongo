@@ -1778,6 +1778,54 @@ TEST_F(PipelineDependencyGraphTest, ModifyPathLookupDottedAsMayDestroySibling) {
     });
 }
 
+TEST_F(PipelineDependencyGraphTest, SubFieldExistsAndIsNonMultikey) {
+    pathArrayness->addPath("a", {}, true);
+    pathArrayness->addPath("a.sub", {}, true);
+
+    setPipeline(R"([
+        {$project: {'a': 1}}
+    ])");
+
+    runTest([&] {
+        // "a" is defined as non-array.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.sub"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubFieldExistsIsSetAndIsNonMultikey) {
+    pathArrayness->addPath("a", {}, true);
+    pathArrayness->addPath("a.sub", {}, true);
+
+    setPipeline(R"([
+        {$set: {'a.b': 'baz'}}
+    ])");
+
+    runTest([&] {
+        // "a" is defined as non-array.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.sub"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SubFieldDoesNotExistAndIsNonMultikey) {
+    pathArrayness->addPath("a.sub", {}, true);
+
+    setPipeline(R"([
+        {$set: {a: 1}}
+    ])");
+
+    runTest([&] {
+        // "a" is defined as non-array, and goes through kExact.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+
+        // After setting 'a', this goes through 'kShadowed'
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.sub"));
+    });
+}
+
 TEST_F(PipelineDependencyGraphTest, LeafRedeclaredAsDottedPath) {
     setPipeline(
         "[{$set: {a: 1}},"
@@ -2008,6 +2056,422 @@ TEST_F(PipelineDependencyGraphTest, PathWithDollarPrefixEmptyComponent) {
     // $match interprets field names starting with '$' as operators (e.g., $gt, $eq).
     // Since "$." is not a recognized operator, it fails.
     ASSERT_THROWS(setPipeline(R"([{$match: {"$.": 1}}])"), DBException);
+}
+
+// Tests for dollar sign in path components
+
+TEST_F(PipelineDependencyGraphTest, DollarSignAsComponentInFieldName) {
+    // $match interprets "$a" as an operator (like $eq, $gt, etc).
+    ASSERT_THROWS(setPipeline(R"([{$match: {"$a": 1}}])"), DBException);
+
+    // The dollar prefixed field '$' in 'a.$' is not valid
+    ASSERT_THROWS(setPipeline(R"([{$set: {"a.$": 1}}])"), DBException);
+
+    // $match accepts "a.$" as a literal field name.
+    setPipeline(R"([{$match: {"a.$": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQ(graph->getDeclaringStage(nullptr, "a.$"), nullptr);
+
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.$"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, BareDollarSignAsFieldName) {
+    // The dollar prefixed field '$' in '$' is not valid
+    ASSERT_THROWS(setPipeline(R"([{$set: {"$": 1}}])"), DBException);
+
+    // $match interprets "$" as an operator (like $eq, $gt, etc).
+    ASSERT_THROWS(setPipeline(R"([{$match: {"$": 1}}])"), DBException);
+}
+
+
+TEST_F(PipelineDependencyGraphTest, DollarSignInMiddleOfFieldName) {
+    // Dollar sign in the middle of a field name like 'field$name' is valid
+    // $match accepts it as a literal field name.
+    setPipeline(R"([{$match: {"field$name": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQ(graph->getDeclaringStage(nullptr, "field$name"), nullptr);
+
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "field$name"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, DollarSignInMiddleOfNestedPath) {
+    // Dollar sign in the middle of a nested path component like 'a.b$c.d' is valid
+    // $match accepts it as a literal field name path.
+    setPipeline(R"([{$match: {"a.b$c.d": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQ(graph->getDeclaringStage(nullptr, "a.b$c.d"), nullptr);
+
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b$c"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b$c.d"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, DollarSignAtEndOfNestedPath) {
+    // Dollar sign at the end of a nested path like 'a.b.c$' is valid (not the bare '$')
+    // $match accepts it as a literal field name path.
+    setPipeline(R"([{$match: {"a.b.c$": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQ(graph->getDeclaringStage(nullptr, "a.b.c$"), nullptr);
+
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a.b.c$"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, MultipleDollarSignsInFieldName) {
+    // Multiple dollar signs like 'a$b$c' in the middle/end positions are valid
+    // $match accepts it as a literal field name.
+    setPipeline(R"([{$match: {"a$b$c": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQ(graph->getDeclaringStage(nullptr, "a$b$c"), nullptr);
+
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "a$b$c"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, DollarPrefixedNestedPathComponent) {
+    // Dollar-prefixed path component in nested path like 'foo.$bar' is invalid in $set
+    ASSERT_THROWS(setPipeline(R"([{$set: {"foo.$bar": 1}}])"), DBException);
+
+    // $match accepts "foo.$bar" as a literal field name path.
+    setPipeline(R"([{$match: {"foo.$bar": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQ(graph->getDeclaringStage(nullptr, "foo.$bar"), nullptr);
+
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "foo"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "foo.$bar"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, LookupWithDollarInAsField) {
+    // $lookup with a dollar-prefixed component in the 'as' field should fail
+    ASSERT_THROWS(setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "bar",
+        as: "results.$data"
+    }}])"),
+                  DBException);
+
+    // $lookup with a field containing dollar in the middle is valid
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "foo",
+        foreignField: "bar",
+        as: "result$data"
+    }}])");
+
+    runTest([&] {
+        // The $lookup stage declares "result$data"
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "result$data"), stages[0]);
+
+        // "result$data" can be an array (it's the output array from $lookup)
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "result$data"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, UnwindOnFieldWithDollarSign) {
+    // $unwind on a field with a dollar-prefixed component should fail
+    ASSERT_THROWS(setPipeline(R"([{$unwind: "$foo.$bar"}])"), DBException);
+
+    // $unwind on a field with dollar in the middle is valid
+    setPipeline(R"([
+        {$match: {"items$list": [1, 2, 3]}},
+        {$unwind: "$items$list"}
+    ])");
+
+    runTest([&] {
+        // The dependency graph conservatively assumes "items$list" can be an array
+        // even after $unwind (it doesn't track the unwinding semantics precisely)
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "items$list"));
+    });
+}
+
+// Tests for numeric path component handling (numeric component in prefix)
+
+TEST_F(PipelineDependencyGraphTest, NumericFirstComponentIsFieldName) {
+    pathArrayness->addPath("a", {}, true);
+    pathArrayness->addPath("a.sub", {}, true);
+    pathArrayness->addPath("0.sub", {}, true);
+
+    setPipeline(R"([
+        {$project: {"0": 1}},
+        {$project: {result: "$0.sub"}}
+    ])");
+
+    runTest([&] {
+        // First component "0" is treated as a field name. Will look up path "0.sub".
+        // Should find the stage removing "0.sub"
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "0.sub"), stages[1]);
+        // 0 comes originally from the collection
+        ASSERT_EQUALS(graph->getDeclaringStage(stages[0].get(), "0"), nullptr);
+
+        // "a" is removed by the 'project' operator and goes to 'kMissing'.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a"));
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "a"));
+
+        // Similarly, a.sub goes to 'kMissing'
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.sub"));
+
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "0"));
+        ASSERT_FALSE(graph->canPathBeArray(stages[1].get(), "0"));
+
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "0.sub"));
+    });
+}
+
+// Tests for numeric path component handling (numeric component in between other components)
+
+TEST_F(PipelineDependencyGraphTest, NumericPathComponentInMiddle) {
+    pathArrayness->addPath("items", {}, true);
+    pathArrayness->addPath("items.0.details", {}, true);
+
+    setPipeline(R"([
+        {$project: {items: 1}},
+        {$project: {result: "$items.0.details"}}
+    ])");
+
+    runTest([&] {
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "items.0.details"), stages[1]);
+
+        // "items.0.details" was set as non-array, thus this should be false.
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "result"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "items.0.details"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, MultipleNumericComponentsInMiddle) {
+    pathArrayness->addPath("matrix", {}, true);
+
+    setPipeline(R"([
+        {$project: {matrix: 1}},
+        {$set: {'matrix.0.1.value': [1,2,3]}},
+        {$project: {val: "$matrix.0.1.value"}}
+    ])");
+
+    runTest([&] {
+        // Should handle nested numeric paths without crashing
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "matrix"), stages[2]);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "matrix.0.1"), stages[2]);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "matrix.0.1.value"), stages[2]);
+
+        // "matrix" was set as non-array, thus this should be false.
+        // This goes to kMissing
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "matrix"));
+
+        // "matrix" is not an array, however we set matrix.0.1.value to an array.
+        // This goes to kMissing
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "matrix.0.1.value"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "val"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, NumericWithLeadingZeroNotTruncated) {
+    pathArrayness->addPath("data", {}, true);
+    pathArrayness->addPath("data.01", {}, true);
+
+    setPipeline(R"([
+        {$project: {data: {"01": {value: 1}}}},
+        {$project: {result: "$data.01.value"}}
+    ])");
+
+    runTest([&] {
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "data.01.value"), stages[1]);
+
+        // goes to kMissing
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "data"));
+        // goes to kMissing
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "data.01"));
+        // goes to kMissing
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "data.01.value"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "result"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, CheckingValidityOfNumericWithLeadingZeroNotTruncatedTest) {
+    pathArrayness->addPath("data", {}, true);
+    pathArrayness->addPath("data.foo", {}, true);
+
+    setPipeline(R"([
+        {$project: {data: {"foo": {value: 1}}}},
+        {$project: {result: "$data.foo.value"}}
+    ])");
+
+    runTest([&] {
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "data.foo.value"), stages[1]);
+
+        // goes to kMissing
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "data"));
+        // goes to kMissing
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "data.foo"));
+        // goes to kMissing
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "data.foo.value"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "result"));
+    });
+}
+
+// Tests for numeric path component handling (numeric component in suffix components)
+
+TEST_F(PipelineDependencyGraphTest, SuffixNumericPathComponentSimple) {
+    pathArrayness->addPath("arr", {}, true);
+
+    setPipeline(R"([
+        {$project: {arr: 1}},
+        {$project: {val: "$arr.0"}}
+    ])");
+
+    runTest([&] {
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "arr.0"), stages[1]);
+
+        // goes to kMissing
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "arr.0"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "val"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SuffixNumericPathSetToArray) {
+    setPipeline(R"([
+        {$set: {items: [1, 2, 3]}},
+        {$project: {first: "$items.0"}}
+    ])");
+
+    runTest([&] {
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "items.0"), stages[1]);
+
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "first"));
+
+        // "items" is explicitly set to an array.
+        ASSERT_TRUE(graph->canPathBeArray(stages[1].get(), "items"));
+        ASSERT_TRUE(graph->canPathBeArray(stages[1].get(), "items.0"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SuffixNumericPathMultipleComponents) {
+    setPipeline(R"([
+        {$set: {matrix: [[1, 2], [3, 4]]}},
+        {$project: {val: "$matrix.0.1"}}
+    ])");
+
+    runTest([&] {
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "matrix.0"), stages[1]);
+
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "val"));
+
+        // "matrix" is explicitly set to an array.
+        ASSERT_TRUE(graph->canPathBeArray(stages[1].get(), "matrix"));
+        ASSERT_TRUE(graph->canPathBeArray(stages[1].get(), "matrix.0"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SuffixNumericPathSetToNonArray) {
+    setPipeline(R"([
+        {$set: {matrix: "foo"}},
+        {$project: {val: "$matrix.0.1"}}
+    ])");
+
+    runTest([&] {
+        // The $project stage declares "matrix.0" (and by extension "matrix.0.1")
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "matrix.0"), stages[1]);
+
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "val"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SuffixNumericPathSetToNonArrayWithSet) {
+    setPipeline(R"([
+        {$set: {matrix: "foo"}},
+        {$set: {val: "$matrix.0.1"}}
+    ])");
+
+    runTest([&] {
+        // The $set stage declares "val"
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "val"), stages[1]);
+
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "val"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, DollarPrefixedNestedPathComponentWithArrayness) {
+    // PathArrayness API should reject paths with dollar-prefixed components like "foo.$bar"
+    // because field path components may not start with '$'
+    ASSERT_THROWS(pathArrayness->addPath("foo.$bar", {}, false), DBException);
+
+    // $match accepts "foo.$bar" as a literal field name path.
+    setPipeline(R"([{$match: {"foo.$bar": 1}}])");
+
+    runTest([&] {
+        // getDeclaringStage returns nullptr (field comes from base collection)
+        ASSERT_EQ(graph->getDeclaringStage(nullptr, "foo.$bar"), nullptr);
+
+        // Without PathArrayness metadata, both conservatively assume they can be an array
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "foo"));
+        ASSERT_TRUE(graph->canPathBeArray(nullptr, "foo.$bar"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SuffixNumericPathSetToNonArrayWithArrayness) {
+    // Add PathArrayness metadata for the non-array base path
+    pathArrayness->addPath("matrix", {}, true);
+    pathArrayness->addPath("matrix.0", {}, true);
+    pathArrayness->addPath("matrix.0.1", {}, true);
+
+    setPipeline(R"([
+        {$set: {matrix: "foo"}},
+        {$project: {val: "$matrix.0.1"}}
+    ])");
+
+    runTest([&] {
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "matrix"), stages[1]);
+        // The $project stage declares "matrix.0" (and by extension "matrix.0.1")
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "matrix.0"), stages[1]);
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "matrix.0.1"), stages[1]);
+
+        // "matrix" is explicitly marked as non-array in PathArrayness, but
+        // after the $set it goes to kMissing since the $project doesn't include it
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "matrix"));
+        // "matrix.0.1" is also marked as non-array and goes to kMissing
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "matrix.0.1"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "val"));
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, SuffixNumericPathSetToNonArrayWithSetAndArrayness) {
+    // Add PathArrayness metadata for the non-array base path
+    pathArrayness->addPath("matrix", {}, true);
+    pathArrayness->addPath("matrix.0", {}, true);
+    pathArrayness->addPath("matrix.0.1", {}, true);
+
+    setPipeline(R"([
+        {$set: {matrix: "foo"}},
+        {$set: {val: "$matrix.0.1"}}
+    ])");
+
+    runTest([&] {
+        // The $set stage declares "val"
+        ASSERT_EQUALS(graph->getDeclaringStage(nullptr, "val"), stages[1]);
+
+        // With $set (unlike $project), "matrix" is still accessible
+        // "matrix" is explicitly marked as non-array in PathArrayness
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "matrix"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "matrix.0.1"));
+        ASSERT_FALSE(graph->canPathBeArray(nullptr, "val"));
+    });
 }
 
 // When 'a' is known to be non-array, $lookup will preserve all siblings, same as $set in this case.
