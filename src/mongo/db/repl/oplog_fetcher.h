@@ -127,8 +127,10 @@ public:
      * Statistics on current batch of operations returned by the sync source.
      */
     struct DocumentsInfo {
+        // The count of the bytes of the documents read off the network.
         size_t networkDocumentCount = 0;
         size_t networkDocumentBytes = 0;
+
         size_t toApplyDocumentCount = 0;
         size_t toApplyDocumentBytes = 0;
         OpTime lastDocument = OpTime();
@@ -429,14 +431,14 @@ private:
      * Returns OplogStartMissing if we should go into rollback.
      */
     Status _checkRemoteOplogStart(const OplogFetcher::Documents& documents,
-                                  OpTime remoteLastOpApplied);
+                                  OpTime remoteLastOpApplied) const;
 
     /**
      * Distinguishes between needing to rollback and being too stale to sync from our sync source.
      * This will be called when we check the first batch of results and our last fetched optime does
      * not equal the first document in that batch. This function should never return Status::OK().
      */
-    Status _checkTooStaleToSyncFromSource(OpTime lastFetched, OpTime firstOpTimeInBatch);
+    Status _checkTooStaleToSyncFromSource(OpTime lastFetched, OpTime firstOpTimeInBatch) const;
 
     // Protects member data of this OplogFetcher.
     mutable ObservableMutex<std::mutex> _mutex;

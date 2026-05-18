@@ -173,11 +173,9 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
                                     << lastTS.toString());
     }
     DocumentsInfo info;
-    // The count of the bytes of the documents read off the network.
-    info.networkDocumentBytes = 0;
-    info.networkDocumentCount = 0;
+    const bool checkForOplogVersionChange = feature_flags::gReduceMajorityWriteLatency.isEnabled();
     for (auto&& doc : documents) {
-        if (feature_flags::gReduceMajorityWriteLatency.isEnabled()) {
+        if (checkForOplogVersionChange) {
             // Check for oplog version change.
             auto version = doc[OplogEntry::kVersionFieldName].numberLong();
             if (version != OplogEntry::kOplogVersion) {
@@ -704,6 +702,8 @@ StatusWith<OplogFetcher::Documents> OplogFetcher::_getNextBatch() {
             }
             _cursor->more();
         }
+
+        batch.reserve(_cursor->objsLeftInBatch());
         while (_cursor->moreInCurrentBatch()) {
             batch.emplace_back(_cursor->nextSafe());
         }
@@ -962,7 +962,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
 }
 
 Status OplogFetcher::_checkRemoteOplogStart(const OplogFetcher::Documents& documents,
-                                            OpTime remoteLastOpApplied) {
+                                            OpTime remoteLastOpApplied) const {
     // Sometimes our remoteLastOpApplied may be stale; if we received a document with an
     // opTime later than remoteLastApplied, we can assume the remote is at least up to that
     // opTime.
@@ -1042,7 +1042,7 @@ Status OplogFetcher::_checkRemoteOplogStart(const OplogFetcher::Documents& docum
 }
 
 Status OplogFetcher::_checkTooStaleToSyncFromSource(const OpTime lastFetched,
-                                                    const OpTime firstOpTimeInBatch) {
+                                                    const OpTime firstOpTimeInBatch) const {
     // Check to see if the sync source's first oplog entry is later than 'lastFetched'. If it is, we
     // are too stale to sync from this node. If it isn't, we should go into rollback instead.
     BSONObj remoteFirstOplogEntry;
