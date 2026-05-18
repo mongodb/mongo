@@ -393,6 +393,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
     invariant(_indexes.empty());
 
+    _wasResumed = resumeInfo.has_value();
     if (resumeInfo) {
         _phase = resumeInfo->getPhase();
     }
@@ -1258,8 +1259,11 @@ Status MultiIndexBlock::drainBackgroundWrites(
         CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, _collectionUUID.value()));
     coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, coll));
 
+    // Write to the container if the collection is non-empty or if the index build was
+    // resumed from a prior generation (e.g. kCollectionScan or kBulkLoad phase) and this
+    // generation's scan inserted no new records.
     if (firstDrain && _containerWriteBehavior == ContainerWriteBehavior::kReplicate &&
-        _isResumable && _lastRecordIdInserted.has_value()) {
+        _isResumable && (_lastRecordIdInserted.has_value() || _wasResumed)) {
         _writeStateToContainer(opCtx);
     }
 

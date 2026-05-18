@@ -398,6 +398,9 @@ private:
 
     bool _isResumable = false;
 
+    // True if init() was called with a resumeInfo.
+    bool _wasResumed = false;
+
     bool _ignoreUnique = false;
 
     // True if one or more indexes being built are on time-series measurements.

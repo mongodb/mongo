@@ -1166,6 +1166,108 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringDrain) {
     resumedIndexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+// Verifies that a resumed PDIB persists resume state at the firstDrain transition even when this
+// generation's collection scan inserts no new records (e.g. resumed from kCollectionScan or
+// kBulkLoad phase with no remaining records to process in this generation).
+TEST_F(MultiIndexBlockTest, ResumedPdibPersistsStateOnFirstDrainWithNoNewRecords) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    // Force frequent sorter spills so the first build's scan persists kCollectionScan state.
+    // TODO SERVER-127011: maxIndexBuildMemoryUsageMegabytes doesn't correctly set percentage-based
+    // bytes.
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    const auto buildUUID = UUID::gen();
+    auto configurePdib = [&](MultiIndexBlock& idx) {
+        idx.setBuildUUID(buildUUID);
+        idx.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+        idx.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+        idx.setIsResumable(true);
+    };
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       engine);
+
+    // Phase 1: original build runs the scan with low memory limit, triggering spills that
+    // persist resume state at phase=kCollectionScan with a savedPosition mid-collection.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        std::string val(64 * 1024, 'a');
+        for (auto i = 0; i < 20; ++i) {
+            ASSERT_OK(
+                Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+        }
+        wuow.commit();
+    }
+
+    auto& indexer = *getIndexer();
+    configurePdib(indexer);
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           {indexBuildInfo},
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto scanResumeInfo =
+        index_builds::readAndParseResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
+    ASSERT_TRUE(scanResumeInfo);
+    ASSERT_EQ(IndexBuildPhaseEnum::kCollectionScan, scanResumeInfo->getPhase());
+
+    // Tear down in-memory state; on-disk side-writes / sorter container / resume record persist.
+    indexer.markAsCleanedUp();
+
+    // Phase 2: resume from kCollectionScan. Pass a RecordId past every record in the collection
+    // as the resumeAfter so the resumed scan inserts nothing — _lastRecordIdInserted remains
+    // boost::none, and the firstDrain persist is therefore gated by _wasResumed.
+    MultiIndexBlock resumedIndexer;
+    configurePdib(resumedIndexer);
+    ASSERT_OK(resumedIndexer.init(operationContext(),
+                                  coll,
+                                  {indexBuildInfo},
+                                  MultiIndexBlock::kNoopOnInitFn,
+                                  MultiIndexBlock::InitMode::SteadyState,
+                                  scanResumeInfo));
+
+    // RecordIds for the 20 docs were assigned sequentially starting from 1, so RecordId(20)
+    // is the last record. Scanning AFTER it finds nothing — _lastRecordIdInserted stays
+    // boost::none, so the firstDrain persist is now gated solely on _wasResumed.
+    ASSERT_OK(
+        resumedIndexer.insertAllDocumentsInCollection(operationContext(), getNSS(), RecordId(20)));
+
+    ASSERT_OK(
+        resumedIndexer.drainBackgroundWrites(operationContext(),
+                                             RecoveryUnit::ReadSource::kNoTimestamp,
+                                             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto drainResumeInfo =
+        index_builds::readAndParseResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
+    ASSERT_TRUE(drainResumeInfo);
+    EXPECT_EQ(IndexBuildPhaseEnum::kDrainWrites, drainResumeInfo->getPhase());
+
+    resumedIndexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 // Empty-collection PDIB short-circuits insertAllDocumentsInCollection before the bulk loader is
 // initialized. Drain entry must skip the persist (rather than null-deref in _constructStateObject)
 // and not leave a resume record on disk.
