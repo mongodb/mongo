@@ -10,4 +10,4 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-    uds_path_prefix: /tmp/mongodb-test-sockets
+    uds_path_prefix: True

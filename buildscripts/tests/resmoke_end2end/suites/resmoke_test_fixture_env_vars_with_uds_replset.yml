@@ -11,4 +11,4 @@ executor:
       set_parameters:
         enableTestCommands: 1
     num_nodes: 3
-    uds_path_prefix: /tmp/mongodb-test-sockets
+    uds_path_prefix: True

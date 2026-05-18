@@ -42,7 +42,7 @@ class TestShardedClusterFixtureUDSEnvironmentVariables(unittest.TestCase):
                 uds_path.endswith(".sock"), f"UDS path should end with .sock: {uds_path}"
             )
             self.assertIn(
-                "/tmp/mongodb-test-sockets",
+                "/data/db",
                 uds_path,
                 f"UDS path should contain the configured prefix: {uds_path}",
             )
@@ -81,7 +81,7 @@ class TestShardedClusterFixtureUDSEnvironmentVariables(unittest.TestCase):
 
             # Verify it contains the expected prefix
             self.assertIn(
-                "/tmp/mongodb-test-sockets",
+                "/data/db",
                 uds_path,
                 f"UDS path should contain the configured prefix: {uds_path}",
             )

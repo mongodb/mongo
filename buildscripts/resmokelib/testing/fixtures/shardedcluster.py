@@ -998,6 +998,8 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
             self.mongos_options["priorityPort"] = self.priority_port
 
         # Unix domain socket support
+        if uds_path_prefix is True:
+            uds_path_prefix = dbpath_prefix
         self.uds_path_prefix = uds_path_prefix
         self.uds_path = None
         if self.uds_path_prefix:

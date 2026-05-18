@@ -3,6 +3,7 @@
 import os
 import os.path
 import shutil
+import sys
 import time
 import uuid
 from typing import Optional
@@ -44,7 +45,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         load_extensions=None,
         skip_extensions_signature_verification=False,
         use_priority_port: bool = False,
-        uds_path_prefix: Optional[str] = None,
+        uds_path_prefix: Optional[str | bool] = None,
     ):
         """Initialize MongoDFixture with different options for the mongod process.
 
@@ -66,7 +67,8 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                 Use specific names (e.g. ["add_fields_match"]) to load individual extensions.
                 Defaults to None (no extensions loaded).
             use_priority_port (bool, optional): Whether to open a priority port on this node at startup. Defaults to False.
-            uds_path_prefix (Optional[str], optional): Directory prefix for Unix domain socket. Defaults to None.
+            uds_path_prefix (Optional[str | bool], optional): Directory prefix for Unix domain socket.
+                Pass True to use the mongod data directory as the prefix. Defaults to None.
 
         Raises
             ValueError: _description_
@@ -140,6 +142,8 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.mongod_options["port"] = self.port
 
         # Unix domain socket support
+        if uds_path_prefix is True:
+            uds_path_prefix = self._dbpath if sys.platform != "win32" else None
         self.uds_path_prefix = uds_path_prefix
         self.uds_path = None
         if self.uds_path_prefix:

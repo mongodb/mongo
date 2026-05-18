@@ -85,7 +85,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         skip_extensions_signature_verification=False,
         router_endpoint_for_mongot: Optional[int] = None,
         use_priority_ports=False,
-        uds_path_prefix: Optional[str] = None,
+        uds_path_prefix: Optional[str | bool] = None,
     ):
         """Initialize ReplicaSetFixture."""
 
