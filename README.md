@@ -54,7 +54,7 @@ This will download the appropriate MongoDB Compass package for your platform and
 ## Drivers
 
 Client drivers for most programming languages are available at
-https://docs.mongodb.com/manual/applications/drivers/.
+https://www.mongodb.com/docs/drivers/.
 
 ## Bug Reports
 
