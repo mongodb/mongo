@@ -18,9 +18,10 @@ COPTS = select({
     ],
     "//build_defs:config_clang": [
         "-Wno-sign-compare",
-        # (spencer)  `a9dff35ad251` | [Clang] Enable -fextend-lifetimes at -Og (#118026)
-        #  prevents clang from correctly interacting with LimitToken's poisoned stack memory.
-        "-fextend-variable-liveness=none",
+        # TODO SERVER-105043: Enable when we reapply llvm 21
+        # # (spencer)  `a9dff35ad251` | [Clang] Enable -fextend-lifetimes at -Og (#118026)
+        # #  prevents clang from correctly interacting with LimitToken's poisoned stack memory.
+        # "-fextend-variable-liveness=none",
     ],
     "//conditions:default": [
         "-Wno-sign-compare",

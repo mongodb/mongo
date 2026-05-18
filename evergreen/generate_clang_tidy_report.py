@@ -32,25 +32,21 @@ if clang_tidy:
                             raise ValueError(f"Unexpected status file format: {filename}")
                         source_file = ".".join(parts[:2])
                         target_name = parts[2]
-                        target_dir_match = re.search(
+                        target_dir = re.search(
                             r"bazel-bin/(.*)/bazel_clang_tidy_src/", log_file
-                        )
-                        if target_dir_match is not None:
-                            target_dir = target_dir_match.group(1)
-                            target = f"//{target_dir}:{target_name}"
-                            content += f"Run 'bazel build --config=clang-tidy --keep_going {target}' to reproduce this error"
+                        ).group(1)
+                        target = f"//{target_dir}:{target_name}"
+                        content += f"Run 'bazel build --config=clang-tidy --keep_going {target}' to reproduce this error"
 
-                            failures.append(
-                                [
-                                    os.path.join(
-                                        re.sub("^.*/bazel_clang_tidy_src/", "src/", root, 1),
-                                        source_file,
-                                    ),
-                                    content,
-                                ]
-                            )
-                        else:
-                            print(f"no clang tidy dir found in output: {log_file}")
+                        failures.append(
+                            [
+                                os.path.join(
+                                    re.sub("^.*/bazel_clang_tidy_src/", "src/", root, 1),
+                                    source_file,
+                                ),
+                                content,
+                            ]
+                        )
 
     with open("bazel-invocation.txt", "w") as f:
         f.write("bazel build --config=clang-tidy //src/mongo/...")
