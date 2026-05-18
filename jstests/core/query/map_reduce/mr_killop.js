@@ -25,7 +25,18 @@ assert.commandWorked(db.adminCommand({configureFailPoint: "mr_killop_test_fp", m
 
 /** @return op code for map reduce op created by spawned shell. */
 function getOpCode() {
-    const inProg = db.currentOp().inprog;
+    let inProg;
+    // In add/remove shard suites, we use localOps to get the opId on the mongoS rather than the
+    // shard. This ensures that we don't end up with an opId for shard local operation on a shard
+    // that no longer exists.
+    if (TestData.hasRandomShardsAddedRemoved) {
+        inProg = db
+            .getSiblingDB("admin")
+            .aggregate([{$currentOp: {localOps: true}}])
+            .toArray();
+    } else {
+        inProg = db.currentOp().inprog;
+    }
 
     function isMapReduce(op) {
         if (!op.command) {

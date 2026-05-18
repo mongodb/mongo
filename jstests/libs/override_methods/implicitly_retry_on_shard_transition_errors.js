@@ -83,6 +83,15 @@ const kCommandRetryableOnShardNotFoundError = {
         // will show up again)
         return command.shardDistribution[0].shard == "config";
     },
+    "killOp": (command) => {
+        // if the opId is not in the format "shardid:opid", then we can retry
+        if (command.op.indexOf(":") == -1) {
+            return true;
+        }
+        // only retryable if the target is the config shard (as eventually it will show up again)
+        const shardId = command.op.split(":")[0];
+        return shardId == "config";
+    },
 };
 
 function matchesRetryableError(error, retryableError) {
