@@ -39,6 +39,7 @@
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -145,6 +146,9 @@ class SamplingEstimatorTest : public CatalogTestFixture {
 public:
     void setUp() override {
         _kTestNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+
+        // (Generic FCV reference): Set FCV so feature flag checks don't tassert on undefined FCV.
+        serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
         CatalogTestFixture::setUp();
         ASSERT_OK(storageInterface()->createCollection(
