@@ -503,6 +503,11 @@ __checkpoint_cleanup_walk_btree(WT_SESSION_IMPL *session, WT_ITEM *uri)
     }
 
     btree = S2BT(session);
+
+    /* Skip read-only btrees. */
+    if (F_ISSET(btree, WT_BTREE_READONLY))
+        goto err;
+
     /* There is nothing to do on an empty tree. */
     if (btree->root.page == NULL)
         goto err;
