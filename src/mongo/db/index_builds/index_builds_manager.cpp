@@ -38,6 +38,8 @@
 #include "mongo/db/index_builds/index_build_knobs_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/index_builds/multi_index_block.h"
+#include "mongo/db/index_builds/primary_driven/registry.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_builds/primary_driven_index_build_knobs_gen.h"
 #include "mongo/db/index_repair.h"
 #include "mongo/db/namespace_string.h"
@@ -49,6 +51,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -160,6 +163,15 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
         });
     } catch (const DBException& ex) {
         return ex.toStatus();
+    }
+
+    if (options.protocol == IndexBuildProtocol::kPrimaryDriven) {
+        index_builds::primary_driven::registry(opCtx->getServiceContext())
+            .add(buildUUID,
+                 collection->ns().dbName(),
+                 collection->uuid(),
+                 indexes,
+                 ident::generateNewIndexBuildIdent(buildUUID));
     }
 
     return Status::OK();

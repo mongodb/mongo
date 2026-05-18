@@ -31,11 +31,15 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/index_builds/primary_driven/registry.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -57,6 +61,9 @@ public:
     const UUID _buildUUID = UUID::gen();
     const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.foo");
     IndexBuildsManager _indexBuildsManager;
+
+private:
+    RAIIServerParameterControllerForTest _featureFlag{"featureFlagPrimaryDrivenIndexBuilds", true};
 };
 
 void IndexBuildsManagerTest::setUp() {
@@ -96,6 +103,82 @@ TEST_F(IndexBuildsManagerTest, IndexBuildsManagerSetUpAndTearDown) {
     auto indexes = makeSpecs({"a", "b"});
     ASSERT_OK(_indexBuildsManager.setUpIndexBuild(
         operationContext(), collection, indexes, _buildUUID, MultiIndexBlock::kNoopOnInitFn));
+
+    _indexBuildsManager.abortIndexBuild(
+        operationContext(), collection, _buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+    _indexBuildsManager.tearDownAndUnregisterIndexBuild(_buildUUID);
+}
+
+TEST_F(IndexBuildsManagerTest, SetUpPrimaryDrivenIndexBuildAddsToRegistry) {
+    AutoGetCollection autoColl{operationContext(), _nss, MODE_X};
+    CollectionWriter collection{operationContext(), autoColl};
+
+    auto indexes = makeSpecs({"a", "b"});
+
+    IndexBuildsManager::SetupOptions options;
+    options.protocol = IndexBuildProtocol::kPrimaryDriven;
+    options.method = IndexBuildMethodEnum::kPrimaryDriven;
+
+    ASSERT_OK(_indexBuildsManager.setUpIndexBuild(operationContext(),
+                                                  collection,
+                                                  indexes,
+                                                  _buildUUID,
+                                                  MultiIndexBlock::kNoopOnInitFn,
+                                                  options));
+
+    auto entries =
+        index_builds::primary_driven::registry(operationContext()->getServiceContext()).all();
+    ASSERT_EQ(entries.size(), 1);
+    EXPECT_EQ(entries[0].first, _buildUUID);
+    EXPECT_EQ(entries[0].second.dbName, _nss.dbName());
+    EXPECT_EQ(entries[0].second.collectionUUID, collection->uuid());
+    EXPECT_EQ(entries[0].second.indexes.size(), indexes.size());
+    for (size_t i = 0; i < indexes.size(); ++i) {
+        ASSERT_BSONOBJ_EQ(entries[0].second.indexes[i].spec, indexes[i].spec);
+    }
+    ASSERT(entries[0].second.indexBuildIdent);
+    EXPECT_EQ(*entries[0].second.indexBuildIdent, ident::generateNewIndexBuildIdent(_buildUUID));
+
+    _indexBuildsManager.abortIndexBuild(
+        operationContext(), collection, _buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+    _indexBuildsManager.tearDownAndUnregisterIndexBuild(_buildUUID);
+}
+
+TEST_F(IndexBuildsManagerTest, SetUpFailureDoesNotAddPrimaryDrivenIndexBuildToRegistry) {
+    AutoGetCollection autoColl{operationContext(), _nss, MODE_X};
+    CollectionWriter collection{operationContext(), autoColl};
+
+    auto indexes = makeSpecs({"a"});
+
+    IndexBuildsManager::SetupOptions options;
+    options.protocol = IndexBuildProtocol::kPrimaryDriven;
+    options.method = IndexBuildMethodEnum::kPrimaryDriven;
+
+    auto throwingOnInit = []() {
+        uasserted(ErrorCodes::InternalError, "simulated setUpIndexBuild failure");
+    };
+
+    ASSERT_NOT_OK(_indexBuildsManager.setUpIndexBuild(
+        operationContext(), collection, indexes, _buildUUID, throwingOnInit, options));
+
+    EXPECT_TRUE(index_builds::primary_driven::registry(operationContext()->getServiceContext())
+                    .all()
+                    .empty());
+
+    _indexBuildsManager.tearDownAndUnregisterIndexBuild(_buildUUID);
+}
+
+TEST_F(IndexBuildsManagerTest, SetUpNonPrimaryDrivenIndexBuildDoesNotAddToRegistry) {
+    AutoGetCollection autoColl{operationContext(), _nss, MODE_X};
+    CollectionWriter collection{operationContext(), autoColl};
+
+    auto indexes = makeSpecs({"a"});
+    ASSERT_OK(_indexBuildsManager.setUpIndexBuild(
+        operationContext(), collection, indexes, _buildUUID, MultiIndexBlock::kNoopOnInitFn));
+
+    EXPECT_TRUE(index_builds::primary_driven::registry(operationContext()->getServiceContext())
+                    .all()
+                    .empty());
 
     _indexBuildsManager.abortIndexBuild(
         operationContext(), collection, _buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
