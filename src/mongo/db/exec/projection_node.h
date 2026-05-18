@@ -45,6 +45,7 @@
 #include "mongo/util/string_map.h"
 
 #include <cstddef>
+#include <limits>
 #include <list>
 #include <memory>
 #include <set>
@@ -275,7 +276,7 @@ private:
      * node added).
      */
     void makeOptimizationsStale() {
-        _maxFieldsToProject = boost::none;
+        _maxFieldsToProject = kUnlimitedFieldsToProject;
     }
 
     /**
@@ -288,9 +289,14 @@ private:
      */
     void _addProjectionForPath(const FieldPath& path);
 
+    /**
+     * Sentinel value for '_maxFieldsToProject'.
+     */
+    static constexpr size_t kUnlimitedFieldsToProject = std::numeric_limits<size_t>::max();
+
     // Maximum number of fields that need to be projected. This allows for an "early" return
     // optimization which means we don't have to iterate over an entire document. The value is
     // stored here to avoid re-computation for each document.
-    boost::optional<size_t> _maxFieldsToProject;
+    size_t _maxFieldsToProject = kUnlimitedFieldsToProject;
 };
 }  // namespace mongo::projection_executor

@@ -96,10 +96,13 @@ void FastPathProjectionNode<ProjectionNode, BaseProjectionNode>::_applyProjectio
         const auto bsonElement{it.next()};
         const auto fieldName{bsonElement.fieldNameStringData()};
 
-        if (this->_projectedFieldsSet.find(fieldName) != this->_projectedFieldsSet.end()) {
+        // Pre-compute the hash once and reuse it for both set and map lookups.
+        const auto hashedName = StringMapHasher{}.hashed_key(fieldName);
+
+        if (this->_projectedFieldsSet.find(hashedName) != this->_projectedFieldsSet.end()) {
             projectionNode->_applyToProjectedField(bsonElement, bob);
             --nFieldsLeft;
-        } else if (auto childIt = this->_children.find(fieldName);
+        } else if (auto childIt = this->_children.find(hashedName);
                    childIt != this->_children.end()) {
             auto child = static_cast<const ProjectionNode*>(childIt->second.get());
 

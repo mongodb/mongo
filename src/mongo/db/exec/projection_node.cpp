@@ -95,14 +95,12 @@ void ProjectionNode::_addExpressionForPath(const FieldPath& path,
 }
 
 boost::intrusive_ptr<Expression> ProjectionNode::getExpressionForPath(const FieldPath& path) const {
-    // The FieldPath always conatins at least one field.
+    // The FieldPath always contains at least one field.
     auto fieldName = std::string{path.getFieldName(0)};
 
     if (path.getPathLength() == 1) {
-        if (_expressions.find(fieldName) != _expressions.end()) {
-            return _expressions.at(fieldName);
-        }
-        return nullptr;
+        auto it = _expressions.find(fieldName);
+        return (it != _expressions.end()) ? it->second : nullptr;
     }
     if (auto child = getChild(fieldName)) {
         return child->getExpressionForPath(path.tail());
@@ -157,7 +155,10 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
     while (it.more()) {
         auto fieldName = it.fieldName();
 
-        if (_projectedFieldsSet.find(fieldName) != _projectedFieldsSet.end()) {
+        // Pre-compute the hash once and reuse it for both set and map lookups.
+        const auto hashedName = StringMapHasher{}.hashed_key(fieldName);
+
+        if (_projectedFieldsSet.find(hashedName) != _projectedFieldsSet.end()) {
             if (isIncl) {
                 outputProjectedField(fieldName, it.next().second, outputDoc);
             } else {
@@ -165,7 +166,7 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
                 it.advance();
             }
             ++projectedFields;
-        } else if (auto childIt = _children.find(fieldName); childIt != _children.end()) {
+        } else if (auto childIt = _children.find(hashedName); childIt != _children.end()) {
             outputProjectedField(
                 fieldName, childIt->second->applyProjectionsToValue(it.next().second), outputDoc);
             ++projectedFields;
@@ -174,7 +175,7 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
         }
 
         // Check if we can avoid reading from the document any further.
-        if (_maxFieldsToProject && _maxFieldsToProject <= projectedFields) {
+        if (projectedFields >= _maxFieldsToProject) {
             break;
         }
     }
@@ -218,9 +219,18 @@ void ProjectionNode::applyExpressions(const Document& root, MutableDocument* out
     for (auto&& field : _orderToProcessAdditionsAndChildren) {
         auto childIt = _children.find(field);
         if (childIt != _children.end()) {
-            outputDoc->setField(field,
-                                childIt->second->applyExpressionsToValue(
-                                    root, outputDoc->peek()[StringData{field}]));
+            // Use position-based access to avoid a second hash lookup when reading and writing the
+            // field value.
+            const Document& doc = outputDoc->peek();
+            const auto pos = doc.positionOf(StringData{field});
+            Value currentValue = pos.found() ? doc.getField(pos) : Value{};
+            Value newValue =
+                childIt->second->applyExpressionsToValue(root, std::move(currentValue));
+            if (pos.found()) {
+                outputDoc->setField(pos, std::move(newValue));
+            } else {
+                outputDoc->setField(StringData{field}, std::move(newValue));
+            }
         } else {
             auto expressionIt = _expressions.find(field);
             tassert(7241726,
@@ -340,7 +350,7 @@ void ProjectionNode::optimize() {
         childPair.second->optimize();
     }
 
-    _maxFieldsToProject = maxFieldsToProject();
+    _maxFieldsToProject = maxFieldsToProject().value_or(kUnlimitedFieldsToProject);
 }
 
 Document ProjectionNode::serialize(const SerializationOptions& options) const {

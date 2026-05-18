@@ -133,6 +133,7 @@ mongo_cc_unit_test(
         "projection_executor_test.cpp",
         "projection_executor_utils_test.cpp",
         "projection_executor_wildcard_access_test.cpp",
+        "projection_node_optimizations_test.cpp",
         "serialize_ejson_utils_test.cpp",
         "//src/mongo/db/exec/agg:exec_pipeline_test.cpp",
         "//src/mongo/db/exec/agg:graph_lookup_test.cpp",
