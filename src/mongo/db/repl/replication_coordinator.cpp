@@ -39,6 +39,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/str.h"
 
 #include <utility>
 
@@ -133,6 +134,38 @@ bool ReplicationCoordinator::shouldUseEmptyOplogBatchToPropagateCommitPoint(
     // we will return early so that we can inform the client of the new lastCommittedOpTime
     // immediately.
     return clientOpTime < getLastCommittedOpTime();
+}
+
+bool ReplicationCoordinator::shouldParkHelloAwaitingTopologyChange(
+    const TopologyVersion& currentTopologyVersion,
+    const boost::optional<TopologyVersion>& clientTopologyVersion,
+    std::int64_t lastHorizonTopologyChange) {
+    if (!clientTopologyVersion) {
+        // The client is not using awaitable hello so we respond immediately.
+        return false;
+    }
+    if (clientTopologyVersion->getProcessId() != currentTopologyVersion.getProcessId()) {
+        // Getting a different process id indicates that the server has restarted so we return
+        // immediately with the updated process id.
+        return false;
+    }
+    auto clientCounter = clientTopologyVersion->getCounter();
+    auto serverCounter = currentTopologyVersion.getCounter();
+    uassert(31382,
+            str::stream() << "Received a topology version with counter: " << clientCounter
+                          << " which is greater than the server topology version counter: "
+                          << serverCounter,
+            clientCounter <= serverCounter);
+    if (clientCounter < serverCounter) {
+        uassert(ErrorCodes::SplitHorizonChange,
+                "Stale horizon detected, we have since received a reconfig that changed the "
+                "horizon mappings.",
+                clientCounter >= lastHorizonTopologyChange);
+        // The received hello command contains a stale topology version so we respond
+        // immediately with a more current topology version.
+        return false;
+    }
+    return true;
 }
 
 }  // namespace repl

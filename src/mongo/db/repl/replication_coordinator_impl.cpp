@@ -2588,35 +2588,8 @@ ReplicationCoordinatorImpl::_getHelloResponseFuture(
 
     const bool hasValidConfig = horizonString != boost::none;
 
-    if (!clientTopologyVersion) {
-        // The client is not using awaitable hello so we respond immediately.
-        return SharedSemiFuture<SharedHelloResponse>(
-            SharedHelloResponse(_makeHelloResponse(horizonString, lk, hasValidConfig)));
-    }
-
-    const TopologyVersion topologyVersion = _topCoord->getTopologyVersion();
-    if (clientTopologyVersion->getProcessId() != topologyVersion.getProcessId()) {
-        // Getting a different process id indicates that the server has restarted so we return
-        // immediately with the updated process id.
-        return SharedSemiFuture<SharedHelloResponse>(
-            SharedHelloResponse(_makeHelloResponse(horizonString, lk, hasValidConfig)));
-    }
-
-    auto prevCounter = clientTopologyVersion->getCounter();
-    auto topologyVersionCounter = topologyVersion.getCounter();
-    uassert(31382,
-            str::stream() << "Received a topology version with counter: " << prevCounter
-                          << " which is greater than the server topology version counter: "
-                          << topologyVersionCounter,
-            prevCounter <= topologyVersionCounter);
-
-    if (prevCounter < topologyVersionCounter) {
-        uassert(ErrorCodes::SplitHorizonChange,
-                "Stale horizon detected, we have since received a reconfig that changed the "
-                "horizon mappings.",
-                prevCounter >= _lastHorizonTopologyChange);
-        // The received hello command contains a stale topology version so we respond
-        // immediately with a more current topology version.
+    if (!shouldParkHelloAwaitingTopologyChange(
+            _topCoord->getTopologyVersion(), clientTopologyVersion, _lastHorizonTopologyChange)) {
         return SharedSemiFuture<SharedHelloResponse>(
             SharedHelloResponse(_makeHelloResponse(horizonString, lk, hasValidConfig)));
     }

@@ -1010,6 +1010,22 @@ public:
     virtual TopologyVersion getTopologyVersion() const = 0;
 
     /**
+     * Decides whether an awaitable hello request should park on a topology-change promise.
+     *
+     * Throws ErrorCodes::SplitHorizonChange if the client's counter predates a horizon-changing
+     * reconfig (clientCounter < lastHorizonTopologyChange). Throws uassert 31382 if the client
+     * carries a counter greater than the server's.
+     *
+     * Returns true iff the caller should park (client counter equals server counter).
+     * Returns false otherwise (no client version, different processId, or stale counter); the
+     * caller should respond immediately.
+     */
+    static bool shouldParkHelloAwaitingTopologyChange(
+        const TopologyVersion& currentTopologyVersion,
+        const boost::optional<TopologyVersion>& clientTopologyVersion,
+        std::int64_t lastHorizonTopologyChange);
+
+    /**
      * Attempts to update the current term for the V1 election protocol. If the term changes and
      * this node is primary, relinquishes primary.
      * Returns a Status OK if the term was *not* updated (meaning, it is safe to proceed with
