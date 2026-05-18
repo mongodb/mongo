@@ -1272,8 +1272,12 @@ Status executeResolvedAggregate(const AggExState& aggExState,
     auto pipeline = std::move(swPipeline.getValue());
     std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
 
-    auto swResForJoin = join_ordering::getJoinReorderedExecutor(
-        aggCatalogState.getCollections(), *pipeline, aggExState.getOpCtx(), expCtx);
+    auto swResForJoin =
+        join_ordering::getJoinReorderedExecutor(aggCatalogState.getCollections(),
+                                                *pipeline,
+                                                aggExState.getOriginalRequest().getHint(),
+                                                aggExState.getOpCtx(),
+                                                expCtx);
     if (swResForJoin.isOK()) {
         /**
          * We are careful to keep the AggJoinModel alive for the entirety of this function scope.

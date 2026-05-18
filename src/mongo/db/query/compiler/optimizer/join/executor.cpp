@@ -136,7 +136,8 @@ bool isCollectionOrViewEligibleForJoinOpt(const CollectionOrViewAcquisition& col
 }
 
 bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
-                                    const Pipeline& pipeline) {
+                                    const Pipeline& pipeline,
+                                    const boost::optional<BSONObj>& queryHint) {
     const auto& queryKnob = pipeline.getContext()->getQueryKnobConfiguration();
 
     if (!queryKnob.isJoinOrderingEnabled()) {
@@ -144,6 +145,10 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
     }
 
     if (queryKnob.isForceClassicEngineEnabled()) {
+        return false;
+    }
+
+    if (queryHint.has_value() && !queryHint->isEmpty()) {
         return false;
     }
 
@@ -268,10 +273,11 @@ PerCollUniqueFieldInfo buildUniqueFieldInfo(const AvailableIndexes& perCollIdxs)
 StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     const MultipleCollectionAccessor& mca,
     const Pipeline& pipeline,
+    const boost::optional<BSONObj>& queryHint,
     OperationContext* opCtx,
     const boost::intrusive_ptr<ExpressionContext> expCtx) {
     // Quick eligibility check.
-    if (!isAggEligibleForJoinReordering(mca, pipeline)) {
+    if (!isAggEligibleForJoinReordering(mca, pipeline, queryHint)) {
         return Status(ErrorCodes::QueryFeatureNotAllowed,
                       "Pipeline or collection ineligible for join-reordering");
     }

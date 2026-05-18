@@ -39,24 +39,24 @@ assert.commandWorked(coll13.createIndex({dummy: 1, a: 1, b: 1, d: 1}));
 assert.commandWorked(coll2.createIndex({dummy: 1, a: 1, b: 1}));
 assert.commandWorked(coll3.createIndex({dummy: 1, a: 1, b: 1}));
 
-function assertSameResultsWithJoinOptToggled(pipeline, expectedCount) {
+function assertSameResultsWithJoinOptToggled(pipeline, aggOptions, expectedCount) {
     assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
-    assert.eq(coll1.aggregate(pipeline).toArray().length, expectedCount);
+    assert.eq(coll1.aggregate(pipeline, aggOptions).toArray().length, expectedCount);
     assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
-    assert.eq(coll1.aggregate(pipeline).toArray().length, expectedCount);
+    assert.eq(coll1.aggregate(pipeline, aggOptions).toArray().length, expectedCount);
 }
 
 // This helper is for test cases where the entire pipeline is ineligible for join optimization.
-function runTestCaseIneligiblePipeline({pipeline, expectedCount}) {
-    assertSameResultsWithJoinOptToggled(pipeline, expectedCount);
-    const explain = coll1.explain().aggregate(pipeline);
+function runTestCaseIneligiblePipeline({pipeline, aggOptions = {}, expectedCount}) {
+    assertSameResultsWithJoinOptToggled(pipeline, aggOptions, expectedCount);
+    const explain = coll1.explain().aggregate(pipeline, aggOptions);
     assert(!joinOptUsed(explain), "Expected join optimizer and actual usage differ: " + tojson(explain));
 }
 
 // This helper is for test cases where the prefix is eligible for join opt but the suffix is not.
-function runTestCaseIneligibleSuffix({pipeline, expectedCount, expectedJoinNodesInPrefix}) {
-    assertSameResultsWithJoinOptToggled(pipeline, expectedCount);
-    const explain = coll1.explain().aggregate(pipeline);
+function runTestCaseIneligibleSuffix({pipeline, aggOptions = {}, expectedCount, expectedJoinNodesInPrefix}) {
+    assertSameResultsWithJoinOptToggled(pipeline, aggOptions, expectedCount);
+    const explain = coll1.explain().aggregate(pipeline, aggOptions);
 
     // Since the prefix is join eligible we should see the usedJoinOptimization flag in the explain.
     assert(joinOptUsed(explain), "Expected join optimizer and actual usage differ: " + tojson(explain));
@@ -74,9 +74,9 @@ function runTestCaseIneligibleSuffix({pipeline, expectedCount, expectedJoinNodes
 }
 
 // This helper is for test cases where the entire pipeline is eligible for join optimization.
-function runTestCaseEligiblePipeline({pipeline, expectedCount}) {
-    assertSameResultsWithJoinOptToggled(pipeline, expectedCount);
-    const explain = coll1.explain().aggregate(pipeline);
+function runTestCaseEligiblePipeline({pipeline, aggOptions = {}, expectedCount}) {
+    assertSameResultsWithJoinOptToggled(pipeline, aggOptions, expectedCount);
+    const explain = coll1.explain().aggregate(pipeline, aggOptions);
     assert(joinOptUsed(explain), "Expected join optimizer and actual usage differ: " + tojson(explain));
 }
 
@@ -352,6 +352,58 @@ runTestCaseIneligiblePipeline({
         {$lookup: {from: coll12.getName(), as: "x", localField: "a", foreignField: "a"}},
         {$unwind: {path: "$x", preserveNullAndEmptyArrays: true, includeArrayIndex: "idx"}},
     ],
+    expectedCount: 1,
+});
+
+// Aggregation is ineligible when a hint is specified.
+assert.commandWorked(coll1.createIndex({a: 1}));
+assert.commandWorked(coll12.createIndex({a: 1}));
+
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                localField: "a",
+                foreignField: "a",
+                as: "coll12",
+            },
+        },
+        {$unwind: "$coll12"},
+    ],
+    aggOptions: {hint: "a_1"},
+    expectedCount: 1,
+});
+
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                localField: "a",
+                foreignField: "a",
+                as: "coll12",
+            },
+        },
+        {$unwind: "$coll12"},
+    ],
+    aggOptions: {hint: {$natural: 1}},
+    expectedCount: 1,
+});
+
+runTestCaseEligiblePipeline({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                localField: "a",
+                foreignField: "a",
+                as: "coll12",
+            },
+        },
+        {$unwind: "$coll12"},
+    ],
+    aggOptions: {hint: {}},
     expectedCount: 1,
 });
 

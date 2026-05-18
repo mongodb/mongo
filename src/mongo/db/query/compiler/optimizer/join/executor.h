@@ -45,11 +45,12 @@ struct JoinReorderedExecutorResult {
 
 /**
  * Attempts to apply join optimization to the given aggregation, but if it fails to extract a join
- * model, falls back to preparing executors for the pipeline in the normal way.
+ * model, returns an error status.
  */
 StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     const MultipleCollectionAccessor& mca,
     const Pipeline& pipeline,
+    const boost::optional<BSONObj>& queryHint,
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx);
 }  // namespace mongo::join_ordering
