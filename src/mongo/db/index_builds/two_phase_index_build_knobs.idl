@@ -42,22 +42,6 @@ server_parameters:
         redact: false
         mod_visibility: needs_replacement
 
-    maxNumActiveUserIndexBuilds:
-        description: >
-            Specifies the maximum number of active user index builds that can be built simultaneously on
-            the primary node. Index builds initiated by the system are not subject to this limitation.
-
-            Additionally, active index builds initiated by the system count towards the limit and can
-            delay scheduling user index builds even when the number of active user index builds is below
-            the limit.
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<int>
-        cpp_varname: maxNumActiveUserIndexBuilds
-        default: 3
-        validator:
-            gte: 0
-        redact: false
-
     resumableIndexBuildMajorityOpTimeTimeoutMillis:
         description: >
             Time in milliseconds a node waits for the last optime before installing the interceptors to
@@ -71,16 +55,4 @@ server_parameters:
         cpp_vartype: long long
         cpp_varname: gResumableIndexBuildMajorityOpTimeTimeoutMillis
         default: 10000
-        redact: false
-
-    indexBuildMinAvailableDiskSpaceMB:
-        description: Minimum disk space required to build an index
-        set_at: [startup, runtime]
-        cpp_vartype: AtomicWord<long long>
-        cpp_varname: gIndexBuildMinAvailableDiskSpaceMB
-        default: 500
-        validator:
-            gte: 0
-            # This is equal to std::numeric_limits<int64_t>::max() / (1024 * 1024)
-            lte: 8796093022207
         redact: false
