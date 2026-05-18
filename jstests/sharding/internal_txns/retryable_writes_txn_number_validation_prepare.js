@@ -14,9 +14,6 @@ import {
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 let numNodes = 2;
-if (TestData.doesNotSupportRestartingSecondaryWithPreparedTxn) {
-    numNodes = 1;
-}
 const rst = new ReplSetTest({nodes: numNodes});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
@@ -43,13 +40,6 @@ if (TestData.doesNotSupportGracefulStepdown) {
 
 function setUpTestMode(mode) {
     if (mode == kTestMode.kRestart) {
-        if (TestData.doesNotSupportRestartingSecondaryWithPreparedTxn) {
-            // Ensure the latest changes are checkpointed and sent to the SLS backend before the
-            // restart.
-            // TODO SERVER-115355: Remove this.
-            assert.commandWorked(rst.getPrimary().adminCommand({fsync: 1}));
-        }
-
         rst.stopSet(null /* signal */, true /*forRestart */, {skipValidation: true, skipCheckDBHashes: true});
         rst.startSet({restart: true});
         primary = rst.getPrimary();

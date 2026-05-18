@@ -906,6 +906,11 @@ void _recoverPreparedTransactionFromPreciseCheckpoint(
     ScopedSetTxnInfoOnOperationContext scopedTxnInfo(
         opCtx, txnRecord.getSessionId(), txnRecord.getTxnNum(), txnRecord.getTxnRetryCounter());
 
+    // Recovery won't perform writes but does retake the locks for recovered prepared transactions,
+    // so use an UnreplicatedWritesBlock so those locks are correctly stashed in secondary mode when
+    // recovery is complete. They will be retaken if this node steps up as primary.
+    repl::UnreplicatedWritesBlock uwb(opCtx);
+
     // Check out without refresh because we already have the transaction table entry from the
     // earlier scan.
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -989,6 +994,8 @@ std::vector<Timestamp> getUnmatchedTxnPrepareTimestampsForLog(
 }
 
 void recoverPreparedTransactionsFromPreciseCheckpoint(OperationContext* opCtx) try {
+    LOGV2(11535500, "Recovering prepared transactions from precise checkpoint");
+
     // Find all transactions left in prepare according to the transaction table.
     ExpectedTxnMap expectedTransactions;
     _forEachTransactionTablePreparedTransaction(
@@ -1000,6 +1007,10 @@ void recoverPreparedTransactionsFromPreciseCheckpoint(OperationContext* opCtx) t
             invariant(
                 expectedTransactions.emplace(preparedId, std::move(validatedTxnRecord)).second);
         });
+
+    LOGV2(11535501,
+          "Loaded prepared transactions from transaction table",
+          "numPreparedTransactions"_attr = expectedTransactions.size());
 
     // Cross reference those transactions with the transactions with prepared artifacts in the
     // checkpoint being recovered from then restore the in-memory state for that transaction while
@@ -1040,6 +1051,10 @@ void recoverPreparedTransactionsFromPreciseCheckpoint(OperationContext* opCtx) t
     }
 
     ReclaimedPreparedTxnTracker::get(opCtx)->discoveryComplete();
+
+    LOGV2(11535502,
+          "Finished recovering prepared transactions from precise checkpoint",
+          "numRecovered"_attr = processedPrepareTimestamps.size());
 
     if (MONGO_unlikely(expectedTransactions.size())) {
         LOGV2_FATAL(11372907,

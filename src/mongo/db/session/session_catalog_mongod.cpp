@@ -569,9 +569,9 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     std::vector<SessionCatalog::KillToken> sessionKillTokens;
 
     // Scan all sessions and reacquire locks for prepared transactions.
-    // There may be sessions that are checked out during this scan, but none of them
-    // can be prepared transactions, since only oplog application can make transactions
-    // prepared on secondaries and oplog application has been stopped at this moment.
+    // There may be sessions that are checked out during this scan, but none of them can be prepared
+    // transactions, since only oplog application and prepared transaction recovery can make
+    // transactions prepared on secondaries and oplog application has been stopped at this moment.
     std::vector<OperationSessionInfo> sessionsToReacquireLocks;
 
     SessionKiller::Matcher matcher(

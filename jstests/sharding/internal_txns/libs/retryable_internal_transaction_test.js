@@ -62,9 +62,6 @@ export function RetryableInternalTransactionTest(collectionOptions = {}, initiat
     // oplog reading done by the find command may not be able to keep up with the oplog truncation,
     // causing the command to fail with CappedPositionLost.
     let numNodes = 2;
-    if (TestData.doesNotSupportRestartingSecondaryWithPreparedTxn) {
-        numNodes = 1;
-    }
     const st = new ShardingTest({
         shards: 1,
         rs: {nodes: numNodes, oplogSize: 256},
@@ -123,13 +120,6 @@ export function RetryableInternalTransactionTest(collectionOptions = {}, initiat
 
     function setUpTestMode(mode) {
         if (mode == kTestMode.kRestart) {
-            if (TestData.doesNotSupportRestartingSecondaryWithPreparedTxn) {
-                // Ensure the latest changes are checkpointed and sent to the SLS backend before the
-                // restart.
-                // TODO SERVER-115355: Remove this.
-                assert.commandWorked(st.rs0.getPrimary().adminCommand({fsync: 1}));
-            }
-
             st.rs0.restart(
                 0,
                 {
