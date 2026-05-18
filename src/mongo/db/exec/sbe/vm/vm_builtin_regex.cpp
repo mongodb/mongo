@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/sbe/util/pcre.h"
+#include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -132,15 +133,15 @@ value::TagValueMaybeOwned genericPcreRegexSingleMatch(value::TypeTags typeTagPcr
 value::TagValueMaybeOwned ByteCode::builtinRegexCompile(ArityType arity) {
     tassert(11080022, "Unexpected arity value", arity == 2);
 
-    auto [patternOwned, patternTypeTag, patternValue] = getFromStack(0);
-    auto [optionsOwned, optionsTypeTag, optionsValue] = getFromStack(1);
+    auto patternView = viewFromStack(0);
+    auto optionsView = viewFromStack(1);
 
-    if (!value::isString(patternTypeTag) || !value::isString(optionsTypeTag)) {
+    if (!value::isString(patternView.tag) || !value::isString(optionsView.tag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto pattern = value::getStringView(patternTypeTag, patternValue);
-    auto options = value::getStringView(optionsTypeTag, optionsValue);
+    auto pattern = value::getStringView(patternView.tag, patternView.value);
+    auto options = value::getStringView(optionsView.tag, optionsView.value);
 
     if (pattern.find('\0', 0) != std::string::npos || options.find('\0', 0) != std::string::npos) {
         return {false, value::TypeTags::Nothing, 0};
@@ -152,14 +153,15 @@ value::TagValueMaybeOwned ByteCode::builtinRegexCompile(ArityType arity) {
 
 value::TagValueMaybeOwned ByteCode::builtinRegexMatch(ArityType arity) {
     tassert(11080021, "Unexpected arity value", arity == 2);
-    auto [ownedPcreRegex, tagPcreRegex, valPcreRegex] = getFromStack(0);
-    auto [ownedInputStr, tagInputStr, valInputStr] = getFromStack(1);
+    auto pcreRegexView = viewFromStack(0);
+    auto inputStrView = viewFromStack(1);
 
-    if (value::isArray(tagPcreRegex)) {
-        for (value::ArrayEnumerator ae(tagPcreRegex, valPcreRegex); !ae.atEnd(); ae.advance()) {
+    if (value::isArray(pcreRegexView.tag)) {
+        for (value::ArrayEnumerator ae(pcreRegexView.tag, pcreRegexView.value); !ae.atEnd();
+             ae.advance()) {
             auto [elemTag, elemVal] = ae.getViewOfValue();
-            auto result =
-                genericPcreRegexSingleMatch(elemTag, elemVal, tagInputStr, valInputStr, true);
+            auto result = genericPcreRegexSingleMatch(
+                elemTag, elemVal, inputStrView.tag, inputStrView.value, true);
 
             if (result.tag() == value::TypeTags::Boolean &&
                 value::bitcastTo<bool>(result.value())) {
@@ -170,29 +172,30 @@ value::TagValueMaybeOwned ByteCode::builtinRegexMatch(ArityType arity) {
         return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
     }
 
-    return genericPcreRegexSingleMatch(tagPcreRegex, valPcreRegex, tagInputStr, valInputStr, true);
+    return genericPcreRegexSingleMatch(
+        pcreRegexView.tag, pcreRegexView.value, inputStrView.tag, inputStrView.value, true);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinRegexFind(ArityType arity) {
     tassert(11080020, "Unexpected arity value", arity == 2);
-    auto [ownedPcreRegex, typeTagPcreRegex, valuePcreRegex] = getFromStack(0);
-    auto [ownedInputStr, typeTagInputStr, valueInputStr] = getFromStack(1);
+    auto pcreRegexView = viewFromStack(0);
+    auto inputStrView = viewFromStack(1);
 
     return genericPcreRegexSingleMatch(
-        typeTagPcreRegex, valuePcreRegex, typeTagInputStr, valueInputStr, false);
+        pcreRegexView.tag, pcreRegexView.value, inputStrView.tag, inputStrView.value, false);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
     tassert(11080019, "Unexpected arity value", arity == 2);
-    auto [ownedPcre, typeTagPcreRegex, valuePcreRegex] = getFromStack(0);
-    auto [ownedStr, typeTagInputStr, valueInputStr] = getFromStack(1);
+    auto pcreRegexView = viewFromStack(0);
+    auto inputStrView = viewFromStack(1);
 
-    if (!value::isString(typeTagInputStr) || typeTagPcreRegex != value::TypeTags::pcreRegex) {
+    if (!value::isString(inputStrView.tag) || pcreRegexView.tag != value::TypeTags::pcreRegex) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto inputString = value::getStringView(typeTagInputStr, valueInputStr);
-    auto pcre = value::getPcreRegexView(valuePcreRegex);
+    auto inputString = value::getStringView(inputStrView.tag, inputStrView.value);
+    auto pcre = value::getPcreRegexView(pcreRegexView.value);
 
     uint32_t startBytePos = 0;
     uint32_t codePointPos = 0;
@@ -242,13 +245,13 @@ value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
 
 value::TagValueMaybeOwned ByteCode::builtinGetRegexPattern(ArityType arity) {
     tassert(11080018, "Unexpected arity value", arity == 1);
-    auto [regexOwned, regexType, regexValue] = getFromStack(0);
+    auto regexView = viewFromStack(0);
 
-    if (regexType != value::TypeTags::bsonRegex) {
+    if (regexView.tag != value::TypeTags::bsonRegex) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto regex = value::getBsonRegexView(regexValue);
+    auto regex = value::getBsonRegexView(regexView.value);
     auto [strType, strValue] = value::makeNewString(regex.pattern);
 
     return {true, strType, strValue};
@@ -256,13 +259,13 @@ value::TagValueMaybeOwned ByteCode::builtinGetRegexPattern(ArityType arity) {
 
 value::TagValueMaybeOwned ByteCode::builtinGetRegexFlags(ArityType arity) {
     tassert(11080017, "Unexpected arity value", arity == 1);
-    auto [regexOwned, regexType, regexValue] = getFromStack(0);
+    auto regexView = viewFromStack(0);
 
-    if (regexType != value::TypeTags::bsonRegex) {
+    if (regexView.tag != value::TypeTags::bsonRegex) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto regex = value::getBsonRegexView(regexValue);
+    auto regex = value::getBsonRegexView(regexView.value);
     auto [strType, strValue] = value::makeNewString(regex.flags);
 
     return {true, strType, strValue};
