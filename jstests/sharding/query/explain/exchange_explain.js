@@ -1,7 +1,11 @@
 /**
  * Test $merge and exchange with explain.
  *
- * @tags: [requires_sharding]
+ * @tags: [
+ *   # TODO SERVER-124190: remove the multiversion incompatible tag.
+ *   multiversion_incompatible,
+ *   requires_sharding
+ * ]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

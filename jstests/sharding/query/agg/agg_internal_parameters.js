@@ -2,6 +2,8 @@
  * Tests that mongoS rejects 'aggregate' commands which explicitly set any of the
  * parameters that mongoS uses internally when communicating with the shards.
  * @tags: [
+ *   # TODO SERVER-124190: remove the multiversion incompatible tag.
+ *   multiversion_incompatible,
  *   requires_fcv_81,
  * ]
  */
