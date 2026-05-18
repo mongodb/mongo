@@ -167,8 +167,8 @@ def resmoke_suite_test(
     if not srcs:
         resolved = _resolve_suite_srcs(config)
         if resolved == None:
-            fail("resmoke_suite_test '%s': no srcs provided and config '%s' not found in SUITE_SELECTORS. " +
-                 "Either provide explicit srcs or ensure the suite YAML has selector.roots." % (name, config))
+            fail(("resmoke_suite_test '%s': no srcs provided and config '%s' not found in SUITE_SELECTORS. " +
+                  "Either provide explicit srcs or ensure the suite YAML has selector.roots.") % (name, config))
         srcs = resolved
 
     generated_config = name + "_config"
