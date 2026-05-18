@@ -495,8 +495,9 @@ private:
     value::TagValueMaybeOwned scalarRoundTrunc(std::string funcName,
                                                Decimal128::RoundingMode roundingMode,
                                                ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> blockRoundTrunc(
-        std::string funcName, Decimal128::RoundingMode roundingMode, ArityType arity);
+    value::TagValueMaybeOwned blockRoundTrunc(std::string funcName,
+                                              Decimal128::RoundingMode roundingMode,
+                                              ArityType arity);
     value::TagValueOwned genericNot(value::TypeTags tag, value::Value value);
 
     FastTuple<bool, value::TypeTags, value::Value> getField(value::TypeTags objTag,
@@ -1029,134 +1030,122 @@ private:
 
     // Block builtins
 
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockExists(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockTypeMatch(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockIsTimezone(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmpty(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmptyBlock(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillType(ArityType arity);
+    value::TagValueOwned builtinValueBlockExists(ArityType arity);
+    value::TagValueOwned builtinValueBlockTypeMatch(ArityType arity);
+    value::TagValueOwned builtinValueBlockIsTimezone(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockFillEmpty(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockFillEmptyBlock(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockFillType(ArityType arity);
     template <bool less>
-    FastTuple<bool, value::TypeTags, value::Value> valueBlockMinMaxImpl(
-        value::ValueBlock* inputBlock, value::ValueBlock* bitsetBlock);
+    value::TagValueOwned valueBlockMinMaxImpl(value::ValueBlock* inputBlock,
+                                              value::ValueBlock* bitsetBlock);
     template <bool less>
-    FastTuple<bool, value::TypeTags, value::Value> valueBlockAggMinMaxImpl(
-        value::TypeTags accTag,
-        value::Value accVal,
-        value::TypeTags inputTag,
-        value::Value inputVal,
-        value::TypeTags bitsetTag,
-        value::Value bitsetVal);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggMin(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggMax(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggCount(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggSum(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggDoubleDoubleSum(
-        ArityType arity);
+    value::TagValueOwned valueBlockAggMinMaxImpl(value::TagValueOwned acc,
+                                                 value::TagValueView input,
+                                                 value::TagValueView bitset);
+    value::TagValueOwned builtinValueBlockAggMin(ArityType arity);
+    value::TagValueOwned builtinValueBlockAggMax(ArityType arity);
+    value::TagValueOwned builtinValueBlockAggCount(ArityType arity);
+    value::TagValueOwned builtinValueBlockAggSum(ArityType arity);
+    value::TagValueOwned builtinValueBlockAggDoubleDoubleSum(ArityType arity);
 
     // Take advantage of the fact that we know we have block input, instead of looping over
     // generalized helper functions.
     template <TopBottomSense Sense, bool ValueIsArray>
-    FastTuple<bool, value::TypeTags, value::Value> blockNativeAggTopBottomNImpl(
-        value::TypeTags stateTag,
-        value::Value stateVal,
-        value::ValueBlock* bitsetBlock,
-        SortSpec* sortSpec,
-        size_t numKeysBlocks,
-        size_t numValuesBlocks);
+    value::TagValueOwned blockNativeAggTopBottomNImpl(value::TagValueOwned state,
+                                                      value::ValueBlock* bitsetBlock,
+                                                      SortSpec* sortSpec,
+                                                      size_t numKeysBlocks,
+                                                      size_t numValuesBlocks);
 
     template <TopBottomSense Sense, bool ValueIsArray>
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggTopBottomNImpl(
-        ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggTopN(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggBottomN(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggTopNArray(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggBottomNArray(
-        ArityType arity);
+    value::TagValueOwned builtinValueBlockAggTopBottomNImpl(ArityType arity);
+    value::TagValueOwned builtinValueBlockAggTopN(ArityType arity);
+    value::TagValueOwned builtinValueBlockAggBottomN(ArityType arity);
+    value::TagValueOwned builtinValueBlockAggTopNArray(ArityType arity);
+    value::TagValueOwned builtinValueBlockAggBottomNArray(ArityType arity);
 
     template <int operation>
-    FastTuple<bool, value::TypeTags, value::Value> builtinBlockBlockArithmeticOperation(
-        const value::TypeTags* bitsetTags,
-        const value::Value* bitsetVals,
-        value::ValueBlock* leftInputBlock,
-        value::ValueBlock* rightInputBlock,
-        size_t valsNum);
+    value::TagValueOwned builtinBlockBlockArithmeticOperation(const value::TypeTags* bitsetTags,
+                                                              const value::Value* bitsetVals,
+                                                              value::ValueBlock* leftInputBlock,
+                                                              value::ValueBlock* rightInputBlock,
+                                                              size_t valsNum);
     template <int operation>
-    FastTuple<bool, value::TypeTags, value::Value> builtinBlockBlockArithmeticOperation(
-        value::ValueBlock* leftInputBlock, value::ValueBlock* rightInputBlock, size_t valsNum);
+    value::TagValueOwned builtinBlockBlockArithmeticOperation(value::ValueBlock* leftInputBlock,
+                                                              value::ValueBlock* rightInputBlock,
+                                                              size_t valsNum);
     template <int operation>
-    FastTuple<bool, value::TypeTags, value::Value> builtinScalarBlockArithmeticOperation(
-        const value::TypeTags* bitsetTags,
-        const value::Value* bitsetVals,
-        value::TagValueView scalar,
-        value::ValueBlock* block,
-        size_t valsNum);
+    value::TagValueOwned builtinScalarBlockArithmeticOperation(const value::TypeTags* bitsetTags,
+                                                               const value::Value* bitsetVals,
+                                                               value::TagValueView scalar,
+                                                               value::ValueBlock* block,
+                                                               size_t valsNum);
     template <int operation>
-    FastTuple<bool, value::TypeTags, value::Value> builtinScalarBlockArithmeticOperation(
-        value::TagValueView scalar, value::ValueBlock* block, size_t valsNum);
+    value::TagValueOwned builtinScalarBlockArithmeticOperation(value::TagValueView scalar,
+                                                               value::ValueBlock* block,
+                                                               size_t valsNum);
     template <int operation>
-    FastTuple<bool, value::TypeTags, value::Value> builtinBlockScalarArithmeticOperation(
-        const value::TypeTags* bitsetTags,
-        const value::Value* bitsetVals,
-        value::ValueBlock* block,
-        value::TagValueView scalar,
-        size_t valsNum);
+    value::TagValueOwned builtinBlockScalarArithmeticOperation(const value::TypeTags* bitsetTags,
+                                                               const value::Value* bitsetVals,
+                                                               value::ValueBlock* block,
+                                                               value::TagValueView scalar,
+                                                               size_t valsNum);
     template <int operation>
-    FastTuple<bool, value::TypeTags, value::Value> builtinBlockScalarArithmeticOperation(
-        value::ValueBlock* block, value::TagValueView scalar, size_t valsNum);
+    value::TagValueOwned builtinBlockScalarArithmeticOperation(value::ValueBlock* block,
+                                                               value::TagValueView scalar,
+                                                               size_t valsNum);
     template <int operation>
-    FastTuple<bool, value::TypeTags, value::Value> builtinScalarScalarArithmeticOperation(
+    value::TagValueOwned builtinScalarScalarArithmeticOperation(
         value::TagValueView leftInputScalar, value::TagValueView rightInputScalar, size_t valsNum);
     template <int operation>
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockArithmeticOperation(
-        ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAdd(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockSub(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMult(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDiv(ArityType arity);
+    value::TagValueOwned builtinValueBlockArithmeticOperation(ArityType arity);
+    value::TagValueOwned builtinValueBlockAdd(ArityType arity);
+    value::TagValueOwned builtinValueBlockSub(ArityType arity);
+    value::TagValueOwned builtinValueBlockMult(ArityType arity);
+    value::TagValueOwned builtinValueBlockDiv(ArityType arity);
 
     value::TagValueMaybeOwned builtinValueBlockDateDiff(ArityType arity);
     value::TagValueMaybeOwned builtinValueBlockDateTrunc(ArityType arity);
     value::TagValueMaybeOwned builtinValueBlockDateAdd(ArityType arity);
 
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockRound(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockTrunc(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockRound(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockTrunc(ArityType arity);
 
     template <class Cmp, value::ColumnOpType::Flags AddFlags = value::ColumnOpType::kNoFlags>
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCmpScalar(ArityType arity);
+    value::TagValueOwned builtinValueBlockCmpScalar(ArityType arity);
 
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGtScalar(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGteScalar(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockEqScalar(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockNeqScalar(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLtScalar(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLteScalar(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCmp3wScalar(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCombine(ArityType arity);
+    value::TagValueOwned builtinValueBlockGtScalar(ArityType arity);
+    value::TagValueOwned builtinValueBlockGteScalar(ArityType arity);
+    value::TagValueOwned builtinValueBlockEqScalar(ArityType arity);
+    value::TagValueOwned builtinValueBlockNeqScalar(ArityType arity);
+    value::TagValueOwned builtinValueBlockLtScalar(ArityType arity);
+    value::TagValueOwned builtinValueBlockLteScalar(ArityType arity);
+    value::TagValueOwned builtinValueBlockCmp3wScalar(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockCombine(ArityType arity);
     template <int operation>
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLogicalOperation(
-        ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLogicalAnd(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLogicalOr(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLogicalNot(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockNewFill(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockSize(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockNone(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockIsMember(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCoerceToBool(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMod(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockConvert(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockLogicalOperation(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockLogicalAnd(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockLogicalOr(ArityType arity);
+    value::TagValueOwned builtinValueBlockLogicalNot(ArityType arity);
+    value::TagValueOwned builtinValueBlockNewFill(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockSize(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockNone(ArityType arity);
+    value::TagValueOwned builtinValueBlockIsMember(ArityType arity);
+    value::TagValueOwned builtinValueBlockCoerceToBool(ArityType arity);
+    value::TagValueOwned builtinValueBlockMod(ArityType arity);
+    value::TagValueOwned builtinValueBlockConvert(ArityType arity);
     template <bool IsAscending>
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGetSortKey(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGetSortKeyAsc(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGetSortKeyDesc(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockGetSortKey(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockGetSortKeyAsc(ArityType arity);
+    value::TagValueMaybeOwned builtinValueBlockGetSortKeyDesc(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGetNonLeafSortKeyAsc(
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGetNonLeafSortKeyDesc(
         ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_F(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_P(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinCellBlockGetFlatValuesBlock(
-        ArityType arity);
+    value::TagValueMaybeOwned builtinCellFoldValues_F(ArityType arity);
+    value::TagValueMaybeOwned builtinCellFoldValues_P(ArityType arity);
+    value::TagValueMaybeOwned builtinCellBlockGetFlatValuesBlock(ArityType arity);
     value::TagValueMaybeOwned builtinCurrentDate(ArityType arity);
 
     /**

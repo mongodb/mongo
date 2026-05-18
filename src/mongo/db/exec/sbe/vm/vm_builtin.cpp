@@ -1128,35 +1128,35 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::aggLinearFillFinalize:
             return builtinAggLinearFillFinalize(arity).releaseToRaw();
         case Builtin::valueBlockExists:
-            return builtinValueBlockExists(arity);
+            return builtinValueBlockExists(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockTypeMatch:
-            return builtinValueBlockTypeMatch(arity);
+            return builtinValueBlockTypeMatch(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockIsTimezone:
-            return builtinValueBlockIsTimezone(arity);
+            return builtinValueBlockIsTimezone(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockFillEmpty:
-            return builtinValueBlockFillEmpty(arity);
+            return builtinValueBlockFillEmpty(arity).releaseToRaw();
         case Builtin::valueBlockFillEmptyBlock:
-            return builtinValueBlockFillEmptyBlock(arity);
+            return builtinValueBlockFillEmptyBlock(arity).releaseToRaw();
         case Builtin::valueBlockFillType:
-            return builtinValueBlockFillType(arity);
+            return builtinValueBlockFillType(arity).releaseToRaw();
         case Builtin::valueBlockAggMin:
-            return builtinValueBlockAggMin(arity);
+            return builtinValueBlockAggMin(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockAggMax:
-            return builtinValueBlockAggMax(arity);
+            return builtinValueBlockAggMax(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockAggCount:
-            return builtinValueBlockAggCount(arity);
+            return builtinValueBlockAggCount(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockAggSum:
-            return builtinValueBlockAggSum(arity);
+            return builtinValueBlockAggSum(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockAggDoubleDoubleSum:
-            return builtinValueBlockAggDoubleDoubleSum(arity);
+            return builtinValueBlockAggDoubleDoubleSum(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockAggTopN:
-            return ByteCode::builtinValueBlockAggTopN(arity);
+            return ByteCode::builtinValueBlockAggTopN(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockAggTopNArray:
-            return ByteCode::builtinValueBlockAggTopNArray(arity);
+            return ByteCode::builtinValueBlockAggTopNArray(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockAggBottomN:
-            return ByteCode::builtinValueBlockAggBottomN(arity);
+            return ByteCode::builtinValueBlockAggBottomN(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockAggBottomNArray:
-            return ByteCode::builtinValueBlockAggBottomNArray(arity);
+            return ByteCode::builtinValueBlockAggBottomNArray(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockDateDiff:
             return builtinValueBlockDateDiff(arity).releaseToRaw();
         case Builtin::valueBlockDateTrunc:
@@ -1164,63 +1164,63 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::valueBlockDateAdd:
             return builtinValueBlockDateAdd(arity).releaseToRaw();
         case Builtin::valueBlockTrunc:
-            return builtinValueBlockTrunc(arity);
+            return builtinValueBlockTrunc(arity).releaseToRaw();
         case Builtin::valueBlockRound:
-            return builtinValueBlockRound(arity);
+            return builtinValueBlockRound(arity).releaseToRaw();
         case Builtin::valueBlockAdd:
-            return builtinValueBlockAdd(arity);
+            return builtinValueBlockAdd(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockSub:
-            return builtinValueBlockSub(arity);
+            return builtinValueBlockSub(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockMult:
-            return builtinValueBlockMult(arity);
+            return builtinValueBlockMult(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockDiv:
-            return builtinValueBlockDiv(arity);
+            return builtinValueBlockDiv(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockGtScalar:
-            return builtinValueBlockGtScalar(arity);
+            return builtinValueBlockGtScalar(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockGteScalar:
-            return builtinValueBlockGteScalar(arity);
+            return builtinValueBlockGteScalar(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockEqScalar:
-            return builtinValueBlockEqScalar(arity);
+            return builtinValueBlockEqScalar(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockNeqScalar:
-            return builtinValueBlockNeqScalar(arity);
+            return builtinValueBlockNeqScalar(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockLtScalar:
-            return builtinValueBlockLtScalar(arity);
+            return builtinValueBlockLtScalar(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockLteScalar:
-            return builtinValueBlockLteScalar(arity);
+            return builtinValueBlockLteScalar(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockCmp3wScalar:
-            return builtinValueBlockCmp3wScalar(arity);
+            return builtinValueBlockCmp3wScalar(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockCombine:
-            return builtinValueBlockCombine(arity);
+            return builtinValueBlockCombine(arity).releaseToRaw();
         case Builtin::valueBlockLogicalAnd:
-            return builtinValueBlockLogicalAnd(arity);
+            return builtinValueBlockLogicalAnd(arity).releaseToRaw();
         case Builtin::valueBlockLogicalOr:
-            return builtinValueBlockLogicalOr(arity);
+            return builtinValueBlockLogicalOr(arity).releaseToRaw();
         case Builtin::valueBlockLogicalNot:
-            return builtinValueBlockLogicalNot(arity);
+            return builtinValueBlockLogicalNot(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockNewFill:
-            return builtinValueBlockNewFill(arity);
+            return builtinValueBlockNewFill(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockSize:
-            return builtinValueBlockSize(arity);
+            return builtinValueBlockSize(arity).releaseToRaw();
         case Builtin::valueBlockNone:
-            return builtinValueBlockNone(arity);
+            return builtinValueBlockNone(arity).releaseToRaw();
         case Builtin::valueBlockIsMember:
-            return builtinValueBlockIsMember(arity);
+            return builtinValueBlockIsMember(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockCoerceToBool:
-            return builtinValueBlockCoerceToBool(arity);
+            return builtinValueBlockCoerceToBool(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockMod:
-            return builtinValueBlockMod(arity);
+            return builtinValueBlockMod(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockConvert:
-            return builtinValueBlockConvert(arity);
+            return builtinValueBlockConvert(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockGetSortKeyAsc:
-            return builtinValueBlockGetSortKeyAsc(arity);
+            return builtinValueBlockGetSortKeyAsc(arity).releaseToRaw();
         case Builtin::valueBlockGetSortKeyDesc:
-            return builtinValueBlockGetSortKeyDesc(arity);
+            return builtinValueBlockGetSortKeyDesc(arity).releaseToRaw();
         case Builtin::cellFoldValues_F:
-            return builtinCellFoldValues_F(arity);
+            return builtinCellFoldValues_F(arity).releaseToRaw();
         case Builtin::cellFoldValues_P:
-            return builtinCellFoldValues_P(arity);
+            return builtinCellFoldValues_P(arity).releaseToRaw();
         case Builtin::cellBlockGetFlatValuesBlock:
-            return builtinCellBlockGetFlatValuesBlock(arity);
+            return builtinCellBlockGetFlatValuesBlock(arity).releaseToRaw();
         case Builtin::currentDate:
             return builtinCurrentDate(arity).releaseToRaw();
         case Builtin::singleByteEndMarker:
