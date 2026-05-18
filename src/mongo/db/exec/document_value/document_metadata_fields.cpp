@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/query/util/rank_fusion_util.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/string_map.h"
 
 #include <ostream>
@@ -49,73 +50,72 @@ Value missingToNull(Value maybeMissing) {
     return maybeMissing.missing() ? Value(BSONNULL) : maybeMissing;
 }
 
-static const std::string textScoreName = "textScore";
-static const std::string randValName = "randVal";
-static const std::string searchScoreName = "searchScore";
-static const std::string searchHighlightsName = "searchHighlights";
-static const std::string geoNearDistanceName = "geoNearDistance";
-static const std::string geoNearPointName = "geoNearPoint";
-static const std::string recordIdName = "recordId";
-static const std::string indexKeyName = "indexKey";
-static const std::string sortKeyName = "sortKey";
-static const std::string searchScoreDetailsName = "searchScoreDetails";
-static const std::string searchRootDocumentIdName = "searchRootDocumentId";
-static const std::string searchSequenceTokenName = "searchSequenceToken";
-static const std::string timeseriesBucketMinTimeName = "timeseriesBucketMinTime";
-static const std::string timeseriesBucketMaxTimeName = "timeseriesBucketMaxTime";
-static const std::string vectorSearchScoreName = "vectorSearchScore";
-static const std::string scoreName = "score";
-static const std::string scoreDetailsName = "scoreDetails";
+constexpr StringData kTextScoreName = "textScore"_sd;
+constexpr StringData kRandValName = "randVal"_sd;
+constexpr StringData kSearchScoreName = "searchScore"_sd;
+constexpr StringData kSearchHighlightsName = "searchHighlights"_sd;
+constexpr StringData kGeoNearDistanceName = "geoNearDistance"_sd;
+constexpr StringData kGeoNearPointName = "geoNearPoint"_sd;
+constexpr StringData kRecordIdName = "recordId"_sd;
+constexpr StringData kIndexKeyName = "indexKey"_sd;
+constexpr StringData kSortKeyName = "sortKey"_sd;
+constexpr StringData kSearchScoreDetailsName = "searchScoreDetails"_sd;
+constexpr StringData kSearchRootDocumentIdName = "searchRootDocumentId"_sd;
+constexpr StringData kSearchSequenceTokenName = "searchSequenceToken"_sd;
+constexpr StringData kTimeseriesBucketMinTimeName = "timeseriesBucketMinTime"_sd;
+constexpr StringData kTimeseriesBucketMaxTimeName = "timeseriesBucketMaxTime"_sd;
+constexpr StringData kVectorSearchScoreName = "vectorSearchScore"_sd;
+constexpr StringData kScoreName = "score"_sd;
+constexpr StringData kScoreDetailsName = "scoreDetails"_sd;
 
 // This field ("value") is extracted from the 'scoreDetails' Document to set the 'score' field too.
-static const std::string scoreDetailsScoreField = "value";
-static const std::string streamName = "stream";
+constexpr StringData kScoreDetailsScoreField = "value"_sd;
+constexpr StringData kStreamName = "stream"_sd;
 
-static const std::string changeStreamControlEventName = "changeStreamControlEvent";
+constexpr StringData kChangeStreamControlEventName = "changeStreamControlEvent"_sd;
 
-static const StringMap<MetaType> kMetaNameToMetaType = {
-    {scoreName, MetaType::kScore},
-    {vectorSearchScoreName, MetaType::kVectorSearchScore},
-    {geoNearDistanceName, MetaType::kGeoNearDist},
-    {geoNearPointName, MetaType::kGeoNearPoint},
-    {indexKeyName, MetaType::kIndexKey},
-    {randValName, MetaType::kRandVal},
-    {recordIdName, MetaType::kRecordId},
-    {searchHighlightsName, MetaType::kSearchHighlights},
-    {searchScoreName, MetaType::kSearchScore},
-    {searchScoreDetailsName, MetaType::kSearchScoreDetails},
-    {searchSequenceTokenName, MetaType::kSearchSequenceToken},
-    {sortKeyName, MetaType::kSortKey},
-    {textScoreName, MetaType::kTextScore},
-    {timeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
-    {timeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
-    {scoreDetailsName, MetaType::kScoreDetails},
-    {searchRootDocumentIdName, MetaType::kSearchRootDocumentId},
-    {streamName, MetaType::kStream},
-    {changeStreamControlEventName, MetaType::kChangeStreamControlEvent},
+static const StringDataMap<MetaType> kMetaNameToMetaType = {
+    {kScoreName, MetaType::kScore},
+    {kVectorSearchScoreName, MetaType::kVectorSearchScore},
+    {kGeoNearDistanceName, MetaType::kGeoNearDist},
+    {kGeoNearPointName, MetaType::kGeoNearPoint},
+    {kIndexKeyName, MetaType::kIndexKey},
+    {kRandValName, MetaType::kRandVal},
+    {kRecordIdName, MetaType::kRecordId},
+    {kSearchHighlightsName, MetaType::kSearchHighlights},
+    {kSearchScoreName, MetaType::kSearchScore},
+    {kSearchScoreDetailsName, MetaType::kSearchScoreDetails},
+    {kSearchSequenceTokenName, MetaType::kSearchSequenceToken},
+    {kSortKeyName, MetaType::kSortKey},
+    {kTextScoreName, MetaType::kTextScore},
+    {kTimeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
+    {kTimeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
+    {kScoreDetailsName, MetaType::kScoreDetails},
+    {kSearchRootDocumentIdName, MetaType::kSearchRootDocumentId},
+    {kStreamName, MetaType::kStream},
+    {kChangeStreamControlEventName, MetaType::kChangeStreamControlEvent},
 };
 
-// NOLINTNEXTLINE needs audit
-static const std::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
-    {MetaType::kScore, scoreName},
-    {MetaType::kVectorSearchScore, vectorSearchScoreName},
-    {MetaType::kGeoNearDist, geoNearDistanceName},
-    {MetaType::kGeoNearPoint, geoNearPointName},
-    {MetaType::kIndexKey, indexKeyName},
-    {MetaType::kRandVal, randValName},
-    {MetaType::kRecordId, recordIdName},
-    {MetaType::kSearchHighlights, searchHighlightsName},
-    {MetaType::kSearchScore, searchScoreName},
-    {MetaType::kSearchScoreDetails, searchScoreDetailsName},
-    {MetaType::kSearchSequenceToken, searchSequenceTokenName},
-    {MetaType::kSortKey, sortKeyName},
-    {MetaType::kTextScore, textScoreName},
-    {MetaType::kTimeseriesBucketMinTime, timeseriesBucketMinTimeName},
-    {MetaType::kTimeseriesBucketMaxTime, timeseriesBucketMaxTimeName},
-    {MetaType::kScoreDetails, scoreDetailsName},
-    {MetaType::kSearchRootDocumentId, searchRootDocumentIdName},
-    {MetaType::kStream, streamName},
-    {MetaType::kChangeStreamControlEvent, changeStreamControlEventName},
+static const stdx::unordered_map<MetaType, StringData> kMetaTypeToMetaName = {
+    {MetaType::kScore, kScoreName},
+    {MetaType::kVectorSearchScore, kVectorSearchScoreName},
+    {MetaType::kGeoNearDist, kGeoNearDistanceName},
+    {MetaType::kGeoNearPoint, kGeoNearPointName},
+    {MetaType::kIndexKey, kIndexKeyName},
+    {MetaType::kRandVal, kRandValName},
+    {MetaType::kRecordId, kRecordIdName},
+    {MetaType::kSearchHighlights, kSearchHighlightsName},
+    {MetaType::kSearchScore, kSearchScoreName},
+    {MetaType::kSearchScoreDetails, kSearchScoreDetailsName},
+    {MetaType::kSearchSequenceToken, kSearchSequenceTokenName},
+    {MetaType::kSortKey, kSortKeyName},
+    {MetaType::kTextScore, kTextScoreName},
+    {MetaType::kTimeseriesBucketMinTime, kTimeseriesBucketMinTimeName},
+    {MetaType::kTimeseriesBucketMaxTime, kTimeseriesBucketMaxTimeName},
+    {MetaType::kScoreDetails, kScoreDetailsName},
+    {MetaType::kSearchRootDocumentId, kSearchRootDocumentIdName},
+    {MetaType::kStream, kStreamName},
+    {MetaType::kChangeStreamControlEvent, kChangeStreamControlEventName},
 };
 
 static const std::set<DocumentMetadataFields::MetaType> kScoreMetadataFields = {
@@ -280,7 +280,7 @@ void DocumentMetadataFields::setScoreDetails(Value scoreDetails, bool featureFla
 
 void DocumentMetadataFields::setScoreAndScoreDetails(Value scoreDetails) {
     if (isRankFusionFullEnabled()) {
-        auto score = scoreDetails.getDocument().getField(StringData{scoreDetailsScoreField});
+        auto score = scoreDetails.getDocument().getField(kScoreDetailsScoreField);
         tassert(9679300,
                 str::stream() << "scoreDetails must provide a numeric 'value' field with which to "
                                  "set the score too, but got "
