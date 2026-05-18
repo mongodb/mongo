@@ -380,8 +380,9 @@ void visitExtensionStage(DocsNeededBoundsContext* ctx,
 }
 
 const ServiceContext::ConstructorActionRegisterer docsNeededBoundsRegisterer{
-    "DocsNeededBoundsRegisterer",
-    [](ServiceContext* service) { registerMongodVisitor<DocsNeededBoundsContext>(service); }};
+    "DocsNeededBoundsRegisterer", [](ServiceContext* service) {
+        registerMongodVisitor<DocsNeededBoundsContext>(service);
+    }};
 
 
 DocsNeededBounds extractDocsNeededBounds(const DocumentSourceContainer& sources,

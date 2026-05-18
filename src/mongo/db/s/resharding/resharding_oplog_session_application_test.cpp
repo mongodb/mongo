@@ -140,7 +140,9 @@ public:
 
         auto opTime = [opCtx] {
             WriteUnitOfWork wuow(opCtx);
-            ScopeGuard guard{[&wuow] { wuow.commit(); }};
+            ScopeGuard guard{[&wuow] {
+                wuow.commit();
+            }};
             return repl::getNextOpTime(opCtx);
         }();
         WriteUnitOfWork wuow(opCtx);

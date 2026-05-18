@@ -53,7 +53,7 @@ struct SigHelper<Ret (*)(Args...)> : std::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
 struct SigHelper<Ret (Class::*)(Args...)> : std::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
-struct SigHelper<Ret (Class::*)(Args...) &> : std::type_identity<Ret(Args...)> {};
+struct SigHelper<Ret (Class::*)(Args...)&> : std::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
 struct SigHelper<Ret (Class::*)(Args...) const> : std::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>

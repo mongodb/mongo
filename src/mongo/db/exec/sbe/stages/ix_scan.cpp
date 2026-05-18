@@ -467,7 +467,7 @@ IndexScanStageBaseImpl<Derived>::IndexScanStageBaseImpl(
                          vars,
                          yieldPolicy,
                          nodeId,
-                         participateInTrialRunTracking) {};
+                         participateInTrialRunTracking){};
 
 SimpleIndexScanStage::SimpleIndexScanStage(UUID collUuid,
                                            DatabaseName dbName,

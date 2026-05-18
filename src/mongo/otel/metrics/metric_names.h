@@ -74,12 +74,10 @@ private:
 };
 
 /** Helper to create MetricName instances. */
-class MONGO_MOD_FILE_PRIVATE MetricNameMaker {
-public:
-    static constexpr MetricName make(StringData name) {
-        return MetricName(name, Passkey<MetricNameMaker>{});
-    }
-};
+class MONGO_MOD_FILE_PRIVATE MetricNameMaker{public : static constexpr MetricName make(
+    StringData name){return MetricName(name, Passkey<MetricNameMaker>{});
+}  // namespace otel::metrics
+};  // namespace mongo
 
 /**
  * Central registry of OpenTelemetry metric names used in the server. When adding a new metric to

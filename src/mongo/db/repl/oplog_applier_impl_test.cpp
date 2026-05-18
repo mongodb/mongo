@@ -528,7 +528,9 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
         auto op = makeOplogEntry(
             [opCtx = _opCtx.get()] {
                 WriteUnitOfWork wuow{opCtx};
-                ScopeGuard guard{[&wuow] { wuow.commit(); }};
+                ScopeGuard guard{[&wuow] {
+                    wuow.commit();
+                }};
                 return repl::getNextOpTime(opCtx);
             }(),
             testCase.opType,
@@ -603,7 +605,9 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsWithMixedFromMigrateRecordsCorrectPreI
     // Get an optime for the applyOps entry.
     auto opTime = [opCtx = _opCtx.get()] {
         WriteUnitOfWork wuow{opCtx};
-        ScopeGuard guard{[&wuow] { wuow.commit(); }};
+        ScopeGuard guard{[&wuow] {
+            wuow.commit();
+        }};
         return repl::getNextOpTime(opCtx);
     }();
 
@@ -832,7 +836,9 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenant) {
     // createCollection uses an actual opTime, so we must generate an actually opTime in the future.
     auto opTime = [opCtx = _opCtx.get()] {
         WriteUnitOfWork wuow{opCtx};
-        ScopeGuard guard{[&wuow] { wuow.commit(); }};
+        ScopeGuard guard{[&wuow] {
+            wuow.commit();
+        }};
         return repl::getNextOpTime(opCtx);
     }();
     auto op = makeCommandOplogEntry(opTime, sourceNss, oRename, {});
@@ -860,7 +866,9 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenantRequireTenantIDFa
     // createCollection uses an actual opTime, so we must generate an actually opTime in the future.
     auto opTime = [opCtx = _opCtx.get()] {
         WriteUnitOfWork wuow{opCtx};
-        ScopeGuard guard{[&wuow] { wuow.commit(); }};
+        ScopeGuard guard{[&wuow] {
+            wuow.commit();
+        }};
         return repl::getNextOpTime(opCtx);
     }();
     auto op = makeCommandOplogEntry(opTime, sourceNss, oRename, {});
@@ -893,7 +901,9 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenantAcrossTenantsRequ
     // createCollection uses an actual opTime, so we must generate an actually opTime in the future.
     auto opTime = [opCtx = _opCtx.get()] {
         WriteUnitOfWork wuow{opCtx};
-        ScopeGuard guard{[&wuow] { wuow.commit(); }};
+        ScopeGuard guard{[&wuow] {
+            wuow.commit();
+        }};
         return repl::getNextOpTime(opCtx);
     }();
     auto op = makeCommandOplogEntry(opTime, sourceNss, oRename, {});

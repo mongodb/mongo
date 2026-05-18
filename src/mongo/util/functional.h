@@ -286,7 +286,7 @@ struct UFDeductionHelper {};
 template <typename Class, typename Ret, typename... Args>
 struct UFDeductionHelper<Ret (Class::*)(Args...)> : std::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
-struct UFDeductionHelper<Ret (Class::*)(Args...) &> : std::type_identity<Ret(Args...)> {};
+struct UFDeductionHelper<Ret (Class::*)(Args...)&> : std::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>
 struct UFDeductionHelper<Ret (Class::*)(Args...) const> : std::type_identity<Ret(Args...)> {};
 template <typename Class, typename Ret, typename... Args>

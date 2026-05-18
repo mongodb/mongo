@@ -36,7 +36,9 @@ namespace {
 
 VersionedExtension makeTestVersionedExtension(uint32_t major, uint32_t minor) {
     return VersionedExtension{::MongoExtensionAPIVersion{major, minor},
-                              []() -> std::unique_ptr<sdk::Extension> { return nullptr; }};
+                              []() -> std::unique_ptr<sdk::Extension> {
+                                  return nullptr;
+                              }};
 }
 
 class VersionedExtensionGreaterComparatorTest : public unittest::Test {

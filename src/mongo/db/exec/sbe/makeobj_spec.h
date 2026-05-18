@@ -121,7 +121,9 @@ struct MakeObjSpec {
                                            [](SetArg) { return Type::kSetArg; },
                                            [](AddArg) { return Type::kAddArg; },
                                            [](LambdaArg) { return Type::kLambdaArg; },
-                                           [](const MakeObj&) { return Type::kMakeObj; }},
+                                           [](const MakeObj&) {
+                                               return Type::kMakeObj;
+                                           }},
                          _data);
         }
 

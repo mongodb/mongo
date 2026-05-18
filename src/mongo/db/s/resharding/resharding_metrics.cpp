@@ -656,7 +656,9 @@ std::unique_ptr<ReshardingMetrics> ReshardingMetrics::makeInstance_forTest(
 StringData ReshardingMetrics::getStateString() const {
     return visit(OverloadedVisitor{[](CoordinatorStateEnum state) { return idl::serialize(state); },
                                    [](RecipientStateEnum state) { return idl::serialize(state); },
-                                   [](DonorStateEnum state) { return idl::serialize(state); }},
+                                   [](DonorStateEnum state) {
+                                       return idl::serialize(state);
+                                   }},
                  getState());
 }
 

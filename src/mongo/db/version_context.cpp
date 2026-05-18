@@ -87,7 +87,9 @@ void VersionContext::resetToOperationWithoutOFCV() {
 BSONObj VersionContext::toBSON() const {
     return visit(
         OverloadedVisitor{[](const VersionContextMetadata& metadata) { return metadata.toBSON(); },
-                          [](auto&&) -> BSONObj { MONGO_UNREACHABLE_TASSERT(10083532); }},
+                          [](auto&&) -> BSONObj {
+                              MONGO_UNREACHABLE_TASSERT(10083532);
+                          }},
         _metadataOrTag);
 }
 

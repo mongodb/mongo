@@ -548,7 +548,9 @@ TEST_F(TransactionCoordinatorDriverTest,
                                    kTwoShardIdList);
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
-                [&](const executor::RemoteCommandRequest& request) { return kPrepareOk; }});
+                [&](const executor::RemoteCommandRequest& request) {
+                    return kPrepareOk;
+                }});
 
     auto decision = future.get().decision();
 
@@ -587,7 +589,9 @@ TEST_F(TransactionCoordinatorDriverTest,
                                    kTwoShardIdList);
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
-                [&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; }});
+                [&](const executor::RemoteCommandRequest& request) {
+                    return kNoSuchTransaction;
+                }});
 
     auto decision = future.get().decision();
     ASSERT(decision.getDecision() == txn::CommitDecision::kAbort);
@@ -1306,7 +1310,9 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesAbortDecisionOnAbortAndCommi
     auto commitDecisionFuture = coordinator->getDecision();
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
-                [&](const executor::RemoteCommandRequest& request) { return kPrepareOk; }});
+                [&](const executor::RemoteCommandRequest& request) {
+                    return kPrepareOk;
+                }});
 
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
@@ -1332,7 +1338,9 @@ TEST_F(TransactionCoordinatorTest,
     auto commitDecisionFuture = coordinator->getDecision();
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kPrepareOk; },
-                [&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; }});
+                [&](const executor::RemoteCommandRequest& request) {
+                    return kNoSuchTransaction;
+                }});
 
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
@@ -1357,9 +1365,10 @@ TEST_F(TransactionCoordinatorTest,
     coordinator->runCommit(operationContext(), kTwoShardIdList);
     auto commitDecisionFuture = coordinator->getDecision();
 
-    onCommands(
-        {[&](const executor::RemoteCommandRequest& request) { return kPrepareOk; },
-         [&](const executor::RemoteCommandRequest& request) { return kTxnRetryCounterTooOld; }});
+    onCommands({[&](const executor::RemoteCommandRequest& request) { return kPrepareOk; },
+                [&](const executor::RemoteCommandRequest& request) {
+                    return kTxnRetryCounterTooOld;
+                }});
 
     assertAbortSentAndRespondWithSuccess();
     assertAbortSentAndRespondWithSuccess();
@@ -1411,7 +1420,9 @@ TEST_F(TransactionCoordinatorTest,
 
     // One participant votes commit and other encounters retryable error
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kPrepareOk; },
-                [&](const executor::RemoteCommandRequest& request) { return kRetryableError; }});
+                [&](const executor::RemoteCommandRequest& request) {
+                    return kRetryableError;
+                }});
     advanceClockAndExecuteScheduledTasks();  // Make sure the scheduled retry executes
 
     // One participant votes abort after retry.
@@ -1442,7 +1453,9 @@ TEST_F(TransactionCoordinatorTest,
 
     // One participant votes abort and other encounters retryable error
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
-                [&](const executor::RemoteCommandRequest& request) { return kRetryableError; }});
+                [&](const executor::RemoteCommandRequest& request) {
+                    return kRetryableError;
+                }});
     advanceClockAndExecuteScheduledTasks();  // Make sure the cancellation callback is delivered
 
     assertAbortSentAndRespondWithSuccess();

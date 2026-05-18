@@ -408,7 +408,8 @@ TEST_F(IndexAccessMethodBulkBuilder, CommitRejectsZeroInterval) {
                                         }},
                                     IndexAccessMethod::RecordIdHandlerFn{},
                                     IndexAccessMethod::YieldFn{},
-                                    IndexAccessMethod::OnNKeysLoadedFn{[]() {}},
+                                    IndexAccessMethod::OnNKeysLoadedFn{[]() {
+                                    }},
                                     /*onNKeysLoadedFnInterval=*/0,
                                     /*keyBatchSize=*/1,
                                     /*keyBatchBytes=*/1024),

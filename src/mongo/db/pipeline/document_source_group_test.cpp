@@ -102,8 +102,9 @@ public:
     OwningDistributedPlanContext(std::unique_ptr<Pipeline> pipelinePrefix,
                                  std::unique_ptr<Pipeline> pipelineSuffix,
                                  boost::optional<OrderedPathSet> shardKeys)
-        : DocumentSourceGroup::DistributedPlanContext{
-              *pipelinePrefix, *pipelineSuffix, this->shardKeys},
+        : DocumentSourceGroup::DistributedPlanContext{*pipelinePrefix,
+                                                      *pipelineSuffix,
+                                                      this->shardKeys},
           pipelinePrefix(std::move(pipelinePrefix)),
           pipelineSuffix(std::move(pipelineSuffix)),
           shardKeys(std::move(shardKeys)) {}

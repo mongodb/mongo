@@ -220,7 +220,8 @@ public:
 #if __has_feature(thread_sanitizer)
     __attribute__((no_sanitize("thread")))
 #endif
-    void setSignalOnCount(int c) {
+    void
+    setSignalOnCount(int c) {
         _wait = c;
     }
 

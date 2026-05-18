@@ -163,7 +163,9 @@ inline JoinCostEstimate getNodeCost(const JoinPlanNode& node) {
                                             MONGO_UNREACHABLE_TASSERT(11727800);
                                             return JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE);
                                         },
-                                        [](const BaseNode& base) { return base.cost; }},
+                                        [](const BaseNode& base) {
+                                            return base.cost;
+                                        }},
                       node);
 }
 
@@ -174,7 +176,9 @@ inline NodeSet getNodeBitset(const JoinPlanNode& node) {
     return std::visit(
         OverloadedVisitor{[](const JoiningNode& join) { return join.bitset; },
                           [](const INLJRHSNode& ip) { return NodeSet().set(ip.node); },
-                          [](const BaseNode& base) { return NodeSet().set(base.node); }},
+                          [](const BaseNode& base) {
+                              return NodeSet().set(base.node);
+                          }},
         node);
 }
 

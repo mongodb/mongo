@@ -77,7 +77,9 @@ public:
                                            return bucketState == BucketState::kCleared ||
                                                bucketState == BucketState::kPreparedAndCleared;
                                        },
-                                       [](DirectWriteCounter dwcount) { return false; }},
+                                       [](DirectWriteCounter dwcount) {
+                                           return false;
+                                       }},
                      *state);
     }
 

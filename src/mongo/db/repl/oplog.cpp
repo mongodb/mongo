@@ -1302,10 +1302,14 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      }}},
     {"commitTransaction",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status { return applyCommitTransaction(opCtx, op, mode); }}},
+          -> Status {
+         return applyCommitTransaction(opCtx, op, mode);
+     }}},
     {"abortTransaction",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status { return applyAbortTransaction(opCtx, op, mode); }}},
+          -> Status {
+         return applyAbortTransaction(opCtx, op, mode);
+     }}},
     {"createDatabaseMetadata",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {

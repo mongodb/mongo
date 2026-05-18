@@ -777,7 +777,9 @@ int UpdateModification::objsize() const {
                 return size + kWriteCommandBSONArrayPerElementOverheadBytes;
             },
             [](const DeltaUpdate& delta) -> int { return delta.diff.objsize(); },
-            [](const TransformUpdate& transform) -> int { return 0; }},
+            [](const TransformUpdate& transform) -> int {
+                return 0;
+            }},
         _update);
 }
 
@@ -787,7 +789,9 @@ UpdateModification::Type UpdateModification::type() const {
                           [](const ModifierUpdate& modifier) { return Type::kModifier; },
                           [](const PipelineUpdate& pipelineUpdate) { return Type::kPipeline; },
                           [](const DeltaUpdate& delta) { return Type::kDelta; },
-                          [](const TransformUpdate& transform) { return Type::kTransform; }},
+                          [](const TransformUpdate& transform) {
+                              return Type::kTransform;
+                          }},
         _update);
 }
 
@@ -812,7 +816,8 @@ void UpdateModification::serializeToBSON(StringData fieldName, BSONObjBuilder* b
                   arrayBuilder.doneFast();
               },
               [fieldName, bob](const DeltaUpdate& delta) { *bob << fieldName << delta.diff; },
-              [](const TransformUpdate& transform) {}},
+              [](const TransformUpdate& transform) {
+              }},
           _update);
 }
 

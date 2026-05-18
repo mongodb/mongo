@@ -62,7 +62,9 @@ WiredTigerStats::WiredTigerStats(WiredTigerSession& session) {
             "Unable to open statistics cursor",
             !session.open_cursor("statistics:session", nullptr, "statistics=(fast)", &c));
 
-    ScopeGuard guard{[c] { c->close(c); }};
+    ScopeGuard guard{[c] {
+        c->close(c);
+    }};
 
     // Get all the stats
     while (c->next(c) == 0) {

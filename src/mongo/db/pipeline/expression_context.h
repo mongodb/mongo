@@ -1372,8 +1372,9 @@ private:
     boost::optional<query_settings::QuerySettings> _querySettings = boost::none;
 
     DeferredFn<QueryKnobConfiguration, const query_settings::QuerySettings&>
-        _queryKnobConfiguration{
-            [](const auto& querySettings) { return QueryKnobConfiguration(querySettings); }};
+        _queryKnobConfiguration{[](const auto& querySettings) {
+            return QueryKnobConfiguration(querySettings);
+        }};
 
     Deferred<bool (*)(const VersionContext&)> _featureFlagShardFilteringDistinctScan{
         [](const VersionContext& vCtx) {

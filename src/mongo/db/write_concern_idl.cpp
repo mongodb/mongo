@@ -88,7 +88,9 @@ void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONOb
                                 builder->appendNumber(fieldName, static_cast<long long>(wNumNodes));
                             },
                             [&](const std::string& wMode) { builder->append(fieldName, wMode); },
-                            [&](WTags wTags) { builder->append(fieldName, wTags); }},
+                            [&](WTags wTags) {
+                                builder->append(fieldName, wTags);
+                            }},
           w);
 }
 

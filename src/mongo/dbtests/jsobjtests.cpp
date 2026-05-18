@@ -91,7 +91,8 @@ class EmbeddedBuilder {
 public:
     explicit EmbeddedBuilder(BSONObjBuilder* root) {
         // Root isn't owned, so give it a nop deleter.
-        _builders.push_back({{}, {root, [](auto) {}}});
+        _builders.push_back({{}, {root, [](auto) {
+                                  }}});
     }
 
     void appendAs(const BSONElement& e, StringData name) {

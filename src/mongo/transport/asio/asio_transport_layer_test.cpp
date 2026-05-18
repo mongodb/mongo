@@ -126,7 +126,9 @@ class ConnectionThread {
 public:
     explicit ConnectionThread(int port) : ConnectionThread(port, nullptr) {}
     ConnectionThread(int port, std::function<void(ConnectionThread&)> onConnect)
-        : _port{port}, _onConnect{std::move(onConnect)}, _thread{[this] { _run(); }} {}
+        : _port{port}, _onConnect{std::move(onConnect)}, _thread{[this] {
+              _run();
+          }} {}
 
     ~ConnectionThread() {
         LOGV2(6109500, "connection: Tx stop request");
@@ -1064,7 +1066,9 @@ TEST(AsioTransportLayer, EgressConnectionResetByPeerDuringSessionCtor) {
         conn->socket.close();
         fp.reset();
     });
-    test::JoinThread ioThread{[&] { ioContext.run(); }};
+    test::JoinThread ioThread{[&] {
+        ioContext.run();
+    }};
     ScopeGuard ioContextStop = [&] {
         ioContext.stop();
     };
@@ -1102,7 +1106,9 @@ TEST(AsioTransportLayer, ConfirmSocketSetOptionOnResetConnections) {
         sleepFor(Seconds{1});
         accepted.set(true);
     });
-    test::JoinThread ioThread{[&] { ioContext.run(); }};
+    test::JoinThread ioThread{[&] {
+        ioContext.run();
+    }};
     ScopeGuard ioContextStop = [&] {
         ioContext.stop();
     };

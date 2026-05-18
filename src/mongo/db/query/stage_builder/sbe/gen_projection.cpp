@@ -59,7 +59,9 @@ ProjectActionType ProjectAction::type() const {
                                    [](const SetArg&) { return ProjectActionType::kSetArg; },
                                    [](const AddArg&) { return ProjectActionType::kAddArg; },
                                    [](const LambdaArg&) { return ProjectActionType::kLambdaArg; },
-                                   [](const MakeObj&) { return ProjectActionType::kMakeObj; }},
+                                   [](const MakeObj&) {
+                                       return ProjectActionType::kMakeObj;
+                                   }},
                  _data);
 }
 

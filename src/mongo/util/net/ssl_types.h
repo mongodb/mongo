@@ -144,7 +144,9 @@ public:
         bool containsClusterMembershipConfig = false;
         bool containsOverrideClusterMembershipConfig = false;
         auto visitor = OverloadedVisitor{[](const SSLX509Name&) { return false; },
-                                         [](const std::string&) { return true; }};
+                                         [](const std::string&) {
+                                             return true;
+                                         }};
 
         if (_clusterAuthX509Config._configCriteria) {
             containsClusterMembershipConfig =

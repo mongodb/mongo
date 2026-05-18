@@ -449,7 +449,9 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadUncommittedIsolation) {
     auto session = ru2->getSession();
 
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
-    ScopeGuard guard{[this] { ru1->abortUnitOfWork(); }};
+    ScopeGuard guard{[this] {
+        ru1->abortUnitOfWork();
+    }};
     WT_CURSOR* cursor;
     getCursor(ru1, &cursor);
 
@@ -474,7 +476,9 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadCommittedIsolation) {
     auto session = ru2->getSession();
 
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
-    ScopeGuard guard{[this] { ru1->abortUnitOfWork(); }};
+    ScopeGuard guard{[this] {
+        ru1->abortUnitOfWork();
+    }};
 
     WT_CURSOR* cursor;
     getCursor(ru1, &cursor);
@@ -499,7 +503,9 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, SnapshotIsolation) {
     auto session = ru2->getSession();
 
     ru1->beginUnitOfWork(clientAndCtx1.second->readOnly());
-    ScopeGuard guard{[this] { ru1->abortUnitOfWork(); }};
+    ScopeGuard guard{[this] {
+        ru1->abortUnitOfWork();
+    }};
 
     WT_CURSOR* cursor;
     getCursor(ru1, &cursor);

@@ -222,7 +222,9 @@ TEST_F(PrometheusFileExporterTest, SkippedExportIncrementsCounter) {
     // guarantee that one export is skipped.
     auto [promise, future] = makePromiseFuture<void>();
     std::unique_ptr<PushMetricExporter> exporter =
-        makeExporter(/*options=*/{.testOnlyFailpointCallback = [&future]() { future.wait(); }});
+        makeExporter(/*options=*/{.testOnlyFailpointCallback = [&future]() {
+            future.wait();
+        }});
 
     FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback",
                             BSON("UnlockOnly" << true));
@@ -493,8 +495,9 @@ TEST_F(PrometheusFileExporterTest, ExactlyMaxConsecutiveSkipsIsOk) {
     // The writer thread blocks on this future.
     auto [promise, future] = makePromiseFuture<void>();
     std::unique_ptr<PushMetricExporter> exporter = makeExporter(
-        /*options=*/{.maxConsecutiveFailures = 3,
-                     .testOnlyFailpointCallback = [&future]() { future.wait(); }});
+        /*options=*/{.maxConsecutiveFailures = 3, .testOnlyFailpointCallback = [&future]() {
+                         future.wait();
+                     }});
 
     FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback",
                             BSON("UnlockOnly" << true));
@@ -514,8 +517,9 @@ DEATH_TEST_F(PrometheusFileExporterDeathTest,
     // The writer thread blocks on this future.
     auto [promise, future] = makePromiseFuture<void>();
     std::unique_ptr<PushMetricExporter> exporter = makeExporter(
-        /*options=*/{.maxConsecutiveFailures = 3,
-                     .testOnlyFailpointCallback = [&future]() { future.wait(); }});
+        /*options=*/{.maxConsecutiveFailures = 3, .testOnlyFailpointCallback = [&future]() {
+                         future.wait();
+                     }});
 
     FailPointEnableBlock fp("metricsPrometheusFileExporterThreadCallback",
                             BSON("UnlockOnly" << true));

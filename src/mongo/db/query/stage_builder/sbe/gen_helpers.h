@@ -751,7 +751,9 @@ public:
                                        },
                                        [](const Expr& e) { return ProjectNode(e.expr); },
                                        [](const SbExpr& e) { return ProjectNode(e.clone()); },
-                                       [](const Slice& s) { return ProjectNode(s); }},
+                                       [](const Slice& s) {
+                                           return ProjectNode(s);
+                                       }},
                      _data);
     }
 
@@ -759,7 +761,9 @@ public:
         return visit(OverloadedVisitor{[](const Bool&) { return Type::kBool; },
                                        [](const Expr&) { return Type::kExpr; },
                                        [](const SbExpr&) { return Type::kSbExpr; },
-                                       [](const Slice&) { return Type::kSlice; }},
+                                       [](const Slice&) {
+                                           return Type::kSlice;
+                                       }},
                      _data);
     }
 
