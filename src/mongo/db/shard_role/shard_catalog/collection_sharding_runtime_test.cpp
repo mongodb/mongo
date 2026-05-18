@@ -58,9 +58,9 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
@@ -1095,8 +1095,12 @@ public:
 
         createTestCollection(operationContext(), kTestNss);
 
-        AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-        _uuid = autoColl->uuid();
+        auto acq =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), kTestNss, AcquisitionPrerequisites::kWrite),
+                              MODE_IX);
+        _uuid = acq.uuid();
 
         auto opCtx = operationContext();
         RangeDeleterService::get(opCtx)->onStartup(opCtx);

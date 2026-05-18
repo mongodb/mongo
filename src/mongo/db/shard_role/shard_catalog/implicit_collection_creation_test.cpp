@@ -30,25 +30,21 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_catalog/clustered_collection_options_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/uuid.h"
 
 #include <memory>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -62,8 +58,11 @@ class ImplicitCollectionCreationTest : public ShardServerTestFixture {};
 TEST_F(ImplicitCollectionCreationTest, ImplicitCreateDisallowedByDefault) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         "ImplicitCreateDisallowedByDefaultDB.TestColl");
-    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    auto db = autoColl.ensureDbExists(operationContext());
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_IX);
+    auto db = DatabaseHolder::get(operationContext())->openDb(operationContext(), nss.dbName());
     WriteUnitOfWork wuow(operationContext());
     ASSERT_THROWS_CODE(
         uassertStatusOK(db->userCreateNS(operationContext(), nss, CollectionOptions{})),
@@ -77,8 +76,11 @@ TEST_F(ImplicitCollectionCreationTest, AllowImplicitCollectionCreate) {
         NamespaceString::createNamespaceString_forTest("AllowImplicitCollectionCreateDB.TestColl");
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
         operationContext(), nss);
-    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    auto db = autoColl.ensureDbExists(operationContext());
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_IX);
+    auto db = DatabaseHolder::get(operationContext())->openDb(operationContext(), nss.dbName());
     WriteUnitOfWork wuow(operationContext());
     ASSERT_OK(db->userCreateNS(operationContext(), nss, CollectionOptions{}));
     wuow.commit();
@@ -93,8 +95,11 @@ TEST_F(ImplicitCollectionCreationTest, AllowImplicitCollectionCreateWithSetCSRAs
         NamespaceString::createNamespaceString_forTest("AllowImplicitCollectionCreateDB.TestColl");
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
         operationContext(), nss, /* forceCSRAsUnknownAfterCollectionCreation */ true);
-    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    auto db = autoColl.ensureDbExists(operationContext());
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_IX);
+    auto db = DatabaseHolder::get(operationContext())->openDb(operationContext(), nss.dbName());
     WriteUnitOfWork wuow(operationContext());
     ASSERT_OK(db->userCreateNS(operationContext(), nss, CollectionOptions{}));
     wuow.commit();

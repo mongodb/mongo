@@ -79,6 +79,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_catalog/unique_collection_name.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -217,10 +218,13 @@ void runCreateCollection(OperationContext* opCtx,
                          const BSONObj& idIndex = BSONObj(),
                          bool fromMigrate = false) {
     writeConflictRetry(opCtx, "testCatalogIdentifiers", nss, [&] {
-        WriteUnitOfWork wuow(opCtx);
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
-        auto db = autoDb.ensureDbExists(opCtx);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
         ASSERT_TRUE(db);
+        WriteUnitOfWork wuow(opCtx);
 
         // Signals 'onCreateCollection()' to all OpObservers once complete.
         ASSERT_TRUE(db->createCollection(
@@ -278,10 +282,13 @@ TEST_F(DatabaseTest, CreateCollectionDoesNotReportCatalogIdentifierForVirtualCol
     auto opCtx = _opCtx.get();
     repl::UnreplicatedWritesBlock uwb(opCtx);  // virtual collections are standalone-only
     writeConflictRetry(opCtx, "testNoCatalogIdentifierForVirtualColl", _nss, [&] {
-        WriteUnitOfWork wuow(opCtx);
-        AutoGetDb autoDb(opCtx, _nss.dbName(), MODE_X);
-        auto db = autoDb.ensureDbExists(opCtx);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, _nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, _nss.dbName());
         ASSERT_TRUE(db);
+        WriteUnitOfWork wuow(opCtx);
 
         // Signals 'onCreateCollection()' to the OpObserver once complete.
         uassertStatusOK(
@@ -298,8 +305,11 @@ TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPending
                                          catalog.addDropPending(dbName);
                                      });
 
-            AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
-            auto db = autoDb.ensureDbExists(_opCtx.get());
+            auto acq = acquireCollection(_opCtx.get(),
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             _opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                         MODE_X);
+            auto db = DatabaseHolder::get(_opCtx.get())->openDb(_opCtx.get(), _nss.dbName());
             ASSERT_TRUE(db);
 
             WriteUnitOfWork wuow(_opCtx.get());
@@ -321,18 +331,24 @@ void _testDropCollection(OperationContext* opCtx,
                          const CollectionOptions& collOpts = {}) {
     if (createCollectionBeforeDrop) {
         writeConflictRetry(opCtx, "testDropCollection", nss, [=] {
-            WriteUnitOfWork wuow(opCtx);
-            AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
-            auto db = autoDb.ensureDbExists(opCtx);
+            auto acq = acquireCollection(opCtx,
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                         MODE_X);
+            auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
             ASSERT_TRUE(db);
+            WriteUnitOfWork wuow(opCtx);
             ASSERT_TRUE(db->createCollection(opCtx, nss, collOpts));
             wuow.commit();
         });
     }
 
     writeConflictRetry(opCtx, "testDropCollection", nss, [=] {
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
-        auto db = autoDb.ensureDbExists(opCtx);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
         ASSERT_TRUE(db);
 
         WriteUnitOfWork wuow(opCtx);
@@ -372,8 +388,11 @@ TEST_F(DatabaseTest, DropCollectionRejectsProvidedDropOpTimeIfWritesAreReplicate
 
     auto opCtx = _opCtx.get();
     auto nss = _nss;
-    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
-    auto db = autoDb.ensureDbExists(opCtx);
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
     writeConflictRetry(opCtx, "testDropOpTimeWithReplicated", nss, [&] {
         ASSERT_TRUE(db);
 
@@ -390,8 +409,11 @@ TEST_F(DatabaseTest, DropCollectionRejectsProvidedDropOpTimeIfWritesAreReplicate
 void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationContext* opCtx,
                                                                    const NamespaceString& nss) {
     writeConflictRetry(opCtx, "testDropCollectionWithIndexesInProgress", nss, [opCtx, nss] {
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
-        auto db = autoDb.ensureDbExists(opCtx);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
         ASSERT_TRUE(db);
 
         Collection* collection = nullptr;
@@ -495,8 +517,11 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
 TEST_F(DatabaseTest,
        MakeUniqueCollectionNamespaceReturnsFailedToParseIfModelDoesNotContainPercentSign) {
     writeConflictRetry(_opCtx.get(), "testMakeUniqueCollectionNamespace", _nss, [this] {
-        AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
-        auto db = autoDb.ensureDbExists(_opCtx.get());
+        auto acq = acquireCollection(_opCtx.get(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         _opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
+        auto db = DatabaseHolder::get(_opCtx.get())->openDb(_opCtx.get(), _nss.dbName());
         ASSERT_TRUE(db);
         ASSERT_EQUALS(ErrorCodes::FailedToParse,
                       makeUniqueCollectionName(
@@ -570,7 +595,7 @@ TEST_F(
         }
 
         // makeUniqueCollectionName() returns NamespaceExists because it will not be able to
-        // generate a namespace that will not collide with an existings collection.
+        // generate a namespace that will not collide with an existing collection.
         ASSERT_EQUALS(ErrorCodes::NamespaceExists,
                       makeUniqueCollectionName(_opCtx.get(), db->name(), model));
     });
@@ -578,7 +603,7 @@ TEST_F(
 
 TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineNow) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    Lock::DBLock lock(_opCtx.get(), nss.dbName(), MODE_X);
+    AutoGetDb autoDb(_opCtx.get(), nss.dbName(), MODE_X);
     ASSERT(shard_role_details::getLocker(_opCtx.get())->isDbLockedForMode(nss.dbName(), MODE_X));
     try {
         AutoGetDb db(_opCtx.get(), nss.dbName(), MODE_X, Date_t::now());
@@ -591,7 +616,7 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineNow) {
 
 TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    Lock::DBLock lock(_opCtx.get(), nss.dbName(), MODE_X);
+    AutoGetDb autoDb(_opCtx.get(), nss.dbName(), MODE_X);
     ASSERT(shard_role_details::getLocker(_opCtx.get())->isDbLockedForMode(nss.dbName(), MODE_X));
     try {
         AutoGetDb db(_opCtx.get(), nss.dbName(), MODE_X, Date_t());
@@ -603,28 +628,30 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
 }
 
 TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdIndex) {
-    writeConflictRetry(_opCtx.get(),
-                       "testÇreateCollectionProhibitsReplicatedCollectionsWithoutIdIndex",
-                       _nss,
-                       [this] {
-                           AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
-                           auto db = autoDb.ensureDbExists(_opCtx.get());
-                           ASSERT_TRUE(db);
+    writeConflictRetry(
+        _opCtx.get(),
+        "testÇreateCollectionProhibitsReplicatedCollectionsWithoutIdIndex",
+        _nss,
+        [this] {
+            auto acq = acquireCollection(_opCtx.get(),
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             _opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                         MODE_X);
+            auto db = DatabaseHolder::get(_opCtx.get())->openDb(_opCtx.get(), _nss.dbName());
+            ASSERT_TRUE(db);
 
-                           WriteUnitOfWork wuow(_opCtx.get());
+            WriteUnitOfWork wuow(_opCtx.get());
 
-                           CollectionOptions options;
-                           options.setNoIdIndex();
+            CollectionOptions options;
+            options.setNoIdIndex();
 
-                           ASSERT_THROWS_CODE_AND_WHAT(
-                               db->createCollection(_opCtx.get(), _nss, options),
-                               AssertionException,
-                               50001,
-                               (StringBuilder()
-                                << "autoIndexId:false is not allowed for collection "
-                                << _nss.toStringForErrorMsg() << " because it can be replicated")
-                                   .stringData());
-                       });
+            ASSERT_THROWS_CODE_AND_WHAT(
+                db->createCollection(_opCtx.get(), _nss, options),
+                AssertionException,
+                50001,
+                (str::stream() << "autoIndexId:false is not allowed for collection "
+                               << _nss.toStringForErrorMsg() << " because it can be replicated"));
+        });
 }
 
 
@@ -740,9 +767,12 @@ TEST_F(DatabaseTest, OpenDbAllowsPreExistingNonAsciiCaseConflict) {
     auto createAndClose = [&](const DatabaseName& dbName) {
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "c");
         writeConflictRetry(opCtx, "createAndClose", nss, [&] {
+            auto acq = acquireCollection(opCtx,
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                         MODE_X);
+            auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, dbName);
             WriteUnitOfWork wuow(opCtx);
-            AutoGetDb autoDb(opCtx, dbName, MODE_X);
-            auto db = autoDb.ensureDbExists(opCtx);
             ASSERT_TRUE(db->createCollection(opCtx, nss));
             wuow.commit();
         });
@@ -845,9 +875,13 @@ protected:
     }
 
     bool areRecordIdsReplicated(OperationContext* opCtx, const NamespaceString& nss) {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        ASSERT_TRUE(*autoColl) << "Collection " << nss.toStringForErrorMsg() << " not found";
-        return (*autoColl)->areRecordIdsReplicated();
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        ASSERT_TRUE(acq.getCollectionPtr())
+            << "Collection " << nss.toStringForErrorMsg() << " not found";
+        return (acq.getCollectionPtr())->areRecordIdsReplicated();
     }
 
     const NamespaceString _testNss =
@@ -893,8 +927,11 @@ TEST_F(RecordIdsReplicatedDatabaseTest, NeitherProviderNorFlag_False) {
 Status attemptUserCreateTimeseriesNS(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      bool fromMigrate = false) {
-    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
-    auto* db = autoDb.ensureDbExists(opCtx);
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    auto* db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
     invariant(db);
     CollectionOptions options{.clusteredIndex =
                                   clustered_util::makeCanonicalClusteredInfoForLegacyFormat(),

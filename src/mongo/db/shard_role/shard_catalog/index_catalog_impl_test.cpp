@@ -33,6 +33,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/list_indexes_allowed_fields.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/util/time_support.h"
@@ -62,9 +63,12 @@ TEST_F(IndexCatalogImplTest, WithInvalidIndexSpec) {
     // Create an index which has an invalid on-disk format. This gets fixed whenever we return them
     // with listIndexes.
     {
-        AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+        auto acq = acquireCollection(operationContext(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
         WriteUnitOfWork wuow(operationContext());
-        CollectionWriter writer{operationContext(), autoColl};
+        CollectionWriter writer{operationContext(), &acq};
 
         auto writableColl = writer.getWritableCollection(operationContext());
         IndexDescriptor desc{IndexNames::BTREE, bson};
@@ -78,17 +82,20 @@ TEST_F(IndexCatalogImplTest, WithInvalidIndexSpec) {
 
     {
         auto fixedSpec = index_key_validate::repairIndexSpec(nss, bson);
-        AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+        auto acq = acquireCollection(operationContext(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
         // We have a spec that's fixed according to what listIndexes would output and the on-disk
         // one. These two are different, so we expect them to cause a conflict and mismatch.
-        auto indexes = autoColl->getIndexCatalog()->removeExistingIndexesNoChecks(
-            operationContext(), *autoColl, {fixedSpec});
+        auto indexes = acq.getCollectionPtr()->getIndexCatalog()->removeExistingIndexesNoChecks(
+            operationContext(), acq.getCollectionPtr(), {fixedSpec});
         ASSERT_FALSE(indexes.empty());
         // However, if we specify to the index catalog that we must repair the spec before
         // comparison with the given allowed fields then we should have no conflict.
-        indexes = autoColl->getIndexCatalog()->removeExistingIndexesNoChecks(
+        indexes = acq.getCollectionPtr()->getIndexCatalog()->removeExistingIndexesNoChecks(
             operationContext(),
-            *autoColl,
+            acq.getCollectionPtr(),
             {fixedSpec},
             IndexCatalog::RemoveExistingIndexesFlags{true, &kAllowedListIndexesFieldNames});
         ASSERT_TRUE(indexes.empty());

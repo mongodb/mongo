@@ -43,13 +43,13 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/metadata_manager.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -184,7 +184,10 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
-    AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), kNss, AcquisitionPrerequisites::kRead),
+                                 MODE_IS);
     ScopedSetShardRole scopedSetShardRole{operationContext(),
                                           kNss,
                                           ShardVersionFactory::make(metadata) /* shardVersion */,
@@ -213,7 +216,10 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
-    AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), kNss, AcquisitionPrerequisites::kRead),
+                                 MODE_IS);
     ScopedSetShardRole scopedSetShardRole{operationContext(),
                                           kNss,
                                           ShardVersionFactory::make(metadata) /* shardVersion */,
@@ -250,7 +256,10 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
     auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
-    AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), kNss, AcquisitionPrerequisites::kRead),
+                                 MODE_IS);
     ScopedSetShardRole scopedSetShardRole{operationContext(),
                                           kNss,
                                           ShardVersionFactory::make(metadata) /* shardVersion */,

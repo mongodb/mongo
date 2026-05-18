@@ -199,8 +199,11 @@ void DropDatabaseTest::tearDown() {
  */
 void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
     writeConflictRetry(opCtx, "testDropCollection", nss, [=] {
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
-        auto db = autoDb.ensureDbExists(opCtx);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
         ASSERT_TRUE(db);
 
         WriteUnitOfWork wuow(opCtx);

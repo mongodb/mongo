@@ -63,8 +63,10 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -475,8 +477,11 @@ void _createCollection(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const CollectionOptions options = {}) {
     writeConflictRetry(opCtx, "_createCollection", nss, [=] {
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
-        auto db = autoDb.ensureDbExists(opCtx);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
         ASSERT_TRUE(db) << "Cannot create collection " << nss.toStringForErrorMsg()
                         << " because database " << nss.toStringForErrorMsg() << " does not exist.";
 
@@ -561,16 +566,19 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const std::string& indexName) {
     writeConflictRetry(opCtx, "_createIndexOnEmptyCollection", nss, [=] {
-        AutoGetCollection collection(opCtx, nss, MODE_X);
-        ASSERT_TRUE(collection) << "Cannot create index on empty collection "
-                                << nss.toStringForErrorMsg() << " because collection "
-                                << nss.toStringForErrorMsg() << " does not exist.";
+        auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        ASSERT_TRUE(collection.exists())
+            << "Cannot create index on empty collection " << nss.toStringForErrorMsg()
+            << " because collection " << nss.toStringForErrorMsg() << " does not exist.";
 
         auto indexInfoObj = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key"
                                      << BSON("a" << 1) << "name" << indexName);
 
         WriteUnitOfWork wuow(opCtx);
-        CollectionWriter writer{opCtx, collection};
+        CollectionWriter writer{opCtx, &collection};
 
         auto indexCatalog = writer.getWritableCollection(opCtx)->getIndexCatalog();
         ASSERT_OK(indexCatalog
@@ -588,13 +596,16 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
  */
 void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
     writeConflictRetry(opCtx, "_insertDocument", nss, [=] {
-        AutoGetCollection collection(opCtx, nss, MODE_X);
-        ASSERT_TRUE(collection) << "Cannot insert document " << doc << " into collection "
-                                << nss.toStringForErrorMsg() << " because collection "
-                                << nss.toStringForErrorMsg() << " does not exist.";
+        auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        ASSERT_TRUE(collection.exists())
+            << "Cannot insert document " << doc << " into collection " << nss.toStringForErrorMsg()
+            << " because collection " << nss.toStringForErrorMsg() << " does not exist.";
 
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(Helpers::insert(opCtx, *collection, doc));
+        ASSERT_OK(Helpers::insert(opCtx, collection.getCollectionPtr(), doc));
         wuow.commit();
     });
 }

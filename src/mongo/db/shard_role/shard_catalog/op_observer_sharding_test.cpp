@@ -54,13 +54,13 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -153,7 +153,10 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
                                           kTestNss,
                                           ShardVersionFactory::make(metadata) /* shardVersion */,
                                           boost::none /* databaseVersion */};
-    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), kTestNss, AcquisitionPrerequisites::kRead),
+                                 MODE_IS);
 
     auto doc = BSON("key3" << "abc"
                            << "key" << 3 << "_id"
@@ -161,7 +164,8 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
                            << "key2" << true);
 
     // Check that an order for deletion from an unsharded collection extracts just the "_id" field
-    ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(), BSON("_id" << "hello"));
+    ASSERT_BSONOBJ_EQ(getDocumentKey(acq.getCollectionPtr(), doc).getShardKeyAndId(),
+                      BSON("_id" << "hello"));
 }
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
@@ -173,7 +177,10 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
                                           kTestNss,
                                           ShardVersionFactory::make(metadata) /* shardVersion */,
                                           boost::none /* databaseVersion */};
-    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), kTestNss, AcquisitionPrerequisites::kRead),
+                                 MODE_IS);
 
     // The order of fields in `doc` deliberately does not match the shard key
     auto doc = BSON("key3" << "abc"
@@ -182,7 +189,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
                            << "key2" << true);
 
     // Verify the shard key is extracted, in correct order, followed by the "_id" field.
-    ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(),
+    ASSERT_BSONOBJ_EQ(getDocumentKey(acq.getCollectionPtr(), doc).getShardKeyAndId(),
                       BSON("key" << 100 << "key3"
                                  << "abc"
                                  << "_id"
@@ -198,7 +205,10 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
                                           kTestNss,
                                           ShardVersionFactory::make(metadata) /* shardVersion */,
                                           boost::none /* databaseVersion */};
-    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), kTestNss, AcquisitionPrerequisites::kRead),
+                                 MODE_IS);
 
     // The order of fields in `doc` deliberately does not match the shard key
     auto doc = BSON("key2" << true << "key3"
@@ -208,7 +218,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
                            << "key" << 100);
 
     // Verify the shard key is extracted with "_id" in the right place.
-    ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(),
+    ASSERT_BSONOBJ_EQ(getDocumentKey(acq.getCollectionPtr(), doc).getShardKeyAndId(),
                       BSON("key" << 100 << "_id"
                                  << "hello"
                                  << "key2" << true));
@@ -223,14 +233,18 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
                                           kTestNss,
                                           ShardVersionFactory::make(metadata) /* shardVersion */,
                                           boost::none /* databaseVersion */};
-    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), kTestNss, AcquisitionPrerequisites::kRead),
+                                 MODE_IS);
 
     auto doc = BSON("key2" << true << "_id"
                            << "hello"
                            << "key" << 100);
 
     // Verify the shard key is extracted with "_id" in the right place, not hashed.
-    ASSERT_BSONOBJ_EQ(getDocumentKey(*autoColl, doc).getShardKeyAndId(), BSON("_id" << "hello"));
+    ASSERT_BSONOBJ_EQ(getDocumentKey(acq.getCollectionPtr(), doc).getShardKeyAndId(),
+                      BSON("_id" << "hello"));
 }
 
 

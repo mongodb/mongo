@@ -29,10 +29,6 @@
 
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -60,10 +56,12 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/collection_yield_restore.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_catalog/uncommitted_catalog_updates.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_store.h"
@@ -80,6 +78,8 @@
 
 #include <algorithm>
 #include <map>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -866,8 +866,13 @@ TEST_F(ForEachCollectionFromDbTest, ModifyAllCollectionsMatchingHandlesConcurren
             if (collection->ns() == originalNss) {
                 ASSERT_OK(storageInterface()->createCollection(opCtx, cloneNss, tempCollOptions));
             }
+            auto acq =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx, collection->ns(), AcquisitionPrerequisites::kWrite),
+                                  MODE_X);
             WriteUnitOfWork wuow(opCtx);
-            CollectionWriter writer(opCtx, collection->ns());
+            CollectionWriter writer(opCtx, &acq);
             writer.getWritableCollection(opCtx)->setIsTemp(opCtx, false);
             wuow.commit();
             numModified++;
@@ -1125,7 +1130,10 @@ public:
                              Timestamp timestamp) {
         _setupDDLOperation(opCtx, timestamp);
 
-        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
         auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         ASSERT(coll);
         CollectionPtr collPtr = CollectionPtr::CollectionPtr_UNSAFE(coll);
@@ -1148,9 +1156,12 @@ public:
                                                                       Timestamp createTimestamp) {
         _setupDDLOperation(opCtx, createTimestamp);
 
-        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
         WriteUnitOfWork wuow(opCtx);
-        CollectionWriter collection(opCtx, nss);
+        CollectionWriter collection(opCtx, &acq);
 
         auto writableColl = collection.getWritableCollection(opCtx);
         auto storageEngine = getServiceContext()->getStorageEngine();
@@ -1186,9 +1197,12 @@ public:
                           Timestamp readyTimestamp) {
         _setupDDLOperation(opCtx, readyTimestamp);
 
-        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
         WriteUnitOfWork wuow(opCtx);
-        CollectionWriter collection(opCtx, nss);
+        CollectionWriter collection(opCtx, &acq);
         indexBuildBlock->success(opCtx, collection.getWritableCollection(opCtx));
         wuow.commit();
     }
@@ -1386,14 +1400,20 @@ public:
             if (committed) {
                 return;
             }
-            AutoGetCollection autoColl(opCtx, nss, MODE_X);
-            CollectionWriter collection(opCtx, nss);
+            auto acq = acquireCollection(opCtx,
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                         MODE_X);
+            CollectionWriter collection(opCtx, &acq);
             multiIndexBlock.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
         });
 
         {
-            AutoGetCollection autoColl(opCtx, nss, MODE_X);
-            CollectionWriter collection(opCtx, nss);
+            auto acq = acquireCollection(opCtx,
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                         MODE_X);
+            CollectionWriter collection(opCtx, &acq);
             auto storageEngine = getServiceContext()->getStorageEngine();
             auto specs =
                 multiIndexBlock.init(opCtx,
@@ -1407,7 +1427,10 @@ public:
 
         ASSERT_OK(multiIndexBlock.insertAllDocumentsInCollection(opCtx, nss));
         {
-            AutoGetCollection autoColl(opCtx, nss, MODE_X);
+            auto acq = acquireCollection(opCtx,
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                         MODE_X);
             ASSERT_OK(multiIndexBlock.drainBackgroundWrites(
                 opCtx,
                 RecoveryUnit::ReadSource::kNoTimestamp,
@@ -1419,8 +1442,12 @@ public:
             lookupNssOrUUID,
             commitBuildTs,
             [&multiIndexBlock, &nss, &committed](OperationContext* threadOpCtx) {
-                AutoGetCollection autoColl(threadOpCtx, nss, MODE_X);
-                CollectionWriter collection(threadOpCtx, nss);
+                auto acq =
+                    acquireCollection(threadOpCtx,
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          threadOpCtx, nss, AcquisitionPrerequisites::kWrite),
+                                      MODE_X);
+                CollectionWriter collection(threadOpCtx, &acq);
                 uassertStatusOK(
                     multiIndexBlock.commit(threadOpCtx,
                                            collection.getWritableCollection(threadOpCtx),
@@ -1528,11 +1555,12 @@ private:
                            const NamespaceString& nss,
                            boost::optional<UUID> uuid = boost::none,
                            bool allowMixedModeWrites = false) {
-        AutoGetDb databaseWriteGuard(opCtx, nss.dbName(), MODE_IX);
-        auto db = databaseWriteGuard.ensureDbExists(opCtx);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
         ASSERT(db);
-
-        Lock::CollectionLock lk(opCtx, nss, MODE_IX);
 
         CollectionOptions options;
         if (uuid) {
@@ -1566,9 +1594,11 @@ private:
     }
 
     void _dropCollection(OperationContext* opCtx, const NamespaceString& nss, Timestamp timestamp) {
-        Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLk(opCtx, nss, MODE_X);
-        CollectionWriter collection(opCtx, nss);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        CollectionWriter collection(opCtx, &acq);
 
         Collection* writableCollection = collection.getWritableCollection(opCtx);
 
@@ -1604,8 +1634,10 @@ private:
                            Timestamp timestamp) {
         invariant(from != to);
 
-        Lock::DBLock dbLk(opCtx, from.dbName(), MODE_IX);
-        Lock::CollectionLock fromLk(opCtx, from, MODE_X);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, from, AcquisitionPrerequisites::kWrite),
+            MODE_X);
         Lock::CollectionLock toLk(opCtx, to, MODE_X);
 
         // Drop the collection if it exists. This triggers the same behavior as renaming with
@@ -1614,7 +1646,7 @@ private:
             _dropCollection(opCtx, to, timestamp);
         }
 
-        CollectionWriter collection(opCtx, from);
+        CollectionWriter collection(opCtx, &acq);
 
         ASSERT_OK(collection.getWritableCollection(opCtx)->rename(opCtx, to, false));
         CollectionCatalog::get(opCtx)->onCollectionRename(
@@ -1622,8 +1654,11 @@ private:
     }
 
     void _createIndex(OperationContext* opCtx, const NamespaceString& nss, BSONObj indexSpec) {
-        AutoGetCollection autoColl(opCtx, nss, MODE_X);
-        CollectionWriter collection(opCtx, nss);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        CollectionWriter collection(opCtx, &acq);
         IndexBuildsCoordinator::createIndexesOnEmptyCollection(
             opCtx, collection, {indexSpec}, /*fromMigrate=*/false);
     }
@@ -1631,9 +1666,12 @@ private:
     void _dropIndex(OperationContext* opCtx,
                     const NamespaceString& nss,
                     const std::string& indexName) {
-        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
 
-        CollectionWriter collection(opCtx, nss);
+        CollectionWriter collection(opCtx, &acq);
 
         Collection* writableCollection = collection.getWritableCollection(opCtx);
 
@@ -3681,9 +3719,12 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
         IndexSpec spec;
         spec.version(1).name("x_1").addKeys(BSON("x" << 1));
         auto desc = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
-        AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
+        auto acq = acquireCollection(opCtx.get(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx.get(), nss, AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
-        CollectionWriter writer{opCtx.get(), autoColl};
+        CollectionWriter writer{opCtx.get(), &acq};
         auto writableColl = writer.getWritableCollection(opCtx.get());
         ASSERT_OK(
             writableColl->prepareForIndexBuild(opCtx.get(), &desc, "index-ident", boost::none));
@@ -3706,9 +3747,12 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
 
     {
         // Now finish the index build on the original client.
-        AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
+        auto acq = acquireCollection(opCtx.get(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx.get(), nss, AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
-        CollectionWriter writer{opCtx.get(), autoColl};
+        CollectionWriter writer{opCtx.get(), &acq};
         auto writableColl = writer.getWritableCollection(opCtx.get());
         auto writableEntry = writableColl->getIndexCatalog()->getWritableEntryByName(
             opCtx.get(), "x_1", IndexCatalog::InclusionPolicy::kUnfinished);
@@ -4321,9 +4365,11 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentRecreateWithReapedIdentDoesNotC
     // "reaped", establishConsistentCollection must throw SnapshotUnavailable.
     {
         ConcurrentDDL ddl(getServiceContext(), recreateTs, [&nss](OperationContext* opCtx) {
-            AutoGetDb databaseWriteGuard(opCtx, nss.dbName(), MODE_IX);
-            databaseWriteGuard.ensureDbExists(opCtx);
-            Lock::CollectionLock lk(opCtx, nss, MODE_IX);
+            auto acq = acquireCollection(opCtx,
+                                         CollectionAcquisitionRequest::fromOpCtx(
+                                             opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                         MODE_IX);
+            DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
 
             CollectionOptions options;
             options.uuid.emplace(UUID::gen());

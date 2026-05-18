@@ -51,6 +51,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/durable_catalog.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
@@ -258,8 +259,12 @@ TEST_F(CollModTest, TimeseriesBucketingParameterChanged) {
         writeConflictRetry(opCtx.get(), "unitTestTimeseriesBucketingParameterChanged", tsNss, [&] {
             WriteUnitOfWork wunit(opCtx.get());
 
-            AutoGetCollection collection(opCtx.get(), tsNss, MODE_X);
-            CollectionWriter writer{opCtx.get(), collection};
+            auto collection =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx.get(), tsNss, AcquisitionPrerequisites::kWrite),
+                                  MODE_X);
+            CollectionWriter writer{opCtx.get(), &collection};
             auto writableColl = writer.getWritableCollection(opCtx.get());
             writableColl->setTimeseriesBucketingParametersChanged(opCtx.get(), boost::none);
 

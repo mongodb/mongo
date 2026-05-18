@@ -39,6 +39,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
@@ -121,8 +122,11 @@ protected:
 };
 
 TEST_F(CollectionWriterTest, Commit) {
-    AutoGetCollection lock(operationContext(), kNss, MODE_X);
-    CollectionWriter writer(operationContext(), kNss);
+    auto lock = acquireCollection(operationContext(),
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      operationContext(), kNss, AcquisitionPrerequisites::kWrite),
+                                  MODE_X);
+    CollectionWriter writer(operationContext(), &lock);
 
     const Collection* before = lookupCollectionFromCatalog().get();
 
@@ -174,8 +178,11 @@ TEST_F(CollectionWriterTest, Commit) {
 }
 
 TEST_F(CollectionWriterTest, Rollback) {
-    AutoGetCollection lock(operationContext(), kNss, MODE_X);
-    CollectionWriter writer(operationContext(), kNss);
+    auto lock = acquireCollection(operationContext(),
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      operationContext(), kNss, AcquisitionPrerequisites::kWrite),
+                                  MODE_X);
+    CollectionWriter writer(operationContext(), &lock);
 
     const Collection* before = lookupCollectionFromCatalog().get();
 
@@ -203,11 +210,15 @@ TEST_F(CollectionWriterTest, CommitAfterDestroy) {
     const Collection* writable = nullptr;
 
     {
-        AutoGetCollection lock(operationContext(), kNss, MODE_X);
+        auto lock =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), kNss, AcquisitionPrerequisites::kWrite),
+                              MODE_X);
         WriteUnitOfWork wuow(operationContext());
 
         {
-            CollectionWriter writer(operationContext(), kNss);
+            CollectionWriter writer(operationContext(), &lock);
 
             // Request a writable Collection and destroy CollectionWriter before WUOW commits
             writable = writer.getWritableCollection(operationContext());
@@ -269,8 +280,11 @@ TEST_F(CollectionWriterTest, OplogCOW) {
     const auto& oplogInitial = lookupCollectionFromCatalogForRead(nss);
     ASSERT(oplogInitial);
 
-    AutoGetCollection lock(operationContext(), nss, MODE_X);
-    CollectionWriter writer(operationContext(), nss);
+    auto lock = acquireCollection(operationContext(),
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                  MODE_X);
+    CollectionWriter writer(operationContext(), &lock);
 
     const auto& oplogDuringDDL = lookupCollectionFromCatalogForRead(nss);
     ASSERT(oplogDuringDDL);
@@ -318,11 +332,15 @@ void runAutoGetOplogFastPathObjectStabilityConcurrentDDL(ServiceContext* svcCtx,
 
             writeConflictRetry(
                 opCtx.get(), "dummy oplog DDL", NamespaceString::kRsOplogNamespace, [&] {
-                    AutoGetCollection autoColl(
-                        opCtx.get(), NamespaceString::kRsOplogNamespace, MODE_X);
-                    ASSERT(*autoColl);
+                    auto acq = acquireCollection(
+                        opCtx.get(),
+                        CollectionAcquisitionRequest::fromOpCtx(opCtx.get(),
+                                                                NamespaceString::kRsOplogNamespace,
+                                                                AcquisitionPrerequisites::kWrite),
+                        MODE_X);
+                    ASSERT(acq.getCollectionPtr());
                     WriteUnitOfWork wunit(opCtx.get());
-                    CollectionWriter writer{opCtx.get(), autoColl};
+                    CollectionWriter writer{opCtx.get(), &acq};
 
                     auto oplogWrite = writer.getWritableCollection(opCtx.get());
                     ASSERT(oplogWrite);

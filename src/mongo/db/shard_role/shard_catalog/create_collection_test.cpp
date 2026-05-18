@@ -53,12 +53,13 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_impl.h"
 #include "mongo/db/shard_role/shard_catalog/virtual_collection_options.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -148,8 +149,11 @@ void CreateCollectionTest::validateValidator(const std::string& validatorStr,
     options.uuid = UUID::gen();
 
     return writeConflictRetry(opCtx.get(), "create", newNss, [&] {
-        AutoGetCollection autoColl(opCtx.get(), newNss, MODE_IX);
-        auto db = autoColl.ensureDbExists(opCtx.get());
+        auto acq = acquireCollection(opCtx.get(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx.get(), newNss, AcquisitionPrerequisites::kWrite),
+                                     MODE_IX);
+        auto db = DatabaseHolder::get(opCtx.get())->openDb(opCtx.get(), newNss.dbName());
         ASSERT_TRUE(db) << "Cannot create collection " << newNss.toStringForErrorMsg()
                         << " because database " << newNss.dbName().toStringForErrorMsg()
                         << " does not exist.";

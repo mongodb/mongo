@@ -49,15 +49,16 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_mock.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/record_data.h"
@@ -305,17 +306,23 @@ TEST_F(CollectionTest, AsynchronouslyNotifyCappedWaitersIfNeeded) {
 void CollectionTest::makeCollectionForMultikey(NamespaceString nss, StringData indexName) {
     auto opCtx = operationContext();
     {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        auto db = autoColl.ensureDbExists(opCtx);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
         WriteUnitOfWork wuow(opCtx);
         ASSERT(db->createCollection(opCtx, nss));
         wuow.commit();
     }
 
     {
-        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
         WriteUnitOfWork wuow(opCtx);
-        CollectionWriter writer{opCtx, autoColl};
+        CollectionWriter writer{opCtx, &acq};
 
         auto writableColl = writer.getWritableCollection(opCtx);
         ASSERT_OK(writableColl->getIndexCatalog()->createIndexOnEmptyCollection(
@@ -330,8 +337,11 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    const auto& coll = acq.getCollectionPtr();
 
     auto oldDoc = BSON("_id" << 1 << "a" << 1);
     {
@@ -385,8 +395,11 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    const auto& coll = acq.getCollectionPtr();
 
     auto oldDoc = BSON("_id" << 1 << "a" << 1 << "b"
                              << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
@@ -442,8 +455,11 @@ TEST_F(CollectionTest, SetIndexIsMultikey) {
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    const auto& coll = acq.getCollectionPtr();
     ASSERT(coll);
     MultikeyPaths paths = {{0}};
     {
@@ -464,8 +480,11 @@ TEST_F(CollectionTest, SetIndexIsMultikeyRemovesUncommittedChangesOnRollback) {
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    const auto& coll = acq.getCollectionPtr();
     ASSERT(coll);
     MultikeyPaths paths = {{0}};
 
@@ -490,8 +509,11 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikey) {
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    const auto& coll = acq.getCollectionPtr();
     ASSERT(coll);
     MultikeyPaths paths = {{0}};
     {
@@ -568,8 +590,11 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollbac
     makeCollectionForMultikey(nss, indexName);
 
     auto opCtx = operationContext();
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    const auto& coll = acq.getCollectionPtr();
     ASSERT(coll);
     MultikeyPaths paths = {{0}};
 
@@ -595,8 +620,11 @@ TEST_F(CollectionTest, CheckTimeseriesBucketDocsForMixedSchemaData) {
     makeTimeseries(nss);
 
     auto opCtx = operationContext();
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-    const auto& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    const auto& coll = acq.getCollectionPtr();
     ASSERT(coll);
     ASSERT(coll->getTimeseriesOptions());
 
@@ -796,8 +824,11 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
     options.cappedSize = 512 * 1024 * 1024;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
-    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = *autoColl;
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_IX);
+    const CollectionPtr& coll = acq.getCollectionPtr();
 
     ASSERT_EQUALS(0, coll->numRecords(operationContext()));
 
@@ -846,8 +877,11 @@ TEST_F(CatalogTestFixture, CappedDeleteMultipleRecords) {
     options.cappedSize = 512 * 1024 * 1024;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
-    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = *autoColl;
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_IX);
+    const CollectionPtr& coll = acq.getCollectionPtr();
 
     ASSERT_EQUALS(0, coll->numRecords(operationContext()));
 
@@ -894,8 +928,11 @@ TEST_F(CatalogTestFixture, CappedVisibilityEmptyInitialState) {
     options.capped = true;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
-    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = *autoColl;
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_IX);
+    const CollectionPtr& coll = acq.getCollectionPtr();
     RecordStore* rs = coll->getRecordStore();
 
     auto doInsert = [&](OperationContext* opCtx) -> RecordId {
@@ -1011,13 +1048,13 @@ TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
     options.capped = true;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
-    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = *autoColl;
-    RecordStore* rs = coll->getRecordStore();
-
     auto doInsert = [&](OperationContext* opCtx) -> RecordId {
-        Lock::GlobalLock globalLock{opCtx, MODE_IX};
         std::string data = "data";
+        auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        auto rs = coll.getCollectionPtr()->getRecordStore();
         return uassertStatusOK(rs->insertRecord(opCtx,
                                                 *shard_role_details::getRecoveryUnit(opCtx),
                                                 data.c_str(),
@@ -1034,6 +1071,12 @@ TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
         initialId = doInsert(longLivedOpCtx.get());
         wuow.commit();
     }
+
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_IX);
+    auto rs = acq.getCollectionPtr()->getRecordStore();
 
     WriteUnitOfWork longLivedWUOW(longLivedOpCtx.get());
 
@@ -1188,8 +1231,11 @@ TEST_F(CollectionTest, CappedCursorRollover) {
     options.cappedSize = 512 * 1024 * 1024;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
-    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = *autoColl;
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_IX);
+    const CollectionPtr& coll = acq.getCollectionPtr();
     RecordStore* rs = coll->getRecordStore();
 
     // First insert 3 documents.
@@ -1232,8 +1278,11 @@ TEST_F(CollectionTest, BoundedSeek) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, {}));
 
-    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = *autoColl;
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_IX);
+    const CollectionPtr& coll = acq.getCollectionPtr();
     RecordStore* rs = coll->getRecordStore();
 
     auto doInsert = [&](OperationContext* opCtx) -> RecordId {
@@ -1320,8 +1369,11 @@ TEST_F(CatalogTestFixture, CappedCursorYieldFirst) {
     options.capped = true;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
-    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    const CollectionPtr& coll = *autoColl;
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_IX);
+    const CollectionPtr& coll = acq.getCollectionPtr();
     RecordStore* rs = coll->getRecordStore();
 
     RecordId recordId;
@@ -1364,13 +1416,16 @@ TEST_F(CatalogTestFixture, TruncateRangeFailOnNonClusteredCollection) {
     RecordId maxRecordId("b");
 
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     // Should fail since collection is not clustered.
-    ASSERT_THROWS_CODE(
-        collection_internal::truncateRange(opCtx, *autoColl, minRecordId, maxRecordId, 1, 1),
-        DBException,
-        ErrorCodes::IllegalOperation);
+    ASSERT_THROWS_CODE(collection_internal::truncateRange(
+                           opCtx, acq.getCollectionPtr(), minRecordId, maxRecordId, 1, 1),
+                       DBException,
+                       ErrorCodes::IllegalOperation);
 }
 
 TEST_F(CatalogTestFixture, TruncateRangeOnClusteredCollection) {
@@ -1383,8 +1438,11 @@ TEST_F(CatalogTestFixture, TruncateRangeOnClusteredCollection) {
 
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
     // Acquire exclusive access for index creation later.
-    AutoGetCollection autoColl(opCtx, nss, MODE_X);
-    const CollectionPtr& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    const CollectionPtr& coll = acq.getCollectionPtr();
 
     // Should not throw on a clustered collection with no indexes.
     {
@@ -1402,17 +1460,21 @@ TEST_F(CatalogTestFixture, TruncateRangeOnClusteredCollection) {
     // Should fail if collection has indexes.
     {
         auto indexName = "myindex"_sd;
-        WriteUnitOfWork wuow(opCtx);
-        CollectionWriter writer{opCtx, autoColl};
-        auto writableColl = writer.getWritableCollection(opCtx);
-        ASSERT_OK(writableColl->getIndexCatalog()->createIndexOnEmptyCollection(
-            opCtx, writableColl, BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1))));
-        wuow.commit();
+        {
+            CollectionWriter writer{opCtx, &acq};
+            WriteUnitOfWork wuow(opCtx);
+            auto writableColl = writer.getWritableCollection(opCtx);
+            ASSERT_OK(writableColl->getIndexCatalog()->createIndexOnEmptyCollection(
+                opCtx,
+                writableColl,
+                BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1))));
+            wuow.commit();
+        }
 
-        ASSERT_THROWS_CODE(
-            collection_internal::truncateRange(opCtx, coll, minRecordId, maxRecordId, 1, 1),
-            DBException,
-            ErrorCodes::IllegalOperation);
+        ASSERT_THROWS_CODE(collection_internal::truncateRange(
+                               opCtx, acq.getCollectionPtr(), minRecordId, maxRecordId, 1, 1),
+                           DBException,
+                           ErrorCodes::IllegalOperation);
     }
 }
 
@@ -1426,13 +1488,16 @@ TEST_F(CatalogTestFixture, TruncateRangeOnPreimagesEnabledCollection) {
     RecordId maxRecordId("b");
 
     ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     // Should fail since change stream preimages is enabled.
-    ASSERT_THROWS_CODE(
-        collection_internal::truncateRange(opCtx, *autoColl, minRecordId, maxRecordId, 1, 1),
-        DBException,
-        ErrorCodes::IllegalOperation);
+    ASSERT_THROWS_CODE(collection_internal::truncateRange(
+                           opCtx, acq.getCollectionPtr(), minRecordId, maxRecordId, 1, 1),
+                       DBException,
+                       ErrorCodes::IllegalOperation);
 }
 
 class TruncateRangeTest : public CollectionTest {
@@ -1469,9 +1534,12 @@ protected:
         options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
 
         ASSERT_OK(storageInterface()->createCollection(opCtx, nss, options));
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        const CollectionPtr& coll = *autoColl;
-        auto rs = autoColl->getRecordStore();
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        const CollectionPtr& coll = acq.getCollectionPtr();
+        auto rs = acq.getCollectionPtr()->getRecordStore();
 
         std::vector<RecordId> recordIds = sortedRecordIds;
         ASSERT_EQ(recordIds.size(), numToInsert);
