@@ -490,6 +490,15 @@ bool DurableOplogEntry::applyOpsIsLinkedTransactionally() const {
         MultiOplogEntryType::kApplyOpsAppliedSeparately;
 }
 
+bool DurableOplogEntry::applyOpsIsMarkedRetryable() const {
+    if (getCommandType() != CommandTypeEnum::kApplyOps) {
+        return false;
+    }
+    auto t = getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType);
+    return t == MultiOplogEntryType::kApplyOpsAppliedSeparately ||
+        t == MultiOplogEntryType::kApplyOpsAppliedAtomically;
+}
+
 bool DurableOplogEntry::isInTransaction() const {
     if (!getTxnNumber() || !getSessionId())
         return false;
@@ -817,6 +826,10 @@ bool OplogEntry::isCommand() const {
 
 bool OplogEntry::applyOpsIsLinkedTransactionally() const {
     return _entry.applyOpsIsLinkedTransactionally();
+}
+
+bool OplogEntry::applyOpsIsMarkedRetryable() const {
+    return _entry.applyOpsIsMarkedRetryable();
 }
 
 bool OplogEntry::isInTransaction() const {

@@ -637,6 +637,12 @@ public:
     bool applyOpsIsLinkedTransactionally() const;
 
     /**
+     * Returns true iff this applyOps is tagged as a retryable-write apply group via
+     * multiOpType.
+     */
+    bool applyOpsIsMarkedRetryable() const;
+
+    /**
      * Returns if the oplog entry is part of a transaction, whether an applyOps, a prepare, or
      * a commit.
      */
@@ -906,6 +912,7 @@ public:
     OpTime getOpTime() const;
     bool isCommand() const;
     bool applyOpsIsLinkedTransactionally() const;
+    bool applyOpsIsMarkedRetryable() const;
     bool isInTransaction() const;
     bool isPartialTransaction() const;
     bool isEndOfLargeTransaction() const;

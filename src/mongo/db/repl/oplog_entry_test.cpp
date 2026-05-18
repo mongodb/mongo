@@ -115,6 +115,7 @@ TEST_F(OplogEntryTest, Insert) {
     ASSERT(entry.isCrudOpType());
     ASSERT_FALSE(entry.isContainerOpType());
     ASSERT_FALSE(entry.shouldPrepare());
+    EXPECT_FALSE(entry.applyOpsIsMarkedRetryable());
     ASSERT_BSONOBJ_EQ(entry.getIdElement().wrap("_id"), BSON("_id" << docId));
     ASSERT_BSONOBJ_EQ(entry.getOperationToApply(), doc);
     ASSERT_BSONOBJ_EQ(entry.getObjectContainingDocumentKey(), doc);
@@ -604,6 +605,7 @@ TEST_F(OplogEntryTest, ApplyOpsNotInSession) {
     ASSERT_FALSE(applyOpsEntry.isPartialTransaction());
     ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
     ASSERT_FALSE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+    EXPECT_FALSE(applyOpsEntry.applyOpsIsMarkedRetryable());
 }
 
 TEST_F(OplogEntryTest, ApplyOpsSingleEntryTransaction) {
@@ -628,6 +630,7 @@ TEST_F(OplogEntryTest, ApplyOpsSingleEntryTransaction) {
     ASSERT_FALSE(applyOpsEntry.isPartialTransaction());
     ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
     ASSERT_TRUE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+    EXPECT_FALSE(applyOpsEntry.applyOpsIsMarkedRetryable());
 }
 
 TEST_F(OplogEntryTest, ApplyOpsStartMultiEntryTransaction) {
@@ -653,6 +656,7 @@ TEST_F(OplogEntryTest, ApplyOpsStartMultiEntryTransaction) {
     ASSERT_TRUE(applyOpsEntry.isPartialTransaction());
     ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
     ASSERT_TRUE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+    EXPECT_FALSE(applyOpsEntry.applyOpsIsMarkedRetryable());
 }
 
 TEST_F(OplogEntryTest, ApplyOpsMiddleMultiEntryTransaction) {
@@ -678,6 +682,7 @@ TEST_F(OplogEntryTest, ApplyOpsMiddleMultiEntryTransaction) {
     ASSERT_TRUE(applyOpsEntry.isPartialTransaction());
     ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
     ASSERT_TRUE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+    EXPECT_FALSE(applyOpsEntry.applyOpsIsMarkedRetryable());
 }
 
 TEST_F(OplogEntryTest, ApplyOpsEndMultiEntryTransaction) {
@@ -702,6 +707,7 @@ TEST_F(OplogEntryTest, ApplyOpsEndMultiEntryTransaction) {
     ASSERT_FALSE(applyOpsEntry.isPartialTransaction());
     ASSERT_TRUE(applyOpsEntry.isEndOfLargeTransaction());
     ASSERT_TRUE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+    EXPECT_FALSE(applyOpsEntry.applyOpsIsMarkedRetryable());
 }
 
 TEST_F(OplogEntryTest, ApplyOpsFirstOrOnlyRetryableWrite) {
@@ -726,6 +732,7 @@ TEST_F(OplogEntryTest, ApplyOpsFirstOrOnlyRetryableWrite) {
     ASSERT_FALSE(applyOpsEntry.isPartialTransaction());
     ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
     ASSERT_FALSE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+    EXPECT_TRUE(applyOpsEntry.applyOpsIsMarkedRetryable());
 }
 
 TEST_F(OplogEntryTest, ApplyOpsSubsequentRetryableWrite) {
@@ -752,6 +759,122 @@ TEST_F(OplogEntryTest, ApplyOpsSubsequentRetryableWrite) {
     ASSERT_FALSE(applyOpsEntry.isPartialTransaction());
     ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
     ASSERT_FALSE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+    EXPECT_TRUE(applyOpsEntry.applyOpsIsMarkedRetryable());
+}
+
+TEST_F(OplogEntryTest, ApplyOpsIsMarkedRetryableAppliedAtomically) {
+    UUID uuid(UUID::gen());
+    auto sessionId = makeLogicalSessionIdForTest();
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1))))
+                  << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
+                  << StmtId(0) << "prevOpTime" << OpTime() << "multiOpType"
+                  << static_cast<int>(MultiOplogEntryType::kApplyOpsAppliedAtomically));
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    EXPECT_TRUE(applyOpsEntry.applyOpsIsMarkedRetryable());
+}
+
+TEST_F(OplogEntryTest, ApplyOpsIsMarkedRetryableAppliedAtomicallyWithPrevOpTime) {
+    UUID uuid(UUID::gen());
+    auto sessionId = makeLogicalSessionIdForTest();
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 2) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1))))
+                  << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
+                  << StmtId(0) << "prevOpTime" << OpTime(Timestamp(1, 1), 1) << "multiOpType"
+                  << static_cast<int>(MultiOplogEntryType::kApplyOpsAppliedAtomically));
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    EXPECT_TRUE(applyOpsEntry.applyOpsIsMarkedRetryable());
+    EXPECT_TRUE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+}
+
+TEST_F(OplogEntryTest, ApplyOpsIsMarkedRetryableExcludesInternalSessionForRetryableWrite) {
+    UUID uuid(UUID::gen());
+    // An internal-session-for-retryable-write lsid carries a txnNumber inside the
+    // LogicalSessionId itself. Build one by appending the txnNumber field to the lsid BSON.
+    auto baseSessionId = makeLogicalSessionIdForTest();
+    BSONObjBuilder lsidBob;
+    baseSessionId.serialize(&lsidBob);
+    lsidBob.append("txnNumber", TxnNumber(0));
+    const auto internalSessionLsid = lsidBob.obj();
+
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1))))
+                  << "lsid" << internalSessionLsid << "txnNumber" << TxnNumber(5) << "stmtId"
+                  << StmtId(0) << "prevOpTime" << OpTime());
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    // applyOpsIsMarkedRetryable() only matches multiOpType-tagged entries; an internal-session
+    // applyOps without a multiOpType tag is not "marked" even though it represents a retryable
+    // write. Callers that want to cover both must compose the two predicates explicitly.
+    EXPECT_FALSE(applyOpsEntry.applyOpsIsMarkedRetryable());
+    ASSERT_TRUE(applyOpsEntry.getSessionId().has_value());
+    EXPECT_TRUE(isInternalSessionForRetryableWrite(*applyOpsEntry.getSessionId()));
+}
+
+TEST_F(OplogEntryTest, ApplyOpsIsMarkedRetryableMultiDocTxnIsNotMarked) {
+    UUID uuid(UUID::gen());
+    auto sessionId = makeLogicalSessionIdForTest();
+    // End of a multi-entry transaction: non-null prevOpTime links to a prior applyOps entry.
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 2) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1))))
+                  << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
+                  << StmtId(0) << "prevOpTime" << OpTime(Timestamp(1, 1), 1));
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    EXPECT_FALSE(applyOpsEntry.applyOpsIsMarkedRetryable());
+}
+
+TEST_F(OplogEntryTest, ApplyOpsIsMarkedRetryableNotInSessionIsNotMarked) {
+    UUID uuid(UUID::gen());
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                             << "ns" << nss.ns_forTest() << "ui"
+                                                             << uuid << "o" << BSON("_id" << 1)))));
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    EXPECT_FALSE(applyOpsEntry.applyOpsIsMarkedRetryable());
+}
+
+TEST_F(OplogEntryTest, ApplyOpsIsMarkedRetryableNonApplyOpsWithMultiOpTypeIsNotMarked) {
+    UUID uuid(UUID::gen());
+    const auto insertBson =
+        BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "op"
+                  << "i"
+                  << "ns" << nss.ns_forTest() << "ui" << uuid << "wall" << Date_t() << "o"
+                  << BSON("_id" << 1) << "multiOpType"
+                  << static_cast<int>(MultiOplogEntryType::kApplyOpsAppliedSeparately));
+    auto insertEntry = unittest::assertGet(OplogEntry::parse(insertBson));
+    EXPECT_FALSE(insertEntry.applyOpsIsMarkedRetryable());
 }
 
 TEST_F(OplogEntryTest, OpTimeBaseNonStrictParsing) {
