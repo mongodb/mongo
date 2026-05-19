@@ -39,6 +39,10 @@ let setUp = function (rst) {
     // Each time we drop the database we have to re-enable profiling. Enable profiling on 'admin'
     // to test the $currentOp aggregation stage.
     rst.nodes.forEach(function (node) {
+        // Increase the profiling lock deadline so that entries are not silently discarded when
+        // there is brief lock contention on secondaries (e.g. during replication batch application).
+        // This test relies on profile entries to verify read-preference routing.
+        assert.commandWorked(node.adminCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}));
         assert(node.getDB(kDbName).setProfilingLevel(2));
         assert(node.getDB("admin").setProfilingLevel(2));
     });
