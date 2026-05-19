@@ -161,6 +161,10 @@ void LogicalAggStageAPI::applyPipelineSuffixDependencies(
 }
 
 
+void LogicalAggStageAPI::skipStream(::MongoExtensionStreamType streamType) {
+    invokeCAndConvertStatusToException([&]() { return _vtable().skip_stream(get(), streamType); });
+}
+
 /**
  * Returns the sort pattern applied by this stage. Returns an empty BSONObj if the stage does
  * not apply a sort pattern.

@@ -207,6 +207,14 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _hostSkipStream(::MongoExtensionLogicalAggStage* logicalStage,
+                                                   ::MongoExtensionStreamType streamType) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([]() {
+            tasserted(12601401,
+                      "_hostSkipStream should not be called on a host-allocated logical stage.");
+        });
+    }
+
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_hostDestroy,
         .get_name = &_hostGetName,
@@ -223,6 +231,7 @@ private:
         .get_filter = &_hostGetFilter,
         .apply_pipeline_suffix_dependencies = &_hostApplyPipelineSuffixDependencies,
         .get_sort_pattern = &_hostGetSortPattern,
+        .skip_stream = &_hostSkipStream,
     };
 
     std::unique_ptr<host::LogicalAggStage> _logicalAggStage;

@@ -1898,6 +1898,45 @@ TEST(AggregationStageTest, GetFilterReturnsFilterWhenOverridden) {
     ASSERT_BSONOBJ_EQ(FilteredLogicalStage::kFilter, handle->getFilter());
 }
 
+class SkipStreamRecordingStage
+    : public sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage> {
+public:
+    boost::optional<::MongoExtensionStreamType> lastStreamType;
+
+    SkipStreamRecordingStage()
+        : sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage>("$skipStreamStage",
+                                                                                BSONObj()) {}
+
+    void skipStream(::MongoExtensionStreamType streamType) override {
+        lastStreamType = streamType;
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> clone() const override {
+        return std::make_unique<SkipStreamRecordingStage>();
+    }
+};
+
+TEST(AggregationStageTest, SkipStreamOverrideIsCalledWithCorrectStreamType) {
+    auto skipStreamImpl = std::make_unique<SkipStreamRecordingStage>();
+    auto* skipStreamPtr = skipStreamImpl.get();
+    auto logicalStage =
+        new extension::sdk::ExtensionLogicalAggStageAdapter(std::move(skipStreamImpl));
+    auto handle = extension::LogicalAggStageHandle{logicalStage};
+
+    handle->skipStream(::MongoExtensionStreamType::kMongoExtensionStreamTypeMetaResult);
+
+    ASSERT_TRUE(skipStreamPtr->lastStreamType.has_value());
+    ASSERT_EQ(*skipStreamPtr->lastStreamType,
+              ::MongoExtensionStreamType::kMongoExtensionStreamTypeMetaResult);
+}
+
+TEST(AggregationStageTest, SkipStreamDefaultNoOpDoesNotCrash) {
+    auto logicalStage = new extension::sdk::ExtensionLogicalAggStageAdapter(
+        sdk::shared_test_stages::TransformLogicalAggStage::make());
+    auto handle = extension::LogicalAggStageHandle{logicalStage};
+    handle->skipStream(::MongoExtensionStreamType::kMongoExtensionStreamTypeDocResult);
+}
+
 }  // namespace
 
 }  // namespace mongo::extension::sdk

@@ -722,6 +722,14 @@ typedef struct MongoExtensionLogicalAggStage {
 struct MongoExtensionPipelineRewriteContext;
 
 /**
+ * Identifies which stream a multi-stream extension source document belongs to.
+ */
+typedef enum MongoExtensionStreamType : uint8_t {
+    kMongoExtensionStreamTypeDocResult = 0,
+    kMongoExtensionStreamTypeMetaResult = 1,
+} MongoExtensionStreamType;
+
+/**
  * Virtual function table for MongoExtensionLogicalAggStage.
  */
 typedef struct MongoExtensionLogicalAggStageVTable {
@@ -867,6 +875,14 @@ typedef struct MongoExtensionLogicalAggStageVTable {
     MongoExtensionStatus* (*get_sort_pattern)(MongoExtensionLogicalAggStage* logicalStage,
                                               MongoExtensionByteBuf** sortPattern);
 
+    /**
+     * Notifies the logical stage that the stream identified by `streamType` will not produce any
+     * more documents. Extensions may override this to update internal state or release resources
+     * associated with that stream when it is skipped.
+     */
+    MongoExtensionStatus* (*skip_stream)(MongoExtensionLogicalAggStage* logicalStage,
+                                         MongoExtensionStreamType streamType);
+
 } MongoExtensionLogicalAggStageVTable;
 
 /**
@@ -889,14 +905,6 @@ typedef enum MongoExtensionGetNextResultCode : uint8_t {
      */
     kPauseExecution = 2,
 } MongoExtensionGetNextResultCode;
-
-/**
- * Identifies which stream a multi-stream extension source document belongs to.
- */
-typedef enum MongoExtensionStreamType : uint8_t {
-    kMongoExtensionStreamTypeDocResult = 0,
-    kMongoExtensionStreamTypeMetaResult = 1,
-} MongoExtensionStreamType;
 
 /**
  * MongoExtensionGetNextResult is a container used to fetch results (with or without metadata) from

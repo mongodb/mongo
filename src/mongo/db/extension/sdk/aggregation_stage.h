@@ -148,6 +148,12 @@ public:
      */
     virtual void applyPipelineSuffixDependencies(const PipelineDependenciesHandle& deps) {}
 
+    /**
+     * Notifies the logical stage that the stream identified by streamType will not produce any more
+     * documents.
+     */
+    virtual void skipStream(::MongoExtensionStreamType streamType) {}
+
 protected:
     LogicalAggStage() = delete;  // No default constructor.
     explicit LogicalAggStage(std::string_view name) : _name(name) {}
@@ -352,6 +358,14 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _extSkipStream(::MongoExtensionLogicalAggStage* extLogicalStage,
+                                                  ::MongoExtensionStreamType streamType) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            auto& impl = static_cast<ExtensionLogicalAggStageAdapter*>(extLogicalStage)->getImpl();
+            impl.skipStream(streamType);
+        });
+    }
+
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_extDestroy,
         .get_name = &_extGetName,
@@ -367,7 +381,8 @@ private:
         .evaluate_rule_transform = &_extEvaluateRuleTransform,
         .get_filter = &_extGetFilter,
         .apply_pipeline_suffix_dependencies = &_extApplyPipelineSuffixDependencies,
-        .get_sort_pattern = &_extGetSortPattern};
+        .get_sort_pattern = &_extGetSortPattern,
+        .skip_stream = &_extSkipStream};
     std::unique_ptr<LogicalAggStage> _stage;
 };
 

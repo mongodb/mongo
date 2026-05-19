@@ -124,6 +124,12 @@ public:
      */
     BSONObj getSortPattern() const;
 
+    /**
+     * Notifies the logical stage that the stream identified by streamType will not produce any more
+     * documents.
+     */
+    void skipStream(::MongoExtensionStreamType streamType);
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11420603, "LogicalAggStage 'get_name' is null", vtable.get_name != nullptr);
         tassert(11173703, "LogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
@@ -152,6 +158,7 @@ public:
         tassert(12327100,
                 "LogicalAggStage 'get_sort_pattern' is null",
                 vtable.get_sort_pattern != nullptr);
+        tassert(12601400, "LogicalAggStage 'skip_stream' is null", vtable.skip_stream != nullptr);
     }
 };
 
