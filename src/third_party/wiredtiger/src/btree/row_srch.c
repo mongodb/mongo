@@ -205,7 +205,7 @@ __wt_search_insert(
      * This is an expensive call on a performance-critical path, so we only want to enable it behind
      * the stress_skiplist session flag.
      */
-    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_STRESS_SKIPLIST))
+    if (FLD_ISSET(S2C(session)->debug.flags, WT_CONN_DEBUG_STRESS_SKIPLIST))
         WT_RET(__validate_next_stack(session, cbt->next_stack, srch_key));
 
     return (0);

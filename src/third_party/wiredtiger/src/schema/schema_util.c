@@ -219,7 +219,7 @@ __wti_debug_crash_if_flag_set(
 {
     /* FIXME-WT-12021: Replace this function and its call sites with a proper failpoint once the
      * framework is available. */
-    if (FLD_ISSET(S2C(session)->debug_flags, flag)) {
+    if (FLD_ISSET(S2C(session)->debug.flags, flag)) {
         __wt_verbose_warning(session, WT_VERB_DEFAULT, "Simulating a crash %s '%s'", msg, uri);
         /* Wait for the previous metadata change to be persisted. */
         __wt_sleep(2, 0);

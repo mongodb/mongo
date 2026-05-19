@@ -22,7 +22,7 @@ cloud objects that makes these btrees different.
 
 Tiered storage is configured and enabled on the connection
 via ::wiredtiger_open configuration options
-(e.g. <code>tiered_storage=(name="s3_store",bucket="...")</code> ).
+(e.g. <code>tiered_storage=(name="dir_store",bucket="...")</code> ).
 Once enabled on the connection, the configuration applies to all tables created.
 The configuration can be overridden on individual tables with
 configuration options for WT_SESSION::create .
@@ -271,8 +271,7 @@ The connection has a pointer to a \c WT_BUCKET_STORAGE, and each
 Among the fields of a \c WT_BUCKET_STORAGE is a pointer to a \c
 WT_STORAGE_SOURCE. The storage source can be thought of as a driver,
 or an abstraction of a cloud provider with operations. WiredTiger has
-several instances of \c WT_STORAGE_SOURCE, these include the drivers
-for the AWS, GCP, and Azure clouds, as well as \c dir_store,
+instances of \c WT_STORAGE_SOURCE, including \c dir_store,
 used for testing and development.
 A storage source can be asked to create a custom file system
 (returning a \c WT_FILE_SYSTEM) from a

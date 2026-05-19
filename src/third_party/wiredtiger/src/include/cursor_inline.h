@@ -65,7 +65,7 @@ __cursor_copy_release(WT_CURSOR *cursor)
      * we can exit the function quickly.
      */
     if (F_ISSET(cursor, WT_CURSTD_DEBUG_COPY_KEY | WT_CURSTD_DEBUG_COPY_VALUE) &&
-      FLD_ISSET(S2C(CUR2S(cursor))->debug_flags, WT_CONN_DEBUG_CURSOR_COPY)) {
+      FLD_ISSET(S2C(CUR2S(cursor))->debug.flags, WT_CONN_DEBUG_CURSOR_COPY)) {
         if (F_ISSET(cursor, WT_CURSTD_DEBUG_COPY_KEY)) {
             WT_RET(__wt_cursor_copy_release_item(cursor, &cursor->key));
             F_CLR(cursor, WT_CURSTD_DEBUG_COPY_KEY);

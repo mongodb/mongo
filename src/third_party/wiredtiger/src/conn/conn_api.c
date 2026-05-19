@@ -2278,17 +2278,17 @@ __debug_mode_log_retention_config(WT_SESSION_IMPL *session, const char *cfg[])
      * value. Once it was on in the past and then turned off, you cannot turn it back on again.
      */
     if (cval.val != 0) {
-        if (conn->debug_ckpt_cnt != 0 && cval.val != conn->debug_ckpt_cnt)
+        if (conn->debug.ckpt_cnt != 0 && cval.val != conn->debug.ckpt_cnt)
             WT_ERR_MSG(session, EINVAL, "Cannot change value for checkpoint retention");
         WT_ERR(
-          __wt_realloc_def(session, &conn->debug_ckpt_alloc, (size_t)cval.val, &conn->debug_ckpt));
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CKPT_RETAIN);
+          __wt_realloc_def(session, &conn->debug.ckpt_alloc, (size_t)cval.val, &conn->debug.ckpt));
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_CKPT_RETAIN);
     } else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CKPT_RETAIN);
-    conn->debug_ckpt_cnt = (uint32_t)cval.val;
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_CKPT_RETAIN);
+    conn->debug.ckpt_cnt = (uint32_t)cval.val;
 
     WT_ERR(__wt_config_gets(session, cfg, "debug_mode.log_retention", &cval));
-    conn->debug_log_cnt = (uint32_t)cval.val;
+    conn->debug.log_cnt = (uint32_t)cval.val;
 
 err:
     __wt_writeunlock(session, &conn->log_mgr.debug_log_retention_lock);
@@ -2347,108 +2347,108 @@ __wti_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.configuration", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CONFIGURATION);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_CONFIGURATION);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CONFIGURATION);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_CONFIGURATION);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.corruption_abort", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CORRUPTION_ABORT);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_CORRUPTION_ABORT);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CORRUPTION_ABORT);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_CORRUPTION_ABORT);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.crash_point.before_insert_colgroup", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_COLGROUP);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_COLGROUP);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_COLGROUP);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_COLGROUP);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.crash_point.before_insert_file", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_FILE);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_FILE);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_FILE);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_CRASH_POINT_BEFORE_INSERT_FILE);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.crash_point.after_drop_colgroup", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_COLGROUP);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_COLGROUP);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_COLGROUP);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_COLGROUP);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.crash_point.after_drop_file", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_FILE);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_FILE);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_FILE);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_CRASH_POINT_AFTER_DROP_FILE);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.cursor_copy", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CURSOR_COPY);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_CURSOR_COPY);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CURSOR_COPY);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_CURSOR_COPY);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.cursor_reposition", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CURSOR_REPOSITION);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_CURSOR_REPOSITION);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CURSOR_REPOSITION);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_CURSOR_REPOSITION);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.eviction", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.realloc_exact", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_REALLOC_EXACT);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_REALLOC_EXACT);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_REALLOC_EXACT);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_REALLOC_EXACT);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.realloc_malloc", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_REALLOC_MALLOC);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_REALLOC_MALLOC);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_REALLOC_MALLOC);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_REALLOC_MALLOC);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.rollback_error", &cval));
     txn_global->debug_rollback = (uint64_t)cval.val;
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.slow_checkpoint", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_SLOW_CKPT);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_SLOW_CKPT);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_SLOW_CKPT);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_SLOW_CKPT);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.stress_skiplist", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_STRESS_SKIPLIST);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_STRESS_SKIPLIST);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_STRESS_SKIPLIST);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_STRESS_SKIPLIST);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.table_logging", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_TABLE_LOGGING);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_TABLE_LOGGING);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_TABLE_LOGGING);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_TABLE_LOGGING);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.tiered_flush_error_continue", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_TIERED_FLUSH_ERROR_CONTINUE);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_TIERED_FLUSH_ERROR_CONTINUE);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_TIERED_FLUSH_ERROR_CONTINUE);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_TIERED_FLUSH_ERROR_CONTINUE);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.update_restore_evict", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_UPDATE_RESTORE_EVICT);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_UPDATE_RESTORE_EVICT);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_UPDATE_RESTORE_EVICT);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_UPDATE_RESTORE_EVICT);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.eviction_checkpoint_ts_ordering", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_EVICTION_CKPT_TS_ORDERING);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_EVICTION_CKPT_TS_ORDERING);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_EVICTION_CKPT_TS_ORDERING);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_EVICTION_CKPT_TS_ORDERING);
     return (0);
 }
 
@@ -2754,12 +2754,12 @@ __wti_disagg_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
     else
         WT_RET_MSG(session, EINVAL, "Invalid value for debug.disagg_address_cookie_upgrade: '%.*s'",
           (int)cval.len, cval.str);
-    conn->debug_disagg_address_cookie_upgrade = address_cookie_upgrade;
+    conn->debug.disagg_address_cookie_upgrade = address_cookie_upgrade;
 
     /* Check whether we are pretending to have an optional field. */
     WT_RET(
       __wt_config_gets(session, cfg, "debug_mode.disagg_address_cookie_optional_field", &cval));
-    conn->debug_disagg_address_cookie_optional_field = cval.val != 0;
+    conn->debug.disagg_address_cookie_optional_field = cval.val != 0;
 
     return (0);
 }

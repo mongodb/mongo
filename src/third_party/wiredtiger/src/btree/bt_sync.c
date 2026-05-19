@@ -356,7 +356,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 internal_bytes += __wt_atomic_load_size_relaxed(&page->memory_footprint);
                 ++internal_pages;
                 /* Slow down checkpoints. */
-                if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_SLOW_CKPT))
+                if (FLD_ISSET(conn->debug.flags, WT_CONN_DEBUG_SLOW_CKPT))
                     __wt_sleep(0, 10 * WT_THOUSAND);
             } else {
                 leaf_bytes += __wt_atomic_load_size_relaxed(&page->memory_footprint);

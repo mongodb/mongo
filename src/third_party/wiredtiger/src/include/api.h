@@ -391,12 +391,12 @@
  * eviction of hot pages. These macros facilitate tracking when that is OK.
  */
 #define CURSOR_REPOSITION_ENTER(c, s)                                      \
-    if (FLD_ISSET(S2C(s)->debug_flags, WT_CONN_DEBUG_CURSOR_REPOSITION) && \
+    if (FLD_ISSET(S2C(s)->debug.flags, WT_CONN_DEBUG_CURSOR_REPOSITION) && \
       (s)->api_call_counter == 1)                                          \
     F_SET((c), WT_CURSTD_EVICT_REPOSITION)
 
 #define CURSOR_REPOSITION_END(c, s)                                        \
-    if (FLD_ISSET(S2C(s)->debug_flags, WT_CONN_DEBUG_CURSOR_REPOSITION) && \
+    if (FLD_ISSET(S2C(s)->debug.flags, WT_CONN_DEBUG_CURSOR_REPOSITION) && \
       (s)->api_call_counter == 1)                                          \
     F_CLR((c), WT_CURSTD_EVICT_REPOSITION)
 

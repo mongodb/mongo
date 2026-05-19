@@ -324,6 +324,6 @@ struct __wt_verbose_multi_category {
  */
 #define WT_CONFIG_DEBUG(session, fmt, ...)                                          \
     do {                                                                            \
-        if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CONFIGURATION))      \
+        if (FLD_ISSET(S2C(session)->debug.flags, WT_CONN_DEBUG_CONFIGURATION))      \
             __wt_verbose_warning(session, WT_VERB_CONFIGURATION, fmt, __VA_ARGS__); \
     } while (0)

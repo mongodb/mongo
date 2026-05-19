@@ -171,6 +171,8 @@ struct __wt_config_parser_impl;
 typedef struct __wt_config_parser_impl WT_CONFIG_PARSER_IMPL;
 struct __wt_conn_capacity;
 typedef struct __wt_conn_capacity WT_CONN_CAPACITY;
+struct __wt_conn_debug;
+typedef struct __wt_conn_debug WT_CONN_DEBUG;
 struct __wt_conn_evict_config;
 typedef struct __wt_conn_evict_config WT_CONN_EVICT_CONFIG;
 struct __wt_conn_extensions;

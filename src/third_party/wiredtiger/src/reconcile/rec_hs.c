@@ -685,7 +685,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
     WT_TIME_WINDOW_INIT(&tw);
     insert_cnt = 0;
     error_on_ts_ordering = F_ISSET(r, WT_REC_CHECKPOINT_RUNNING) ||
-      FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_EVICTION_CKPT_TS_ORDERING);
+      FLD_ISSET(conn->debug.flags, WT_CONN_DEBUG_EVICTION_CKPT_TS_ORDERING);
     cache_hs_insert_full_update = cache_hs_insert_reverse_modify = cache_hs_write_squash = 0;
     cache_hs_key_processed = cache_hs_update_processed = 0;
 

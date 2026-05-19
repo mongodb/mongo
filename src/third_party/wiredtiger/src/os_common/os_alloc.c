@@ -146,7 +146,7 @@ __realloc_func(WT_SESSION_IMPL *session, size_t *bytes_allocated_ret, size_t byt
      * memory, scribble over the old memory then free it.
      */
     tmpp = p;
-    if (session != NULL && FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_REALLOC_MALLOC) &&
+    if (session != NULL && FLD_ISSET(S2C(session)->debug.flags, WT_CONN_DEBUG_REALLOC_MALLOC) &&
       (bytes_allocated_ret != NULL)) {
         if ((p = malloc(bytes_to_allocate)) == NULL)
             WT_RET_MSG(session, __wt_errno(), "memory allocation of %" WT_SIZET_FMT " bytes failed",

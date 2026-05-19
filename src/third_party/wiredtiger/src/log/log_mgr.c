@@ -405,10 +405,10 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
 
     /* Adjust the number of log files to retain based on debugging options. */
 
-    if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_CKPT_RETAIN) && conn->debug_ckpt_cnt != 0)
-        min_lognum = WT_MIN(conn->debug_ckpt[conn->debug_ckpt_cnt - 1].l.file, min_lognum);
+    if (FLD_ISSET(conn->debug.flags, WT_CONN_DEBUG_CKPT_RETAIN) && conn->debug.ckpt_cnt != 0)
+        min_lognum = WT_MIN(conn->debug.ckpt[conn->debug.ckpt_cnt - 1].l.file, min_lognum);
 
-    if (conn->debug_log_cnt != 0) {
+    if (conn->debug.log_cnt != 0) {
         /*
          * If we're performing checkpoints, apply the retain value as a minimum, increasing the
          * number the log files we keep. If not performing checkpoints, it's an absolute number of
@@ -418,12 +418,12 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
          *
          * Check for N+1, that is, we retain N full log files, and one partial.
          */
-        if ((conn->debug_log_cnt + 1) >= log->fileid)
+        if ((conn->debug.log_cnt + 1) >= log->fileid)
             min_lognum = 0;
         else if (WT_IS_INIT_LSN(&log->ckpt_lsn))
-            min_lognum = log->fileid - (conn->debug_log_cnt + 1);
+            min_lognum = log->fileid - (conn->debug.log_cnt + 1);
         else
-            min_lognum = WT_MIN(log->fileid - (conn->debug_log_cnt + 1), min_lognum);
+            min_lognum = WT_MIN(log->fileid - (conn->debug.log_cnt + 1), min_lognum);
     }
 
     __wt_readunlock(session, &conn->log_mgr.debug_log_retention_lock);
@@ -435,7 +435,7 @@ __compute_min_lognum(WT_SESSION_IMPL *session, WTI_LOG *log, uint32_t backup_fil
           " sync file %" PRIu32 " backup_file %" PRIu32 " debug_log count%" PRIu32
           " old min %" PRIu32,
           (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / WT_THOUSAND, min_lognum,
-          log->ckpt_lsn.l.file, log->sync_lsn.l.file, backup_file, conn->debug_log_cnt,
+          log->ckpt_lsn.l.file, log->sync_lsn.l.file, backup_file, conn->debug.log_cnt,
           log->min_fileid));
         log->min_fileid = min_lognum;
     }

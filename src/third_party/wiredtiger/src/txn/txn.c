@@ -1918,7 +1918,7 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
      * turned on.
      */
     if (txn->txn_log.logrec != NULL &&
-      !FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_TABLE_LOGGING))
+      !FLD_ISSET(S2C(session)->debug.flags, WT_CONN_DEBUG_TABLE_LOGGING))
         WT_RET_MSG(session, EINVAL, "a prepared transaction cannot include a logged table");
 
     /* Set the prepare timestamp. */

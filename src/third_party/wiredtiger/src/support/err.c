@@ -629,7 +629,7 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
      */
     if (conn != NULL &&
       (!F_ISSET_ATOMIC_32(conn, WT_CONN_DATA_CORRUPTION) ||
-        FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_CORRUPTION_ABORT)))
+        FLD_ISSET(conn->debug.flags, WT_CONN_DEBUG_CORRUPTION_ABORT)))
         __wt_abort(session);
 #endif
 

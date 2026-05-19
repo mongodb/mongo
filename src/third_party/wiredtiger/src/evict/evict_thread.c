@@ -590,7 +590,7 @@ __evict_update_work(WT_SESSION_IMPL *session, bool *eviction_needed)
     } else
         LF_SET(WT_EVICT_CACHE_NOKEEP);
 
-    if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_UPDATE_RESTORE_EVICT)) {
+    if (FLD_ISSET(conn->debug.flags, WT_CONN_DEBUG_UPDATE_RESTORE_EVICT)) {
         LF_SET(WT_EVICT_CACHE_SCRUB);
         LF_CLR(WT_EVICT_CACHE_NOKEEP);
     }

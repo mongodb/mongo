@@ -227,7 +227,7 @@ __wti_evict_lru_walk(WT_SESSION_IMPL *session)
      * Style note: __wt_qsort is a macro that can leave a dangling else. Full curly braces are
      * needed here for the compiler.
      */
-    if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE)) {
+    if (FLD_ISSET(conn->debug.flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE)) {
         __wt_qsort(queue->evict_queue, entries, sizeof(WTI_EVICT_ENTRY), __evict_lru_cmp_debug);
     } else {
         __wt_qsort(queue->evict_queue, entries, sizeof(WTI_EVICT_ENTRY), __evict_lru_cmp);

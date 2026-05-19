@@ -54,7 +54,7 @@ __wt_txn_log_op_check(WT_SESSION_IMPL *session)
      * out almost all log records, check it first.
      */
     if (!F_ISSET(S2BT(session), WT_BTREE_LOGGED) &&
-      !FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_TABLE_LOGGING))
+      !FLD_ISSET(conn->debug.flags, WT_CONN_DEBUG_TABLE_LOGGING))
         return (false);
 
     /*

@@ -64,9 +64,9 @@ __evict_validate_config(WT_SESSION_IMPL *session, const char *cfg[])
     /* Debug flags are not yet set when this function runs during connection open. Set it now. */
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.configuration", &cval));
     if (cval.val)
-        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_CONFIGURATION);
+        FLD_SET(conn->debug.flags, WT_CONN_DEBUG_CONFIGURATION);
     else
-        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_CONFIGURATION);
+        FLD_CLR(conn->debug.flags, WT_CONN_DEBUG_CONFIGURATION);
 
     WT_RET(__wt_config_gets(session, cfg, "eviction_target", &cval));
     evict->eviction_target = (double)cval.val;

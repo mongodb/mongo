@@ -1173,7 +1173,7 @@ __evict_try_queue_page(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue, WT_REF 
      * being skipped for walks), or we are in eviction debug mode. The goal here is that if trees
      * become completely idle, we eventually push them out of cache completely.
      */
-    if (!FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE) &&
+    if (!FLD_ISSET(conn->debug.flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE) &&
       F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
         if (page == last_parent) {
             WT_STAT_CONN_INCR(session, eviction_server_skip_intl_page_with_active_child);

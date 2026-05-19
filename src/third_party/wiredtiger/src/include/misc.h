@@ -145,7 +145,7 @@
     (((number) * sizeof(**(addr)) <= *(sizep)) ?                                \
         0 :                                                                     \
         __wt_realloc(session, sizep,                                            \
-          (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_REALLOC_EXACT)) ? \
+          (FLD_ISSET(S2C(session)->debug.flags, WT_CONN_DEBUG_REALLOC_EXACT)) ? \
             (number) * sizeof(**(addr)) :                                       \
             WT_MAX(*(sizep)*2, WT_MAX(10, (number)) * sizeof(**(addr))),        \
           addr))

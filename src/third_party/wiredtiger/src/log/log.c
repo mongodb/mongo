@@ -317,10 +317,10 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckpt_lsn)
      * newest LSN into the array.
      */
     __wt_writelock(session, &conn->log_mgr.debug_log_retention_lock);
-    if (conn->debug_ckpt_cnt != 0) {
-        for (i = (int)conn->debug_ckpt_cnt - 1; i > 0; --i)
-            conn->debug_ckpt[i] = conn->debug_ckpt[i - 1];
-        conn->debug_ckpt[0] = *ckpt_lsn;
+    if (conn->debug.ckpt_cnt != 0) {
+        for (i = (int)conn->debug.ckpt_cnt - 1; i > 0; --i)
+            conn->debug.ckpt[i] = conn->debug.ckpt[i - 1];
+        conn->debug.ckpt[0] = *ckpt_lsn;
     }
     __wt_writeunlock(session, &conn->log_mgr.debug_log_retention_lock);
 }
