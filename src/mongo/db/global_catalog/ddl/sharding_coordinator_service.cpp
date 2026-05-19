@@ -49,6 +49,7 @@
 #include "mongo/db/global_catalog/ddl/drop_database_coordinator.h"
 #include "mongo/db/global_catalog/ddl/drop_indexes_coordinator.h"
 #include "mongo/db/global_catalog/ddl/initialize_placement_history_coordinator.h"
+#include "mongo/db/global_catalog/ddl/merge_all_chunks_coordinator.h"
 #include "mongo/db/global_catalog/ddl/merge_chunks_coordinator.h"
 #include "mongo/db/global_catalog/ddl/migration_blocking_operation_coordinator.h"
 #include "mongo/db/global_catalog/ddl/move_primary_coordinator.h"
@@ -135,6 +136,7 @@ constexpr std::pair<CoordinatorTypeEnum,
         {CoordinatorTypeEnum::kTimeseriesUpgradeDowngrade,
          typedInstance<TimeseriesUpgradeDowngradeCoordinator>},
         {CoordinatorTypeEnum::kMergeChunks, typedInstance<MergeChunksCoordinator>},
+        {CoordinatorTypeEnum::kMergeAllChunks, typedInstance<MergeAllChunksCoordinator>},
         {CoordinatorTypeEnum::kSplitChunk, typedInstance<SplitChunkCoordinator>},
         {CoordinatorTypeEnum::kTestCoordinator, noInstance},
     };

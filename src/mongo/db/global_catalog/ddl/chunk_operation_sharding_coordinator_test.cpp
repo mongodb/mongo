@@ -29,6 +29,7 @@
 
 #include "mongo/db/global_catalog/ddl/chunk_operation_sharding_coordinator.h"
 
+#include "mongo/db/global_catalog/ddl/merge_all_chunks_coordinator.h"
 #include "mongo/db/global_catalog/ddl/merge_chunks_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_external_state_for_test.h"
 #include "mongo/db/global_catalog/ddl/split_chunk_coordinator.h"
@@ -119,6 +120,25 @@ protected:
         metadata.setForwardableOpMetadata(forwardableOpMetadata);
         doc.setShardingCoordinatorMetadata(std::move(metadata));
         doc.setShardsvrMergeChunksRequest(req);
+        return doc;
+    }
+
+    MergeAllChunksCoordinatorDocument makeMergeAllChunksCoordinatorDoc(
+        const ShardId& shard,
+        int maxNumberOfChunksToMerge = std::numeric_limits<int>::max(),
+        int maxTimeProcessingChunksMS = std::numeric_limits<int>::max()) {
+        MergeAllChunksCoordinatorDocument doc;
+        ShardsvrMergeAllChunksOnShardRequest req;
+        req.setShard(shard);
+        req.setMaxNumberOfChunksToMerge(maxNumberOfChunksToMerge);
+        req.setMaxTimeProcessingChunksMS(maxTimeProcessingChunksMS);
+        ShardingCoordinatorMetadata metadata{
+            {NamespaceString::createNamespaceString_forTest("test.coll"),
+             CoordinatorTypeEnum::kMergeAllChunks}};
+        ForwardableOperationMetadata forwardableOpMetadata(_opCtx);
+        metadata.setForwardableOpMetadata(forwardableOpMetadata);
+        doc.setShardingCoordinatorMetadata(std::move(metadata));
+        doc.setShardsvrMergeAllChunksOnShardRequest(req);
         return doc;
     }
 
@@ -213,6 +233,21 @@ TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictS
         ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
 }
 
+TEST_F(ChunkOperationShardingCoordinatorTest, MergeAllChunksCheckIfOptionsConflictSameParams) {
+    const ShardId shard{"shard0"};
+    auto coordinatorDoc = makeMergeAllChunksCoordinatorDoc(shard);
+
+    auto coordinator = std::make_shared<MergeAllChunksCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Same parameters — should not throw.
+    ASSERT_DOES_NOT_THROW(coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON()));
+
+    // Satisfy destructor invariants by resolving internal promises.
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
 TEST_F(ChunkOperationShardingCoordinatorTest, SplitChunkCheckIfOptionsConflictSameParams) {
     auto epoch = OID::gen();
     std::vector<BSONObj> splitKeys = {BSON("x" << 50)};
@@ -240,6 +275,25 @@ TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictD
     // Different bounds — should throw.
     std::vector<BSONObj> differentBounds = {BSON("a" << 5), BSON("a" << 20)};
     auto otherDoc = makeMergeChunksCoordinatorDoc(differentBounds, epoch);
+
+    ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, MergeAllChunksCheckIfOptionsConflictDifferentShard) {
+    const ShardId shard{"shard0"};
+    auto coordinatorDoc = makeMergeAllChunksCoordinatorDoc(shard);
+
+    auto coordinator = std::make_shared<MergeAllChunksCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Different shard — should throw.
+    const ShardId differentShard{"shard1"};
+    auto otherDoc = makeMergeAllChunksCoordinatorDoc(differentShard);
 
     ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
                        DBException,
@@ -280,6 +334,25 @@ TEST_F(ChunkOperationShardingCoordinatorTest, MergeChunksCheckIfOptionsConflictD
     // Different epoch — should throw.
     auto differentEpoch = OID::gen();
     auto otherDoc = makeMergeChunksCoordinatorDoc(bounds, differentEpoch);
+
+    ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest,
+       MergeAllChunksCheckIfOptionsConflictDifferentMaxNumberOfChunks) {
+    const ShardId shard{"shard0"};
+    auto coordinatorDoc = makeMergeAllChunksCoordinatorDoc(shard, /*maxNumberOfChunksToMerge=*/100);
+
+    auto coordinator = std::make_shared<MergeAllChunksCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Different maxNumberOfChunksToMerge — should throw.
+    auto otherDoc = makeMergeAllChunksCoordinatorDoc(shard, /*maxNumberOfChunksToMerge=*/50);
 
     ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
                        DBException,

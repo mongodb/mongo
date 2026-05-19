@@ -68,6 +68,7 @@ enums:
             # TODO (SERVER-116499): Remove this coordinator type once 9.0 becomes last LTS.
             kTimeseriesUpgradeDowngrade: "upgradeDowngradeViewlessTimeseries"
             kMergeChunks: "mergeChunks"
+            kMergeAllChunks: "mergeAllChunks"
             kSplitChunk: "splitChunk"
             kTestCoordinator: "testCoordinator"
 

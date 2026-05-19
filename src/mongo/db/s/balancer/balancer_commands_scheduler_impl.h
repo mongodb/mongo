@@ -311,7 +311,9 @@ public:
         : CommandInfo(shardId, nss, boost::none) {}
 
     BSONObj serialise() const override {
-        ShardSvrMergeAllChunksOnShard req(getNameSpace(), getTarget());
+        ShardSvrMergeAllChunksOnShard req(getNameSpace());
+        req.setDbName(DatabaseName::kAdmin);
+        req.setShard(getTarget());
         req.setMaxNumberOfChunksToMerge(AutoMergerPolicy::MAX_NUMBER_OF_CHUNKS_TO_MERGE);
         req.setMaxTimeProcessingChunksMS(autoMergerMaxTimeProcessingChunksMS.load());
         return req.toBSON();

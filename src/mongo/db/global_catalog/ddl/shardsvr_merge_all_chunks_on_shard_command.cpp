@@ -38,9 +38,12 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/ddl/merge_all_chunks_coordinator.h"
 #include "mongo/db/global_catalog/ddl/merge_chunk_request_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -49,12 +52,16 @@
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #include <memory>
 #include <string>
@@ -64,6 +71,72 @@
 
 namespace mongo {
 namespace {
+
+/**
+ * Attempts to execute the merge-all-chunks-on-shard operation through the sharding coordinator
+ * service, retrying while a conflicting coordinator is already running for the same namespace.
+ * Populates `response` and returns true if the merge completed via the coordinator; returns
+ * false if the caller should fall back to the legacy config-server path (because the
+ * authoritative metadata feature flag is disabled). Throws ConflictingOperationInProgress if
+ * the configured retry budget is exhausted.
+ */
+bool tryRunMergeAllChunksCoordinator(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const ShardSvrMergeAllChunksOnShard& req,
+                                     MergeAllChunksOnShardResponse* response) {
+    // If a conflicting merge all chunks coordinator is already running for this namespace,
+    // wait for it to complete and retry.
+    // TODO (SERVER-125033): Remove the retry-loop once this task gets done.
+    const int maxConflictRetries = shardsvrMergeAllChunksMaxConflictRetries.load();
+    Status lastConflictStatus = Status::OK();
+    for (int retries = 0; retries < maxConflictRetries; ++retries) {
+        boost::optional<FixedFCVRegion> optFixedFcvRegion{boost::in_place_init, opCtx};
+
+        if (sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                VersionContext::getDecoration(opCtx),
+                optFixedFcvRegion.get()->acquireFCVSnapshot()) ==
+            AuthoritativeMetadataAccessLevelEnum::kNone) {
+            return false;
+        }
+
+        auto coordinatorDoc = MergeAllChunksCoordinatorDocument();
+        coordinatorDoc.setShardsvrMergeAllChunksOnShardRequest(
+            req.getShardsvrMergeAllChunksOnShardRequest());
+        coordinatorDoc.setShardingCoordinatorMetadata(
+            {{nss, CoordinatorTypeEnum::kMergeAllChunks}});
+
+        // Defer option conflict checking to the explicit checkIfOptionsConflict
+        // call below, allowing the retry loop to handle ConflictingOperationInProgress.
+        auto service = ShardingCoordinatorService::getService(opCtx);
+        auto coordinator =
+            checked_pointer_cast<MergeAllChunksCoordinator>(service->getOrCreateInstance(
+                opCtx, coordinatorDoc.toBSON(), *optFixedFcvRegion, false /*checkOptions*/));
+
+        try {
+            coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON());
+        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
+            LOGV2_DEBUG(12118002,
+                        1,
+                        "Merge all chunks coordinator already running, waiting for completion",
+                        "namespace"_attr = nss,
+                        "error"_attr = ex);
+            lastConflictStatus = ex.toStatus();
+            optFixedFcvRegion.reset();
+            coordinator->getCompletionFuture().getNoThrow(opCtx).ignore();
+            continue;
+        }
+
+        optFixedFcvRegion.reset();
+        *response = coordinator->getResponse(opCtx);
+        return true;
+    }
+
+    uasserted(ErrorCodes::ConflictingOperationInProgress,
+              str::stream() << "Failed to execute merge all chunks for namespace "
+                            << nss.toStringForErrorMsg() << " after " << maxConflictRetries
+                            << " retries due to conflicting operations. Last conflict: "
+                            << lastConflictStatus.reason());
+}
 
 class ShardSvrMergeAllChunksOnShardCommand final
     : public TypedCommand<ShardSvrMergeAllChunksOnShardCommand> {
@@ -102,10 +175,18 @@ public:
                     "invalid namespace specified for request",
                     ns().isValid());
 
+            const auto& nss = ns();
+            const auto& req = request();
+
+            MergeAllChunksOnShardResponse response;
+            if (tryRunMergeAllChunksCoordinator(opCtx, nss, req, &response)) {
+                return response;
+            }
+
             // Because this is a non-authoritative update, we must mark the CSR metadata as
             // kNonAuthoritative so that the following refresh will fetch the metadata from the
             // config server. Leaving it kAuthoritative would short-circuit the refresh against the
-            // durable shard catalog and keep the CSR pinned to the pre-split version.
+            // durable shard catalog and keep the CSR pinned to the pre-mergeAllChunks version.
             // This must be done before starting the operation to ensure the CSR is left as
             // kNonAuthoritative in case of an unexpected failure.
             // TODO (SERVER-125786) The clearFilteringMetadata_nonAuthoritative should go away once
@@ -115,13 +196,14 @@ public:
                 scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
             }
 
-            ConfigSvrCommitMergeAllChunksOnShard configSvrCommitMergeAllChunksOnShard(ns());
+            // Legacy path: forward directly to the config server.
+            ConfigSvrCommitMergeAllChunksOnShard configSvrCommitMergeAllChunksOnShard(nss);
             configSvrCommitMergeAllChunksOnShard.setDbName(DatabaseName::kAdmin);
-            configSvrCommitMergeAllChunksOnShard.setShard(request().getShard());
+            configSvrCommitMergeAllChunksOnShard.setShard(req.getShard());
             configSvrCommitMergeAllChunksOnShard.setMaxNumberOfChunksToMerge(
-                request().getMaxNumberOfChunksToMerge());
+                req.getMaxNumberOfChunksToMerge());
             configSvrCommitMergeAllChunksOnShard.setMaxTimeProcessingChunksMS(
-                request().getMaxTimeProcessingChunksMS());
+                req.getMaxTimeProcessingChunksMS());
             configSvrCommitMergeAllChunksOnShard.setWriteConcern(
                 defaultMajorityWriteConcernDoNotUse());
 
@@ -135,16 +217,16 @@ public:
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swCommandResponse));
 
-            auto response = MergeAllChunksOnShardResponse::parse(
-                swCommandResponse.getValue().response, IDL_PARSER_CONTEXT);
+            auto res = MergeAllChunksOnShardResponse::parse(swCommandResponse.getValue().response,
+                                                            IDL_PARSER_CONTEXT);
 
             // Update the shard catalog filtering metadata to reflect the new shard
             // version produced by the config server merge.
             uassertStatusOK(
                 FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
-                    opCtx, ns(), response.getShardVersion()));
+                    opCtx, ns(), res.getShardVersion()));
 
-            return response;
+            return res;
         }
 
     private:

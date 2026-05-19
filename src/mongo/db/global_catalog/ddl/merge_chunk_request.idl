@@ -65,6 +65,25 @@ structs:
                 type: timestamp
                 optional: true
 
+    ShardsvrMergeAllChunksOnShardRequest:
+        description: "mergeAllChunksOnShard command parameters"
+        strict: false
+        fields:
+            shard:
+                description: "The id of the shard."
+                type: shard_id
+                validator:
+                    callback: "ShardId::validate"
+            maxNumberOfChunksToMerge:
+                description: "The maximum number of chunks to merge."
+                type: int
+                default: 2147483647 # INT_MAX
+            maxTimeProcessingChunksMS:
+                description: >-
+                    "The maximum time in milliseconds spent looking for mergeable chunks."
+                type: int
+                default: 2147483647 # INT_MAX
+
     ConfigSvrMergeResponse:
         description: "Response of the _configsvrCommitChunksMerge command"
         strict: false
@@ -174,21 +193,8 @@ commands:
         type: namespacestring
         api_version: ""
         strict: false
-        fields:
-            shard:
-                description: "The id of the shard."
-                type: shard_id
-                validator:
-                    callback: "ShardId::validate"
-            maxNumberOfChunksToMerge:
-                description: "The maximum number of chunks to merge."
-                type: int
-                default: 2147483647 # INT_MAX
-            maxTimeProcessingChunksMS:
-                description: >-
-                    "The maximum time in milliseconds spent looking for mergeable chunks."
-                type: int
-                default: 2147483647 # INT_MAX
+        chained_structs:
+            ShardsvrMergeAllChunksOnShardRequest: ShardsvrMergeAllChunksOnShardRequest
 
     _configsvrCommitMergeAllChunksOnShard:
         command_name: _configsvrCommitMergeAllChunksOnShard
