@@ -101,6 +101,10 @@ structs:
                 cpp_name: storageIdentifier
                 type: string
                 optional: true
+            lastSpilledRecordId:
+                description: "The record id of the last document that was spilled"
+                type: RecordId
+                optional: true
             numKeys:
                 description: "The number of keys that were that were already sorted and spilled to disk"
                 type: long
