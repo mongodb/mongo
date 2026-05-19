@@ -491,7 +491,6 @@ bool canHoistEnableMatchPushdown(const DocumentSourceMatch& match,
  * ->  FAIL: Cannot split this since 'expr_b' would see the new 'a'.
  */
 bool hoistSingleDocTransformBeforeStage(PipelineRewriteContext& ctx) {
-    dassert(shouldAttemptToHoistTransform(ctx));
     auto& transform =
         checked_cast<const DocumentSourceSingleDocumentTransformation&>(ctx.current());
     dassert(isHoistableTransform(transform));
