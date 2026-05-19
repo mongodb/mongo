@@ -705,29 +705,31 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
             for (auto&& exemptCmd : exemptField.Array()) {
                 if (exemptCmd.type() == BSONType::string &&
                     cmd->hasAlias(exemptCmd.valueStringData())) {
-                    LOGV2(12322200,
-                          "Skipping 'failCommand' failpoint for command exempt via "
-                          "'failCommandsExcept'",
-                          "data"_attr = data,
-                          "threadName"_attr = threadName,
-                          "appName"_attr = appName,
-                          logAttrs(nss),
-                          "isInternalClient"_attr = isInternalThreadOrClient,
-                          "isOnPriorityPort"_attr = isOnPriorityPort,
-                          "command"_attr = cmd->getName());
+                    LOGV2_DEBUG(12322200,
+                                1,
+                                "Skipping 'failCommand' failpoint for command exempt via "
+                                "'failCommandsExcept'",
+                                "data"_attr = data,
+                                "threadName"_attr = threadName,
+                                "appName"_attr = appName,
+                                logAttrs(nss),
+                                "isInternalClient"_attr = isInternalThreadOrClient,
+                                "isOnPriorityPort"_attr = isOnPriorityPort,
+                                "command"_attr = cmd->getName());
                     return false;
                 }
             }
         }
-        LOGV2(6348500,
-              "Activating 'failCommand' failpoint for all commands",
-              "data"_attr = data,
-              "threadName"_attr = threadName,
-              "appName"_attr = appName,
-              logAttrs(nss),
-              "isInternalClient"_attr = isInternalThreadOrClient,
-              "isOnPriorityPort"_attr = isOnPriorityPort,
-              "command"_attr = cmd->getName());
+        LOGV2_DEBUG(6348500,
+                    1,
+                    "Activating 'failCommand' failpoint for all commands",
+                    "data"_attr = data,
+                    "threadName"_attr = threadName,
+                    "appName"_attr = appName,
+                    logAttrs(nss),
+                    "isInternalClient"_attr = isInternalThreadOrClient,
+                    "isOnPriorityPort"_attr = isOnPriorityPort,
+                    "command"_attr = cmd->getName());
         return true;
     }
 
