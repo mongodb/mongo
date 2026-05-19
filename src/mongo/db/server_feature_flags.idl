@@ -172,6 +172,12 @@ feature_flags:
         default: true
         version: 9.0
         fcv_gated: true
+    featureFlagFixedBucketingCatalog:
+        description: >-
+            Enables catalog support for the fixedBucketing timeseries option.
+        cpp_varname: gFeatureFlagFixedBucketingCatalog
+        default: false
+        fcv_gated: true
     featureFlagMongodProxyProtocolSupport:
         description: "Enables non-OCS proxy protocol connections on Mongos and Mongod"
         cpp_varname: gFeatureFlagMongodProxyProtocolSupport
