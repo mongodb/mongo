@@ -364,7 +364,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       }()) {
     invariant(_externalState);
     _metrics->onStateTransition(boost::none, _recipientCtx.getState());
-    _fulfillPromisesOnStepup(recipientDoc.getMetrics());
+    _fulfillPromisesOnStepup(recipientDoc);
 
     if (_changeStreamsMonitorCtx) {
         invariant(_metadata.getPerformVerification());
@@ -508,6 +508,9 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                 std::lock_guard<std::mutex> lk(_mutex);
                 invariant(_recipientCtx.getState() >= RecipientStateEnum::kError);
                 ensureFulfilledPromise(lk, _inStrictConsistencyOrError);
+                if (_recipientCtx.getState() == RecipientStateEnum::kError) {
+                    _promises.setError(lk, resharding::getStatusFromAbortReason(_recipientCtx));
+                }
             }
             return ExecutorFuture<void>(**executor, status);
         });
@@ -755,6 +758,7 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
     if (_dataReplication) {
         _dataReplication->shutdown();
     }
+    _promises.setError(lk, status);
     ensureFulfilledPromise(lk, _completionPromise, status);
 }
 
@@ -849,9 +853,7 @@ void ReshardingRecipientService::RecipientStateMachine::onCoordinatorStateAdvanc
 
 void ReshardingRecipientService::RecipientStateMachine::_onCoordinatorStateAdvanced(
     WithLock lk, CoordinatorStateEnum newState, boost::optional<CloneDetails> cloneDetails) {
-    if (cloneDetails && newState >= CoordinatorStateEnum::kCloning) {
-        ensureFulfilledPromise(lk, _allDonorsPreparedToDonate, std::move(*cloneDetails));
-    }
+    _promises.onCoordinatorStateAdvanced(lk, newState, std::move(cloneDetails));
 
     if (newState == CoordinatorStateEnum::kBlockingWrites) {
         if (_dataReplication) {
@@ -889,7 +891,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         return ExecutorFuture(**executor);
     }
 
-    return future_util::withCancellation(_allDonorsPreparedToDonate.getFuture(),
+    return future_util::withCancellation(_promises.getAllDonorsPreparedToDonateFuture(),
                                          _cancelState.getAbortOrStepdownToken())
         .thenRunOn(**executor)
         .then([this, executor, factory](
@@ -2305,8 +2307,9 @@ void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancell
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_fulfillPromisesOnStepup(
-    boost::optional<mongo::ReshardingRecipientMetrics> metrics) {
+    const ReshardingRecipientDocument& document) {
     std::lock_guard<std::mutex> lk(_mutex);
+    _promises.recover(lk, document);
 
     if (_recipientCtx.getState() >= RecipientStateEnum::kApplying) {
         ensureFulfilledPromise(lk, _inApplyingOrError);
@@ -2330,14 +2333,6 @@ void ReshardingRecipientService::RecipientStateMachine::_fulfillPromisesOnStepup
         return;
     }
 
-    if (metrics && _cloneTimestamp) {
-        ensureFulfilledPromise(lk,
-                               _allDonorsPreparedToDonate,
-                               {*_cloneTimestamp,
-                                *metrics->getApproxDocumentsToCopy(),
-                                *metrics->getApproxBytesToCopy(),
-                                _donorShards});
-    }
     ensureFulfilledPromise(lk, _transitionedToCreateCollection);
 }
 

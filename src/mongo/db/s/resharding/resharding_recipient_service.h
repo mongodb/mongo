@@ -48,6 +48,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_participant_cancel_state.h"
+#include "mongo/db/s/resharding/resharding_recipient_promises.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -126,24 +127,7 @@ private:
 class ReshardingRecipientService::RecipientStateMachine final
     : public repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine> {
 public:
-    struct CloneDetails {
-        Timestamp cloneTimestamp;
-        int64_t approxDocumentsToCopy;
-        int64_t approxBytesToCopy;
-        std::vector<DonorShardFetchTimestamp> donorShards;
-
-        auto lens() const {
-            return std::tie(cloneTimestamp, approxDocumentsToCopy, approxBytesToCopy);
-        }
-
-        friend bool operator==(const CloneDetails& a, const CloneDetails& b) {
-            return a.lens() == b.lens();
-        }
-
-        friend bool operator!=(const CloneDetails& a, const CloneDetails& b) {
-            return a.lens() != b.lens();
-        }
-    };
+    using CloneDetails = ReshardingRecipientPromises::CloneDetails;
 
     explicit RecipientStateMachine(
         const ReshardingRecipientService* recipientService,
@@ -222,10 +206,6 @@ public:
      */
     SharedSemiFuture<int64_t> awaitChangeStreamsMonitorCompletedForTest();
 
-    SharedSemiFuture<CloneDetails> awaitAllDonorsPreparedToDonateForTest() {
-        return _allDonorsPreparedToDonate.getFuture();
-    }
-
     inline const CommonReshardingMetadata& getMetadata() const {
         return _metadata;
     }
@@ -257,7 +237,7 @@ public:
      * Throws PrimaryOnlyServiceInitializing if the recipient is not yet initialized.
      *
      * Promises fulfilled here:
-     *   newState >= kCloning && cloneDetails -> _allDonorsPreparedToDonate (with cloneDetails)
+     *   newState >= kCloning && cloneDetails -> _allDonorsPreparedToDonate (in _promises)
      *   newState >= kBlockingWrites          -> _dataReplication->prepareForCriticalSection()
      *   newState >= kBlockingWrites          -> _coordinatorHasEngagedCriticalSection
      *   newState >= kCommitting              -> _coordinatorHasDecisionPersisted
@@ -447,7 +427,7 @@ private:
     // in the cloner resume data documents. Otherwise, return none.
     boost::optional<CloningMetrics> _tryFetchCloningMetrics(OperationContext* opCtx);
 
-    void _fulfillPromisesOnStepup(boost::optional<mongo::ReshardingRecipientMetrics> metrics);
+    void _fulfillPromisesOnStepup(const ReshardingRecipientDocument&);
 
     /**
      * Creates a new span with the resharding UUID set as an attribute.
@@ -533,10 +513,10 @@ private:
     // It states whether or not the user has aborted the resharding operation.
     boost::optional<bool> _userCanceled;
 
+    ReshardingRecipientPromises _promises;
+
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
-    SharedPromise<CloneDetails> _allDonorsPreparedToDonate;
-
     SharedPromise<void> _inApplyingOrError;
     SharedPromise<void> _inStrictConsistencyOrError;
 

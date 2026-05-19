@@ -220,6 +220,32 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "resharding_recipient_promises",
+    srcs = [
+        "resharding_recipient_promises.cpp",
+    ],
+    hdrs = [
+        "resharding_recipient_promises.h",
+    ],
+    deps = [
+        ":resharding_promise",
+        ":resharding_state_documents",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "resharding_recipient_promises_test",
+    srcs = [
+        "resharding_recipient_promises_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":resharding_recipient_promises",
+    ],
+)
+
+mongo_cc_library(
     name = "resharding_destined_recipient_util",
     srcs = [
         "resharding_destined_recipient_util.cpp",

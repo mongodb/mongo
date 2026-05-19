@@ -3330,39 +3330,6 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringApplying) {
     }
 }
 
-TEST_F(ReshardingRecipientServiceTest,
-       OnCoordinatorStateAdvancedSkipsAllDonorsPreparedWithoutCloneDetails) {
-    auto testOptions = makeBasicTestOptions().front();
-    setupFeatureFlags(testOptions);
-
-    auto doc = makeRecipientDocument(testOptions);
-    auto opCtx = makeOperationContext();
-    if (testOptions.isAlsoDonor) {
-        createSourceCollection(opCtx.get(), doc);
-    }
-    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
-    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
-
-    // Wait until past initialization. Without cloneDetails the call must not fulfill
-    // _allDonorsPreparedToDonate.
-    while (true) {
-        try {
-            recipient->onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
-            break;
-        } catch (const ExceptionFor<ErrorCodes::PrimaryOnlyServiceInitializing>&) {
-            sleepmillis(10);
-        }
-    }
-    ASSERT_FALSE(recipient->awaitAllDonorsPreparedToDonateForTest().isReady());
-
-    // A repeat call must not throw and must not change the state.
-    recipient->onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
-    ASSERT_FALSE(recipient->awaitAllDonorsPreparedToDonateForTest().isReady());
-
-    // Cleanup.
-    stepDown();
-    ASSERT_NOT_OK(recipient->getCompletionFuture().getNoThrow());
-}
 
 TEST_F(ReshardingRecipientServiceTest, StepDownBeforeRunFulfillsCompletionPromise) {
     auto testOptions = makeBasicTestOptions().front();
