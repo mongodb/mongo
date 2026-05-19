@@ -88,7 +88,7 @@ public:
         QueryStats();
 
         /**
-         * If the command is an aggregate, count or distinct command, increment its count.
+         * If the command is a findAndModify, count, or distinct, increment its count.
          */
         void gotCommand(StringData cmdName);
 
@@ -117,9 +117,8 @@ public:
     private:
         double _calculateExponentialMovingAverage(double prevAvg, long long newVal) const;
 
-        // The counts for update, delete and find are already tracked by the OpCounters.
+        // The counts for update, delete, find, and aggregate are already tracked by the OpCounters.
         long long _lastFindAndModifyQueriesCount = 0;
-        long long _lastAggregateQueriesCount = 0;
         long long _lastCountQueriesCount = 0;
         long long _lastDistinctQueriesCount = 0;
 

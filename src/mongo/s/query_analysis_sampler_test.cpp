@@ -646,7 +646,7 @@ protected:
 
     void testAggregates(bool shouldCount) {
         auto& sampler = QueryAnalysisSampler::get(operationContext());
-        sampler.gotCommand("aggregate");
+        _localOpCounters.gotAggregate();
         sampler.refreshQueryStatsForTest();
 
         auto queryStats = sampler.getQueryStatsForTest();
@@ -942,8 +942,8 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
 
     // The per-second counts after: [0, 2, 5].
     _localOpCounters.gotQuery();
+    _localOpCounters.gotAggregate();
     sampler.gotCommand("findandmodify");
-    sampler.gotCommand("aggregate");
     sampler.gotCommand("count");
     sampler.gotCommand("distinct");
     sampler.refreshQueryStatsForTest();

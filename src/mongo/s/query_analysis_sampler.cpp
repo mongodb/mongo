@@ -209,8 +209,6 @@ void QueryAnalysisSampler::onShutdown() {
 void QueryAnalysisSampler::QueryStats::gotCommand(StringData cmdName) {
     if (cmdName == "findAndModify" || cmdName == "findandmodify") {
         _lastFindAndModifyQueriesCount++;
-    } else if (cmdName == "aggregate") {
-        _lastAggregateQueriesCount++;
     } else if (cmdName == "count") {
         _lastCountQueriesCount++;
     } else if (cmdName == "distinct") {
@@ -236,8 +234,8 @@ void QueryAnalysisSampler::QueryStats::refreshTotalCount() {
             return _opCounters->updates->value() +  //
                 _opCounters->deletes->value() +     //
                 _opCounters->queries->value() +     //
+                _opCounters->aggregates->value() +  //
                 _lastFindAndModifyQueriesCount +    //
-                _lastAggregateQueriesCount +        //
                 _lastCountQueriesCount +            //
                 _lastDistinctQueriesCount;
         } else if (thisNodesClusterRole.has(ClusterRole::ShardServer)) {
