@@ -4430,6 +4430,13 @@ SbExpr generateExpressionFieldPath(StageBuilderState& state,
                     return SbExpr{slots.get(fpe)};
                 }
 
+                // Skip the dotted path traversal if the full path is already exposed as a field
+                // slot.
+                auto fullPathField = std::make_pair(PlanStageSlots::kField, fp->fullPath());
+                if (slots.has(fullPathField)) {
+                    return SbExpr{slots.get(fullPathField)};
+                }
+
                 // Obtain a slot for the top-level field referred to by 'expr', if one
                 // exists.
                 auto topLevelField = std::make_pair(PlanStageSlots::kField, fp->front());

@@ -385,6 +385,26 @@ TEST_F(GoldenSbeFilterBuilderTestFixture, TestCompExpr) {
     }
 }
 
+TEST_F(GoldenSbeFilterBuilderTestFixture, InternalExprEqOnDottedPathOverIxscan) {
+    auto abSlotId = _env->registerSlot("aDotB"_sd,
+                                       sbe::value::TypeTags::NumberInt32,
+                                       0 /* val */,
+                                       true /* owned */,
+                                       &_slotIdGenerator);
+    PlanStageSlots slots;
+    slots.set(std::make_pair(PlanStageSlots::kField, "a.b"_sd), SbSlot{abSlotId});
+
+    auto rhs = BSON("" << 0);
+    InternalExprEqMatchExpression eqExpr("a.b"_sd, rhs.firstElement());
+
+    runTest(&eqExpr,
+            boost::none /* rootSlot, as at the IXSCAN level */,
+            true /* isFilterOverIxscan */,
+            true /* expected: slot value 0 == 0 */,
+            "InternalExprEqOnDottedPathOverIxscan"_sd,
+            std::move(slots));
+}
+
 class GoldenSbeFilterBuilderArraynessTestFixture : public GoldenSbeFilterBuilderTestFixture {
 public:
     void setUp() override {

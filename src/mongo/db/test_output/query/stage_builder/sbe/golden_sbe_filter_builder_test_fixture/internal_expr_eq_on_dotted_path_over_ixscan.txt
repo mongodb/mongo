@@ -1,0 +1,3 @@
+# Golden test output of GoldenSbeFilterBuilderTestFixture/InternalExprEqOnDottedPathOverIxscan
+InternalExprEqOnDottedPathOverIxscan
+((isArray(s1) ?: false) || (((s1 <=> 0) == 0) ?: (exists(s1) && typeMatch(s1, -65)))) 
