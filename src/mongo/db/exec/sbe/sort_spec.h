@@ -44,8 +44,6 @@ class SortSpec {
 public:
     using TypeTags = value::TypeTags;
     using Value = value::Value;
-    using ValueGuard = value::ValueGuard;
-
     explicit SortSpec(
         const BSONObj& sortPatternBson,
         const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr /* needed for meta sorts */)
@@ -81,7 +79,7 @@ public:
      * be used.
      */
     value::SortKeyComponentVector* generateSortKeyComponentVector(
-        FastTuple<bool, value::TypeTags, value::Value> obj, const CollatorInterface* collator);
+        value::TagValueMaybeOwned obj, const CollatorInterface* collator);
 
     /**
      * Compare an array of values based on the sort pattern.
@@ -118,6 +116,6 @@ private:
     // caller generates keys using an object that is temporary, it will get stashed here so that it
     // remains alive while the sort keys can be used.
     BSONObj _tempObj;
-    boost::optional<ValueGuard> _tempVal;
+    value::TagValueMaybeOwned _tempVal;
 };
 }  // namespace mongo::sbe

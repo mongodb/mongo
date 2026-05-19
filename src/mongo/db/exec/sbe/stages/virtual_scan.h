@@ -60,7 +60,7 @@ public:
                               bool participateInTrialRunTracking = true,
                               bool owned = true);
 
-    ~VirtualScanStage() final;
+    ~VirtualScanStage() final = default;
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -87,18 +87,19 @@ protected:
 private:
     const value::SlotId _outField;
 
-    value::TypeTags _arrTag;
-    value::Value _arrVal;
-    bool _owned;
+    // Owns the input array if and only if the 'owned' constructor argument was true.
+    value::TagValueMaybeOwned _arr;
 
     std::unique_ptr<value::ViewOfValueAccessor> _outFieldOutputAccessor;
 
-    // Keeps track of an index for the array values, and an index for the next value to release.
+    // _index advances on each getNext(); _releaseIndex trails behind to allow the caller to observe
+    // the current value before we release the previous one (mimicking scan resource management).
+    // Though the TagValueOwned elements in _values would release themselves on destruction anyway,
+    // _releaseIndex drives eager release during getNext()/doSaveState() to expose use-after-free
+    // bugs — the same way a real scan frees records as it advances past them.
     size_t _index{0};
     size_t _releaseIndex{0};
 
-    // Stores the values in std::vector instead of value::Array allows to release memory from values
-    // individually. This also avoid releasing memory twice due to value::Array::~Array().
-    std::vector<std::pair<value::TypeTags, sbe::value::Value>> _values;
+    std::vector<value::TagValueOwned> _values;
 };
 }  // namespace mongo::sbe

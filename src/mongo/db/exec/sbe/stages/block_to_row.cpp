@@ -54,14 +54,6 @@ BlockToRowStage::BlockToRowStage(std::unique_ptr<PlanStage> input,
 }
 
 void BlockToRowStage::freeDeblockedValueRuns() {
-    if (_deblockedOwned) {
-        for (auto& run : _deblockedValueRuns) {
-            for (auto [t, v] : run) {
-                value::releaseValue(t, v);
-            }
-        }
-        _deblockedOwned = false;
-    }
     _deblockedValueRuns.clear();
 }
 
@@ -114,8 +106,7 @@ PlanState BlockToRowStage::getNextFromDeblockedValues() {
     }
 
     for (size_t i = 0; i < _deblockedValueRuns.size(); ++i) {
-        auto [t, v] = _deblockedValueRuns[i][_curIdx];
-        _valsOutAccessors[i].reset(t, v);
+        _valsOutAccessors[i].reset(_deblockedValueRuns[i][_curIdx].view());
     }
 
     ++_curIdx;
@@ -164,14 +155,17 @@ void BlockToRowStage::prepareDeblock() {
                 selectivityVector.empty() || deblocked.count() == selectivityVector.size());
 
         // Apply the selectivity vector here, only taking the values which are included.
-        std::vector<std::pair<value::TypeTags, value::Value>> tvVec;
+        // The deblocked values are non-owning views into the block's buffer, which is held by
+        // the child stage and remains valid until the next child getNext(). doSaveState() copies
+        // them to owned values before a yield can invalidate the buffer.
+        std::vector<value::TagValueMaybeOwned> tvVec;
         tvVec.resize(onesInBitset.get_value_or(deblocked.count()));
 
         {
             size_t idxInTvVec = 0;
             for (size_t i = 0; i < deblocked.count(); ++i) {
                 if (selectivityVector.empty() || selectivityVector[i]) {
-                    tvVec[idxInTvVec++] = std::pair(deblocked[i].tag, deblocked[i].value);
+                    tvVec[idxInTvVec++] = value::TagValueMaybeOwned(deblocked[i]);
                 }
             }
         }
@@ -237,18 +231,15 @@ void BlockToRowStage::doSaveState() {
     // current one to be conservative. Note that copying the current value is not strictly necessary
     // when slotsAccessible() is false, but we do it anyway since it's a negligible fixed cost per
     // save/restore.
-    if (!_deblockedOwned) {
-        for (auto& run : _deblockedValueRuns) {
-            // Copy the values which have not yet been returned, starting at _curIdx.
-            for (size_t i = _curIdx; i < run.size(); ++i) {
-                auto [t, v] = run[i];
-                run[i - _curIdx] = value::copyValue(t, v);
-            }
-            run.resize(run.size() - _curIdx);
+    for (auto& run : _deblockedValueRuns) {
+        // Copy the values which have not yet been returned, starting at _curIdx.
+        for (size_t i = _curIdx; i < run.size(); ++i) {
+            run[i - _curIdx] = std::move(run[i]);
+            run[i - _curIdx].makeOwned();
         }
-        _deblockedOwned = true;
-        _curIdx = 0;
+        run.resize(run.size() - _curIdx);
     }
+    _curIdx = 0;
 }
 
 std::unique_ptr<PlanStageStats> BlockToRowStage::getStats(bool includeDebugInfo) const {

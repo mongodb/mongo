@@ -45,23 +45,19 @@ key_string::Value SortSpec::generateSortKey(const BSONObj& obj, const CollatorIn
 }
 
 value::SortKeyComponentVector* SortSpec::generateSortKeyComponentVector(
-    FastTuple<bool, value::TypeTags, value::Value> obj, const CollatorInterface* collator) {
-    auto [objOwned, objTag, objVal] = obj;
-    ValueGuard guard(objOwned, objTag, objVal);
-
+    value::TagValueMaybeOwned obj, const CollatorInterface* collator) {
     // While this function accepts any type of object, for now we simply convert everything
     // to BSON. In the future, we may change this function to avoid the conversion.
-    auto bsonObj = [&, objTag = objTag, objVal = objVal, objOwned = objOwned]() {
-        if (objTag == value::TypeTags::bsonObject) {
-            if (objOwned) {
-                // Take ownership of the temporary object here.
-                _tempVal.emplace(objTag, objVal);
-                guard.reset();
+    auto bsonObj = [&]() {
+        if (obj.tag() == value::TypeTags::bsonObject) {
+            auto bsonVal = obj.value();
+            if (obj.owned()) {
+                _tempVal = std::move(obj);
             }
-            return BSONObj{value::bitcastTo<const char*>(objVal)};
-        } else if (objTag == value::TypeTags::Object) {
+            return BSONObj{value::bitcastTo<const char*>(bsonVal)};
+        } else if (obj.tag() == value::TypeTags::Object) {
             BSONObjBuilder objBuilder;
-            bson::convertToBsonObj(objBuilder, value::getObjectView(objVal));
+            bson::convertToBsonObj(objBuilder, value::getObjectView(obj.value()));
             _tempObj = objBuilder.obj();
             return _tempObj;
         } else {

@@ -124,13 +124,11 @@ public:
         // Deep-copy slot by slot
         for (size_t i = 0; i < _probeKey.size(); ++i) {
             auto [tag, val] = _probeKey.getViewOfValue(i);
-            auto [newTag, newVal] = value::copyValue(tag, val);
-            _savedProbeKey.reset(i, true, newTag, newVal);
+            _savedProbeKey.reset(i, value::TagValueOwned::fromRaw(value::copyValue(tag, val)));
         }
         for (size_t i = 0; i < _probeProject.size(); ++i) {
             auto [tag, val] = _probeProject.getViewOfValue(i);
-            auto [newTag, newVal] = value::copyValue(tag, val);
-            _savedProbeProject.reset(i, true, newTag, newVal);
+            _savedProbeProject.reset(i, value::TagValueOwned::fromRaw(value::copyValue(tag, val)));
         }
     }
 

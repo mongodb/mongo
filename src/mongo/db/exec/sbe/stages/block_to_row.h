@@ -93,10 +93,9 @@ private:
     const value::SlotVector _valsOutSlotIds;
     const value::SlotId _bitmapSlotId;
 
-    // Values extracted from the blocks. The memory for these values are owned by the blocks in the
-    // '_blocks' member.
-    std::vector<std::vector<std::pair<value::TypeTags, value::Value>>> _deblockedValueRuns;
-    bool _deblockedOwned = false;
+    // Values extracted from the blocks. Initially non-owning views into the block data; after
+    // doSaveState() copies them, each element becomes an owning TagValueMaybeOwned.
+    std::vector<std::vector<value::TagValueMaybeOwned>> _deblockedValueRuns;
 
     std::vector<value::SlotAccessor*> _blockAccessors;
     value::SlotAccessor* _bitmapAccessor = nullptr;

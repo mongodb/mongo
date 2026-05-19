@@ -42,25 +42,12 @@ VirtualScanStage::VirtualScanStage(PlanNodeId planNodeId,
                                    bool owned /*=true*/)
     : PlanStage("virtualscan"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _outField(out),
-      _arrTag(arrTag),
-      _arrVal(arrVal),
-      _owned(owned) {
+      _arr(owned, arrTag, arrVal) {
     tassert(11094700, "expect arr parameter to be an array", value::isArray(arrTag));
 }
 
-VirtualScanStage::~VirtualScanStage() {
-    if (!_owned) {
-        return;
-    }
-    value::releaseValue(_arrTag, _arrVal);
-    for (; _releaseIndex < _values.size(); ++_releaseIndex) {
-        auto [tagElem, valueElem] = _values.at(_releaseIndex);
-        value::releaseValue(tagElem, valueElem);
-    }
-}
-
 std::unique_ptr<PlanStage> VirtualScanStage::clone() const {
-    auto [tag, val] = value::copyValue(_arrTag, _arrVal);
+    auto [tag, val] = value::copyValue(_arr.tag(), _arr.value());
     return std::make_unique<VirtualScanStage>(
         _commonStats.nodeId, _outField, tag, val, _yieldPolicy, participateInTrialRunTracking());
 }
@@ -79,16 +66,12 @@ value::SlotAccessor* VirtualScanStage::getAccessor(sbe::CompileCtx& ctx, sbe::va
 void VirtualScanStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
-    for (; _releaseIndex < _values.size(); ++_releaseIndex) {
-        auto [tagElem, valueElem] = _values.at(_releaseIndex);
-        value::releaseValue(tagElem, valueElem);
-    }
     _values.clear();
 
-    value::ArrayEnumerator enumerator(_arrTag, _arrVal);
+    value::ArrayEnumerator enumerator(_arr.tag(), _arr.value());
     while (!enumerator.atEnd()) {
-        auto [tagElem, valueElem] = enumerator.getViewOfValue();
-        _values.push_back(value::copyValue(tagElem, valueElem));
+        auto view = enumerator.getViewOfValue();
+        _values.emplace_back(value::TagValueOwned::fromRaw(value::copyValue(view.tag, view.value)));
         enumerator.advance();
     }
     _releaseIndex = 0;
@@ -106,8 +89,7 @@ PlanState VirtualScanStage::getNext() {
         return trackPlanState(PlanState::IS_EOF);
     }
 
-    auto [tagElem, valueElem] = _values.at(_index);
-    _outFieldOutputAccessor->reset(tagElem, valueElem);
+    _outFieldOutputAccessor->reset(_values[_index].tag(), _values[_index].value());
     _index++;
 
     // Depends on whether the last call was to getNext() or open()/doSaveState().
@@ -118,8 +100,7 @@ PlanState VirtualScanStage::getNext() {
     // We don't want to release at _index-1, since this is the data we're in the process of
     // returning, but data at any prior index is allowed to be freed.
     if (_releaseIndex == _index - 2) {
-        auto [returnedTagElem, returnedValueElem] = _values.at(_releaseIndex);
-        value::releaseValue(returnedTagElem, returnedValueElem);
+        auto released = std::move(_values.at(_releaseIndex));
         _releaseIndex++;
     }
 
@@ -157,7 +138,7 @@ void VirtualScanStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     DebugPrinter::addIdentifier(ret, _outField);
 
     ret.emplace_back("{`");
-    DebugPrinter::addBlocks(ret, debugPrintValue(_arrTag, _arrVal));
+    DebugPrinter::addBlocks(ret, debugPrintValue(_arr.tag(), _arr.value()));
     ret.emplace_back("`}");
 }
 
@@ -167,8 +148,7 @@ size_t VirtualScanStage::estimateCompileTimeSize() const {
 
 void VirtualScanStage::doSaveState() {
     for (; _releaseIndex < _index; ++_releaseIndex) {
-        auto [tagElem, valueElem] = _values.at(_releaseIndex);
-        value::releaseValue(tagElem, valueElem);
+        auto released = std::move(_values.at(_releaseIndex));
     }
 }
 }  // namespace mongo::sbe
