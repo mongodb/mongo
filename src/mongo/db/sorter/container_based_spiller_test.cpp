@@ -733,7 +733,10 @@ TEST_P(ContainerBasedSpillerTest, Spill) {
         stats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        [&spiller, &spilled] { EXPECT_EQ(spiller.iterators().size(), ++spilled); },
+        {.onSpill =
+             [&spiller, &spilled] {
+                 EXPECT_EQ(spiller.iterators().size(), ++spilled);
+             }},
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
@@ -784,7 +787,10 @@ TEST_P(ContainerBasedSpillerTest, MergeSpills) {
         containerStats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        [&spilled] { ++spilled; },
+        {.onSpill =
+             [&spilled] {
+                 ++spilled;
+             }},
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
@@ -851,7 +857,10 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsMultiplePasses) {
         containerStats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        [&spilled] { ++spilled; },
+        {.onSpill =
+             [&spilled] {
+                 ++spilled;
+             }},
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
@@ -934,14 +943,15 @@ TEST_P(ContainerBasedSpillerTest, MergeSpillsOnSpillSeesCompleteIteratorView) {
         containerStats,
         boost::none,
         sorter::kLatestChecksumVersion,
-        [&spiller, &snapshots]() {
-            std::vector<std::pair<int64_t, int64_t>> snapshot;
-            for (const auto& it : spiller.iterators()) {
-                auto range = it->getRange();
-                snapshot.emplace_back(range.getStart(), range.getEnd());
-            }
-            snapshots.push_back(std::move(snapshot));
-        },
+        {.onSpill =
+             [&spiller, &snapshots]() {
+                 std::vector<std::pair<int64_t, int64_t>> snapshot;
+                 for (const auto& it : spiller.iterators()) {
+                     auto range = it->getRange();
+                     snapshot.emplace_back(range.getStart(), range.getEnd());
+                 }
+                 snapshots.push_back(std::move(snapshot));
+             }},
         batchSize(),
         batchBytes(),
         testSpillingMinAvailableDiskSpaceBytes};
@@ -1033,7 +1043,7 @@ TEST_P(ContainerBasedSpillerTest, SpillDirPathFromIdent) {
             stats,
             ns.dbName(),
             sorter::kLatestChecksumVersion,
-            [] {},
+            ContainerBasedSpiller<IntWrapper, NullValue, IWComparator>::SpillCallbacks{},
             batchSize(),
             batchBytes(),
             testSpillingMinAvailableDiskSpaceBytes};
@@ -1063,7 +1073,7 @@ TEST_P(ContainerBasedSpillerTest, SpillerWithStartingKeyPreservesExistingEntries
             stats,
             boost::none,
             sorter::kLatestChecksumVersion,
-            [] {},
+            ContainerBasedSpiller<IntWrapper, IntWrapper, IWComparator>::SpillCallbacks{},
             batchSize(),
             batchBytes(),
             testSpillingMinAvailableDiskSpaceBytes};
@@ -1364,6 +1374,136 @@ TEST(ContainerIteratorTest, RecoverCursorAfterAbandoningSnapshot) {
     ASSERT_TRUE(iter.more());
     EXPECT_EQ(iter.next(), (std::pair<IntWrapper, IntWrapper>{5, 5}));
     EXPECT_FALSE(iter.more());
+}
+
+class ContainerBasedSpillerCallbackTest : public ServiceContextMongoDTest {
+public:
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+
+protected:
+    using Settings = sorter::Spiller<IntWrapper, NullValue, IWComparator>::Settings;
+    static constexpr int64_t kBatchSize = 4;
+    static constexpr int64_t kBatchBytes = std::numeric_limits<int64_t>::max();
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        _opCtx = makeOperationContext();
+        auto replCoord = dynamic_cast<repl::ReplicationCoordinatorMock*>(
+            repl::ReplicationCoordinator::get(_opCtx.get()));
+        ASSERT(replCoord);
+        replCoord->alwaysAllowWrites(true);
+        _container.setIdent(
+            std::make_shared<Ident>(ident::generateNewInternalIdent("container_spill"_sd)));
+    }
+
+    auto makeContainerBasedSpiller(
+        ContainerBasedSpiller<IntWrapper, NullValue, IWComparator>::SpillCallbacks callbacks = {}) {
+        return ContainerBasedSpiller<IntWrapper, NullValue, IWComparator>{
+            *_opCtx,
+            *shard_role_details::getRecoveryUnit(_opCtx.get()),
+            _container,
+            _containerStats,
+            boost::none,
+            sorter::kLatestChecksumVersion,
+            std::move(callbacks),
+            kBatchSize,
+            kBatchBytes,
+            testSpillingMinAvailableDiskSpaceBytes};
+    }
+
+    ServiceContext::UniqueOperationContext _opCtx;
+    ViewableIntegerKeyedContainer _container;
+    SorterContainerStats _containerStats{nullptr};
+};
+
+TEST_F(ContainerBasedSpillerCallbackTest, SpillCallbacksFireAroundSpillerEntryPoints) {
+    int preCount = 0;
+    int onCount = 0;
+    int postCount = 0;
+    auto spiller = makeContainerBasedSpiller({.preSpill = [&] { ++preCount; },
+                                              .onSpill = [&] { ++onCount; },
+                                              .postSpill =
+                                                  [&] {
+                                                      ++postCount;
+                                                  }});
+
+    std::vector<std::pair<IntWrapper, NullValue>> data{
+        {10, {}}, {20, {}}, {30, {}}, {40, {}}, {50, {}}, {60, {}}};
+    std::span span{data};
+
+    // Each spill() call invokes pre/on/post exactly once around its internal writeConflictRetry.
+    spiller.spill(SortOptions{}, Settings{}, span.subspan(0, 2));
+    EXPECT_EQ(preCount, 1);
+    EXPECT_EQ(onCount, 1);
+    EXPECT_EQ(postCount, 1);
+
+    spiller.spill(SortOptions{}, Settings{}, span.subspan(2, 2));
+    EXPECT_EQ(preCount, 2);
+    EXPECT_EQ(onCount, 2);
+    EXPECT_EQ(postCount, 2);
+
+    // mergeSpills() also wraps its writeConflictRetry calls in a single pre/post pair, with onSpill
+    // firing after writing the merged ranges but before deleting the merged-from ranges.
+    SorterStats sorterStats{nullptr};
+    spiller.mergeSpills(SortOptions{}, Settings{}, sorterStats, IWComparator(ASC), 1, 2);
+    EXPECT_EQ(preCount, 3);
+    EXPECT_EQ(onCount, 3);
+    EXPECT_EQ(postCount, 3);
+}
+
+TEST_F(ContainerBasedSpillerCallbackTest, NoCallbacksLeavesSpillsAsNoOps) {
+    // No callbacks passed: spill() must route through the no-op branch for each.
+    auto spiller = makeContainerBasedSpiller();
+
+    std::vector<std::pair<IntWrapper, NullValue>> data{{10, {}}, {20, {}}};
+    spiller.spill(SortOptions{}, Settings{}, std::span{data});
+}
+
+TEST_F(ContainerBasedSpillerCallbackTest, PostSpillFiresEvenWhenOnSpillThrows) {
+    int preCount = 0;
+    int postCount = 0;
+    // onSpill throws after the writeConflictRetry succeeds, proving the postSpill guard runs even
+    // when the exception propagates out of spill().
+    auto spiller = makeContainerBasedSpiller(
+        {.preSpill = [&] { ++preCount; },
+         .onSpill = [] { uasserted(ErrorCodes::InternalError, "simulated post-spill failure"); },
+         .postSpill =
+             [&] {
+                 ++postCount;
+             }});
+
+    std::vector<std::pair<IntWrapper, NullValue>> data{{10, {}}, {20, {}}};
+    ASSERT_THROWS_CODE(spiller.spill(SortOptions{}, Settings{}, std::span{data}),
+                       DBException,
+                       ErrorCodes::InternalError);
+    EXPECT_EQ(preCount, 1);
+    EXPECT_EQ(postCount, 1);
+}
+
+TEST_F(ContainerBasedSpillerCallbackTest, SpillCallbacksFireAroundSpillWithHeap) {
+    int preCount = 0;
+    int postCount = 0;
+    // spillWithHeap wraps with preSpill/postSpill but does not fire onSpill (matching existing
+    // semantics; onSpill is reserved for spill() and mergeSpills()).
+    auto spiller = makeContainerBasedSpiller({.preSpill = [&] { ++preCount; },
+                                              .postSpill =
+                                                  [&] {
+                                                      ++postCount;
+                                                  }});
+
+    IWComparator comp{ASC};
+    std::priority_queue<std::pair<IntWrapper, NullValue>,
+                        std::vector<std::pair<IntWrapper, NullValue>>,
+                        Greater<IntWrapper, NullValue, IWComparator>>
+        heap{Greater<IntWrapper, NullValue, IWComparator>{&comp}};
+    heap.emplace(IntWrapper{10}, NullValue{});
+    heap.emplace(IntWrapper{20}, NullValue{});
+
+    auto iter = spiller.spillWithHeap(SortOptions{}, Settings{}, heap);
+    ASSERT(iter);
+    EXPECT_EQ(preCount, 1);
+    EXPECT_EQ(postCount, 1);
 }
 
 }  // namespace

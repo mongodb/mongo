@@ -195,9 +195,9 @@ bool shouldRelaxConstraints(OperationContext* opCtx, const CollectionPtr& collec
     return !isPrimary;
 }
 
-using OnSpillFn = sorter::ContainerBasedSpiller<key_string::Value,
-                                                mongo::NullValue,
-                                                BtreeExternalSortComparison>::OnSpillFn;
+using SpillCallbacks = sorter::ContainerBasedSpiller<key_string::Value,
+                                                     mongo::NullValue,
+                                                     BtreeExternalSortComparison>::SpillCallbacks;
 
 std::shared_ptr<sorter::Spiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>>
 makeSpiller(OperationContext* opCtx,
@@ -207,7 +207,7 @@ makeSpiller(OperationContext* opCtx,
             SorterContainerStats& containerStats,
             const DatabaseName& dbName,
             ContainerWriteBehavior containerWriteBehavior,
-            OnSpillFn onSpill = nullptr) {
+            SpillCallbacks callbacks) {
     if (containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
         return stateInfo && stateInfo->getRanges() && !stateInfo->getRanges()->empty()
             ? std::make_shared<sorter::ContainerBasedSpiller<key_string::Value,
@@ -221,7 +221,7 @@ makeSpiller(OperationContext* opCtx,
                   containerStats,
                   dbName,
                   sorter::kLatestChecksumVersion,
-                  std::move(onSpill),
+                  std::move(callbacks),
                   primaryDrivenIndexBuildSorterInsertionBatchSize.load(),
                   primaryDrivenIndexBuildSorterInsertionBatchBytes.load(),
                   static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()))
@@ -234,12 +234,12 @@ makeSpiller(OperationContext* opCtx,
                   containerStats,
                   dbName,
                   sorter::kLatestChecksumVersion,
-                  std::move(onSpill),
+                  std::move(callbacks),
                   primaryDrivenIndexBuildSorterInsertionBatchSize.load(),
                   primaryDrivenIndexBuildSorterInsertionBatchBytes.load(),
                   static_cast<int64_t>(indexBuildSpillingMinAvailableDiskSpaceBytes.load()));
     }
-    invariant(!onSpill);
+    invariant(!callbacks.preSpill && !callbacks.onSpill && !callbacks.postSpill);
 
     using FileBasedSpiller =
         sorter::FileBasedSpiller<key_string::Value, mongo::NullValue, BtreeExternalSortComparison>;
@@ -563,12 +563,30 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             if (auto status = index.real->initializeAsEmpty(); !status.isOK())
                 return status;
 
-            OnSpillFn onSpill;
+            SpillCallbacks spillCallbacks;
             if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
-                onSpill = [this, opCtx] {
-                    if (_isResumable) {
-                        _writeStateToContainer(opCtx);
-                    }
+                spillCallbacks = {
+                    .preSpill =
+                        [this] {
+                            if (!_exec) {
+                                return;
+                            }
+                            _objToIndex = _objToIndex.getOwned();
+                            _exec->saveState();
+                        },
+                    .onSpill =
+                        [this, opCtx] {
+                            if (_isResumable) {
+                                _writeStateToContainer(opCtx);
+                            }
+                        },
+                    .postSpill =
+                        [this] {
+                            if (!_exec) {
+                                return;
+                            }
+                            _exec->restoreState(nullptr);
+                        },
                 };
             }
             index.bulk = index.real->initiateBulk(opCtx,
@@ -581,7 +599,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                                                               index.real->getSorterContainerStats(),
                                                               collection->ns().dbName(),
                                                               _containerWriteBehavior,
-                                                              std::move(onSpill)),
+                                                              std::move(spillCallbacks)),
                                                   eachIndexBuildMaxMemoryUsageBytes,
                                                   stateInfo,
                                                   collection->ns().dbName(),
@@ -788,6 +806,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         _lastRecordIdInserted = boost::none;
         for (auto& index : _indexes) {
             auto indexCatalogEntry = index.block->getEntry(opCtx, collection->getCollectionPtr());
+            // TODO SERVER-119512 PDIB doesn't restart the collection scan, so SpillCallbacks would
+            // be unreachable here even if populated.
             index.bulk = index.real->initiateBulk(
                 opCtx,
                 collection->getCollectionPtr(),
@@ -798,7 +818,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                             index.real->getSorterFileStats(),
                             index.real->getSorterContainerStats(),
                             collection->nss().dbName(),
-                            _containerWriteBehavior),
+                            _containerWriteBehavior,
+                            SpillCallbacks{}),
                 getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
                 /*stateInfo=*/boost::none,
                 collection->nss().dbName(),
@@ -908,8 +929,12 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
         yieldPolicy = PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY;
     }
 
-    auto exec = getCollectionScanExecutor(
+    _exec = getCollectionScanExecutor(
         opCtx, collection, yieldPolicy, CollectionScanDirection::kForward, resumeAfterRecordId);
+    ON_BLOCK_EXIT([this] {
+        _exec.reset();
+        _objToIndex = BSONObj{};
+    });
 
     // The phase will be kCollectionScan when resuming an index build from the collection
     // scan phase.
@@ -918,31 +943,27 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
               idl::serialize(_phase));
     _phase = IndexBuildPhaseEnum::kCollectionScan;
 
-    BSONObj objToIndex;
     // If a key constraint violation is found, it may be suppressed and written to the constraint
     // violations side table. The plan executor must be passed down to save and restore the
     // cursor around the side table write in case any write conflict exception occurs that would
-    // otherwise reposition the cursor unexpectedly.
-    std::function<void()> saveCursorBeforeWrite = [&exec, &objToIndex] {
-        // Update objToIndex so that it continues to point to valid data when the
-        // cursor is closed. A WCE may occur during a write to index A, and
-        // objToIndex must still be used when the write is retried or for a write to
-        // another index (if creating multiple indexes at once)
-        objToIndex = objToIndex.getOwned();
-        exec->saveState();
+    // otherwise reposition the cursor unexpectedly. The spiller's writeConflictRetry path is
+    // handled separately by the SpillCallbacks installed at spiller construction in init().
+    std::function<void()> saveCursorBeforeWrite = [this] {
+        // Own _objToIndex so it stays valid when the cursor is closed; a WCE may occur during a
+        // write to one index and _objToIndex must still be usable for the retry or for writes to
+        // other indexes.
+        _objToIndex = _objToIndex.getOwned();
+        _exec->saveState();
     };
-    std::function<void()> restoreCursorAfterWrite = [&] {
-        exec->restoreState(nullptr);
+    std::function<void()> restoreCursorAfterWrite = [this] {
+        _exec->restoreState(nullptr);
     };
-    // Callback to handle writing to the side table in case an error is suppressed, it is
-    // constructed using the above callbacks to ensure the cursor is well positioned after the
-    // write.
     const auto onSuppressedError = makeOnSuppressedErrorFn(
         collection.getCollectionPtr(), saveCursorBeforeWrite, restoreCursorAfterWrite);
 
     RecordId loc;
     PlanExecutor::ExecState state;
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&objToIndex, &loc)) ||
+    while (PlanExecutor::ADVANCED == (state = _exec->getNext(&_objToIndex, &loc)) ||
            MONGO_unlikely(hangAfterStartingIndexBuild.shouldFail())) {
         opCtx->checkForInterrupt();
 
@@ -968,7 +989,7 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
             _failPointHangDuringBuild(opCtx,
                                       &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion,
                                       "before",
-                                      objToIndex,
+                                      _objToIndex,
                                       progress->get(WithLock::withoutLock())->hits()));
 
         // In case there are constraint violations being suppressed, resulting in a write to the
@@ -980,7 +1001,7 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
         // whether the error is suppressed or an exception is thrown.
         uassertStatusOK(_insert(opCtx,
                                 collection.getCollectionPtr(),
-                                objToIndex,
+                                _objToIndex,
                                 loc,
                                 onSuppressedError,
                                 shouldRelaxConstraints));
@@ -988,7 +1009,7 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
         _failPointHangDuringBuild(opCtx,
                                   &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
                                   "after",
-                                  objToIndex,
+                                  _objToIndex,
                                   progress->get(WithLock::withoutLock())->hits())
             .ignore();
 

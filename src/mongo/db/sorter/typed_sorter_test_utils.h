@@ -301,7 +301,7 @@ private:
                 _containerStats,
                 boost::none,
                 checksumVersion,
-                [] {},
+                typename ContainerBasedSpiller<K2, V2, C2>::SpillCallbacks{},
                 kInsertionBatchSize,
                 std::numeric_limits<int64_t>::max(),
                 testSpillingMinAvailableDiskSpaceBytes),
