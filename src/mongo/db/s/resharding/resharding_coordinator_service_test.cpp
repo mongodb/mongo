@@ -553,6 +553,13 @@ public:
                 ASSERT_EQ(*coordinatorDoc.getApproxDocumentsToCopy(),
                           expectedApproxDocumentsToClone);
 
+                // Under featureFlagReshardingInitNoRefresh the coordinator no longer writes
+                // reshardingFields to the temp collection's config.collections entry, so the
+                // recipient-side copy metrics are not persisted there.
+                if (resharding::gFeatureFlagReshardingInitNoRefresh.isEnabledAndIgnoreFCVUnsafe()) {
+                    return;
+                }
+
                 auto collectionDoc = getTemporaryCollectionCatalogEntry(opCtx, coordinatorDoc);
                 auto recipientFields = collectionDoc.getReshardingFields()->getRecipientFields();
                 ASSERT_EQ(*recipientFields->getApproxBytesToCopy(), expectedApproxBytesToClone);

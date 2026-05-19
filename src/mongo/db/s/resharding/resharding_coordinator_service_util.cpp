@@ -80,6 +80,7 @@
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -271,9 +272,10 @@ void writeToConfigPlacementHistoryForOriginalNss(
     const Timestamp& newCollectionTimestamp,
     const std::vector<ShardId>& reshardedCollectionPlacement,
     TxnNumber txnNumber) {
-    invariant(coordinatorDoc.getState() == CoordinatorStateEnum::kCommitting,
-              "New placement data on the collection being resharded can only be persisted at "
-              "commit time");
+    tassert(12567200,
+            "New placement data on the collection being resharded can only be persisted at "
+            "commit time",
+            coordinatorDoc.getState() == CoordinatorStateEnum::kCommitting);
 
     NamespacePlacementType placementInfo(
         coordinatorDoc.getSourceNss(), newCollectionTimestamp, reshardedCollectionPlacement);
@@ -382,11 +384,14 @@ makeFlushRoutingTableCacheUpdatesOptions(const NamespaceString& nss,
 
 namespace resharding {
 
-BSONObj createReshardingFieldsUpdateForOriginalNss(
-    OperationContext* opCtx,
-    const ReshardingCoordinatorDocument& coordinatorDoc,
-    boost::optional<OID> newCollectionEpoch,
-    boost::optional<Timestamp> newCollectionTimestamp) {
+bool skipReshardingFieldsWritesForCoordinator(const ReshardingCoordinatorDocument& coordinatorDoc) {
+    return resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(
+        resharding::getVersionContextOrDefault(coordinatorDoc.getForwardableOpMetadata()),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+}
+
+BSONObj createLegacyReshardingFieldsUpdate(OperationContext* opCtx,
+                                           const ReshardingCoordinatorDocument& coordinatorDoc) {
     auto nextState = coordinatorDoc.getState();
     switch (nextState) {
         case CoordinatorStateEnum::kInitializing: {
@@ -440,29 +445,11 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             return updateBuilder.obj();
         }
         case CoordinatorStateEnum::kCommitting: {
-            // Update the config.collections entry for the original nss to reflect the new sharded
-            // collection. Set 'uuid' to the reshardingUUID, 'key' to the new shard key,
-            // 'lastmodEpoch' to newCollectionEpoch, and 'timestamp' to newCollectionTimestamp. Also
-            // update the 'state' field and add the 'recipientFields' to the 'reshardingFields'
-            // section.
             auto recipientFields = resharding::constructRecipientFields(coordinatorDoc);
-            BSONObj setFields =
-                BSON("uuid" << coordinatorDoc.getReshardingUUID() << "key"
-                            << coordinatorDoc.getReshardingKey().toBSON() << "lastmodEpoch"
-                            << newCollectionEpoch.value() << "lastmod"
-                            << opCtx->getServiceContext()->getPreciseClockSource()->now()
-                            << "reshardingFields.state" << idl::serialize(coordinatorDoc.getState())
-                            << "reshardingFields.recipientFields" << recipientFields.toBSON());
-            if (newCollectionTimestamp.has_value()) {
-                setFields =
-                    setFields.addFields(BSON("timestamp" << newCollectionTimestamp.value()));
-            }
-            auto provenance = coordinatorDoc.getCommonReshardingMetadata().getProvenance();
-            if (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection) {
-                setFields = setFields.addFields(BSON("unsplittable" << true));
-            }
-
-            return BSON("$set" << setFields);
+            return BSON("$set" << BSON("reshardingFields.state"
+                                       << idl::serialize(coordinatorDoc.getState())
+                                       << "reshardingFields.recipientFields"
+                                       << recipientFields.toBSON()));
         }
         case mongo::CoordinatorStateEnum::kQuiesced:
         case mongo::CoordinatorStateEnum::kDone:
@@ -497,22 +484,38 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             return updateBuilder.obj();
         }
     }
+    MONGO_UNREACHABLE;
 }
 
-void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
-                                           const ReshardingCoordinatorDocument& coordinatorDoc,
-                                           boost::optional<OID> newCollectionEpoch,
-                                           boost::optional<Timestamp> newCollectionTimestamp,
-                                           TxnNumber txnNumber) {
-    auto writeOp = resharding::createReshardingFieldsUpdateForOriginalNss(
-        opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp);
+BSONObj createReshardedCollectionEntryUpdate(OperationContext* opCtx,
+                                             const ReshardingCoordinatorDocument& coordinatorDoc,
+                                             OID newCollectionEpoch,
+                                             boost::optional<Timestamp> newCollectionTimestamp) {
+    invariant(coordinatorDoc.getState() == CoordinatorStateEnum::kCommitting);
+    BSONObj setFields = BSON("uuid" << coordinatorDoc.getReshardingUUID() << "key"
+                                    << coordinatorDoc.getReshardingKey().toBSON() << "lastmodEpoch"
+                                    << newCollectionEpoch << "lastmod"
+                                    << opCtx->getServiceContext()->getPreciseClockSource()->now());
+    if (newCollectionTimestamp.has_value()) {
+        setFields = setFields.addFields(BSON("timestamp" << newCollectionTimestamp.value()));
+    }
+    auto provenance = coordinatorDoc.getCommonReshardingMetadata().getProvenance();
+    if (provenance && provenance.get() == ReshardingProvenanceEnum::kUnshardCollection) {
+        setFields = setFields.addFields(BSON("unsplittable" << true));
+    }
+    return BSON("$set" << setFields);
+}
 
+namespace {
+void issueConfigCollectionsUpdate(OperationContext* opCtx,
+                                  const NamespaceString& sourceNss,
+                                  const BSONObj& update,
+                                  TxnNumber txnNumber) {
     auto request = BatchedCommandRequest::buildUpdateOp(
         NamespaceString::kConfigsvrCollectionsNamespace,
         BSON(CollectionType::kNssFieldName
-             << NamespaceStringUtil::serialize(coordinatorDoc.getSourceNss(),
-                                               SerializationContext::stateDefault())),  // query
-        writeOp,
+             << NamespaceStringUtil::serialize(sourceNss, SerializationContext::stateDefault())),
+        update,
         false,  // upsert
         false   // multi
     );
@@ -521,6 +524,31 @@ void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
         opCtx, NamespaceString::kConfigsvrCollectionsNamespace, request, txnNumber);
 
     assertNumDocsMatchedEqualsExpected(request, res, 1 /* expected */);
+}
+}  // namespace
+
+void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
+                                           const ReshardingCoordinatorDocument& coordinatorDoc,
+                                           boost::optional<OID> newCollectionEpoch,
+                                           boost::optional<Timestamp> newCollectionTimestamp,
+                                           TxnNumber txnNumber) {
+    if (coordinatorDoc.getState() == CoordinatorStateEnum::kCommitting) {
+        invariant(newCollectionEpoch.has_value());
+        issueConfigCollectionsUpdate(
+            opCtx,
+            coordinatorDoc.getSourceNss(),
+            resharding::createReshardedCollectionEntryUpdate(
+                opCtx, coordinatorDoc, *newCollectionEpoch, newCollectionTimestamp),
+            txnNumber);
+    }
+
+    if (!resharding::skipReshardingFieldsWritesForCoordinator(coordinatorDoc)) {
+        issueConfigCollectionsUpdate(
+            opCtx,
+            coordinatorDoc.getSourceNss(),
+            resharding::createLegacyReshardingFieldsUpdate(opCtx, coordinatorDoc),
+            txnNumber);
+    }
 }
 
 /**
@@ -572,21 +600,24 @@ CollectionType createTempReshardingCollectionType(
         collType.setUnsplittable(isUnsplittable.get());
     }
 
-    TypeCollectionReshardingFields tempEntryReshardingFields(coordinatorDoc.getReshardingUUID());
-    tempEntryReshardingFields.setState(coordinatorDoc.getState());
-    tempEntryReshardingFields.setStartTime(coordinatorDoc.getStartTime());
-
     auto provenance = coordinatorDoc.getCommonReshardingMetadata().getProvenance();
-    tempEntryReshardingFields.setProvenance(provenance);
-    tempEntryReshardingFields.setPerformVerification(
-        coordinatorDoc.getCommonReshardingMetadata().getPerformVerification());
-    if (coordinatorDoc.getTelemetryContext()) {
-        tempEntryReshardingFields.setTelemetryContext(*coordinatorDoc.getTelemetryContext());
-    }
 
-    auto recipientFields = constructRecipientFields(coordinatorDoc);
-    tempEntryReshardingFields.setRecipientFields(std::move(recipientFields));
-    collType.setReshardingFields(std::move(tempEntryReshardingFields));
+    if (!skipReshardingFieldsWritesForCoordinator(coordinatorDoc)) {
+        TypeCollectionReshardingFields tempEntryReshardingFields(
+            coordinatorDoc.getReshardingUUID());
+        tempEntryReshardingFields.setState(coordinatorDoc.getState());
+        tempEntryReshardingFields.setStartTime(coordinatorDoc.getStartTime());
+        tempEntryReshardingFields.setProvenance(provenance);
+        tempEntryReshardingFields.setPerformVerification(
+            coordinatorDoc.getCommonReshardingMetadata().getPerformVerification());
+        if (coordinatorDoc.getTelemetryContext()) {
+            tempEntryReshardingFields.setTelemetryContext(*coordinatorDoc.getTelemetryContext());
+        }
+
+        auto recipientFields = constructRecipientFields(coordinatorDoc);
+        tempEntryReshardingFields.setRecipientFields(std::move(recipientFields));
+        collType.setReshardingFields(std::move(tempEntryReshardingFields));
+    }
 
     // Block migrations on the temporary resharding collection until resharding completes.
     // unshardCollection and moveCollection produce unsplittable collections, which are not subject
@@ -1073,41 +1104,45 @@ void assertResultIsValidForUpdatesAndDeletes(const BatchedCommandRequest& reques
     }
 }
 
-void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
-                                        const ReshardingCoordinatorDocument& coordinatorDoc,
-                                        boost::optional<ChunkVersion> chunkVersion,
-                                        boost::optional<const BSONObj&> collation,
-                                        boost::optional<bool> isUnsplittable,
-                                        TxnNumber txnNumber) {
-    auto request = generateBatchedCommandRequestForConfigCollectionsForTempNss(
-        opCtx, coordinatorDoc, chunkVersion, collation, isUnsplittable);
-
-    auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx, NamespaceString::kConfigsvrCollectionsNamespace, request, txnNumber);
-
-    assertResultIsValidForUpdatesAndDeletes(request, res);
-}
-
-BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNss(
+boost::optional<BatchedCommandRequest> createTempCollectionLifecycleRequest(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& coordinatorDoc,
     boost::optional<ChunkVersion> chunkVersion,
     boost::optional<const BSONObj&> collation,
     boost::optional<bool> isUnsplittable) {
-    auto nextState = coordinatorDoc.getState();
-    switch (nextState) {
+    switch (coordinatorDoc.getState()) {
         case CoordinatorStateEnum::kPreparingToDonate: {
-            // Insert new entry for the temporary nss into config.collections
+            // Insert new entry for the temporary nss into config.collections.
             auto collType = resharding::createTempReshardingCollectionType(
                 opCtx, coordinatorDoc, chunkVersion.value(), collation.value(), isUnsplittable);
             return BatchedCommandRequest::buildInsertOp(
                 NamespaceString::kConfigsvrCollectionsNamespace,
                 std::vector<BSONObj>{collType.toBSON()});
         }
+        case CoordinatorStateEnum::kCommitting:
+            // Remove the entry for the temporary nss.
+            return BatchedCommandRequest::buildDeleteOp(
+                NamespaceString::kConfigsvrCollectionsNamespace,
+                BSON(CollectionType::kNssFieldName
+                     << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
+                                                       SerializationContext::stateDefault())),
+                false  // multi
+            );
+        default:
+            return boost::none;
+    }
+}
+
+boost::optional<BatchedCommandRequest> createLegacyTempCollectionReshardingFieldsRequest(
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+    auto nextState = coordinatorDoc.getState();
+    switch (nextState) {
+        case CoordinatorStateEnum::kPreparingToDonate:
+        case CoordinatorStateEnum::kCommitting:
+            return boost::none;
         case CoordinatorStateEnum::kCloning: {
             // Update the 'state', 'donorShards', 'approxCopySize', and 'cloneTimestamp' fields
-            // in the 'reshardingFields.recipient' section
-
+            // in the 'reshardingFields.recipient' section.
             BSONArrayBuilder donorShardsBuilder;
             for (const auto& donor : coordinatorDoc.getDonorShards()) {
                 DonorShardFetchTimestamp donorShardFetchTimestamp(donor.getId());
@@ -1136,15 +1171,6 @@ BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNs
                 false   // multi
             );
         }
-        case CoordinatorStateEnum::kCommitting:
-            // Remove the entry for the temporary nss
-            return BatchedCommandRequest::buildDeleteOp(
-                NamespaceString::kConfigsvrCollectionsNamespace,
-                BSON(CollectionType::kNssFieldName
-                     << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
-                                                       SerializationContext::stateDefault())),
-                false  // multi
-            );
         default: {
             // Update the 'state' field, and 'abortReason' field if it exists, in the
             // 'reshardingFields' section.
@@ -1175,6 +1201,38 @@ BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNs
                 false  // multi
             );
         }
+    }
+}
+
+void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
+                                        const ReshardingCoordinatorDocument& coordinatorDoc,
+                                        boost::optional<ChunkVersion> chunkVersion,
+                                        boost::optional<const BSONObj&> collation,
+                                        boost::optional<bool> isUnsplittable,
+                                        TxnNumber txnNumber) {
+    // The temp-nss write splits into two disjoint shapes: a structural lifecycle write
+    // (insert at kPreparingToDonate, delete at kCommitting) that must always run, and a
+    // legacy 'reshardingFields' partial update for the remaining transient states that is
+    // suppressed under 'featureFlagReshardingInitNoRefresh'. Each helper returns boost::none
+    // for the states it does not handle.
+    auto runRequest = [&](const BatchedCommandRequest& request) {
+        auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+            opCtx, NamespaceString::kConfigsvrCollectionsNamespace, request, txnNumber);
+        assertResultIsValidForUpdatesAndDeletes(request, res);
+    };
+
+    if (auto lifecycleRequest = createTempCollectionLifecycleRequest(
+            opCtx, coordinatorDoc, chunkVersion, collation, isUnsplittable)) {
+        runRequest(*lifecycleRequest);
+    }
+
+    if (skipReshardingFieldsWritesForCoordinator(coordinatorDoc)) {
+        return;
+    }
+
+    if (auto legacyRequest =
+            createLegacyTempCollectionReshardingFieldsRequest(opCtx, coordinatorDoc)) {
+        runRequest(*legacyRequest);
     }
 }
 

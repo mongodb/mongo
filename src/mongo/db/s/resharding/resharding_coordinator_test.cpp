@@ -67,6 +67,7 @@
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/unittest/unittest.h"
@@ -889,6 +890,16 @@ protected:
 
     std::unique_ptr<ReshardingMetrics> _metrics;
 
+    // The assertions in this fixture exercise the legacy contract where the coordinator
+    // writes 'reshardingFields' to both config.collections entries. Both flags are now
+    // default-on, so forcing them off is required to keep these tests covering the legacy
+    // path; the gated-off code paths are covered by ReshardingCoordinatorNoRefreshPersistenceTest
+    // below and by resharding_coordinator_service_util_test.
+    RAIIServerParameterControllerForTest _initNoRefreshFlag{"featureFlagReshardingInitNoRefresh",
+                                                            false};
+    RAIIServerParameterControllerForTest _noRefreshApplyingAndBlockingWritesFlag{
+        "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", false};
+
     const std::vector<ChunkRange> _oldChunkRanges = {
         ChunkRange(_oldShardKey.getKeyPattern().globalMin(), BSON("oldSK" << 12345)),
         ChunkRange(BSON("oldSK" << 12345), _oldShardKey.getKeyPattern().globalMax()),
@@ -1230,6 +1241,176 @@ TEST_F(ReshardingCoordinatorPersistenceTest, SourceCleanupBetweenTransitionsSucc
 
     cleanupSourceCollectionExpectSuccess(
         operationContext(), expectedCoordinatorDoc, updatedChunks, updatedZones);
+}
+
+/**
+ * Mirror of ReshardingCoordinatorPersistenceTest, but with the coordinator's reshardingFields
+ * writes gated off via featureFlagReshardingInitNoRefresh and
+ * featureFlagReshardingNoRefreshApplyingAndBlockingWrites. Verifies that the persistence helpers
+ * leave the on-disk config.collections entries free of reshardingFields across pre-commit
+ * transitions, complementing the BSON-shape coverage in resharding_coordinator_service_util_test.
+ */
+class ReshardingCoordinatorNoRefreshPersistenceTest : public ReshardingCoordinatorPersistenceTest {
+protected:
+    ReshardingCoordinatorNoRefreshPersistenceTest()
+        : _initNoRefreshOn{"featureFlagReshardingInitNoRefresh", true},
+          _noRefreshApplyingAndBlockingWritesOn{
+              "featureFlagReshardingNoRefreshApplyingAndBlockingWrites", true} {}
+
+    BSONObj findOriginalCollectionEntry(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+        return client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
+                              BSON("_id" << _originalNss.ns_forTest()));
+    }
+
+    BSONObj findTempCollectionEntry(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+        return client.findOne(NamespaceString::kConfigsvrCollectionsNamespace,
+                              BSON("_id" << _tempNss.ns_forTest()));
+    }
+
+private:
+    // Re-flip the parent's controllers back on for the test body. Destruction unwinds in
+    // reverse so the parent's off-state is restored cleanly.
+    RAIIServerParameterControllerForTest _initNoRefreshOn;
+    RAIIServerParameterControllerForTest _noRefreshApplyingAndBlockingWritesOn;
+};
+
+TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
+       TempCollectionEntryHasNoReshardingFieldsAfterInitialInsert) {
+    // Setting up the catalog at kPreparingToDonate inserts the temp collection entry via the
+    // production helper createTempReshardingCollectionType. With InitNoRefresh on, that entry
+    // should have no 'reshardingFields' subdocument.
+    insertStateAndCatalogEntries(CoordinatorStateEnum::kPreparingToDonate, _originalEpoch);
+
+    auto tempEntryBSON = findTempCollectionEntry(operationContext());
+    ASSERT(!tempEntryBSON.isEmpty());
+    ASSERT_FALSE(tempEntryBSON.hasField(CollectionType::kReshardingFieldsFieldName))
+        << tempEntryBSON;
+}
+
+TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
+       TempCollectionEntryUntouchedDuringTransientStateTransition) {
+    // Pre-populate at kCloning. Under InitNoRefresh, this seeds an entry without
+    // reshardingFields.
+    auto coordinatorDoc =
+        insertStateAndCatalogEntries(CoordinatorStateEnum::kCloning, _originalEpoch);
+
+    auto initialTempEntry = findTempCollectionEntry(operationContext());
+    ASSERT(!initialTempEntry.isEmpty());
+    ASSERT_FALSE(initialTempEntry.hasField(CollectionType::kReshardingFieldsFieldName))
+        << initialTempEntry;
+
+    // Ensure chunks exist for both namespaces so the placement-version bump in the helper
+    // succeeds.
+    makeAndInsertChunksForDonorShard(
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+    makeAndInsertChunksForRecipientShard(
+        _reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+
+    // Drive a transient transition (kCloning -> kBlockingWrites). Both flags are on, so the
+    // legacy reshardingFields write produced by createLegacyTempCollectionReshardingFieldsRequest
+    // must be skipped (per skipReshardingFieldsWritesForCoordinator) and no partial
+    // reshardingFields subtree may appear on the temp entry.
+    auto expectedCoordinatorDoc = coordinatorDoc;
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kBlockingWrites);
+
+    writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
+        operationContext(), _metrics.get(), expectedCoordinatorDoc, boost::none);
+
+    auto finalTempEntry = findTempCollectionEntry(operationContext());
+    ASSERT(!finalTempEntry.isEmpty());
+    ASSERT_FALSE(finalTempEntry.hasField(CollectionType::kReshardingFieldsFieldName))
+        << finalTempEntry;
+}
+
+TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
+       OriginalCollectionEntryReshardingFieldsAreNotReWrittenDuringTransientStateTransition) {
+    // Pre-populate at kCloning. The fixture's setup inserts an originalNss entry with
+    // reshardingFields hand-built; the gating only affects writes done by the coordinator's
+    // production helpers (updateConfigCollectionsForOriginalNss returns BSONObj() here).
+    auto coordinatorDoc =
+        insertStateAndCatalogEntries(CoordinatorStateEnum::kCloning, _originalEpoch);
+
+    auto initialOriginalEntry = findOriginalCollectionEntry(operationContext());
+    ASSERT(!initialOriginalEntry.isEmpty());
+    auto initialReshardingFields =
+        initialOriginalEntry.getObjectField(CollectionType::kReshardingFieldsFieldName);
+    auto initialState = initialReshardingFields.getStringField("state");
+
+    makeAndInsertChunksForDonorShard(
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+    makeAndInsertChunksForRecipientShard(
+        _reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+
+    auto expectedCoordinatorDoc = coordinatorDoc;
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kBlockingWrites);
+
+    writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
+        operationContext(), _metrics.get(), expectedCoordinatorDoc, boost::none);
+
+    // The reshardingFields.state on the original entry must be unchanged: with the no-refresh
+    // flag on, the coordinator no longer rewrites reshardingFields during transient transitions.
+    auto finalOriginalEntry = findOriginalCollectionEntry(operationContext());
+    ASSERT(!finalOriginalEntry.isEmpty());
+    auto finalReshardingFields =
+        finalOriginalEntry.getObjectField(CollectionType::kReshardingFieldsFieldName);
+    ASSERT_EQ(finalReshardingFields.getStringField("state"), initialState)
+        << "expected reshardingFields.state to be unchanged across transient transition; "
+        << "before=" << initialOriginalEntry << " after=" << finalOriginalEntry;
+}
+
+TEST_F(ReshardingCoordinatorNoRefreshPersistenceTest,
+       TempCollectionEntryStaysFreeOfReshardingFieldsAcrossFullPreCommitLifecycle) {
+    // Walk the coordinator through the full pre-commit lifecycle
+    // (kPreparingToDonate -> kCloning -> kBlockingWrites) and assert at every step that the
+    // temp config.collections entry never grows a 'reshardingFields' subtree. This exercises
+    // both the initial insert path (createTempCollectionLifecycleRequest +
+    // createTempReshardingCollectionType) and the transient update path
+    // (createLegacyTempCollectionReshardingFieldsRequest), gated through
+    // writeToConfigCollectionsForTempNss when the no-refresh flag is on.
+    auto coordinatorDoc =
+        insertStateAndCatalogEntries(CoordinatorStateEnum::kPreparingToDonate, _originalEpoch);
+
+    auto assertTempEntryHasNoReshardingFields = [&](StringData phase) {
+        auto entry = findTempCollectionEntry(operationContext());
+        ASSERT(!entry.isEmpty()) << "phase=" << phase;
+        ASSERT_FALSE(entry.hasField(CollectionType::kReshardingFieldsFieldName))
+            << "phase=" << phase << " entry=" << entry;
+    };
+
+    assertTempEntryHasNoReshardingFields("after kPreparingToDonate insert");
+
+    makeAndInsertChunksForDonorShard(
+        _originalUUID, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+    makeAndInsertChunksForRecipientShard(
+        _reshardingUUID, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+
+    // kPreparingToDonate -> kCloning. kCloning is the path that historically wrote a
+    // partial $set against 'reshardingFields.recipientFields.*'; the gate must skip it.
+    auto cloningDoc = coordinatorDoc;
+    cloningDoc.setState(CoordinatorStateEnum::kCloning);
+    emplaceCloneTimestampIfExists(cloningDoc, Timestamp(1, 1));
+    emplaceApproxBytesToCopyIfExists(cloningDoc, [] {
+        ReshardingApproxCopySize approxCopySize;
+        approxCopySize.setApproxBytesToCopy(0);
+        approxCopySize.setApproxDocumentsToCopy(0);
+        return approxCopySize;
+    }());
+    writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
+        operationContext(), _metrics.get(), cloningDoc, boost::none);
+
+    assertTempEntryHasNoReshardingFields("after kCloning transition");
+
+    // kCloning -> kBlockingWrites. This goes through the 'default' branch of
+    // createLegacyTempCollectionReshardingFieldsRequest, which is upsert: true and would
+    // otherwise create a malformed parent doc; the gate must skip it.
+    auto blockingDoc = cloningDoc;
+    blockingDoc.setState(CoordinatorStateEnum::kBlockingWrites);
+    writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
+        operationContext(), _metrics.get(), blockingDoc, boost::none);
+
+    assertTempEntryHasNoReshardingFields("after kBlockingWrites transition");
 }
 
 }  // namespace

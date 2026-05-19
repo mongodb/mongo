@@ -31,6 +31,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/resharding/local_resharding_operations_registry.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
@@ -55,6 +56,14 @@ namespace resharding_metrics {
 namespace {
 
 boost::optional<UUID> tryGetReshardingUUID(OperationContext* opCtx, const NamespaceString& nss) {
+    // The user CRUD opCtx has no coordinator-pinned VersionContext, so a flag gate here would
+    // race with FCV transitions. Consult the registry (populated by the op observer under the
+    // coordinator's pinned OFCV) first; fall back to the legacy reshardingFields lookup for
+    // pre-registry ops.
+    if (auto op = LocalReshardingOperationsRegistry::get().getOperation(nss)) {
+        return op->metadata.getReshardingUUID();
+    }
+
     // If the metadata is not known (because this is a secondary that stepped up during the critical
     // section), the metrics will not be incremented. The resharding metrics already do not attempt
     // to restore the number of reads/writes done on a previous primary during a critical section,

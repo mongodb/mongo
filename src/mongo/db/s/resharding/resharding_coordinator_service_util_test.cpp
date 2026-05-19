@@ -32,13 +32,19 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/resharding/local_resharding_operations_registry.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/traces/span/span.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/version/releases.h"
+
+#include <array>
 
 #include <gtest/gtest.h>
 
@@ -64,155 +70,163 @@ public:
         return CommonReshardingMetadata(
             reshardingUUID, kSourceNss, UUID::gen(), kTempNss, kShardKey);
     }
+
+    ReshardingCoordinatorDocument makeTempNssTestCoordinatorDoc() {
+        ReshardingCoordinatorDocument coordinatorDoc;
+        auto commonReshardingMetadata = makeMetadata();
+        commonReshardingMetadata.setStartTime(Date_t::now());
+        commonReshardingMetadata.setPerformVerification(true);
+        coordinatorDoc.setCommonReshardingMetadata(std::move(commonReshardingMetadata));
+
+        coordinatorDoc.setApproxBytesToCopy(1024);
+        coordinatorDoc.setApproxDocumentsToCopy(100);
+        coordinatorDoc.setCloneTimestamp(Timestamp(1234, 5678));
+
+        std::vector<DonorShardEntry> donorShards;
+        DonorShardContext donorContext;
+        donorContext.setState(DonorStateEnum::kPreparingToDonate);
+        donorShards.emplace_back(ShardId("donorShard1"), donorContext);
+        donorShards.emplace_back(ShardId("donorShard2"), donorContext);
+        coordinatorDoc.setDonorShards(std::move(donorShards));
+
+        std::vector<RecipientShardEntry> recipientShards;
+        RecipientShardContext recipientContext;
+        recipientContext.setState(RecipientStateEnum::kCloning);
+        recipientShards.emplace_back(ShardId("recipientShard1"), recipientContext);
+        recipientShards.emplace_back(ShardId("recipientShard2"), recipientContext);
+        coordinatorDoc.setRecipientShards(std::move(recipientShards));
+
+        coordinatorDoc.setCollation(BSON("locale" << "simple"));
+        return coordinatorDoc;
+    }
 };
 
+namespace {
+
+constexpr std::array kAllCoordinatorStates = {
+    CoordinatorStateEnum::kUnused,
+    CoordinatorStateEnum::kInitializing,
+    CoordinatorStateEnum::kPreparingToDonate,
+    CoordinatorStateEnum::kCloning,
+    CoordinatorStateEnum::kApplying,
+    CoordinatorStateEnum::kBlockingWrites,
+    CoordinatorStateEnum::kAborting,
+    CoordinatorStateEnum::kCommitting,
+    CoordinatorStateEnum::kQuiesced,
+    CoordinatorStateEnum::kDone,
+};
+}  // namespace
+
 TEST_F(ReshardingCoordinatorServiceUtilTest,
-       GenerateBatchedCommandRequestForConfigCollectionsForTempNss) {
+       CreateTempCollectionLifecycleRequestProducesInsertAtPreparingToDonateAndDeleteAtCommitting) {
     auto opCtx = makeOperationContext();
-    ReshardingCoordinatorDocument coordinatorDoc;
-    auto commonReshardingMetadata = makeMetadata();
-    commonReshardingMetadata.setStartTime(Date_t::now());
-    commonReshardingMetadata.setPerformVerification(true);
+    auto coordinatorDoc = makeTempNssTestCoordinatorDoc();
 
-    coordinatorDoc.setCommonReshardingMetadata(std::move(commonReshardingMetadata));
-
-    // Set additional fields.
-    coordinatorDoc.setApproxBytesToCopy(1024);                // Approximate bytes to copy
-    coordinatorDoc.setApproxDocumentsToCopy(100);             // Approximate documents to copy
-    coordinatorDoc.setCloneTimestamp(Timestamp(1234, 5678));  // Clone timestamp
-
-    // Add donor shards.
-    std::vector<DonorShardEntry> donorShards;
-    DonorShardContext donorContext;
-    donorContext.setState(DonorStateEnum::kPreparingToDonate);
-
-    donorShards.emplace_back(ShardId("donorShard1"), donorContext);
-    donorShards.emplace_back(ShardId("donorShard2"), donorContext);
-    coordinatorDoc.setDonorShards(std::move(donorShards));
-
-    // Add recipient shards.
-    std::vector<RecipientShardEntry> recipientShards;
-    RecipientShardContext recipientContext;
-    recipientContext.setState(RecipientStateEnum::kCloning);
-    recipientShards.emplace_back(ShardId("recipientShard1"), recipientContext);
-    recipientShards.emplace_back(ShardId("recipientShard2"), recipientContext);
-    coordinatorDoc.setRecipientShards(std::move(recipientShards));
-
-    // Set collation.
-    BSONObj collation = BSON("locale" << "simple");
-    coordinatorDoc.setCollation(collation);
-
-    // Initialize additional fields as needed.
     boost::optional<ChunkVersion> chunkVersion =
         ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1));
+    BSONObj collation = BSON("locale" << "simple");
     boost::optional<bool> isUnsplittable = true;
 
-    for (auto& state : {
-             CoordinatorStateEnum::kUnused,
-             CoordinatorStateEnum::kInitializing,
-             CoordinatorStateEnum::kPreparingToDonate,
-             CoordinatorStateEnum::kCloning,
-             CoordinatorStateEnum::kApplying,
-             CoordinatorStateEnum::kBlockingWrites,
-             CoordinatorStateEnum::kAborting,
-             CoordinatorStateEnum::kCommitting,
-             CoordinatorStateEnum::kQuiesced,
-             CoordinatorStateEnum::kDone,
-         }) {
+    for (auto state : kAllCoordinatorStates) {
         coordinatorDoc.setState(state);
-        auto request = generateBatchedCommandRequestForConfigCollectionsForTempNss(
+        auto request = createTempCollectionLifecycleRequest(
             opCtx.get(), coordinatorDoc, chunkVersion, collation, isUnsplittable);
 
         if (state == CoordinatorStateEnum::kPreparingToDonate) {
-            ASSERT_TRUE(request.getBatchType() == BatchedCommandRequest::BatchType_Insert);
+            ASSERT_TRUE(request.has_value()) << "state=" << idl::serialize(state);
+            ASSERT_TRUE(request->getBatchType() == BatchedCommandRequest::BatchType_Insert);
 
-            auto insertDocs = request.getInsertRequest().getDocuments();
+            auto insertDocs = request->getInsertRequest().getDocuments();
             ASSERT_EQ(insertDocs.size(), 1);
 
             auto expectedDoc =
                 resharding::createTempReshardingCollectionType(
                     opCtx.get(), coordinatorDoc, chunkVersion.value(), collation, isUnsplittable)
                     .toBSON();
-
             auto actualDoc = insertDocs[0];
-
-            // Compare specific fields individually.
             ASSERT_BSONELT_EQ(actualDoc["_id"], expectedDoc["_id"]);
             ASSERT_BSONELT_EQ(actualDoc["uuid"], expectedDoc["uuid"]);
             ASSERT_BSONELT_EQ(actualDoc["key"], expectedDoc["key"]);
             ASSERT_BSONELT_EQ(actualDoc["defaultCollation"], expectedDoc["defaultCollation"]);
             ASSERT_BSONELT_EQ(actualDoc["reshardingFields"], expectedDoc["reshardingFields"]);
-        } else if (state == CoordinatorStateEnum::kCloning) {
-            ASSERT_TRUE(request.getBatchType() == BatchedCommandRequest::BatchType_Update);
-
-            BSONObj expectedQuery = BSON(
-                CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
-                    coordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault()));
-            BSONArrayBuilder donorShardsBuilder;
-            for (const auto& donorShard : coordinatorDoc.getDonorShards()) {
-                donorShardsBuilder.append(BSON("shardId" << donorShard.getId()));
-            }
-            BSONArray donorShardsArray = donorShardsBuilder.arr();
-            BSONObj expectedUpdate =
-                BSON("$set" << BSON("reshardingFields.state"
-                                    << idl::serialize(state)
-                                    << "reshardingFields.recipientFields.approxDocumentsToCopy"
-                                    << coordinatorDoc.getApproxDocumentsToCopy().value()
-                                    << "reshardingFields.recipientFields.approxBytesToCopy"
-                                    << coordinatorDoc.getApproxBytesToCopy().value()
-                                    << "reshardingFields.recipientFields.cloneTimestamp"
-                                    << coordinatorDoc.getCloneTimestamp().value()
-                                    << "reshardingFields.recipientFields.donorShards"
-                                    << donorShardsArray));
-
-            ASSERT_EQ(request.getUpdateRequest().getUpdates().size(), 1);
-            auto updateEntry = request.getUpdateRequest().getUpdates()[0].toBSON();
-
-            // The lastmod field has a dynamic value, so remove it for comparison.
-            auto setBSON =
-                updateEntry.getObjectField("u").getObjectField("$set").removeField("lastmod");
-
-            ASSERT_BSONOBJ_EQ(updateEntry.getObjectField("q"), expectedQuery);
-            ASSERT_BSONOBJ_EQ(setBSON, expectedUpdate.getObjectField("$set"));
         } else if (state == CoordinatorStateEnum::kCommitting) {
-            ASSERT_TRUE(request.getBatchType() == BatchedCommandRequest::BatchType_Delete);
+            ASSERT_TRUE(request.has_value()) << "state=" << idl::serialize(state);
+            ASSERT_TRUE(request->getBatchType() == BatchedCommandRequest::BatchType_Delete);
             BSONObj expectedQuery = BSON(
                 CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
                     coordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault()));
             BSONObj expectedDeletes = BSON("q" << expectedQuery << "limit" << 1);
-
             BSONObj expectedBSON =
                 BSON("delete" << NamespaceString::kConfigsvrCollectionsNamespace.coll()
                               << "bypassDocumentValidation" << false << "ordered" << true
                               << "deletes" << BSON_ARRAY(expectedDeletes));
-
-            auto requestBSON = request.toBSON();
-            ASSERT_BSONOBJ_EQ(requestBSON, expectedBSON);
+            ASSERT_BSONOBJ_EQ(request->toBSON(), expectedBSON);
         } else {
-            ASSERT_TRUE(request.getBatchType() == BatchedCommandRequest::BatchType_Update);
-            ASSERT_EQ(request.getUpdateRequest().getUpdates().size(), 1);
-            auto updateEntry = request.getUpdateRequest().getUpdates()[0].toBSON();
+            // Non-lifecycle states are handled by
+            // 'createLegacyTempCollectionReshardingFieldsRequest' and are signaled by boost::none
+            // here.
+            ASSERT_FALSE(request.has_value()) << "state=" << idl::serialize(state);
+        }
+    }
+}
 
-            BSONObj expectedQuery = BSON(
-                CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
-                    coordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault()));
-            ASSERT_BSONOBJ_EQ(updateEntry.getObjectField("q"), expectedQuery);
+TEST_F(ReshardingCoordinatorServiceUtilTest,
+       CreateLegacyTempCollectionReshardingFieldsRequestProducesUpdatesForNonLifecycleStates) {
+    auto opCtx = makeOperationContext();
+    auto coordinatorDoc = makeTempNssTestCoordinatorDoc();
 
-            BSONObjBuilder expectedBSONBuilder;
-            BSONObjBuilder setBuilder(expectedBSONBuilder.subobjStart("$set"));
-            setBuilder.append("reshardingFields.state", idl::serialize(state));
+    for (auto state : kAllCoordinatorStates) {
+        coordinatorDoc.setState(state);
+        auto request =
+            createLegacyTempCollectionReshardingFieldsRequest(opCtx.get(), coordinatorDoc);
 
-            if (state == CoordinatorStateEnum::kAborting && coordinatorDoc.getAbortReason()) {
-                setBuilder.append("reshardingFields.abortReason", *coordinatorDoc.getAbortReason());
-                auto abortStatus = resharding::getStatusFromAbortReason(coordinatorDoc);
-                setBuilder.append("reshardingFields.userCanceled",
-                                  abortStatus == ErrorCodes::ReshardCollectionAborted);
+        if (state == CoordinatorStateEnum::kPreparingToDonate ||
+            state == CoordinatorStateEnum::kCommitting) {
+            // Lifecycle states are handled by 'createTempCollectionLifecycleRequest'.
+            ASSERT_FALSE(request.has_value()) << "state=" << idl::serialize(state);
+            continue;
+        }
+
+        ASSERT_TRUE(request.has_value()) << "state=" << idl::serialize(state);
+        ASSERT_TRUE(request->getBatchType() == BatchedCommandRequest::BatchType_Update);
+        ASSERT_EQ(request->getUpdateRequest().getUpdates().size(), 1);
+        auto updateEntry = request->getUpdateRequest().getUpdates()[0].toBSON();
+
+        BSONObj expectedQuery =
+            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                     coordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault()));
+        ASSERT_BSONOBJ_EQ(updateEntry.getObjectField("q"), expectedQuery);
+
+        // The lastmod field has a dynamic value, so remove it for comparison.
+        auto setBSON =
+            updateEntry.getObjectField("u").getObjectField("$set").removeField("lastmod");
+
+        if (state == CoordinatorStateEnum::kCloning) {
+            BSONArrayBuilder donorShardsBuilder;
+            for (const auto& donorShard : coordinatorDoc.getDonorShards()) {
+                donorShardsBuilder.append(BSON("shardId" << donorShard.getId()));
             }
-            setBuilder.done();
-            BSONObj expectedBSON = expectedBSONBuilder.obj();
-            auto setBSON =
-                updateEntry.getObjectField("u").getObjectField("$set").removeField("lastmod");
-            ASSERT_BSONOBJ_EQ(setBSON, expectedBSON.getObjectField("$set"));
+            BSONObj expectedSet = BSON(
+                "reshardingFields.state"
+                << idl::serialize(state) << "reshardingFields.recipientFields.approxDocumentsToCopy"
+                << coordinatorDoc.getApproxDocumentsToCopy().value()
+                << "reshardingFields.recipientFields.approxBytesToCopy"
+                << coordinatorDoc.getApproxBytesToCopy().value()
+                << "reshardingFields.recipientFields.cloneTimestamp"
+                << coordinatorDoc.getCloneTimestamp().value()
+                << "reshardingFields.recipientFields.donorShards" << donorShardsBuilder.arr());
+            ASSERT_BSONOBJ_EQ(setBSON, expectedSet);
+        } else {
+            BSONObjBuilder expectedSetBuilder;
+            expectedSetBuilder.append("reshardingFields.state", idl::serialize(state));
+            if (state == CoordinatorStateEnum::kAborting && coordinatorDoc.getAbortReason()) {
+                expectedSetBuilder.append("reshardingFields.abortReason",
+                                          *coordinatorDoc.getAbortReason());
+                auto abortStatus = resharding::getStatusFromAbortReason(coordinatorDoc);
+                expectedSetBuilder.append("reshardingFields.userCanceled",
+                                          abortStatus == ErrorCodes::ReshardCollectionAborted);
+            }
+            ASSERT_BSONOBJ_EQ(setBSON, expectedSetBuilder.obj());
         }
     }
 }
@@ -284,7 +298,11 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
 }
 
 TEST_F(ReshardingCoordinatorServiceUtilTest,
-       CreateReshardingFieldsUpdateForOriginalNssAddsTelemetryContext) {
+       CreateLegacyReshardingFieldsUpdateAddsTelemetryContext) {
+    // The reshardingFields persistence path is gated off by featureFlagReshardingInitNoRefresh
+    // (which defaults to true). Disable it to exercise the legacy contract this test verifies.
+    RAIIServerParameterControllerForTest initNoRefresh{"featureFlagReshardingInitNoRefresh", false};
+
     auto opCtx = makeOperationContext();
 
     ReshardingCoordinatorDocument coordinatorDoc;
@@ -301,12 +319,119 @@ TEST_F(ReshardingCoordinatorServiceUtilTest,
     coordinatorDoc.setTelemetryContext(
         otel::traces::TelemetryContextSerializer::toBSON(telemetryContext));
 
-    auto updateBSON = createReshardingFieldsUpdateForOriginalNss(
-        opCtx.get(), coordinatorDoc, OID::gen(), Timestamp(1, 2));
+    auto updateBSON = createLegacyReshardingFieldsUpdate(opCtx.get(), coordinatorDoc);
 
     auto setFields = updateBSON.getObjectField("$set");
     auto reshardingFields = setFields.getObjectField("reshardingFields");
     ASSERT(reshardingFields.hasField("telemetryContext"));
+}
+
+TEST_F(ReshardingCoordinatorServiceUtilTest,
+       SkipReshardingFieldsWritesForCoordinatorRespectsInitNoRefreshFlag) {
+    ReshardingCoordinatorDocument coordinatorDoc;
+    auto metadata = makeMetadata();
+    metadata.setStartTime(Date_t::now());
+    coordinatorDoc.setCommonReshardingMetadata(std::move(metadata));
+    coordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
+
+    ASSERT_TRUE(skipReshardingFieldsWritesForCoordinator(coordinatorDoc));
+
+    {
+        RAIIServerParameterControllerForTest flagScope{"featureFlagReshardingInitNoRefresh", false};
+        ASSERT_FALSE(skipReshardingFieldsWritesForCoordinator(coordinatorDoc));
+    }
+}
+
+TEST_F(
+    ReshardingCoordinatorServiceUtilTest,
+    CreateReshardedCollectionEntryUpdateAlwaysWritesIdentityFieldsRegardlessOfInitNoRefreshFlag) {
+    auto runWithFlag = [&](bool initNoRefreshOn) {
+        RAIIServerParameterControllerForTest flagScope{"featureFlagReshardingInitNoRefresh",
+                                                       initNoRefreshOn};
+
+        auto opCtx = makeOperationContext();
+        ReshardingCoordinatorDocument coordinatorDoc;
+        auto metadata = makeMetadata();
+        metadata.setStartTime(Date_t::now());
+        coordinatorDoc.setCommonReshardingMetadata(std::move(metadata));
+        coordinatorDoc.setState(CoordinatorStateEnum::kCommitting);
+
+        auto updateBSON = createReshardedCollectionEntryUpdate(
+            opCtx.get(), coordinatorDoc, OID::gen(), Timestamp(1, 2));
+        auto setFields = updateBSON.getObjectField("$set");
+        ASSERT(setFields.hasField("uuid"))
+            << "initNoRefreshOn=" << initNoRefreshOn << " update=" << updateBSON;
+        ASSERT(setFields.hasField("key"))
+            << "initNoRefreshOn=" << initNoRefreshOn << " update=" << updateBSON;
+        ASSERT(setFields.hasField("lastmodEpoch"))
+            << "initNoRefreshOn=" << initNoRefreshOn << " update=" << updateBSON;
+        ASSERT(setFields.hasField("timestamp"))
+            << "initNoRefreshOn=" << initNoRefreshOn << " update=" << updateBSON;
+        ASSERT_FALSE(setFields.hasField("reshardingFields.state"))
+            << "initNoRefreshOn=" << initNoRefreshOn << " update=" << updateBSON;
+        ASSERT_FALSE(setFields.hasField("reshardingFields.recipientFields"))
+            << "initNoRefreshOn=" << initNoRefreshOn << " update=" << updateBSON;
+    };
+    runWithFlag(true);
+    runWithFlag(false);
+}
+
+TEST_F(ReshardingCoordinatorServiceUtilTest,
+       CreateTempReshardingCollectionTypeOmitsReshardingFieldsWhenInitNoRefreshFlagOn) {
+    auto opCtx = makeOperationContext();
+    ReshardingCoordinatorDocument coordinatorDoc;
+    auto metadata = makeMetadata();
+    metadata.setStartTime(Date_t::now());
+    coordinatorDoc.setCommonReshardingMetadata(std::move(metadata));
+    coordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
+
+    ChunkVersion chunkVersion{CollectionGeneration{OID::gen(), Timestamp(5, 0)},
+                              CollectionPlacement(10, 1)};
+    BSONObj collation = BSON("locale" << "simple");
+
+    auto collType = createTempReshardingCollectionType(
+        opCtx.get(), coordinatorDoc, chunkVersion, collation, /*isUnsplittable*/ boost::none);
+
+    ASSERT_FALSE(collType.getReshardingFields().has_value());
+}
+
+TEST_F(ReshardingCoordinatorServiceUtilTest,
+       SkipReshardingFieldsWritesForCoordinatorHonorsPinnedLastLTSVersionContext) {
+    ReshardingCoordinatorDocument coordinatorDoc;
+    auto metadata = makeMetadata();
+    metadata.setStartTime(Date_t::now());
+
+    ForwardableOperationMetadata fom;
+    // (Generic FCV reference): pin the operation to last-LTS so the InitNoRefresh feature flag,
+    // which is gated on the latest FCV, evaluates to false and the legacy write path is
+    // selected -- regardless of the global flag value.
+    fom.setVersionContext(
+        VersionContext{ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS}});
+    metadata.setForwardableOpMetadata(std::move(fom));
+    coordinatorDoc.setCommonReshardingMetadata(std::move(metadata));
+    coordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
+
+    ASSERT_FALSE(skipReshardingFieldsWritesForCoordinator(coordinatorDoc));
+}
+
+TEST_F(ReshardingCoordinatorServiceUtilTest,
+       SkipReshardingFieldsWritesForCoordinatorHonorsGlobalFlagDisableShortCircuit) {
+    RAIIServerParameterControllerForTest flagScope{"featureFlagReshardingInitNoRefresh", false};
+
+    ReshardingCoordinatorDocument coordinatorDoc;
+    auto metadata = makeMetadata();
+    metadata.setStartTime(Date_t::now());
+
+    ForwardableOperationMetadata fom;
+    // (Generic FCV reference): pin the operation to latest so the InitNoRefresh flag would
+    // normally be on; the test then forces the global flag off to verify the short-circuit.
+    fom.setVersionContext(
+        VersionContext{ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLatest}});
+    metadata.setForwardableOpMetadata(std::move(fom));
+    coordinatorDoc.setCommonReshardingMetadata(std::move(metadata));
+    coordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
+
+    ASSERT_FALSE(skipReshardingFieldsWritesForCoordinator(coordinatorDoc));
 }
 
 TEST_F(ReshardingCoordinatorServiceUtilTest, RegistryPathThrowsWhenReshardingUUIDNotFound) {
@@ -329,7 +454,7 @@ TEST_F(ReshardingCoordinatorServiceUtilTest, RegistryPathReturnsReshardingUUID) 
 
 /**
  * Parameterized fixture exercising the per-provenance behavior of
- * createReshardingFieldsUpdateForOriginalNss and createTempReshardingCollectionType.
+ * createLegacyReshardingFieldsUpdate and createTempReshardingCollectionType.
  */
 class ReshardingCoordinatorServiceUtilProvenanceTest
     : public ReshardingCoordinatorServiceUtilTest,
@@ -371,7 +496,7 @@ TEST_P(ReshardingCoordinatorServiceUtilProvenanceTest,
     auto doc = makeCoordinatorDocWithProvenance(CoordinatorStateEnum::kCommitting);
 
     auto update =
-        createReshardingFieldsUpdateForOriginalNss(opCtx.get(), doc, OID::gen(), Timestamp(1, 2));
+        createReshardedCollectionEntryUpdate(opCtx.get(), doc, OID::gen(), Timestamp(1, 2));
     auto setFields = update.getObjectField("$set");
 
     if (isUnshardCollection(GetParam())) {
@@ -402,14 +527,17 @@ TEST_P(ReshardingCoordinatorServiceUtilProvenanceTest,
     auto opCtx = makeOperationContext();
     auto doc = makeCoordinatorDocWithProvenance(CoordinatorStateEnum::kInitializing);
 
-    auto update =
-        createReshardingFieldsUpdateForOriginalNss(opCtx.get(), doc, boost::none, boost::none);
+    auto update = createLegacyReshardingFieldsUpdate(opCtx.get(), doc);
 
     auto reshardingFields = update.getObjectField("$set").getObjectField("reshardingFields");
     ASSERT_EQ(reshardingFields.getStringField("provenance"), idl::serialize(GetParam()));
 }
 
 TEST_P(ReshardingCoordinatorServiceUtilProvenanceTest, TempCollectionTypeCopiesProvenance) {
+    // The temp-collection reshardingFields subtree is gated off by
+    // featureFlagReshardingInitNoRefresh (which defaults to true).
+    RAIIServerParameterControllerForTest initNoRefresh{"featureFlagReshardingInitNoRefresh", false};
+
     auto opCtx = makeOperationContext();
     auto doc = makeCoordinatorDocWithProvenance(CoordinatorStateEnum::kPreparingToDonate);
     ChunkVersion chunkVersion(CollectionGeneration{OID::gen(), Timestamp(5, 0)},

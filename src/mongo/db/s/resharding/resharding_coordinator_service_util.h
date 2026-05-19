@@ -158,18 +158,65 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                                         boost::optional<bool> isUnsplittable,
                                         TxnNumber txnNumber);
 
-BatchedCommandRequest generateBatchedCommandRequestForConfigCollectionsForTempNss(
+/**
+ * Builds the structurally-required lifecycle write to config.collections for the temporary
+ * resharding namespace: an insert at kPreparingToDonate (which materializes the temp entry)
+ * and a delete at kCommitting (which removes it).
+ *
+ * Returns boost::none for any other state.
+ */
+boost::optional<BatchedCommandRequest> createTempCollectionLifecycleRequest(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& coordinatorDoc,
     boost::optional<ChunkVersion> chunkVersion,
     boost::optional<const BSONObj&> collation,
     boost::optional<bool> isUnsplittable);
 
-BSONObj createReshardingFieldsUpdateForOriginalNss(
-    OperationContext* opCtx,
-    const ReshardingCoordinatorDocument& coordinatorDoc,
-    boost::optional<OID> newCollectionEpoch,
-    boost::optional<Timestamp> newCollectionTimestamp);
+/**
+ * Builds the legacy 'reshardingFields' partial-update write to the temp-nss config.collections
+ * entry for transient states (kCloning and the catch-all default branch covering kApplying,
+ * kBlockingWrites, kAborting, kQuiesced, and kDone). Callers must first consult
+ * 'skipReshardingFieldsWritesForCoordinator' to decide whether the legacy path applies.
+ *
+ * Returns boost::none for kPreparingToDonate and kCommitting, which are handled by
+ * 'createTempCollectionLifecycleRequest'.
+ */
+boost::optional<BatchedCommandRequest> createLegacyTempCollectionReshardingFieldsRequest(
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
+
+/**
+ * Returns true when the coordinator should skip writing the 'reshardingFields' subtree to
+ * config.collections. Under 'featureFlagReshardingInitNoRefresh' participants are initialized
+ * via explicit shardsvr commands instead of the refresh-driven path, so the subtree is unused;
+ * writing it via partial $set would produce a parent missing IDL-required fields.
+ *
+ * Uses the VersionContext pinned on the coordinator doc so the decision is stable across FCV
+ * transitions for the operation's lifetime. Callers should consult this predicate before
+ * invoking 'createLegacyReshardingFieldsUpdate' for the original nss, or before populating
+ * 'reshardingFields' on a temp-nss CollectionType via 'createTempReshardingCollectionType'.
+ */
+bool skipReshardingFieldsWritesForCoordinator(const ReshardingCoordinatorDocument& coordinatorDoc);
+
+/**
+ * Builds the legacy 'reshardingFields' update for the original-nss config.collections entry,
+ * shaped per the coordinator's current state. The function does not gate itself; callers are
+ * expected to first check 'skipReshardingFieldsWritesForCoordinator' to decide whether the
+ * legacy path applies.
+ */
+BSONObj createLegacyReshardingFieldsUpdate(OperationContext* opCtx,
+                                           const ReshardingCoordinatorDocument& coordinatorDoc);
+
+/**
+ * Builds the collection-identity swap for the original-nss config.collections entry during
+ * kCommitting: sets 'uuid', 'key', 'lastmodEpoch', 'lastmod', and (when provided) 'timestamp', plus
+ * 'unsplittable: true' for unshardCollection provenance. This runs unconditionally at commit and
+ * is what flips config.collections.<sourceNss> from the pre-resharding identity to the resharded
+ * one.
+ */
+BSONObj createReshardedCollectionEntryUpdate(OperationContext* opCtx,
+                                             const ReshardingCoordinatorDocument& coordinatorDoc,
+                                             OID newCollectionEpoch,
+                                             boost::optional<Timestamp> newCollectionTimestamp);
 
 boost::optional<UUID> tryRetrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns);
 
