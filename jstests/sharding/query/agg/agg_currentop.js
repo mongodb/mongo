@@ -18,6 +18,8 @@
  *   uses_prepare_transaction,
  *   uses_transactions,
  *   requires_fcv_81,
+ *   # TODO SERVER-123918: remove the multiversion incompatible tag.
+ *   multiversion_incompatible,
  * ]
  */
 
