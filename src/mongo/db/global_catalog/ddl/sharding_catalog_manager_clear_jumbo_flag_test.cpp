@@ -34,11 +34,13 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/unittest/unittest.h"
@@ -167,6 +169,58 @@ TEST_F(ClearJumboFlagTest, AssertsIfChunkCantBeFound) {
     };
 
     test(_nss2, Timestamp(42));
+}
+
+// Demonstrates that the balancer (which reads through the configsvr's
+// RoutingInformationCache) observes a cleared jumbo flag even though clearJumboFlag does not bump
+// the chunk's placement version. The mechanism is the in-memory ChunkInfo mutation performed by
+// clearJumboFlag: an incremental cache refresh would otherwise not pick up the change because the
+// loader filters chunks by {lastmod: {$gte: sinceVersion}}.
+TEST_F(ClearJumboFlagTest, BalancerObservesClearedJumboFlagViaRoutingCache) {
+    const auto collTimestamp = Timestamp(42);
+    const auto collUuid = UUID::gen();
+    const auto collEpoch = OID::gen();
+    makeCollection(_nss2, collUuid, collEpoch, collTimestamp);
+
+    // Reads jumbo for the chunk whose min == jumboChunk().getMin() through the same path the
+    // balancer takes (RoutingInformationCache::getCollectionPlacementInfoWithRefresh).
+    const auto isJumboInRoutingCache = [&]() {
+        auto cm =
+            uassertStatusOK(RoutingInformationCache::get(operationContext())
+                                ->getCollectionPlacementInfoWithRefresh(operationContext(), _nss2));
+        ASSERT_TRUE(cm.isSharded());
+
+        bool found = false;
+        bool jumbo = false;
+        cm.forEachChunk([&](const auto& chunk) {
+            if (chunk.getMin().woCompare(jumboChunk().getMin()) == 0) {
+                found = true;
+                jumbo = chunk.isJumbo();
+                return false;
+            }
+            return true;
+        });
+        ASSERT_TRUE(found);
+        return jumbo;
+    };
+
+    // Prime the routing cache: the chunk is jumbo on disk, so the cached ChunkInfo must reflect
+    // that.
+    ASSERT_TRUE(isJumboInRoutingCache());
+
+    ShardingCatalogManager::get(operationContext())
+        ->clearJumboFlag(operationContext(), _nss2, collEpoch, jumboChunk());
+
+    // The persisted chunk's placement version is unchanged: any observation of the cleared flag
+    // through the routing cache must come from the in-memory mutation, not from a version-driven
+    // incremental refresh.
+    auto chunkDoc = uassertStatusOK(
+        getChunkDoc(operationContext(), collUuid, jumboChunk().getMin(), collEpoch, collTimestamp));
+    ASSERT_FALSE(chunkDoc.getJumbo());
+    ASSERT_EQ(ChunkVersion({collEpoch, collTimestamp}, {12, 7}), chunkDoc.getVersion());
+
+    // The balancer's next read sees the cleared flag.
+    ASSERT_FALSE(isJumboInRoutingCache());
 }
 
 }  // namespace
