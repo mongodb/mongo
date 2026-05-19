@@ -111,7 +111,7 @@ function bazel_test_results::print_executor_logs() {
     fi
 
     local -r sorted_log_files=$(echo "${log_files}" | while IFS= read -r log_file; do
-        local shard_num=$(echo "${log_file}" | grep -oP 'shard_\K\d+(?=/)')
+        local shard_num=$(echo "${log_file}" | sed -n 's|.*shard_\([0-9][0-9]*\)/.*|\1|p')
         echo "${shard_num} ${log_file}"
     done | sort -n | cut -d' ' -f2-)
 
@@ -149,7 +149,7 @@ function bazel_test_results::display_test_summary() {
 
     IFS=$'\n' sorted_indices=($(
         for i in "${sorted_indices[@]}"; do
-            local shard_num=$(echo "${_names[$i]}" | grep -oP 'shard_\K\d+$')
+            local shard_num=$(echo "${_names[$i]}" | sed -n 's|.*shard_\([0-9][0-9]*\)$|\1|p')
             echo "${shard_num} ${i}"
         done | sort -n | cut -d' ' -f2
     ))

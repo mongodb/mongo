@@ -4,7 +4,12 @@ set -o errexit
 set -o verbose
 
 # Extract version from .bazelrc.target_mongo_version (e.g., "common --define=MONGO_VERSION=8.2.2")
-version="r$(grep -oP '(?<=MONGO_VERSION=)[^\s]+' .bazelrc.target_mongo_version)"
+target_mongo_version=$(awk -F'MONGO_VERSION=' '/MONGO_VERSION=/ { split($2, version, /[[:space:]]/); print version[1]; exit }' .bazelrc.target_mongo_version)
+if [[ -z "${target_mongo_version}" ]]; then
+    echo "Unable to extract MONGO_VERSION from .bazelrc.target_mongo_version" >&2
+    exit 1
+fi
+version="r${target_mongo_version}"
 
 # For commit builds, append the last 8 characters of the git revision to the version string.
 if [[ "${requester:-}" == "commit" ]]; then

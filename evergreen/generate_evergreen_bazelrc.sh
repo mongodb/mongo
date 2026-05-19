@@ -36,7 +36,12 @@ else
 fi
 
 if [[ "${requester}" == "commit" ]]; then
-    echo "common --define MONGO_VERSION=$(grep -oP 'MONGO_VERSION=\K.*' .bazelrc.target_mongo_version)-${GIT_REV: -8}" >>.bazelrc.git
+    mongo_version=$(awk -F'MONGO_VERSION=' '/MONGO_VERSION=/ { split($2, version, /[[:space:]]/); print version[1]; exit }' .bazelrc.target_mongo_version)
+    if [[ -z "${mongo_version}" ]]; then
+        echo "Unable to extract MONGO_VERSION from .bazelrc.target_mongo_version" >&2
+        exit 1
+    fi
+    echo "common --define MONGO_VERSION=${mongo_version}-${GIT_REV: -8}" >>.bazelrc.git
 fi
 
 if [[ "${evergreen_remote_exec}" != "on" ]]; then
