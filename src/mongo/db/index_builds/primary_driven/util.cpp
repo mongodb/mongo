@@ -54,6 +54,45 @@ namespace {
 
 auto _registry = ServiceContext::declareDecoration<Registry>();
 
+std::vector<std::string> getIndexBuildIdents(const std::vector<IndexBuildInfo>& indexes,
+                                             const boost::optional<std::string>& indexBuildIdent) {
+    std::vector<std::string> idents;
+    for (auto& index : indexes) {
+        if (index.sorterIdent) {
+            idents.push_back(*index.sorterIdent);
+        }
+        if (index.sideWritesIdent) {
+            idents.push_back(*index.sideWritesIdent);
+        }
+        if (index.skippedRecordsIdent) {
+            idents.push_back(*index.skippedRecordsIdent);
+        }
+        if (index.constraintViolationsIdent) {
+            idents.push_back(*index.constraintViolationsIdent);
+        }
+    }
+    if (indexBuildIdent) {
+        idents.push_back(*indexBuildIdent);
+    }
+    return idents;
+}
+
+void dropIdentsAndDeregisterOnCommit(OperationContext* opCtx,
+                                     const UUID& buildUUID,
+                                     std::vector<std::string> idents) {
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [buildUUID, idents = std::move(idents)](OperationContext* opCtx,
+                                                boost::optional<Timestamp> commitTs) {
+            invariant(commitTs && !commitTs->isNull());
+            auto dropTime = StorageEngine::DropTime{StorageEngine::StableTimestamp{*commitTs}};
+            auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            for (auto& ident : idents) {
+                storageEngine->addDropPendingIdent(dropTime, std::make_shared<Ident>(ident));
+            }
+            _registry(opCtx->getServiceContext()).remove(buildUUID);
+        });
+}
+
 std::vector<boost::optional<BSONObj>> multikeyPathsToObjs(
     const std::vector<IndexBuildInfo>& indexes,
     const std::vector<boost::optional<MultikeyPaths>>& multikeyPaths) {
@@ -163,20 +202,11 @@ Status commit(OperationContext* opCtx,
     WriteUnitOfWork wuow{opCtx};
     auto writableColl = writer.getWritableCollection(opCtx);
 
-    auto commitTs = shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp();
-    StorageEngine::DropTime dropTime = !commitTs.isNull()
-        ? StorageEngine::DropTime{StorageEngine::StableTimestamp{commitTs}}
-        : StorageEngine::DropTime{StorageEngine::Immediate{}};
-
     for (size_t i = 0; i < indexes.size(); ++i) {
         auto&& index = indexes[i];
 
         auto entry = writableColl->getIndexCatalog()->getWritableEntryByName(
             opCtx, index.getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
-
-        IndexBuildInterceptor interceptor{
-            opCtx, index, LazyRecordStore::CreateMode::openExisting, entry->descriptor()->unique()};
-        interceptor.dropTemporaryTables(opCtx, dropTime);
 
         writableColl->indexBuildSuccess(opCtx, entry);
         if (multikey[i]) {
@@ -221,11 +251,8 @@ Status commit(OperationContext* opCtx,
         }
     }
 
-    if (indexBuildIdent) {
-        opCtx->getServiceContext()->getStorageEngine()->addDropPendingIdent(
-            dropTime, std::make_shared<Ident>(*indexBuildIdent));
-    }
-
+    dropIdentsAndDeregisterOnCommit(
+        opCtx, buildUUID, getIndexBuildIdents(indexes, indexBuildIdent));
     opCtx->getServiceContext()->getOpObserver()->onCommitIndexBuild(
         opCtx,
         coll.nss(),
@@ -234,11 +261,6 @@ Status commit(OperationContext* opCtx,
         indexes,
         multikeyPathsToObjs(indexes, multikey),
         /*fromMigrate=*/false);
-    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [buildUUID](OperationContext* opCtx, boost::optional<Timestamp>) {
-            _registry(opCtx->getServiceContext()).remove(buildUUID);
-        });
-
     wuow.commit();
     return Status::OK();
 }
@@ -259,18 +281,9 @@ Status abort(OperationContext* opCtx,
     WriteUnitOfWork wuow{opCtx};
     auto writableColl = writer.getWritableCollection(opCtx);
 
-    auto commitTs = shard_role_details::getRecoveryUnit(opCtx)->getCommitTimestamp();
-    StorageEngine::DropTime dropTime = !commitTs.isNull()
-        ? StorageEngine::DropTime{StorageEngine::StableTimestamp{commitTs}}
-        : StorageEngine::DropTime{StorageEngine::Immediate{}};
-
     for (auto&& index : indexes) {
         auto entry = writableColl->getIndexCatalog()->getWritableEntryByName(
             opCtx, index.getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
-
-        IndexBuildInterceptor interceptor{
-            opCtx, index, LazyRecordStore::CreateMode::openExisting, entry->descriptor()->unique()};
-        interceptor.dropTemporaryTables(opCtx, dropTime);
 
         auto status = writableColl->getIndexCatalog()->dropIndexEntry(opCtx, writableColl, entry);
         if (!status.isOK()) {
@@ -285,11 +298,8 @@ Status abort(OperationContext* opCtx,
                               ErrorCodes::IndexBuildAborted);
     }
 
-    if (indexBuildIdent) {
-        opCtx->getServiceContext()->getStorageEngine()->addDropPendingIdent(
-            dropTime, std::make_shared<Ident>(*indexBuildIdent));
-    }
-
+    dropIdentsAndDeregisterOnCommit(
+        opCtx, buildUUID, getIndexBuildIdents(indexes, indexBuildIdent));
     opCtx->getServiceContext()->getOpObserver()->onAbortIndexBuild(opCtx,
                                                                    coll.nss(),
                                                                    collectionUUID,
@@ -297,11 +307,6 @@ Status abort(OperationContext* opCtx,
                                                                    indexes,
                                                                    cause,
                                                                    /*fromMigrate=*/false);
-    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [buildUUID](OperationContext* opCtx, boost::optional<Timestamp>) {
-            _registry(opCtx->getServiceContext()).remove(buildUUID);
-        });
-
     wuow.commit();
     return Status::OK();
 }

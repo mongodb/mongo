@@ -36,7 +36,6 @@
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
@@ -110,6 +109,9 @@ public:
                             const std::vector<boost::optional<BSONObj>>& multikey,
                             bool fromMigrate,
                             bool isTimeseries) override {
+        if (throwOnCommit) {
+            uasserted(ErrorCodes::InterruptedDueToReplStateChange, "simulated stepdown");
+        }
         lastCommitArgs = CommitArgs{.ns = ns,
                                     .collUUID = collUUID,
                                     .buildUUID = buildUUID,
@@ -127,6 +129,9 @@ public:
                            const Status& cause,
                            bool fromMigrate,
                            bool isTimeseries) override {
+        if (throwOnAbort) {
+            uasserted(ErrorCodes::InterruptedDueToReplStateChange, "simulated stepdown");
+        }
         lastAbortArgs = AbortArgs{.ns = ns,
                                   .collUUID = collUUID,
                                   .buildUUID = buildUUID,
@@ -135,6 +140,9 @@ public:
                                   .fromMigrate = fromMigrate,
                                   .isTimeseries = isTimeseries};
     }
+
+    bool throwOnAbort = false;
+    bool throwOnCommit = false;
 
     boost::optional<StartArgs> lastStartArgs;
     boost::optional<CommitArgs> lastCommitArgs;
@@ -260,23 +268,21 @@ TEST_F(UtilTest, Commit) {
     const auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
     ASSERT_OK(
         start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
+    const Timestamp commitTs(1, 0);
+    shard_role_details::getRecoveryUnit(operationContext())->setCommitTimestamp(commitTs);
     ASSERT_OK(commit(
         operationContext(), ns.dbName(), collUUID, buildUUID, indexes, multikey, indexBuildIdent));
 
+    const Timestamp dropTs(commitTs.getSecs() + 1, 0);
     for (auto&& index : indexes) {
         auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
-        ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(), index.indexIdent));
-        ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(), *index.sorterIdent));
-        ASSERT_OK(
-            engine.immediatelyCompletePendingDrop(operationContext(), *index.sideWritesIdent));
-        ASSERT_OK(
-            engine.immediatelyCompletePendingDrop(operationContext(), *index.skippedRecordsIdent));
-        ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(),
-                                                        *index.constraintViolationsIdent));
+        engine.dropIdentTimestamped(operationContext(), *index.sorterIdent, dropTs);
+        engine.dropIdentTimestamped(operationContext(), *index.sideWritesIdent, dropTs);
+        engine.dropIdentTimestamped(operationContext(), *index.skippedRecordsIdent, dropTs);
+        engine.dropIdentTimestamped(operationContext(), *index.constraintViolationsIdent, dropTs);
     }
-    ASSERT_OK(
-        operationContext()->getServiceContext()->getStorageEngine()->immediatelyCompletePendingDrop(
-            operationContext(), indexBuildIdent));
+    operationContext()->getServiceContext()->getStorageEngine()->dropIdentTimestamped(
+        operationContext(), indexBuildIdent, dropTs);
 
     auto coll = acquireCollectionMaybeLockFree(
         operationContext(),
@@ -339,23 +345,22 @@ TEST_F(UtilTest, Abort) {
     const auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
     ASSERT_OK(
         start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
+    const Timestamp commitTs(1, 0);
+    shard_role_details::getRecoveryUnit(operationContext())->setCommitTimestamp(commitTs);
     ASSERT_OK(abort(
         operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause));
 
+    const Timestamp dropTs(commitTs.getSecs() + 1, 0);
     for (auto&& index : indexes) {
         auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
-        ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(), index.indexIdent));
-        ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(), *index.sorterIdent));
-        ASSERT_OK(
-            engine.immediatelyCompletePendingDrop(operationContext(), *index.sideWritesIdent));
-        ASSERT_OK(
-            engine.immediatelyCompletePendingDrop(operationContext(), *index.skippedRecordsIdent));
-        ASSERT_OK(engine.immediatelyCompletePendingDrop(operationContext(),
-                                                        *index.constraintViolationsIdent));
+        engine.dropIdentTimestamped(operationContext(), index.indexIdent, dropTs);
+        engine.dropIdentTimestamped(operationContext(), *index.sorterIdent, dropTs);
+        engine.dropIdentTimestamped(operationContext(), *index.sideWritesIdent, dropTs);
+        engine.dropIdentTimestamped(operationContext(), *index.skippedRecordsIdent, dropTs);
+        engine.dropIdentTimestamped(operationContext(), *index.constraintViolationsIdent, dropTs);
     }
-    ASSERT_OK(
-        operationContext()->getServiceContext()->getStorageEngine()->immediatelyCompletePendingDrop(
-            operationContext(), indexBuildIdent));
+    operationContext()->getServiceContext()->getStorageEngine()->dropIdentTimestamped(
+        operationContext(), indexBuildIdent, dropTs);
 
     auto coll = acquireCollectionMaybeLockFree(
         operationContext(),
@@ -400,16 +405,9 @@ TEST_F(UtilTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
         start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
 
     const Timestamp commitTs(200, 0);
-    {
-        TimestampBlock tsBlock(operationContext(), commitTs);
-        ASSERT_OK(commit(operationContext(),
-                         ns.dbName(),
-                         collUUID,
-                         buildUUID,
-                         indexes,
-                         multikey,
-                         indexBuildIdent));
-    }
+    shard_role_details::getRecoveryUnit(operationContext())->setCommitTimestamp(commitTs);
+    ASSERT_OK(commit(
+        operationContext(), ns.dbName(), collUUID, buildUUID, indexes, multikey, indexBuildIdent));
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     for (auto&& index : indexes) {
@@ -435,11 +433,9 @@ TEST_F(UtilTest, AbortUsesCommitTimestampForTemporaryTableDrops) {
         start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
 
     const Timestamp commitTs(300, 0);
-    {
-        TimestampBlock tsBlock(operationContext(), commitTs);
-        ASSERT_OK(abort(
-            operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause));
-    }
+    shard_role_details::getRecoveryUnit(operationContext())->setCommitTimestamp(commitTs);
+    ASSERT_OK(abort(
+        operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause));
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     for (auto&& index : indexes) {
@@ -453,23 +449,63 @@ TEST_F(UtilTest, AbortUsesCommitTimestampForTemporaryTableDrops) {
     }
 }
 
-TEST_F(UtilTest, AbortWithNoCommitTimestampDropsImmediately) {
+
+TEST_F(UtilTest, AbortWUOWRollbackAllowsRetry) {
     auto buildUUID = UUID::gen();
     auto indexes = makeIndexes({"a"});
     auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
-    Status cause{ErrorCodes::Error{11130403}, "abort"};
+    const Status cause{ErrorCodes::Error{11130404}, "abort"};
 
     ASSERT_OK(
         start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
+
+    // Throw from the OpObserver to roll back the WUoW after dropIdentsAndDeregisterOnCommit
+    // has registered its onCommit handler but before wuow.commit().
+    opObserver().throwOnAbort = true;
+    ASSERT_THROWS_CODE(
+        abort(
+            operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause),
+        DBException,
+        ErrorCodes::InterruptedDueToReplStateChange);
+    opObserver().throwOnAbort = false;
+
+    ASSERT_FALSE(registry(getServiceContext()).all().empty());
+    EXPECT_EQ(getServiceContext()->getStorageEngine()->getNumDropPendingIdents(), 0U);
+    // No mangled state.
+    shard_role_details::getRecoveryUnit(operationContext())->setCommitTimestamp(Timestamp(1, 0));
     ASSERT_OK(abort(
         operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent, cause));
+}
 
-    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
-    for (auto&& index : indexes) {
-        // Without a commit timestamp, the drop is registered as Immediate.
-        ASSERT_OK(
-            engine.immediatelyCompletePendingDrop(operationContext(), *index.sideWritesIdent));
-    }
+TEST_F(UtilTest, CommitWUOWRollbackAllowsRetry) {
+    auto buildUUID = UUID::gen();
+    auto indexes = makeIndexes({"a"});
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    std::vector<boost::optional<MultikeyPaths>> multikey(indexes.size());
+
+    ASSERT_OK(
+        start(operationContext(), ns.dbName(), collUUID, buildUUID, indexes, indexBuildIdent));
+
+    // Throw from the OpObserver to roll back the WUoW after dropIdentsAndDeregisterOnCommit
+    // has registered its onCommit handler but before wuow.commit().
+    opObserver().throwOnCommit = true;
+    ASSERT_THROWS_CODE(commit(operationContext(),
+                              ns.dbName(),
+                              collUUID,
+                              buildUUID,
+                              indexes,
+                              multikey,
+                              indexBuildIdent),
+                       DBException,
+                       ErrorCodes::InterruptedDueToReplStateChange);
+    opObserver().throwOnCommit = false;
+
+    ASSERT_FALSE(registry(getServiceContext()).all().empty());
+    EXPECT_EQ(getServiceContext()->getStorageEngine()->getNumDropPendingIdents(), 0U);
+    // No mangled state.
+    shard_role_details::getRecoveryUnit(operationContext())->setCommitTimestamp(Timestamp(1, 0));
+    ASSERT_OK(commit(
+        operationContext(), ns.dbName(), collUUID, buildUUID, indexes, multikey, indexBuildIdent));
 }
 
 TEST_F(UtilTest, ResumeInfoRequiresValidIdent) {
