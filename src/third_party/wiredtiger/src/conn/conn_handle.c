@@ -20,10 +20,13 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
 
     session = conn->default_session;
 
-    TAILQ_INIT(&conn->dhqh);   /* Data handle list */
-    TAILQ_INIT(&conn->dlhqh);  /* Library list */
-    TAILQ_INIT(&conn->dsrcqh); /* Data source list */
-    TAILQ_INIT(&conn->fhqh);   /* File list */
+    TAILQ_INIT(&conn->dhqh);                                     /* Data handle list */
+    TAILQ_INIT(&conn->dlhqh);                                    /* Library list */
+    TAILQ_INIT(&conn->dsrcqh);                                   /* Data source list */
+    TAILQ_INIT(&conn->fhqh);                                     /* File list */
+    TAILQ_INIT(&conn->disaggregated_storage.shared_metadata_qh); /* Shared metadata list */
+
+    /* Prefetch. */
     WT_RET(__wti_conn_prefetch_init(session));
 
     /* Tiered storage. */
@@ -34,9 +37,6 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
 
     /* Extension interface lists. */
     WT_RET(__wti_conn_ext_init(session));
-
-    /* Disaggregated storage. */
-    TAILQ_INIT(&conn->disaggregated_storage.shared_metadata_qh);
 
     /* Random numbers. */
     __wt_session_rng_init_once(session);
@@ -62,8 +62,10 @@ __wti_connection_init(WT_CONNECTION_IMPL *conn)
     /* Read-write locks */
     WT_RET(__wt_rwlock_init(session, &conn->log_mgr.debug_log_retention_lock));
     WT_RWLOCK_INIT_SESSION_TRACKED(session, &conn->dhandle_lock, dhandle);
-    WT_RET(__wt_rwlock_init(session, &conn->hot_backup_lock));
     WT_RWLOCK_INIT_TRACKED(session, &conn->table_lock, table);
+
+    /* Hot backup subsystem. */
+    WT_RET(__wti_conn_backup_init(session));
 
     /* Initialize the generation manager. */
     __wt_gen_init(session);
@@ -114,7 +116,7 @@ __wti_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_rwlock_destroy(session, &conn->log_mgr.debug_log_retention_lock);
     __wt_rwlock_destroy(session, &conn->dhandle_lock);
     __wt_spin_destroy(session, &conn->fh_lock);
-    __wt_rwlock_destroy(session, &conn->hot_backup_lock);
+    __wti_conn_backup_destroy(session);
     __wt_spin_destroy(session, &conn->metadata_lock);
     __wt_spin_destroy(session, &conn->reconfig_lock);
     __wt_spin_destroy(session, &conn->schema_lock);

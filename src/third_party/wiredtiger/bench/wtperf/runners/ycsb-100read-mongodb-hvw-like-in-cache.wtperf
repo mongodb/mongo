@@ -1,0 +1,26 @@
+# FIXME WT-17498: Consider bringing the wtperf YCSB logic closer to MongoDB's YCSB HVW implementation.
+#
+# This configuration is intended to imitate MongoDB high-value workloads (HVW) YCSB variants.
+# This is the in-cache variant: the dataset (~6 GB) fits entirely within the cache (16 GB),
+# so all data is served from memory.
+#
+# This configuration is intended to be executed on a system with at least 32 GB of RAM and 16 CPUs.
+# Because of that, cache_size is set to 16 GB, since this is typically the WiredTiger cache size for
+# a 32 GB RAM system (50%).
+# This is also the reason for having 6M entries, which are expected to generate approximately 6.4 GB
+# of on-disk data, so the entire dataset fits comfortably within the cache.
+# The total number of user threads is also set to 16 to avoid oversubscription.
+
+conn_config="cache_size=16G,log=(enabled=true)"
+pareto=20
+scramble=true
+table_config="type=file"
+key_sz=100
+value_sz=1024
+icount=6000000
+run_time=1800
+threads=((count=16,reads=1))
+warmup=120
+sample_interval=5
+populate_threads=8
+report_interval=5

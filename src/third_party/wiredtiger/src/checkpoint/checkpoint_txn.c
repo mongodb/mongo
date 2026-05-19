@@ -932,10 +932,11 @@ __checkpoint_update_disagg_database_size(WT_SESSION_IMPL *session, uint64_t drop
  *     Compute the drop size from the shared metadata queue, then process the queue.
  */
 static int
-__checkpoint_process_disagg_metadata(WT_SESSION_IMPL *session, uint64_t *drop_sizep)
+__checkpoint_process_disagg_metadata(
+  WT_SESSION_IMPL *session, wt_timestamp_t schema_epoch, uint64_t *drop_sizep)
 {
-    WT_RET(__wt_disagg_shared_metadata_queue_drop_size(session, drop_sizep));
-    WT_RET(__wt_disagg_shared_metadata_queue_process(session));
+    WT_RET(__wt_disagg_shared_metadata_queue_drop_size(session, schema_epoch, drop_sizep));
+    WT_RET(__wt_disagg_shared_metadata_queue_process(session, schema_epoch));
     return (0);
 }
 
@@ -1736,8 +1737,9 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      * adjust the overall database size after the checkpoint completes.
      */
     if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
-        WT_WITH_SCHEMA_LOCK(
-          session, ret = __checkpoint_process_disagg_metadata(session, &drop_size));
+        WT_WITH_SCHEMA_LOCK(session,
+          ret =
+            __checkpoint_process_disagg_metadata(session, ckpt_disagg_schema_epoch, &drop_size));
         WT_ERR_MSG_CHK(session, ret,
           "Disaggregated storage checkpoint failed while processing shared metadata queue");
     }
@@ -2263,8 +2265,8 @@ __checkpoint_lock_dirty_tree_int(WT_SESSION_IMPL *session, bool is_checkpoint, b
          * been created before the backup started. Fail if trying to delete any other named
          * checkpoint.
          */
-        if (__wt_atomic_load_uint64_relaxed(&conn->hot_backup_start) != 0 &&
-          ckpt->sec <= __wt_atomic_load_uint64_relaxed(&conn->hot_backup_start)) {
+        if (__wt_atomic_load_uint64_relaxed(&conn->backup.start) != 0 &&
+          ckpt->sec <= __wt_atomic_load_uint64_relaxed(&conn->backup.start)) {
             if (is_wt_ckpt) {
                 F_CLR(ckpt, WT_CKPT_DELETE);
                 continue;
@@ -2314,8 +2316,8 @@ __checkpoint_lock_dirty_tree_int(WT_SESSION_IMPL *session, bool is_checkpoint, b
                 continue;
             WT_ASSERT(session,
               !WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT) ||
-                __wt_atomic_load_uint64_relaxed(&conn->hot_backup_start) == 0 ||
-                ckpt->sec > __wt_atomic_load_uint64_relaxed(&conn->hot_backup_start));
+                __wt_atomic_load_uint64_relaxed(&conn->backup.start) == 0 ||
+                ckpt->sec > __wt_atomic_load_uint64_relaxed(&conn->backup.start));
             /*
              * We can't delete checkpoints referenced by a cursor. WiredTiger checkpoints are
              * uniquely named and it's OK to have multiple in the system: clear the delete flag for

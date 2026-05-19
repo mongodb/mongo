@@ -1,3 +1,9 @@
+# FIXME WT-17498: Consider bringing the wtperf YCSB logic closer to MongoDB's YCSB HVW implementation.
+#
+# This configuration is intended to imitate MongoDB high-value workloads (HVW) YCSB variants.
+# This is the out-of-cache variant: the dataset (~32 GB) exceeds the cache size (16 GB),
+# so the cache holds approximately 50% of the total dataset.
+#
 # This configuration is intended to be executed on a system with at least 32 GB of RAM and 16 CPUs.
 # Because of that, cache_size is set to 16 GB, since this is typically the WiredTiger cache size for
 # a 32 GB RAM system (50%).
@@ -7,6 +13,7 @@
 
 conn_config="cache_size=16G,log=(enabled=true)"
 pareto=20
+scramble=true
 table_config="type=file"
 key_sz=100
 value_sz=1024

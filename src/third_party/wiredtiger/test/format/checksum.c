@@ -28,47 +28,10 @@
 
 #include "format.h"
 
-#define FNV_PRIME 0x00000100000001b3
-
 struct checksum_table_arg {
     WT_SESSION *session;
     uint64_t hash;
 };
-
-/*
- * fnv1a_init --
- *     Initialize an incremental FNV-1A hash with a seed value.
- */
-static uint64_t
-fnv1a_init(void)
-{
-    return (0xcbf29ce484222325);
-}
-
-/*
- * fnv1a_add_bytes --
- *     Update an incremental FNV-1A hash using an arbitrary run of bytes.
- */
-static uint64_t
-fnv1a_add_bytes(uint64_t cur_hash, const uint8_t *data, size_t sz)
-{
-    for (size_t i = 0; i < sz; i++) {
-        cur_hash ^= data[i];
-        cur_hash *= FNV_PRIME;
-    }
-
-    return (cur_hash);
-}
-
-/*
- * fnv1a_add_u32 --
- *     Update an incremental FNV-1A hash using the four bytes of a u32.
- */
-static uint64_t
-fnv1a_add_u32(uint64_t cur_hash, uint32_t data)
-{
-    return (fnv1a_add_bytes(cur_hash, (const uint8_t *)&data, sizeof(uint32_t)));
-}
 
 /*
  * checksum_key --
@@ -79,7 +42,7 @@ checksum_key(uint64_t *hash, TABLE *table, WT_ITEM *key)
 {
     /* Skip any key prefix added by (e.g.) mirrored tables. */
     uint32_t keyno = atou32("checksum-key", (char *)key->data + NTV(table, BTREE_PREFIX_LEN), '.');
-    *hash = fnv1a_add_u32(*hash, keyno);
+    *hash = testutil_fnv1a_add_bytes(*hash, (const uint8_t *)&keyno, sizeof(uint32_t));
 }
 
 /*
@@ -89,7 +52,7 @@ checksum_key(uint64_t *hash, TABLE *table, WT_ITEM *key)
 static void
 checksum_value(uint64_t *hash, WT_ITEM *value)
 {
-    *hash = fnv1a_add_bytes(*hash, value->data, value->size);
+    *hash = testutil_fnv1a_add_bytes(*hash, value->data, value->size);
 }
 
 /*
@@ -142,7 +105,7 @@ checksum_database(WT_SESSION *session)
 {
     struct checksum_table_arg arg = {
       .session = session,
-      .hash = fnv1a_init(),
+      .hash = testutil_fnv1a_init(),
     };
 
     tables_apply(checksum_table, &arg);

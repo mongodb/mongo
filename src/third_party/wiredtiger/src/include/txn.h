@@ -17,6 +17,9 @@
 #define WT_TS_NONE 0         /* Beginning of time */
 #define WT_TS_MAX UINT64_MAX /* End of time */
 
+#define WT_SCHEMA_EPOCH_NONE 0                /* Beginning of time for schema epoch */
+#define WT_SCHEMA_EPOCH_UNPUBLISHED WT_TS_MAX /* Unpublished schema epoch */
+
 /*
  * A list of reasons for returning a rollback error from the API. These reasons can be queried via
  * the session get rollback reason API call. Users of the API could have a dependency on the format

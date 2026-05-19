@@ -1413,6 +1413,50 @@ err:
 }
 
 /*
+ * __session_publish --
+ *     WT_SESSION->publish method.
+ */
+static int
+__session_publish(WT_SESSION *wt_session, const char *uri, const char *config)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    session = (WT_SESSION_IMPL *)wt_session;
+    SESSION_API_CALL(session, ret, publish, config, cfg, true);
+
+    WT_WITH_SCHEMA_LOCK(
+      session, WT_WITH_TABLE_WRITE_LOCK(session, ret = __wt_schema_publish(session, uri, cfg)));
+err:
+    if (ret != 0)
+        WT_STAT_CONN_INCR(session, session_table_publish_fail);
+    else
+        WT_STAT_CONN_INCR(session, session_table_publish_success);
+
+    API_END_RET(session, ret);
+}
+
+/*
+ * __session_publish_readonly --
+ *     WT_SESSION->publish method; readonly version.
+ */
+static int
+__session_publish_readonly(WT_SESSION *wt_session, const char *uri, const char *config)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    WT_UNUSED(uri);
+    WT_UNUSED(config);
+
+    session = (WT_SESSION_IMPL *)wt_session;
+    SESSION_API_CALL_NOCONF(session, publish);
+    ret = __wti_session_notsup(session);
+err:
+    API_END_RET(session, ret);
+}
+
+/*
  * __session_salvage_worker --
  *     Wrapper function for salvage processing.
  */
@@ -2507,7 +2551,7 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
       stds = {NULL, NULL, __session_close, __session_reconfigure, __wt_session_strerror,
         __session_open_cursor, __session_alter, __session_bind_configuration, __session_create,
         __wti_session_compact, __session_drop, __session_log_flush, __session_log_printf,
-        __session_reset, __session_salvage, __session_truncate, __session_verify,
+        __session_publish, __session_reset, __session_salvage, __session_truncate, __session_verify,
         __session_begin_transaction, __session_commit_transaction, __session_prepare_transaction,
         __session_rollback_transaction, __session_query_timestamp, __session_timestamp_transaction,
         __session_timestamp_transaction_uint, __session_prepared_id_transaction,
@@ -2516,20 +2560,21 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
       stds_min = {NULL, NULL, __session_close, __session_reconfigure_notsup, __wt_session_strerror,
         __session_open_cursor, __session_alter_readonly, __session_bind_configuration,
         __session_create_readonly, __wti_session_compact_readonly, __session_drop_readonly,
-        __session_log_flush_readonly, __session_log_printf_readonly, __session_reset_notsup,
-        __session_salvage_readonly, __session_truncate_readonly, __session_verify_notsup,
-        __session_begin_transaction_notsup, __session_commit_transaction_notsup,
-        __session_prepare_transaction_readonly, __session_rollback_transaction_notsup,
-        __session_query_timestamp_notsup, __session_timestamp_transaction_notsup,
-        __session_timestamp_transaction_uint_notsup, __session_prepared_id_transaction_notsup,
-        __session_prepared_id_transaction_uint_notsup, __session_checkpoint_readonly,
-        __session_reset_snapshot_notsup, __session_transaction_pinned_range_notsup,
-        __session_get_last_error, __wt_session_breakpoint},
+        __session_log_flush_readonly, __session_log_printf_readonly, __session_publish_readonly,
+        __session_reset_notsup, __session_salvage_readonly, __session_truncate_readonly,
+        __session_verify_notsup, __session_begin_transaction_notsup,
+        __session_commit_transaction_notsup, __session_prepare_transaction_readonly,
+        __session_rollback_transaction_notsup, __session_query_timestamp_notsup,
+        __session_timestamp_transaction_notsup, __session_timestamp_transaction_uint_notsup,
+        __session_prepared_id_transaction_notsup, __session_prepared_id_transaction_uint_notsup,
+        __session_checkpoint_readonly, __session_reset_snapshot_notsup,
+        __session_transaction_pinned_range_notsup, __session_get_last_error,
+        __wt_session_breakpoint},
       stds_readonly = {NULL, NULL, __session_close, __session_reconfigure, __wt_session_strerror,
         __session_open_cursor, __session_alter_readonly, __session_bind_configuration,
         __session_create_readonly, __wti_session_compact_readonly, __session_drop_readonly,
-        __session_log_flush_readonly, __session_log_printf_readonly, __session_reset,
-        __session_salvage_readonly, __session_truncate_readonly, __session_verify,
+        __session_log_flush_readonly, __session_log_printf_readonly, __session_publish_readonly,
+        __session_reset, __session_salvage_readonly, __session_truncate_readonly, __session_verify,
         __session_begin_transaction, __session_commit_transaction,
         __session_prepare_transaction_readonly, __session_rollback_transaction,
         __session_query_timestamp, __session_timestamp_transaction,

@@ -1191,7 +1191,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created, bool *clo
      */
     create_log = true;
     if (__wti_log_is_prealloc_enabled(session) &&
-      __wt_atomic_load_uint64_relaxed(&conn->hot_backup_start) == 0) {
+      __wt_atomic_load_uint64_relaxed(&conn->backup.start) == 0) {
         WT_WITH_HOTBACKUP_READ_LOCK(
           session, ret = __log_alloc_prealloc(session, log->fileid), &skipp);
 
@@ -1220,7 +1220,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created, bool *clo
          * hot backup is not in progress. We are deliberately not using pre-allocated log files
          * during backup (see comment above).
          */
-        if (__wt_atomic_load_uint64_relaxed(&conn->hot_backup_start) == 0 && !conn_open)
+        if (__wt_atomic_load_uint64_relaxed(&conn->backup.start) == 0 && !conn_open)
             __wt_atomic_add_uint32_relaxed(&log->prep_missed, 1);
         WT_RET(__wti_log_allocfile(session, log->fileid, WT_LOG_FILENAME));
     }
@@ -1412,7 +1412,7 @@ __log_truncate_file(WT_SESSION_IMPL *session, WT_FH *log_fh, wt_off_t offset)
     log = log_mgr->log;
 
     if (!F_ISSET(log, WTI_LOG_TRUNCATE_NOTSUP) &&
-      __wt_atomic_load_uint64_relaxed(&conn->hot_backup_start) == 0) {
+      __wt_atomic_load_uint64_relaxed(&conn->backup.start) == 0) {
         WT_WITH_HOTBACKUP_READ_LOCK(session, ret = __wt_ftruncate(session, log_fh, offset), &skipp);
         if (!skipp) {
             if (ret != ENOTSUP)

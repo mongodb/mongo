@@ -225,7 +225,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session, WT_BACKUPHASH *backuphash)
 
     F_SET(conn, WT_CONN_WAS_BACKUP);
     if (F_ISSET(conn, WT_CONN_BACKUP_PARTIAL_RESTORE) && meta_state.partial_backup_names != NULL) {
-        WT_ERR(__wt_calloc_def(session, meta_state.slot + 1, &conn->partial_backup_remove_ids));
+        WT_ERR(__wt_calloc_def(session, meta_state.slot + 1, &conn->backup.partial_remove_ids));
         file_len = strlen("file:") + meta_state.max_len + strlen(".wt") + 1;
         WT_ERR(__wt_calloc_def(session, file_len, &filename));
         /*
@@ -240,7 +240,7 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session, WT_BACKUPHASH *backuphash)
             WT_ERR(__wt_snprintf(filename, file_len, "file:%s.wt", tablename));
             WT_ERR(__wt_metadata_search(session, filename, &metadata_conf));
             WT_ERR(__wt_config_getones(session, metadata_conf, "id", &cval));
-            conn->partial_backup_remove_ids[i] = (uint32_t)cval.val;
+            conn->backup.partial_remove_ids[i] = (uint32_t)cval.val;
 
             WT_WITH_SCHEMA_LOCK(session,
               WT_WITH_TABLE_WRITE_LOCK(session,

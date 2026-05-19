@@ -6631,7 +6631,7 @@ tasks:
         vars:
           test-name: ycsb-50read50update.wtperf
 
-  - name: perf-test-ycsb-95read5update
+  - name: perf-test-ycsb-95read5update-mongodb-hvw-like-out-of-cache
     tags: ["ycsb-perf"]
     depends_on:
       - name: compile
@@ -6639,17 +6639,17 @@ tasks:
       - func: "fetch artifacts"
       - func: "run-perf-test"
         vars:
-          perf-test-name: ycsb-95read5update.wtperf
+          perf-test-name: ycsb-95read5update-mongodb-hvw-like-out-of-cache.wtperf
           maxruns: 1
           wtarg: -ops '["read_ops", "update_ops", "avg_latency_read", "avg_latency_update"]'
       - func: "upload stats to atlas"
         vars:
-          test-name: ycsb-95read5update.wtperf
+          test-name: ycsb-95read5update-mongodb-hvw-like-out-of-cache.wtperf
       - func: "upload stats to evergreen"
         vars:
-          test-name: ycsb-95read5update.wtperf
+          test-name: ycsb-95read5update-mongodb-hvw-like-out-of-cache.wtperf
 
-  - name: perf-test-ycsb-100read
+  - name: perf-test-ycsb-95read5update-mongodb-hvw-like-in-cache
     tags: ["ycsb-perf"]
     depends_on:
       - name: compile
@@ -6657,15 +6657,51 @@ tasks:
       - func: "fetch artifacts"
       - func: "run-perf-test"
         vars:
-          perf-test-name: ycsb-100read.wtperf
+          perf-test-name: ycsb-95read5update-mongodb-hvw-like-in-cache.wtperf
+          maxruns: 1
+          wtarg: -ops '["read_ops", "update_ops", "avg_latency_read", "avg_latency_update"]'
+      - func: "upload stats to atlas"
+        vars:
+          test-name: ycsb-95read5update-mongodb-hvw-like-in-cache.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: ycsb-95read5update-mongodb-hvw-like-in-cache.wtperf
+
+  - name: perf-test-ycsb-100read-mongodb-hvw-like-out-of-cache
+    tags: ["ycsb-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: ycsb-100read-mongodb-hvw-like-out-of-cache.wtperf
           maxruns: 1
           wtarg: -ops '["read_ops", "avg_latency_read"]'
       - func: "upload stats to atlas"
         vars:
-          test-name: ycsb-100read.wtperf
+          test-name: ycsb-100read-mongodb-hvw-like-out-of-cache.wtperf
       - func: "upload stats to evergreen"
         vars:
-          test-name: ycsb-100read.wtperf
+          test-name: ycsb-100read-mongodb-hvw-like-out-of-cache.wtperf
+
+  - name: perf-test-ycsb-100read-mongodb-hvw-like-in-cache
+    tags: ["ycsb-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: ycsb-100read-mongodb-hvw-like-in-cache.wtperf
+          maxruns: 1
+          wtarg: -ops '["read_ops", "avg_latency_read"]'
+      - func: "upload stats to atlas"
+        vars:
+          test-name: ycsb-100read-mongodb-hvw-like-in-cache.wtperf
+      - func: "upload stats to evergreen"
+        vars:
+          test-name: ycsb-100read-mongodb-hvw-like-in-cache.wtperf
 
   - name: perf-test-ycsb-95readlatest5insert
     tags: ["ycsb-perf"]

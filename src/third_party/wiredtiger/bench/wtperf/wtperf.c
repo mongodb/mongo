@@ -180,37 +180,37 @@ update_value_delta(WTPERF_THREAD *thread, int64_t delta)
  *     Update an operation's tracking structure with new latency information.
  */
 static inline void
-track_operation(TRACK *trk, uint64_t usecs)
+track_operation(TRACK *trk, uint64_t nsecs)
 {
     uint64_t v;
 
-    /* average microseconds per call */
-    v = (uint64_t)usecs;
+    /* average nanoseconds per call */
+    v = (uint64_t)nsecs;
 
-    trk->latency += usecs; /* track total latency */
+    trk->latency += nsecs; /* track total latency */
 
     if (v > trk->max_latency) /* track max/min latency */
-        trk->max_latency = (uint32_t)v;
+        trk->max_latency = v;
     if (v < trk->min_latency)
-        trk->min_latency = (uint32_t)v;
+        trk->min_latency = v;
 
     /*
      * Update a latency bucket. First buckets: usecs from 100us to 1000us at 100us each.
      */
-    if (v < WT_THOUSAND)
-        ++trk->us[v];
+    if (v < us_to_ns(WT_THOUSAND))
+        ++trk->us[ns_to_us(v)];
 
     /*
      * Second buckets: milliseconds from 1ms to 1000ms, at 1ms each.
      */
-    else if (v < ms_to_us(WT_THOUSAND))
-        ++trk->ms[us_to_ms(v)];
+    else if (v < ms_to_ns(WT_THOUSAND))
+        ++trk->ms[ns_to_ms(v)];
 
     /*
      * Third buckets are seconds from 1s to 100s, at 1s each.
      */
-    else if (v < sec_to_us(100))
-        ++trk->sec[us_to_sec(v)];
+    else if (v < sec_to_ns(100))
+        ++trk->sec[ns_to_sec(v)];
 
     /* >100 seconds, accumulate in the biggest bucket. */
     else
@@ -340,7 +340,7 @@ worker(void *arg)
     WT_SESSION *session;
     size_t i, iter, modify_offset, modify_size, total_modify_size, value_len;
     int64_t delta, ops, ops_per_txn;
-    uint64_t log_id, next_val, start, stop, usecs;
+    uint64_t log_id, next_val, start, stop, nsecs;
     uint32_t rand_val, total_table_count;
     uint8_t *op, *op_end;
     int measure_latency, nmodify, ret, truncated;
@@ -808,8 +808,8 @@ op_err:
             if (measure_latency) {
                 stop = __wt_clock(NULL);
                 ++trk->latency_ops;
-                usecs = WT_CLOCKDIFF_US(stop, start);
-                track_operation(trk, usecs);
+                nsecs = WT_CLOCKDIFF_NS(stop, start);
+                track_operation(trk, nsecs);
             }
             /* Increment operation count */
             ++trk->ops;
@@ -985,7 +985,7 @@ populate_thread(void *arg)
     WT_CURSOR **cursors, *cursor, *index_cursor;
     WT_SESSION *session;
     size_t i;
-    uint64_t op, start, stop, usecs;
+    uint64_t nsecs, op, start, stop;
     uint32_t opcount, total_table_count;
     int intxn, measure_latency, ret, stress_checkpoint_due;
     char *index_buf, *key_buf, *value_buf;
@@ -1098,8 +1098,8 @@ populate_thread(void *arg)
         if (measure_latency) {
             stop = __wt_clock(NULL);
             ++trk->latency_ops;
-            usecs = WT_CLOCKDIFF_US(stop, start);
-            track_operation(trk, usecs);
+            nsecs = WT_CLOCKDIFF_NS(stop, start);
+            track_operation(trk, nsecs);
         }
         ++thread->insert.ops; /* Same as trk->ops */
 
@@ -1154,11 +1154,12 @@ monitor(void *arg)
     uint64_t inserts, modifies, reads, updates;
     uint64_t cur_inserts, cur_modifies, cur_reads, cur_updates;
     uint64_t last_inserts, last_modifies, last_reads, last_updates;
-    uint32_t latency_max, level;
-    uint32_t insert_avg, insert_max, insert_min;
-    uint32_t modify_avg, modify_max, modify_min;
-    uint32_t read_avg, read_max, read_min;
-    uint32_t update_avg, update_max, update_min;
+    uint64_t latency_max;
+    uint64_t insert_avg, insert_max, insert_min;
+    uint64_t modify_avg, modify_max, modify_min;
+    uint64_t read_avg, read_max, read_min;
+    uint64_t update_avg, update_max, update_min;
+    uint32_t level;
     u_int i;
     size_t buf_size;
     int msg_err;
@@ -1175,7 +1176,7 @@ monitor(void *arg)
     path = NULL;
 
     min_thr = (uint64_t)opts->min_throughput;
-    latency_max = (uint32_t)ms_to_us(opts->max_latency);
+    latency_max = (uint64_t)ms_to_ns(opts->max_latency);
 
     /* Open the logging file. */
     len = strlen(wtperf->monitor_dir) + 100;
@@ -1202,18 +1203,18 @@ monitor(void *arg)
       "update ops per second,"
       "checkpoints,"
       "scans,"
-      "insert average latency(uS),"
-      "insert min latency(uS),"
-      "insert maximum latency(uS),"
-      "modify average latency(uS),"
-      "modify min latency(uS),"
-      "modify maximum latency(uS),"
-      "read average latency(uS),"
-      "read minimum latency(uS),"
-      "read maximum latency(uS),"
-      "update average latency(uS),"
-      "update min latency(uS),"
-      "update maximum latency(uS)"
+      "insert average latency(ns),"
+      "insert min latency(ns),"
+      "insert maximum latency(ns),"
+      "modify average latency(ns),"
+      "modify min latency(ns),"
+      "modify maximum latency(ns),"
+      "read average latency(ns),"
+      "read minimum latency(ns),"
+      "read maximum latency(ns),"
+      "update average latency(ns),"
+      "update min latency(ns),"
+      "update maximum latency(ns)"
       "\n");
     last_inserts = last_modifies = last_reads = last_updates = 0;
     while (!wtperf->stop) {
@@ -1255,9 +1256,9 @@ monitor(void *arg)
         cur_updates = (updates - last_updates) / opts->sample_interval;
 
         (void)fprintf(fp,
-          "%s,%" PRIu32 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%c,%c,%c,%c%" PRIu32
-          ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32
-          ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 ",%" PRIu32 "\n",
+          "%s,%" PRIu32 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%c,%c,%c,%c%" PRIu64
+          ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64
+          ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 "\n",
           buf, wtperf->totalsec, cur_inserts, cur_modifies, cur_reads, cur_updates,
           wtperf->backup ? 'Y' : 'N', wtperf->ckpt ? 'Y' : 'N', wtperf->flush ? 'Y' : 'N',
           wtperf->scan ? 'Y' : 'N', insert_avg, insert_min, insert_max, modify_avg, modify_min,
@@ -1275,20 +1276,20 @@ monitor(void *arg)
             (void)fprintf(jfp, "\"localTime\":\"%s\",\"wtperf\":{", buf);
             /* Note does not have initial comma before "insert" */
             (void)fprintf(jfp,
-              "\"insert\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
-              ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
+              "\"insert\":{\"ops per sec\":%" PRIu64 ",\"average latency (ns)\":%" PRIu64
+              ",\"min latency (ns)\":%" PRIu64 ",\"max latency (ns)\":%" PRIu64 "}",
               cur_inserts, insert_avg, insert_min, insert_max);
             (void)fprintf(jfp,
-              ",\"modify\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
-              ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
+              ",\"modify\":{\"ops per sec\":%" PRIu64 ",\"average latency (ns)\":%" PRIu64
+              ",\"min latency (ns)\":%" PRIu64 ",\"max latency (ns)\":%" PRIu64 "}",
               cur_modifies, modify_avg, modify_min, modify_max);
             (void)fprintf(jfp,
-              ",\"read\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
-              ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
+              ",\"read\":{\"ops per sec\":%" PRIu64 ",\"average latency (ns)\":%" PRIu64
+              ",\"min latency (ns)\":%" PRIu64 ",\"max latency (ns)\":%" PRIu64 "}",
               cur_reads, read_avg, read_min, read_max);
             (void)fprintf(jfp,
-              ",\"update\":{\"ops per sec\":%" PRIu64 ",\"average latency\":%" PRIu32
-              ",\"min latency\":%" PRIu32 ",\"max latency\":%" PRIu32 "}",
+              ",\"update\":{\"ops per sec\":%" PRIu64 ",\"average latency (ns)\":%" PRIu64
+              ",\"min latency (ns)\":%" PRIu64 ",\"max latency (ns)\":%" PRIu64 "}",
               cur_updates, update_avg, update_min, update_max);
             fprintf(jfp, "}}\n");
         }
@@ -1306,8 +1307,8 @@ monitor(void *arg)
                 str = "WARNING";
             }
             lprintf(wtperf, msg_err, level,
-              "%s: max latency exceeded: threshold %" PRIu32 " insert max %" PRIu32
-              " modify max %" PRIu32 " read max %" PRIu32 " update max %" PRIu32,
+              "%s: max latency exceeded: threshold %" PRIu64 " insert max %" PRIu64
+              " modify max %" PRIu64 " read max %" PRIu64 " update max %" PRIu64,
               str, latency_max, insert_max, modify_max, read_max, update_max);
         }
         if (min_thr != 0 &&
@@ -2920,7 +2921,7 @@ start_threads(WTPERF *wtperf, WORKLOAD *workp, WTPERF_THREAD *base, u_int num,
          */
         thread->backup.min_latency = thread->ckpt.min_latency = thread->flush.min_latency =
           thread->scan.min_latency = thread->insert.min_latency = thread->modify.min_latency =
-            thread->read.min_latency = thread->update.min_latency = UINT32_MAX;
+            thread->read.min_latency = thread->update.min_latency = UINT64_MAX;
         thread->backup.max_latency = thread->ckpt.max_latency = thread->flush.max_latency =
           thread->scan.max_latency = thread->insert.max_latency = thread->modify.max_latency =
             thread->read.max_latency = thread->update.max_latency = 0;
@@ -3063,7 +3064,14 @@ wtperf_rand(WTPERF_THREAD *thread)
     rval = __wt_random(&thread->rnd);
     /* Use Pareto distribution to give 80/20 hot/cold values. */
     if (opts->pareto != 0)
-        rval = testutil_pareto(rval, end_range - start_range, opts->pareto);
+        rval = testutil_pareto(rval, range, opts->pareto);
+
+    /*
+     * Hash keys to scatter them across the key space (especially useful for non-uniform
+     * distributions like pareto).
+     */
+    if (opts->scramble)
+        rval = testutil_fnvhash64(rval) % range;
 
     /*
      * A distribution that selects the record with a higher key with higher probability. This was

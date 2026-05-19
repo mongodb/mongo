@@ -773,6 +773,27 @@ __wti_conn_remove_storage_source(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wti_conn_backup_init --
+ *     Initialize the WT_CONN_BACKUP structure.
+ */
+int
+__wti_conn_backup_init(WT_SESSION_IMPL *session)
+{
+    WT_RET(__wt_rwlock_init(session, &S2C(session)->backup.lock));
+    return (0);
+}
+
+/*
+ * __wti_conn_backup_destroy --
+ *     Destroy the WT_CONN_BACKUP structure.
+ */
+void
+__wti_conn_backup_destroy(WT_SESSION_IMPL *session)
+{
+    __wt_rwlock_destroy(session, &S2C(session)->backup.lock);
+}
+
+/*
  * __wti_conn_ext_init --
  *     Initialize the WT_CONN_EXTENSIONS structure.
  */
@@ -3736,8 +3757,8 @@ err:
      * to happen on tables to clean up the entries in the creation of the metadata file.
      */
     F_CLR(conn, WT_CONN_BACKUP_PARTIAL_RESTORE);
-    if (conn->partial_backup_remove_ids != NULL)
-        __wt_free(session, conn->partial_backup_remove_ids);
+    if (conn->backup.partial_remove_ids != NULL)
+        __wt_free(session, conn->backup.partial_remove_ids);
 
     if (ret != 0) {
         if (conn->default_session->event_handler->handle_general != NULL &&

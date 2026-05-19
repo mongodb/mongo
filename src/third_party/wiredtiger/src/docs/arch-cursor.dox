@@ -180,7 +180,7 @@ First, we'll look at full backups.
 A backup cursor for a full backup returns the set of files that need to be copied to achieve the
 backup.  The backup cursor, when opened, ensures that it is the only backup cursor running
 in the system and returns an error if not.  This is managed using the
-\c WT_CONNECTION_IMPL->hot_backup_start variable, which can only be accessed when the
+\c WT_CONNECTION_IMPL->backup.start variable, which can only be accessed when the
 connection schema lock is held.  A non-zero value means a hot backup is in progress.
 Closing the backup cursor sets it back to zero.
 

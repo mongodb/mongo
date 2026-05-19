@@ -757,6 +757,11 @@ config_sanity(WTPERF *wtperf)
         return (EINVAL);
     }
 
+    if (opts->scramble && opts->select_latest) {
+        fprintf(stderr, "scramble and select_latest are incompatible and cannot both be set\n");
+        return (EINVAL);
+    }
+
     if (opts->scan_pct > 100) {
         fprintf(stderr, "Invalid scan_pct - should be a percentage\n");
         return (EINVAL);

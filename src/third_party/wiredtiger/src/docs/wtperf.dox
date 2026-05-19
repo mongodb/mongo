@@ -216,6 +216,8 @@ scan tables every interval seconds during the workload phase, 0 to disable
 percentage of entire data set scanned, if scan_interval is enabled
 @par scan_table_count (unsigned int, default=0)
 number of separate tables to be used for scanning. Zero indicates that tables are shared with  other operations
+@par scramble (boolean, default=false)
+if true, apply hash to distribution output to scatter hot keys across the key space.
 @par select_latest (boolean, default=false)
 in workloads that involve inserts and another type of operation, select the recently inserted records with higher probability
 @par sess_config (string, default="")

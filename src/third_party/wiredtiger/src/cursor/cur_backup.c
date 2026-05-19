@@ -781,7 +781,7 @@ __backup_start(
      * Single thread hot backups: we're holding the schema lock, so we know we'll serialize with
      * other attempts to start a hot backup.
      */
-    if (__wt_atomic_load_uint64_relaxed(&conn->hot_backup_start) != 0 && !is_dup)
+    if (__wt_atomic_load_uint64_relaxed(&conn->backup.start) != 0 && !is_dup)
         WT_RET_MSG(session, EINVAL, "there is already a backup cursor open");
 
     if (F_ISSET(session, WT_SESSION_BACKUP_DUP) && is_dup)
@@ -897,7 +897,7 @@ err:
     if (ret == 0 && exist)
         ret = __wt_sync_and_rename(session, &cb->bfs, WT_BACKUP_TMP, dest);
     if (ret == 0) {
-        WT_WITH_HOTBACKUP_WRITE_LOCK(session, conn->hot_backup_list = cb->list);
+        WT_WITH_HOTBACKUP_WRITE_LOCK(session, conn->backup.list = cb->list);
         F_SET(session, WT_SESSION_BACKUP_CURSOR);
     }
     /*
@@ -926,7 +926,7 @@ __backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
     WT_ASSERT(session, !F_ISSET(cb, WT_CURBACKUP_DUP));
     /* If it's not a dup backup cursor, make sure one isn't open. */
     WT_ASSERT(session, !F_ISSET(session, WT_SESSION_BACKUP_DUP));
-    WT_WITH_HOTBACKUP_WRITE_LOCK(session, conn->hot_backup_list = NULL);
+    WT_WITH_HOTBACKUP_WRITE_LOCK(session, conn->backup.list = NULL);
     if (cb->incr_src != NULL)
         F_CLR(cb->incr_src, WT_BLKINCR_INUSE);
     WT_TRET(__backup_free(session, cb));
@@ -938,8 +938,7 @@ __backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
     WT_TRET(__wt_remove_if_exists(session, WT_EXPORT_BACKUP, true));
 
     /* Checkpoint deletion and next hot backup can proceed. */
-    WT_WITH_HOTBACKUP_WRITE_LOCK(
-      session, __wt_atomic_store_uint64_relaxed(&conn->hot_backup_start, 0));
+    WT_WITH_HOTBACKUP_WRITE_LOCK(session, __wt_atomic_store_uint64_relaxed(&conn->backup.start, 0));
     F_CLR(session, WT_SESSION_BACKUP_CURSOR);
 
     return (ret);

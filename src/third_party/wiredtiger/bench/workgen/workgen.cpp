@@ -1178,15 +1178,15 @@ Monitor::_format_out_header()
             << "insert ops per second,"
             << "update ops per second,"
             << "checkpoints,"
-            << "read average latency(uS),"
-            << "read minimum latency(uS),"
-            << "read maximum latency(uS),"
-            << "insert average latency(uS),"
-            << "insert min latency(uS),"
-            << "insert maximum latency(uS),"
-            << "update average latency(uS),"
-            << "update min latency(uS),"
-            << "update maximum latency(uS)" << std::endl;
+            << "read average latency(us),"
+            << "read minimum latency(us),"
+            << "read maximum latency(us),"
+            << "insert average latency(us),"
+            << "insert min latency(us),"
+            << "insert maximum latency(us),"
+            << "update average latency(us),"
+            << "update min latency(us),"
+            << "update maximum latency(us)" << std::endl;
 }
 
 void

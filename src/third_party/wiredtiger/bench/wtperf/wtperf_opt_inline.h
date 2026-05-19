@@ -172,6 +172,8 @@ DEF_OPT_AS_UINT32(
 DEF_OPT_AS_UINT32(scan_table_count, 0,
   "number of separate tables to be used for scanning. Zero indicates that tables are shared with "
   "other operations")
+DEF_OPT_AS_BOOL(scramble, 0,
+  "if true, apply hash to distribution output to scatter hot keys across the key space.")
 DEF_OPT_AS_BOOL(select_latest, 0,
   "in workloads that involve inserts and another type of operation,"
   "select the recently inserted records with higher probability")

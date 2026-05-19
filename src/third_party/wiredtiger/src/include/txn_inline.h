@@ -833,6 +833,18 @@ __wt_txn_modify_page_delete(WT_SESSION_IMPL *session, WT_REF *ref)
 
     txn = session->txn;
 
+    /*
+     * During ingest replay there is no running transaction; timestamp the page delete directly from
+     * the replay context and skip the transaction machinery.
+     */
+    if (F_ISSET(session, WT_SESSION_INGEST_REPLAY)) {
+        ref->page_del->txnid = session->replay_trunc_ctx.txn_id;
+        ref->page_del->pg_del_start_ts = session->replay_trunc_ctx.commit_ts;
+        ref->page_del->pg_del_durable_ts = session->replay_trunc_ctx.durable_ts;
+        ref->page_del->committed = true;
+        return (0);
+    }
+
     WT_RET(__txn_next_op(session, &op));
     op->type = WT_TXN_OP_REF_DELETE;
     op->u.ref = ref;

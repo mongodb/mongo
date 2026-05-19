@@ -100,6 +100,48 @@ class test_layered91(wttest.WiredTigerTestCase):
                     c.remove()
             c.close()
 
+    # Iterate using a zigzag pattern: two forward, one back, etc.
+    def _verify_zigzag(self, cursor, forward, expect):
+        # step is the total number of operations. We'll later use modulo
+        # three with step to see whether we should do next or prev.
+        step = 0
+        # expect_pos is our current position in the expect string.
+        if forward:
+            expect_pos = -1   # start at the beginning, next will be 0'th entry
+        else:
+            expect_pos = len(expect)   # start at the end
+
+        ret = 0
+        while ret == 0:
+            if step > 1000:
+                raise Exception('verify_zigzag: endless loop?')
+            if forward:
+                # For a forward iteration: two steps forward, one step back
+                if step % 3 == 2:   # step 2, 5, 8, etc. are backwards
+                    incr = -1
+                    ret = cursor.prev()
+                else:               # step 0, 1, 3, 4, etc. are forwards
+                    incr = 1
+                    ret = cursor.next()
+            else:
+                # For a backward iteration: two steps back, one step forward
+                if step % 3 == 2:
+                    incr = 1
+                    ret = cursor.next()
+                else:
+                    incr = -1
+                    ret = cursor.prev()
+            step += 1
+            expect_pos += incr
+            if expect_pos < 0 or expect_pos >= len(expect):
+                self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
+                break
+            else:
+                self.assertEqual(ret, 0)
+                k, v = cursor.get_key(), cursor.get_value()
+                self.assertEqual(k, v)
+                self.assertEqual(v, expect[expect_pos])
+
     def _verify_cursor(self, session, uri, sit):
         '''Verify forward/backward iteration and point reads on a layered cursor.'''
         # Keys with state I (ingest only), S (stable only), or B (both) should be visible.
@@ -127,6 +169,16 @@ class test_layered91(wttest.WiredTigerTestCase):
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         c.close()
         self.assertEqual(list(reversed(expect)), got_rev)
+
+        # zigzag forward iteration
+        c = session.open_cursor(uri)
+        self._verify_zigzag(c, True, expect)
+        c.close()
+
+        # zigzag backward iteration
+        c = session.open_cursor(uri)
+        self._verify_zigzag(c, False, expect)
+        c.close()
 
         # Point reads: cursor.search() must find visible keys and return WT_NOTFOUND for hidden ones.
         c = session.open_cursor(uri)

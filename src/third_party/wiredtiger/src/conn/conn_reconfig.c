@@ -217,7 +217,7 @@ __wti_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool recon
     /* Once an operation tracking path has been set it can't be changed. */
     if (!reconfig) {
         WT_RET(__wt_config_gets(session, cfg, "operation_tracking.path", &cval));
-        WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->optrack_path));
+        WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->optrack.path));
     }
 
     WT_RET(__wt_config_gets(session, cfg, "operation_tracking.enabled", &cval));
@@ -241,7 +241,7 @@ __wti_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool recon
      * distinguish between log files created by different WiredTiger processes in the same
      * directory. We cache the process id for future use.
      */
-    conn->optrack_pid = __wt_process_id();
+    conn->optrack.pid = __wt_process_id();
 
     /*
      * Open the file in the same directory that will hold a map of translations between function
@@ -249,11 +249,11 @@ __wti_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool recon
      */
     WT_RET(__wt_scr_alloc(session, 0, &buf));
     WT_ERR(__wt_filename_construct(
-      session, conn->optrack_path, "optrack-map", conn->optrack_pid, UINT32_MAX, buf));
+      session, conn->optrack.path, "optrack-map", conn->optrack.pid, UINT32_MAX, buf));
     WT_ERR(__wt_open(session, (const char *)buf->data, WT_FS_OPEN_FILE_TYPE_REGULAR,
-      WT_FS_OPEN_CREATE, &conn->optrack_map_fh));
+      WT_FS_OPEN_CREATE, &conn->optrack.map_fh));
 
-    WT_ERR(__wt_spin_init(session, &conn->optrack_map_spinlock, "optrack map spinlock"));
+    WT_ERR(__wt_spin_init(session, &conn->optrack.map_spinlock, "optrack map spinlock"));
 
     WT_ERR(__wt_malloc(session, WT_OPTRACK_BUFSIZE, &conn->dummy_session.optrack_buf));
 
@@ -279,14 +279,14 @@ __wti_conn_optrack_teardown(WT_SESSION_IMPL *session, bool reconfig)
 
     if (!reconfig)
         /* Looks like we are shutting down */
-        __wt_free(session, conn->optrack_path);
+        __wt_free(session, conn->optrack.path);
 
     if (!F_ISSET_ATOMIC_32(conn, WT_CONN_OPTRACK))
         return (0);
 
-    __wt_spin_destroy(session, &conn->optrack_map_spinlock);
+    __wt_spin_destroy(session, &conn->optrack.map_spinlock);
 
-    WT_TRET(__wt_close(session, &conn->optrack_map_fh));
+    WT_TRET(__wt_close(session, &conn->optrack.map_fh));
     __wt_free(session, conn->dummy_session.optrack_buf);
 
     return (ret);

@@ -242,6 +242,8 @@ __wt_schema_range_truncate(WT_TRUNCATE_INFO *trunc_info)
 
     if (WT_IS_URI_HS(uri))
         ret = __wt_curhs_range_truncate(trunc_info);
+    else if (WT_PREFIX_MATCH(uri, "file:") && F_ISSET(session, WT_SESSION_INGEST_REPLAY))
+        ret = __wt_clayered_range_truncate_stable_replay(trunc_info);
     else if (WT_PREFIX_MATCH(uri, "file:")) {
         WT_ERR(__cursor_needkey(trunc_info->start));
         if (F_ISSET(trunc_info, WT_TRUNC_EXPLICIT_STOP))

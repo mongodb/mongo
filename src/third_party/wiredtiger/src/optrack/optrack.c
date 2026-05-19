@@ -25,13 +25,13 @@ __wt_optrack_record_funcid(WT_SESSION_IMPL *session, const char *func, uint16_t 
 
     WT_ERR(__wt_scr_alloc(session, strlen(func) + 32, &tmp));
 
-    __wt_spin_lock(session, &conn->optrack_map_spinlock);
+    __wt_spin_lock(session, &conn->optrack.map_spinlock);
     if (*func_idp == 0) {
         *func_idp = ++optrack_uid;
 
         WT_ERR(__wt_buf_fmt(session, tmp, "%" PRIu16 " %s\n", *func_idp, func));
-        WT_ERR(__wt_filesize(session, conn->optrack_map_fh, &fsize));
-        WT_ERR(__wt_write(session, conn->optrack_map_fh, fsize, tmp->size, tmp->data));
+        WT_ERR(__wt_filesize(session, conn->optrack.map_fh, &fsize));
+        WT_ERR(__wt_write(session, conn->optrack.map_fh, fsize, tmp->size, tmp->data));
     }
 
     if (0) {
@@ -39,7 +39,7 @@ err:
         WT_IGNORE_RET(__wt_panic(session, ret, "operation tracking initialization failure"));
     }
 
-    __wt_spin_unlock_if_owned(session, &conn->optrack_map_spinlock);
+    __wt_spin_unlock_if_owned(session, &conn->optrack.map_spinlock);
     __wt_scr_free(session, &tmp);
 }
 
@@ -64,7 +64,7 @@ __optrack_open_file(WT_SESSION_IMPL *session)
 
     WT_RET(__wt_scr_alloc(session, 0, &buf));
     WT_ERR(__wt_filename_construct(
-      session, conn->optrack_path, "optrack", conn->optrack_pid, session->id, buf));
+      session, conn->optrack.path, "optrack", conn->optrack.pid, session->id, buf));
     WT_ERR(__wt_open(session, (const char *)buf->data, WT_FS_OPEN_FILE_TYPE_REGULAR,
       WT_FS_OPEN_CREATE, &session->optrack_fh));
 

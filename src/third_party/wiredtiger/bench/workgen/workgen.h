@@ -99,8 +99,8 @@ struct Track {
     // Minimum/maximum latency, shared with the monitor thread, that is, the
     // monitor thread clears it so it's recalculated again for each period.
 
-    uint32_t max_latency;                // Maximum latency (uS)
-    uint32_t min_latency;                // Minimum latency (uS)
+    uint32_t max_latency;                // Maximum latency (us)
+    uint32_t min_latency;                // Minimum latency (us)
 
     Track(bool latency_tracking = false);
     Track(const Track &other);

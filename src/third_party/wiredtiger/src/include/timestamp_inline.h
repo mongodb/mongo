@@ -91,7 +91,9 @@
 /*
  * Set the stop values of a time window from those in an update structure. We can race with prepared
  * rollback. If we read an aborted transaction id in the first attempt, get the transaction id from
- * the saved transaction id.
+ * the saved transaction id. On the non-prepare path we can also race with __wt_delete_page_rollback
+ * writing WT_TXN_ABORTED; use TSAN suppression since the race is benign (both sides are relaxed
+ * atomics and callers handle WT_TXN_ABORTED stop_txn values).
  */
 #define WT_TIME_WINDOW_SET_STOP(tw, upd, write_prepare)                                    \
     do {                                                                                   \
@@ -102,7 +104,7 @@
             if ((tw)->stop_txn == WT_TXN_ABORTED)                                          \
                 (tw)->stop_txn = __wt_atomic_load_uint64_relaxed(&(upd)->upd_saved_txnid); \
         } else {                                                                           \
-            (tw)->stop_txn = __wt_atomic_load_uint64_v_relaxed(&(upd)->txnid);             \
+            (tw)->stop_txn = __wt_tsan_suppress_load_uint64_v(&(upd)->txnid);              \
             (tw)->stop_ts = (upd)->upd_start_ts;                                           \
             (tw)->durable_stop_ts = (upd)->upd_durable_ts;                                 \
         }                                                                                  \
@@ -333,5 +335,5 @@ __wt_get_stable_disaggregated_schema_epoch(WT_SESSION_IMPL *session)
     txn_global = &S2C(session)->txn_global;
     return (__wt_atomic_load_bool_acquire(&txn_global->has_stable_disaggregated_schema_epoch) ?
         __wt_atomic_load_uint64_relaxed(&txn_global->stable_disaggregated_schema_epoch) :
-        WT_TS_NONE);
+        WT_SCHEMA_EPOCH_NONE);
 }

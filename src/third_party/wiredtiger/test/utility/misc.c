@@ -512,6 +512,40 @@ testutil_pareto(uint64_t rand, uint64_t range, u_int skew)
 }
 
 /*
+ * testutil_fnv1a_init --
+ *     Initialize a 64-bit FNV-1a hash.
+ */
+uint64_t
+testutil_fnv1a_init(void)
+{
+    return (UINT64_C(0xcbf29ce484222325));
+}
+
+/*
+ * testutil_fnv1a_add_bytes --
+ *     Update a 64-bit FNV-1a hash with an arbitrary run of bytes.
+ */
+uint64_t
+testutil_fnv1a_add_bytes(uint64_t hash, const uint8_t *data, size_t sz)
+{
+    for (size_t i = 0; i < sz; i++) {
+        hash ^= data[i];
+        hash *= UINT64_C(0x00000100000001b3);
+    }
+    return (hash);
+}
+
+/*
+ * testutil_fnvhash64 --
+ *     FNV-1a 64-bit hash of a uint64 value.
+ */
+uint64_t
+testutil_fnvhash64(uint64_t val)
+{
+    return (testutil_fnv1a_add_bytes(testutil_fnv1a_init(), (const uint8_t *)&val, sizeof(val)));
+}
+
+/*
  * dcalloc --
  *     Call calloc, dying on failure.
  */

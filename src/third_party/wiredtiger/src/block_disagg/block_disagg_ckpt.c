@@ -158,6 +158,9 @@ __block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool fail
     /* Construct the URI of the stable/shared table. */
     WT_ERR(__wt_snprintf(stable_uri, len, "file:%s", block_disagg->name));
 
+    /* Get the current schema epoch. */
+    schema_epoch = conn->disaggregated_storage.cur_schema_epoch;
+
     /*
      * Store the metadata of regular shared tables in the shared metadata table. Store the metadata
      * of the shared metadata table in the system-level metadata (similar to the turtle file).
@@ -179,7 +182,6 @@ __block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool fail
         /* Get the config we want to print to the metadata file */
         WT_ERR(__wt_config_getones(session, md_value, "checkpoint", &cval));
         checkpoint_timestamp = conn->disaggregated_storage.cur_checkpoint_timestamp;
-        schema_epoch = conn->disaggregated_storage.cur_schema_epoch;
         WT_ERR(__wt_disagg_put_checkpoint_meta(
           session, cval.str, cval.len, checkpoint_timestamp, schema_epoch));
     } else {
@@ -194,10 +196,10 @@ __block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool fail
             /* This can happen if the "file:" is created without a suffix in our tests. */
             WT_ERR(__wt_snprintf(table_name, len, "%s", block_disagg->name));
 
-        /* Remember the metadata of the stable/shared table. */
+        /* Update the metadata of the stable/shared table in the current schema epoch. */
         WT_SAVE_DHANDLE(session,
           ret = __wt_disagg_enqueue_metadata_operation(
-            session, stable_uri, table_name, WT_SHARED_METADATA_UPDATE));
+            session, stable_uri, table_name, WT_SHARED_METADATA_UPDATE, schema_epoch));
         WT_ERR(ret);
     }
 

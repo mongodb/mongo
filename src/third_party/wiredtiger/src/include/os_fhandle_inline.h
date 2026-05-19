@@ -73,8 +73,7 @@ __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
     if (handle->fh_size != NULL) {
         WT_RET(handle->fh_size(handle, (WT_SESSION *)session, &cur_size));
         WT_ASSERT(session,
-          cur_size <= offset ||
-            __wt_atomic_load_uint64_relaxed(&S2C(session)->hot_backup_start) == 0);
+          cur_size <= offset || __wt_atomic_load_uint64_relaxed(&S2C(session)->backup.start) == 0);
     }
 #endif
     if (handle->fh_extend_nolock != NULL)
@@ -168,8 +167,7 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
     if (handle->fh_size != NULL) {
         WT_RET(handle->fh_size(handle, (WT_SESSION *)session, &cur_size));
         WT_ASSERT(session,
-          cur_size <= offset ||
-            __wt_atomic_load_uint64_relaxed(&S2C(session)->hot_backup_start) == 0);
+          cur_size <= offset || __wt_atomic_load_uint64_relaxed(&S2C(session)->backup.start) == 0);
     }
 #endif
     if (handle->fh_truncate != NULL)

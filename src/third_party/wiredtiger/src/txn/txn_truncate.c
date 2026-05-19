@@ -281,6 +281,10 @@ __wt_truncate_delete_visible_check(
     if (!__wt_process.disagg_fast_truncate_2026)
         return (WT_NOTFOUND);
 
+    /* The truncate list is only populated on followers; leaders truncate stable directly. */
+    if (S2C(session)->layered_table_manager.leader)
+        return (WT_NOTFOUND);
+
     WT_ASSERT(session, WT_PREFIX_MATCH(layered_table->iface.name, "layered:"));
 
     /* FIXME-WT-17384: Investigate the use of atomics to minimize locking. */

@@ -948,6 +948,64 @@ __clayered_truncate_follower(WT_TRUNCATE_INFO *trunc_info)
 }
 
 /*
+ * __clayered_stable_replay_remove_int --
+ *     Per-key delete function for ingest truncate replay. Allocates a pre-stamped tombstone and
+ *     inserts it directly via __wt_row_modify, bypassing the session transaction entirely.
+ */
+static int
+__clayered_stable_replay_remove_int(WT_CURSOR_BTREE *cbt, const WT_ITEM *value, u_int modify_type)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+    WT_UPDATE *upd;
+
+    WT_UNUSED(value);
+    WT_UNUSED(modify_type);
+
+    session = CUR2S(cbt);
+    WT_RET(__wt_upd_alloc(session, NULL, WT_UPDATE_TOMBSTONE, &upd, NULL));
+    upd->txnid = session->replay_trunc_ctx.txn_id;
+    upd->upd_start_ts = session->replay_trunc_ctx.commit_ts;
+    upd->upd_durable_ts = session->replay_trunc_ctx.durable_ts;
+    F_SET(upd, WT_UPDATE_RESTORED_FROM_INGEST);
+
+    ret = __wt_row_modify(cbt, &cbt->iface.key, NULL, &upd, WT_UPDATE_INVALID, false, false);
+    if (ret != 0)
+        __wt_free(session, upd);
+    return (ret);
+}
+
+/*
+ * __wt_clayered_range_truncate_stable_replay --
+ *     Range truncate dispatch for ingest replay on the stable table.
+ */
+int
+__wt_clayered_range_truncate_stable_replay(WT_TRUNCATE_INFO *trunc_info)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    session = trunc_info->session;
+
+    /* Only valid on stable tables during step up to leader, routed via WT_SESSION_INGEST_REPLAY. */
+    WT_ASSERT(session, F_ISSET(session, WT_SESSION_INGEST_REPLAY));
+    WT_ASSERT(session, WT_URI_IS_STABLE(trunc_info->start->internal_uri));
+    WT_ASSERT(session, S2C(session)->layered_table_manager.leader);
+
+    /* Both boundary cursors must be fully positioned. */
+    WT_ASSERT(session, F_ISSET(trunc_info->start, WT_CURSTD_KEY_INT));
+    WT_RET(__wt_cursor_localkey(trunc_info->start));
+    WT_ASSERT(session, trunc_info->stop != NULL);
+    WT_ASSERT(session, F_ISSET(trunc_info->stop, WT_CURSTD_KEY_INT));
+    WT_RET(__wt_cursor_localkey(trunc_info->stop));
+
+    WT_WITH_BTREE(session, CUR2BT(trunc_info->start),
+      ret = __wt_cursor_truncate((WT_CURSOR_BTREE *)trunc_info->start,
+        (WT_CURSOR_BTREE *)trunc_info->stop, __clayered_stable_replay_remove_int));
+    return (ret);
+}
+
+/*
  * __wt_layered_truncate --
  *     Discard a cursor range from the layered table.
  */
