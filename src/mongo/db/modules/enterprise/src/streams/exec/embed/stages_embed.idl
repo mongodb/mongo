@@ -1,0 +1,92 @@
+#    Copyright (C) 2026-present MongoDB, Inc.
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the Server Side Public License, version 1,
+#    as published by MongoDB, Inc.
+
+# Snippet to merge into src/mongo/db/modules/enterprise/src/streams/exec/stages.idl.
+# Defines the parser types for the $embed stream-processing stage.
+
+global:
+    cpp_namespace: "mongo::streams"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+enums:
+    EmbedErrorMode:
+        description: "Behavior when the embedding API call fails for a document."
+        type: string
+        values:
+            kFail: "fail"
+            kDlq: "dlq"
+            kIgnore: "ignore"
+
+structs:
+    EmbedModelSpec:
+        description: "Embedding model selector."
+        strict: true
+        fields:
+            connectionName:
+                description: "Connection Registry entry that stores endpoint and credentials."
+                type: string
+            name:
+                description: "Provider-specific model identifier (e.g. voyage-3-large)."
+                type: string
+            dimensions:
+                description: >-
+                    Optional reduced-dimension output, where the provider supports it.
+                type: int
+                optional: true
+
+    EmbedBatchSpec:
+        description: "Dual-threshold batching configuration."
+        strict: true
+        fields:
+            maxSize:
+                description: "Flush when this many documents accumulate."
+                type: int
+                default: 96
+            maxWaitMs:
+                description: "Flush after this many milliseconds, whichever fires first."
+                type: int
+                default: 50
+
+    EmbedCacheSpec:
+        description: "Content-addressed LRU cache config."
+        strict: true
+        fields:
+            enabled:
+                description: "When true, identical inputs reuse prior embeddings."
+                type: bool
+                default: false
+            maxEntries:
+                description: "Maximum number of entries the LRU may retain."
+                type: int
+                default: 10000
+
+    EmbedStageSpec:
+        description: "Specification for the $embed stage."
+        strict: true
+        fields:
+            input:
+                description: "Aggregation expression yielding the string to embed."
+                type: IDLAnyType
+            into:
+                description: "Dotted field path where the embedding array is written."
+                type: string
+            model:
+                description: "Embedding model selection."
+                type: EmbedModelSpec
+            batch:
+                description: "Optional batching configuration."
+                type: EmbedBatchSpec
+                optional: true
+            cache:
+                description: "Optional cache configuration."
+                type: EmbedCacheSpec
+                optional: true
+            onError:
+                description: "Behavior on a non-retryable embedding API failure."
+                type: EmbedErrorMode
+                default: kFail

@@ -1,0 +1,50 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//src/mongo/db/modules/enterprise:__subpackages__"])
+
+mongo_cc_library(
+    name = "embed",
+    srcs = [
+        "embed_operator.cpp",
+        "planning.cpp",
+    ],
+    hdrs = [
+        "embed_operator.h",
+        "planning.h",
+    ],
+    deps = [
+        "//src/mongo/bson:bson",
+        "//src/mongo/db/exec/document_value:document_value",
+        "//src/mongo/db/modules/enterprise/src/streams/exec:context",
+        "//src/mongo/db/modules/enterprise/src/streams/exec:dead_letter_queue",
+        "//src/mongo/db/modules/enterprise/src/streams/exec:message",
+        "//src/mongo/db/modules/enterprise/src/streams/exec:operator",
+        "//src/mongo/db/modules/enterprise/src/streams/exec:stages_gen",
+        "//src/mongo/db/pipeline:expression",
+        "//src/mongo/db/pipeline:field_path",
+        "//src/mongo/util:assert_util",
+        "//src/mongo/util/net:http_client",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "embed_operator_test",
+    srcs = ["tests/embed_operator_test.cpp"],
+    deps = [
+        ":embed",
+        "//src/mongo/db/modules/enterprise/src/streams/exec/tests:operator_test_fixture",
+        "//src/mongo/idl:idl_parser",
+        "//src/mongo/unittest:unittest",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "embed_planning_test",
+    srcs = ["tests/planning_test.cpp"],
+    deps = [
+        ":embed",
+        "//src/mongo/db/modules/enterprise/src/streams/exec/tests:operator_test_fixture",
+        "//src/mongo/idl:idl_parser",
+        "//src/mongo/unittest:unittest",
+    ],
+)

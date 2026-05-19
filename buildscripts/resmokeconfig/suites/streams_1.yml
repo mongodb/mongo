@@ -2,6 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
+    - src/mongo/db/modules/*/jstests/streams/embed.js
     - src/mongo/db/modules/*/jstests/streams/modify_2.js
     - src/mongo/db/modules/*/jstests/streams/processing_time_window.js
 
