@@ -182,8 +182,6 @@ private:
 
     JoinPhase _joinPhase{JoinPhase::kProbing};
     JoinCursor _cursor = JoinCursor::empty();
-    bool _innerOpened{false};
-    bool _outerOpened{false};
 
     PlanStage* outerChild() const {
         return _children[0].get();

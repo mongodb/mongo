@@ -90,6 +90,5 @@ private:
     vm::ByteCode _bytecode;
 
     bool _compiled{false};
-    bool _childOpened{false};
 };
 }  // namespace mongo::sbe

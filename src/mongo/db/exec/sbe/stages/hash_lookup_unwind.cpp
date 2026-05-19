@@ -164,7 +164,6 @@ void HashLookupUnwindStage::open(bool reOpen) {
 
     // Insert the inner side into the hash table.
     innerChild()->open(false);
-    _innerOpened = true;
     while (innerChild()->getNext() == PlanState::ADVANCED) {
         value::FixedSizeRow<1 /*N*/> value;
 
@@ -192,9 +191,7 @@ void HashLookupUnwindStage::open(bool reOpen) {
     }
 
     innerChild()->close();
-    _innerOpened = false;
     outerChild()->open(reOpen);
-    _outerOpened = true;
 }  // HashLookupUnwindStage::open
 
 PlanState HashLookupUnwindStage::getNext() {
@@ -241,14 +238,7 @@ PlanState HashLookupUnwindStage::getNext() {
 void HashLookupUnwindStage::close() {
     auto optTimer(getOptTimer(_opCtx));
     trackClose();
-    if (_innerOpened) {
-        innerChild()->close();
-        _innerOpened = false;
-    }
-    if (_outerOpened) {
-        outerChild()->close();
-        _outerOpened = false;
-    }
+    outerChild()->close();
     reset(true /* fromClose */);
 }
 

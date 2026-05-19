@@ -100,6 +100,5 @@ private:
     std::vector<value::OwnedValueAccessor> _outputAccessors;
     value::SlotMap<size_t> _outputAccessorsIdxForSlotId;
     std::vector<value::ScalarProjectionPositionInfoRecorder> _recorders;
-    bool _childOpened{false};
 };
 }  // namespace mongo::sbe

@@ -106,7 +106,6 @@ void UniqueStage::open(bool reOpen) {
         _memoryTracker->set(0);
     }
     _children[0]->open(reOpen);
-    _childOpened = true;
 }
 
 PlanState UniqueStage::getNext() {
@@ -151,10 +150,7 @@ void UniqueStage::close() {
     _prevSeenSizeBytes = 0;
     _specificStats.peakTrackedMemBytes = _memoryTracker->peakTrackedMemoryBytes();
 
-    if (_childOpened) {
-        _children[0]->close();
-        _childOpened = false;
-    }
+    _children[0]->close();
 }
 
 std::unique_ptr<PlanStageStats> UniqueStage::getStats(bool includeDebugInfo) const {
@@ -252,7 +248,6 @@ void UniqueRoaringStage::open(bool reOpen) {
         _prevSeenSizeBytes = 0;
     }
     _children[0]->open(reOpen);
-    _childOpened = true;
 }
 
 PlanState UniqueRoaringStage::getNext() {
@@ -318,10 +313,7 @@ void UniqueRoaringStage::close() {
     _prevSeenSizeBytes = 0;
     _specificStats.peakTrackedMemBytes = _memoryTracker->peakTrackedMemoryBytes();
 
-    if (_childOpened) {
-        _children[0]->close();
-        _childOpened = false;
-    }
+    _children[0]->close();
 }
 
 std::unique_ptr<PlanStageStats> UniqueRoaringStage::getStats(bool includeDebugInfo) const {

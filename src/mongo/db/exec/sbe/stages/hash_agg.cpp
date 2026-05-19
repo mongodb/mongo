@@ -517,10 +517,8 @@ void HashAggStage::close() {
     _spilledAggRow = {0};
     _stashedNextRow = {0, 0};
 
-    if (_childOpened) {
-        _children[0]->close();
-        _childOpened = false;
-    }
+    _children[0]->close();
+    _childOpened = false;
 
     _memoryTracker.value().set(0);
     _specificStats.peakTrackedMemBytes = _memoryTracker.value().peakTrackedMemoryBytes();

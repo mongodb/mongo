@@ -649,7 +649,6 @@ boost::optional<BlockHashAggStage::TokenizedKeys> BlockHashAggStage::tryTokenize
 void BlockHashAggStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
     _children[0]->open(reOpen);
-    _childOpened = true;
     _commonStats.opens++;
 
     _ht.emplace();
@@ -1002,10 +1001,7 @@ void BlockHashAggStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
-    if (_childOpened) {
-        _children[0]->close();
-        _childOpened = false;
-    }
+    _children[0]->close();
 
     _ht = boost::none;
     if (_recordStore && _opCtx) {

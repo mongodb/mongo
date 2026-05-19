@@ -98,8 +98,6 @@ private:
 
     std::vector<value::SwitchAccessor> _outAccessors;
 
-    bool _childrenOpened{false};
-
     // Maintains state about merging the results in order. Initialized during prepare().
     boost::optional<SortedStreamMerger<PlanStage>> _merger;
 };

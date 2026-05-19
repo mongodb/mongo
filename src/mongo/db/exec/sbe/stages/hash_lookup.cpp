@@ -175,7 +175,6 @@ void HashLookupStage::open(bool reOpen) {
 
     // Insert the inner side into the hash table.
     innerChild()->open(false);
-    _innerOpened = true;
     value::FixedSizeRow<1 /*N*/> value{1};
     while (innerChild()->getNext() == PlanState::ADVANCED) {
         // Copy the projected value.
@@ -202,9 +201,7 @@ void HashLookupStage::open(bool reOpen) {
     }
 
     innerChild()->close();
-    _innerOpened = false;
     outerChild()->open(reOpen);
-    _outerOpened = true;
 }  // HashLookupStage::open
 
 template <typename Container>
@@ -238,14 +235,7 @@ PlanState HashLookupStage::getNext() {
 void HashLookupStage::close() {
     auto optTimer(getOptTimer(_opCtx));
     trackClose();
-    if (_innerOpened) {
-        innerChild()->close();
-        _innerOpened = false;
-    }
-    if (_outerOpened) {
-        outerChild()->close();
-        _outerOpened = false;
-    }
+    outerChild()->close();
     reset(true /* fromClose */);
 }
 
