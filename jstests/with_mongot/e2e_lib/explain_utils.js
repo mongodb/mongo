@@ -273,17 +273,34 @@ export function assertLookupSearchSubPipelineAppliedViews(
  * $unionWith, $lookup does not produce a full nested explain with per-stage execution stats — it
  * serializes the resolved introspection pipeline as an array of stage specs. This function performs
  * an abridged verification: confirming the sub-pipeline is present, that the expected search stage
- * appears as its first stage, and (for non-queryPlanner verbosities) that the $lookup stage itself
- * reports the expected nReturned.
+ * appears as its first stage, and (for non-queryPlanner verbosities where $lookup ran on individual
+ * shards) that the $lookup stage itself reports the expected nReturned.
+ *
+ * Note: when $lookup runs on the merger (e.g. because its sub-pipeline contains $searchMeta),
+ * nReturned is not checked even for non-queryPlanner verbosities, because mergerPart is always
+ * serialized at queryPlanner verbosity and execution stats are not tracked there.
  *
  * @param {Object} explainOutput The explain output from the whole aggregation.
  * @param {string} searchStageType The expected first stage name, e.g. "$search" or "$searchMeta".
  * @param {string} verbosity The explain verbosity.
  * @param {NumberLong} nReturned Expected total nReturned across all $lookup stages (sum across
- *     shards). Not needed when verbosity is "queryPlanner".
+ *     shards). Not checked when verbosity is "queryPlanner" or when $lookup runs on the merger.
  */
 export function verifyE2ELookupSearchExplainOutput({explainOutput, searchStageType, verbosity, nReturned = null}) {
+    // getAggPlanStages searches root.stages and root.shards[*].stages but not splitPipeline.
+    // When $lookup runs on the merger (e.g. because its sub-pipeline contains $searchMeta),
+    // it appears only in splitPipeline.mergerPart. Fall back to getLookupStage, which is
+    // splitPipeline-aware, to keep traversal logic centralized in analyze_plan.js.
     let lookupStages = getAggPlanStages(explainOutput, "$lookup");
+    let fromMergerPart = false;
+    if (lookupStages.length === 0) {
+        const stage = getLookupStage(explainOutput);
+        if (stage) {
+            lookupStages = [stage];
+            fromMergerPart = true;
+        }
+    }
+
     assert.gt(lookupStages.length, 0, "Expected at least one $lookup stage: " + tojson(explainOutput));
     for (let stage of lookupStages) {
         let stageSpec = stage["$lookup"];
@@ -302,7 +319,9 @@ export function verifyE2ELookupSearchExplainOutput({explainOutput, searchStageTy
                 tojson(stageSpec["pipeline"][0]),
         );
     }
-    if (verbosity != "queryPlanner") {
+    // mergerPart is always serialized at queryPlanner verbosity (execution stats are not
+    // supported there), so nReturned is unavailable when $lookup runs on the merger.
+    if (verbosity != "queryPlanner" && !fromMergerPart) {
         let lookupReturned = 0;
         // In the sharded scenario, there will be more than one $lookup stage.
         for (let stage of lookupStages) {
