@@ -72,6 +72,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             // collection options, but then created by another thread before $out finished
             // timeseries options validation.
             7268700,
+            // $out's temporary collection can be dropped by a concurrent thread mid-execution.
+            ErrorCodes.NamespaceNotFound,
         ];
 
         // TODO (SERVER-88275) a moveCollection can cause the original collection to be dropped and
@@ -157,11 +159,17 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.createIndexes = function createIndexes(db, unusedCollName) {
         // Create timeseries_agg_out as timeseries before running createIndex to prevent the case
         // the collection is created for the first time by the createIndex itself.
+        const allowedErrorCodes = [ErrorCodes.NamespaceExists];
+        // TODO (SERVER-88275) On slow builds with the balancer enabled, the router can exhaust
+        // all refresh attempts without converging, causing StaleConfig to be returned.
+        if (TestData.runningWithBalancer) {
+            allowedErrorCodes.push(ErrorCodes.StaleConfig);
+        }
         assert.commandWorkedOrFailedWithCode(
             db.createCollection(this.outputCollName, {
                 timeseries: {timeField: timeFieldName, metaField: metaFieldName},
             }),
-            [ErrorCodes.NamespaceExists],
+            allowedErrorCodes,
         );
 
         for (let i = 0; i < this.indexSpecs; ++i) {
