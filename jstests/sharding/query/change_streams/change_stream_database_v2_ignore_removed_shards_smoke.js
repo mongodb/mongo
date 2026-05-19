@@ -36,7 +36,8 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
     let db;
     let coll;
     let csTest;
-    let shardsAdded = [];
+    let extraReplicaSetsToRemove = [];
+    let shardsToReAdd = [];
 
     let skipCheckingIndexesConsistentAcrossClusterWas;
 
@@ -49,19 +50,11 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // `ShardingTest` Fixture has been removed. It is fine to skip the index consistency in this
         // test because it focuses on change stream results correctness.
         TestData.skipCheckingIndexesConsistentAcrossCluster = true;
-    });
 
-    after(() => {
-        // Restore the previous value of 'skipCheckingIndexesConsistentAcrossCluster' so that the
-        // change does not leak into any following tests running in the same instance.
-        TestData.skipCheckingIndexesConsistentAcrossCluster = skipCheckingIndexesConsistentAcrossClusterWas;
-    });
-
-    beforeEach(function () {
-        // Create a sharded cluster with 4 shards.
-        // Documents are only inserted on shard0, shard1, and shard2.
-        // shard3 is only used so that we can remove shard0, shard1, and shard2 from the test later.
-        // One shard needs to remain present so that we can successfully shut down the test later.
+        // Create one cluster shared across all test cases. afterEach() restores removed shards via
+        // addShard so each test starts with a full 4-shard cluster without a full restart.
+        // shard3 is never removed; it ensures the cluster always has at least one shard for a clean
+        // shutdown.
         st = new ShardingTest({
             shards: 4,
             mongos: 1,
@@ -77,11 +70,21 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
                 enableBalancer: false,
             },
         });
+    });
 
+    after(() => {
+        st.stop();
+        // Restore the previous value of 'skipCheckingIndexesConsistentAcrossCluster' so that the
+        // change does not leak into any following tests running in the same instance.
+        TestData.skipCheckingIndexesConsistentAcrossCluster = skipCheckingIndexesConsistentAcrossClusterWas;
+    });
+
+    beforeEach(function () {
         db = st.s.getDB(jsTestName());
         db.dropDatabase();
         coll = db.test;
-        shardsAdded = [];
+        extraReplicaSetsToRemove = [];
+        shardsToReAdd = [];
     });
 
     afterEach(function () {
@@ -90,11 +93,23 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
             csTest = null;
         }
         db.dropDatabase();
-        shardsAdded.forEach((shard) => {
-            shard.stopSet();
+        withBalancerEnabled(st.s, () => {
+            extraReplicaSetsToRemove.forEach((shard) => {
+                removeShard(st, shard.shardName);
+                shard.stopSet();
+            });
+            extraReplicaSetsToRemove = [];
         });
-        st.stop();
-        shardsAdded = [];
+
+        // Re-introduce any decommissioned shards back into the cluster.
+        shardsToReAdd.forEach((shard) => {
+            assert.commandWorked(
+                st.s.adminCommand({
+                    addShard: shard.rs.getURL(),
+                    name: shard.shardName,
+                }),
+            );
+        });
     });
 
     // Query the current data distribution of the collection across the shards.
@@ -103,7 +118,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         [st.shard0, st.shard1, st.shard2, st.shard3].forEach((shardConn) => {
             docs[shardConn.shardName] = shardConn.getDB(db.getName())[coll.getName()].find().itcount();
         });
-        shardsAdded.forEach((shard) => {
+        extraReplicaSetsToRemove.forEach((shard) => {
             docs[shard.shardName] = shard.getPrimary().getDB(db.getName())[coll.getName()].find().itcount();
         });
         return docs;
@@ -247,11 +262,13 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
             // from the shard to decommission, using the balancer.
             beforeDecommission();
 
+            shardsToReAdd.push(...shardsToDecommission);
             shardsToDecommission.forEach((shardToDecommission) => {
                 // Remove and decommission a shard from the system.
-                jsTest.log.info(`Decommissioning shard ${shardToDecommission}`);
-                removeShard(st, shardToDecommission);
-                jsTest.log.info(`Shard ${shardToDecommission} successfully decommissioned`);
+                jsTest.log.info(`Decommissioning shard ${shardToDecommission.shardName}`);
+                removeShard(st, shardToDecommission.shardName);
+                st.restartShardClean(shardToDecommission);
+                jsTest.log.info(`Shard ${shardToDecommission.shardName} successfully decommissioned`);
             });
         });
 
@@ -329,11 +346,13 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
             // from the shard to decommission, using the balancer.
             beforeDecommission();
 
+            shardsToReAdd.push(...shardsToDecommission);
             shardsToDecommission.forEach((shardToDecommission) => {
                 // Remove and decommission a shard from the system.
-                jsTest.log.info(`Decommissioning shard ${shardToDecommission}`);
-                removeShard(st, shardToDecommission);
-                jsTest.log.info(`Shard ${shardToDecommission} successfully decommissioned`);
+                jsTest.log.info(`Decommissioning shard ${shardToDecommission.shardName}`);
+                removeShard(st, shardToDecommission.shardName);
+                st.restartShardClean(shardToDecommission);
+                jsTest.log.info(`Shard ${shardToDecommission.shardName} successfully decommissioned`);
             });
         });
     }
@@ -353,7 +372,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // Execute the operations on the collection, make shard2 the primary shard for the database
         // and then remove shard0.
         executeCollectionOperations(
-            [st.shard0.shardName],
+            [st.shard0],
             () => {
                 assert.commandWorked(
                     st.s.adminCommand({
@@ -413,7 +432,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // Execute the operations on the collection, make shard2 the primary shard for the database
         // and then remove shard0 and shard1.
         executeCollectionOperations(
-            [st.shard0.shardName, st.shard1.shardName],
+            [st.shard0, st.shard1],
             () => {
                 assert.commandWorked(
                     st.s.adminCommand({
@@ -468,7 +487,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         const startAtOperationTime = getClusterTime(db);
 
         // Execute the operations on the collection and then remove shard2.
-        executeCollectionOperations([st.shard2.shardName], () => {}, true);
+        executeCollectionOperations([st.shard2], () => {}, true);
 
         // Open a change stream and compare the events.
         csTest = new ChangeStreamTest(db);
@@ -524,7 +543,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // Execute the operations on the collection, add a new shard and make this new shard the
         // primary shard for the database. Then decommission shard0, shard1 and shard2.
         executeCollectionOperations(
-            [st.shard0.shardName, st.shard1.shardName, st.shard2.shardName],
+            [st.shard0, st.shard1, st.shard2],
             () => {
                 newShard = new ReplSetTest({
                     nodes: 1,
@@ -569,7 +588,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         );
 
         assert.neq(newShard, null, "Expected a new shard to have been added");
-        shardsAdded.push(newShard);
+        extraReplicaSetsToRemove.push(newShard);
 
         // Open a change stream and compare the events.
         csTest = new ChangeStreamTest(db);
@@ -638,9 +657,12 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
 
         // Remove shard0 from the cluster. After removal, shard0's oplog (including all events
         // above) is no longer accessible.
+        shardsToReAdd.push(st.shard0);
         withBalancerEnabled(st.s, () => {
             removeShard(st, st.shard0.shardName);
         });
+
+        st.restartShardClean(st.shard0);
 
         // Open a retroactive database-level change stream on the dropped database.
         const comment = "only_shard_removed";
@@ -723,9 +745,12 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
 
         // Remove shard1 from the cluster. After removal, shard1's oplog (including the drop events)
         // is no longer accessible.
+        shardsToReAdd.push(st.shard1);
         withBalancerEnabled(st.s, () => {
             removeShard(st, st.shard1.shardName);
         });
+
+        st.restartShardClean(st.shard1);
 
         // Open a retroactive database-level change stream on the dropped database.
         const comment = "last_shard_removed";
@@ -783,7 +808,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
 
         csTest.assertNoChange(csCursor);
 
-        assertOpenCursors(st, [], /*expectedConfigCursor=*/ false, cursorCommentFilter(comment));
+        assertOpenCursors(st, [], /*expectedConfigCursor=*/ true, cursorCommentFilter(comment));
     });
 
     it("returns events in ignoreRemovedShards mode for multiple collections when no shards are decommissioned", () => {
@@ -825,7 +850,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // Record high-watermark time marking the start point of the test.
         const startAtOperationTime = getClusterTime(db);
 
-        executeMultiCollectionOperations(() => {}, [st.shard1.shardName]);
+        executeMultiCollectionOperations(() => {}, [st.shard1]);
 
         // Open a change stream on a non-existing collection in ignoreRemovedShards mode from the
         // original start point, and assume that the events from non-decommissioned shards are returned.
@@ -865,7 +890,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
                     to: st.shard1.shardName,
                 }),
             );
-        }, [st.shard0.shardName, st.shard2.shardName]);
+        }, [st.shard0, st.shard2]);
 
         // Open a change stream on a non-existing collection in ignoreRemovedShards mode from the
         // original start point, and assume that the events from non-decommissioned shards returned.

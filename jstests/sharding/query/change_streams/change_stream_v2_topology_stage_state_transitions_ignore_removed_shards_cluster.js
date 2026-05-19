@@ -48,22 +48,18 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
     let db;
     let coll;
     let csTest;
+    let shardsToReAdd = [];
 
     let savedSkipIndexCheck;
 
     before(() => {
         savedSkipIndexCheck = TestData.skipCheckingIndexesConsistentAcrossCluster;
-    });
-
-    after(() => {
-        TestData.skipCheckingIndexesConsistentAcrossCluster = savedSkipIndexCheck;
-    });
-
-    beforeEach(() => {
         // Temporarily disable index-consistency checks because they fail when a shard has been
         // removed from the cluster.
         TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 
+        // Create one cluster shared across all test cases. afterEach() restores removed shards via
+        // addShard so each test starts with a full 4-shard cluster without a full restart.
         // shard3 is a survivor shard: it is never removed and ensures that the cluster has at least
         // one shard remaining for a clean shutdown.
         st = new ShardingTest({
@@ -92,7 +88,15 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                 },
             },
         });
+    });
 
+    after(() => {
+        st.stop();
+        TestData.skipCheckingIndexesConsistentAcrossCluster = savedSkipIndexCheck;
+    });
+
+    beforeEach(() => {
+        shardsToReAdd = [];
         db = st.s.getDB(dbName);
         db.dropDatabase();
         coll = db.test;
@@ -104,7 +108,15 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
             csTest = null;
         }
         db.dropDatabase();
-        st.stop();
+        shardsToReAdd.forEach((shard) => {
+            st.restartShardClean(shard);
+            assert.commandWorked(
+                st.s.adminCommand({
+                    addShard: shard.rs.getURL(),
+                    name: shard.shardName,
+                }),
+            );
+        });
     });
 
     describe("Cluster-level change streams", () => {
@@ -126,6 +138,7 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
             // Drain shard1 by moving its user-data chunk ({_id: 1}) to shard2, then remove shard1.
             // After removal, the cluster's placement history at T_before still records
             // {shard0, shard1}.
+            shardsToReAdd.push(st.shard1);
             removeShardFromCluster(st, st.shard1.shardName, () => {
                 assert.commandWorked(
                     db.adminCommand({
@@ -198,6 +211,7 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
 
             // Insert two documents inside the degraded window and two after T_drain. The post-
             // T_drain documents exercise the undoGetNext() path.
+            shardsToReAdd.push(st.shard1);
             removeShardFromCluster(st, st.shard1.shardName, () => {
                 assert.commandWorked(coll.insert({_id: -10}));
                 assert.commandWorked(coll.insert({_id: -20}));
@@ -210,6 +224,7 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
                     }),
                 );
             });
+
             assert.commandWorked(coll.insert({_id: -30}));
             assert.commandWorked(coll.insert({_id: -40}));
 
@@ -278,6 +293,7 @@ describe("ChangeStreamHandleTopologyChangeV2Stage: IRS degraded-mode state trans
             assert.commandWorked(coll.insert({_id: 100}));
             assert.commandWorked(coll.insert({_id: 200}));
 
+            shardsToReAdd.push(st.shard2);
             removeShardFromCluster(st, st.shard2.shardName, () => {
                 assert.commandWorked(
                     db.adminCommand({
