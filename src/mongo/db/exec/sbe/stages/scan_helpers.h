@@ -60,9 +60,7 @@ MONGO_COMPILER_ALWAYS_INLINE inline void placeFieldsFromRecordInAccessors(
     if (scanFieldAccessors.size() == 1) {
         // If we're only looking for 1 field, then it's more efficient to forgo the hashtable
         // and just use equality comparison.
-        auto name = StringData{scanFieldNames[0]};
-        auto [tag, val] = bson::getField(rawBson, name);
-        scanFieldAccessors.front().reset(value::TagValueView{tag, val});
+        scanFieldAccessors.front().reset(bson::getField(rawBson, scanFieldNames[0]));
     } else {
         // If we're looking for 2 or more fields, it's more efficient to use the hashtable.
         for (auto& accessor : scanFieldAccessors) {

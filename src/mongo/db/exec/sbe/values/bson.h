@@ -36,7 +36,6 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
-#include <utility>
 
 // TODO(SERVER-114140): Remove all MONGO_MOD_NEEDS_REPLACEMENT annotations
 
@@ -98,8 +97,7 @@ inline const char* getValue(const char* be) noexcept {
     return be + 1 + strlen(be + 1) + 1;
 }
 
-inline std::pair<value::TypeTags, value::Value> getField(const char* be,
-                                                         StringData fieldStr) noexcept {
+inline value::TagValueView getField(const char* be, StringData fieldStr) noexcept {
     const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
     be += sizeof(int);
     const auto targetSize = fieldStr.size();
