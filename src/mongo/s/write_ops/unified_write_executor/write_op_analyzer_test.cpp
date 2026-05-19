@@ -34,6 +34,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_test_fixture_common.h"
+#include "mongo/db/topology/cluster_parameters/migration_blocking_operation_cluster_parameters_gen.h"
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
@@ -81,22 +82,6 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
                                                    std::move(targeter));
         }
         setupShards(shards);
-    }
-
-    void setClusterParameter(std::string parameter) {
-        OnlyTargetDataOwningShardsForMultiWritesParam updatedParam;
-        ClusterServerParameter baseCSP;
-        baseCSP.setClusterParameterTime(LogicalTime(Timestamp(Date_t::now())));
-        baseCSP.set_id(parameter);
-        updatedParam.setClusterServerParameter(baseCSP);
-        updatedParam.setEnabled(true);
-        auto param = ServerParameterSet::getClusterParameterSet()->get(parameter);
-        ASSERT_OK(param->set(updatedParam.toBSON(), boost::none));
-    }
-
-    void resetClusterParameter(std::string parameter) {
-        auto param = ServerParameterSet::getClusterParameterSet()->get(parameter);
-        ASSERT_OK(param->reset(boost::none));
     }
 
     Stats stats;
@@ -825,8 +810,10 @@ TEST_F(WriteOpAnalyzerTestImpl, MultiWriteInATransaction) {
 
 TEST_F(WriteOpAnalyzerTestImpl,
        MultiWriteWithOnlyTargetDataOwningShardsForMultiWritesParamEnabled) {
-    // Set the "onlyTargetDataOwningShardsForMultiWrites" cluster param to true.
-    setClusterParameter("onlyTargetDataOwningShardsForMultiWrites");
+    OnlyTargetDataOwningShardsForMultiWritesParam onlyTargetParam;
+    onlyTargetParam.setEnabled(true);
+    RAIIServerParameterControllerForTest onlyTargetGuard("onlyTargetDataOwningShardsForMultiWrites",
+                                                         onlyTargetParam);
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
@@ -864,12 +851,13 @@ TEST_F(WriteOpAnalyzerTestImpl,
     ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[1].shardVersion->placementVersion());
 
     rtx->onRequestSentForNss(nss);
-    resetClusterParameter("onlyTargetDataOwningShardsForMultiWrites");
 }
 
 TEST_F(WriteOpAnalyzerTestImpl, PauseMigrationsDuringMultiUpdatesParamEnabledWithMultiUpdate) {
-    // Set the "pauseMigrationsDuringMultiUpdates" cluster param to true.
-    setClusterParameter("pauseMigrationsDuringMultiUpdates");
+    migration_blocking_operation::PauseMigrationsDuringMultiUpdatesParam pauseParam;
+    pauseParam.setEnabled(true);
+    RAIIServerParameterControllerForTest pauseGuard("pauseMigrationsDuringMultiUpdates",
+                                                    pauseParam);
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
@@ -894,7 +882,6 @@ TEST_F(WriteOpAnalyzerTestImpl, PauseMigrationsDuringMultiUpdatesParamEnabledWit
     ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[1].shardVersion->placementVersion());
 
     rtx->onRequestSentForNss(nss);
-    setClusterParameter("pauseMigrationsDuringMultiUpdates");
 }
 
 TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesSimple) {
