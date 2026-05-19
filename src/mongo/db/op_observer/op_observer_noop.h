@@ -286,6 +286,8 @@ public:
     void onInvalidateCollectionMetadata(OperationContext* opCtx,
                                         const repl::OplogEntry& op) override {}
 
+    void onSetAllowChunkOperations(OperationContext* opCtx, const repl::OplogEntry& op) override {}
+
     void onTruncateRange(OperationContext* opCtx,
                          const CollectionPtr& coll,
                          const RecordId& minRecordId,

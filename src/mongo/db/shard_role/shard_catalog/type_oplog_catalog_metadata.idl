@@ -78,3 +78,14 @@ structs:
     CollectionShardingStateDeltaOplogEntry:
         description: "Oplog entry format for delta changes to apply to the overall CSS"
         strict: false
+
+    SetAllowChunkOperationsOplogEntry:
+        description: "Oplog entry format to signal the change of allowChunkOperations"
+        strict: false
+        fields:
+            setAllowChunkOperations:
+                type: string
+                description: "Collection name for which we are changing allowChunkOperations"
+            allowChunkOperations:
+                type: bool
+                description: "The new value of allowChunkOperations"

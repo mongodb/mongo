@@ -1328,6 +1328,12 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          opCtx->getServiceContext()->getOpObserver()->onInvalidateCollectionMetadata(opCtx, *op);
          return Status::OK();
      }}},
+    {"setAllowChunkOperations",
+     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+          -> Status {
+         opCtx->getServiceContext()->getOpObserver()->onSetAllowChunkOperations(opCtx, *op);
+         return Status::OK();
+     }}},
     {"truncateRange",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {

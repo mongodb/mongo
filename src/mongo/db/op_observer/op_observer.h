@@ -762,6 +762,11 @@ public:
                                                 const repl::OplogEntry& op) = 0;
 
     /**
+     * Called when the authoritative CSS needs to update the value of allowChunkOperations.
+     */
+    virtual void onSetAllowChunkOperations(OperationContext* opCtx, const repl::OplogEntry& op) = 0;
+
+    /**
      * Called when 'truncateRange' is called on a collection.
      * Out parameter 'opTime' is updated to the optime of the oplog entry logged.
      */

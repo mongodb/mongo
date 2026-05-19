@@ -752,4 +752,9 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
     }
 }
 
+void ShardServerOpObserver::onSetAllowChunkOperations(OperationContext* opCtx,
+                                                      const repl::OplogEntry& op) {
+    // TODO (SERVER-121209): implement.
+}
+
 }  // namespace mongo

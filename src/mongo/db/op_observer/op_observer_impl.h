@@ -296,6 +296,8 @@ public:
     void onInvalidateCollectionMetadata(OperationContext* opCtx, const repl::OplogEntry& op) final {
     }
 
+    void onSetAllowChunkOperations(OperationContext* opCtx, const repl::OplogEntry& op) final {}
+
     void onTruncateRange(OperationContext* opCtx,
                          const CollectionPtr& coll,
                          const RecordId& minRecordId,
