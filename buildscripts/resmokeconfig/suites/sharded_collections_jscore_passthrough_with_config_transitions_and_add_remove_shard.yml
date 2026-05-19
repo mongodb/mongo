@@ -75,6 +75,7 @@ selector:
     - jstests/core/timeseries/query/bucket_unpacking_with_compound_sort_on_point_queries.js
     - jstests/core/timeseries/query/bucket_unpacking_with_limit.js
     - jstests/core/timeseries/query/bucket_unpacking_with_sort_negative.js
+    - jstests/core/timeseries/query/bucket_unpacking_with_sort_on_multiple_fields_point_queries.js
     - jstests/core/timeseries/query/bucket_unpacking_with_sort_with_collation.js
     - jstests/core/timeseries/query/timeseries_find.js
     - jstests/core/timeseries/query/timeseries_hint.js
