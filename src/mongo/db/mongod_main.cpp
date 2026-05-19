@@ -1976,6 +1976,17 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                                                         true /* memLeakAllowed */);
     }
 
+    // Stop FTDC before tearing down FlowControl. The FTDC background thread runs serverStatus
+    // collection (including FlowControl::get()) concurrently. Joining the FTDC thread here
+    // ensures it is fully quiesced before FlowControl::shutdown() resets the unique_ptr
+    // decoration, preventing a TSAN data race between the two threads.
+    {
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::shutDownFTDC,
+                                       &shutdownTimeElapsedBuilder);
+        stopMongoDFTDC();
+    }
+
     // Stop flow control before service lifecycle storage-access shutdown so the periodic job does
     // not overlap it.
     {
@@ -2013,14 +2024,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                        TimedSectionId::shutDownOtelTraces,
                                        &shutdownTimeElapsedBuilder);
         otel::traces::shutdown(serviceContext);
-    }
-
-    // Shutdown Full-Time Data Capture
-    {
-        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                       TimedSectionId::shutDownFTDC,
-                                       &shutdownTimeElapsedBuilder);
-        stopMongoDFTDC();
     }
 
     {
