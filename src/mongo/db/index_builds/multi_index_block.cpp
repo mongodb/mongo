@@ -392,6 +392,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     _buildIsCleanedUp = false;
 
     invariant(_indexes.empty());
+    // Reserve the indexes upfront so that any references to them remain valid.
+    _indexes.reserve(indexes.size());
 
     _wasResumed = resumeInfo.has_value();
     if (resumeInfo) {
@@ -575,7 +577,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                             _exec->saveState();
                         },
                     .onSpill =
-                        [this, opCtx] {
+                        [this, opCtx, &lastSpilledRecordId = index.lastSpilledRecordId] {
+                            lastSpilledRecordId = _lastRecordIdInserted;
                             if (_isResumable) {
                                 _writeStateToContainer(opCtx);
                             }
@@ -1679,6 +1682,10 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
                     break;
                 }
             }
+        }
+
+        if (_phase == IndexBuildPhaseEnum::kCollectionScan) {
+            indexStateInfo.setLastSpilledRecordId(index.lastSpilledRecordId);
         }
 
         auto& indexBuildInfo = index.block->getIndexBuildInfo();

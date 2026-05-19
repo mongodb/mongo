@@ -2117,6 +2117,143 @@ TEST_F(MultiIndexBlockTest, OnSpillCallbackSeesLatestRecordIdAndKeyCount) {
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordId) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto& indexer = *getIndexer();
+    AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
+    CollectionWriter coll{operationContext(), autoColl};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    WriteUnitOfWork wuow{operationContext()};
+    std::string val(64 * 1024, 'a');
+    auto numDocs = 20;
+    for (auto i = 0; i < numDocs; ++i) {
+        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+    }
+    wuow.commit();
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       engine);
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           {indexBuildInfo},
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        &engine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    EXPECT_EQ(resumeInfo->getPhase(), IndexBuildPhaseEnum::kCollectionScan);
+
+    ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
+    auto lastSpilledRecordId = resumeInfo->getIndexes()[0].getLastSpilledRecordId();
+    ASSERT_TRUE(lastSpilledRecordId);
+    // The most recent spill captures whatever _lastRecordIdInserted held at that moment, which is
+    // also what the scan-position metadata records, so the two values must agree.
+    ASSERT_TRUE(resumeInfo->getCollectionScanPosition());
+    EXPECT_EQ(lastSpilledRecordId->getLong(), resumeInfo->getCollectionScanPosition()->getLong());
+    EXPECT_GT(lastSpilledRecordId->getLong(), 0);
+    EXPECT_LE(lastSpilledRecordId->getLong(), numDocs);
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordIdForMultipleIndexes) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto& indexer = *getIndexer();
+    AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
+    CollectionWriter coll{operationContext(), autoColl};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    WriteUnitOfWork wuow{operationContext()};
+    std::string val(64 * 1024, 'a');
+    auto numDocs = 20;
+    for (auto i = 0; i < numDocs; ++i) {
+        ASSERT_OK(Helpers::insert(operationContext(),
+                                  *autoColl,
+                                  BSON("_id" << i << "a" << val << "b" << val << "c" << val)));
+    }
+    wuow.commit();
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto makeInfo = [&](StringData field, StringData ident) {
+        return IndexBuildInfo(BSON("key" << BSON(field << 1) << "name"
+                                         << (std::string(field) + "_1") << "v"
+                                         << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                              std::string(ident),
+                              engine);
+    };
+    std::vector<IndexBuildInfo> infos{
+        makeInfo("a", "index-1"), makeInfo("b", "index-2"), makeInfo("c", "index-3")};
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           infos,
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        &engine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
+    ASSERT_TRUE(resumeInfo);
+    EXPECT_EQ(resumeInfo->getPhase(), IndexBuildPhaseEnum::kCollectionScan);
+
+    ASSERT_TRUE(resumeInfo->getCollectionScanPosition());
+    auto scanPosition = resumeInfo->getCollectionScanPosition()->getLong();
+
+    EXPECT_EQ(resumeInfo->getIndexes().size(), infos.size());
+    for (auto&& indexInfo : resumeInfo->getIndexes()) {
+        auto lastSpilledRecordId = indexInfo.getLastSpilledRecordId();
+        ASSERT_TRUE(lastSpilledRecordId);
+        EXPECT_EQ(lastSpilledRecordId->getLong(), scanPosition);
+        EXPECT_GT(lastSpilledRecordId->getLong(), 0);
+        EXPECT_LE(lastSpilledRecordId->getLong(), numDocs);
+    }
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 // Sorter spills during the collection scan persist resume state with
 // phase=kCollectionScan and the current scan position. On step-up, a new MultiIndexBlock
 // initialized from that state must reopen the existing tables and resume the scan from the saved
@@ -2653,6 +2790,100 @@ TEST_F(MultiIndexBlockTest, LoadDoesNotPeriodicallyWriteWhenNotResumable) {
     auto opsObserved = observer.countInsertsForIdent(indexBuildIdent) +
         observer.countUpdatesForIdent(indexBuildIdent);
     EXPECT_EQ(0U, opsObserved);
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+TEST_F(MultiIndexBlockTest, LastSpilledRecordIdIsNotPersistedDuringLoadPhase) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+    RAIIServerParameterControllerForTest insertionBatchSize{
+        "primaryDrivenIndexBuildIndexInsertionBatchSize", 5};
+    RAIIServerParameterControllerForTest resumeStateInterval{
+        "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 10};
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+    auto& observer = installResumeStateContainerObserver(operationContext());
+
+    auto& indexer = *getIndexer();
+    AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
+    CollectionWriter coll{operationContext(), autoColl};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    WriteUnitOfWork wuow{operationContext()};
+    std::string val(16 * 1024, 'a');
+    for (auto i = 0; i < 50; ++i) {
+        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+    }
+    wuow.commit();
+
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *operationContext()->getServiceContext()->getStorageEngine());
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           {indexBuildInfo},
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    // Collect every persisted ResumeIndexInfo the observer saw (inserts + updates), keyed by
+    // phase.
+    std::vector<ResumeIndexInfo> scanStates;
+    std::vector<ResumeIndexInfo> loadStates;
+    auto record = [&](const auto& ops) {
+        for (auto&& op : ops) {
+            if (op.ident != indexBuildIdent) {
+                continue;
+            }
+            auto info = ResumeIndexInfo::parse(BSONObj{op.value.data()},
+                                               IDLParserContext{"ResumeIndexInfo"});
+            switch (info.getPhase()) {
+                case IndexBuildPhaseEnum::kCollectionScan:
+                    scanStates.push_back(std::move(info));
+                    break;
+                case IndexBuildPhaseEnum::kBulkLoad:
+                    loadStates.push_back(std::move(info));
+                    break;
+                case IndexBuildPhaseEnum::kInitialized:
+                case IndexBuildPhaseEnum::kDrainWrites:
+                    ADD_FAILURE() << "Unexpected index build phase: "
+                                  << idl::serialize(info.getPhase());
+                    break;
+            }
+        }
+    };
+    record(observer.inserts);
+    record(observer.updates);
+
+    EXPECT_FALSE(scanStates.empty());
+    EXPECT_FALSE(loadStates.empty());
+
+    for (const auto& info : scanStates) {
+        ASSERT_EQ(info.getIndexes().size(), 1);
+        EXPECT_TRUE(info.getIndexes()[0].getLastSpilledRecordId());
+    }
+    for (const auto& info : loadStates) {
+        ASSERT_EQ(info.getIndexes().size(), 1);
+        EXPECT_FALSE(info.getIndexes()[0].getLastSpilledRecordId());
+    }
 
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }

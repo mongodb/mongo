@@ -351,6 +351,10 @@ private:
 
         InsertDeleteOptions options;
 
+        // The highest spilled record id. Only set during the scan phase when replicating container
+        // writes.
+        boost::optional<RecordId> lastSpilledRecordId;
+
         // We cache index catalog entry pointer for the collection scan phase. This is necessary for
         // index build performance in the insert path.
         const IndexCatalogEntry* entryForScan = nullptr;
