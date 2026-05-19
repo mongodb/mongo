@@ -675,6 +675,8 @@ last-continuous:
     ticket: SERVER-95570
   - test_file: jstests/aggregation/expressions/trim.js
     ticket: SERVER-120668
+  - test_file: jstests/change_streams/events_containing_version_literals.js
+    ticket: SERVER-111406
   suites: null
 last-lts:
   all:
@@ -1402,4 +1404,6 @@ last-lts:
     ticket: SERVER-95570
   - test_file: jstests/aggregation/expressions/trim.js
     ticket: SERVER-120668
+  - test_file: jstests/change_streams/events_containing_version_literals.js
+    ticket: SERVER-111406
   suites: null
