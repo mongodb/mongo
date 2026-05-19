@@ -44,7 +44,7 @@ void assertCanAcceptContainerWrites(OperationContext* opCtx) {
                     VersionContext::getDecoration(opCtx), fcv));
 
     uassert(ErrorCodes::NotWritablePrimary,
-            str::stream() << "Not primary while inserting to container",
+            str::stream() << "Not primary while writing to container",
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
                 opCtx, NamespaceString::kContainerNamespace));
 }
@@ -91,11 +91,7 @@ Status update(OperationContext* opCtx,
               IntegerKeyedContainer& container,
               int64_t key,
               std::span<const char> value) {
-    uassert(ErrorCodes::NotWritablePrimary,
-            "Not primary while updating container",
-            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
-                opCtx, NamespaceString::kContainerNamespace));
-
+    assertCanAcceptContainerWrites(opCtx);
     auto status = container.update(ru, key, value);
     if (!status.isOK()) {
         return status;
@@ -112,11 +108,7 @@ Status update(OperationContext* opCtx,
               StringKeyedContainer& container,
               std::span<const char> key,
               std::span<const char> value) {
-    uassert(ErrorCodes::NotWritablePrimary,
-            "Not primary while updating container",
-            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
-                opCtx, NamespaceString::kContainerNamespace));
-
+    assertCanAcceptContainerWrites(opCtx);
     auto status = container.update(ru, key, value);
     if (!status.isOK()) {
         return status;
