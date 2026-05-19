@@ -66,7 +66,3 @@ structs:
             userSelectedPrimary:
                 type: bool
                 description: "If the primary shard was specified by the user."
-            authoritativeMetadataAccessLevel:
-                type: AuthoritativeMetadataAccessLevel
-                description: "The access level to authoritative metadata granted by the FCV state at the creation of this document."
-                default: kNone

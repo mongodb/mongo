@@ -40,7 +40,6 @@
 #include "mongo/db/global_catalog/ddl/create_database_util.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -138,9 +137,6 @@ public:
                 const auto createDatabaseDDLCoordinatorFeatureFlagEnabled =
                     feature_flags::gCreateDatabaseDDLCoordinator.isEnabled(
                         VersionContext::getDecoration(opCtx), fcvSnapshot);
-                const auto authoritativeMetadataAccessLevel =
-                    sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
-                        VersionContext::getDecoration(opCtx), fcvSnapshot);
 
                 if (!createDatabaseDDLCoordinatorFeatureFlagEnabled) {
                     // (Ignore FCV check): The use isEnabledAndIgnoreFCVUnsafe is intentional, we
@@ -166,8 +162,6 @@ public:
                         {{NamespaceString(dbName), CoordinatorTypeEnum::kCreateDatabase}});
                     coordinatorDoc.setPrimaryShard(optResolvedPrimaryShard);
                     coordinatorDoc.setUserSelectedPrimary(optResolvedPrimaryShard.is_initialized());
-                    coordinatorDoc.setAuthoritativeMetadataAccessLevel(
-                        authoritativeMetadataAccessLevel);
                     auto createDatabaseCoordinator =
                         checked_pointer_cast<CreateDatabaseCoordinator>(
                             ShardingCoordinatorService::getService(opCtx)->getOrCreateInstance(

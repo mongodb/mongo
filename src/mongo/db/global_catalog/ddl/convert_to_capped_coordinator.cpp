@@ -45,7 +45,6 @@
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
@@ -361,10 +360,8 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 }();
 
                 if (_doc.getOriginalCollection().has_value()) {
-                    const bool isAuthoritative =
-                        feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-                            VersionContext::getDecoration(opCtx),
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+                    const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
 
                     {
                         const auto session = getNewSession(opCtx);
@@ -470,10 +467,8 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                 // When the original collection was not tracked, there is no need to clear the
                 // filtering metadata upon releasing the critical section because no changes to the
                 // global / shard catalog were made.
-                const bool isAuthoritative =
-                    feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+                const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
 
                 std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
                 if (isAuthoritative) {
@@ -569,10 +564,8 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_cleanupOnAbort(
                     _exitCriticalSectionOnDataShard(opCtx, executor, token);
                 }
 
-                const bool isAuthoritative =
-                    feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+                const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
 
                 std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
                 if (isAuthoritative) {
@@ -606,9 +599,8 @@ void ConvertToCappedCoordinator::_enterCriticalSectionOnDataShard(
     // releasing the critical section; the commit phase is responsible for updating the shard
     // catalog with current information. This flag is evaluated at insertion time because on
     // secondaries, metadata is cleared during the onDelete of the critical section document.
-    if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (_doc.getAuthoritativeMetadataAccessLevel() >=
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
         blockCRUDOperationsRequest.setClearCollMetadata(false);
     }
 
@@ -632,9 +624,8 @@ void ConvertToCappedCoordinator::_exitCriticalSectionOnDataShard(
     // releasing the critical section; the commit phase is responsible for updating the shard
     // catalog (both durable and in-memory) with current information on both primary and secondary
     // nodes.
-    if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (_doc.getAuthoritativeMetadataAccessLevel() >=
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
         unblockCRUDOperationsRequest.setClearCollMetadata(false);
     }
 

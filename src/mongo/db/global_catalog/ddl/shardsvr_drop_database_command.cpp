@@ -38,7 +38,6 @@
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
-#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
@@ -114,16 +113,10 @@ public:
                         // which cannot be nested. Therefore, the VersionContext shouldn't have
                         // an OFCV yet.
                         invariant(!VersionContext::getDecoration(opCtx).hasOperationFCV());
-                        const auto authoritativeMetadataAccessLevel =
-                            sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
-                                VersionContext::getDecoration(opCtx),
-                                fcvRegion->acquireFCVSnapshot());
 
                         DropDatabaseCoordinatorDocument coordinatorDoc;
                         coordinatorDoc.setShardingCoordinatorMetadata(
                             {{ns(), CoordinatorTypeEnum::kDropDatabase}});
-                        coordinatorDoc.setAuthoritativeMetadataAccessLevel(
-                            authoritativeMetadataAccessLevel);
 
                         dropDatabaseCoordinator = checked_pointer_cast<DropDatabaseCoordinator>(
                             service->getOrCreateInstance(

@@ -70,7 +70,3 @@ structs:
                 type: array<namespacestring>
                 description: "List of collections to be cloned by the destination shard."
                 optional: true
-            authoritativeMetadataAccessLevel:
-                type: AuthoritativeMetadataAccessLevel
-                description: "The access level to authoritative metadata granted by the FCV state at the creation of this document."
-                default: kNone

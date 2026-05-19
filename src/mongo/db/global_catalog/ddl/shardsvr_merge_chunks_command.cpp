@@ -41,6 +41,7 @@
 #include "mongo/db/global_catalog/ddl/merge_chunk_request_gen.h"
 #include "mongo/db/global_catalog/ddl/merge_chunks_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -52,7 +53,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -92,9 +92,10 @@ bool tryRunMergeChunksCoordinator(OperationContext* opCtx,
     for (int retries = 0; retries < maxConflictRetries; ++retries) {
         boost::optional<FixedFCVRegion> optFixedFcvRegion{boost::in_place_init, opCtx};
 
-        if (!feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+        if (sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
                 VersionContext::getDecoration(opCtx),
-                optFixedFcvRegion.get()->acquireFCVSnapshot())) {
+                optFixedFcvRegion.get()->acquireFCVSnapshot()) ==
+            AuthoritativeMetadataAccessLevelEnum::kNone) {
             return false;
         }
 

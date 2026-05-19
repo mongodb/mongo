@@ -62,7 +62,6 @@
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/shard_registry.h"
@@ -308,9 +307,8 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
         // releasing the critical section; the commit phase is responsible for updating the shard
         // catalog with current information. This flag is evaluated at insertion time because on
         // secondaries, metadata is cleared during the onDelete of the critical section document.
-        if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (_doc.getAuthoritativeMetadataAccessLevel() >=
+            AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
             blockCRUDOperationsRequest.setClearCollMetadata(false);
         }
 
@@ -338,9 +336,8 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
         sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, session);
     }
 
-    bool isAuthoritative = feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-        VersionContext::getDecoration(opCtx),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
 
     if (isAuthoritative) {
         const auto session = getNewSession(opCtx);
@@ -426,9 +423,8 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
         // releasing the critical section; the commit phase is responsible for updating the shard
         // catalog (both durable and in-memory) with current information on both primary and
         // secondary nodes.
-        if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (_doc.getAuthoritativeMetadataAccessLevel() >=
+            AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
             unblockCRUDOperationsRequest.setClearCollMetadata(false);
         }
 

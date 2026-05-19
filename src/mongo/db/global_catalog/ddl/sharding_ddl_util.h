@@ -431,7 +431,7 @@ MONGO_MOD_PRIVATE void commitCreateCollectionMetadataToShardCatalog(
 
 /**
  * Based on the FCV, get the where the DDL needs to act accordingly to the database
- * authoritativeness.
+ * or collection metadata authoritativeness.
  */
 MONGO_MOD_NEEDS_REPLACEMENT AuthoritativeMetadataAccessLevelEnum
 getGrantedAuthoritativeMetadataAccessLevel(const VersionContext& vCtx,

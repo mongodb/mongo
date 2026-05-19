@@ -77,7 +77,3 @@ structs:
                     "The identity of the Shard that will generate the op log entries about the sharded/unsplittable collection being dropped
                     (which drive the behavior of change stream readers V2)."
                 optional: true
-            authoritativeMetadataAccessLevel:
-                type: AuthoritativeMetadataAccessLevel
-                description: "The access level to authoritative metadata granted by the FCV state at the creation of this document."
-                default: kNone

@@ -33,6 +33,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/split_chunk.h"
 #include "mongo/db/global_catalog/ddl/split_chunk_coordinator.h"
 #include "mongo/db/global_catalog/type_chunk.h"
@@ -40,7 +41,6 @@
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/version_context.h"
@@ -76,9 +76,10 @@ bool tryRunSplitChunkCoordinator(OperationContext* opCtx,
     for (int retries = 0; retries < maxConflictRetries; ++retries) {
         boost::optional<FixedFCVRegion> optFixedFcvRegion{boost::in_place_init, opCtx};
 
-        if (!feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
+        if (sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
                 VersionContext::getDecoration(opCtx),
-                optFixedFcvRegion.get()->acquireFCVSnapshot())) {
+                optFixedFcvRegion.get()->acquireFCVSnapshot()) ==
+            AuthoritativeMetadataAccessLevelEnum::kNone) {
             return false;
         }
 

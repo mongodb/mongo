@@ -49,7 +49,6 @@
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
@@ -297,9 +296,8 @@ void DropCollectionCoordinator::_enterCriticalSection(
     // catalog with current information. This flag is evaluated at insertion time because on
     // secondaries, metadata is cleared during the onDelete of the critical section document.
     if (collIsTracked &&
-        feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        _doc.getAuthoritativeMetadataAccessLevel() >=
+            AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
         blockCRUDOperationsRequest.setClearCollMetadata(false);
     }
 
@@ -372,9 +370,8 @@ void DropCollectionCoordinator::_commitDropCollection(
         sharding_ddl_util::removeQueryAnalyzerMetadata(opCtx, nss(), session);
     }
 
-    bool isAuthoritative = feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-        VersionContext::getDecoration(opCtx),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
 
     if (collIsTracked) {
         tassert(10644514,
@@ -494,9 +491,8 @@ void DropCollectionCoordinator::_exitCriticalSection(
     // catalog (both durable and in-memory) with current information on both primary and secondary
     // nodes.
     if (collIsTracked &&
-        feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        _doc.getAuthoritativeMetadataAccessLevel() >=
+            AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
         unblockCRUDOperationsRequest.setClearCollMetadata(false);
     }
 

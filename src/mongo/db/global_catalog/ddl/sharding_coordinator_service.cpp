@@ -56,6 +56,7 @@
 #include "mongo/db/global_catalog/ddl/rename_collection_coordinator.h"
 #include "mongo/db/global_catalog/ddl/set_allow_migrations_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/split_chunk_coordinator.h"
 #include "mongo/db/global_catalog/ddl/timeseries_upgrade_downgrade_coordinator.h"
 #include "mongo/db/global_catalog/ddl/untrack_unsplittable_collection_coordinator.h"
@@ -432,6 +433,9 @@ ShardingCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
     coorMetadata.setDatabaseVersion(
         OperationShardingState::get(opCtx).getDbVersion(coorMetadata.getId().getNss().dbName()));
     coorMetadata.setForwardableOpMetadata(forwardableOpMetadata);
+    coorMetadata.setAuthoritativeMetadataAccessLevel(
+        sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+            VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot()));
     const auto patchedCoorDoc = coorDoc.addFields(coorMetadata.toBSON());
 
     auto [coordinator, created] = [&] {

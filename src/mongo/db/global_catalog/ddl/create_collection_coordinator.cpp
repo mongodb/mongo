@@ -1139,6 +1139,7 @@ void enterCriticalSectionsOnCoordinator(OperationContext* opCtx,
 }
 
 void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
+                                       AuthoritativeMetadataAccessLevelEnum metadataAccessLevel,
                                        bool throwIfReasonDiffers,
                                        const BSONObj& critSecReason,
                                        const NamespaceString& originalNss) {
@@ -1147,9 +1148,8 @@ void exitCriticalSectionsOnCoordinator(OperationContext* opCtx,
         ? originalNss.getTimeseriesViewNamespace()
         : originalNss;
 
-    const bool clearFilteringMetadata = !feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-        VersionContext::getDecoration(opCtx),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    const bool clearFilteringMetadata =
+        metadataAccessLevel == AuthoritativeMetadataAccessLevelEnum::kNone;
 
     std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
     if (clearFilteringMetadata) {
@@ -1529,9 +1529,8 @@ void CreateCollectionCoordinator::_exitCriticalSectionOnShards(
     // releasing the critical section; the commit phase is responsible for updating the shard
     // catalog (both durable and in-memory) with current information on both primary and secondary
     // nodes.
-    bool isDDLAuthoritative = feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-        VersionContext::getDecoration(opCtx),
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    bool isDDLAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
     if (isDDLAuthoritative) {
         unblockCRUDOperationsRequest.setClearCollMetadata(false);
     }
@@ -1576,8 +1575,11 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     LOGV2(8119050,
                           "Found that collection already exists with matching option after taking "
                           "the collection critical section");
-                    exitCriticalSectionsOnCoordinator(
-                        opCtx, _firstExecution, _critSecReason, originalNss());
+                    exitCriticalSectionsOnCoordinator(opCtx,
+                                                      _doc.getAuthoritativeMetadataAccessLevel(),
+                                                      _firstExecution,
+                                                      _critSecReason,
+                                                      originalNss());
                     throw ex;
                 }
             }))
@@ -2380,9 +2382,7 @@ void CreateCollectionCoordinator::_commitOnShardCatalog(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    if (!feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (_doc.getAuthoritativeMetadataAccessLevel() == AuthoritativeMetadataAccessLevelEnum::kNone) {
         return;
     }
 
@@ -2508,8 +2508,11 @@ void CreateCollectionCoordinator::_exitCriticalSection(
     // If the coordinator successfully committed the collection during a previous execution, the
     // critical section may have already been released. In such case, it is safe to skip the release
     // if the reason does not match because a migration may have already re-acquired it.
-    exitCriticalSectionsOnCoordinator(
-        opCtx, _firstExecution /* throwIfReasonDiffers */, _critSecReason, originalNss());
+    exitCriticalSectionsOnCoordinator(opCtx,
+                                      _doc.getAuthoritativeMetadataAccessLevel(),
+                                      _firstExecution /* throwIfReasonDiffers */,
+                                      _critSecReason,
+                                      originalNss());
 }
 
 ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
@@ -2563,8 +2566,11 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
 
 
             // Exit both critical sections on the coordinator
-            exitCriticalSectionsOnCoordinator(
-                opCtx, true /* throwIfReasonDiffers */, _critSecReason, originalNss());
+            exitCriticalSectionsOnCoordinator(opCtx,
+                                              _doc.getAuthoritativeMetadataAccessLevel(),
+                                              true /* throwIfReasonDiffers */,
+                                              _critSecReason,
+                                              originalNss());
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
             const auto opCtxHolder = makeOperationContext();

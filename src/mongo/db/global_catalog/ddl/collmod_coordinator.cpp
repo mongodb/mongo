@@ -57,7 +57,6 @@
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -142,6 +141,7 @@ void commitToGlobalCatalog(OperationContext* opCtx,
 
 template <typename GetSessionFn>
 void commitToShardCatalog(OperationContext* opCtx,
+                          AuthoritativeMetadataAccessLevelEnum metadataAccessLevel,
                           const NamespaceString& nss,
                           const std::vector<ShardId>& participantsOwningChunks,
                           const ShardId& primaryShard,
@@ -149,9 +149,7 @@ void commitToShardCatalog(OperationContext* opCtx,
                           GetSessionFn&& getSession,
                           const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                           const CancellationToken& token) {
-    if (!feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    if (metadataAccessLevel == AuthoritativeMetadataAccessLevelEnum::kNone) {
         return;
     }
 
@@ -394,9 +392,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     // for updating the shard catalog with current information. This flag is
                     // evaluated at insertion time because on secondaries, metadata is cleared
                     // during the onDelete of the critical section document.
-                    if (feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-                            VersionContext::getDecoration(opCtx),
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    if (_doc.getAuthoritativeMetadataAccessLevel() >=
+                        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
                         blockCRUDOperationsRequest.setClearCollMetadata(false);
                     }
 
@@ -426,6 +423,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                     commitToShardCatalog(
                         opCtx,
+                        _doc.getAuthoritativeMetadataAccessLevel(),
                         _collInfo->nsForTargeting,
                         _shardingInfo->participantsOwningChunks,
                         _shardingInfo->primaryShard,
@@ -491,9 +489,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         request.setNeedsUnblock(needsUnblock);
                         if (needsUnblock) {
                             const bool isDDLAuthoritative =
-                                feature_flags::gShardAuthoritativeCollMetadata.isEnabled(
-                                    VersionContext::getDecoration(opCtx),
-                                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+                                _doc.getAuthoritativeMetadataAccessLevel() >=
+                                AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
                             request.setClearCollMetadata(!isDDLAuthoritative);
                         }
 

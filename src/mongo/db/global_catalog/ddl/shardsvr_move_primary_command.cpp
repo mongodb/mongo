@@ -49,7 +49,6 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/util/assert_util.h"
@@ -102,9 +101,6 @@ public:
                 // The Operation FCV is currently propagated only for DDL operations,
                 // which cannot be nested. Therefore, the VersionContext shouldn't have an OFCV yet.
                 invariant(!VersionContext::getDecoration(opCtx).hasOperationFCV());
-                const auto authoritativeMetadataAccessLevel =
-                    sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
-                        VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot());
 
                 auto shardRegistry = Grid::get(opCtx)->shardRegistry();
                 // Ensure that the shard information is up-to-date as possible to catch the case
@@ -120,7 +116,6 @@ public:
                     doc.setShardingCoordinatorMetadata(
                         {{dbNss, CoordinatorTypeEnum::kMovePrimary}});
                     doc.setToShardId(toShard->getId());
-                    doc.setAuthoritativeMetadataAccessLevel(authoritativeMetadataAccessLevel);
                     return doc.toBSON();
                 }();
 

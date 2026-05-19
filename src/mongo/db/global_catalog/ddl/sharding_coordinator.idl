@@ -143,3 +143,7 @@ structs:
                 description: "Error triggering the cleanup pipeline"
                 type: error_status
                 optional: true
+            authoritativeMetadataAccessLevel:
+                type: AuthoritativeMetadataAccessLevel
+                description: "The access level to authoritative metadata granted by the FCV state at the creation of this document."
+                default: kNone
