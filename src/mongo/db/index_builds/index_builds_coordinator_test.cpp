@@ -831,14 +831,23 @@ void runResumePrimaryDrivenOnStepUpTest(OperationContext* opCtx,
     ASSERT(collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(
         opCtx, opObserver->startIndexBuildIdents[1]));
 
-    // Any phase before kDrainWrites includes a collection scan, which indexes the one document in
-    // the collection as {a: null} → 1 key. kDrainWrites skips straight to draining side-writes → 0
-    // keys.
+    // Any phase before load includes a collection scan, which indexes the one document in the
+    // collection as {a: null} → 1 key. Drain skips straight to draining side-writes → 0 keys.
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     const auto* indexEntry =
         collection.getCollectionPtr()->getIndexCatalog()->findIndexByName(opCtx, "a_1");
     ASSERT(indexEntry);
-    const int64_t expectedKeys = (phase == IndexBuildPhaseEnum::kDrainWrites) ? 0 : 1;
+    auto expectedKeys = [phase] {
+        switch (phase) {
+            case IndexBuildPhaseEnum::kInitialized:
+            case IndexBuildPhaseEnum::kCollectionScan:
+                return 1;
+            case IndexBuildPhaseEnum::kBulkLoad:
+            case IndexBuildPhaseEnum::kDrainWrites:
+                return 0;
+        }
+        MONGO_UNREACHABLE;
+    }();
     EXPECT_EQ(expectedKeys, indexEntry->accessMethod()->numKeys(opCtx, ru));
 }
 
@@ -860,6 +869,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Values(std::tuple{IndexBuildPhaseEnum::kInitialized, false},
                     std::tuple{IndexBuildPhaseEnum::kInitialized, true},
                     std::tuple{IndexBuildPhaseEnum::kCollectionScan, true},
+                    std::tuple{IndexBuildPhaseEnum::kBulkLoad, true},
                     std::tuple{IndexBuildPhaseEnum::kDrainWrites, true}),
     [](const testing::TestParamInfo<std::tuple<IndexBuildPhaseEnum, bool>>& info) {
         auto phase = std::get<0>(info.param);
@@ -869,11 +879,12 @@ INSTANTIATE_TEST_SUITE_P(
                 return hasPersistedResumeState ? "Initialized" : "MissingResumeState";
             case IndexBuildPhaseEnum::kCollectionScan:
                 return "CollectionScan";
+            case IndexBuildPhaseEnum::kBulkLoad:
+                return "Load";
             case IndexBuildPhaseEnum::kDrainWrites:
                 return "DrainWrites";
-            default:
-                MONGO_UNREACHABLE;
         }
+        MONGO_UNREACHABLE;
     });
 
 }  // namespace

@@ -2225,6 +2225,140 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
     resumedIndexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+TEST_F(MultiIndexBlockTest, ResumePdibDuringLoad) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+    RAIIServerParameterControllerForTest resumeStateInterval{
+        "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 5};
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto buildUUID = UUID::gen();
+    auto configurePdib = [&](MultiIndexBlock& idx) {
+        idx.setBuildUUID(buildUUID);
+        idx.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+        idx.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+        idx.setIsResumable(true);
+    };
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       engine);
+
+    boost::optional<ResumeIndexInfo> resumeInfo;
+    UUID collectionUUID = UUID::gen();
+    auto numDocs = 20;
+    {
+        AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+        CollectionWriter coll(operationContext(), autoColl);
+        collectionUUID = autoColl->uuid();
+
+        auto& indexer = *getIndexer();
+        configurePdib(indexer);
+        ASSERT_OK(indexer.init(operationContext(),
+                               coll,
+                               {indexBuildInfo},
+                               MultiIndexBlock::kNoopOnInitFn,
+                               MultiIndexBlock::InitMode::SteadyState,
+                               boost::none));
+
+        {
+            WriteUnitOfWork wuow(operationContext());
+            std::string val(64 * 1024, 'a');
+            for (auto i = 0; i < numDocs; ++i) {
+                ASSERT_OK(
+                    Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+            }
+            wuow.commit();
+        }
+
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+        auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+        resumeInfo =
+            index_builds::readAndParseResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
+        ASSERT_TRUE(resumeInfo);
+        EXPECT_EQ(buildUUID, resumeInfo->getBuildUUID());
+        EXPECT_EQ(IndexBuildPhaseEnum::kBulkLoad, resumeInfo->getPhase());
+        EXPECT_EQ(collectionUUID, resumeInfo->getCollectionUUID());
+
+        EXPECT_FALSE(resumeInfo->getCollectionScanPosition());
+        ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
+        const auto& indexState = resumeInfo->getIndexes()[0];
+        EXPECT_EQ(*indexBuildInfo.sideWritesIdent, indexState.getSideWritesTable());
+        ASSERT_TRUE(indexState.getSkippedRecordTrackerTable());
+        EXPECT_EQ(*indexState.getSkippedRecordTrackerTable(), *indexBuildInfo.skippedRecordsIdent);
+        ASSERT_TRUE(indexState.getStorageIdentifier());
+        EXPECT_EQ(*indexState.getStorageIdentifier(), *indexBuildInfo.sorterIdent);
+        EXPECT_EQ(indexState.getSpec()["name"].String(), "a_1");
+        EXPECT_FALSE(indexState.getIsMultikey());
+        ASSERT_TRUE(indexState.getRanges());
+        EXPECT_FALSE(indexState.getRanges()->empty());
+
+        indexer.markAsCleanedUp();
+    }
+
+    MultiIndexBlock resumedIndexer;
+    configurePdib(resumedIndexer);
+    {
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(getNSS(),
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        CollectionWriter collWriter(operationContext(), &coll);
+        ASSERT_OK(resumedIndexer.init(operationContext(),
+                                      collWriter,
+                                      {indexBuildInfo},
+                                      MultiIndexBlock::kNoopOnInitFn,
+                                      MultiIndexBlock::InitMode::SteadyState,
+                                      resumeInfo));
+    }
+
+    {
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(getNSS(),
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        ASSERT_OK(resumedIndexer.dumpInsertsFromBulk(operationContext(), coll));
+
+        auto* entry = coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
+            operationContext(), "a_1", IndexCatalog::InclusionPolicy::kUnfinished);
+        ASSERT(entry);
+        EXPECT_EQ(entry->accessMethod()->asSortedData()->getSortedDataInterface()->numEntries(
+                      operationContext(), *shard_role_details::getRecoveryUnit(operationContext())),
+                  numDocs);
+    }
+
+    {
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(getNSS(),
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        CollectionWriter collWriter(operationContext(), &coll);
+        resumedIndexer.abortIndexBuild(
+            operationContext(), collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
+    }
+}
+
 TEST_F(MultiIndexBlockTest, ResumedPdibSpillerContinuesContainerKeysPastPriorRanges) {
     RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
     RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
