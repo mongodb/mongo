@@ -40,6 +40,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/matcher/doc_validation/constraint_validation_level_upgrade.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
@@ -51,6 +52,7 @@
 #include "mongo/db/shard_role/ddl/coll_mod_reply_validation.h"
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/shard_role/shard_catalog/coll_mod.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -183,6 +185,13 @@ public:
                             gFeatureFlagConstraintValidationLevel
                                 .isEnabledUseLastLTSFCVWhenUninitialized(
                                     VersionContext::getDecoration(opCtx), fcvSnapshot));
+
+                    auto& oss = OperationShardingState::get(opCtx);
+                    uassertStatusOK(noDocumentsViolatingValidator(
+                        opCtx,
+                        nss,
+                        PlacementConcern{oss.getDbVersion(nss.dbName()),
+                                         oss.getShardVersion(nss)}));
                 }
             }
 

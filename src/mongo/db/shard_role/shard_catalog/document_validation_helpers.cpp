@@ -59,6 +59,8 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
                 ErrorCodes::BadValue,
                 "Validation action of 'warn' is not allowed when Validation level is 'constraint'");
         }
+        // TODO SERVER-123713: enforce that validationAction is set to 'error' when upgrading
+        // validationLevel to 'constraint'.
         if (opts.uuid) {  // existing collection
             if (opts.validationLevel == ValidationLevelEnum::constraint && newValidator) {
                 return Status(ErrorCodes::BadValue,
