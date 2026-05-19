@@ -119,7 +119,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -301,7 +300,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"sort" : {
 					"_id" : 1
@@ -417,7 +415,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -527,7 +524,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -618,7 +614,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -771,7 +766,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"sort" : {
 					"_id" : 1
@@ -912,7 +906,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -1047,7 +1040,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -1223,7 +1215,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -1397,7 +1388,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -1506,7 +1496,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -1625,7 +1614,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -1744,7 +1732,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -1845,7 +1832,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -1953,7 +1939,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -2064,7 +2049,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -2191,7 +2175,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -2286,7 +2269,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -2429,7 +2411,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -2527,7 +2508,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -2674,7 +2654,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -2783,7 +2762,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting_compound",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -2885,7 +2863,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting_compound",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -2997,7 +2974,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting_compound",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -3129,7 +3105,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting_compound",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -3278,7 +3253,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting_compound",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -3390,7 +3364,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting_compound",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -3523,7 +3496,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting_compound",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -3640,7 +3612,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting_compound",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -3804,7 +3775,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.group_targeting_compound",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}

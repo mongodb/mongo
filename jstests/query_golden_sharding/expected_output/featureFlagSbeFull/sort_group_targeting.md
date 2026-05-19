@@ -118,7 +118,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.sort_group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -278,7 +277,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.sort_group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -444,7 +442,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.sort_group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"tailableMode" : "normal"
 			}
@@ -644,7 +641,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.sort_group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"sort" : {
 					"shardKey" : 1
@@ -805,7 +801,6 @@
 				"allowPartialResults" : false,
 				"compareWholeSortKey" : false,
 				"nss" : "test.sort_group_targeting",
-				"recordRemoteOpWaitTime" : false,
 				"requestQueryStatsFromRemotes" : false,
 				"sort" : {
 					"shardKey" : 1
