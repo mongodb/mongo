@@ -41,6 +41,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -58,6 +59,13 @@ class OpTime;
  * Returns true if 'cmdObj' has a 'writeConcern' field.
  */
 bool commandSpecifiesWriteConcern(const GenericArguments& requestArgs);
+
+/**
+ * Optional hook to remap write concern options before validation. Modules that restrict supported
+ * write concerns (e.g. DSC) may set this at startup to transparently remap
+ * unsupported values (such as w:N for N>1) to an equivalent supported form.
+ */
+extern std::function<void(WriteConcernOptions&)> remapWriteConcernHook;
 
 /**
  * Attempts to extract a WriteConcernOptions from a command's generic arguments.

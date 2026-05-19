@@ -73,6 +73,8 @@
 
 namespace mongo {
 
+std::function<void(WriteConcernOptions&)> remapWriteConcernHook;
+
 using repl::OpTime;
 using std::string;
 
@@ -212,6 +214,10 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             writeConcern.majorityJFalseOverridden = true;
             writeConcern.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
         }
+    }
+
+    if (remapWriteConcernHook) {
+        remapWriteConcernHook(writeConcern);
     }
 
     Status wcStatus = validateWriteConcern(opCtx, writeConcern);

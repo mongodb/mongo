@@ -9,6 +9,7 @@
 
 // TODO (SERVER-39704): Remove the following load after SERVER-39704 is completed
 import {retryOnceOnTransientOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const dbName = "test";
 const collName = "multi_statement_transaction_abort";
@@ -305,39 +306,43 @@ assert.commandWorked(
     }),
 );
 
-jsTest.log("Aborting transaction attempts to wait for write concern.");
-txnNumber++;
-assert.commandWorked(
-    sessionDb.runCommand({
-        insert: collName,
-        documents: [{a: 1}],
-        txnNumber: NumberLong(txnNumber),
-        startTransaction: true,
-        autocommit: false,
-    }),
-);
-assert.commandFailedWithCode(
-    sessionDb.adminCommand({
-        abortTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        writeConcern: {w: 40},
-        autocommit: false,
-    }),
-    ErrorCodes.UnsatisfiableWriteConcern,
-);
+// In disagg, w:N (N>1) is remapped to majority, so the abort below would succeed rather than
+// fail with UnsatisfiableWriteConcern. Skip this block in disagg.
+if (PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "supportsLocalCollections", true)) {
+    jsTest.log("Aborting transaction attempts to wait for write concern.");
+    txnNumber++;
+    assert.commandWorked(
+        sessionDb.runCommand({
+            insert: collName,
+            documents: [{a: 1}],
+            txnNumber: NumberLong(txnNumber),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
+    assert.commandFailedWithCode(
+        sessionDb.adminCommand({
+            abortTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            writeConcern: {w: 40},
+            autocommit: false,
+        }),
+        ErrorCodes.UnsatisfiableWriteConcern,
+    );
 
-// TODO (SLS-2341): Remove cleanup abort once w:n write concern is supported.
-// On a replica set, the failed abort above leaves the transaction in a dangling state because only
-// the write concern was unsatisfiable, not the abort itself. Abort it properly here to ensure the
-// transaction releases its locks before ending the session. On a sharded cluster, the transaction
-// may already be aborted, so we also accept NoSuchTransaction.
-assert.commandWorkedOrFailedWithCode(
-    sessionDb.adminCommand({
-        abortTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-    }),
-    ErrorCodes.NoSuchTransaction,
-);
+    // TODO (SLS-2341): Remove cleanup abort once w:n write concern is supported.
+    // On a replica set, the failed abort above leaves the transaction in a dangling state because only
+    // the write concern was unsatisfiable, not the abort itself. Abort it properly here to ensure the
+    // transaction releases its locks before ending the session. On a sharded cluster, the transaction
+    // may already be aborted, so we also accept NoSuchTransaction.
+    assert.commandWorkedOrFailedWithCode(
+        sessionDb.adminCommand({
+            abortTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        }),
+        ErrorCodes.NoSuchTransaction,
+    );
+}
 
 session.endSession();
