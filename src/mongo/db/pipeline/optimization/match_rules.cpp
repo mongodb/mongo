@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_list_sessions.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
@@ -363,6 +364,17 @@ REGISTER_RULES(DocumentSourceListSessions,
                    .priority = kDefaultPushdownPriority,
                    .tags = PipelineRewriteContext::Tags::Reordering,
                });
+
+// Projection rewrites require $match pushdown to be attempted before the other rules for the stage.
+REGISTER_RULES_WITH_FEATURE_FLAG(DocumentSourceSingleDocumentTransformation,
+                                 &feature_flags::gFeatureFlagImprovedDepsAnalysis,
+                                 {
+                                     .name = "PUSH_MATCH_BEFORE_SINGLE_DOC_TRANSFORMATION",
+                                     .precondition = canSwapWithSubsequentMatch,
+                                     .transform = pushMatchBeforeCurrentStage,
+                                     .priority = kDefaultPushdownPriority,
+                                     .tags = PipelineRewriteContext::Tags::Reordering,
+                                 });
 
 // Timeseries rewrites require $match pushdown to be attempted before the other optimizations
 // implemented in 'optimizeAt()'.

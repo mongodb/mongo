@@ -604,6 +604,16 @@ runTest({
 /// $project+$match pushdown cases follow
 /// ------------------------------------
 
+// This test verifies that we apply match pushdown first before we attempt to hoist.
+runTest({
+    name: "$project+$match pushdown: $match pushdown before hoisting",
+    docs: [{a: 5, c: 1}],
+    pipeline: [lookupStage("x"), {$project: {c: "$a", x: 1}}, {$match: {c: 1}}],
+    optimized: [lookupStage("x"), {$project: {c: "$a", x: 1}}],
+    expected: [],
+    policy: "forMatchPushdown",
+});
+
 runTest({
     name: "$project+$match pushdown: independent $set hoisted before $lookup when $match follows",
     docs: [{a: 5, c: 1}],
