@@ -35,3 +35,204 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "aggregation_repeat_queries_multiplan_single_solutions",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_repeat_queries_multiplan_single_solutions.yml",
+    shard_count = 8,
+    tags = ["ci-default"],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "identity_views_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/identity_views_passthrough.yml",
+    shard_count = 8,
+    tags = ["ci-default"],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_cbr_automatic_cost_choice_aggregation_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_cost_choice_aggregation_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_cbr_automatic_cost_choice_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_cost_choice_jscore_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_cbr_automatic_no_multiplanning_results_aggregation_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_no_multiplanning_results_aggregation_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_cbr_automatic_no_multiplanning_results_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_automatic_no_multiplanning_results_jscore_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_cbr_heuristic_aggregation_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_heuristic_aggregation_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-experimental",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_cbr_heuristic_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_heuristic_jscore_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-experimental",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_cbr_histogram_aggregation_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_histogram_aggregation_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-experimental",
+        "manual",  # Currently disabled due to an OOM in SERVER-109720. To be re-enabled in SERVER-109881. Remove "manual".
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_cbr_histogram_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_histogram_jscore_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-experimental",
+        "manual",  # Currently disabled due to an OOM in SERVER-109720. To be re-enabled in SERVER-109881. Remove "manual".
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_cbr_sampling_aggregation_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_sampling_aggregation_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-experimental",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "query_cbr_sampling_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/query_cbr_sampling_jscore_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "blocked_in_query_alias",  # We explicitly specify this task in query alias
+        "ci-experimental",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_repeat_queries_always_replan",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_repeat_queries_always_replan.yml",
+    shard_count = 8,
+    tags = [
+        "aggregation",
+        "ci-default",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "core_repeat_queries_always_replan",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/core_repeat_queries_always_replan.yml",
+    shard_count = 8,
+    tags = ["ci-default"],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
