@@ -545,6 +545,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 }();
 
                 stateInfo = *stateInfoIt;
+                index.lastSpilledRecordId = stateInfo->getLastSpilledRecordId();
                 auto status = index.block->initForResume(opCtx,
                                                          collection.getWritableCollection(opCtx),
                                                          indexes[i],
