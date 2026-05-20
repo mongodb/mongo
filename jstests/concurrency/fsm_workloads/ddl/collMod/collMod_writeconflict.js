@@ -9,6 +9,8 @@
  *  incompatible_with_concurrency_simultaneous,
  *  # The WTWriteConflictException failpoint is not supported on mongos.
  *  assumes_against_mongod_not_mongos,
+ *  # TODO SERVER-127099: Enable test on TSAN variant.
+ *  incompatible_disaggregated_storage_tsan,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

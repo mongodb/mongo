@@ -4,6 +4,8 @@
 //   # Time series collections (as views) have specific limitations on aggregation stages
 //   # (e.g. $merge, $out) or cursor options (e.g. noCursorTimeout, singleBatch).
 //   exclude_from_timeseries_crud_passthrough,
+//   # TODO SERVER-127093: Enable test on TSAN variant.
+//   incompatible_disaggregated_storage_tsan,
 // ]
 
 // Test subtleties of batchSize and limit.

@@ -1,7 +1,11 @@
 /**
  * Tests that a projection which retains expected fields but changes their types does not cause the
  * change stream framework to throw exceptions. Exercises the fix for SERVER-65497.
- * @tags: [ requires_fcv_60 ]
+ * @tags: [
+ *   requires_fcv_60,
+ *   # TODO SERVER-127094: Enable test on TSAN variant.
+ *   incompatible_disaggregated_storage_tsan,
+ * ]
  */
 import {
     generateChangeStreamWriteWorkload,

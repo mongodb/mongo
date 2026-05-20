@@ -31,6 +31,8 @@
  *
  *  @tags: [
  *    uses_transactions,
+ *    # TODO SERVER-127100: Enable test on TSAN variant.
+ *    incompatible_disaggregated_storage_tsan,
  *  ]
  */
 import {WriteConflictHelpers} from "jstests/core/txns/libs/write_conflicts.js";

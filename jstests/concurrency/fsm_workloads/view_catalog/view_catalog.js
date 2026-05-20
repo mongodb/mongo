@@ -3,6 +3,11 @@
  *
  * Creates, modifies and drops view namespaces concurrently. Each worker operates on their own view,
  * built on a shared underlying collection.
+ *
+ * @tags: [
+ *   # TODO SERVER-127099: Enable test on TSAN variant.
+ *   incompatible_disaggregated_storage_tsan,
+ * ]
  */
 export const $config = (function () {
     let data = {

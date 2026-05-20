@@ -2,7 +2,12 @@
  * Repeatedly creates a collection and a view with the same namespace. Validates that we never
  * manage to have both a Collection and View created on the same namespace at the same time.
  *
- * @tags: [catches_command_failures, antithesis_incompatible]
+ * @tags: [
+ *   catches_command_failures,
+ *   antithesis_incompatible,
+ *   # TODO SERVER-127099: Enable test on TSAN variant.
+ *   incompatible_disaggregated_storage_tsan,
+ * ]
  */
 
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
