@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/primary_driven/registry.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/namespace_string.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
@@ -55,6 +57,8 @@ private:
 
 public:
     void createCollection(const NamespaceString& nss);
+
+    UUID getCollectionUUID() const;
 
     std::vector<IndexBuildInfo> makeSpecs(std::vector<std::string> keys);
 
@@ -79,6 +83,11 @@ void IndexBuildsManagerTest::tearDown() {
 
 void IndexBuildsManagerTest::createCollection(const NamespaceString& nss) {
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
+}
+
+UUID IndexBuildsManagerTest::getCollectionUUID() const {
+    AutoGetCollection autoColl(operationContext(), _nss, MODE_IS);
+    return autoColl->uuid();
 }
 
 std::vector<IndexBuildInfo> IndexBuildsManagerTest::makeSpecs(std::vector<std::string> keys) {
@@ -182,6 +191,55 @@ TEST_F(IndexBuildsManagerTest, SetUpNonPrimaryDrivenIndexBuildDoesNotAddToRegist
 
     _indexBuildsManager.abortIndexBuild(
         operationContext(), collection, _buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
+    _indexBuildsManager.tearDownAndUnregisterIndexBuild(_buildUUID);
+}
+
+// `MultiIndexBlock::commit`'s per-index loop collects multikey paths and passes them to `onCommit`;
+// that collection must be scoped to a single attempt so a WCE retry doesn't leave the caller
+// observing entries from a prior failed attempt. We force a retry by throwing a
+// WriteConflictException from `onCommitFn` after the loop has completed all push_backs.
+TEST_F(IndexBuildsManagerTest, CommitIndexBuildMultikeysAreResetWhenWceFiresAfterLoop) {
+    auto opCtx = operationContext();
+    const auto collectionUUID = getCollectionUUID();
+
+    AutoGetCollection lockHolder(opCtx, _nss, MODE_X);
+    CollectionWriter collection(opCtx, collectionUUID);
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, *lockHolder, BSON("_id" << 0 << "a" << 1 << "b" << 2)));
+        wuow.commit();
+    }
+
+    auto indexes = makeSpecs({"a", "b"});
+    ASSERT_OK(_indexBuildsManager.setUpIndexBuild(
+        opCtx, collection, indexes, _buildUUID, MultiIndexBlock::kNoopOnInitFn));
+    ASSERT_OK(
+        _indexBuildsManager.startBuildingIndex(opCtx, _nss.dbName(), collectionUUID, _buildUUID));
+    ASSERT_OK(_indexBuildsManager.drainBackgroundWrites(
+        opCtx,
+        _buildUUID,
+        RecoveryUnit::ReadSource::kNoTimestamp,
+        IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+
+    int commitAttempts = 0;
+    size_t multikeysAtCommit = 0;
+    auto onCommitFn = [&](const std::vector<boost::optional<MultikeyPaths>>& multikeys) {
+        ++commitAttempts;
+        multikeysAtCommit = multikeys.size();
+        if (commitAttempts == 1) {
+            // Force a retry after the loop has populated `multikeys` so we can verify that the
+            // next attempt observes a freshly-built vector rather than accumulated entries.
+            throwWriteConflictException("Force WCE in onCommitFn after commit loop.");
+        }
+    };
+
+    ASSERT_OK(_indexBuildsManager.commitIndexBuild(
+        opCtx, collection, _nss, _buildUUID, MultiIndexBlock::kNoopOnCreateEachFn, onCommitFn));
+
+    ASSERT_EQ(commitAttempts, 2);
+    ASSERT_EQ(multikeysAtCommit, indexes.size());
+
     _indexBuildsManager.tearDownAndUnregisterIndexBuild(_buildUUID);
 }
 }  // namespace

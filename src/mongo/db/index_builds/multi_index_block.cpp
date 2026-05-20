@@ -1359,8 +1359,9 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx, const Collecti
 MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn =
     +[](const BSONObj&, IndexCatalogEntry&, boost::optional<MultikeyPaths>&&) {
     };
-MultiIndexBlock::OnCommitFn MultiIndexBlock::kNoopOnCommitFn = +[]() {
-};
+MultiIndexBlock::OnCommitFn MultiIndexBlock::kNoopOnCommitFn =
+    +[](const std::vector<boost::optional<MultikeyPaths>>&) {
+    };
 
 Status MultiIndexBlock::commit(OperationContext* opCtx,
                                Collection* collection,
@@ -1407,6 +1408,9 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     }
     MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo();
 
+    std::vector<boost::optional<MultikeyPaths>> multikeys;
+    multikeys.reserve(_indexes.size());
+
     for (auto& index : _indexes) {
         boost::optional<MultikeyPaths> paths;
 
@@ -1448,10 +1452,11 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
             }
         }
 
+        multikeys.push_back(paths);
         onCreateEach(index.block->getSpec(), *indexCatalogEntry, std::move(paths));
     }
 
-    onCommit();
+    onCommit(multikeys);
 
     // We can't update the 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag here as it
     // requires the change to be driven by the router role. It means that subsequent index builds

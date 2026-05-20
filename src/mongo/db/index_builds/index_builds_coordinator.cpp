@@ -3949,51 +3949,46 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         indexBuildsSSS.commit.addAndFetch(1);
         storeLastCommittedDuration(*replState);
 
-        std::vector<boost::optional<MultikeyPaths>> multikeys;
+        // TODO (SERVER-109664): Check build protocol rather than feature flag.
+        auto onCommitFn = [&](const std::vector<boost::optional<MultikeyPaths>>& multikeys) {
+            const bool isPdib = [&] {
+                if (replState->protocol == IndexBuildProtocol::kPrimaryDriven) {
+                    return true;
+                }
+                if (replState->protocol != IndexBuildProtocol::kTwoPhase) {
+                    return false;
+                }
+                auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                return fcvSnapshot.isVersionInitialized() &&
+                    feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                        VersionContext::getDecoration(opCtx), fcvSnapshot);
+            }();
 
-        // If two phase index builds is enabled, index build will be coordinated using
-        // startIndexBuild and commitIndexBuild oplog entries.
-        auto onCommitFn = [&] {
+            const bool shouldReplicate = isPdib && IndexBuildAction::kOplogCommit != action;
             onCommitIndexBuild(opCtx,
                                collection->ns(),
                                replState,
-                               multikeys,
+                               shouldReplicate ? multikeys
+                                               : std::vector<boost::optional<MultikeyPaths>>{},
                                collection->isTimeseriesCollection());
         };
 
-        int i = 0;
-        auto onCreateEachFn = [&](const BSONObj& spec,
-                                  IndexCatalogEntry& entry,
-                                  boost::optional<MultikeyPaths>&& multikey) {
-            if (IndexBuildProtocol::kTwoPhase == replState->protocol ||
-                IndexBuildProtocol::kPrimaryDriven == replState->protocol) {
-                if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
-                    // TODO (SERVER-109664): Check build protocol rather than feature flag.
-                    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-                    if (!fcvSnapshot.isVersionInitialized() ||
-                        !feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-                        return;
-                    }
+        auto onCreateEachFn =
+            [&](const BSONObj& spec, IndexCatalogEntry& entry, boost::optional<MultikeyPaths>&&) {
+                if (IndexBuildProtocol::kSinglePhase != replState->protocol) {
+                    return;
                 }
 
-                if (IndexBuildAction::kOplogCommit != action) {
-                    multikeys.push_back(std::move(multikey));
-                }
-                ++i;
-                return;
-            }
-
-            auto opObserver = opCtx->getServiceContext()->getOpObserver();
-            IndexBuildInfo indexBuildInfo(spec, std::string{entry.getIdent()});
-            auto fromMigrate = false;
-            opObserver->onCreateIndex(opCtx,
-                                      collection->ns(),
-                                      replState->collectionUUID,
-                                      indexBuildInfo,
-                                      fromMigrate,
-                                      collection->isTimeseriesCollection());
-        };
+                auto opObserver = opCtx->getServiceContext()->getOpObserver();
+                IndexBuildInfo indexBuildInfo(spec, std::string{entry.getIdent()});
+                auto fromMigrate = false;
+                opObserver->onCreateIndex(opCtx,
+                                          collection->ns(),
+                                          replState->collectionUUID,
+                                          indexBuildInfo,
+                                          fromMigrate,
+                                          collection->isTimeseriesCollection());
+            };
 
         // Commit index build.
         TimestampBlock tsBlock(opCtx, commitIndexBuildTimestamp);

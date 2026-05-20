@@ -249,11 +249,14 @@ public:
      * logOp() should be called from the same unit of work as commit().
      *
      * `onCreateEach` will be called after each index has been marked as "ready".
-     * `onCommit` will be called after all indexes have been marked "ready".
+     *
+     * `onCommit` will be called after all indexes have been marked "ready", with the per-index
+     * multikey paths collected during the commit attempt.
      *
      * Requires holding an exclusive lock on the collection.
      */
-    using OnCommitFn = function_ref<void()>;
+    using OnCommitFn =
+        function_ref<void(const std::vector<boost::optional<MultikeyPaths>>& multikeys)>;
     using OnCreateEachFn = function_ref<void(
         const BSONObj& spec, IndexCatalogEntry& entry, boost::optional<MultikeyPaths>&& multikey)>;
     Status commit(OperationContext* opCtx,
