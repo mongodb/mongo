@@ -476,7 +476,17 @@ public:
     }
 
     BSONObj toBSON() const override {
-        return _doc.toBSON();
+        auto bson = _doc.toBSON();
+        // TODO (SERVER-98118): Remove once v9.0 becomes last-LTS.
+        // In v8.x, some coordinators parse the document with strict:true, so do not serialize the
+        // default "none" value of authoritativeMetadataAccessLevel (see SERVER-127097).
+        // This is also correct for newer binaries, which interpret the missing field as "none".
+        if (_doc.getShardingCoordinatorMetadata().getAuthoritativeMetadataAccessLevel() ==
+            AuthoritativeMetadataAccessLevelEnum::kNone) {
+            bson = bson.removeField(
+                ShardingCoordinatorMetadata::kAuthoritativeMetadataAccessLevelFieldName);
+        }
+        return bson;
     }
 
     void replace(std::unique_ptr<CoordinatorStateDoc> newDoc) override {

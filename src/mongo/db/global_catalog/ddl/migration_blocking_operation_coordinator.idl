@@ -45,6 +45,7 @@ enums:
 structs:
     MigrationBlockingOperationCoordinatorDocument:
         description: State documents for a MigrationBlockingOperationCoordinator.
+        strict: false
         chained_structs:
             ShardingCoordinatorMetadata: ShardingCoordinatorMetadata
         fields:
