@@ -189,9 +189,16 @@ function reporter(propertyFn, namespaces) {
  * failure, `runProperty` is called again in the reporter, and prints out more details about the
  * failed property.
  */
-export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples) {
+export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples, counterexamplePath) {
     assert.eq(typeof propertyFn, "function");
     assert.eq(typeof numRuns, "number");
+
+    if (counterexamplePath) {
+        jsTest.log.warning(
+            "PBT is not running fully — replaying a single counterexample path. " +
+                "Remove the counterexamplePath argument to run the full property test.",
+        );
+    }
 
     const isValidNamespaceKey = (collName) => {
         switch (collName) {
@@ -251,7 +258,13 @@ export function testProperty(propertyFn, namespaces, workloadModel, numRuns, exa
             // `runProperty` is called again and more details are exposed.
             return result.passed;
         }),
-        {seed, numRuns, reporter: reporter(propertyFn, namespaces), examples},
+        {
+            seed,
+            numRuns,
+            reporter: reporter(propertyFn, namespaces),
+            examples,
+            ...(counterexamplePath && {path: counterexamplePath}),
+        },
     );
 }
 
