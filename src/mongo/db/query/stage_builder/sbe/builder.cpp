@@ -266,9 +266,13 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     env.ctx.mca = &collections;
     if (expCtx->getQueryKnobConfiguration().getEnablePathArrayness() &&
         !expCtx->getNonArrayPathsForNss().empty()) {
-        yieldPolicy->setPathArraynessInfo(
+        stdx::unordered_map<NamespaceString, PathArraynessChecker> perNss;
+        for (auto& [nss, paths] : expCtx->getNonArrayPathsForNss()) {
+            perNss.emplace(nss, PathArraynessChecker{.nonArrayPaths = paths});
+        }
+        yieldPolicy->setMultipleCollectionPathArraynessChecker(
             {MultipleCollectionAccessor{collections},
-             expCtx->getNonArrayPathsForNss(),
+             std::move(perNss),
              [](const CollectionPtr& coll) {
                  return CollectionQueryInfo::get(coll).getPathArrayness();
              }});

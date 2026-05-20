@@ -42,6 +42,8 @@
 namespace mongo {
 
 class ExpressionContext;
+class NamespaceString;
+class PathArrayness;
 
 /**
  * A monotonically-increasing set of FieldPaths. Supports insertion and iteration but not removal.
@@ -66,6 +68,12 @@ public:
 
 private:
     std::set<FieldPath> _paths;
+};
+
+struct PathArraynessChecker {
+    const MonotonicallyIncreasingFieldPathSet nonArrayPaths;
+
+    void uassertIfInvalidated(const PathArrayness& current, const NamespaceString& ns);
 };
 
 /**

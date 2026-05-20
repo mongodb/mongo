@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -214,6 +215,17 @@ boost::optional<FieldPath> PathArrayness::getFirstInvalidatedPath(
         }
     }
     return boost::none;
+}
+
+void PathArraynessChecker::uassertIfInvalidated(const PathArrayness& current,
+                                                const NamespaceString& ns) {
+    if (auto invalidated = PathArrayness::getFirstInvalidatedPath(nonArrayPaths, current)) {
+        uasserted(
+            ErrorCodes::QueryPlanKilled,
+            str::stream() << "query plan killed :: non-array path became multikey during yield: "
+                             "namespace="
+                          << ns.toStringForErrorMsg() << ", path=" << invalidated->fullPath());
+    }
 }
 
 }  // namespace mongo

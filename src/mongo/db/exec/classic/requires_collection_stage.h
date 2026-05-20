@@ -32,6 +32,7 @@
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -63,7 +64,9 @@ public:
           _collectionPtr(&coll.getCollectionPtr()),
           _collectionUUID(coll.getCollectionPtr()->uuid()),
           _catalogEpoch(getCatalogEpoch()),
-          _nss(coll.getCollectionPtr()->ns()) {}
+          _nss(coll.getCollectionPtr()->ns()),
+          _pathArraynessChecker{.nonArrayPaths =
+                                    expCtx->nonArrayPathsForNss(coll.getCollectionPtr()->ns())} {}
 
     ~RequiresCollectionStage() override = default;
 
@@ -110,6 +113,8 @@ private:
     // TODO SERVER-31695: The namespace will no longer be needed once queries can survive collection
     // renames.
     const NamespaceString _nss;
+
+    PathArraynessChecker _pathArraynessChecker;
 };
 
 // Type alias for use by PlanStages that write to a Collection.

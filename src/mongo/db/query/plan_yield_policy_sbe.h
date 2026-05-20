@@ -81,22 +81,23 @@ public:
         _yieldingPlans.clear();
     }
 
-    struct PathArraynessInfo {
+    struct MultipleCollectionPathArraynessChecker {
         MultipleCollectionAccessor collections;
-        stdx::unordered_map<NamespaceString, MonotonicallyIncreasingFieldPathSet>
-            nonArrayPathsForNss;
+        stdx::unordered_map<NamespaceString, PathArraynessChecker> perNss;
         // Returns current PathArrayness for a collection. Caller supplies this so
         // PlanYieldPolicySBE need not depend on CollectionQueryInfo directly.
         std::function<std::shared_ptr<const PathArrayness>(const CollectionPtr&)> getPathArrayness;
+
+        void uassertIfInvalidated();
     };
 
     /**
      * Registers a path arrayness check to run after each yield/restore cycle.
      */
-    void setPathArraynessInfo(PathArraynessInfo info);
+    void setMultipleCollectionPathArraynessChecker(MultipleCollectionPathArraynessChecker checker);
 
 private:
-    void _checkPathArrayness();
+    void uassertIfPathArraynessInvalidated();
     PlanYieldPolicySBE(OperationContext* opCtx,
                        YieldPolicy policy,
                        ClockSource* clockSource,
@@ -113,7 +114,8 @@ private:
     // The list of plans registered to yield when the configured policy triggers a yield.
     std::vector<sbe::PlanStage*> _yieldingPlans;
 
-    boost::optional<PathArraynessInfo> _pathArraynessInfo;
+    boost::optional<MultipleCollectionPathArraynessChecker>
+        _multipleCollectionsPathArraynessChecker;
 };
 
 }  // namespace mongo

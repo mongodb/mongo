@@ -84,35 +84,33 @@ void PlanYieldPolicySBE::restoreState(OperationContext* opCtx,
     for (auto&& root : _yieldingPlans) {
         root->restoreState();
     }
-    _checkPathArrayness();
+    uassertIfPathArraynessInvalidated();
 }
 
-void PlanYieldPolicySBE::setPathArraynessInfo(PathArraynessInfo info) {
-    _pathArraynessInfo.emplace(std::move(info));
-}
-
-void PlanYieldPolicySBE::_checkPathArrayness() {
-    if (!_pathArraynessInfo.has_value()) {
-        return;
-    }
-    _pathArraynessInfo->collections.forEach([&](const CollectionPtr& coll) {
+void PlanYieldPolicySBE::MultipleCollectionPathArraynessChecker::uassertIfInvalidated() {
+    collections.forEach([&](const CollectionPtr& coll) {
         if (!coll) {
             return;
         }
-        auto it = _pathArraynessInfo->nonArrayPathsForNss.find(coll->ns());
-        if (it == _pathArraynessInfo->nonArrayPathsForNss.end() || it->second.empty()) {
+        auto it = perNss.find(coll->ns());
+        if (it == perNss.end() || it->second.nonArrayPaths.empty()) {
             return;
         }
-        auto current = _pathArraynessInfo->getPathArrayness(coll);
+        auto current = getPathArrayness(coll);
         tassert(12567300, "Expected path arrayness to be set on CollectionQueryInfo", current);
-        if (auto invalidated = PathArrayness::getFirstInvalidatedPath(it->second, *current)) {
-            uasserted(ErrorCodes::QueryPlanKilled,
-                      str::stream() << "query plan killed :: non-array path became multikey during "
-                                       "yield: namespace="
-                                    << coll->ns().toStringForErrorMsg()
-                                    << ", path=" << invalidated->fullPath());
-        }
+        it->second.uassertIfInvalidated(*current, coll->ns());
     });
+}
+
+void PlanYieldPolicySBE::setMultipleCollectionPathArraynessChecker(
+    MultipleCollectionPathArraynessChecker checker) {
+    _multipleCollectionsPathArraynessChecker.emplace(std::move(checker));
+}
+
+void PlanYieldPolicySBE::uassertIfPathArraynessInvalidated() {
+    if (_multipleCollectionsPathArraynessChecker) {
+        _multipleCollectionsPathArraynessChecker->uassertIfInvalidated();
+    }
 }
 
 }  // namespace mongo
