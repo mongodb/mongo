@@ -516,8 +516,7 @@ common:macos -c dbg
 # Remote execution and caching is the default, but only mongodb employees will be able to access
 # the engflow cluster. External builders should use the --config=local option
 
-# Enable remote build execution:
-common:linux --remote_executor=grpcs://sodalite.cluster.engflow.com
+# Disable remote execution on Windows and MacOS (they cannot reach the engflow cluster):
 common:windows --remote_executor=
 common:macos --remote_executor=
 
@@ -525,7 +524,8 @@ common:macos --remote_executor=
 common:windows --//bazel/config:build_atlas=False
 common:macos --//bazel/config:build_atlas=False
 
-# Enable remote cache (also necessary for remote build execution):
+# Enable remote build execution and caching:
+common --remote_executor=grpcs://sodalite.cluster.engflow.com
 common --experimental_remote_downloader=grpcs://sodalite.cluster.engflow.com
 common --remote_cache=grpcs://sodalite.cluster.engflow.com
 common --bes_backend=grpcs://sodalite.cluster.engflow.com
@@ -594,27 +594,20 @@ common:no-remote-exec --jobs=auto
 --config=public-release
 common:public-release --//bazel/config:release=True
 common:public-release --//bazel/config:extensions_signature_verification_secure=True
+common:public-release --remote_instance_name=release
+common:public-release --bes_instance_name=release
+common:public-release --remote_upload_local_results=false
 common:public-release --stamp
 
-# Disable remote execution and caching for public releases
+# Disable remote execution for public releases but keep remote downloader for artifact caching
 --config=public-release-local
 common:public-release-local --config=public-release
 common:public-release-local --remote_executor=
-common:public-release-local --experimental_remote_downloader=
-common:public-release-local --remote_cache=
-common:public-release-local --bes_backend=
-common:public-release-local --bes_results_url=
-common:public-release-local --tls_client_certificate=
-common:public-release-local --tls_client_key=
-common:public-release-local --remote_cache_compression=false
-common:public-release-local --grpc_keepalive_time=0s
-common:public-release-local --legacy_important_outputs
+common:public-release-local --modify_execution_info=.*=+no-cache
 
 # Release configuration with rbe enabled
 --config=public-release-rbe
 common:public-release-rbe --config=public-release
-common:public-release-rbe --remote_instance_name=release
-common:public-release-rbe --bes_instance_name=release
 
 common --@rules_rust//rust/toolchain/channel=nightly
 common --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols=true

@@ -123,7 +123,9 @@ if [[ -n "${no_mongo_version}" ]]; then
 fi
 
 # Build flags line
-ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${MONGO_VERSION_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} ${patch_compile_flags:-}"
+BEP_FULL="build_events_full.json"
+BEP_OUT="build_events.json"
+ALL_FLAGS="--verbose_failures ${LOCAL_ARG} ${MONGO_VERSION_ARG} ${bazel_args:-} ${bazel_compile_flags:-} ${task_compile_flags:-} ${patch_compile_flags:-} --build_event_json_file=${BEP_FULL}"
 echo "${ALL_FLAGS}" >.bazel_build_flags
 
 # Save the entire bazel build invocation to attach to the task for re-running locally
@@ -137,6 +139,14 @@ bazel_evergreen_shutils::retry_bazel_cmd 3 "$BAZEL_BINARY" \
 RET=$?
 
 bazel_evergreen_shutils::write_last_engflow_link
+
+# Extract just the optionsParsed event from the full BEP JSON.
+# This single line (~few KB) is all package_test.py needs to verify
+# that remote cache and remote execution were not used.
+if [[ -f "${BEP_FULL}" ]]; then
+    grep '"optionsParsed"' "${BEP_FULL}" >"${BEP_OUT}" || true
+    rm -f "${BEP_FULL}"
+fi
 
 set -o errexit
 
