@@ -53,11 +53,9 @@ createDatabase(OperationContext* opCtx,
 
 /**
  * Creates the specified collection.
- *
- * TODO (SERVER-100309): remove `againstFirstShard` once 9.0 becomes last LTS.
  */
-MONGO_MOD_NEEDS_REPLACEMENT CreateCollectionResponse createCollection(
-    OperationContext* opCtx, ShardsvrCreateCollection request, bool againstFirstShard = false);
+MONGO_MOD_NEEDS_REPLACEMENT CreateCollectionResponse
+createCollection(OperationContext* opCtx, ShardsvrCreateCollection request);
 
 /**
  * Creates a collection with the options specified in `request`. Calls the above createCollection

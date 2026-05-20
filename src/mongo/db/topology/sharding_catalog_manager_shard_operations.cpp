@@ -106,7 +106,6 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/add_shard_gen.h"
@@ -449,10 +448,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         }
     }
 
-    // Check that the shard candidate does not have a local config.system.sessions collection. We do
-    // not want to drop this once featureFlagSessionsCollectionCoordinatorOnConfigServer is enabled
-    // but we do not have stability yet. We optimistically do not drop it here and then double check
-    // later under the fixed FCV region.
+    // Check that the shard candidate does not have a local config.system.sessions collection.
     if (!isConfigShard) {
         auto res = _dropSessionsCollection(opCtx, targeter);
         if (!res.isOK()) {
@@ -495,9 +491,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
               currentFCV == multiversion::GenericFCV::kLastContinuous ||
               currentFCV == multiversion::GenericFCV::kLastLTS);
 
-    if (isConfigShard &&
-        !feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+    if (isConfigShard) {
         auto res = _dropSessionsCollection(opCtx, targeter);
         if (!res.isOK()) {
             return res.withContext(
@@ -928,21 +922,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             }
 
             // Also drop the sessions collection, which we assume is the only sharded collection in
-            // the config database. Only do this if
-            // featureFlagSessionsCollectionCoordinatorOnConfigServer is disabled. We don't have
-            // synchronization with setFCV here, so it is still possible for rare interleavings to
-            // drop the collection when they shouldn't, but the create coordinator will re-create it
-            // on the next periodic refresh.
-            if (!feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabled(
-                    VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot())) {
-                DBDirectClient client(opCtx);
-                BSONObj result;
-                if (!client.dropCollection(
-                        NamespaceString::kLogicalSessionsNamespace,
-                        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                        &result)) {
-                    uassertStatusOK(getStatusFromCommandResult(result));
-                }
+            // the config database.
+            DBDirectClient client(opCtx);
+            BSONObj result;
+            if (!client.dropCollection(
+                    NamespaceString::kLogicalSessionsNamespace,
+                    ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                    &result)) {
+                uassertStatusOK(getStatusFromCommandResult(result));
             }
         }
 

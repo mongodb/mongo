@@ -35,10 +35,9 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/global_catalog/ddl/cluster_ddl.h"
-#include "mongo/db/global_catalog/ddl/drop_collection_coordinator.h"
 #include "mongo/db/global_catalog/ddl/placement_history_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
@@ -463,13 +462,6 @@ private:
             }
         }
 
-        // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
-        if (isConfigsvr &&
-            feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabledOnVersion(
-                requestedVersion)) {
-            _createConfigSessionsCollectionLocally(opCtx);
-        }
-
         // The content of config.placementHistory needs to be recomputed after ensuring that all
         // shards (including a possible embedded config server) reached the kComplete FCV phase, so
         // that the routine has to be invoked here (rather than embedding it within
@@ -504,22 +496,6 @@ private:
             service
                 .migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
                     opCtx);
-        }
-    }
-
-    void _createConfigSessionsCollectionLocally(OperationContext* opCtx) {
-        ShardsvrCreateCollection shardsvrCollRequest(NamespaceString::kLogicalSessionsNamespace);
-        ShardsvrCreateCollectionRequest requestParamsObj;
-        requestParamsObj.setShardKey(BSON("_id" << 1));
-        shardsvrCollRequest.setShardsvrCreateCollectionRequest(std::move(requestParamsObj));
-        shardsvrCollRequest.setDbName(NamespaceString::kLogicalSessionsNamespace.dbName());
-
-        try {
-            cluster::createCollection(opCtx, std::move(shardsvrCollRequest));
-        } catch (const ExceptionFor<ErrorCodes::IllegalOperation>& ex) {
-            LOGV2(8694900,
-                  "Failed to create config.system.sessions on upgrade",
-                  "error"_attr = redact(ex));
         }
     }
 
@@ -972,11 +948,6 @@ private:
 
         _cleanUpClusterParameters(opCtx, originalVersion, requestedVersion);
         _createAuthzSchemaVersionDocIfNeeded(opCtx);
-        // Note the config server is also considered a shard, so the ConfigServer and ShardServer
-        // roles aren't mutually exclusive.
-        if (role && role->has(ClusterRole::ConfigServer)) {
-            _dropSessionsCollectionLocally(opCtx, requestedVersion, originalVersion);
-        }
 
         if (role && role->has(ClusterRole::ShardServer)) {
             abortAllMultiUpdateCoordinators(opCtx, requestedVersion, originalVersion);
@@ -1092,32 +1063,6 @@ private:
             }());
 
             write_ops::checkWriteErrors(result);
-        }
-    }
-
-    void _dropSessionsCollectionLocally(OperationContext* opCtx,
-                                        const FCV requestedVersion,
-                                        const FCV originalVersion) {
-        if (feature_flags::gSessionsCollectionCoordinatorOnConfigServer
-                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
-            // Only drop the collection locally if the config server is not acting as a shard. Since
-            // addShard (transitionFromDedicated) cannot run on transitional FCV, we cannot drop
-            // this when we shouldn't. If we transition to dedicated after this check, then
-            // transition to dedicated will drop the collection.
-            const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-            bool amIAConfigShard =
-                std::find(allShardIds.begin(),
-                          allShardIds.end(),
-                          ShardingState::get(opCtx)->shardId()) != allShardIds.end();
-            if (!amIAConfigShard) {
-                DropCollectionCoordinator::dropCollectionLocally(
-                    opCtx,
-                    NamespaceString::kLogicalSessionsNamespace,
-                    true /* fromMigrate */,
-                    true /* dropSystemCollections */,
-                    boost::none,
-                    false /* requireCollectionEmpty */);
-            }
         }
     }
 

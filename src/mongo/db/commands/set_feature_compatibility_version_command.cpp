@@ -758,15 +758,6 @@ private:
                             opCtx, CoordinatorTypeEnum::kRenameCollection);
                 }
 
-                // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
-                if (feature_flags::gSessionsCollectionCoordinatorOnConfigServer
-                        .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                                      originalVersion)) {
-                    ShardingCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, CoordinatorTypeEnum::kCreateCollection);
-                }
-
                 // TODO SERVER-77915: Remove once v8.0 branches out.
                 if (feature_flags::gTrackUnshardedCollectionsUponMoveCollection
                         .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,

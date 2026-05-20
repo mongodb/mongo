@@ -6106,8 +6106,6 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
     }
 
     if (testCase == "noop") {
-        // TODO SERVER-100309 adapt/enable setFeatureCompatibilityVersion no-op case once the
-        // upgrade procedure will not proactively shard the sessions collection.
         if (
             clusterType == "sharded" &&
             (shardedDDLCommandsRequiringMajorityCommit.includes(command) ||

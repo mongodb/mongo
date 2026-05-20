@@ -305,11 +305,7 @@ const newShardName = assert.commandWorked(st.s.adminCommand({addShard: newShardR
     assert(!configPrimary.getCollection(ns).exists());
     assert(!configPrimary.getCollection(indexedNs).exists());
     assert.sameMembers(configPrimary.getCollection(indexedNs).getIndexKeys(), []);
-    if (FeatureFlagUtil.isPresentAndEnabled(configPrimary, "SessionsCollectionCoordinatorOnConfigServer")) {
-        assert(configPrimary.getCollection("config.system.sessions").exists());
-    } else {
-        assert(!configPrimary.getCollection("config.system.sessions").exists());
-    }
+    assert(!configPrimary.getCollection("config.system.sessions").exists());
 
     // Basic CRUD and sharded DDL work.
     basicCRUD(st.s);

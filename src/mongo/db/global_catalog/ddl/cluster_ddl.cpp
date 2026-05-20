@@ -85,7 +85,6 @@ std::vector<AsyncRequestsSender::Request> buildUntrackedRequestsForAllShards(
     return requests;
 }
 
-// TODO (SERVER-100309): remove once 9.0 becomes last LTS.
 AsyncRequestsSender::Response executeCommandAgainstFirstShard(OperationContext* opCtx,
                                                               const DatabaseName& dbName,
                                                               const NamespaceString& nss,
@@ -162,8 +161,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
 }
 
 CreateCollectionResponse createCollection(OperationContext* opCtx,
-                                          ShardsvrCreateCollection request,
-                                          bool againstFirstShard) {
+                                          ShardsvrCreateCollection request) {
     const auto& nss = request.getNamespace();
 
     if (MONGO_unlikely(hangCreateUnshardedCollection.shouldFail()) && request.getUnsplittable() &&
@@ -262,14 +260,7 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
 
     boost::optional<executor::RemoteCommandResponse> remoteResponse;
 
-    // TODO (SERVER-100309): remove againstFirstShard option once 9.0 becomes last LTS.
-    if (againstFirstShard) {
-        tassert(
-            113986,
-            "createCollection can only run against the first shard for `config.system.sessions` "
-            "collection.",
-            nss == NamespaceString::kLogicalSessionsNamespace);
-
+    if (isSharded && nss.isConfigDB()) {
         const auto dbInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
         const auto cmdResponse =

@@ -47,7 +47,6 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
@@ -256,25 +255,15 @@ public:
                     }
                 }
 
-                // Check whether we should create config.system.sessions from the config server on
-                // the first shard using dataShard. Will throw if the feature flag is enabled and
-                // we are on a shard server.
-                //
-                // TODO (SERVER-100309): remove once 9.0 becomes last LTS.
-                bool useNewCoordinatorPathForSessionsColl =
-                    _checkSessionsFeatureFlagAndClusterRole(opCtx, ns(), *optFixedFcvRegion);
-
-                // If we are in the old world (where the config.system.sessions coordinator is run
-                // on the first shard) we need to route the command to the first shard unless we
-                // are the first shard.
-                //
-                // TODO (SERVER-100309): remove once 9.0 becomes last LTS.
+                // Routers do not know FCV and can still follow the old behavior by sending
+                // config.system.sessions create requests to the config server. Until all routers
+                // have upgraded, route those requests to the first shard so they reach the
+                // coordinator. Once 9.0 becomes last LTS, only embedded config servers should reach
+                // this path and it can be removed.
+                // TODO (SERVER-127204): Remove once 9.0 becomes last LTS.
                 if (boost::optional<Response> remoteCreateResponse =
                         _routeSessionsCollectionCreateIfNeeded(
-                            opCtx,
-                            ns(),
-                            useNewCoordinatorPathForSessionsColl,
-                            request().getShardsvrCreateCollectionRequest()))
+                            opCtx, request().getShardsvrCreateCollectionRequest()))
                     return *remoteCreateResponse;
 
                 auto requestToForward = request().getShardsvrCreateCollectionRequest();
@@ -298,9 +287,6 @@ public:
                     auto doc = CreateCollectionCoordinatorDocument();
                     doc.setShardingCoordinatorMetadata({{ns(), coordType}});
                     doc.setShardsvrCreateCollectionRequest(requestToForward);
-                    if (useNewCoordinatorPathForSessionsColl) {
-                        doc.setCreateSessionsCollectionRemotelyOnFirstShard(true);
-                    }
                     return doc.toBSON();
                 }();
 
@@ -360,40 +346,11 @@ public:
             return CreateCollectionResponse{ShardVersion::UNTRACKED()};
         }
 
-        // TODO (SERVER-100309): remove once 9.0 becomes last LTS.
-        bool _checkSessionsFeatureFlagAndClusterRole(OperationContext* opCtx,
-                                                     const NamespaceString& nss,
-                                                     const FixedFCVRegion& fixedFcvRegion) {
-            if (ns() != NamespaceString::kLogicalSessionsNamespace)
-                return false;
-
-            // If the feature flag is enabled, we must be running on the config server
-            // and we want to tell the coordinator that it must not create the
-            // collection locally.
-            auto clusterRole = ShardingState::get(opCtx)->pollClusterRole();
-            if (feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabled(
-                    VersionContext::getDecoration(opCtx), fixedFcvRegion->acquireFCVSnapshot())) {
-
-                uassert(ErrorCodes::CommandNotSupported,
-                        "Sessions collection can only be sharded on the config server",
-                        !clusterRole->hasExclusively(ClusterRole::ShardServer));
-                return true;
-            }
-            return false;
-        }
-
-        // TODO (SERVER-100309): remove once 9.0 becomes last LTS.
         boost::optional<Response> _routeSessionsCollectionCreateIfNeeded(
-            OperationContext* opCtx,
-            const NamespaceString& nss,
-            bool useNewPathForSessionsColl,
-            ShardsvrCreateCollectionRequest request) {
-            if (ns() != NamespaceString::kLogicalSessionsNamespace || useNewPathForSessionsColl)
+            OperationContext* opCtx, ShardsvrCreateCollectionRequest request) {
+            if (ns() != NamespaceString::kLogicalSessionsNamespace)
                 return boost::none;
-            // If the feature flag is disabled, we should check whether we are the first
-            // shard (which can be the case in embedded config scenarios). If so, we
-            // should run the coordinator normally. Otherwise we should route the
-            // command appropriately.
+
             auto clusterRole = ShardingState::get(opCtx)->pollClusterRole();
             if (clusterRole->has(ClusterRole::ConfigServer)) {
                 auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
@@ -403,7 +360,7 @@ public:
                     ShardsvrCreateCollection requestToForward(ns());
                     requestToForward.setShardsvrCreateCollectionRequest(request);
                     requestToForward.setDbName(ns().dbName());
-                    return cluster::createCollection(opCtx, std::move(requestToForward), true);
+                    return cluster::createCollection(opCtx, std::move(requestToForward));
                 }
             }
             return boost::none;

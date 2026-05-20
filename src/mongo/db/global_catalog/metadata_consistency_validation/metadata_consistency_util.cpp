@@ -905,9 +905,8 @@ bool _collectionMustExistLocallyButDoesnt(OperationContext* opCtx,
                                           const ShardId& currentShard,
                                           const ShardId& primaryShard) {
     // The DBPrimary shard must always have the collection created locally regardless if it owns
-    // chunks or not.
-    //
-    // TODO (SERVER-100309): Remove exclusion for configDB once 9.0 becomes lastLTS.
+    // chunks or not. The config database is excluded because config.system.sessions is created on
+    // the first shard instead of the database primary.
     if (currentShard == primaryShard && !nss.isConfigDB()) {
         return true;
     }
