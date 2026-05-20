@@ -285,6 +285,7 @@ class ConnectionPoolQueuingTest : public ConnectionPoolTest {};
 class ConnectionPoolSpawningTest : public ConnectionPoolTest {};
 class ConnectionPoolSetupTest : public ConnectionPoolTest {};
 class ConnectionPoolReturnAndRefreshTest : public ConnectionPoolTest {};
+class ConnectionPoolLeasingTest : public ConnectionPoolTest {};
 
 /**
  * Verify that a request is rejected immediately when the pending request queue is at capacity.
@@ -2689,7 +2690,10 @@ TEST_F(ConnectionPoolTest, OverlappingCheckoutsAdditivelyContributeToTotalUsageT
     ASSERT_GREATER_THAN_OR_EQUALS(totalTimeUsageDelta, checkOutLength * numConnections);
 }
 
-TEST_F(ConnectionPoolTest, LeasedConnectionsDontCountTowardsUsageTime) {
+/**
+ * Verify that a concurrent lease does not count toward the pool's total connection usage time.
+ */
+TEST_F(ConnectionPoolLeasingTest, LeasedConnectionsDontCountTowardsConnectionUsageTime) {
     constexpr Milliseconds checkOutLength = Milliseconds(10);
     auto pool = makePool();
 
@@ -2704,6 +2708,7 @@ TEST_F(ConnectionPoolTest, LeasedConnectionsDontCountTowardsUsageTime) {
     pool->lease_forTest(HostAndPort(),
                         Milliseconds(5000),
                         [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                            ASSERT_OK(swConn.getStatus());
                             PoolImpl::setNow(endTimePoint);
                             doneWith(swConn.getValue());
                         });
@@ -2715,7 +2720,12 @@ TEST_F(ConnectionPoolTest, LeasedConnectionsDontCountTowardsUsageTime) {
     ASSERT_EQ(totalTimeUsageDelta, Milliseconds(0));
 }
 
-TEST_F(ConnectionPoolTest, LeasedConnectionsDontInterfereWithOrdinaryCheckoutUsageTime) {
+/**
+ * Verify that a concurrent lease does not inflate the connection usage time when there is a
+ * concurrent checkout.
+ */
+TEST_F(ConnectionPoolLeasingTest,
+       LeasedConnectionsWithConcurrentCheckoutDontInflateConnectionUsageTime) {
     constexpr Milliseconds checkOutLength = Milliseconds(10);
     auto pool = makePool();
 
@@ -2727,20 +2737,27 @@ TEST_F(ConnectionPoolTest, LeasedConnectionsDontInterfereWithOrdinaryCheckoutUsa
     PoolImpl::setNow(startTimePoint);
 
     ConnectionImpl::pushSetup(Status::OK());
+    ConnectionImpl::pushSetup(Status::OK());
 
-    // Checkout one connection and lease one connection.
+    // Check out one connection and lease one connection.
     ConnectionPool::ConnectionHandle normal;
     ConnectionPool::ConnectionHandle leased;
     pool->get_forTest(HostAndPort(),
                       Milliseconds(5000),
                       [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                          ASSERT_OK(swConn.getStatus());
                           normal = std::move(swConn.getValue());
                       });
     pool->lease_forTest(HostAndPort(),
                         Milliseconds(5000),
                         [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                            ASSERT_OK(swConn.getStatus());
                             leased = std::move(swConn.getValue());
                         });
+
+    // Verify both handles were acquired before testing time behavior.
+    ASSERT(normal);
+    ASSERT(leased);
 
     // Advance the time and return the connections.
     PoolImpl::setNow(endTimePoint);
@@ -2754,6 +2771,118 @@ TEST_F(ConnectionPoolTest, LeasedConnectionsDontInterfereWithOrdinaryCheckoutUsa
     // Should only include usage time from the checkout, not the lease
     ASSERT_GREATER_THAN_OR_EQUALS(totalTimeUsageDelta, checkOutLength);
     ASSERT_LESS_THAN(totalTimeUsageDelta, checkOutLength * 2);
+}
+
+/**
+ * Verify that a returned leased connection is available for reuse via get() without spawning a
+ * new setup.
+ */
+TEST_F(ConnectionPoolLeasingTest, ReturnedLeasedConnectionIsAvailableForReuse) {
+    auto pool = makePool();
+
+    // Lease one connection.
+    ConnectionPool::ConnectionHandle leased;
+    size_t leasedId = 0;
+    ConnectionImpl::pushSetup(Status::OK());
+    pool->lease_forTest(HostAndPort(),
+                        Milliseconds(5000),
+                        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                            leasedId = verifyAndGetId(swConn);
+                            leased = std::move(swConn.getValue());
+                        });
+    ASSERT(leased);
+
+    // Return the connection. It should go back to the ready pool.
+    doneWith(leased);
+    ASSERT_EQ(1u, getStats(pool).totalAvailable);
+
+    // Get the connection. No new setup should be needed.
+    size_t reusedId = 0;
+    pool->get_forTest(HostAndPort(),
+                      Milliseconds(5000),
+                      [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                          reusedId = verifyAndGetId(swConn);
+                          doneWith(swConn.getValue());
+                      });
+    ASSERT_EQ(0u, ConnectionImpl::setupQueueDepth());
+    ASSERT_EQ(leasedId, reusedId);
+    ASSERT_EQ(1u, getStats(pool).totalCreated);
+}
+
+/**
+ * Verify that a pending lease() request is fulfilled when a connection becomes available.
+ */
+TEST_F(ConnectionPoolLeasingTest, PendingLeaseIsFulfilledWhenConnectionBecomesAvailable) {
+    ConnectionPool::Options options;
+    options.maxConnections = 1;
+    auto pool = makePool(options);
+
+    // Check out the only connection so the pool is at capacity.
+    ConnectionPool::ConnectionHandle normal;
+    ConnectionImpl::pushSetup(Status::OK());
+    pool->get_forTest(HostAndPort(),
+                      Milliseconds(5000),
+                      [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                          ASSERT_OK(swConn.getStatus());
+                          normal = std::move(swConn.getValue());
+                      });
+    ASSERT(normal);
+
+    // Enqueue a lease(). The pool is at maxConnections so no new setup is spawned.
+    ConnectionPool::ConnectionHandle leased;
+    pool->lease_forTest(HostAndPort(),
+                        Milliseconds(5000),
+                        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                            ASSERT_OK(swConn.getStatus());
+                            leased = std::move(swConn.getValue());
+                        });
+    ASSERT_FALSE(leased);
+
+    // Return the checked-out connection. It should be routed to the pending lease request.
+    doneWith(normal);
+    ASSERT_TRUE(leased);
+    ASSERT_EQ(0u, ConnectionImpl::setupQueueDepth());
+    ASSERT_EQ(0u, getStats(pool).totalAvailable);
+    ASSERT_EQ(1u, getStats(pool).totalLeased);
+
+    doneWith(leased);
+}
+
+/**
+ * Verify that a leased connection counts toward the connection limit.
+ */
+TEST_F(ConnectionPoolLeasingTest, LeasedConnectionCountsTowardsMaxConnections) {
+    ConnectionPool::Options options;
+    options.maxConnections = 1;
+    auto pool = makePool(options);
+
+    // Lease one connection. It counts against the connection limit.
+    ConnectionPool::ConnectionHandle leased;
+    ConnectionImpl::pushSetup(Status::OK());
+    pool->lease_forTest(HostAndPort(),
+                        Milliseconds(5000),
+                        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                            ASSERT_OK(swConn.getStatus());
+                            leased = std::move(swConn.getValue());
+                        });
+    ASSERT_TRUE(leased);
+
+    // A get() request cannot be served while the pool is at its connection limit.
+    bool gotConn = false;
+    ConnectionPool::ConnectionHandle conn;
+    pool->get_forTest(HostAndPort(),
+                      Milliseconds(5000),
+                      [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                          ASSERT_OK(swConn.getStatus());
+                          gotConn = true;
+                          conn = std::move(swConn.getValue());
+                      });
+    ASSERT_FALSE(gotConn);
+
+    // Returning the leased connection frees capacity and unblocks the pending get().
+    doneWith(leased);
+    ASSERT_TRUE(gotConn);
+    doneWith(conn);
 }
 
 TEST_F(ConnectionPoolTest, CancelGetBeforeCallDoesntPullConnection) {
