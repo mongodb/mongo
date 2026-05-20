@@ -1315,6 +1315,12 @@ void RunCommandAndWaitForWriteConcern::_waitForWriteConcern(BSONObjBuilder& bb) 
     }
 
     CurOp::get(opCtx)->debug().writeConcern.emplace(opCtx->getWriteConcern());
+    LOGV2_DEBUG(12091302,
+                2,
+                "Waiting for write concern",
+                "command"_attr = invocation->definition()->getName(),
+                "opTime"_attr = _ecd->getLastOpBeforeRun(),
+                "writeConcern"_attr = opCtx->getWriteConcern().toBSON());
     service_entry_point_shard_role_helpers::waitForWriteConcern(
         opCtx, invocation, _ecd->getLastOpBeforeRun(), bb);
 }
@@ -1388,13 +1394,12 @@ void RunCommandAndWaitForWriteConcern::_setup() {
                   fmt::format("unexpected unset provenance on writeConcern: {}",
                               _extractedWriteConcern->toBSON().jsonString()));
 
-        uassert(ErrorCodes::UnsatisfiableWriteConcern,
-                "Unsupported WriteConcernOptions",
-                rss::ReplicatedStorageService::get(opCtx->getServiceContext())
-                    .getPersistenceProvider()
-                    .supportsWriteConcernOptions(_extractedWriteConcern.get()));
-
         opCtx->setWriteConcern(*_extractedWriteConcern);
+        LOGV2_DEBUG(12091301,
+                    2,
+                    "Extracted write concern for command",
+                    "command"_attr = command->getName(),
+                    "writeConcern"_attr = _extractedWriteConcern->toBSON());
     }
 }
 
