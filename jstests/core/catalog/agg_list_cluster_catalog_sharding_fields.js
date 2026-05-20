@@ -249,7 +249,11 @@ for (const [collName, expectedResult] of Object.entries(expectedResults[serverTy
 
 // 3. Verify that rawData=true returns the raw (buckets) shard key for timeseries collections,
 //    while rawData=false (default) returns the logical (user-facing) format.
-if (FixtureHelpers.isMongos(dbTest)) {
+(() => {
+    if (!FixtureHelpers.isMongos(dbTest)) {
+        return;
+    }
+
     const rawResult = assert.commandWorked(
         dbTest.runCommand({
             aggregate: 1,
@@ -260,6 +264,16 @@ if (FixtureHelpers.isMongos(dbTest)) {
     );
     const rawEntries = rawResult.cursor.firstBatch;
 
+    const regularRawEntry = rawEntries.find((e) => e.ns === dbName + "." + kCollSharded);
+    assert(regularRawEntry, "Sharded collection not found in rawData=true results: " + tojson(rawEntries));
+    assert.docEq({x: 1}, regularRawEntry.shardKey, "rawData should not affect non-timeseries shard keys");
+
+    // TODO SERVER-120014: Remove once 9.0 becomes last LTS and all timeseries collections are viewless.
+    // TODO SERVER-97061: Remove once $listClusterCatalog returns a consistent state for the local and global catalog.
+    if (runningWithViewlessTimeseriesUpgradeDowngrade(dbTest)) {
+        return;
+    }
+
     const tsRawEntry = rawEntries.find((e) => e.ns.endsWith("." + kCollTimeseriesSharded));
     assert(tsRawEntry, "Sharded timeseries collection not found in rawData=true results: " + tojson(rawEntries));
     assert.docEq(
@@ -267,10 +281,6 @@ if (FixtureHelpers.isMongos(dbTest)) {
         tsRawEntry.shardKey,
         "rawData=true should return the raw buckets shard key for timeseries collections",
     );
-
-    const regularRawEntry = rawEntries.find((e) => e.ns === dbName + "." + kCollSharded);
-    assert(regularRawEntry, "Sharded collection not found in rawData=true results: " + tojson(rawEntries));
-    assert.docEq({x: 1}, regularRawEntry.shardKey, "rawData should not affect non-timeseries shard keys");
 
     const tsMetaRawEntry = rawEntries.find((e) => e.ns.endsWith("." + kCollTimeseriesShardedByMeta));
     assert(tsMetaRawEntry, kCollTimeseriesShardedByMeta + " not found in rawData=true results: " + tojson(rawEntries));
@@ -290,7 +300,7 @@ if (FixtureHelpers.isMongos(dbTest)) {
         tsSubfieldRawEntry.shardKey,
         "rawData=true should return {meta.sensorId: 1} for metaField sub-path timeseries shard key",
     );
-}
+})();
 
 // 4. Test balancingEnabled and balancingEnabledReason flags with all the possible configurations.
 //    This is only necessary when the cluster is sharded.
