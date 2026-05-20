@@ -182,6 +182,300 @@ TEST_F(PipelineAnalyzerTest, MatchInSubPipeline) {
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
 
+TEST_F(PipelineAnalyzerTest, AbsorbedFilterNonPipelineLookup) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$match: {"fromA.d": 11}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ d: { $eq: 11 } }", cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, AbsorbedFilterEmptyPipeline) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [] }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.d": 11}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    // TODO (SERVER-125579): pipeline: [] with an absorbed filter should be eligible once we can
+    // properly capture the filter in the join graph.
+    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+}
+
+TEST_F(PipelineAnalyzerTest, EmptyPipelineNoFilterEligible) {
+    // pipeline: [] without a trailing $match remains eligible — guards against the ineligibility
+    // check on absorbed filter over-firing for the no-filter case.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [] }
+            },
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+}
+
+TEST_F(PipelineAnalyzerTest, TwoMatchesBothOnAsField) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$match: {"fromA.c": 5}},
+            {$match: {"fromA.d": 11}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ $and: [ { c: { $eq: 5 } }, { d: { $eq: 11 } } ] }",
+              cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, TwoMatchesFirstOnAsFieldSecondOnBaseField) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$match: {"fromA.d": 11}},
+            {$match: {"e": 5}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{ e: { $eq: 5 } }", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ d: { $eq: 11 } }", cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, TwoMatchesFirstOnBaseFieldSecondOnAsField) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$match: {"e": 5}},
+            {$match: {"fromA.d": 11}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{ e: { $eq: 5 } }", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ d: { $eq: 11 } }", cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, TwoMatchesSameFieldBothOnAsField) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$match: {"fromA.d": {$gt: 5}}},
+            {$match: {"fromA.d": {$lt: 10}}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ $and: [ { d: { $lt: 10 } }, { d: { $gt: 5 } } ] }",
+              cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, TwoMatchesEachOnDifferentCollection) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "a", foreignField: "c", as: "fromB"}},
+            {$unwind: "$fromB"},
+            {$match: {"fromA.d": 11}},
+            {$match: {"fromB.e": 7}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"c"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 3);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cqA = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cqA->nss().coll(), "A");
+    ASSERT_EQ("{ d: { $eq: 11 } }", cqA->getPrimaryMatchExpression()->toString());
+    const auto* cqB = joinModel.graph.accessPathAt((NodeId)2);
+    ASSERT_EQ(cqB->nss().coll(), "B");
+    ASSERT_EQ("{ e: { $eq: 7 } }", cqB->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, MatchBetweenTwoLookupUnwinds) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$match: {"fromA.d": 11}},
+            {$lookup: {from: "B", localField: "a", foreignField: "c", as: "fromB"}},
+            {$unwind: "$fromB"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"c"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 3);
+    const auto* cqA = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cqA->nss().coll(), "A");
+    ASSERT_EQ("{ d: { $eq: 11 } }", cqA->getPrimaryMatchExpression()->toString());
+    const auto* cqB = joinModel.graph.accessPathAt((NodeId)2);
+    ASSERT_EQ(cqB->nss().coll(), "B");
+    ASSERT_EQ("{}", cqB->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SingleMatchOnBothBaseAndAsField) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$match: {"fromA.d": 11, "e": 5}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{ e: { $eq: 5 } }", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ d: { $eq: 11 } }", cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SingleMatchOnTwoDifferentAsFields) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "a", foreignField: "c", as: "fromB"}},
+            {$unwind: "$fromB"},
+            {$match: {"fromA.d": 11, "fromB.e": 7}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"c"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 3);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cqA = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cqA->nss().coll(), "A");
+    ASSERT_EQ("{ d: { $eq: 11 } }", cqA->getPrimaryMatchExpression()->toString());
+    const auto* cqB = joinModel.graph.accessPathAt((NodeId)2);
+    ASSERT_EQ(cqB->nss().coll(), "B");
+    ASSERT_EQ("{ e: { $eq: 7 } }", cqB->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, AbsorbedFilterOnChainedLookup) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "fromA.c", foreignField: "d", as: "fromB"}},
+            {$unwind: "$fromB"},
+            {$match: {"fromB.e": 7}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd, "c"_sd}}, {"B", {"d"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 3);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cqA = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cqA->nss().coll(), "A");
+    ASSERT_EQ("{}", cqA->getPrimaryMatchExpression()->toString());
+    const auto* cqB = joinModel.graph.accessPathAt((NodeId)2);
+    ASSERT_EQ(cqB->nss().coll(), "B");
+    ASSERT_EQ("{ e: { $eq: 7 } }", cqB->getPrimaryMatchExpression()->toString());
+}
+
 TEST_F(PipelineAnalyzerTest, GroupOnMainCollection) {
     const auto query = R"([
             {$group: {_id: "$key", a: {$avg: "$c"}}},

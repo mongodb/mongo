@@ -397,4 +397,45 @@ joinTestWrapper(db, () => {
         {$unwind: "$x"},
         {$project: {"_id": 0, "d": 1}},
     ]);
+
+    section("Non-pipeline $lookup with single absorbed $match on as field");
+    runBasicJoinTest([
+        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+        {$match: {"x.c": {$eq: "blah"}}},
+    ]);
+
+    section("Non-pipeline $lookup with two absorbed $match stages both on as field");
+    runBasicJoinTest([
+        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+        {$match: {"x.c": {$eq: "blah"}}},
+        {$match: {"x.d": {$eq: 2}}},
+    ]);
+
+    section("Non-pipeline $lookup with absorbed $match on as field followed by $match on base field");
+    runBasicJoinTest([
+        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+        {$match: {"x.c": {$eq: "blah"}}},
+        {$match: {"b": {$eq: "bar"}}},
+    ]);
+
+    section("Two joins where second join has absorbed filter");
+    runBasicJoinTest([
+        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+        {$lookup: {from: foreignColl2.getName(), as: "y", localField: "b", foreignField: "b"}},
+        {$unwind: "$y"},
+        {$match: {"y.d": {$gt: 2}}},
+    ]);
+
+    section(
+        "$match referencing the as-field placed before the $lookup that introduces it is a base collection filter and is not absorbed into the joined collection",
+    );
+    runBasicJoinTest([
+        {$match: {"x.c": {$eq: "blah"}}},
+        {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+    ]);
 }); // joinTestWrapper();

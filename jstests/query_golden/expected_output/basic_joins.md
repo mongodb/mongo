@@ -3699,3 +3699,768 @@ rightEmbeddingField: "none"
   COLLSCAN [test.basic_joins_md_foreign2]
   direction: "forward"
 ```
+## 18. Non-pipeline $lookup with single absorbed $match on as field
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a"
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$match" : {
+			"x.c" : {
+				"$eq" : "blah"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
+```
+### With bottom-up plan enumeration (left-deep)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With bottom-up plan enumeration (right-deep)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With random order, seed 44
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  filter: { "c" : { "$eq" : "blah" } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With random order, seed 45
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  filter: { "c" : { "$eq" : "blah" } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With random order, index join
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  filter: { "c" : { "$eq" : "blah" } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With bottom-up plan enumeration and indexes
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+## 19. Non-pipeline $lookup with two absorbed $match stages both on as field
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a"
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$match" : {
+			"x.c" : {
+				"$eq" : "blah"
+			}
+		}
+	},
+	{
+		"$match" : {
+			"x.d" : {
+				"$eq" : 2
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
+```
+### With bottom-up plan enumeration (left-deep)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$eq" : 2 } } ] }
+  direction: "forward"
+```
+### With bottom-up plan enumeration (right-deep)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$eq" : 2 } } ] }
+  direction: "forward"
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$eq" : 2 } } ] }
+  direction: "forward"
+```
+### With random order, seed 44
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$eq" : 2 } } ] }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With random order, seed 45
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$eq" : 2 } } ] }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With random order, index join
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$eq" : 2 } } ] }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With bottom-up plan enumeration and indexes
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "$and" : [ { "c" : { "$eq" : "blah" } }, { "d" : { "$eq" : 2 } } ] }
+  direction: "forward"
+```
+## 20. Non-pipeline $lookup with absorbed $match on as field followed by $match on base field
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a"
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$match" : {
+			"x.c" : {
+				"$eq" : "blah"
+			}
+		}
+	},
+	{
+		"$match" : {
+			"b" : {
+				"$eq" : "bar"
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
+```
+### With bottom-up plan enumeration (left-deep)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  filter: { "b" : { "$eq" : "bar" } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With bottom-up plan enumeration (right-deep)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  filter: { "b" : { "$eq" : "bar" } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  filter: { "b" : { "$eq" : "bar" } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With random order, seed 44
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  filter: { "c" : { "$eq" : "blah" } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  filter: { "b" : { "$eq" : "bar" } }
+  direction: "forward"
+```
+### With random order, seed 45
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  filter: { "c" : { "$eq" : "blah" } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  filter: { "b" : { "$eq" : "bar" } }
+  direction: "forward"
+```
+### With random order, index join
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  filter: { "c" : { "$eq" : "blah" } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  filter: { "b" : { "$eq" : "bar" } }
+  direction: "forward"
+```
+### With bottom-up plan enumeration and indexes
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  filter: { "b" : { "$eq" : "bar" } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  filter: { "c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+## 21. Two joins where second join has absorbed filter
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a"
+		}
+	},
+	{
+		"$unwind" : "$x"
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign2",
+			"as" : "y",
+			"localField" : "b",
+			"foreignField" : "b"
+		}
+	},
+	{
+		"$unwind" : "$y"
+	},
+	{
+		"$match" : {
+			"y.d" : {
+				"$gt" : 2
+			}
+		}
+	}
+]
+```
+### Results
+```json
+{ "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+```
+### With bottom-up plan enumeration (left-deep)
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "y"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign2]
+  filter: { "d" : { "$gt" : 2 } }
+  direction: "forward"
+```
+### With bottom-up plan enumeration (right-deep)
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "x"
+rightEmbeddingField: "none"
+  |  |
+  |  HASH_JOIN_EMBEDDING [b = b]
+  |  leftEmbeddingField: "y"
+  |  rightEmbeddingField: "none"
+  |  |  |
+  |  |  COLLSCAN [test.basic_joins_md]
+  |  |  direction: "forward"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  filter: { "d" : { "$gt" : 2 } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  direction: "forward"
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "y"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign2]
+  filter: { "d" : { "$gt" : 2 } }
+  direction: "forward"
+```
+### With random order, seed 44
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [b = b]
+leftEmbeddingField: "none"
+rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  filter: { "d" : { "$gt" : 2 } }
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "x"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign1]
+  direction: "forward"
+```
+### With random order, seed 45
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  filter: { "d" : { "$gt" : 2 } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With random order, index join
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  NESTED_LOOP_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  filter: { "d" : { "$gt" : 2 } }
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  direction: "forward"
+```
+### With bottom-up plan enumeration and indexes
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "y"
+  rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.basic_joins_md]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md_foreign2]
+  filter: { "d" : { "$gt" : 2 } }
+  direction: "forward"
+```
+## 22. $match referencing the as-field placed before the $lookup that introduces it is a base collection filter and is not absorbed into the joined collection
+### No join opt
+### Pipeline
+```json
+[
+	{
+		"$match" : {
+			"x.c" : {
+				"$eq" : "blah"
+			}
+		}
+	},
+	{
+		"$lookup" : {
+			"from" : "basic_joins_md_foreign1",
+			"as" : "x",
+			"localField" : "a",
+			"foreignField" : "a"
+		}
+	},
+	{
+		"$unwind" : "$x"
+	}
+]
+```
+### Results
+```json
+
+```
+### With bottom-up plan enumeration (left-deep)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  filter: { "x.c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With bottom-up plan enumeration (right-deep)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  filter: { "x.c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With bottom-up plan enumeration (zig-zag)
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  filter: { "x.c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With random order, seed 44
+usedJoinOptimization: true
+
+```
+HASH_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  filter: { "x.c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With random order, seed 45
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  filter: { "x.c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With random order, index join
+usedJoinOptimization: true
+
+```
+NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
+  filter: { "x.c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
+### With bottom-up plan enumeration and indexes
+usedJoinOptimization: true
+
+```
+INDEXED_NESTED_LOOP_JOIN_EMBEDDING [a = a]
+leftEmbeddingField: "none"
+rightEmbeddingField: "x"
+  |  |
+  |  FETCH [test.basic_joins_md_foreign1]
+  |  
+  |  |
+  |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
+  |  keyPattern: { "a" : 1 }
+  |  indexName: "a_1"
+  |  isMultiKey: false
+  |  isUnique: false
+  |  isSparse: false
+  |  isPartial: false
+  |
+  COLLSCAN [test.basic_joins_md]
+  filter: { "x.c" : { "$eq" : "blah" } }
+  direction: "forward"
+```
