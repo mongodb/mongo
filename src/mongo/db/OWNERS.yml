@@ -65,6 +65,9 @@ filters:
   - "generic_argument_util.*":
     approvers:
       - 10gen/server-programmability
+  - "ifr_flag_registry.yml":
+    approvers:
+      - 10gen/rollout-flag-managers
   - "ifr_flag_retry_info*":
     approvers:
       - 10gen/server-programmability

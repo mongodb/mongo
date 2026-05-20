@@ -14,6 +14,7 @@ py_library(
     name = "idl",
     srcs = [
         "gen_all_feature_flag_list.py",
+        "generate_ifr_registry.py",
         "idlc.py",
         "lib.py",
     ] + glob(["idl/**/*.py"]),
