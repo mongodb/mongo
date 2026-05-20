@@ -267,7 +267,8 @@ feature_flags:
     featureFlagConvertObjectToBinData:
         description: "Feature flag to enable converting from Object to BinData"
         cpp_varname: gFeatureFlagConvertObjectToBinData
-        default: false
+        default: true
+        version: 9.0
         fcv_gated: true
 
     featureFlagVectorSimilarityExpressions:

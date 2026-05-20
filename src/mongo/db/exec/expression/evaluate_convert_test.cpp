@@ -985,7 +985,6 @@ TEST_F(EvaluateConvertTest, ConvertObjectToBinDataFailsWhenFeatureFlagDisabled) 
 }
 
 TEST_F(EvaluateConvertTest, ConvertEmptyObjectToBinData) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
@@ -1001,7 +1000,6 @@ TEST_F(EvaluateConvertTest, ConvertEmptyObjectToBinData) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertObjectWithFieldsToBinData) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
@@ -1017,7 +1015,6 @@ TEST_F(EvaluateConvertTest, ConvertObjectWithFieldsToBinData) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertObjectToBinDataFieldOrderMatters) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
@@ -1035,7 +1032,6 @@ TEST_F(EvaluateConvertTest, ConvertObjectToBinDataFieldOrderMatters) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertNestedObjectToBinData) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
@@ -1052,7 +1048,6 @@ TEST_F(EvaluateConvertTest, ConvertNestedObjectToBinData) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertObjectToBinDataWithCustomSubtype) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: {type: 'binData', subtype: 128}}}");
@@ -1070,7 +1065,6 @@ TEST_F(EvaluateConvertTest, ConvertObjectToBinDataWithCustomSubtype) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertObjectToBinDataNullInputReturnsNull) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
@@ -1086,7 +1080,6 @@ TEST_F(EvaluateConvertTest, ConvertObjectToBinDataNullInputReturnsNull) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertObjectToBinDataOnNullReturnsOnNullValue) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', onNull: 'was null'}}");
@@ -1098,7 +1091,6 @@ TEST_F(EvaluateConvertTest, ConvertObjectToBinDataOnNullReturnsOnNullValue) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertNonObjectToBinDataWithOnError) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', onError: 'error!'}}");
@@ -1110,7 +1102,6 @@ TEST_F(EvaluateConvertTest, ConvertNonObjectToBinDataWithOnError) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertNonObjectToBinDataWithoutOnErrorFails) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
@@ -1128,7 +1119,6 @@ TEST_F(EvaluateConvertTest, ConvertNonObjectToBinDataWithoutOnErrorFails) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertObjectToBinDataFormatIsIgnored) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', format: 'hex'}}");
@@ -1144,7 +1134,6 @@ TEST_F(EvaluateConvertTest, ConvertObjectToBinDataFormatIsIgnored) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertObjectToBinDataInvalidFormatStillFails) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', format: 'bson'}}");
@@ -1162,7 +1151,6 @@ TEST_F(EvaluateConvertTest, ConvertObjectToBinDataInvalidFormatStillFails) {
 }
 
 TEST_F(EvaluateConvertTest, ConvertObjectToBinDataInvalidSubtypeFails) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagConvertObjectToBinData", true};
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: '$path1', to: {type: 5, subtype: 50}}}");

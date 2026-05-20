@@ -4,7 +4,6 @@
  * BSON representation of the input.
  * @tags: [
  *   requires_fcv_90,
- *   featureFlagConvertObjectToBinData,
  * ]
  */
 

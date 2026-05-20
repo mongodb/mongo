@@ -1,10 +1,6 @@
 /**
  * Verifies that $convert from Object to BinData behaves correctly in FCV upgrade/downgrade
  * scenarios.
- *
- * @tags: [
- *   featureFlagConvertObjectToBinData,
- * ]
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
