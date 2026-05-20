@@ -496,13 +496,13 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             executor::shutdownSearchExecutorsIfNeeded(serviceContext);
         }
 
-        {
+        if (auto&& rwc = ReadWriteConcernDefaults::getDecoration(serviceContext->getService())) {
             SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                            TimedSectionId::shutDownAndJoinReadWriteConcernDefaults,
                                            &shutdownTimeElapsedBuilder);
             LOGV2_OPTIONS(
                 12370200, {LogComponent::kDefault}, "Shutting down the ReadWriteConcernDefaults");
-            ReadWriteConcernDefaults::get(serviceContext->getService()).shutDownAndJoin();
+            rwc->shutDownAndJoin();
         }
 
         // Finish shutting down the TransportLayers

@@ -73,8 +73,16 @@ public:
     // The _id of the persisted default read/write concern document.
     static constexpr StringData kPersistedDocumentId = "ReadWriteConcernDefaults"_sd;
 
-    static ReadWriteConcernDefaults& get(Service* service);
-    static ReadWriteConcernDefaults& get(OperationContext* opCtx);
+    static boost::optional<ReadWriteConcernDefaults>& getDecoration(Service* service);
+
+    static ReadWriteConcernDefaults& get(Service* service) {
+        return *getDecoration(service);
+    }
+
+    static ReadWriteConcernDefaults& get(OperationContext* opCtx) {
+        return *getDecoration(opCtx->getService());
+    }
+
     static void create(Service* service, FetchDefaultsFn fetchDefaultsFn);
 
     ReadWriteConcernDefaults(Service* service, FetchDefaultsFn fetchDefaultsFn);

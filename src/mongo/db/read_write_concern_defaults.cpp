@@ -355,12 +355,9 @@ boost::optional<ReadWriteConcernDefaults::WriteConcern> ReadWriteConcernDefaults
     return boost::none;
 }
 
-ReadWriteConcernDefaults& ReadWriteConcernDefaults::get(Service* service) {
-    return *getReadWriteConcernDefaults(service);
-}
-
-ReadWriteConcernDefaults& ReadWriteConcernDefaults::get(OperationContext* opCtx) {
-    return *getReadWriteConcernDefaults(opCtx->getService());
+boost::optional<ReadWriteConcernDefaults>& ReadWriteConcernDefaults::getDecoration(
+    Service* service) {
+    return getReadWriteConcernDefaults(service);
 }
 
 void ReadWriteConcernDefaults::create(Service* service, FetchDefaultsFn fetchDefaultsFn) {
