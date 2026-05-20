@@ -33,6 +33,8 @@
 #include "mongo/db/change_stream_pre_image_id_util.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_truncate_markers.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -50,6 +52,8 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(preImagesTruncateOnlyOnSecondaries);
+MONGO_FAIL_POINT_DEFINE(preImagesTruncateHangBeforeExecution);
+MONGO_FAIL_POINT_DEFINE(preImagesTruncateHangOnEarlyBailOut);
 
 BSONObj PreImagesTruncateManager::MarkerCreationStats::toBSON() const {
     BSONObjBuilder builder;
@@ -61,6 +65,20 @@ BSONObj PreImagesTruncateManager::MarkerCreationStats::toBSON() const {
 
 PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(
     OperationContext* opCtx, bool useReplicatedTruncates) {
+    if (MONGO_unlikely(preImagesTruncateHangBeforeExecution.shouldFail())) {
+        preImagesTruncateHangBeforeExecution.pauseWhileSet();
+    }
+
+    if (auto replCoord = repl::ReplicationCoordinator::get(opCtx)) {
+        if (replCoord->getSettings().isReplSet() && !replCoord->getMemberState().readable()) {
+            // Early exit in case the node is not ready at the moment, e.g. it is still in recovery.
+            if (MONGO_unlikely(preImagesTruncateHangOnEarlyBailOut.shouldFail())) {
+                preImagesTruncateHangOnEarlyBailOut.pauseWhileSet();
+            }
+            return {};
+        }
+    }
+
     // Pre image truncation is marked non-deprio, as with this it has the same pace as the user
     // writes that generates new entries in the config.system.preimages collection
     admission::execution_control::ScopedTaskTypeNonDeprioritizable prioGuard(opCtx);
