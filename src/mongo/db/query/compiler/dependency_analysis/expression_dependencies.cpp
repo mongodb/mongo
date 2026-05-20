@@ -255,6 +255,16 @@ public:
         _deps->needRandomGenerator = true;
     }
 
+    void visit(const ExpressionFunction*) final {
+        // JavaScript functions may call Math.random(), Date.now(), or other non-deterministic
+        // mechanisms that make reordering or caching unsafe.
+        _deps->needRandomGenerator = true;
+    }
+
+    void visit(const ExpressionInternalJsEmit*) final {
+        _deps->needRandomGenerator = true;
+    }
+
     void visit(const ExpressionFieldPath* expr) final {
         if (!expr->isVariableReference()) {  // includes CURRENT when it is equivalent to ROOT.
             if (expr->getFieldPath().getPathLength() == 1) {

@@ -260,9 +260,10 @@ struct MONGO_MOD_NEEDS_REPLACEMENT DepsTracker {
 
     bool needWholeDocument = false;  // If true, ignore 'fields'; the whole document is needed.
 
-    // The output of some operators (such as $sample and $rand) depends on a source of fresh random
-    // numbers. During execution this dependency is implicit, but during optimize() we need to know
-    // about this dependency to decide whether it's ok to cache or reevaluate an operator.
+    // The output of some operators depends on a source of fresh random numbers or other
+    // non-deterministic state (e.g. $sample, $rand, $function, $_internalJsEmit). During
+    // execution this dependency is implicit, but during optimize() we need to know about it
+    // to decide whether it is safe to cache, reevaluate, or reorder an operator.
     bool needRandomGenerator = false;
 
 private:
