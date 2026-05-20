@@ -307,7 +307,7 @@ private:
 class SessionWorkflowRateLimitAcceptAllBm : public SessionWorkflowBm {
     void doConfigureServerParameters(ServiceContext* sc) override {
         gFeatureFlagIngressRateLimiting.setForServerParameter(true);
-        gIngressRequestRateLimiterEnabled.store(true);
+        admission::gIngressRequestRateLimiterEnabled.store(true);
     }
 };
 
@@ -318,9 +318,9 @@ class SessionWorkflowRateLimitAcceptAllBm : public SessionWorkflowBm {
 class SessionWorkflowRateLimitRejectAllBm : public SessionWorkflowBm {
     void doConfigureServerParameters(ServiceContext* sc) override {
         gFeatureFlagIngressRateLimiting.setForServerParameter(true);
-        gIngressRequestRateLimiterEnabled.store(true);
+        admission::gIngressRequestRateLimiterEnabled.store(true);
 
-        auto& rateLimiter = IngressRequestRateLimiter::get(getGlobalServiceContext());
+        auto& rateLimiter = admission::IngressRequestRateLimiter::get(getGlobalServiceContext());
 
         auto const verySlowRatePerSec = 5e-6;
         auto const smallestPossibleBurstSize = 1.0;

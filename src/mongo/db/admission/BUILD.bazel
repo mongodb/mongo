@@ -63,10 +63,12 @@ mongo_cc_library(
     ],
     deps = [
         ":app_name_exemption_matcher",
+        ":ingress_admission_context",
         ":rate_limiter",
         "//src/mongo:base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/admission/ticketing:admission_context",
         "//src/mongo/db/auth",
         "//src/mongo/rpc:client_metadata",
         "//src/mongo/transport:cidr_range_list_parameter",

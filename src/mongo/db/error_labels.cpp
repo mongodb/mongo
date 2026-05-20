@@ -190,9 +190,12 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
 }
 
 bool ErrorLabelBuilder::isOperationIdempotent() const {
-    // TODO: SERVER-108898 When OperationContext support marking an operation as idempotent, check
-    //       for idempotency to apply the error label
-    return false;
+    // TODO(SERVER-108898): When OperationContext support marking an operation as idempotent, check
+    // for idempotency to apply the error label.
+
+    // Ingress request rate-limiter rejection happens before command execution. The operation can
+    // always be retried safely because no command side effects occurred.
+    return _code && *_code == ErrorCodes::IngressRequestRateLimitExceeded;
 }
 
 bool ErrorLabelBuilder::isErrorWithNoWritesPerformed() const {
@@ -227,8 +230,11 @@ void ErrorLabelBuilder::build(BSONArrayBuilder& labels) const {
                 labels << ErrorLabel::kNoWritesPerformed;
             }
         } else if (isOperationIdempotent()) {
-            // TODO SERVER-108898: apply the NoWritesPerformed error label here too, if appropriate.
             labels << ErrorLabel::kRetryableError;
+            // TODO(SERVER-108898): Today `isOperationIdempotent` only checks for
+            // IngressRequestRateLimitExceeded, which means no writes were ever performed.
+            // Additional logic will be needed if we add additional conditions.
+            labels << ErrorLabel::kNoWritesPerformed;
         }
     }
 

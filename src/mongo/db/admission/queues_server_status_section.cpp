@@ -59,7 +59,7 @@ public:
             executionBuilder.done();
         }
 
-        if (gIngressAdmissionControlEnabled.load() && role.has(ClusterRole::ShardServer)) {
+        if (gIngressAdmissionControlEnabled.load() || gFeatureFlagIngressRateLimiting.isEnabled()) {
             BSONObjBuilder ingressBuilder(admissionBuilder.subobjStart("ingress"));
             auto& controller = IngressAdmissionController::get(opCtx);
             controller.appendStats(ingressBuilder);

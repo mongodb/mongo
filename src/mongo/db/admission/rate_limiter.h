@@ -30,8 +30,11 @@
 #pragma once
 
 #include "mongo/base/counter.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/moving_average.h"
 #include "mongo/util/system_tick_source.h"
@@ -44,7 +47,68 @@ namespace MONGO_MOD_PUBLIC admission {
  * interruptibility, maximum queue depth, and metrics.
  */
 class MONGO_MOD_PUBLIC RateLimiter {
+    class RateLimiterPrivate;
+
 public:
+    /**
+     * A DeferredToken represents an atomically pre-reserved position in the rate limiter queue. It
+     * encapsulates logic for waiting until the reserved position becomes valid or for abandoning
+     * the reservation. See acquireToken() for details on how deferred tokens are issued and used.
+     *
+     * A DeferredToken must be consumed exactly once via get() before it is destroyed, unless
+     * recordExemption() is called first to mark the request as not subject to admission control.
+     */
+    class MONGO_MOD_PUBLIC DeferredToken {
+    public:
+        DeferredToken(const DeferredToken&) = delete;
+        DeferredToken& operator=(const DeferredToken&) = delete;
+        DeferredToken& operator=(DeferredToken&&) = delete;
+
+        // The _impl member serves as the consumed/moved-from sentinel, it is nulled when ownership
+        // transfers out (move operation) or when the deferred token is redeemed (get). The default
+        // move constructor would copy the pointer without nulling the source, so we define it here
+        // to perform the necessary std::exchange.
+        DeferredToken(DeferredToken&& other) noexcept
+            : _impl(std::exchange(other._impl, nullptr)),
+              _napTime(other._napTime),
+              _numTokens(other._numTokens) {}
+
+        ~DeferredToken();
+
+        /**
+         * Returns true if the token was immediately available when acquireToken() was called.
+         * For ready deferred tokens, get() returns without sleeping.
+         */
+        bool isReady() const {
+            return _napTime == Milliseconds{0};
+        }
+
+        /**
+         * Waits until the pre-reserved token slot becomes valid, or until the opCtx is
+         * interrupted. For ready deferred tokens, this method returns immediately.
+         *
+         * Must be called exactly once, the deferred token is consumed on return.
+         */
+        Status get(OperationContext* opCtx) &&;
+
+        /**
+         * Records that this request is not subject to admission control.
+         *
+         * This method is valid only for queued (non-ready) deferred tokens. It only records the
+         * exemption, token/queue cleanup is covered by the destructor.
+         */
+        void recordExemption() &&;
+
+    private:
+        friend class RateLimiter;
+
+        DeferredToken(RateLimiterPrivate* impl, Milliseconds napTime, double numTokens);
+
+        RateLimiterPrivate* _impl{nullptr};
+        Milliseconds _napTime{0};
+        double _numTokens{1.0};
+    };
+
     struct Stats {
         /**
          * addedToQueue is the count of acquireToken calls that involved entering a sleep.
@@ -104,10 +168,19 @@ public:
     ~RateLimiter();
 
     /**
-     * Acquire a token or block until one becomes available. Returns an error status if
-     * the operationContext is interrupted or the maxQueueDepth is exceeded.
+     * Atomically reserves a token position and returns a DeferredToken. The deferred token is
+     * either ready (the token was immediately available) or queued (the token was not immediately
+     * available and the caller must wait for the slot to become valid).
+     *
+     * Returns an error if the max queue depth is exceeded.
      */
-    Status acquireToken(OperationContext*, double numTokensToConsume = 1.0);
+    StatusWith<DeferredToken> acquireToken(double numTokensToConsume = 1.0);
+
+    /**
+     * Convenience method that acquires a token and blocks until it is ready. This is equivalent to
+     * calling acquireToken() and then get(opCtx) on the returned deferred token.
+     */
+    Status acquireToken(OperationContext* opCtx, double numTokensToConsume = 1.0);
 
     /**
      * Attempts to acquire a token without queuing. Returns an error status if the rate limit
@@ -160,8 +233,10 @@ public:
     /** Returns the number of sessions that are sleeping in acquireToken(...). **/
     int64_t queued() const;
 
+    /** Returns the configured maximum number of sessions that may sleep in acquireToken(...). **/
+    int64_t maxQueueDepth() const;
+
 private:
-    class RateLimiterPrivate;
     std::unique_ptr<RateLimiterPrivate> _impl;
 };
 }  // namespace MONGO_MOD_PUBLIC admission

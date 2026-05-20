@@ -42,11 +42,13 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
+#include "mongo/db/admission/rate_limiter.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/baton.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -55,6 +57,7 @@
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_compressed.h"
@@ -105,6 +108,9 @@
 
 namespace mongo::transport {
 namespace {
+
+using namespace admission;
+
 const Status kClosedSessionError{ErrorCodes::SocketException, "Session is closed"};
 const Status kNetworkError{ErrorCodes::HostUnreachable, "Someone is unreachable"};
 const Status kShutdownError{ErrorCodes::ShutdownInProgress, "Something is shutting down"};
@@ -330,6 +336,24 @@ public:
         return std::move(pf->future);
     }
 
+    // Overload that accepts a full callback. Blocks until the callback has returned, so any
+    // captures are visible to the caller as soon as expect() returns.
+    template <Event e>
+    Future<void> asyncExpect(unique_function<EventSigT<e>> cb) {
+        auto pf = std::make_shared<PromiseAndFuture<void>>();
+        injectMockResponse<e>([cb = std::move(cb), pf](auto&&... args) mutable -> EventResultT<e> {
+            if constexpr (std::is_void_v<EventResultT<e>>) {
+                cb(std::forward<decltype(args)>(args)...);
+                pf->promise.emplaceValue();
+            } else {
+                auto result = cb(std::forward<decltype(args)>(args)...);
+                pf->promise.emplaceValue();
+                return result;
+            }
+        });
+        return std::move(pf->future);
+    }
+
     template <Event e>
     void expect(EventResultT<e> r) {
         asyncExpect<e>(std::move(r)).get();
@@ -338,6 +362,28 @@ public:
     template <Event e>
     void expect() {
         asyncExpect<e>().get();
+    }
+
+    template <Event e>
+    void expect(unique_function<EventSigT<e>> cb) {
+        asyncExpect<e>(std::move(cb)).get();
+    }
+
+    /**
+     * Installs a one-shot sepHandleRequest mock that runs `cb` with the OperationContext and
+     * Message, then blocks until the mock fires. Using a synchronous wait ensures the
+     * expectation slot is empty by the time the helper returns, so subsequent expect<>/inject
+     * calls can safely push.
+     */
+    void runSepHandleRequest(unique_function<DbResponse(OperationContext*, const Message&)> cb) {
+        auto pf = std::make_shared<PromiseAndFuture<void>>();
+        injectMockResponse<Event::sepHandleRequest>(
+            [cb = std::move(cb), pf](OperationContext* opCtx, const Message& msg) mutable {
+                auto response = cb(opCtx, msg);
+                pf->promise.emplaceValue();
+                return response;
+            });
+        pf->future.get();
     }
 
 
@@ -747,6 +793,8 @@ public:
         std::int32_t successfulAdmissions;
         std::int32_t exemptedAdmissions;
         std::int32_t attemptedAdmissions;
+        std::int32_t addedToQueue;
+        std::int32_t removedFromQueue;
         double totalAvailableTokens;
     };
 
@@ -783,6 +831,8 @@ public:
             .successfulAdmissions = stats["successfulAdmissions"].numberInt(),
             .exemptedAdmissions = stats["exemptedAdmissions"].numberInt(),
             .attemptedAdmissions = stats["attemptedAdmissions"].numberInt(),
+            .addedToQueue = stats["addedToQueue"].numberInt(),
+            .removedFromQueue = stats["removedFromQueue"].numberInt(),
             .totalAvailableTokens = stats["totalAvailableTokens"].numberDouble(),
         };
     }
@@ -791,6 +841,18 @@ public:
         MessageCompressorManager compressorManager{};
         const auto cid = static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
         return uassertStatusOK(compressorManager.compressMessage(message, &cid));
+    }
+
+    static bool hasErrorLabels(const BSONObj& body,
+                               std::initializer_list<StringData> expectedLabels) {
+        if (!body.hasField(kErrorLabelsFieldName))
+            return false;
+        auto labels = body[kErrorLabelsFieldName].Array();
+        return std::all_of(expectedLabels.begin(), expectedLabels.end(), [&](StringData expected) {
+            return std::any_of(labels.begin(), labels.end(), [&](const BSONElement& e) {
+                return e.String() == expected;
+            });
+        });
     }
 
 private:
@@ -866,6 +928,135 @@ TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponseCompressed) {
     ASSERT_EQ(stats.exemptedAdmissions, 0);
     ASSERT_EQ(stats.attemptedAdmissions, 2);
     ASSERT_LT(stats.totalAvailableTokens, 1);
+}
+
+// Verifies that SessionWorkflow both sets the deferred admission token on the client and clears it
+// via IterationFrame's destructor at the end of each iteration.
+TEST_F(IngressRequestRateLimiterTest, IterationFrameClearsDeferredAdmissionTokenBetweenIterations) {
+    enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
+
+    // Allow queueing so the post-burst request waits in the limiter rather than being rejected.
+    RAIIServerParameterControllerForTest queueDepth{"ingressRequestAdmissionMaxQueueDepth", 4};
+
+    startSession();
+
+    // Iteration 1: burst is available; SessionWorkflow's _rateLimit grants a ready token via
+    // admitRequest, leaving no deferred token on the client.
+    expect<Event::sessionSourceMessage>(setMoreToCome(makeOpMsg()));
+    runSepHandleRequest([](OperationContext* opCtx, const Message&) {
+        ASSERT_FALSE(
+            IngressRequestRateLimiter::hasDeferredAdmissionToken_forTest(opCtx->getClient()));
+        return makeResponse(Message{});
+    });
+
+    // Iteration 2: burst is exhausted; admitRequest queues and stores the resulting deferred
+    // token on the client. The handler observes the token, and IterationFrame's destructor must
+    // clear it when the iteration ends.
+    expect<Event::sessionSourceMessage>(setMoreToCome(makeOpMsg()));
+    runSepHandleRequest([](OperationContext* opCtx, const Message&) {
+        ASSERT_TRUE(
+            IngressRequestRateLimiter::hasDeferredAdmissionToken_forTest(opCtx->getClient()));
+        return makeResponse(Message{});
+    });
+
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    // Iter 1 took the burst (success). Iter 2 added one to the queue, and the IterationFrame
+    // destructor tore down the unconsumed deferred token, releasing the queue slot.
+    const auto stats = getRateLimiterStats();
+    ASSERT_EQ(stats.attemptedAdmissions, 2);
+    ASSERT_EQ(stats.successfulAdmissions, 1);
+    ASSERT_EQ(stats.rejectedAdmissions, 0);
+    ASSERT_EQ(stats.addedToQueue, 1);
+    ASSERT_EQ(stats.removedFromQueue, 1);
+}
+
+TEST_F(IngressRequestRateLimiterTest, ImmediateRejectionHasExpectedErrorLabels) {
+    enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
+    // Default maxQueueDepth is 0: requests are rejected immediately when the burst is exhausted.
+
+    startSession();
+
+    // Iteration 1: burst is available; consume it with a fire-and-forget request.
+    expect<Event::sessionSourceMessage>(setMoreToCome(makeOpMsg()));
+    runSepHandleRequest([](OperationContext*, const Message&) { return makeResponse(Message{}); });
+
+    // Iteration 2: burst is exhausted; rate limiter rejects immediately without calling
+    // sepHandleRequest. Capture the sunk rejection response; the callback overload of expect()
+    // blocks until the handler returns, so body is populated before the next expect() call.
+    expect<Event::sessionSourceMessage>(makeOpMsg());
+    BSONObj body;
+    expect<Event::sessionSinkMessage>([&](const Message& m) {
+        body = OpMsg::parse(m).body.getOwned();
+        return Status::OK();
+    });
+
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    ASSERT_EQ(getStatusFromCommandResult(body).code(), ErrorCodes::IngressRequestRateLimitExceeded);
+    ASSERT_TRUE(hasErrorLabels(body,
+                               {ErrorLabel::kSystemOverloadedError,
+                                ErrorLabel::kRetryableError,
+                                ErrorLabel::kNoWritesPerformed}));
+
+    const auto stats = getRateLimiterStats();
+    ASSERT_EQ(stats.attemptedAdmissions, 2);
+    ASSERT_EQ(stats.successfulAdmissions, 1);
+    ASSERT_EQ(stats.rejectedAdmissions, 1);
+    ASSERT_EQ(stats.addedToQueue, 0);
+}
+
+TEST_F(IngressRequestRateLimiterTest, QueueDepthExceededRejectionHasExpectedErrorLabels) {
+    enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
+    RAIIServerParameterControllerForTest queueDepth{"ingressRequestAdmissionMaxQueueDepth", 1};
+
+    startSession();
+
+    // Iteration 1: burst is available; consume it with a fire-and-forget request.
+    expect<Event::sessionSourceMessage>(setMoreToCome(makeOpMsg()));
+    runSepHandleRequest([](OperationContext*, const Message&) { return makeResponse(Message{}); });
+
+    // Fill the single queue slot using a separate client so that the session's iter 2 request
+    // finds the queue at capacity. The session_workflow blocks in sessionSourceMessage.pop() until
+    // we push a handler, so filling the queue here is safe from races.
+    auto queueFillerClient =
+        getServiceContext()->getService()->makeClient("queue-depth-rejection-test");
+    ASSERT_OK(
+        IngressRequestRateLimiter::get(getServiceContext()).admitRequest(queueFillerClient.get()));
+    ASSERT_TRUE(
+        IngressRequestRateLimiter::hasDeferredAdmissionToken_forTest(queueFillerClient.get()));
+
+    // Iteration 2: queue is full; rate limiter rejects immediately. Capture the sunk rejection
+    // response; the callback overload of expect() blocks until the handler returns.
+    expect<Event::sessionSourceMessage>(makeOpMsg());
+    BSONObj body;
+    expect<Event::sessionSinkMessage>([&](const Message& m) {
+        body = OpMsg::parse(m).body.getOwned();
+        return Status::OK();
+    });
+
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+    joinSessions();
+
+    // Release the queue slot held by the filler client.
+    IngressRequestRateLimiter::clearDeferredAdmissionToken(queueFillerClient.get());
+
+    ASSERT_EQ(getStatusFromCommandResult(body).code(), ErrorCodes::IngressRequestRateLimitExceeded);
+    ASSERT_TRUE(hasErrorLabels(body,
+                               {ErrorLabel::kSystemOverloadedError,
+                                ErrorLabel::kRetryableError,
+                                ErrorLabel::kNoWritesPerformed}));
+
+    const auto stats = getRateLimiterStats();
+    ASSERT_EQ(stats.attemptedAdmissions, 3);  // iter1 + queue-filler + iter2
+    ASSERT_EQ(stats.successfulAdmissions, 1);
+    ASSERT_EQ(stats.rejectedAdmissions, 1);
+    ASSERT_EQ(stats.addedToQueue, 1);
 }
 
 class StepRunnerSessionWorkflowTest : public SessionWorkflowTest {
@@ -1214,5 +1405,6 @@ DEATH_TEST_F(SessionWorkflowTestDeathTest,
     expect<Event::sepHandleRequest>(makeResponse(makeMessageWithOpcode(dbCompressed)));
     joinSessions();
 }
+
 }  // namespace
 }  // namespace mongo::transport

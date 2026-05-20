@@ -49,6 +49,8 @@ const testKillOnClientDisconnectOpts = {
     ingressConnectionEstablishmentRatePerSec: 1,
     ingressConnectionEstablishmentBurstCapacitySecs: 1,
     ingressConnectionEstablishmentMaxQueueDepth: maxQueueSize,
+    // TODO(SERVER-125073): Remove `ingressRequestRateLimiterEnabled:false` once we resolve how to hang specific rate limiters.
+    ingressRequestRateLimiterEnabled: false,
 };
 runTestStandaloneParamsSetAtStartup(testKillOnClientDisconnectOpts, testKillOnClientDisconnect);
 runTestStandaloneParamsSetAtRuntime(testKillOnClientDisconnectOpts, testKillOnClientDisconnect);
