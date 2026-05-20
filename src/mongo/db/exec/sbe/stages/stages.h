@@ -732,6 +732,10 @@ public:
      * When reOpen flag is true then the plan stage should reinitizalize already acquired resources
      * (e.g. re-hash, re-sort, re-seek, etc), but it can avoid reinitializing things that do not
      * contain state and are not destroyed by close(), since close() is not called before a reopen.
+     *
+     * open() is not all-or-nothing. If open() throws, the plan stage may be left in a "partially
+     * open" state. The only legal operations on a partially-open stage are to destroy it (let the
+     * destructor run), or to call close() and then destroy it.
      */
     virtual void open(bool reOpen) = 0;
 
@@ -757,7 +761,13 @@ public:
     virtual PlanState getNext() = 0;
 
     /**
-     * The mirror method to open(). It releases any acquired resources.
+     * Releases any resources acquired by open(). This method is idempotent: it is safe to call
+     * close() multiple times, and safe to call close() on a stage that was never opened. Callers
+     * are not required to call close() before destroying a plan stage, but are encouraged to do so
+     * whenever they have a plan that is no longer actively executing and want to release runtime
+     * resources (e.g. storage-engine cursors, memory buffers) without destroying the plan tree
+     * itself (for example, call close() before collecting explain output so that runtime resources
+     * are released while the plan tree remains available for inspection).
      */
     virtual void close() = 0;
 

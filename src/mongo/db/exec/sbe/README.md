@@ -227,8 +227,18 @@ acquired during `open()`. Acquiring resources for query execution can include ac
   needs to sort all of the values produced by its children (either in memory or on disk) before it
   can produce results in sorted order.
 
-It is only legal to call `close()` on PlanStages that have called `open()`, and to call `open()` on
-PlanStages that are closed. In some cases (such as in
+`close()` may be called at any time after `prepare()` — it is idempotent, so calling it multiple
+times is always safe. Callers are not required to call `close()` before destroying the plan tree,
+but are encouraged to do so as soon as execution is complete and the plan tree is only needed for
+its accumulated statistics (for example, call `close()` before collecting `explain` output to
+release runtime resources while keeping the plan tree alive for inspection).
+
+`open()` is not all-or-nothing. If `open()` throws an exception, the plan tree may be left in a
+partially open state: some child stages may have already acquired resources while others have not.
+In that case, the only legal operations are to destroy the plan or to call `close()` followed by
+destruction.
+
+In some cases (such as in
 [`LoopJoinStage`](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/stages/loop_join.cpp#L158)),
 a parent stage may `open()` and `close()` a child stage repeatedly. However, doing so may be
 expensive and ultimately redundant. This is where the `reOpen` parameter of `open()` comes in: when
