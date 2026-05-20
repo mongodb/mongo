@@ -103,28 +103,16 @@ void appendNamespaceShape(BSONObjBuilder& bob,
 }
 
 boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    OperationContext* opCtx,
     const query_shape::DeferredQueryShape& deferredShape,
     const NamespaceString& nss,
     bool skipInternalClientCheck) {
     // QueryShapeHash is not computed for:
-    // - intenal clients, i.e. queries coming from mongos
+    // - internal clients, i.e. queries coming from mongos
     // and
     // - queries executed via DBDirectClient.
-    auto* opCtx = expCtx->getOperationContext();
     auto* client = opCtx->getClient();
     if ((!skipInternalClientCheck && client->isInternalClient()) || client->isInDirectClient()) {
-        return boost::none;
-    }
-
-    // TODO: SERVER-102484 Provide fast path QueryShape and QueryShapeHash computation for Express
-    // queries.
-    if (expCtx->isIdHackQuery()) {
-        return boost::none;
-    }
-
-    // QueryShapeHash is not computed for queries with encryption information.
-    if (expCtx->isFleQuery()) {
         return boost::none;
     }
 
@@ -139,6 +127,26 @@ boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
     }
 
     return shapePtr.getValue()->sha256Hash(opCtx, kSerializationContext);
+}
+
+boost::optional<query_shape::QueryShapeHash> computeQueryShapeHash(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const query_shape::DeferredQueryShape& deferredShape,
+    const NamespaceString& nss,
+    bool skipInternalClientCheck) {
+    // TODO: SERVER-102484 Provide fast path QueryShape and QueryShapeHash computation for Express
+    // queries.
+    if (expCtx->isIdHackQuery()) {
+        return boost::none;
+    }
+
+    // QueryShapeHash is not computed for queries with encryption information.
+    if (expCtx->isFleQuery()) {
+        return boost::none;
+    }
+
+    return computeQueryShapeHash(
+        expCtx->getOperationContext(), deferredShape, nss, skipInternalClientCheck);
 }
 
 }  // namespace mongo::shape_helpers
