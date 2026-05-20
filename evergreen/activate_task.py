@@ -18,6 +18,10 @@ def main(
     expansions = read_config_file(expansions_file)
     evg_api = evergreen_conn.get_evergreen_api()
 
+    # skip if in commit-queue, commit-queue patches cannot be modified
+    if expansions.get("is_commit_queue", False):
+        return
+
     # Skip activation if the patch author is the excluded user
     if (
         (skip_for_patch_author is not None) and expansions.get("author") == skip_for_patch_author
