@@ -11,6 +11,14 @@ exports_files(
     ]),
 )
 
+filegroup(
+    name = "resmoke_data",
+    srcs = [
+        "configurations.yml",
+        "//src/mongo/db/extension/test_examples/test_extensions_signing_keys:test_extensions_signing_public_key.asc",
+    ],
+)
+
 # This sets up the valid extension targets to use in the top level `dist-test`
 # and `extensions` targets. Using Bazel's transition system, this rule ensures
 # that the extensions are built with the correct configuration. All extensions

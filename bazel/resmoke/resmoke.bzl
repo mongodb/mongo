@@ -195,7 +195,10 @@ def resmoke_suite_test(
     python_imports_target = name + "_python_imports"
     _collect_python_imports(
         name = python_imports_target,
-        data = data,
+        data = select({
+            "//bazel/resmoke:skip_deps_for_cquery_enabled": [],
+            "//conditions:default": data,
+        }),
         tags = ["manual"],
     )
 
@@ -245,6 +248,9 @@ def resmoke_suite_test(
         "//jstests/libs:authTestsKey",
         "//jstests/libs:key1",
         "//jstests/libs:key2",
+        "//jstests/with_mongot:keyfile_for_testing",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb/libs:ekf2",
+        "//src/mongo/db/modules/enterprise/jstests/encryptdb/libs:ekf",
         "//src/third_party/schemastore.org:schemas",
         "//x509:generate_main_certificates",
     ]
@@ -256,12 +262,19 @@ def resmoke_suite_test(
         for dep in multiversion_deps
     ]
 
-    merged_data = data + [d for d in srcs if d not in data] + [d for d in default_data if d not in data and d not in srcs] + multiversion_deps + multiversion_config + multiversion_exclude_tags
+    # Data that is always safe for cquery (no C++ toolchain needed): auto-derived srcs,
+    # default resmoke infrastructure, and multiversion artifacts.
+    cquery_safe_data = [d for d in srcs if d not in data] + [d for d in default_data if d not in data and d not in srcs] + multiversion_deps + multiversion_config + multiversion_exclude_tags
 
     py_test(
         name = name,
         srcs = [resmoke_shim],
-        data = merged_data + select({
+        data = select({
+            # Skip user-provided data during cquery — it may include targets that require
+            # C++ toolchain resolution, which fails when --noincompatible_enable_cc_toolchain_resolution is set.
+            "//bazel/resmoke:skip_deps_for_cquery_enabled": cquery_safe_data,
+            "//conditions:default": data + cquery_safe_data,
+        }) + select({
             "//bazel/resmoke:installed_dist_test_enabled": ["//:installed-dist-test"],
             "//conditions:default": [],
         }),

@@ -222,7 +222,7 @@ class MongotLauncher(object):
         """
 
         executable = self.fixturelib.default_if_none(
-            executable, self.config.DEFAULT_MONGOD_EXECUTABLE
+            executable, self.config.DEFAULT_MONGOT_EXECUTABLE
         )
         mongot_options = self.fixturelib.default_if_none(mongot_options, {}).copy()
 

@@ -4,17 +4,16 @@ import logging
 import os
 import sys
 
-from buildscripts.resmokelib.extensions.constants import (
-    CONF_OUT_DIR,
-)
+from buildscripts.resmokelib.extensions.generate_extension_configs import get_conf_out_dir
 
 
 def delete_extension_configs(extension_names: str, logger: logging.Logger):
     """Delete extension .conf files."""
+    conf_out_dir = get_conf_out_dir()
     extension_names = [item.strip() for item in extension_names.split(",")]
     for name in extension_names:
         file_name = f"{name}.conf"
-        file_path = os.path.join(CONF_OUT_DIR, file_name)
+        file_path = os.path.join(conf_out_dir, file_name)
         try:
             os.remove(file_path)
             logger.info("Deleted extension configuration file %s", file_path)

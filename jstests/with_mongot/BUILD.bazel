@@ -2,6 +2,10 @@ load("//bazel:mongo_js_rules.bzl", "all_subpackage_javascript_files", "mongo_js_
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files(
+    ["keyfile_for_testing"],
+)
+
 mongo_js_library(
     name = "common_utils",
     srcs = ["common_utils.js"],

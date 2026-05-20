@@ -4,13 +4,26 @@ import logging
 import os
 import shutil
 import sys
+import tempfile
 
 import yaml
 
-from buildscripts.resmokelib.extensions.constants import (
-    CONF_IN_PATH,
-    CONF_OUT_DIR,
-)
+from buildscripts.resmokelib.extensions.constants import CONF_IN_PATH
+
+
+def get_conf_out_dir() -> str:
+    """Return the directory for generated extension .conf files.
+
+    Checks for the temp dir explicitly. Using tempfile.gettempdir() caches its result, and
+    the temporary directory may be adjusted early by resmoke or other test setup.
+    """
+    tmpdir = (
+        os.environ.get("TMPDIR")
+        or os.environ.get("TEMP")
+        or os.environ.get("TMP")
+        or tempfile.gettempdir()
+    )
+    return os.path.join(tmpdir, "mongo", "extensions")
 
 
 def generate_extension_configs(
@@ -48,7 +61,8 @@ def generate_extension_configs(
     extension_names = []
 
     # Create a clean output directory.
-    os.makedirs(CONF_OUT_DIR, exist_ok=True)
+    conf_out_dir = get_conf_out_dir()
+    os.makedirs(conf_out_dir, exist_ok=True)
 
     for so_file in so_files:
         # path/to/libfoo_mongo_extension.so -> libfoo_mongo_extension
@@ -62,7 +76,7 @@ def generate_extension_configs(
         # Add the parsed extension name to the list.
         extension_names.append(extension_name_with_suffix)
 
-        conf_file_path = os.path.join(CONF_OUT_DIR, f"{extension_name_with_suffix}.conf")
+        conf_file_path = os.path.join(conf_out_dir, f"{extension_name_with_suffix}.conf")
         try:
             # Create the .conf file for the extension.
             with open(conf_file_path, "w+") as conf_file:
@@ -83,7 +97,7 @@ def generate_extension_configs(
                 )
         except (IOError, OSError) as e:
             # Clean up created directories on failure.
-            shutil.rmtree(CONF_OUT_DIR)
+            shutil.rmtree(conf_out_dir)
             raise RuntimeError(
                 f"Failed to create .conf file for extension {extension_name} at {conf_file_path}"
             ) from e
