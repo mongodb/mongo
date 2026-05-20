@@ -40,6 +40,14 @@ if (response.ok) {
     // To ensure the failure indeed occurs, we issue a getMore command to ensure that the cursor
     // will be attempted to be opened on the shard and will fail.
     assert.eq(response._changeStreamVersion, "v2", "Change stream of version v1 should fail immediately");
-    response = db.runCommand({getMore: response.cursor.id, collection: normalViewName});
+
+    // In a v2 change stream, the first getMore operation may return a future cluster time.
+    // Retry the getMore until the expected error is returned.
+    assert.soonNoExcept(() => {
+        response = db.runCommand({getMore: response.cursor.id, collection: normalViewName});
+        assert.commandFailedWithCode(response, ErrorCodes.CommandNotSupportedOnView);
+        return true;
+    });
+} else {
+    assert.commandFailedWithCode(response, ErrorCodes.CommandNotSupportedOnView);
 }
-assert.commandFailedWithCode(response, ErrorCodes.CommandNotSupportedOnView);
