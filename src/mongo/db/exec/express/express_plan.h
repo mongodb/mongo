@@ -87,6 +87,9 @@ void logRecordNotFound(OperationContext* opCtx,
                        const BSONObj& keyPattern,
                        const NamespaceString& ns);
 
+void throwIfExpressWriteConflictFailpointEnabled();
+void throwIfExpressTemporarilyUnavailableFailpointEnabled();
+
 /**
  * The 'PlanProgress' variant (defined below) represents the possible return values from an
  * execution step in 'ExpressPlan' execution. It holds one of the following results.
@@ -929,6 +932,8 @@ public:
             exceptionRecoveryPolicy,
             UpdateOperation::name,
             [&]() {
+                throwIfExpressWriteConflictFailpointEnabled();
+                throwIfExpressTemporarilyUnavailableFailpointEnabled();
                 mutablebson::Document doc{};
                 bool docWasModified;
                 std::tie(newObj, docWasModified) =
@@ -1010,6 +1015,8 @@ public:
             exceptionRecoveryPolicy,
             DeleteOperation::name,
             [&]() {
+                throwIfExpressWriteConflictFailpointEnabled();
+                throwIfExpressTemporarilyUnavailableFailpointEnabled();
                 bool noWarn = false;
                 WriteUnitOfWork wunit(opCtx);
                 collection_internal::deleteDocument(opCtx,

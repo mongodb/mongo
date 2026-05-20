@@ -1009,6 +1009,21 @@ server_parameters:
         default: false
         redact: false
 
+    internalQueryWriteConflictBackoffMaxReleaseTicketCycles:
+        description: >-
+            When internalQueryEnableWriteConflictBackoffWithoutTicket is true, release-ticket WCE
+            backoff is used for up to this many WriteConflicts-in-a-row per operation. After the
+            threshold is crossed, the operation falls back to sleeping while holding its ticket.
+            Holding the ticket throttles concurrent writers in a write-conflict storm. A very
+            large value disables the fallback (pure release-ticket behavior).
+        set_at: [startup, runtime]
+        cpp_varname: gInternalQueryWriteConflictBackoffMaxReleaseTicketCycles
+        cpp_vartype: AtomicWord<int>
+        default: 2147483647
+        validator:
+            gte: 0
+        redact: false
+
     internalChangeStreamRespectsReadPreference:
         description: "Enables change stream cursors to respect readPreference after replica set elections."
         set_at: [startup, runtime]

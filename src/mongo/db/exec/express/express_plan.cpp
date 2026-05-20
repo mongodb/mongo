@@ -30,11 +30,30 @@
 #include "mongo/db/exec/express/express_plan.h"
 
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/exceptions.h"
+#include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInExpressWrite);
+MONGO_FAIL_POINT_DEFINE(throwTemporarilyUnavailableExceptionInExpressWrite);
+
 namespace express {
+
+void throwIfExpressWriteConflictFailpointEnabled() {
+    if (MONGO_unlikely(throwWriteConflictExceptionInExpressWrite.shouldFail())) {
+        throwWriteConflictException("Failpoint: throwWriteConflictExceptionInExpressWrite");
+    }
+}
+
+void throwIfExpressTemporarilyUnavailableFailpointEnabled() {
+    if (MONGO_unlikely(throwTemporarilyUnavailableExceptionInExpressWrite.shouldFail())) {
+        throwTemporarilyUnavailableException(
+            "Failpoint: throwTemporarilyUnavailableExceptionInExpressWrite");
+    }
+}
 
 void releaseShardFilterResources(ScopedCollectionFilter&) {}
 void restoreShardFilterResources(ScopedCollectionFilter&) {}

@@ -67,6 +67,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 #include <memory>
 #include <utility>
@@ -78,6 +79,10 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(expressExecutorHangBeforeLogAndBackoff);
+MONGO_FAIL_POINT_DEFINE(expressExecutorHangBeforeTemporarilyUnavailableBackoff);
+
 namespace {
 class DoNotRecoverPolicy final : public express::ExceptionRecoveryPolicy {
 public:
@@ -439,35 +444,64 @@ template <class Plan>
 void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForYield,
                                                    size_t& numUnavailabilityYieldsSinceLastSuccess,
                                                    size_t& numWriteConflictYieldsSinceLastSuccess) {
+    // Capture count before incrementing so the lambda sees the pre-increment value.
     // No increasing write conflict metric as it was already increased before this point
     // in ExceptionRecoveryPolicy::recoverFromNonFatalWriteException
-    logWriteConflictAndBackoff(numWriteConflictYieldsSinceLastSuccess++,
-                               "plan execution",
-                               "write contention during express execution"_sd,
-                               NamespaceStringOrUUID(_nss));
+    auto numAttempts = numWriteConflictYieldsSinceLastSuccess++;
 
-    // TODO SERVER-116168: Is this the desired behavior?
-    _plan.temporarilyReleaseResourcesAndYield(_opCtx, []() {
-        // No-op.
-    });
+    // When release-ticket backoff is enabled, we yield the ticket before sleeping so other
+    // writers can make progress. However, after
+    // 'gInternalQueryWriteConflictBackoffMaxReleaseTicketCycles' consecutive conflicts we fall back
+    // to sleeping while holding the ticket. Holding the ticket throttles concurrent writers from
+    // entering the conflict zone, which helps break a write-conflict storm.
+    const bool releaseTicketEnabled = internalQueryEnableWriteConflictBackoffWithoutTicket.load();
+    const bool fallbackToHoldTicket = releaseTicketEnabled &&
+        static_cast<int64_t>(numAttempts) >=
+            gInternalQueryWriteConflictBackoffMaxReleaseTicketCycles.load();
+
+    if (releaseTicketEnabled && !fallbackToHoldTicket) {
+        _plan.temporarilyReleaseResourcesAndYield(_opCtx, [this, numAttempts]() {
+            if (MONGO_unlikely(expressExecutorHangBeforeLogAndBackoff.shouldFail())) {
+                expressExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
+            }
+            logWriteConflictAndBackoff(numAttempts,
+                                       "plan execution",
+                                       "write contention during express execution"_sd,
+                                       NamespaceStringOrUUID(_nss));
+        });
+    } else {
+        if (MONGO_unlikely(expressExecutorHangBeforeLogAndBackoff.shouldFail())) {
+            expressExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
+        }
+        logWriteConflictAndBackoff(numAttempts,
+                                   "plan execution",
+                                   "write contention during express execution"_sd,
+                                   NamespaceStringOrUUID(_nss));
+        _plan.temporarilyReleaseResourcesAndYield(_opCtx, []() {});
+    }
 }
 
 template <class Plan>
 void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForBackoff,
                                                    size_t& numUnavailabilityYieldsSinceLastSuccess,
                                                    size_t& numWriteConflictYieldsSinceLastSuccess) {
-    handleTemporarilyUnavailableException(_opCtx,
-                                          numUnavailabilityYieldsSinceLastSuccess++,
-                                          "plan executor",
-                                          NamespaceStringOrUUID(_nss),
-                                          Status(ErrorCodes::TemporarilyUnavailable,
-                                                 "resource contention during express execution"_sd),
-                                          numWriteConflictYieldsSinceLastSuccess);
-
-    // TODO SERVER-116168: Is this the desired behavior?
-    _plan.temporarilyReleaseResourcesAndYield(_opCtx, []() {
-        // No-op.
-    });
+    // Capture count before incrementing so the lambda sees the pre-increment value.
+    auto numUnavailabilityAttempts = numUnavailabilityYieldsSinceLastSuccess++;
+    _plan.temporarilyReleaseResourcesAndYield(
+        _opCtx, [this, numUnavailabilityAttempts, &numWriteConflictYieldsSinceLastSuccess]() {
+            if (MONGO_unlikely(
+                    expressExecutorHangBeforeTemporarilyUnavailableBackoff.shouldFail())) {
+                expressExecutorHangBeforeTemporarilyUnavailableBackoff.pauseWhileSet(_opCtx);
+            }
+            handleTemporarilyUnavailableException(
+                _opCtx,
+                numUnavailabilityAttempts,
+                "plan executor",
+                NamespaceStringOrUUID(_nss),
+                Status(ErrorCodes::TemporarilyUnavailable,
+                       "resource contention during express execution"_sd),
+                numWriteConflictYieldsSinceLastSuccess);
+        });
 }
 
 template <class Plan>
