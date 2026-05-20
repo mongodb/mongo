@@ -13,12 +13,27 @@ exports_files(
 # call connect() and return a DBClientBase* back. For that you need to link
 # against the 'clientdriver_network' library.
 mongo_cc_library(
+    name = "credential",
+    srcs = [
+        "credential.cpp",
+    ],
+    hdrs = [
+        "credential.h",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db/auth:auth_mechanism",
+    ],
+)
+
+mongo_cc_library(
     name = "connection_string",
     srcs = [
         "connection_string.cpp",
         "mongo_uri.cpp",
     ],
     deps = [
+        ":credential",
         "//src/mongo/util:dns_query",
         "//src/mongo/util/net:network",
         "//src/mongo/util/options_parser",
@@ -127,6 +142,7 @@ mongo_cc_library(
     ],
     deps = [
         ":connection_string",
+        ":credential",
         ":internal_auth",
         ":native_sasl_client",
         "//src/mongo/bson/util:bson_extract",
@@ -492,6 +508,7 @@ mongo_cc_unit_test(
         "authenticate_test.cpp",
         "backoff_with_jitter_test.cpp",
         "connection_string_test.cpp",
+        "credential_test.cpp",
         "dbclient_cursor_test.cpp",
         "fetcher_test.cpp",
         "index_spec_test.cpp",
@@ -668,5 +685,17 @@ mongo_cc_library(
     ],
     deps = [
         ":backoff_with_jitter",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sasl_client_authenticate_impl_test",
+    srcs = [
+        "sasl_client_authenticate_impl_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":native_sasl_client",
+        "//src/mongo/db:server_base",
     ],
 )

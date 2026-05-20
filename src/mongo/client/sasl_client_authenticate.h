@@ -60,23 +60,12 @@ class SaslClientSession;
  * client application must have successfully executed mongo::runGlobalInitializersOrDie() or its
  * ilk to make this functionality available.
  *
- * The "saslParameters" BSONObj should be initialized with zero or more of the
- * fields below.  Which fields are required depends on the mechanism.  Consult the
- * relevant IETF standards.
- *
- *     "mechanism": The std::string name of the sasl mechanism to use.  Mandatory.
- *     "autoAuthorize": Truthy values tell the server to automatically acquire privileges on
- *         all resources after successful authentication, which is the default.  Falsey values
- *         instruct the server to await separate privilege-acquisition commands.
- *     "user": The std::string name of the user to authenticate.
- *     "db": The database target of the auth command, which identifies the location
- *         of the credential information for the user.  May be "$external" if credential
- *         information is stored outside of the mongo cluster.
- *     "pwd": The password.
- *     "serviceName": The GSSAPI service name to use.  Defaults to "mongodb".
- *     "serviceHostname": The GSSAPI hostname to use.  Defaults to the name of the remote host.
- *
- * Other fields in saslParameters are silently ignored.
+ * The "credential" struct must have "mechanism" set. Other fields are mechanism-dependent:
+ *   - "username": required for SCRAM, PLAIN, GSSAPI; omitted for X.509, AWS, OIDC.
+ *   - "db": auth-source database; uses mechanism default ($external or admin) when absent.
+ *   - "password": required for SCRAM and PLAIN; absent for other mechanisms.
+ *   - "mechanismProperties": mechanism-specific options such as serviceName, serviceHostname,
+ *       awsIamSessionToken, oidcAccessToken, digestPassword.
  *
  * Returns an OK status on success, and ErrorCodes::AuthenticationFailed if authentication is
  * rejected.  Other failures, all of which are tantamount to authentication failure, may also be
@@ -84,7 +73,7 @@ class SaslClientSession;
  */
 extern Future<void> (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
                                               const HostAndPort& hostname,
-                                              const BSONObj& saslParameters);
+                                              const auth::Credential& credential);
 
 /**
  * Extracts the payload field from "cmdObj", and store it into "*payload".
@@ -101,17 +90,15 @@ Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType*
 constexpr int kSaslClientLogLevelDefault = 4;
 
 /**
- * Configures and initializes "session" to perform the client side of a
- * SASL conversation over connection "client".
+ * Configures and initializes "session" to perform the client side of a SASL conversation.
  *
- * "saslParameters" is a BSON document providing the necessary configuration information.
+ * Reads mechanism, username, password, and mechanism-specific properties from "credential".
  *
  * Returns Status::OK() on success.
  */
 Status saslConfigureSession(SaslClientSession* session,
                             const HostAndPort& hostname,
-                            StringData targetDatabase,
-                            const BSONObj& saslParameters);
+                            const auth::Credential& credential);
 
 /**
  * Continue a previously started sasl session and proceed until completion.

@@ -283,7 +283,7 @@ public:
         // X.509 auth only means we only want to use a single mechanism regards of what hello says
         if (_x509AuthOnly) {
             _saslMechsForInternalAuth.clear();
-            _saslMechsForInternalAuth.push_back("MONGODB-X509");
+            _saslMechsForInternalAuth.push_back(std::string{auth::kMechanismMongoX509});
         } else {
             const auto saslMechsElem = reply.getField("saslSupportedMechs");
             if (saslMechsElem.type() == BSONType::array) {
@@ -359,14 +359,14 @@ public:
 
     ~TransientInternalAuthParametersProvider() override = default;
 
-    BSONObj get(size_t index, StringData mechanism) final {
+    boost::optional<auth::Credential> get(size_t index, StringData mechanism) final {
         if (_transientSSLContext) {
             if (index == 0) {
-                return auth::createInternalX509AuthDocument(
+                return auth::createInternalX509AuthCredential(
                     boost::optional<StringData>{_transientSSLContext->manager->getSSLConfiguration()
                                                     .clientSubjectName.toString()});
             } else {
-                return BSONObj();
+                return boost::none;
             }
         }
 
@@ -465,6 +465,10 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
         .then([this, helloHook, authParametersProvider](bool authenticatedDuringConnect) {
             if (_skipAuth || authenticatedDuringConnect) {
                 return Future<void>::makeReady();
+            }
+
+            if (_credential) {
+                return _client->authenticate(*_credential);
             }
 
             boost::optional<std::string> mechanism;
@@ -615,7 +619,8 @@ std::shared_ptr<ConnectionPool::ConnectionInterface> TLTypeFactory::makeConnecti
                                                generation,
                                                _onConnectHook.get(),
                                                _connPoolOptions.skipAuthentication,
-                                               _transientSSLContext);
+                                               _transientSSLContext,
+                                               _connPoolOptions.credential);
     fasten(conn.get());
     return conn;
 }

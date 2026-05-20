@@ -97,8 +97,8 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder builder;
-        cacheToBSON(scramsha1ClientCache, "SCRAM-SHA-1", &builder);
-        cacheToBSON(scramsha256ClientCache, "SCRAM-SHA-256", &builder);
+        cacheToBSON(scramsha1ClientCache, auth::kMechanismScramSha1, &builder);
+        cacheToBSON(scramsha256ClientCache, auth::kMechanismScramSha256, &builder);
         return builder.obj();
     }
 };

@@ -196,7 +196,7 @@ auth::RunCommandHook AsyncDBClient::_makeAuthRunCommandHook() {
     };
 }
 
-Future<void> AsyncDBClient::authenticate(const BSONObj& params) {
+Future<void> AsyncDBClient::authenticate(const auth::Credential& credential) {
     // We will only have a valid clientName if SSL is enabled.
     std::string clientName;
 #ifdef MONGO_CONFIG_SSL
@@ -205,7 +205,7 @@ Future<void> AsyncDBClient::authenticate(const BSONObj& params) {
     }
 #endif
 
-    return auth::authenticateClient(params, remote(), clientName, _makeAuthRunCommandHook());
+    return auth::authenticateClient(credential, remote(), clientName, _makeAuthRunCommandHook());
 }
 
 Future<void> AsyncDBClient::authenticateInternal(

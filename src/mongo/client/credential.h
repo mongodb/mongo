@@ -26,34 +26,43 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/client/authenticate.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/auth_mechanism.h"
+#include "mongo/util/modules.h"
 
-#include <algorithm>
 #include <string>
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
+namespace MONGO_MOD_PUBLIC auth {
 
-inline Status validateAuthMechanism(const std::string& value) {
-    static constexpr std::array<StringData, 7> kValidMechanisms = {
-        "MONGODB-X509"_sd,
-        "PLAIN"_sd,
-        "GSSAPI"_sd,
-        "SCRAM-SHA-1"_sd,
-        "SCRAM-SHA-256"_sd,
-        "MONGODB-AWS"_sd,
-        "MONGODB-OIDC"_sd,
-    };
-    if (std::find(kValidMechanisms.begin(), kValidMechanisms.end(), value) ==
-        kValidMechanisms.end()) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Unknown authentication mechanism '" << value
-                              << "'. Supported mechanisms: MONGODB-X509, PLAIN, GSSAPI, "
-                                 "SCRAM-SHA-1, SCRAM-SHA-256, MONGODB-AWS, MONGODB-OIDC"};
-    }
-    return Status::OK();
-}
+/** Typed representation of client authentication credentials. */
+struct Credential {
+    AuthMechanism mechanism;
 
+    /** Auth-source database. Uses mechanism default ($external or admin) when absent. */
+    boost::optional<std::string> db;
+
+    /** Required for SCRAM, PLAIN, GSSAPI; absent for X.509 / AWS / OIDC. */
+    boost::optional<std::string> username;
+
+    /** Required for SCRAM and PLAIN; absent for others. */
+    boost::optional<std::string> password;
+
+    /** Mechanism-specific options. Not required, but not marked as optional for ergonomics. */
+    BSONObj mechanismProperties;
+
+    /**
+     * Parse and validate BSON into a Credential. Returns an error if a required field is missing or
+     * if both "db" and the legacy "userSource" field are present.
+     */
+    static StatusWith<Credential> fromBSON(const BSONObj& params);
+};
+
+}  // namespace MONGO_MOD_PUBLIC auth
 }  // namespace mongo

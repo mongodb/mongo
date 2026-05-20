@@ -29,12 +29,8 @@
 
 #include "mongo/client/internal_auth.h"
 
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/client/authenticate.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_command_constants.h"
@@ -43,12 +39,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/password_digest.h"
 #include "mongo/util/read_through_cache.h"
-#include "mongo/util/str.h"
 
-#include <memory>
 #include <mutex>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -57,19 +50,18 @@ namespace auth {
 static std::mutex internalAuthKeysMutex;
 static bool internalAuthSet = false;
 static std::vector<std::string> internalAuthKeys;
-static BSONObj internalAuthParams;
+static boost::optional<Credential> internalAuthCredential;
 
 void setInternalAuthKeys(const std::vector<std::string>& keys) {
     std::lock_guard<std::mutex> lk(internalAuthKeysMutex);
-
     internalAuthKeys = keys;
     fassert(50996, internalAuthKeys.size() > 0);
     internalAuthSet = true;
 }
 
-void setInternalUserAuthParams(BSONObj obj) {
+void setInternalUserAuthParams(Credential credential) {
     std::lock_guard<std::mutex> lk(internalAuthKeysMutex);
-    internalAuthParams = obj.getOwned();
+    internalAuthCredential = std::move(credential);
     internalAuthKeys.clear();
     internalAuthSet = true;
 }
@@ -84,63 +76,52 @@ bool isInternalAuthSet() {
     return internalAuthSet;
 }
 
-BSONObj createInternalX509AuthDocument(boost::optional<StringData> userName) {
-    BSONObjBuilder builder;
-    builder.append(saslCommandMechanismFieldName, "MONGODB-X509");
-    builder.append(saslCommandUserDBFieldName, "$external");
-
-    if (userName) {
-        builder.append(saslCommandUserFieldName, userName.value());
-    }
-
-    return builder.obj();
+Credential createInternalX509AuthCredential(boost::optional<StringData> userName) {
+    return Credential{
+        .mechanism = AuthMechanism::kMongoX509,
+        .db = std::string{"$external"},
+        .username = userName ? boost::make_optional(std::string{*userName}) : boost::none,
+    };
 }
 
-BSONObj getInternalAuthParams(size_t idx, StringData mechanism) {
+boost::optional<Credential> getInternalAuthParams(size_t idx, StringData mechanism) {
     std::lock_guard<std::mutex> lk(internalAuthKeysMutex);
     if (!internalAuthSet) {
-        return BSONObj();
+        return boost::none;
     }
 
-    // If we've set a specific BSONObj as the internal auth pararms, return it if the index
-    // is zero (there are no alternate credentials if we've set a BSONObj explicitly).
-    if (!internalAuthParams.isEmpty()) {
-        return idx == 0 ? internalAuthParams : BSONObj();
+    // Explicit credential (e.g. X.509): only one entry, no alternates.
+    if (internalAuthCredential) {
+        return idx == 0 ? internalAuthCredential : boost::none;
     }
 
-    // If the index is larger than the number of keys we know about then return an empty
-    // BSONObj.
     if (idx + 1 > internalAuthKeys.size()) {
-        return BSONObj();
+        return boost::none;
     }
+
+    auto swMech = authMechanismFromString(mechanism);
+    if (!swMech.isOK())
+        return boost::none;
 
     auto password = internalAuthKeys.at(idx);
     auto systemUser = internalSecurity.getUser();
-    if (mechanism == kMechanismScramSha1) {
+    if (swMech.getValue() == AuthMechanism::kScramSha1) {
         password = mongo::createPasswordDigest((*systemUser)->getName().getUser(), password);
     }
 
-    return BSON(saslCommandMechanismFieldName
-                << mechanism << saslCommandUserDBFieldName << (*systemUser)->getName().getDB()
-                << saslCommandUserFieldName << (*systemUser)->getName().getUser()
-                << saslCommandPasswordFieldName << password << saslCommandDigestPasswordFieldName
-                << false);
+    // digestPassword: false because the password is already in its final form above.
+    return Credential{swMech.getValue(),
+                      std::string{(*systemUser)->getName().getDB()},
+                      std::string{(*systemUser)->getName().getUser()},
+                      std::move(password),
+                      BSON(saslCommandDigestPasswordFieldName << false)};
 }
-
-std::string getBSONString(const BSONObj& container, StringData field) {
-    auto elem = container[field];
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "Field '" << field << "' must be of type string",
-            elem.type() == BSONType::string);
-    return elem.String();
-}
-
 
 std::string getInternalAuthDB() {
     std::lock_guard<std::mutex> lk(internalAuthKeysMutex);
 
-    if (!internalAuthParams.isEmpty()) {
-        return getBSONString(internalAuthParams, saslCommandUserDBFieldName);
+    if (internalAuthCredential && internalAuthCredential->db) {
+        return *internalAuthCredential->db;
     }
 
     auto systemUser = internalSecurity.getUser();

@@ -76,7 +76,7 @@ public:
 
         // Set the internal user auth parameters so we auth with X.509 externally
         auth::setInternalUserAuthParams(
-            auth::createInternalX509AuthDocument(boost::optional<StringData>("Ignored")));
+            auth::createInternalX509AuthCredential(boost::optional<StringData>("Ignored")));
 
         createNet();
         net().startup();

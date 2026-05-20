@@ -87,7 +87,6 @@ namespace {
 
 constexpr auto kDBFieldName = "db"_sd;
 constexpr auto kSASLPayloadUsernameField = "username"_sd;
-constexpr StringData kX509AuthMechanism = "MONGODB-X509"_sd;
 
 class CmdLogout : public TypedCommand<CmdLogout> {
 public:
@@ -251,7 +250,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
         const auto& v = saslGlobalParams.authenticationMechanisms;
         uassert(ErrorCodes::BadValue,
                 kX509AuthenticationDisabledMessage,
-                std::find(v.begin(), v.end(), kX509AuthMechanism) != v.end());
+                std::find(v.begin(), v.end(), auth::kMechanismMongoX509) != v.end());
 
         uassertStatusOK(
             authorizationSession->addAndAuthorizeUser(opCtx, std::move(request), boost::none));

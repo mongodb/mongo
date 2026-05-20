@@ -101,8 +101,13 @@ void URIInfo::construct(JSContext* cx, JS::CallArgs args) {
     ObjectWrapper o(cx, thisv);
 
     o.setValue(InternedString::uri, uriArg);
-    o.setString(InternedString::user, parsed.getUser());
-    o.setString(InternedString::password, parsed.getPassword());
+    auto& cred = parsed.getCredential();
+    if (cred && cred->username) {
+        o.setString(InternedString::user, *cred->username);
+    }
+    if (cred && cred->password) {
+        o.setString(InternedString::password, *cred->password);
+    }
     o.setBSON(InternedString::options, optsBuilder.obj(), true);
     o.setString(InternedString::database, parsed.getDatabase());
     o.setBoolean(InternedString::isValid, parsed.isValid());

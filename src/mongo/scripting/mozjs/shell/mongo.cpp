@@ -802,7 +802,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
         uassert(ErrorCodes::InvalidOptions,
                 "Authentication is not currently supported when gRPC mode is enabled",
-                cs.getUser().empty());
+                !cs.getCredential() || !cs.getCredential()->username);
     }
 #endif
 

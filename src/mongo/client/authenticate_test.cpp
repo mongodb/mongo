@@ -150,12 +150,19 @@ public:
 #ifdef MONGO_CONFIG_SSL
 TEST_F(AuthClientTest, X509) {
     auto params = loadX509Conversation();
-    auth::authenticateClient(params, HostAndPort(), _username, _runCommandCallback).get();
+    auth::authenticateClient(uassertStatusOK(auth::Credential::fromBSON(params)),
+                             HostAndPort(),
+                             _username,
+                             _runCommandCallback)
+        .get();
 }
 
 TEST_F(AuthClientTest, asyncX509) {
     auto params = loadX509Conversation();
-    ASSERT_OK(auth::authenticateClient(params, HostAndPort(), _username, _runCommandCallback)
+    ASSERT_OK(auth::authenticateClient(uassertStatusOK(auth::Credential::fromBSON(params)),
+                                       HostAndPort(),
+                                       _username,
+                                       _runCommandCallback)
                   .getNoThrow());
 }
 #endif

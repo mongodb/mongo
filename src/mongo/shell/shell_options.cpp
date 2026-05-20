@@ -283,11 +283,13 @@ Status storeMongoShellOptions(const moe::Environment& params,
             StringBuilder sb;
             sb << "ERROR: Cannot specify ";
 
-            if (!shellGlobalParams.username.empty() && !cs.getUser().empty() &&
-                shellGlobalParams.username != cs.getUser()) {
+            if (!shellGlobalParams.username.empty() && cs.getCredential() &&
+                cs.getCredential()->username &&
+                shellGlobalParams.username != *cs.getCredential()->username) {
                 sb << "different usernames";
-            } else if (!shellGlobalParams.password.empty() && !cs.getPassword().empty() &&
-                       shellGlobalParams.password != cs.getPassword()) {
+            } else if (!shellGlobalParams.password.empty() && cs.getCredential() &&
+                       cs.getCredential()->password &&
+                       shellGlobalParams.password != *cs.getCredential()->password) {
                 sb << "different passwords";
             } else if (!shellGlobalParams.authenticationMechanism.empty() &&
                        uriOptions.count("authMechanism") &&

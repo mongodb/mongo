@@ -38,6 +38,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
@@ -645,8 +647,9 @@ void testValidURIFormat(URITestCase testCase) {
     const auto cs_status = MongoURI::parse(testCase.URI);
     ASSERT_OK(cs_status);
     auto result = cs_status.getValue();
-    ASSERT_EQ(testCase.uname, result.getUser());
-    ASSERT_EQ(testCase.password, result.getPassword());
+    auto& cred = result.getCredential();
+    ASSERT_EQ(testCase.uname, cred ? cred->username.value_or("") : "");
+    ASSERT_EQ(testCase.password, cred ? cred->password.value_or("") : "");
     ASSERT_EQ(testCase.type, result.type());
     ASSERT_EQ(testCase.setname, result.getReplicaSetName());
     ASSERT_EQ(testCase.numservers, result.getServers().size());
@@ -1044,9 +1047,10 @@ TEST(MongoURI, srvRecordTest) {
         ASSERT_OK(rs.getStatus()) << "Failed on URI: " << test.uri
                                   << " data on line: " << test.lineNumber;
         auto rv = rs.getValue();
-        ASSERT_EQ(rv.getUser(), test.user)
+        auto& cred = rv.getCredential();
+        ASSERT_EQ(cred ? cred->username.value_or("") : "", test.user)
             << "Failed on URI: " << test.uri << " data on line: " << test.lineNumber;
-        ASSERT_EQ(rv.getPassword(), test.password)
+        ASSERT_EQ(cred ? cred->password.value_or("") : "", test.password)
             << "Failed on URI: " << test.uri << " data on line : " << test.lineNumber;
         ASSERT_EQ(rv.getDatabase(), test.database)
             << "Failed on URI: " << test.uri << " data on line : " << test.lineNumber;
@@ -1096,6 +1100,403 @@ TEST(MongoURI, Redact) {
     const auto toRedactSRV = "mongodb+srv://admin:password@localhost/admin?secret=foo"_sd;
     const auto redactedSRV = "mongodb+srv://admin@localhost/admin"_sd;
     ASSERT_EQ(MongoURI::redact(toRedactSRV), redactedSRV);
+}
+
+// MONGODB-CR is a deprecated mechanism. It must be recognized at URI parse time so that
+// username and password are preserved in the credential (they are needed to produce a useful
+// error at authentication time). Completely unknown mechanisms must fail at parse time.
+TEST(MongoURI, DeprecatedAndUnknownMechanisms) {
+    // MONGODB-CR: parse succeeds; username/password are preserved.
+    {
+        auto rs = MongoURI::parse("mongodb://user:pwd@localhost/db?authMechanism=MONGODB-CR");
+        ASSERT_OK(rs.getStatus());
+        const auto& cred = rs.getValue().getCredential();
+        ASSERT_TRUE(cred.has_value());
+        ASSERT_EQ(cred->mechanism, auth::AuthMechanism::kMongoDbCr);
+        ASSERT_EQ(cred->username.value_or(""), "user");
+        ASSERT_EQ(cred->password.value_or(""), "pwd");
+        ASSERT_EQ(cred->db.value_or(""), "db");
+    }
+
+    // Truly unknown mechanism: parse must fail.
+    {
+        auto rs =
+            MongoURI::parse("mongodb://user:pwd@localhost/db?authMechanism=COMPLETELY-UNKNOWN");
+        ASSERT_NOT_OK(rs.getStatus());
+    }
+}
+
+// External auth mechanisms (X.509, AWS, OIDC) must use "$external" as the auth db even when
+// the URI carries a database path (e.g. /admin). Without an explicit authSource, picking up the
+// URI path database breaks speculative authentication because the saslStart lands on "admin"
+// instead of "$external".
+TEST(MongoURI, ExternalMechanismDefaultsToExternalDb) {
+    struct TestCase {
+        std::string uri;
+        auth::AuthMechanism expectedMech;
+        std::string expectedDb;
+    };
+
+    const TestCase cases[] = {
+        {.uri = "mongodb://localhost/admin?authMechanism=MONGODB-X509",
+         .expectedMech = auth::AuthMechanism::kMongoX509,
+         .expectedDb = "$external"},
+        {.uri = "mongodb://localhost/?authMechanism=MONGODB-X509",
+         .expectedMech = auth::AuthMechanism::kMongoX509,
+         .expectedDb = "$external"},
+        {.uri = "mongodb://localhost/admin?authMechanism=MONGODB-AWS",
+         .expectedMech = auth::AuthMechanism::kMongoAWS,
+         .expectedDb = "$external"},
+        {.uri = "mongodb://localhost/admin?authMechanism=MONGODB-OIDC",
+         .expectedMech = auth::AuthMechanism::kMongoOIDC,
+         .expectedDb = "$external"},
+        {.uri = "mongodb://user@localhost/admin?authMechanism=GSSAPI",
+         .expectedMech = auth::AuthMechanism::kGSSAPI,
+         .expectedDb = "$external"},
+        // Explicit authSource overrides the external default.
+        {.uri = "mongodb://localhost/admin?authMechanism=MONGODB-X509&authSource=$external",
+         .expectedMech = auth::AuthMechanism::kMongoX509,
+         .expectedDb = "$external"},
+        {.uri = "mongodb://user:pwd@localhost/admin?authMechanism=SCRAM-SHA-256",
+         .expectedMech = auth::AuthMechanism::kScramSha256,
+         .expectedDb = "admin"},
+        {.uri = "mongodb://user:pwd@localhost/admin?authMechanism=SCRAM-SHA-1",
+         .expectedMech = auth::AuthMechanism::kScramSha1,
+         .expectedDb = "admin"},
+        {.uri = "mongodb://user:pwd@localhost/?authMechanism=PLAIN",
+         .expectedMech = auth::AuthMechanism::kSaslPlain,
+         .expectedDb = "$external"},
+        {.uri = "mongodb://user:pwd@localhost/admin?authMechanism=MONGODB-CR",
+         .expectedMech = auth::AuthMechanism::kMongoDbCr,
+         .expectedDb = "admin"},
+        // No authMechanism specified: URI parsing defaults to SCRAM-SHA-256.
+        {.uri = "mongodb://user:pwd@localhost/admin",
+         .expectedMech = auth::AuthMechanism::kScramSha256,
+         .expectedDb = "admin"},
+    };
+
+    for (const auto& tc : cases) {
+        auto rs = MongoURI::parse(tc.uri);
+        ASSERT_OK(rs.getStatus()) << "URI: " << tc.uri;
+        const auto& cred = rs.getValue().getCredential();
+        ASSERT_TRUE(cred.has_value()) << "URI: " << tc.uri;
+        ASSERT_EQ(cred->mechanism, tc.expectedMech) << "URI: " << tc.uri;
+        ASSERT_EQ(cred->db.value_or(""), tc.expectedDb) << "URI: " << tc.uri;
+    }
+}
+
+// Test authSource precedence according to the MongoDB driver specification:
+// 1. Explicit authSource option (highest priority)
+// 2. Database path in URI
+// 3. Mechanism-specific default is used (e.g. "admin" for SCRAM).
+TEST(MongoURI, AuthSourcePrecedence) {
+    struct TestCase {
+        std::string uri;
+        std::string expectedDb;
+        std::string description;
+    };
+
+    const TestCase cases[] = {
+        // Explicit authSource takes precedence over database path
+        {"mongodb://user:pwd@localhost/mydb?authSource=authdb",
+         "authdb",
+         "Explicit authSource overrides database path"},
+
+        // Database path is used when no authSource specified
+        {"mongodb://user:pwd@localhost/mydb", "mydb", "Database path used as authSource"},
+
+        // Empty database path with explicit authSource
+        {"mongodb://user:pwd@localhost/?authSource=customdb",
+         "customdb",
+         "Explicit authSource with no database path"},
+
+        // No database path and no authSource uses mechanism-specific default.
+        {"mongodb://user:pwd@localhost/?authMechanism=SCRAM-SHA-256",
+         "admin",
+         "No authSource and no database path default to admin for SCRAM"},
+
+        // Explicit authSource can override to non-standard database
+        {"mongodb://user:pwd@localhost/prod?authSource=test",
+         "test",
+         "authSource overrides to different database"},
+
+        // Database path with special characters (URL encoded)
+        {"mongodb://user:pwd@localhost/my%40db?authMechanism=SCRAM-SHA-256",
+         "my@db",
+         "Database path with special characters"},
+
+        // Explicit authSource with special characters
+        {"mongodb://user:pwd@localhost/?authSource=my%40db",
+         "my@db",
+         "authSource with special characters"},
+    };
+
+    for (const auto& tc : cases) {
+        auto rs = MongoURI::parse(tc.uri);
+        ASSERT_OK(rs.getStatus()) << "Failed to parse URI: " << tc.uri
+                                  << " (test: " << tc.description << ")";
+        const auto& cred = rs.getValue().getCredential();
+        ASSERT_TRUE(cred.has_value())
+            << "No credential created for URI: " << tc.uri << " (test: " << tc.description << ")";
+        ASSERT_TRUE(cred->db.has_value()) << "No authSource in credential for URI: " << tc.uri
+                                          << " (test: " << tc.description << ")";
+        ASSERT_EQ(*cred->db, tc.expectedDb)
+            << "Wrong authSource for URI: " << tc.uri << " (test: " << tc.description << ")";
+    }
+}
+
+// For non-external mechanisms at URI parse time:
+// 1. Database path is used when present.
+// 2. Explicit authSource overrides the database path.
+// 3. If both are absent, mechanism-specific default is used.
+TEST(MongoURI, NonExternalMechanismAuthSourceDefaults) {
+    struct TestCase {
+        std::string uri;
+        std::string expectedDb;
+        std::string description;
+    };
+
+    const TestCase cases[] = {
+        // SCRAM-SHA-256 with database path
+        {"mongodb://user:pwd@localhost/mydb?authMechanism=SCRAM-SHA-256",
+         "mydb",
+         "SCRAM-SHA-256 uses database path"},
+
+        // SCRAM-SHA-1 with database path
+        {"mongodb://user:pwd@localhost/testdb?authMechanism=SCRAM-SHA-1",
+         "testdb",
+         "SCRAM-SHA-1 uses database path"},
+
+        // PLAIN with explicit authSource (PLAIN typically requires $external)
+        {"mongodb://user:pwd@localhost/?authMechanism=PLAIN&authSource=$external",
+         "$external",
+         "PLAIN with explicit $external authSource"},
+
+        // PLAIN with database path defaults to that database.
+        {"mongodb://user:pwd@localhost/mydb?authMechanism=PLAIN",
+         "mydb",
+         "PLAIN with database path defaults to that database"},
+
+        // SCRAM with no database path and no authSource defaults to admin.
+        {"mongodb://user:pwd@localhost/?authMechanism=SCRAM-SHA-256",
+         "admin",
+         "SCRAM-SHA-256 without authSource or database path defaults to admin"},
+
+        // PLAIN with no database path and no authSource defaults to $external.
+        {"mongodb://user:pwd@localhost/?authMechanism=PLAIN",
+         "$external",
+         "PLAIN without authSource or database path defaults to $external"},
+    };
+
+    for (const auto& tc : cases) {
+        auto rs = MongoURI::parse(tc.uri);
+        ASSERT_OK(rs.getStatus()) << "Failed to parse URI: " << tc.uri
+                                  << " (test: " << tc.description << ")";
+        const auto& cred = rs.getValue().getCredential();
+        ASSERT_TRUE(cred.has_value())
+            << "No credential created for URI: " << tc.uri << " (test: " << tc.description << ")";
+        ASSERT_TRUE(cred->db.has_value()) << "No authSource in credential for URI: " << tc.uri
+                                          << " (test: " << tc.description << ")";
+        ASSERT_EQ(*cred->db, tc.expectedDb)
+            << "Wrong authSource for URI: " << tc.uri << " (test: " << tc.description << ")";
+    }
+}
+
+// Validate authSource defaulting in MongoURI::makeAuthObjFromOptions so auth command generation
+// matches parse-time defaults.
+TEST(MongoURI, MakeAuthObjAuthSourceDefaults) {
+    struct TestCase {
+        std::string uri;
+        std::vector<std::string> saslMechsForAuth;
+        std::string expectedDb;
+        std::string description;
+    };
+
+    const TestCase cases[] = {
+        {"mongodb://user:pwd@localhost/mydb?authSource=authdb&authMechanism=SCRAM-SHA-256",
+         {},
+         "authdb",
+         "Explicit authSource overrides database path"},
+        {"mongodb://localhost/admin?authMechanism=MONGODB-AWS",
+         {},
+         "$external",
+         "External mechanism defaults to $external"},
+        {"mongodb://user:pwd@localhost/mydb?authMechanism=PLAIN",
+         {},
+         "mydb",
+         "PLAIN defaults to database path when present"},
+        {"mongodb://user:pwd@localhost/?authMechanism=PLAIN",
+         {},
+         "$external",
+         "PLAIN defaults to $external when database path is absent"},
+        {"mongodb://user:pwd@localhost/mydb?authMechanism=SCRAM-SHA-256",
+         {},
+         "mydb",
+         "SCRAM defaults to database path when present"},
+        {"mongodb://user:pwd@localhost/?authMechanism=SCRAM-SHA-256",
+         {},
+         "admin",
+         "SCRAM defaults to admin when database path is absent"},
+        {"mongodb://user:pwd@localhost/",
+         {std::string{auth::kMechanismScramSha1}},
+         "admin",
+         "Negotiated SCRAM-SHA-1 defaults to admin when database path is absent"},
+    };
+
+    for (const auto& tc : cases) {
+        auto rs = MongoURI::parse(tc.uri);
+        ASSERT_OK(rs.getStatus()) << "Failed to parse URI: " << tc.uri
+                                  << " (test: " << tc.description << ")";
+
+        auto authObj =
+            rs.getValue().makeAuthObjFromOptions(/*maxWireVersion*/ 0, tc.saslMechsForAuth);
+        ASSERT_TRUE(authObj.has_value())
+            << "No auth object created for URI: " << tc.uri << " (test: " << tc.description << ")";
+
+        const auto sourceField = authObj->getField(saslCommandUserDBFieldName);
+        ASSERT_FALSE(sourceField.eoo()) << "No auth db in auth object for URI: " << tc.uri
+                                        << " (test: " << tc.description << ")";
+        ASSERT_EQ(sourceField.type(), BSONType::string)
+            << "Auth db has wrong type for URI: " << tc.uri << " (test: " << tc.description << ")";
+        ASSERT_EQ(sourceField.String(), tc.expectedDb)
+            << "Wrong auth db in auth object for URI: " << tc.uri << " (test: " << tc.description
+            << ")";
+    }
+}
+
+// Test that explicit authSource can override the external mechanism default
+TEST(MongoURI, ExplicitAuthSourceOverridesExternalDefault) {
+    struct TestCase {
+        std::string uri;
+        std::string expectedDb;
+        std::string description;
+    };
+
+    const TestCase cases[] = {
+        // X.509 with explicit non-$external authSource (unusual but should be allowed)
+        {"mongodb://CN=test@localhost/?authMechanism=MONGODB-X509&authSource=admin",
+         "admin",
+         "X.509 with explicit admin authSource"},
+
+        // AWS with explicit authSource
+        {"mongodb://localhost/?authMechanism=MONGODB-AWS&authSource=custom",
+         "custom",
+         "MONGODB-AWS with explicit custom authSource"},
+
+        // OIDC with explicit authSource
+        {"mongodb://localhost/?authMechanism=MONGODB-OIDC&authSource=mydb",
+         "mydb",
+         "MONGODB-OIDC with explicit custom authSource"},
+
+        // GSSAPI with explicit authSource
+        {"mongodb://user@localhost/?authMechanism=GSSAPI&authSource=test",
+         "test",
+         "GSSAPI with explicit test authSource"},
+    };
+
+    for (const auto& tc : cases) {
+        auto rs = MongoURI::parse(tc.uri);
+        ASSERT_OK(rs.getStatus()) << "Failed to parse URI: " << tc.uri
+                                  << " (test: " << tc.description << ")";
+        const auto& cred = rs.getValue().getCredential();
+        ASSERT_TRUE(cred.has_value())
+            << "No credential created for URI: " << tc.uri << " (test: " << tc.description << ")";
+        ASSERT_TRUE(cred->db.has_value()) << "No authSource in credential for URI: " << tc.uri
+                                          << " (test: " << tc.description << ")";
+        ASSERT_EQ(*cred->db, tc.expectedDb)
+            << "Wrong authSource for URI: " << tc.uri << " (test: " << tc.description << ")";
+    }
+}
+
+// Test URIs without credentials don't create credentials
+TEST(MongoURI, NoCredentialsWithoutAuthInfo) {
+    struct TestCase {
+        std::string uri;
+        std::string description;
+    };
+
+    const TestCase cases[] = {
+        {"mongodb://localhost/", "No username, no database"},
+        {"mongodb://localhost/mydb", "Database path but no username"},
+        {"mongodb://localhost/?authSource=test", "authSource but no username"},
+    };
+
+    for (const auto& tc : cases) {
+        auto rs = MongoURI::parse(tc.uri);
+        ASSERT_OK(rs.getStatus()) << "Failed to parse URI: " << tc.uri
+                                  << " (test: " << tc.description << ")";
+        const auto& cred = rs.getValue().getCredential();
+        ASSERT_FALSE(cred.has_value()) << "Unexpected credential created for URI: " << tc.uri
+                                       << " (test: " << tc.description << ")";
+    }
+}
+
+TEST(MongoURI, MakeAuthObjMechanismNegotiation) {
+    struct TestCase {
+        std::string uri;
+        std::vector<std::string> saslMechsForAuth;
+        std::string expectedMechanism;
+        std::string description;
+    };
+
+    const std::string base = "mongodb://user:pwd@localhost/";
+    const TestCase cases[] = {
+        {.uri = base,
+         .saslMechsForAuth = {std::string{auth::kMechanismScramSha256},
+                              std::string{auth::kMechanismScramSha1}},
+         .expectedMechanism = std::string{auth::kMechanismScramSha256},
+         .description = "SHA-256 preferred when both advertised"},
+        {.uri = base,
+         .saslMechsForAuth = {std::string{auth::kMechanismScramSha1}},
+         .expectedMechanism = std::string{auth::kMechanismScramSha1},
+         .description = "SHA-1 chosen when only SHA-1 advertised"},
+        {.uri = base,
+         .saslMechsForAuth = {std::string{auth::kMechanismScramSha256}},
+         .expectedMechanism = std::string{auth::kMechanismScramSha256},
+         .description = "SHA-256 chosen when only SHA-256 advertised"},
+        {.uri = base,
+         .saslMechsForAuth = {},
+         .expectedMechanism = std::string{auth::kMechanismScramSha1},
+         .description = "SHA-1 chosen when server advertises no mechanisms"},
+        {.uri = base + "?authMechanism=SCRAM-SHA-256",
+         .saslMechsForAuth = {std::string{auth::kMechanismScramSha1}},
+         .expectedMechanism = std::string{auth::kMechanismScramSha256},
+         .description = "Explicit URI mechanism overrides saslMechsForAuth"},
+    };
+
+    for (const auto& tc : cases) {
+        auto rs = MongoURI::parse(tc.uri);
+        ASSERT_OK(rs.getStatus()) << tc.description;
+
+        auto authObj = rs.getValue().makeAuthObjFromOptions(0, tc.saslMechsForAuth);
+        ASSERT_TRUE(authObj.has_value()) << tc.description;
+
+        const auto mechField = authObj->getField(saslCommandMechanismFieldName);
+        ASSERT_FALSE(mechField.eoo()) << tc.description;
+        ASSERT_EQ(mechField.String(), tc.expectedMechanism) << tc.description;
+    }
+}
+
+TEST(MongoURI, EmptyAuthSourceRejectedByParser) {
+    // The URI parser rejects authSource= (empty value); it does not silently ignore it.
+    const std::string uri = "mongodb://user:pwd@localhost/?authSource=&authMechanism=SCRAM-SHA-256";
+    auto rs = MongoURI::parse(uri);
+    ASSERT_NOT_OK(rs.getStatus());
+    ASSERT_EQ(rs.getStatus().code(), ErrorCodes::FailedToParse);
+}
+
+TEST(MongoURI, MissingAuthSourceDefaultsToAdmin) {
+    // SCRAM-SHA-256 with no authSource specified should default the auth database to "admin".
+    const std::string uri = "mongodb://user:pwd@localhost/?authMechanism=SCRAM-SHA-256";
+    auto rs = MongoURI::parse(uri);
+    ASSERT_OK(rs.getStatus());
+
+    auto authObj = rs.getValue().makeAuthObjFromOptions(0, {});
+    ASSERT_TRUE(authObj.has_value());
+
+    const auto sourceField = authObj->getField(saslCommandUserDBFieldName);
+    ASSERT_FALSE(sourceField.eoo());
+    ASSERT_EQ(sourceField.String(), DatabaseName::kAdmin.db(omitTenant));
 }
 
 }  // namespace

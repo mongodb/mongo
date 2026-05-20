@@ -289,6 +289,19 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "auth_mechanism",
+    srcs = [
+        "auth_mechanism.cpp",
+    ],
+    hdrs = [
+        "auth_mechanism.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
     name = "auth_options",
     srcs = [
         ":auth_options_gen",
@@ -350,6 +363,7 @@ mongo_cc_library(
         "sasl_options.cpp",
     ],
     deps = [
+        ":auth_mechanism",
         "//src/mongo/db:server_base",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/stats:counters",
@@ -552,6 +566,7 @@ mongo_cc_library(
     deps = [
         "auth",
         "authprivilege",
+        ":auth_mechanism",
         "//src/mongo/crypto:sha_block",
         "//src/mongo/db:server_base",
     ],

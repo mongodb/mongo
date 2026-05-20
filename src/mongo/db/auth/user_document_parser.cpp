@@ -74,8 +74,7 @@ constexpr StringData READONLY_FIELD_NAME = "readOnly"_sd;
 constexpr StringData CREDENTIALS_FIELD_NAME = "credentials"_sd;
 constexpr StringData ROLE_NAME_FIELD_NAME = "role"_sd;
 constexpr StringData ROLE_DB_FIELD_NAME = "db"_sd;
-constexpr StringData SCRAMSHA1_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-1"_sd;
-constexpr StringData SCRAMSHA256_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-256"_sd;
+
 constexpr StringData MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external"_sd;
 constexpr StringData AUTHENTICATION_RESTRICTIONS_FIELD_NAME = "authenticationRestrictions"_sd;
 constexpr StringData INHERITED_AUTHENTICATION_RESTRICTIONS_FIELD_NAME =
@@ -220,11 +219,11 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
             return Status::OK();
         };
 
-        auto sha1status = validateScram(SCRAMSHA1_CREDENTIAL_FIELD_NAME);
+        auto sha1status = validateScram(auth::kMechanismScramSha1);
         if (!sha1status.isOK() && (sha1status.code() != ErrorCodes::NoSuchKey)) {
             return sha1status;
         }
-        auto sha256status = validateScram(SCRAMSHA256_CREDENTIAL_FIELD_NAME);
+        auto sha256status = validateScram(auth::kMechanismScramSha256);
         if (!sha256status.isOK() && (sha256status.code() != ErrorCodes::NoSuchKey)) {
             return sha256status;
         }
@@ -278,9 +277,9 @@ Status V2UserDocumentParser::initializeUserCredentialsFromUserDocument(
             }
         } else {
             const bool haveSha1 = parseSCRAMCredentials(
-                credentialsElement, credentials.scram_sha1, SCRAMSHA1_CREDENTIAL_FIELD_NAME);
+                credentialsElement, credentials.scram_sha1, auth::kMechanismScramSha1);
             const bool haveSha256 = parseSCRAMCredentials(
-                credentialsElement, credentials.scram_sha256, SCRAMSHA256_CREDENTIAL_FIELD_NAME);
+                credentialsElement, credentials.scram_sha256, auth::kMechanismScramSha256);
 
             if (!haveSha1 && !haveSha256) {
                 return Status(

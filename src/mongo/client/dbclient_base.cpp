@@ -408,7 +408,8 @@ void DBClientBase::_auth(const BSONObj& params) {
 #endif
 
     HostAndPort remote(getServerAddress());
-    auth::authenticateClient(params, remote, clientName, _makeAuthRunCommandHook()).get();
+    auto credential = uassertStatusOK(auth::Credential::fromBSON(params));
+    auth::authenticateClient(credential, remote, clientName, _makeAuthRunCommandHook()).get();
     _isClientAuthenticated.store(true);
 }
 
@@ -468,7 +469,8 @@ void DBClientBase::auth(const DatabaseName& dbname, StringData username, StringD
 
     // To prevent unexpected behavior for existing clients, default to SCRAM-SHA-1 if the SASL
     // negotiation does not succeeed for some reason.
-    StringData mech = mechResult.isOK() ? mechResult.getValue() : "SCRAM-SHA-1"_sd;
+    StringData mech =
+        mechResult.isOK() ? mechResult.getValue() : auth::kInternalAuthFallbackMechanism;
 
     const auto authParams = auth::buildAuthParams(dbname, username, password_text, mech);
     auth(authParams);

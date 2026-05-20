@@ -48,6 +48,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/address_restriction.h"
+#include "mongo/db/auth/auth_mechanism.h"
 #include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/authorization_backend_interface.h"
@@ -589,9 +590,9 @@ void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T
     bool buildSCRAMSHA1 = false, buildSCRAMSHA256 = false;
     if (auto mechanisms = cmd.getMechanisms(); mechanisms && !mechanisms->empty()) {
         for (const auto& mech : mechanisms.get()) {
-            if (mech == "SCRAM-SHA-1") {
+            if (mech == auth::kMechanismScramSha1) {
                 buildSCRAMSHA1 = true;
-            } else if (mech == "SCRAM-SHA-256") {
+            } else if (mech == auth::kMechanismScramSha256) {
                 buildSCRAMSHA256 = true;
             } else {
                 uasserted(ErrorCodes::BadValue,
@@ -604,8 +605,8 @@ void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T
         }
 
     } else {
-        buildSCRAMSHA1 = haveAuthMechanism("SCRAM-SHA-1");
-        buildSCRAMSHA256 = haveAuthMechanism("SCRAM-SHA-256");
+        buildSCRAMSHA1 = haveAuthMechanism(auth::kMechanismScramSha1);
+        buildSCRAMSHA256 = haveAuthMechanism(auth::kMechanismScramSha256);
     }
 
     auto password = cmd.getPwd().get();
@@ -621,7 +622,7 @@ void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T
         }
         auto sha1Cred = scram::Secrets<SHA1Block>::generateCredentials(
             hashedPwd, saslGlobalParams.scramSHA1IterationCount.load());
-        builder->append("SCRAM-SHA-1", sha1Cred);
+        builder->append(auth::kMechanismScramSha1, sha1Cred);
     }
 
     if (buildSCRAMSHA256) {
@@ -632,7 +633,7 @@ void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T
         auto prepPwd = uassertStatusOK(icuSaslPrep(password));
         auto sha256Cred = scram::Secrets<SHA256Block>::generateCredentials(
             prepPwd, saslGlobalParams.scramSHA256IterationCount.load());
-        builder->append("SCRAM-SHA-256", sha256Cred);
+        builder->append(auth::kMechanismScramSha256, sha256Cred);
     }
 }
 
@@ -1121,9 +1122,9 @@ void trimCredentials(OperationContext* opCtx,
                 "mechanisms field must be a subset of previously set mechanisms",
                 creds.hasField(mech));
 
-        if (mech == "SCRAM-SHA-1") {
+        if (mech == auth::kMechanismScramSha1) {
             keepSCRAMSHA1 = true;
-        } else if (mech == "SCRAM-SHA-256") {
+        } else if (mech == auth::kMechanismScramSha256) {
             keepSCRAMSHA256 = true;
         }
     }
@@ -2155,8 +2156,8 @@ void _auditCreateOrUpdateUser(const BSONObj& userObj, bool create) {
         authenticationRestrictions = r.getValue();
     }
 
-    const bool hasPwd = userObj["credentials"].Obj().hasField("SCRAM-SHA-1") ||
-        userObj["credentials"].Obj().hasField("SCRAM-SHA-256");
+    const bool hasPwd = userObj["credentials"].Obj().hasField(auth::kMechanismScramSha1) ||
+        userObj["credentials"].Obj().hasField(auth::kMechanismScramSha256);
     if (create) {
         audit::logCreateUser(Client::getCurrent(),
                              userName,

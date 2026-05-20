@@ -117,7 +117,7 @@ public:
         const BatonHandle& baton = nullptr,
         const CancellationToken& token = CancellationToken::uncancelable());
 
-    Future<void> authenticate(const BSONObj& params);
+    Future<void> authenticate(const auth::Credential& credential);
 
     Future<void> authenticateInternal(
         boost::optional<std::string> mechanismHint,

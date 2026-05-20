@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/client/credential.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -39,13 +39,9 @@
 #include <string>
 #include <vector>
 
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-class BSONObj;
-
 namespace MONGO_MOD_PUBLIC auth {
 
 /**
@@ -58,7 +54,7 @@ void setInternalAuthKeys(const std::vector<std::string>& keys);
 /**
  * Sets the parameters for non-password based internal authentication.
  */
-void setInternalUserAuthParams(BSONObj obj);
+void setInternalUserAuthParams(Credential credential);
 
 /**
  * Returns whether there are multiple keys that will be tried while authenticating an internal
@@ -77,14 +73,15 @@ bool isInternalAuthSet();
 std::string getInternalAuthDB();
 
 /**
- * Returns the internal auth sasl parameters.
+ * Returns the internal auth credential for the given index and mechanism.
+ * Returns boost::none if no internal auth has been configured or index is out of range.
  */
-BSONObj getInternalAuthParams(size_t idx, StringData mechanism);
+boost::optional<Credential> getInternalAuthParams(size_t idx, StringData mechanism);
 
 /**
- * Create a BSON document for internal authentication.
+ * Create a Credential for internal X.509 authentication.
  */
-BSONObj createInternalX509AuthDocument(boost::optional<StringData> userName = boost::none);
+Credential createInternalX509AuthCredential(boost::optional<StringData> userName = boost::none);
 
 }  // namespace MONGO_MOD_PUBLIC auth
 }  // namespace mongo

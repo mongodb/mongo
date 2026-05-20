@@ -745,11 +745,13 @@ int mongo_main(int argc, char* argv[]) {
             bool usingPassword = !shellGlobalParams.password.empty();
 
             if (mechanismRequiresPassword(parsedURI) &&
-                (parsedURI.getUser().size() || shellGlobalParams.username.size())) {
+                ((parsedURI.getCredential() && parsedURI.getCredential()->username) ||
+                 shellGlobalParams.username.size())) {
                 usingPassword = true;
             }
 
-            if (usingPassword && parsedURI.getPassword().empty()) {
+            if (usingPassword &&
+                (!parsedURI.getCredential() || !parsedURI.getCredential()->password)) {
                 if (!shellGlobalParams.password.empty()) {
                     parsedURI.setPassword(std::as_const(shellGlobalParams.password));
                 } else {
@@ -757,7 +759,8 @@ int mongo_main(int argc, char* argv[]) {
                 }
             }
 
-            if (parsedURI.getUser().empty() && !shellGlobalParams.username.empty()) {
+            if ((!parsedURI.getCredential() || !parsedURI.getCredential()->username) &&
+                !shellGlobalParams.username.empty()) {
                 parsedURI.setUser(std::as_const(shellGlobalParams.username));
             }
 

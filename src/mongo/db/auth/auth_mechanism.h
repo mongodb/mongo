@@ -27,43 +27,46 @@
  *    it in the license file.
  */
 
-#include "mongo/db/auth/sasl_options.h"
+#pragma once
 
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
-#include "mongo/db/auth/auth_mechanism.h"
-#include "mongo/db/auth/sasl_options_gen.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/util/text.h"  // IWYU pragma: keep
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
+namespace MONGO_MOD_PUBLIC auth {
 
-const std::vector<std::string> SASLGlobalParams::kDefaultAuthenticationMechanisms =
-    std::vector<std::string>{std::string{auth::kMechanismMongoX509},
-                             std::string{auth::kMechanismScramSha1},
-                             std::string{auth::kMechanismScramSha256}};
-SASLGlobalParams saslGlobalParams;
+/** Wire-protocol names for supported authentication mechanisms. */
+constexpr auto kMechanismMongoX509 = "MONGODB-X509"_sd;
+constexpr auto kMechanismSaslPlain = "PLAIN"_sd;
+constexpr auto kMechanismGSSAPI = "GSSAPI"_sd;
+constexpr auto kMechanismScramSha1 = "SCRAM-SHA-1"_sd;
+constexpr auto kMechanismScramSha256 = "SCRAM-SHA-256"_sd;
+constexpr auto kMechanismMongoAWS = "MONGODB-AWS"_sd;
+constexpr auto kMechanismMongoOIDC = "MONGODB-OIDC"_sd;
+constexpr auto kMechanismMongoDbCr = "MONGODB-CR"_sd;
+constexpr auto kInternalAuthFallbackMechanism = kMechanismScramSha1;
 
-SASLGlobalParams::SASLGlobalParams() {
-    scramSHA1IterationCount.store(kScramIterationCountDefault);
-    scramSHA256IterationCount.store(kScramSHA256IterationCountDefault);
-    numTimesAuthenticationMechanismsSet.store(0);
-    haveHostName.store(false);
-    haveServiceName.store(false);
-    haveAuthdPath.store(false);
-    numTimesScramSHA1IterationCountSet.store(0);
-    numTimesScramSHA256IterationCountSet.store(0);
-    authenticationMechanisms = kDefaultAuthenticationMechanisms;
+/** Typed enum of supported authentication mechanisms. */
+enum class AuthMechanism {
+    kMongoX509,
+    kSaslPlain,
+    kGSSAPI,
+    kScramSha1,
+    kScramSha256,
+    kMongoAWS,
+    kMongoOIDC,
+    kMongoDbCr,  // deprecated; recognized at parse time, rejected at auth time
+};
 
-    // Default value for auth failed delay
-    authFailedDelay.store(0);
-}
+/** Return the wire-protocol string for a mechanism (e.g. "SCRAM-SHA-256"). */
+StringData toString(AuthMechanism mechanism);
 
-namespace {
-MONGO_INITIALIZER_WITH_PREREQUISITES(InitSpeculativeCounters, ("EndStartupOptionStorage"))
-(InitializerContext*) {
-    authCounter.initializeMechanismMap(saslGlobalParams.authenticationMechanisms);
-}
-}  // namespace
+/** Parse a wire-protocol string into an AuthMechanism, or return InvalidOptions. */
+StatusWith<AuthMechanism> authMechanismFromString(StringData s);
 
+/** Validate that a string names a supported mechanism; returns BadValue on failure. */
+Status validateAuthMechanism(StringData value);
+
+}  // namespace MONGO_MOD_PUBLIC auth
 }  // namespace mongo

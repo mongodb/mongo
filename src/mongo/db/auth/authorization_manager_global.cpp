@@ -103,7 +103,7 @@ Service::ConstructorActionRegisterer createAuthorizationManager(
         if (clusterAuthMode.sendsX509()) {
         // Send x509 authentication if we can.
 #ifdef MONGO_CONFIG_SSL
-            auth::setInternalUserAuthParams(auth::createInternalX509AuthDocument(
+            auth::setInternalUserAuthParams(auth::createInternalX509AuthCredential(
                 boost::optional<StringData>{SSLManagerCoordinator::get()
                                                 ->getSSLManager()
                                                 ->getSSLConfiguration()

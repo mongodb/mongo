@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/hash_block.h"
+#include "mongo/db/auth/auth_mechanism.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/util/modules.h"
 
@@ -38,7 +39,7 @@ namespace mongo {
 
 struct AWSIAMPolicy {
     static constexpr StringData getName() {
-        return "MONGODB-AWS"_sd;
+        return auth::kMechanismMongoAWS;
     }
     static SecurityPropertySet getProperties() {
         return SecurityPropertySet{SecurityProperty::kNoPlainText};
@@ -53,7 +54,7 @@ struct AWSIAMPolicy {
 
 struct PLAINPolicy {
     static constexpr StringData getName() {
-        return "PLAIN"_sd;
+        return auth::kMechanismSaslPlain;
     }
     static SecurityPropertySet getProperties() {
         return SecurityPropertySet{};
@@ -70,7 +71,7 @@ struct SCRAMSHA1Policy {
     using HashBlock = SHA1Block;
 
     static constexpr StringData getName() {
-        return "SCRAM-SHA-1"_sd;
+        return auth::kMechanismScramSha1;
     }
     static SecurityPropertySet getProperties() {
         return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
@@ -87,7 +88,7 @@ struct SCRAMSHA256Policy {
     using HashBlock = SHA256Block;
 
     static constexpr StringData getName() {
-        return "SCRAM-SHA-256"_sd;
+        return auth::kMechanismScramSha256;
     }
     static SecurityPropertySet getProperties() {
         return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
@@ -102,7 +103,7 @@ struct SCRAMSHA256Policy {
 
 struct GSSAPIPolicy {
     static constexpr StringData getName() {
-        return "GSSAPI"_sd;
+        return auth::kMechanismGSSAPI;
     }
     static SecurityPropertySet getProperties() {
         return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
@@ -117,7 +118,7 @@ struct GSSAPIPolicy {
 
 struct X509Policy {
     static constexpr StringData getName() {
-        return "MONGODB-X509"_sd;
+        return auth::kMechanismMongoX509;
     }
 
     static SecurityPropertySet getProperties() {

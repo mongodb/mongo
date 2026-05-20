@@ -33,6 +33,7 @@
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters_auth_gen.h"
 
@@ -61,7 +62,7 @@ Status ClusterAuthModeServerParameter::setFromString(StringData strMode,
     // Set our ingress mode, then our egress parameters.
     ClusterAuthMode::set(getGlobalServiceContext(), mode);
     if (mode.sendsX509()) {
-        auth::setInternalUserAuthParams(auth::createInternalX509AuthDocument());
+        auth::setInternalUserAuthParams(auth::createInternalX509AuthCredential());
     }
 
     return Status::OK();

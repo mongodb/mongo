@@ -35,6 +35,7 @@
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/auth_mechanism.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/restriction_set.h"
@@ -241,8 +242,8 @@ class User {
 
 public:
     using UserId = std::vector<std::uint8_t>;
-    constexpr static auto kSHA1FieldName = "SCRAM-SHA-1"_sd;
-    constexpr static auto kSHA256FieldName = "SCRAM-SHA-256"_sd;
+    constexpr static auto kSHA1FieldName = auth::kMechanismScramSha1;
+    constexpr static auto kSHA256FieldName = auth::kMechanismScramSha256;
     constexpr static auto kExternalFieldName = "external"_sd;
     constexpr static auto kIterationCountFieldName = "iterationCount"_sd;
     constexpr static auto kSaltFieldName = "salt"_sd;

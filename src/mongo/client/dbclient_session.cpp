@@ -188,8 +188,8 @@ executor::RemoteCommandResponse initWireVersion(
     }
 
     *speculativeAuthType = auth::speculateAuth(&bob, uri, saslClientSession);
-    if (!uri.getUser().empty()) {
-        UserName user(uri.getUser(), uri.getAuthenticationDatabase());
+    if (auto& cred = uri.getCredential(); cred && cred->username) {
+        UserName user(*cred->username, uri.getAuthenticationDatabase());
         bob.append("saslSupportedMechs", user.getUnambiguousName());
     }
 

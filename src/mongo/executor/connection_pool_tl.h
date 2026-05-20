@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/client/async_client.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_metrics.h"
 #include "mongo/executor/connection_pool.h"
@@ -185,7 +186,8 @@ public:
         size_t generation,
         NetworkConnectionHook* onConnectHook,
         bool skipAuth,
-        std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = nullptr)
+        std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = nullptr,
+        boost::optional<auth::Credential> credential = boost::none)
         : ConnectionInterface(id, generation),
           TLTypeFactory::Type(factory),
           _reactor(reactor),
@@ -197,6 +199,7 @@ public:
           _sslMode(sslMode),
           _onConnectHook(onConnectHook),
           _transientSSLContext(transientSSLContext),
+          _credential(std::move(credential)),
           _connMetrics(serviceContext->getFastClockSource()) {}
 
     ~TLConnection() override {
@@ -241,6 +244,7 @@ private:
     NetworkConnectionHook* const _onConnectHook;
     // SSL context to use intead of the default one for this pool.
     const std::shared_ptr<const transport::SSLConnectionContext> _transientSSLContext;
+    boost::optional<auth::Credential> _credential;
 
     // Guards assignment of the _client pointer.
     // Do not need to acquire this in contexts where the pointer is known to be valid.

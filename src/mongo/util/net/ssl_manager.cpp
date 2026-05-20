@@ -377,7 +377,7 @@ void SSLManagerCoordinator::rotate() {
     auto svcCtx = getGlobalServiceContext();
     const auto clusterAuthMode = ClusterAuthMode::get(svcCtx);
     if (clusterAuthMode.sendsX509()) {
-        auth::setInternalUserAuthParams(auth::createInternalX509AuthDocument(
+        auth::setInternalUserAuthParams(auth::createInternalX509AuthCredential(
             StringData(manager->getSSLConfiguration().clientSubjectName.toString())));
     }
 

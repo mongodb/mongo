@@ -35,6 +35,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/credential.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -167,20 +168,32 @@ public:
         const boost::optional<TransientSSLParams>& transientSSLParams = boost::none,
         ErrorCodes::Error* errcode = nullptr) const;
 
-    const std::string& getUser() const {
-        return _user;
-    }
-
     void setUser(std::string newUsername) {
-        _user = std::move(newUsername);
-    }
-
-    const std::string& getPassword() const {
-        return _password;
+        if (_credential) {
+            _credential->username = std::move(newUsername);
+        } else {
+            _credential = auth::Credential{auth::AuthMechanism::kScramSha256,
+                                           /* db= */ boost::none,
+                                           std::move(newUsername),
+                                           /* password= */ boost::none,
+                                           BSONObj{}};
+        }
     }
 
     void setPassword(std::string newPassword) {
-        _password = std::move(newPassword);
+        if (_credential) {
+            _credential->password = std::move(newPassword);
+        } else {
+            _credential = auth::Credential{auth::AuthMechanism::kScramSha256,
+                                           /* db= */ boost::none,
+                                           /* username= */ boost::none,
+                                           std::move(newPassword),
+                                           BSONObj{}};
+        }
+    }
+
+    const boost::optional<auth::Credential>& getCredential() const {
+        return _credential;
     }
 
     const OptionsMap& getOptions() const {
@@ -310,16 +323,14 @@ public:
 
 private:
     MongoURI(ConnectionString connectString,
-             const std::string& user,
-             const std::string& password,
+             boost::optional<auth::Credential> credential,
              const std::string& database,
              boost::optional<bool> retryWrites,
              transport::ConnectSSLMode sslMode,
              boost::optional<bool> helloOk,
              OptionsMap options)
         : _connectString(std::move(connectString)),
-          _user(user),
-          _password(password),
+          _credential(std::move(credential)),
           _database(database),
           _retryWrites(std::move(retryWrites)),
           _sslMode(sslMode),
@@ -328,8 +339,7 @@ private:
 
 #ifdef MONGO_CONFIG_GRPC
     MongoURI(ConnectionString connectString,
-             const std::string& user,
-             const std::string& password,
+             boost::optional<auth::Credential> credential,
              const std::string& database,
              boost::optional<bool> retryWrites,
              transport::ConnectSSLMode sslMode,
@@ -337,8 +347,7 @@ private:
              boost::optional<bool> grpc,
              OptionsMap options)
         : _connectString(std::move(connectString)),
-          _user(user),
-          _password(password),
+          _credential(std::move(credential)),
           _database(database),
           _retryWrites(std::move(retryWrites)),
           _sslMode(sslMode),
@@ -350,8 +359,7 @@ private:
     static MongoURI parseImpl(StringData url);
 
     ConnectionString _connectString;
-    std::string _user;
-    std::string _password;
+    boost::optional<auth::Credential> _credential;
     std::string _database;
     boost::optional<bool> _retryWrites;
     transport::ConnectSSLMode _sslMode = transport::kGlobalSSLMode;

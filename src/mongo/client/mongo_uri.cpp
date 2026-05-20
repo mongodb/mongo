@@ -316,6 +316,53 @@ URIParts::URIParts(StringData uri) {
     database = databaseAndOptions.first;
     options = databaseAndOptions.second;
 }
+
+// Resolves the auth mechanism with the following precedence:
+// 1. Explicit authMechanism URI option.
+// 2. SCRAM mechanism advertised by the server for the selected auth source (prefer SHA-256).
+// 3. Default to SCRAM-SHA-256 when server mechanisms are unavailable.
+StatusWith<auth::AuthMechanism> resolveMechanism(
+    const MongoURI::OptionsMap& options,
+    boost::optional<std::vector<std::string>> saslMechsForAuth = boost::none) {
+    if (auto it = options.find("authMechanism"); it != options.end())
+        return auth::authMechanismFromString(it->second);
+    if (saslMechsForAuth) {
+        return std::find(saslMechsForAuth->begin(),
+                         saslMechsForAuth->end(),
+                         auth::kMechanismScramSha256) != saslMechsForAuth->end()
+            ? auth::AuthMechanism::kScramSha256
+            : auth::AuthMechanism::kScramSha1;
+    }
+    return auth::AuthMechanism::kScramSha256;
+}
+
+bool mechanismRequiresUsername(auth::AuthMechanism mechanism) {
+    return mechanism != auth::AuthMechanism::kMongoX509 &&
+        mechanism != auth::AuthMechanism::kMongoAWS && mechanism != auth::AuthMechanism::kMongoOIDC;
+}
+
+// Resolves the authentication database with the following precedence:
+// 1. Explicit non-empty authSource URI option.
+// 2. For X.509/AWS/OIDC/GSSAPI, default to $external.
+// 3. For PLAIN, use the URI database when present, otherwise $external.
+// 4. For all other mechanisms, use the URI database when present, otherwise admin.
+std::string resolveAuthSource(auth::AuthMechanism mechanism,
+                              const MongoURI::OptionsMap& options,
+                              StringData database) {
+    const bool isExternalDefaultDbMech = mechanism == auth::AuthMechanism::kMongoX509 ||
+        mechanism == auth::AuthMechanism::kMongoAWS ||
+        mechanism == auth::AuthMechanism::kMongoOIDC || mechanism == auth::AuthMechanism::kGSSAPI;
+    if (auto it = options.find("authSource"); it != options.end() && !it->second.empty())
+        return it->second;
+    if (isExternalDefaultDbMech)
+        return std::string{DatabaseName::kExternal.db(omitTenant)};
+    if (mechanism == auth::AuthMechanism::kSaslPlain)
+        return !database.empty() ? std::string{database}
+                                 : std::string{DatabaseName::kExternal.db(omitTenant)};
+    return !database.empty() ? std::string{database}
+                             : std::string{DatabaseName::kAdmin.db(omitTenant)};
+}
+
 }  // namespace
 
 MongoURI::CaseInsensitiveString::CaseInsensitiveString(std::string str)
@@ -523,12 +570,32 @@ MongoURI MongoURI::parseImpl(StringData url) {
                               : transport::ConnectSSLMode::kDisableSSL;
     }
 
+    // Build a Credential if the URI carries authentication data.
+    boost::optional<auth::Credential> credential;
+    {
+        auto swMech = resolveMechanism(options);
+        uassertStatusOK(swMech);
+        const auto mechanism = swMech.getValue();
+        // Build credentials when either:
+        // - a username is present, or
+        // - the selected mechanism allows username omission (for example X509/AWS/OIDC).
+        // In the latter case, a non-empty username is still valid and is forwarded when building
+        // the auth command.
+        if (!username.empty() || !mechanismRequiresUsername(mechanism)) {
+            credential = auth::Credential{
+                .mechanism = mechanism,
+                .db = resolveAuthSource(mechanism, options, database),
+                .username = username.empty() ? boost::none : boost::optional<std::string>{username},
+                .password =
+                    password.empty() ? boost::none : boost::optional<std::string>{password}};
+        }
+    }
+
     auto cs = replicaSetName.empty()
         ? ConnectionString::forStandalones(std::move(servers))
         : ConnectionString::forReplicaSet(replicaSetName, std::move(servers));
     return MongoURI(std::move(cs),
-                    username,
-                    password,
+                    std::move(credential),
                     database,
                     retryWrites,
                     tlsMode,
@@ -556,10 +623,10 @@ boost::optional<std::string> MongoURI::getAppName() const {
 std::string MongoURI::canonicalizeURIAsString() const {
     StringBuilder uri;
     uri << kURIPrefix;
-    if (!_user.empty()) {
-        uri << uriEncode(_user);
-        if (!_password.empty()) {
-            uri << ":" << uriEncode(_password);
+    if (_credential && _credential->username && !_credential->username->empty()) {
+        uri << uriEncode(*_credential->username);
+        if (_credential->password && !_credential->password->empty()) {
+            uri << ":" << uriEncode(*_credential->password);
         }
         uri << "@";
     }
@@ -640,42 +707,28 @@ boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
     // and OIDC, which infers it from the access token.
     bool usernameRequired = true;
 
+    const auto credUser =
+        (_credential && _credential->username) ? *_credential->username : std::string{};
+    const auto credPassword =
+        (_credential && _credential->password) ? *_credential->password : std::string{};
+
     BSONObjBuilder bob;
-    if (!_password.empty()) {
-        bob.append(saslCommandPasswordFieldName, _password);
+    if (!credPassword.empty()) {
+        bob.append(saslCommandPasswordFieldName, credPassword);
     }
 
-    auto it = _options.find("authSource");
-    if (it != _options.end()) {
-        bob.append(saslCommandUserDBFieldName, it->second);
-    } else if (!_database.empty()) {
-        bob.append(saslCommandUserDBFieldName, _database);
-    } else {
-        bob.append(saslCommandUserDBFieldName, "admin");
-    }
+    const auto mechanism = resolveMechanism(_options, saslMechsForAuth).getValue();
+    usernameRequired = mechanismRequiresUsername(mechanism);
+    bob.append(saslCommandUserDBFieldName, resolveAuthSource(mechanism, _options, _database));
+    bob.append(saslCommandMechanismFieldName, auth::toString(mechanism));
 
-    it = _options.find("authMechanism");
-    if (it != _options.end()) {
-        bob.append(saslCommandMechanismFieldName, it->second);
-        if (it->second == auth::kMechanismMongoX509 || it->second == auth::kMechanismMongoAWS ||
-            it->second == auth::kMechanismMongoOIDC) {
-            usernameRequired = false;
-        }
-    } else if (std::find(saslMechsForAuth.begin(),
-                         saslMechsForAuth.end(),
-                         auth::kMechanismScramSha256) != saslMechsForAuth.end()) {
-        bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha256);
-    } else {
-        bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha1);
-    }
-
-    if (usernameRequired && _user.empty()) {
+    if (usernameRequired && credUser.empty()) {
         return boost::none;
     }
 
-    std::string username(_user);  // may have to tack on service realm before we append
+    std::string username = credUser;  // may have to tack on service realm before we append
 
-    it = _options.find("authMechanismProperties");
+    auto it = _options.find("authMechanismProperties");
     if (it != _options.end()) {
         BSONObj parsed(parseAuthMechanismProperties(it->second));
 

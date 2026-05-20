@@ -432,6 +432,7 @@ mongo_cc_library(
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
         "//src/mongo/db/auth:address_restriction",
+        "//src/mongo/db/auth:auth_mechanism",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/auth:role_name_or_string",
     ],

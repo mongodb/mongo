@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/executor/connection_pool_state.h"
 #include "mongo/executor/connection_pool_stats.h"
@@ -177,6 +178,12 @@ public:
          * Connections created through this connection pool will not attempt to authenticate.
          */
         bool skipAuthentication = false;
+
+        /**
+         * If set, new connections authenticate as this client credential immediately after setup,
+         * before being returned to callers.
+         */
+        boost::optional<auth::Credential> credential;
 
 #ifdef MONGO_CONFIG_SSL
         /**

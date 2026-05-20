@@ -33,12 +33,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/credential.h"
 #include "mongo/client/internal_auth.h"
-#include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/database_name.h"
-#include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
@@ -55,23 +54,11 @@
 namespace mongo {
 
 class BSONObj;
+class MongoURI;
 
 namespace MONGO_MOD_PUBLIC auth {
 
 using RunCommandHook = std::function<Future<BSONObj>(OpMsgRequest request)>;
-
-/**
- * Names for supported authentication mechanisms.
- */
-
-constexpr auto kMechanismMongoX509 = "MONGODB-X509"_sd;
-constexpr auto kMechanismSaslPlain = "PLAIN"_sd;
-constexpr auto kMechanismGSSAPI = "GSSAPI"_sd;
-constexpr auto kMechanismScramSha1 = "SCRAM-SHA-1"_sd;
-constexpr auto kMechanismScramSha256 = "SCRAM-SHA-256"_sd;
-constexpr auto kMechanismMongoAWS = "MONGODB-AWS"_sd;
-constexpr auto kMechanismMongoOIDC = "MONGODB-OIDC"_sd;
-constexpr auto kInternalAuthFallbackMechanism = kMechanismScramSha1;
 
 constexpr auto kSaslSupportedMechanisms = "saslSupportedMechs"_sd;
 constexpr auto kSpeculativeAuthenticate = "speculativeAuthenticate"_sd;
@@ -91,12 +78,12 @@ public:
     virtual ~InternalAuthParametersProvider() = default;
 
     /**
-     * Get the information for a given SASL mechanism.
+     * Get the credential for a given SASL mechanism.
      *
-     * If there are multiple entries for a mechanism, suppots retrieval by index. Used when rotating
-     * the security key.
+     * If there are multiple entries for a mechanism, supports retrieval by index. Used when
+     * rotating the security key. Returns boost::none if no credential is available at that index.
      */
-    virtual BSONObj get(size_t index, StringData mechanism) = 0;
+    virtual boost::optional<Credential> get(size_t index, StringData mechanism) = 0;
 };
 
 std::shared_ptr<InternalAuthParametersProvider> createDefaultInternalAuthProvider();
@@ -108,27 +95,17 @@ std::shared_ptr<InternalAuthParametersProvider> createDefaultInternalAuthProvide
  * there is a stored client subject name, pass that through the "clientSubjectName" parameter.
  * Otherwise, "clientSubjectName" will be silently ignored, pass in any string.
  *
- * The "params" BSONObj should be initialized with some of the fields below.  Which fields
- * are required depends on the mechanism, which is mandatory.
- *
- *     "mechanism": The std::string name of the sasl mechanism to use.  Mandatory.
- *     "user": The std::string name of the user to authenticate.  Mandatory.
- *     "db": The database target of the auth command, which identifies the location
- *         of the credential information for the user.  May be "$external" if
- *         credential information is stored outside of the mongo cluster.  Mandatory.
- *     "pwd": The password data.
- *     "digestPassword": Boolean, set to true if the "pwd" is undigested (default).
- *     "serviceName": The GSSAPI service name to use.  Defaults to "mongodb".
- *     "serviceHostname": The GSSAPI hostname to use.  Defaults to the name of the remote
- *          host.
- *
- * Other fields in "params" are silently ignored. A "params" object can be constructed
- * using the buildAuthParams() method.
+ * The "credential" struct must have "mechanism" set. Other fields are mechanism-dependent:
+ *   - "username": required for SCRAM, PLAIN, GSSAPI; omitted for X.509, AWS, OIDC.
+ *   - "db": auth-source database; uses mechanism default ($external or admin) when absent.
+ *   - "password": required for SCRAM and PLAIN; absent for other mechanisms.
+ *   - "mechanismProperties": mechanism-specific options such as serviceName, serviceHostname,
+ *       awsIamSessionToken, oidcAccessToken, digestPassword.
  *
  * This function will return a future that will be filled with the final result of the
  * authentication command on success or a Status on error.
  */
-Future<void> authenticateClient(const BSONObj& params,
+Future<void> authenticateClient(const Credential& credential,
                                 const HostAndPort& hostname,
                                 const std::string& clientSubjectName,
                                 RunCommandHook runCommand);
@@ -211,6 +188,7 @@ SpeculativeAuthType speculateAuth(BSONObjBuilder* helloRequestBuilder,
 SpeculativeAuthType speculateInternalAuth(const HostAndPort& remoteHost,
                                           BSONObjBuilder* helloRequestBuilder,
                                           std::shared_ptr<SaslClientSession>* saslClientSession);
+
 
 }  // namespace MONGO_MOD_PUBLIC auth
 }  // namespace mongo

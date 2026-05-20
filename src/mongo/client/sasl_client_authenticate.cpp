@@ -45,7 +45,7 @@ namespace mongo {
 
 Future<void> (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
                                        const HostAndPort& hostname,
-                                       const BSONObj& saslParameters) = nullptr;
+                                       const auth::Credential& credential) = nullptr;
 
 Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType* type) {
     BSONElement payloadElement;
