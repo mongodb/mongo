@@ -25,6 +25,7 @@ export default [
         languageOptions: {
             globals: {
                 ...globals.mongo,
+                internalModule: true,
 
                 // jstests/global.d.ts
                 TestData: true,

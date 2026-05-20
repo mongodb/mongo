@@ -290,16 +290,28 @@ MONGOJS_CPP_JSFILES = [
     ":error_codes_js",
 ]
 
-# Converts core JS file content into CPP structures to be loaded directly
+# Converts std JS file content into CPP structures to be loaded directly
 # into the native binary via bytecode upon startup.
+MONGOJS_STD_JS_MODULES = [
+    ("std:performance", "std/performance.js"),
+]
+
 render_template(
     name = "mongojs_cpp",
-    srcs = MONGOJS_CPP_JSFILES,
+    srcs = MONGOJS_CPP_JSFILES + [file for _, file in MONGOJS_STD_JS_MODULES],
     cmd = [
         "$(location mongojs.cpp)",
     ] + [
         "$(location {})".format(file)
         for file in MONGOJS_CPP_JSFILES
+    ] + [
+        item
+        for name, file in MONGOJS_STD_JS_MODULES
+        for item in [
+            "--module",
+            name,
+            "$(location {})".format(file),
+        ]
     ],
     output = "mongojs.cpp",
     python_file = "//buildscripts:jstoh.py",
@@ -339,6 +351,28 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "std_internal_modules",
+    srcs = glob(["std/*.cpp"]),
+    auto_header = False,
+    copts = select({
+        "@platforms//os:windows": [
+            # The default MSVC preprocessor elides commas in some cases as a
+            # convenience, but this behavior breaks compilation of jspubtd.h.
+            # Enabling the newer preprocessor fixes the problem.
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":mongojs",
+        "//src/mongo/scripting/mozjs/shell:internal_module_registry",
+        "//src/third_party/mozjs",
     ],
 )
 

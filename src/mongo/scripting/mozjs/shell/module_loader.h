@@ -89,6 +89,7 @@ private:
                                   JS::HandleValue referencingInfo);
     JSObject* getOrCreateModuleRegistry(JSContext* cx);
     JSString* fetchSource(JSContext* cx, JS::HandleString path, JS::HandleValue referencingPrivate);
+    bool preloadInternalModules(JSContext* cx);
     bool getScriptPath(JSContext* cx,
                        JS::HandleValue privateValue,
                        JS::MutableHandleString pathOut);

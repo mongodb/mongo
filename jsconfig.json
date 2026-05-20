@@ -2,7 +2,13 @@
     "compilerOptions": {
         "baseUrl": ".",
         "disableSizeLimit": true,
-        "target": "ES2020"
+        "target": "ES2020",
+        "moduleResolution": "node",
+        "paths": {
+            "std:*": [
+                "src/mongo/shell/std/*"
+            ]
+        }
     },
     "include": [
         "jstests/**/*.js",
@@ -11,6 +17,8 @@
         "src/mongo/scripting/**/*.d.ts",
         "src/mongo/shell/*.js",
         "src/mongo/shell/*.d.ts",
+        "src/mongo/shell/std/**/*.js",
+        "src/mongo/shell/std/**/*.d.ts",
         "src/third_party/fast_check/**/*"
     ],
     "exclude": [

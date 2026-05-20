@@ -41,6 +41,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/mongo_path_util.h"
 #include "mongo/scripting/mozjs/shell/implscope.h"
+#include "mongo/scripting/mozjs/shell/internal_module_registry.h"
 #include "mongo/scripting/mozjs/shell/module_loader.h"
 #include "mongo/util/file.h"
 
@@ -53,6 +54,7 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <js/CallArgs.h>
 #include <js/CharacterEncoding.h>
 #include <js/CompileOptions.h>
 #include <js/Context.h>
@@ -63,6 +65,7 @@
 #include <js/PropertyAndElement.h>
 #include <js/PropertyDescriptor.h>
 #include <js/RootingAPI.h>
+#include <js/ScriptPrivate.h>
 #include <js/String.h>
 #include <js/TypeDecls.h>
 #include <js/Utility.h>
@@ -75,6 +78,143 @@
 
 namespace mongo {
 namespace mozjs {
+namespace {
+constexpr const char* kStdModulePrefix = "std:";
+
+enum GlobalAppSlot {
+    GlobalAppSlotModuleRegistry,
+    GlobalAppSlotInternalBindingsRegistry,
+    GlobalAppSlotCount
+};
+
+bool startsWithPrefix(const char* value, const char* prefix) {
+    return std::strncmp(value, prefix, std::strlen(prefix)) == 0;
+}
+
+bool getOrCreateGlobalMapInSlot(JSContext* cx, GlobalAppSlot slot, JS::MutableHandleObject mapOut) {
+    mapOut.set(nullptr);
+    JS::RootedObject global(cx, JS::CurrentGlobalOrNull(cx));
+    if (!global) {
+        return false;
+    }
+
+    JS::RootedValue value(cx, JS::GetReservedSlot(global, slot));
+    if (!value.isUndefined()) {
+        mapOut.set(&value.toObject());
+        return true;
+    }
+
+    JS::RootedObject map(cx, JS::NewMapObject(cx));
+    if (!map) {
+        return false;
+    }
+
+    JS::SetReservedSlot(global, slot, JS::ObjectValue(*map));
+    mapOut.set(map);
+    return true;
+}
+
+bool getOrCreateInternalModuleBindingsRegistry(JSContext* cx,
+                                               JS::MutableHandleObject bindingsRegistryOut) {
+    return getOrCreateGlobalMapInSlot(
+        cx, GlobalAppSlotInternalBindingsRegistry, bindingsRegistryOut);
+}
+
+bool registerInternalModuleBinding(JSContext* cx,
+                                   const char* moduleName,
+                                   JS::HandleObject bindingObject) {
+    JS::RootedObject bindingsRegistry(cx);
+    if (!getOrCreateInternalModuleBindingsRegistry(cx, &bindingsRegistry)) {
+        return false;
+    }
+
+    JS::RootedString moduleNameString(cx, JS_NewStringCopyZ(cx, moduleName));
+    if (!moduleNameString) {
+        return false;
+    }
+
+    JS::RootedValue moduleNameValue(cx, JS::StringValue(moduleNameString));
+    JS::RootedValue bindingValue(cx, JS::ObjectValue(*bindingObject));
+    return JS::MapSet(cx, bindingsRegistry, moduleNameValue, bindingValue);
+}
+
+bool lookUpInternalModuleBinding(JSContext* cx,
+                                 JS::HandleString moduleName,
+                                 JS::MutableHandleObject bindingOut) {
+    bindingOut.set(nullptr);
+
+    JS::RootedObject bindingsRegistry(cx);
+    if (!getOrCreateInternalModuleBindingsRegistry(cx, &bindingsRegistry)) {
+        return false;
+    }
+
+    JS::RootedValue moduleNameValue(cx, JS::StringValue(moduleName));
+    JS::RootedValue bindingValue(cx);
+    if (!JS::MapGet(cx, bindingsRegistry, moduleNameValue, &bindingValue)) {
+        return false;
+    }
+
+    if (!bindingValue.isUndefined()) {
+        bindingOut.set(&bindingValue.toObject());
+    }
+
+    return true;
+}
+
+bool internalModuleFunction(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+
+    if (args.length() < 1 || !args[0].isString()) {
+        JS_ReportErrorASCII(cx, "internalModule requires a string module name");
+        return false;
+    }
+
+    JS::RootedValue callerPrivate(cx, JS::GetScriptedCallerPrivate(cx));
+    if (!callerPrivate.isObject()) {
+        JS_ReportErrorASCII(cx, "internalModule is restricted to std:* modules");
+        return false;
+    }
+
+    JS::RootedObject callerInfo(cx, &callerPrivate.toObject());
+    JS::RootedValue callerPathValue(cx);
+    if (!JS_GetProperty(cx, callerInfo, "path", &callerPathValue)) {
+        return false;
+    }
+    if (!callerPathValue.isString()) {
+        JS_ReportErrorASCII(cx, "internalModule is restricted to std:* modules");
+        return false;
+    }
+
+    JS::RootedString callerPath(cx, callerPathValue.toString());
+    JS::UniqueChars callerPathChars = JS_EncodeStringToUTF8(cx, callerPath);
+    if (!callerPathChars) {
+        return false;
+    }
+    if (!startsWithPrefix(callerPathChars.get(), kStdModulePrefix)) {
+        JS_ReportErrorUTF8(cx,
+                           "internalModule is restricted to std:* modules (called from %s)",
+                           callerPathChars.get());
+        return false;
+    }
+
+    JS::RootedString moduleName(cx, args[0].toString());
+    JS::RootedObject binding(cx);
+    if (!lookUpInternalModuleBinding(cx, moduleName, &binding)) {
+        return false;
+    }
+    if (!binding) {
+        JS::UniqueChars moduleNameChars = JS_EncodeStringToUTF8(cx, moduleName);
+        if (!moduleNameChars) {
+            return false;
+        }
+        JS_ReportErrorUTF8(cx, "No such internal module '%s'", moduleNameChars.get());
+        return false;
+    }
+
+    args.rval().setObject(*binding);
+    return true;
+}
+}  // namespace
 
 bool ModuleLoader::init(JSContext* cx, const std::string& loadPath) {
     _baseUrl = resolveBaseUrl(cx, loadPath);
@@ -92,7 +232,17 @@ bool ModuleLoader::init(JSContext* cx, const std::string& loadPath) {
     JSRuntime* rt = JS_GetRuntime(cx);
     JS::SetModuleResolveHook(rt, ModuleLoader::moduleResolveHook);
     JS::SetModuleDynamicImportHook(rt, ModuleLoader::dynamicModuleImportHook);
-    return true;
+
+    JS::RootedObject global(cx, JS::CurrentGlobalOrNull(cx));
+    if (!global) {
+        return false;
+    }
+    if (!JS_DefineFunction(
+            cx, global, "internalModule", internalModuleFunction, 1, JSPROP_PERMANENT)) {
+        return false;
+    }
+
+    return preloadInternalModules(cx);
 }
 
 JSObject* ModuleLoader::loadRootModuleFromPath(JSContext* cx, const std::string& path) {
@@ -129,6 +279,33 @@ JSObject* ModuleLoader::loadRootModule(JSContext* cx,
     }
 
     return resolveImportedModule(cx, referencingPrivate, moduleRequest);
+}
+
+bool ModuleLoader::preloadInternalModules(JSContext* cx) {
+    for (const auto& registration : listRegisteredInternalModules()) {
+        JS::RootedObject binding(cx, JS_NewPlainObject(cx));
+        if (!binding) {
+            return false;
+        }
+        if (!registration.initialize(cx, binding)) {
+            return false;
+        }
+        if (!registerInternalModuleBinding(cx, registration.moduleName.c_str(), binding)) {
+            return false;
+        }
+
+        if (registration.setupFile) {
+            JS::RootedObject setupModule(cx,
+                                         loadRootModuleFromSource(cx,
+                                                                  registration.setupFile->name,
+                                                                  registration.setupFile->source));
+            if (!setupModule) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 // static
@@ -235,7 +412,18 @@ JSString* ModuleLoader::resolveAndNormalize(JSContext* cx,
         return nullptr;
     }
 
-    // check if it's already in the registry
+    // Root modules loaded from in-memory source (via execSetup) carry a source payload in the
+    // referencing info. For those loads, keep the existing behavior and bypass file-system lookup.
+    bool hasSource{false};
+    JS::RootedObject referencingInfoObject(cx, &referencingInfo.toObject());
+    if (!JS_HasProperty(cx, referencingInfoObject, "source", &hasSource)) {
+        return nullptr;
+    }
+    if (hasSource) {
+        return specifierString;
+    }
+
+    // Check if this specifier is already in the in-memory module registry.
     JS::Rooted<JSString*> path(cx, specifierString);
     if (!path) {
         return nullptr;
@@ -248,38 +436,32 @@ JSString* ModuleLoader::resolveAndNormalize(JSContext* cx,
         return specifierString;
     }
 
-    // check if it has a source
-    bool hasSource;
-    JS::RootedObject referencingInfoObject(cx, &referencingInfo.toObject());
-    if (!JS_HasProperty(cx, referencingInfoObject, "source", &hasSource)) {
-        return nullptr;
-    }
-    if (hasSource) {
+    JS::UniqueChars specifierChars = JS_EncodeStringToUTF8(cx, specifierString);
+    uassert(ErrorCodes::JSInterpreterFailure,
+            "Failed to UTF-8 encode module specifier",
+            specifierChars);
+
+    // STD modules are identified by module specifier and don't map to filesystem paths.
+    if (startsWithPrefix(specifierChars.get(), kStdModulePrefix)) {
         return specifierString;
     }
-
-    // otherwise try to read content from the file system
 
     JS::RootedString refPath(cx);
     if (!getScriptPath(cx, referencingInfo, &refPath)) {
         return nullptr;
     }
-
     if (!refPath) {
         JS_ReportErrorASCII(cx, "No path set for referencing module");
         return nullptr;
     }
 
-    JS::UniqueChars specifierChars = JS_EncodeStringToUTF8(cx, specifierString);
-    uassert(ErrorCodes::JSInterpreterFailure,
-            "Failed to UTF-8 encode module specifier",
-            specifierChars);
-    boost::filesystem::path specifierPath(specifierChars.get());
-
     JS::UniqueChars refPathChars = JS_EncodeStringToUTF8(cx, refPath);
     uassert(ErrorCodes::JSInterpreterFailure,
             "Failed to UTF-8 encode referencing module path",
             refPathChars);
+
+    // otherwise try to read content from the file system
+    boost::filesystem::path specifierPath(specifierChars.get());
     boost::filesystem::path refAbsPath(refPathChars.get());
 
     if (is_directory(specifierPath)) {
@@ -373,16 +555,18 @@ JSObject* ModuleLoader::loadAndParse(JSContext* cx,
         return module;
     }
 
+    JS::RootedString source(cx, fetchSource(cx, path, referencingPrivate));
+    if (!source) {
+        return nullptr;
+    }
+
     JS::UniqueChars filename = JS_EncodeStringToLatin1(cx, path);
     if (!filename) {
         return nullptr;
     }
 
-    JS::CompileOptions options(cx);
-    options.setFileAndLine(filename.get(), 1);
-
-    JS::RootedString source(cx, fetchSource(cx, path, referencingPrivate));
-    if (!source) {
+    JS::RootedObject info(cx, createScriptPrivateInfo(cx, path));
+    if (!info) {
         return nullptr;
     }
 
@@ -397,13 +581,10 @@ JSObject* ModuleLoader::loadAndParse(JSContext* cx,
         return nullptr;
     }
 
+    JS::CompileOptions options(cx);
+    options.setFileAndLine(filename.get(), 1);
     module = JS::CompileModule(cx, options, srcBuf);
     if (!module) {
-        return nullptr;
-    }
-
-    JS::RootedObject info(cx, createScriptPrivateInfo(cx, path));
-    if (!info) {
         return nullptr;
     }
 
@@ -437,24 +618,12 @@ JSString* ModuleLoader::fetchSource(JSContext* cx,
     return fileAsString(cx, resolvedPath);
 }
 
-enum GlobalAppSlot { GlobalAppSlotModuleRegistry, GlobalAppSlotCount };
 JSObject* ModuleLoader::getOrCreateModuleRegistry(JSContext* cx) {
-    JS::RootedObject global(cx, JS::CurrentGlobalOrNull(cx));
-    if (!global) {
+    JS::RootedObject registry(cx);
+    if (!getOrCreateGlobalMapInSlot(cx, GlobalAppSlotModuleRegistry, &registry)) {
         return nullptr;
     }
 
-    JS::RootedValue value(cx, JS::GetReservedSlot(global, GlobalAppSlotModuleRegistry));
-    if (!value.isUndefined()) {
-        return &value.toObject();
-    }
-
-    JS::RootedObject registry(cx, JS::NewMapObject(cx));
-    if (!registry) {
-        return nullptr;
-    }
-
-    JS::SetReservedSlot(global, GlobalAppSlotModuleRegistry, JS::ObjectValue(*registry));
     return registry;
 }
 

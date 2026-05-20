@@ -37,9 +37,7 @@ def jsToHeader(target, source):
     def lineToChars(s):
         return ",".join(str(ord(c)) for c in (s.rstrip() + "\n")) + ","
 
-    for s in source:
-        filename = str(s)
-        objname = os.path.split(filename)[1].split(".")[0]
+    for module_name, filename, objname in source:
         stringname = "_jscode_raw_" + objname
 
         h.append("constexpr char " + stringname + "[] = {")
@@ -53,7 +51,7 @@ def jsToHeader(target, source):
         h.append("extern const JSFile %s;" % objname)
         h.append(
             'const JSFile %s = { "%s", StringData(%s, sizeof(%s) - 1) };'
-            % (objname, filename.replace("\\", "/"), stringname, stringname)
+            % (objname, module_name, stringname, stringname)
         )
 
     h.append("} // namespace JSFiles")
@@ -69,9 +67,36 @@ def jsToHeader(target, source):
             out.close()
 
 
+def parse_args(args):
+    """Parse source files and optional --module name overrides.
+
+    Accepts both forms, which may be mixed:
+      path/to/foo.js                    -- module name = file path, C++ var = basename (foo)
+      --module std:performance foo.js   -- module name = std:performance, C++ var = std_performance
+    """
+    entries = []
+    i = 0
+    while i < len(args):
+        if args[i] == "--module":
+            if i + 2 >= len(args):
+                raise ValueError("--module requires two arguments: <name> <file>")
+            module_name = args[i + 1]
+            filename = args[i + 2]
+            objname = "".join(c if c.isalnum() else "_" for c in module_name)
+            entries.append((module_name, filename, objname))
+            i += 3
+        else:
+            filename = args[i].replace("\\", "/")
+            objname = os.path.split(filename)[1].split(".")[0]
+            entries.append((filename, filename, objname))
+            i += 1
+
+    return entries
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Must specify [target] [source] ")
         sys.exit(1)
 
-    jsToHeader(sys.argv[1], sys.argv[2:])
+    jsToHeader(sys.argv[1], parse_args(sys.argv[2:]))

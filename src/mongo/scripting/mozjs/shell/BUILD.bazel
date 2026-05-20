@@ -30,6 +30,26 @@ mongo_js_library(
 )
 
 mongo_cc_library(
+    name = "internal_module_registry",
+    srcs = ["internal_module_registry.cpp"],
+    copts = select({
+        "@platforms//os:windows": [
+            # The default MSVC preprocessor elides commas in some cases as a
+            # convenience, but this behavior breaks compilation of jspubtd.h.
+            # Enabling the newer preprocessor fixes the problem.
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo:base",
+        "//src/third_party/mozjs",
+    ],
+)
+
+mongo_cc_library(
     name = "mozjs_shell",
     srcs = glob(
         ["*.cpp"],
@@ -38,6 +58,7 @@ mongo_cc_library(
             "asan_handles_test.cpp",
             "implscope_test.cpp",
             "module_loader_test.cpp",
+            "internal_module_registry.cpp",
         ],
     ) + [
         ":scripting_util_gen",
@@ -55,11 +76,13 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
     deps = [
+        ":internal_module_registry",
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/db:service_context",
         "//src/mongo/db/auth:security_token_auth",
         "//src/mongo/scripting:scripting_common",
         "//src/mongo/scripting/mozjs/common:mozjs_common",
+        "//src/mongo/shell:std_internal_modules",
         "//src/mongo/util:buildinfo",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/third_party/mozjs",

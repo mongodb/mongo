@@ -111,6 +111,7 @@ const expectedGlobalVars = [
     "getJSHeapLimitMB",
     "globalThis",
     "hex_md5",
+    "internalModule",
     "isFinite",
     "highWaterMarkResumeTokenType",
     "isNaN",
