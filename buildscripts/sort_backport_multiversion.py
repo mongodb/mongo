@@ -50,6 +50,33 @@ def _sort_all_entries(yml_data: dict) -> None:
         entries.sort(key=lambda e: (e["test_file"], e["ticket"]))
 
 
+def sort_backport_multiversion(check: bool = False, path: Path = BACKPORTS_FILE) -> bool:
+    """Sort (or check) the backports file. Returns True if successful."""
+    backports_file_str = path.read_text()
+    header = _extract_header(backports_file_str)
+    data = yaml.safe_load(backports_file_str)
+    _sort_all_entries(data)
+    sorted_content = header + yaml.dump(
+        data,
+        Dumper=_IndentedDumper,
+        default_flow_style=False,
+        sort_keys=False,
+        indent=2,
+        allow_unicode=True,
+    )
+    if check:
+        if backports_file_str != sorted_content:
+            print(
+                "etc/backports_required_for_multiversion_tests.yml is not sorted.\n"
+                "Run 'bazel run //:format' to fix it."
+            )
+            return False
+        return True
+    else:
+        path.write_text(sorted_content)
+        return True
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -69,28 +96,8 @@ def main() -> None:
     if args.fix and args.check:
         parser.error("--fix and --check are mutually exclusive.")
 
-    backports_file_str = BACKPORTS_FILE.read_text()
-    header = _extract_header(backports_file_str)
-    data = yaml.safe_load(backports_file_str)
-    _sort_all_entries(data)
-    sorted_content = header + yaml.dump(
-        data,
-        Dumper=_IndentedDumper,
-        default_flow_style=False,
-        sort_keys=False,
-        indent=2,
-        allow_unicode=True,
-    )
-
-    if args.check:
-        if backports_file_str != sorted_content:
-            print(
-                "etc/backports_required_for_multiversion_tests.yml is not sorted.\n"
-                "Run buildscripts/sort_backport_multiversion.py --fix to fix it."
-            )
-            sys.exit(1)
-    else:
-        BACKPORTS_FILE.write_text(sorted_content)
+    if not sort_backport_multiversion(check=args.check):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

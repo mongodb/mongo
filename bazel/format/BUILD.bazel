@@ -26,6 +26,7 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//buildscripts:bazel_custom_formatter",
+        "//buildscripts:sort_backport_multiversion",
         "@bazel_rules_mongo//utils:evergreen_git",
         dependency(
             "gitpython",

@@ -47,22 +47,22 @@ last-continuous:
       ticket: SERVER-125661
     - test_file: jstests/noPassthrough/sharded_cluster_topology/shard_registry_rsm_removal_race.js
       ticket: SERVER-123567
+    - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_commit_prepared_transaction.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp_no_oplog_application.js
+      ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
       ticket: SERVER-121218
+    - test_file: jstests/replsets/initial_sync_test_fixture_test.js
+      ticket: SERVER-113184
     - test_file: jstests/replsets/server_status_metrics.js
       ticket: SERVER-120318
     - test_file: jstests/sharding/chunk_migration_maxkey_boundary.js
       ticket: SERVER-121533
-    - test_file: jstests/replsets/initial_sync_test_fixture_test.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp_no_oplog_application.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_commit_prepared_transaction.js
-      ticket: SERVER-113184
   suites: null
 last-lts:
   all:
@@ -458,16 +458,28 @@ last-lts:
       ticket: SERVER-106165
     - test_file: jstests/replsets/election_term_over_int_max.js
       ticket: SERVER-119413
+    - test_file: jstests/replsets/index_builds/rollback_index_build_start_abort.js
+      ticket: SERVER-103955
+    - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
+      ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_collStats_resumes_after_network_error.js
       ticket: SERVER-94259
+    - test_file: jstests/replsets/initial_sync_commit_prepared_transaction.js
+      ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_during_stepdown.js
       ticket: SERVER-89664
+    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp_no_oplog_application.js
+      ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_index_conflict_recreate.js
       ticket: SERVER-93141
     - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
       ticket: SERVER-121218
     - test_file: jstests/replsets/initial_sync_survives_restart.js
       ticket: SERVER-88447
+    - test_file: jstests/replsets/initial_sync_test_fixture_test.js
+      ticket: SERVER-113184
     - test_file: jstests/replsets/large_dockey_succeeds_on_secondary.js
       ticket: SERVER-104405
     - test_file: jstests/replsets/log_unprepared_abort_txns.js
@@ -490,8 +502,6 @@ last-lts:
       ticket: SERVER-89618
     - test_file: jstests/replsets/retryable_write_interrupted_on_stepdown.js
       ticket: SERVER-110728
-    - test_file: jstests/replsets/index_builds/rollback_index_build_start_abort.js
-      ticket: SERVER-103955
     - test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application_inserts.js
       ticket: SERVER-99185
     - test_file: jstests/replsets/server_status_metrics.js
@@ -564,6 +574,8 @@ last-lts:
       ticket: SERVER-89630
     - test_file: jstests/sharding/flush_resharding_state_change_errors.js
       ticket: SERVER-107952
+    - test_file: jstests/sharding/index_builds/resharding_index_builds_repl_lag.js
+      ticket: SERVER-103566
     - test_file: jstests/sharding/index_not_cloned_on_non_owner_shards.js
       ticket: SERVER-102165
     - test_file: jstests/sharding/invalid_shard_identity_doc.js
@@ -646,8 +658,6 @@ last-lts:
       ticket: SERVER-89744
     - test_file: jstests/sharding/resharding_error_during_critical_section.js
       ticket: SERVER-114005
-    - test_file: jstests/sharding/index_builds/resharding_index_builds_repl_lag.js
-      ticket: SERVER-103566
     - test_file: jstests/sharding/resharding_oplog_fetcher_repl_lag.js
       ticket: SERVER-103554
     - test_file: jstests/sharding/resharding_skip_cloning_and_applying.js
@@ -754,14 +764,4 @@ last-lts:
       ticket: SERVER-91075
     - test_file: src/mongo/db/modules/enterprise/jstests/fle2/query/range/two_sided_find.js
       ticket: SERVER-91075
-    - test_file: jstests/replsets/initial_sync_test_fixture_test.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp_no_oplog_application.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp.js
-      ticket: SERVER-113184
-    - test_file: jstests/replsets/initial_sync_commit_prepared_transaction.js
-      ticket: SERVER-113184
   suites: null
