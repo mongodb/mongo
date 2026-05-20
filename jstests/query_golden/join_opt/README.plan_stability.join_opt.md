@@ -51,7 +51,7 @@ EOF
 buildscripts/resmoke.py run \
 --suites=query_golden_join_optimization_plan_stability \
 jstests/query_golden/join_opt/plan_stability_* \
---runAllFeatureFlags
+--runAllFeatureFlagTests
 ```
 
 ## Visualizing plan differences
