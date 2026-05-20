@@ -182,11 +182,7 @@ public:
         _mockConfigServerCacheLoader = std::make_shared<ConfigServerCatalogCacheLoaderMock>();
         _mockShardServerCacheLoader = std::make_shared<ShardServerCatalogCacheLoaderMock>();
         auto catalogCache =
-            std::make_unique<CatalogCache>(getServiceContext(),
-                                           _mockConfigServerCacheLoader,
-                                           _mockShardServerCacheLoader,
-                                           true /* cascadeDatabaseCacheLoaderShutdown */,
-                                           false /* cascadeCollectionCacheLoaderShutdown */);
+            std::make_unique<CatalogCache>(getServiceContext(), _mockConfigServerCacheLoader);
         uassertStatusOK(
             initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort),
                                                           std::move(catalogCache),

@@ -82,11 +82,7 @@ void ShardServerTestFixture::setUp() {
 
     if (!_catalogCache) {
         _catalogCache =
-            std::make_unique<CatalogCache>(getServiceContext(),
-                                           _configServerCatalogCacheLoader,
-                                           _shardServerCatalogCacheLoader,
-                                           true /* cascadeDatabaseCacheLoaderShutdown */,
-                                           false /* cascadeCollectionCacheLoaderShutdown */);
+            std::make_unique<CatalogCache>(getServiceContext(), _configServerCatalogCacheLoader);
     }
 
     uassertStatusOK(
@@ -121,8 +117,8 @@ std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatal
 }
 
 void ShardServerTestFixtureWithCatalogCacheMock::setUp() {
-    auto loader = std::make_shared<ShardServerCatalogCacheLoaderMock>();
-    setShardServerCatalogCacheLoader(loader);
+    auto loader = std::make_shared<ConfigServerCatalogCacheLoaderMock>();
+    setConfigServerCatalogCacheLoader(loader);
     setCatalogCache(std::make_unique<CatalogCacheMock>(getServiceContext(), std::move(loader)));
     ShardServerTestFixture::setUp();
 }
@@ -131,10 +127,10 @@ CatalogCacheMock* ShardServerTestFixtureWithCatalogCacheMock::getCatalogCacheMoc
     return static_cast<CatalogCacheMock*>(catalogCache());
 }
 
-std::shared_ptr<ShardServerCatalogCacheLoaderMock>
-ShardServerTestFixtureWithCatalogCacheMock::getCatalogCacheLoaderMock() {
-    auto mockLoader = std::dynamic_pointer_cast<ShardServerCatalogCacheLoaderMock>(
-        _shardServerCatalogCacheLoader);
+std::shared_ptr<ConfigServerCatalogCacheLoaderMock>
+ShardServerTestFixtureWithCatalogCacheMock::getConfigServerCatalogCacheLoaderMock() {
+    auto mockLoader = std::dynamic_pointer_cast<ConfigServerCatalogCacheLoaderMock>(
+        _configServerCatalogCacheLoader);
     invariant(mockLoader);
     return mockLoader;
 }
@@ -162,7 +158,7 @@ ShardServerTestFixtureWithCatalogCacheLoaderMock::getConfigServerCatalogCacheLoa
 }
 
 std::shared_ptr<ShardServerCatalogCacheLoaderMock>
-ShardServerTestFixtureWithCatalogCacheLoaderMock::getCatalogCacheLoaderMock() {
+ShardServerTestFixtureWithCatalogCacheLoaderMock::getShardServerCatalogCacheLoaderMock() {
     auto mockLoader = std::dynamic_pointer_cast<ShardServerCatalogCacheLoaderMock>(
         _shardServerCatalogCacheLoader);
     invariant(mockLoader);

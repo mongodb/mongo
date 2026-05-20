@@ -222,7 +222,7 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, ForceDatabaseRefresh) {
         const auto newDbVersion = newDb.getVersion();
         auto opCtx = operationContext();
 
-        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
+        getShardServerCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(newDb);
         ASSERT_OK(FilteringMetadataCache::get(opCtx)->forceDatabaseMetadataRefresh_DEPRECATED(
             opCtx, kDbName));
 

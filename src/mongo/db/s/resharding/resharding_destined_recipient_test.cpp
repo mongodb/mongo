@@ -62,8 +62,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache_loader.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache_loader_mock.h"
 #include "mongo/db/router_role/routing_cache/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/db/s/resharding/local_resharding_operations_registry.h"
 #include "mongo/db/s/resharding/sharding_write_router.h"
@@ -301,28 +299,28 @@ protected:
                             BSON(kShardKey << 1));
         coll.setAllowMigrations(false);
 
-        // When running in transaction, the db version must carry a PlacementConflictTime.
+        const auto chunksWithXShardKey = createChunks(env.version.placementVersion().epoch(),
+                                                      env.sourceUuid,
+                                                      env.version.placementVersion().getTimestamp(),
+                                                      kShardKey);
+        const auto chunksWithYShardKey = createChunks(env.version.placementVersion().epoch(),
+                                                      env.sourceUuid,
+                                                      env.version.placementVersion().getTimestamp(),
+                                                      "y");
+
+        getShardServerCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
+            DatabaseType(kNss.dbName(), kShardList[0].getName(), env.dbVersion));
+        getShardServerCatalogCacheLoaderMock()->setCollectionRefreshValues(
+            kNss, coll, chunksWithXShardKey, reshardingFields);
+        getShardServerCatalogCacheLoaderMock()->setCollectionRefreshValues(
+            env.tempNss, coll, chunksWithYShardKey, boost::none);
+
         getConfigServerCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
             DatabaseType(kNss.dbName(), kShardList[0].getName(), env.dbVersion));
-
-        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
-            DatabaseType(kNss.dbName(), kShardList[0].getName(), env.dbVersion));
-        getCatalogCacheLoaderMock()->setCollectionRefreshValues(
-            kNss,
-            coll,
-            createChunks(env.version.placementVersion().epoch(),
-                         env.sourceUuid,
-                         env.version.placementVersion().getTimestamp(),
-                         kShardKey),
-            reshardingFields);
-        getCatalogCacheLoaderMock()->setCollectionRefreshValues(
-            env.tempNss,
-            coll,
-            createChunks(env.version.placementVersion().epoch(),
-                         env.sourceUuid,
-                         env.version.placementVersion().getTimestamp(),
-                         "y"),
-            boost::none);
+        getConfigServerCatalogCacheLoaderMock()->setCollectionRefreshValues(
+            kNss, coll, chunksWithXShardKey, reshardingFields);
+        getConfigServerCatalogCacheLoaderMock()->setCollectionRefreshValues(
+            env.tempNss, coll, chunksWithYShardKey, boost::none);
 
         // Refresh the filtering metadata for the nss.
         ASSERT_OK(FilteringMetadataCache::get(opCtx)->forceDatabaseMetadataRefresh_DEPRECATED(

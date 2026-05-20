@@ -152,7 +152,6 @@ mongo_cc_library(
     name = "sharding_test_fixture_common",
     srcs = [
         "sharding_test_fixture_common.cpp",
-        "//src/mongo/db/router_role/routing_cache:catalog_cache_loader_mock.cpp",
         "//src/mongo/db/router_role/routing_cache:catalog_cache_mock.cpp",
         "//src/mongo/db/router_role/routing_cache:config_server_catalog_cache_loader_mock.cpp",
         "//src/mongo/db/router_role/routing_cache:shard_server_catalog_cache_loader_mock.cpp",

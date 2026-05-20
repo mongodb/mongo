@@ -106,7 +106,7 @@ public:
 protected:
     void setUp() override;
     CatalogCacheMock* getCatalogCacheMock();
-    std::shared_ptr<ShardServerCatalogCacheLoaderMock> getCatalogCacheLoaderMock();
+    std::shared_ptr<ConfigServerCatalogCacheLoaderMock> getConfigServerCatalogCacheLoaderMock();
 };
 
 class MONGO_MOD_OPEN ShardServerTestFixtureWithCatalogCacheLoaderMock
@@ -115,7 +115,7 @@ protected:
     void setUp() override;
     CatalogCacheMock* getCatalogCacheMock();
     std::shared_ptr<ConfigServerCatalogCacheLoaderMock> getConfigServerCatalogCacheLoaderMock();
-    std::shared_ptr<ShardServerCatalogCacheLoaderMock> getCatalogCacheLoaderMock();
+    std::shared_ptr<ShardServerCatalogCacheLoaderMock> getShardServerCatalogCacheLoaderMock();
 };
 
 }  // namespace mongo

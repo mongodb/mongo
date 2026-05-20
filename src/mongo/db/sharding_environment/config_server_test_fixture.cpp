@@ -130,19 +130,17 @@ void ConfigServerTestFixture::setUp() {
     _addShardNetworkTestEnv =
         std::make_unique<NetworkTestEnv>(_executorForAddShard, _mockNetworkForAddShard);
 
-    auto loader = std::make_shared<ShardServerCatalogCacheLoaderImpl>(
-        std::make_unique<ConfigServerCatalogCacheLoaderImpl>());
+    auto routerLoader = std::make_shared<ConfigServerCatalogCacheLoaderImpl>();
     auto catalogCache =
-        std::make_unique<CatalogCache>(getServiceContext(),
-                                       std::make_unique<ConfigServerCatalogCacheLoaderImpl>(),
-                                       loader,
-                                       true /* cascadeDatabaseCacheLoaderShutdown */,
-                                       false /* cascadeCollectionCacheLoaderShutdown */);
+        std::make_unique<CatalogCache>(getServiceContext(), std::move(routerLoader));
 
-    RoutingInformationCache::set(getServiceContext());
-
+    auto shardLoader = std::make_shared<ShardServerCatalogCacheLoaderImpl>(
+        std::make_unique<ConfigServerCatalogCacheLoaderImpl>());
     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(
-        ConnectionString::forLocal(), std::move(catalogCache), std::move(loader)));
+        ConnectionString::forLocal(), std::move(catalogCache), std::move(shardLoader)));
+
+    RoutingInformationCache::setOverride(getServiceContext(),
+                                         Grid::get(getServiceContext())->catalogCache());
 
     auto shardLocal = Grid::get(getServiceContext())->shardRegistry()->createLocalConfigShard();
     ASSERT_EQ(typeid(*shardLocal).name(), typeid(ConfigShardWrapper).name());
