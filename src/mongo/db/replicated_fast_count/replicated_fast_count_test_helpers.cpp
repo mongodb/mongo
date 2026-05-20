@@ -45,6 +45,7 @@
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::replicated_fast_count_test_helpers {
@@ -55,13 +56,17 @@ void checkFastCountMetadataInInternalCollection(OperationContext* opCtx,
                                                 int64_t expectedCount,
                                                 int64_t expectedSize) {
     {
-        AutoGetCollection fastCountColl(
+        auto fastCountColl = acquireCollection(
             opCtx,
-            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
-            LockMode::MODE_IS);
+            CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                    NamespaceString::makeGlobalConfigCollection(
+                                                        NamespaceString::kReplicatedFastCountStore),
+                                                    AcquisitionPrerequisites::kRead),
+            MODE_IS);
 
         BSONObj persisted;
-        bool found = Helpers::findById(opCtx, fastCountColl->ns(), BSON("_id" << uuid), persisted);
+        bool found = Helpers::findById(
+            opCtx, fastCountColl.getCollectionPtr()->ns(), BSON("_id" << uuid), persisted);
 
         EXPECT_EQ(found, expectPersisted);
         if (!expectPersisted) {
@@ -114,32 +119,35 @@ void insertDocs(OperationContext* opCtx,
                 const BSONObj& sampleDoc,
                 bool abortWithoutCommit) {
 
-    AutoGetCollection coll(opCtx, nss, LockMode::MODE_IX);
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     {
         WriteUnitOfWork wuow{opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
         for (int i = startingCount; i < startingCount + numDocs; ++i) {
             BSONObj doc = makeDoc(i);
-            ASSERT_OK(Helpers::insert(opCtx, *coll, doc));
+            ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), doc));
         }
         checkUncommittedFastCountChanges(
-            opCtx, coll->uuid(), numDocs, numDocs * sampleDoc.objsize());
-        checkCommittedFastCountChanges(coll->uuid(), fastCountManager, startingCount, startingSize);
+            opCtx, coll.uuid(), numDocs, numDocs * sampleDoc.objsize());
+        checkCommittedFastCountChanges(coll.uuid(), fastCountManager, startingCount, startingSize);
         if (!abortWithoutCommit) {
             wuow.commit();
         }
     }
 
     if (abortWithoutCommit) {
-        checkCommittedFastCountChanges(coll->uuid(), fastCountManager, startingCount, startingSize);
+        checkCommittedFastCountChanges(coll.uuid(), fastCountManager, startingCount, startingSize);
     } else {
-        checkCommittedFastCountChanges(coll->uuid(),
+        checkCommittedFastCountChanges(coll.uuid(),
                                        fastCountManager,
                                        startingCount + numDocs,
                                        startingSize + numDocs * sampleDoc.objsize());
     }
 
-    checkUncommittedFastCountChanges(opCtx, coll->uuid(), 0, 0);
+    checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, 0);
 }
 
 void updateDocs(OperationContext* opCtx,

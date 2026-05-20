@@ -44,8 +44,8 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/idl/idl_parser.h"
@@ -97,10 +97,16 @@ protected:
 
         ASSERT_OK(createCollection(_opCtx, _nss1.dbName(), BSON("create" << _nss1.coll())));
         ASSERT_OK(createCollection(_opCtx, _nss2.dbName(), BSON("create" << _nss2.coll())));
-        AutoGetCollection coll1(_opCtx, _nss1, LockMode::MODE_IS);
-        AutoGetCollection coll2(_opCtx, _nss2, LockMode::MODE_IS);
-        _uuid1 = coll1->uuid();
-        _uuid2 = coll2->uuid();
+        auto coll1 = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss1, AcquisitionPrerequisites::kRead),
+            LockMode::MODE_IS);
+        auto coll2 = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss2, AcquisitionPrerequisites::kRead),
+            LockMode::MODE_IS);
+        _uuid1 = coll1.uuid();
+        _uuid2 = coll2.uuid();
     }
 
     void tearDown() override {
@@ -232,12 +238,15 @@ TEST_F(ReplicatedFastCountTxnTest,
 
     // Start the transaction and perform the insert on a fresh OperationContext.
     beginTxn(sessionId, txnNumber, [&](OperationContext* opCtx1) {
-        AutoGetCollection coll(opCtx1, _nss1, LockMode::MODE_IX);
-        uuid = coll->uuid();
+        auto coll = acquireCollection(opCtx1,
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx1, _nss1, AcquisitionPrerequisites::kWrite),
+                                      LockMode::MODE_IX);
+        uuid = coll.uuid();
 
         {
             WriteUnitOfWork wuow{opCtx1};
-            ASSERT_OK(Helpers::insert(opCtx1, *coll, doc1));
+            ASSERT_OK(Helpers::insert(opCtx1, coll.getCollectionPtr(), doc1));
             wuow.commit();
         }
 
@@ -257,12 +266,15 @@ TEST_F(ReplicatedFastCountTxnTest,
 
     // Continue and commit the transaction.
     continueAndCommitTxn(sessionId, txnNumber, [&](OperationContext* opCtx2) {
-        AutoGetCollection coll(opCtx2, _nss1, LockMode::MODE_IX);
-        EXPECT_EQ(coll->uuid(), *uuid);
+        auto coll = acquireCollection(opCtx2,
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx2, _nss1, AcquisitionPrerequisites::kWrite),
+                                      LockMode::MODE_IX);
+        ASSERT_EQ(coll.uuid(), *uuid);
 
         {
             WriteUnitOfWork wuow{opCtx2};
-            ASSERT_OK(Helpers::insert(opCtx2, *coll, doc2));
+            ASSERT_OK(Helpers::insert(opCtx2, coll.getCollectionPtr(), doc2));
             wuow.commit();
         }
 
@@ -290,12 +302,15 @@ TEST_F(ReplicatedFastCountTxnTest, UncommittedChangesDiscardedAfterMultiDocument
 
     // Start the transaction and perform the insert on a fresh OperationContext.
     beginTxn(sessionId, txnNumber, [&](OperationContext* opCtx1) {
-        AutoGetCollection coll(opCtx1, _nss1, LockMode::MODE_IX);
-        uuid = coll->uuid();
+        auto coll = acquireCollection(opCtx1,
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx1, _nss1, AcquisitionPrerequisites::kWrite),
+                                      LockMode::MODE_IX);
+        uuid = coll.uuid();
 
         {
             WriteUnitOfWork wuow{opCtx1};
-            ASSERT_OK(Helpers::insert(opCtx1, *coll, doc1));
+            ASSERT_OK(Helpers::insert(opCtx1, coll.getCollectionPtr(), doc1));
             wuow.commit();
         }
 
@@ -333,12 +348,15 @@ TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) 
     TxnNumber txnNumber(0);
 
     beginTxn(_opCtx, sessionId, txnNumber, [&](OperationContext* opCtx) {
-        AutoGetCollection coll(opCtx, _nss1, LockMode::MODE_IX);
-        uuid = coll->uuid();
+        auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, _nss1, AcquisitionPrerequisites::kWrite),
+            LockMode::MODE_IX);
+        uuid = coll.uuid();
 
         {
             WriteUnitOfWork wuow{opCtx};
-            ASSERT_OK(Helpers::insert(opCtx, *coll, doc1));
+            ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), doc1));
             wuow.commit();
         }
 
@@ -367,13 +385,16 @@ TEST_F(ReplicatedFastCountTxnTest, ApplyOpsOplogEntryContainsSizeDeltaMetadataSi
     TxnNumber txnNumber(0);
     UUID uuid = UUID::gen();
     beginTxn(sessionId, txnNumber, [&](OperationContext* opCtx1) {
-        AutoGetCollection coll(opCtx1, _nss1, LockMode::MODE_IX);
+        auto coll = acquireCollection(opCtx1,
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx1, _nss1, AcquisitionPrerequisites::kWrite),
+                                      LockMode::MODE_IX);
         {
             WriteUnitOfWork wuow{opCtx1};
-            ASSERT_OK(Helpers::insert(opCtx1, *coll, doc));
+            ASSERT_OK(Helpers::insert(opCtx1, coll.getCollectionPtr(), doc));
             wuow.commit();
         }
-        uuid = coll->uuid();
+        uuid = coll.uuid();
     });
     continueAndCommitTxn(sessionId, txnNumber, [&](OperationContext*) {});
 
@@ -414,7 +435,7 @@ TEST_F(ReplicatedFastCountTxnTest, ApplyOpsOplogEntryContainsSizeDeltaMetadata) 
                                           CollectionAcquisitionRequest::fromOpCtx(
                                               opCtx1, _nss1, AcquisitionPrerequisites::kWrite),
                                           MODE_IX);
-            const auto uuid = coll.getCollectionPtr()->uuid();
+            const auto uuid = coll.uuid();
             {
                 WriteUnitOfWork wuow{opCtx1};
                 ASSERT_OK(Helpers::insert(opCtx1, coll.getCollectionPtr(), doc));
@@ -446,7 +467,7 @@ TEST_F(ReplicatedFastCountTxnTest, ApplyOpsOplogEntryContainsSizeDeltaMetadata) 
                                           CollectionAcquisitionRequest::fromOpCtx(
                                               opCtx1, _nss2, AcquisitionPrerequisites::kWrite),
                                           MODE_IX);
-            const auto uuid = coll.getCollectionPtr()->uuid();
+            const auto uuid = coll.uuid();
             {
                 WriteUnitOfWork wuow{opCtx1};
                 ASSERT_OK(Helpers::insert(opCtx1, coll.getCollectionPtr(), doc));
@@ -538,11 +559,14 @@ protected:
     void addTransactionInsertOps(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const std::vector<BSONObj>& docs) {
-        AutoGetCollection coll(opCtx, nss, MODE_IX);
+        auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         for (const auto& doc : docs) {
             auto operation = repl::DurableOplogEntry::makeInsertOperation(
-                nss, coll->uuid(), doc, doc["_id"].wrap());
+                nss, coll.uuid(), doc, doc["_id"].wrap());
             operation.setSizeMetadata(repl::OplogEntrySizeMetadata{
                 SingleOpSizeMetadata(static_cast<int32_t>(doc.objsize()))});
             txnParticipant.addTransactionOperation(opCtx, operation);

@@ -39,9 +39,9 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -79,12 +79,21 @@ protected:
         ASSERT_OK(createCollection(_opCtx, _nss2.dbName(), BSON("create" << _nss2.coll())));
         ASSERT_OK(createCollection(_opCtx, _nss3.dbName(), BSON("create" << _nss3.coll())));
         {
-            AutoGetCollection coll1(_opCtx, _nss1, LockMode::MODE_IS);
-            AutoGetCollection coll2(_opCtx, _nss2, LockMode::MODE_IS);
-            AutoGetCollection coll3(_opCtx, _nss3, LockMode::MODE_IS);
-            _uuid1 = coll1->uuid();
-            _uuid2 = coll2->uuid();
-            _uuid3 = coll3->uuid();
+            auto coll1 = acquireCollection(_opCtx,
+                                           CollectionAcquisitionRequest::fromOpCtx(
+                                               _opCtx, _nss1, AcquisitionPrerequisites::kRead),
+                                           LockMode::MODE_IS);
+            auto coll2 = acquireCollection(_opCtx,
+                                           CollectionAcquisitionRequest::fromOpCtx(
+                                               _opCtx, _nss2, AcquisitionPrerequisites::kRead),
+                                           LockMode::MODE_IS);
+            auto coll3 = acquireCollection(_opCtx,
+                                           CollectionAcquisitionRequest::fromOpCtx(
+                                               _opCtx, _nss3, AcquisitionPrerequisites::kRead),
+                                           LockMode::MODE_IS);
+            _uuid1 = coll1.uuid();
+            _uuid2 = coll2.uuid();
+            _uuid3 = coll3.uuid();
         }
     }
 
@@ -791,7 +800,10 @@ TEST_P(ReplicatedFastCountCappedCollectionTest, CorrectSizeCountAfterCapReached)
                                                  << maxDocs * sampleDocForInsert.objsize())));
     }
 
-    AutoGetCollection cappedColl(_opCtx, nssCapped, LockMode::MODE_IX);
+    auto cappedColl = acquireCollection(_opCtx,
+                                        CollectionAcquisitionRequest::fromOpCtx(
+                                            _opCtx, nssCapped, AcquisitionPrerequisites::kWrite),
+                                        LockMode::MODE_IX);
 
     for (int i = 0; i < maxDocs + 5; ++i) {
         // Using the query-level InsertCommandRequest path here lets us avoid handling capped
@@ -803,13 +815,15 @@ TEST_P(ReplicatedFastCountCappedCollectionTest, CorrectSizeCountAfterCapReached)
         ASSERT_OK(result.results[0].getStatus());
 
         if (i < maxDocs - 1) {
-            const auto [actualSize, actualCount] = cappedColl->latestSizeCount(_opCtx);
+            const auto [actualSize, actualCount] =
+                cappedColl.getCollectionPtr()->latestSizeCount(_opCtx);
             const long long expectedCount = i + 1;
             EXPECT_EQ(actualSize, expectedCount * sampleDocForInsert.objsize());
             EXPECT_EQ(actualCount, expectedCount);
         } else {
             // After the collection cap has been reached, the size and count should stay the same.
-            const auto [actualSize, actualCount] = cappedColl->latestSizeCount(_opCtx);
+            const auto [actualSize, actualCount] =
+                cappedColl.getCollectionPtr()->latestSizeCount(_opCtx);
             EXPECT_EQ(actualSize, maxDocs * sampleDocForInsert.objsize());
             EXPECT_EQ(actualCount, maxDocs);
         }
@@ -825,15 +839,19 @@ TEST_F(ReplicatedFastCountTest, ReplicatedFastCountDoesNotTrackLocalCollections)
         NamespaceString::createNamespaceString_forTest("local.coll");
     ASSERT_OK(createCollection(_opCtx, internalNss.dbName(), BSON("create" << internalNss.coll())));
 
-    AutoGetCollection internalColl(_opCtx, internalNss, LockMode::MODE_IX);
-    const UUID internalUuid = internalColl->uuid();
+    auto internalColl =
+        acquireCollection(_opCtx,
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              _opCtx, internalNss, AcquisitionPrerequisites::kWrite),
+                          LockMode::MODE_IX);
+    const UUID internalUuid = internalColl.uuid();
     const long long docsToInsertCount = 10;
 
     long long expectedSize = 0;
     WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
     for (size_t i = 0; i < docsToInsertCount; ++i) {
         const BSONObj document = docGeneratorForInsert(i);
-        ASSERT_OK(Helpers::insert(_opCtx, *internalColl, document));
+        ASSERT_OK(Helpers::insert(_opCtx, internalColl.getCollectionPtr(), document));
         expectedSize += document.objsize();
     }
 
@@ -851,8 +869,8 @@ TEST_F(ReplicatedFastCountTest, ReplicatedFastCountDoesNotTrackLocalCollections)
         _opCtx, internalUuid, 0, 0);
 
     // Size and count data for `internalColl` are still tracked through the record store.
-    EXPECT_EQ(internalColl->numRecords(_opCtx), docsToInsertCount);
-    EXPECT_EQ(internalColl->dataSize(_opCtx), expectedSize);
+    EXPECT_EQ(internalColl.getCollectionPtr()->numRecords(_opCtx), docsToInsertCount);
+    EXPECT_EQ(internalColl.getCollectionPtr()->dataSize(_opCtx), expectedSize);
 }
 
 TEST_F(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollections) {
@@ -862,15 +880,19 @@ TEST_F(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollect
         ASSERT_OK(
             createCollection(_opCtx, internalNss.dbName(), BSON("create" << internalNss.coll())));
 
-        AutoGetCollection internalColl(_opCtx, internalNss, LockMode::MODE_IX);
-        const UUID internalUuid = internalColl->uuid();
+        auto internalColl =
+            acquireCollection(_opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  _opCtx, internalNss, AcquisitionPrerequisites::kWrite),
+                              LockMode::MODE_IX);
+        const UUID internalUuid = internalColl.uuid();
         const long long docsToInsertCount = 10;
 
         long long expectedSize = 0;
         WriteUnitOfWork wuow(_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
         for (size_t i = 0; i < docsToInsertCount; ++i) {
             const BSONObj document = docGeneratorForInsert(i);
-            ASSERT_OK(Helpers::insert(_opCtx, *internalColl, document));
+            ASSERT_OK(Helpers::insert(_opCtx, internalColl.getCollectionPtr(), document));
             expectedSize += document.objsize();
         }
 
@@ -897,14 +919,17 @@ class SizeMetadataLoggingTest : public ReplicatedFastCountTest {};
 
 TEST_F(SizeMetadataLoggingTest, BasicInsertOplogEntry) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
-    AutoGetCollection coll(_opCtx, _nss1, LockMode::MODE_IX);
+    auto coll = acquireCollection(
+        _opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(_opCtx, _nss1, AcquisitionPrerequisites::kWrite),
+        LockMode::MODE_IX);
 
     const auto docToInsert = docGeneratorForInsert(0);
     const auto expectedSizeDelta = docToInsert.objsize();
 
     {
         WriteUnitOfWork wuow{_opCtx};
-        ASSERT_OK(Helpers::insert(_opCtx, *coll, docToInsert));
+        ASSERT_OK(Helpers::insert(_opCtx, coll.getCollectionPtr(), docToInsert));
         wuow.commit();
     }
 

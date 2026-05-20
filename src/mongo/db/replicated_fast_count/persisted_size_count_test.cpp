@@ -34,9 +34,9 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 
@@ -82,13 +82,16 @@ TEST_F(PersistedSizeCountTest, UuidExistsInSizeCountStore) {
 
     constexpr int expectedCount = 5;
     int expectedSize = 0;
-    AutoGetCollection coll(operationContext(), nss, LockMode::MODE_IX);
+    auto coll = acquireCollection(operationContext(),
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      operationContext(), nss, AcquisitionPrerequisites::kWrite),
+                                  LockMode::MODE_IX);
     {
         WriteUnitOfWork wuow(operationContext(),
                              WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
         for (int i = 0; i < expectedCount; ++i) {
             const BSONObj document = BSON("_id" << i << "x" << i);
-            ASSERT_OK(Helpers::insert(operationContext(), *coll, document));
+            ASSERT_OK(Helpers::insert(operationContext(), coll.getCollectionPtr(), document));
             expectedSize += document.objsize();
         }
         wuow.commit();
@@ -96,7 +99,8 @@ TEST_F(PersistedSizeCountTest, UuidExistsInSizeCountStore) {
 
     manager->flushSync(operationContext());
 
-    const CollectionSizeCount sizeCount = coll->persistedSizeCount(operationContext());
+    const CollectionSizeCount sizeCount =
+        coll.getCollectionPtr()->persistedSizeCount(operationContext());
     EXPECT_EQ(sizeCount.count, expectedCount);
     EXPECT_EQ(sizeCount.size, expectedSize);
 }
