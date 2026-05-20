@@ -704,6 +704,7 @@ const allCommands = {
         command: {getDiagnosticData: 1},
         shouldFail: false,
     },
+    getESECMKIdentifierListStatus: {skip: "requires additional setup"},
     getESERotateActiveKEKStatus: {skip: "requires additional setup"},
     getLog: {
         isAdminCommand: true,

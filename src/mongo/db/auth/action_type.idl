@@ -113,6 +113,7 @@ enums:
             getCmdLineOpts: "getCmdLineOpts"
             getDatabaseVersion: "getDatabaseVersion"
             getDefaultRWConcern: "getDefaultRWConcern"
+            getESECMKIdentifierListStatus: "getESECMKIdentifierListStatus"
             getESERotateActiveKEKStatus: "getESERotateActiveKEKStatus"
             getLog: "getLog"
             getParameter: "getParameter"

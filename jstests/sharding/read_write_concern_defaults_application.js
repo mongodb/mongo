@@ -569,6 +569,7 @@ let testCases = {
     getDatabaseVersion: {skip: "does not accept read or write concern"},
     getDefaultRWConcern: {skip: "does not accept read or write concern"},
     getDiagnosticData: {skip: "does not accept read or write concern"},
+    getESECMKIdentifierListStatus: {skip: "does not accept read or write concern"},
     getESERotateActiveKEKStatus: {skip: "does not accept read or write concern"},
     getLog: {skip: "does not accept read or write concern"},
     getMore: {skip: "does not accept read or write concern"},

@@ -257,6 +257,7 @@ let testCases = {
     getDatabaseVersion: {skip: "does not return user data"},
     getDefaultRWConcern: {skip: "does not return user data"},
     getDiagnosticData: {skip: "does not return user data"},
+    getESECMKIdentifierListStatus: {skip: "does not return user data"},
     getESERotateActiveKEKStatus: {skip: "does not return user data"},
     getLog: {skip: "does not return user data"},
     getMore: {skip: "shard version already established"},

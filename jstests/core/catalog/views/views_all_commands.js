@@ -447,6 +447,7 @@ let viewsCommandTests = {
     getDatabaseVersion: {skip: isUnrelated},
     getDefaultRWConcern: {skip: isUnrelated},
     getDiagnosticData: {skip: isUnrelated},
+    getESECMKIdentifierListStatus: {skip: isUnrelated},
     getESERotateActiveKEKStatus: {skip: isUnrelated},
     getLog: {skip: isUnrelated},
     getMore: {
