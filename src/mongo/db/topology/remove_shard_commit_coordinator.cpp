@@ -31,6 +31,12 @@
 
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/remove_shard_exception.h"
@@ -39,6 +45,42 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+
+namespace {
+
+void deleteAllDocumentsFromCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    DBDirectClient client(opCtx);
+    write_ops::DeleteCommandRequest deleteOp(nss);
+    deleteOp.setDeletes({[&] {
+        write_ops::DeleteOpEntry entry;
+        entry.setQ(BSONObj());
+        entry.setMulti(true);
+        return entry;
+    }()});
+    deleteOp.setWriteConcern(defaultMajorityWriteConcern());
+    write_ops::checkWriteErrors(client.remove(std::move(deleteOp)));
+}
+
+void dropShardCatalogMetadata(OperationContext* opCtx) {
+    LOGV2(9194400, "Dropping shard catalog metadata before shard removal");
+
+    deleteAllDocumentsFromCollection(opCtx, NamespaceString::kConfigShardCatalogDatabasesNamespace);
+    deleteAllDocumentsFromCollection(opCtx,
+                                     NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    deleteAllDocumentsFromCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+    }
+
+    for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
+        auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(opCtx, dbName);
+        scopedDsr->clearDbMetadata(opCtx);
+    }
+}
+
+}  // namespace
 
 ExecutorFuture<void> RemoveShardCommitCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -203,6 +245,13 @@ void RemoveShardCommitCoordinator::_dropLocalCollections(OperationContext* opCtx
                                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                                &result)) {
         uassertStatusOK(getStatusFromCommandResult(result));
+    }
+
+    if (_doc.getIsTransitionToDedicated()) {
+        // Once the config server is no longer a shard, its local shard catalog must not retain
+        // authoritative ownership metadata. Clear both durable metadata and in-memory CSR/DSR state
+        // so stale entries cannot be reused if the config server is later re-added as a shard.
+        dropShardCatalogMetadata(opCtx);
     }
 }
 
