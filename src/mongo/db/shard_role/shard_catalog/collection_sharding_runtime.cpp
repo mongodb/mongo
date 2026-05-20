@@ -848,9 +848,6 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
                                    _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, _nss);
-    tassert(7032305,
-            "Collection metadata unknown when entering critical section",
-            scopedCsr->getCurrentMetadataIfKnown());
     scopedCsr->enterCriticalSectionCatchUpPhase(_opCtx, _reason);
 }
 
@@ -867,9 +864,6 @@ void CollectionCriticalSection::enterCommitPhase() {
                                    _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
     auto scopedCsr = CollectionShardingRuntime::acquireExclusive(_opCtx, _nss);
-    tassert(7032304,
-            "Collection metadata unknown when entering critical section commit phase",
-            scopedCsr->getCurrentMetadataIfKnown());
     scopedCsr->enterCriticalSectionCommitPhase(_opCtx, _reason);
 }
 
