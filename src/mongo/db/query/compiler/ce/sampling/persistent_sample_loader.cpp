@@ -38,26 +38,32 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <string>
+
+#include <fmt/format.h>
+
 namespace mongo::ce {
 
 std::string buildPersistentSampleId(const UUID& collectionUuid,
                                     SamplingCEMethodEnum method,
                                     size_t sampleSize,
                                     boost::optional<int> numChunks) {
-    str::stream key;
-    key << collectionUuid.toString() << "_";
+    std::string methodStr;
     if (method == SamplingCEMethodEnum::kChunk) {
         tassert(
             12432800, "Chunk-based persistent sample ID requires numChunks", numChunks.has_value());
-        key << "chunk" << *numChunks;
+        methodStr = fmt::format("chunk{}", *numChunks);
     } else {
         tassert(12432801,
                 "numChunks must only be set for chunk-technique persistent samples",
                 !numChunks.has_value());
-        key << idlSerialize(method);
+        methodStr = std::string(idlSerialize(method));
     }
-    key << "_" << sampleSize << "_v" << kPersistentSampleSchemaVersion;
-    return key;
+    return fmt::format("{}_{}_{}_v{}",
+                       collectionUuid.toString(),
+                       methodStr,
+                       sampleSize,
+                       kPersistentSampleSchemaVersion);
 }
 
 StatusWith<PersistentSampleDoc> parsePersistentSample(const BSONObj& doc) {
