@@ -1139,3 +1139,39 @@ commands:
         type: namespacestring
         api_version: ""
         reply_type: OkReply
+
+    _shardsvrCommitRenameCollectionMetadata:
+        command_name: _shardsvrCommitRenameCollectionMetadata
+        cpp_name: ShardsvrCommitRenameCollectionMetadata
+        description: "Internal command sent to shard participating in a rename collection procedure in order to commit the rename on their shard catalog"
+        strict: false
+        api_version: ""
+        namespace: ignored
+        fields:
+            fromNss:
+                type: namespacestring
+                description: "Source collection namespace"
+            sourceUUID:
+                type: uuid
+                description: "ID of the collection getting renamed."
+                optional: true
+            toNss:
+                type: namespacestring
+                description: "Target collection namespace"
+            targetUUID:
+                type: uuid
+                description: "UUID of the collection getting replaced. Only set if it's sharded"
+                optional: true
+            newTargetUUID:
+                type: uuid
+                description: "UUID of the collection in the event it's a rename across databases"
+                optional: true
+            shouldCloneEverything:
+                type: safeBool
+                description: "Whether the rename should also clone all the global catalog entries corresponding to the shard. This is only used during kUpgrading"
+                default: false
+            primaryShardId:
+                type: shard_id
+                description: Primary shard identifier, used to determine whether the shard needs to durably persist collection metadata or not.
+                optional: false
+        reply_type: OkReply

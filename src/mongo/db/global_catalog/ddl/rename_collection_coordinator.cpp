@@ -74,6 +74,7 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -811,6 +812,17 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
                     blockCRUDOperationsRequest.setReason(reason);
 
+                    // When shards are authoritative, there is no need to clear the filtering
+                    // metadata upon releasing the critical section; the commit phase is responsible
+                    // for updating the shard catalog with current information. This flag is
+                    // evaluated at insertion time because on secondaries, metadata is cleared
+                    // during the onDelete of the critical section document.
+                    if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
+                            VersionContext::getDecoration(opCtx),
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                        blockCRUDOperationsRequest.setClearCollMetadata(false);
+                    }
+
                     generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
                     generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
                                                                    getNewSession(opCtx));
@@ -928,6 +940,17 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     _doc.getNewTargetCollectionUuid());
                 renameCollParticipantRequest.setRenameCollectionRequest(_request);
 
+                // When shards are authoritative, there is no need to clear the filtering
+                // metadata upon releasing the critical section; the commit phase is responsible
+                // for updating the shard catalog with current information. This flag is
+                // evaluated at insertion time because on secondaries, metadata is cleared
+                // during the onDelete of the critical section document.
+                if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    renameCollParticipantRequest.setClearCollMetadata(false);
+                }
+
                 const auto opSessionInfo = getNewSession(opCtx);
                 generic_argument_util::setMajorityWriteConcern(renameCollParticipantRequest);
                 generic_argument_util::setOperationSessionInfo(renameCollParticipantRequest,
@@ -1012,17 +1035,37 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 const auto renamedCollectionEpoch = OID::gen();
 
-                const auto session = getNewSession(opCtx);
-                renameCollectionMetadataInTransaction(opCtx,
-                                                      _doc.getOptTrackedCollInfo(),
-                                                      fromNss,
-                                                      toNss,
-                                                      _doc.getTargetUUID(),
-                                                      _doc.getNewTargetCollectionUuid(),
-                                                      commitTime,
-                                                      renamedCollectionEpoch,
-                                                      **executor,
-                                                      session);
+                {
+                    const auto session = getNewSession(opCtx);
+                    renameCollectionMetadataInTransaction(opCtx,
+                                                          _doc.getOptTrackedCollInfo(),
+                                                          fromNss,
+                                                          toNss,
+                                                          _doc.getTargetUUID(),
+                                                          _doc.getNewTargetCollectionUuid(),
+                                                          commitTime,
+                                                          renamedCollectionEpoch,
+                                                          **executor,
+                                                          session);
+                }
+
+                if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::commitRenameCollectionMetadataToShardCatalog(
+                        opCtx,
+                        fromNss,
+                        toNss,
+                        _doc.getSourceUUID(),
+                        _doc.getTargetUUID(),
+                        _doc.getNewTargetCollectionUuid(),
+                        Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+                        session,
+                        executor,
+                        token);
+                }
+
 
                 // Generate post-commit placement change event for FROM.
                 if (preciseChangeStreamTargeterEnabled) {

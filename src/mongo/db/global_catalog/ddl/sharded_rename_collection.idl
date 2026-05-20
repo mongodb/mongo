@@ -92,6 +92,14 @@ commands:
                     "When set, the participant will apply the specified value to the oplog entry generated upon locally committing the operation.
                     When missing, the participant will infer the value to be applied based on whether it is the primary shard of the targeted namespaces."
                 optional: true
+            clearCollMetadata:
+                type: safeBool
+                description: >-
+                    If true, and the critical section taken in this command is acting on a collection
+                    level, the filtering collection metadata will be cleared, forcing a refresh the next time
+                    this metadata is needed. When the shard is collection authoritative, it is no
+                    longer necessary to clear the filtering metadata.
+                default: true
         reply_type: OkReply
 
     _shardsvrRenameCollectionParticipantUnblock:
@@ -108,7 +116,6 @@ commands:
                 type: uuid
                 description: "ID of the collection getting renamed."
         reply_type: OkReply
-
 structs:
     RenameCollectionCoordinatorDocument:
         description: "Represents a rename collection operation on the coordinator shard."
@@ -182,3 +189,11 @@ structs:
                     "When set, the participant will apply the specified value to the oplog entry generated upon locally committing the operation.
                     When missing, the participant will infer the value to be applied based on whether it is the primary shard of the targeted namespaces."
                 optional: true
+            clearCollMetadata:
+                type: safeBool
+                description: >-
+                    If true, and the critical section taken in this command is acting on a collection
+                    level, the filtering collection metadata will be cleared, forcing a refresh the next time
+                    this metadata is needed. When the shard is collection authoritative, it is no
+                    longer necessary to clear the filtering metadata.
+                default: true

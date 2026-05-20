@@ -191,6 +191,7 @@ let testCases = {
     _shardsvrCommitCollModCollectionMetadata: {skip: "internal command"},
     _shardsvrCommitDropCollectionMetadata: {skip: "internal command"},
     _shardsvrCommitCreateCollectionMetadata: {skip: "internal command"},
+    _shardsvrCommitRenameCollectionMetadata: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},
     _shardsvrRenameCollectionParticipant: {skip: "internal command"},
     _shardsvrRenameCollectionParticipantUnblock: {skip: "internal command"},

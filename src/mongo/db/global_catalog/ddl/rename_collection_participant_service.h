@@ -122,8 +122,12 @@ public:
      */
     bool hasSameOptions(const BSONObj& participantDoc);
 
-    BSONObj doc() {
+    BSONObj doc() const {
         return _doc.toBSON();
+    }
+
+    const boost::optional<UUID>& getTargetUUID() const {
+        return _doc.getTargetUUID();
     }
 
     /*

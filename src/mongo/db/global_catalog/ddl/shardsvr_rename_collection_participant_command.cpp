@@ -36,6 +36,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
@@ -46,6 +47,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
+#include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/rpc/op_msg.h"
@@ -115,6 +118,7 @@ public:
             participantDoc.setTargetUUID(req.getTargetUUID());
             participantDoc.setNewTargetCollectionUuid(req.getNewTargetCollectionUuid());
             participantDoc.setFromMigrate(req.getFromMigrate());
+            participantDoc.setClearCollMetadata(req.getClearCollMetadata());
             participantDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
 
             const auto service = RenameCollectionParticipantService::getService(opCtx);
@@ -217,6 +221,8 @@ public:
                 RenameParticipantInstance::lookup(opCtx, service, id);
             if (optRenameCollectionParticipant) {
 
+                const auto targetUUID = optRenameCollectionParticipant.value()->getTargetUUID();
+
                 auto optUnblockCrudFuture =
                     optRenameCollectionParticipant.value()->getUnblockCrudFutureFor(
                         req.getSourceUUID());
@@ -224,6 +230,29 @@ public:
                         "Provided UUID does not match",
                         optUnblockCrudFuture.has_value());
                 optUnblockCrudFuture->get(opCtx);
+
+                if (targetUUID) {
+                    LOGV2_INFO(12295705,
+                               "Cleaning up stale chunk information for replaced collection",
+                               "uuid"_attr = *targetUUID);
+
+                    // Remove the old chunks now since they are now garbage to be cleaned up.
+                    // This is safe to do outside of the critical section because no other operation
+                    // can access the data as the UUID in the chunks point to a non-existent
+                    // collection.
+                    auto newClient = getGlobalServiceContext()->getService()->makeClient(
+                        "ShardsvrRenameCollectionUnblockParticipantCommand");
+                    AlternativeClientRegion acr(newClient);
+                    auto newOpCtx = CancelableOperationContext(cc().makeOperationContext(),
+                                                               opCtx->getCancellationToken(),
+                                                               Grid::get(opCtx->getServiceContext())
+                                                                   ->getExecutorPool()
+                                                                   ->getFixedExecutor());
+                    newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+                    shard_catalog_commit::commitDropOfStaleChunksForRename(newOpCtx.get(),
+                                                                           *targetUUID);
+                }
             }
 
             // Since no write that generated a retryable write oplog entry with this sessionId

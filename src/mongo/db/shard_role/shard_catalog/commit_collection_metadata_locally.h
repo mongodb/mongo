@@ -64,6 +64,26 @@ void commitDropCollectionLocally(OperationContext* opCtx,
                                  const UUID& uuid);
 
 /**
+ * Deletes only chunk metadata from the shard catalog (config.shard.catalog.chunks) and does nothing
+ * else. Only used by rename in the event of rename overwriting an existing collection.
+ */
+void commitDropOfStaleChunksForRename(OperationContext* opCtx, const UUID& uuid);
+
+/**
+ * Modifies the shard catalog for both fromNss and toNss in order to durably persist the decision to
+ * rename the collection.
+ * The command will invalidate the collection metadata for both namespaces and clear the in-memory
+ * state in order to repopulate it on the next query.
+ */
+void commitRenameOfCollectionMetadata(OperationContext* opCtx,
+                                      const NamespaceString& fromNss,
+                                      const boost::optional<UUID>& fromUUID,
+                                      const NamespaceString& toNss,
+                                      const boost::optional<UUID>& targetUUID,
+                                      const boost::optional<UUID>& newTargetUUID,
+                                      bool isUpgrading,
+                                      bool isDbPrimaryShard);
+/**
  * Performs the local persistence of up-to-date collection metadata and chunk information for a
  * sharded collection on the shard. Specifically:
  *   1. Removes any existing chunk entries for the specified collection from the shard catalog
@@ -75,7 +95,9 @@ void commitDropCollectionLocally(OperationContext* opCtx,
  *   5. Updates the in-memory CollectionShardingRuntime (CSR) to reflect the new filtering
  * information.
  */
-void commitCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss);
+void commitCollectionMetadataLocally(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     bool isDbPrimaryShard = false);
 
 /**
  * Fetches the collection metadata from the global catalog, removes any existing chunk entries for

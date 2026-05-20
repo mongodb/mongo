@@ -246,8 +246,9 @@ ChunkMap ChunkMap::createMerged(std::vector<std::shared_ptr<ChunkInfo>> changedC
     auto updatedChunkMap = _makeUpdated(std::move(changedChunks));
     tassert(6752900,
             "Chunk map found to be empty after refresh",
-            updatedChunkMap._chunkVectorMap.size() &&
-                updatedChunkMap._chunkVectorMap.begin()->second->size());
+            (updatedChunkMap._chunkVectorMap.size() &&
+             updatedChunkMap._chunkVectorMap.begin()->second->size()) ||
+                _allowGaps);
     return updatedChunkMap;
 }
 

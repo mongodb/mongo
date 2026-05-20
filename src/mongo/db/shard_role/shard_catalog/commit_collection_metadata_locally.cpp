@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -62,7 +63,8 @@ CollectionType fetchCollection(OperationContext* opCtx, const NamespaceString& n
 
 std::vector<ChunkType> fetchOwnedChunks(OperationContext* opCtx,
                                         const NamespaceString& nss,
-                                        const CollectionType& coll) {
+                                        const CollectionType& coll,
+                                        const boost::optional<int>& limit = boost::none) {
     auto shardId = ShardingState::get(opCtx)->shardId();
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto chunksStatus = catalogClient->getChunks(
@@ -72,7 +74,7 @@ std::vector<ChunkType> fetchOwnedChunks(OperationContext* opCtx,
              << BSON_ARRAY(BSON(ChunkType::shard(shardId.toString()))
                            << BSON("history.shard" << shardId.toString()))),
         BSON(ChunkType::min() << 1) /* sort */,
-        boost::none,
+        limit,
         nullptr,
         coll.getEpoch(),
         coll.getTimestamp(),
@@ -80,6 +82,13 @@ std::vector<ChunkType> fetchOwnedChunks(OperationContext* opCtx,
     uassertStatusOK(chunksStatus.getStatus());
 
     return chunksStatus.getValue();
+}
+
+bool doesShardOwnChunks(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const CollectionType& coll) {
+    const auto chunkList = fetchOwnedChunks(opCtx, nss, coll, 1);
+    return !chunkList.empty();
 }
 
 write_ops::UpdateOpEntry makeUpsertEntry(BSONObj filter, BSONObj replacement) {
@@ -126,9 +135,6 @@ void writeCollectionMetadataLocally(OperationContext* opCtx,
         {makeUpsertEntry(BSON(ShardCatalogCollectionTypeBase::kNssFieldName << serializedNs),
                          coll.toBSON())});
 
-    tassert(
-        10281500, "Expected to find at least one chunk for a tracked collection", !chunks.empty());
-
     // Persist Chunk Metadata, we do this in batches because of the 16MB BSON limit.
     for (auto it = chunks.begin(); it != chunks.end();) {
         size_t updateSize = 0;
@@ -167,9 +173,7 @@ void writeCollectionMetadataLocally(OperationContext* opCtx,
     }
 }
 
-void deleteCollectionMetadataLocally(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const UUID& uuid) {
+void deleteCollectionEntryLocally(OperationContext* opCtx, const NamespaceString& nss) {
     DBDirectClient dbClient(opCtx);
     auto serializedNs = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
 
@@ -177,11 +181,35 @@ void deleteCollectionMetadataLocally(OperationContext* opCtx,
                        NamespaceString::kConfigShardCatalogCollectionsNamespace,
                        BSON(CollectionType::kNssFieldName << serializedNs),
                        false /* multi */);
+}
 
+void upsertCollectionEntryLocally(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const CollectionType& coll) {
+    DBDirectClient dbClient{opCtx};
+
+    auto entry =
+        makeUpsertEntry(BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                                 nss, SerializationContext::stateDefault())),
+                        coll.asShardCatalogType().toBSON());
+
+    executeLocalUpdates(
+        dbClient, NamespaceString::kConfigShardCatalogCollectionsNamespace, {entry});
+}
+
+void deleteCollectionChunksMetadataLocally(OperationContext* opCtx, const UUID& uuid) {
+    DBDirectClient dbClient(opCtx);
     executeLocalDelete(dbClient,
                        NamespaceString::kConfigShardCatalogChunksNamespace,
                        BSON(ChunkType::collectionUUID() << uuid),
                        true /* multi */);
+}
+
+void deleteAllCollectionMetadataLocally(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        const UUID& uuid) {
+    deleteCollectionEntryLocally(opCtx, nss);
+    deleteCollectionChunksMetadataLocally(opCtx, uuid);
 }
 
 void invalidateCollectionMetadataOnSecondaries(OperationContext* opCtx,
@@ -300,8 +328,14 @@ void commitRefineShardKeyLocally(OperationContext* opCtx, const NamespaceString&
 void commitDropCollectionLocally(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const UUID& uuid) {
+
+    LOGV2_INFO(12295703,
+               "Dropping all shard catalog metadata for collection",
+               "nss"_attr = nss,
+               "uuid"_attr = uuid);
+
     // Write to `config.shard.catalog.(collections|chunks)` to delete collection metadata.
-    deleteCollectionMetadataLocally(opCtx, nss, uuid);
+    deleteAllCollectionMetadataLocally(opCtx, nss, uuid);
 
     // Write an oplog 'c' entry to invalidate secondaries CSR.
     invalidateCollectionMetadataOnSecondaries(opCtx, nss, uuid, true /* forDroppedCollection */);
@@ -310,7 +344,114 @@ void commitDropCollectionLocally(OperationContext* opCtx,
     clearShardCatalogCacheForDroppedCollection(opCtx, nss, uuid);
 }
 
-void commitCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss) {
+void commitDropOfStaleChunksForRename(OperationContext* opCtx, const UUID& uuid) {
+    // Delete the old chunks from `config.shard.catalog.chunks`. The deletion/replacement of the
+    // collection entry happened before as part of calling commitRenameOfCollectionMetadata.
+    deleteCollectionChunksMetadataLocally(opCtx, uuid);
+}
+
+void commitRenameOfCollectionMetadata(OperationContext* opCtx,
+                                      const NamespaceString& fromNss,
+                                      const boost::optional<UUID>& fromUUID,
+                                      const NamespaceString& toNss,
+                                      const boost::optional<UUID>& targetUUID,
+                                      const boost::optional<UUID>& newTargetUUID,
+                                      bool isUpgrading,
+                                      bool isDbPrimary) {
+    // Delete the old collection entries if any exist since they'll be replaced by the final
+    // state.
+    deleteCollectionEntryLocally(opCtx, fromNss);
+    deleteCollectionEntryLocally(opCtx, toNss);
+
+    auto cleanupInMemoryState = [&](bool clearFromNss, bool clearToNss) {
+        // At this point we've fully modified the durable state to reflect the final state. We have
+        // to clear out the in-memory state if the collection got replaced.
+        if (clearFromNss && fromUUID) {
+            // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
+            invalidateCollectionMetadataOnSecondaries(
+                opCtx, fromNss, *fromUUID, true /* forDroppedCollection */);
+
+            clearShardCatalogCacheForDroppedCollection(opCtx, fromNss, *fromUUID);
+        }
+
+        if (clearToNss && targetUUID) {
+            // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
+            invalidateCollectionMetadataOnSecondaries(
+                opCtx, toNss, *targetUUID, true /* forDroppedCollection */);
+
+            clearShardCatalogCacheForDroppedCollection(opCtx, toNss, *targetUUID);
+        }
+    };
+
+    if (isUpgrading || newTargetUUID.has_value()) {
+        // If it's upgrading then we just need to fetch the entire filtering metadata from the CSRS
+        // and durably persist it since the local state may be incomplete. This means that we have
+        // to first drop the old collection metadata and subsequently fetch the new one, replacing
+        // the existing entries if necessary.
+        //
+        // We also perform this if the collection has undergone a UUID change since that invalidates
+        // all previous chunks as well and the new chunks aren't present in the shard yet.
+        LOGV2_INFO(12295702,
+                   "Renaming metadata during an FCV upgrade, forcing a full refresh of the data on "
+                   "the shard",
+                   "fromNss"_attr = fromNss,
+                   "toNss"_attr = toNss);
+
+        if (fromUUID) {
+            commitDropCollectionLocally(opCtx, fromNss, *fromUUID);
+        }
+        try {
+            auto _ = fetchCollection(opCtx, toNss);
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+            LOGV2_INFO(12295701,
+                       "Nothing to persist in the local shard catalog since the renamed collection "
+                       "is untracked",
+                       "toNss"_attr = toNss,
+                       "error"_attr = ex.toStatus());
+            cleanupInMemoryState(false, true);
+            return;
+        }
+        commitCollectionMetadataLocally(opCtx, toNss, isDbPrimary);
+        return;
+    }
+
+    // At this point we can assume that the shard catalog metadata is durably persisted on this
+    // shard, so all the chunk entries are stored locally for both from/target collections if they
+    // are owned by this shard.
+    //
+    // There are two paths to take here:
+    // 1. Either the new collection state is tracked (there's a collection entry on the CSRS)
+    // 2. Or it's untracked (No collection entry on the CSRS)
+    try {
+        // For the first case we must delete the collection entries for both fromNss and toNss
+        // namespaces and then insert the final entry for toNss. We've already deleted the first
+        // collection entry so we must upsert the new entry to end up in the final form.
+        auto newEntry = fetchCollection(opCtx, toNss);
+        auto ownsChunks = doesShardOwnChunks(opCtx, toNss, newEntry);
+
+        if (ownsChunks || isDbPrimary) {
+            upsertCollectionEntryLocally(opCtx, toNss, newEntry);
+        }
+        // The old chunks will now get cleaned up outside of the critical section if the rename
+        // actually replaced an existing sharded collection.
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+        // For the second one we have to delete all entries which has already occurred at the
+        // beginning.
+        LOGV2_INFO(12295700,
+                   "Target collection is untracked, nothing to persist in the local shard catalog",
+                   "toNss"_attr = toNss,
+                   "error"_attr = ex);
+    }
+    cleanupInMemoryState(true /*clearFromNss*/, true /*clearToNss*/);
+
+    // TODO SERVER-127215: It should be possible to recover the filtering metadata at this point for
+    // the collection. However, we've chosen not to do it and defer that to the first query in order
+    // to simplify the rename path.
+}
+
+void commitCollectionMetadataLocally(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     bool isDbPrimaryShard) {
     auto coll = fetchCollection(opCtx, nss);
     auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
 
@@ -318,23 +459,25 @@ void commitCollectionMetadataLocally(OperationContext* opCtx, const NamespaceStr
     // collection is sharded) don't accumulate stale rows. The new chunk documents may carry
     // different OIDs, in which case writeCollectionMetadataLocally's upsert-by-OID would insert
     // rather than replace.
-    {
-        DBDirectClient dbClient(opCtx);
-        executeLocalDelete(dbClient,
-                           NamespaceString::kConfigShardCatalogChunksNamespace,
-                           BSON(ChunkType::collectionUUID() << coll.getUuid()),
-                           true /* multi */);
-    }
+    deleteCollectionChunksMetadataLocally(opCtx, coll.getUuid());
 
-    // Write to `config.shard.catalog.(collections|chunks)` to insert collection metadata.
-    writeCollectionMetadataLocally(opCtx, nss, coll.asShardCatalogType(), ownedChunks);
+    if (isDbPrimaryShard || !ownedChunks.empty()) {
+        // Write to `config.shard.catalog.(collections|chunks)` to insert collection metadata.
+        writeCollectionMetadataLocally(opCtx, nss, coll.asShardCatalogType(), ownedChunks);
+
+        // Update this node CSR with collection metadata and chunks.
+        updateShardCatalogCache(opCtx, nss, coll, ownedChunks);
+    } else {
+        // If the shard owns no chunks AND is not the dbPrimary then it really doesn't know anything
+        // about the collection. Make sure to delete any existing collection entry as well and clear
+        // the CSR.
+        deleteCollectionEntryLocally(opCtx, nss);
+        clearShardCatalogCacheForDroppedCollection(opCtx, nss, coll.getUuid());
+    }
 
     // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
     invalidateCollectionMetadataOnSecondaries(
         opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
-
-    // Update this node CSR with collection metadata and chunks.
-    updateShardCatalogCache(opCtx, nss, coll, ownedChunks);
 }
 
 void commitChunklessCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
@@ -342,13 +485,7 @@ void commitChunklessCollectionLocally(OperationContext* opCtx, const NamespaceSt
 
     // Drop all existing chunk entries for this collection to start from a clean slate. This removes
     // both real chunks and any prior chunkless placeholder.
-    {
-        DBDirectClient dbClient(opCtx);
-        executeLocalDelete(dbClient,
-                           NamespaceString::kConfigShardCatalogChunksNamespace,
-                           BSON(ChunkType::collectionUUID() << coll.getUuid()),
-                           true /* multi */);
-    }
+    deleteCollectionChunksMetadataLocally(opCtx, coll.getUuid());
 
     // This shard does not own any chunks, but we still need the CSS to know the collection is
     // tracked. Persist a single placeholder chunk so that disk recovery can distinguish a

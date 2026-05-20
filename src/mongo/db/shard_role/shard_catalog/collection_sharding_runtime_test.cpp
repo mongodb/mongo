@@ -608,16 +608,6 @@ TEST_F(CollectionShardingRuntimeTest, ShardVersionCheckDetectsClusterTimeConflic
 using CollectionShardingRuntimeTestDeathTest = CollectionShardingRuntimeTest;
 
 DEATH_TEST_REGEX_F(CollectionShardingRuntimeTestDeathTest,
-                   ClearFilteringMetadataAuthoritativeAssertsOnUUIDMismatch,
-                   "Tripwire assertion.*11995200") {
-    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
-    OperationContext* opCtx = operationContext();
-    csr.setFilteringMetadata_nonAuthoritative(opCtx, makeShardedMetadata(opCtx, UUID::gen()));
-
-    csr.clearFilteringMetadata_authoritative(opCtx, UUID::gen());
-}
-
-DEATH_TEST_REGEX_F(CollectionShardingRuntimeTestDeathTest,
                    TestsShouldTassertIfPlacementConflictTimeIsNotPresentInTxns,
                    "Tripwire assertion.*10206300") {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);

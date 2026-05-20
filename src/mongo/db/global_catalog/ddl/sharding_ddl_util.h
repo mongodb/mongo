@@ -430,6 +430,22 @@ MONGO_MOD_PRIVATE void commitCreateCollectionMetadataToShardCatalog(
     const CancellationToken& token);
 
 /**
+ *  Commits a renameCollection operation to the shard catalog by sending the command
+ * `_shardsvrCommitRenameCollectionMetadata` to all given shards.
+ */
+MONGO_MOD_PRIVATE void commitRenameCollectionMetadataToShardCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& fromNss,
+    const NamespaceString& toNss,
+    const boost::optional<UUID>& sourceUuid,
+    const boost::optional<UUID>& targetUuid,
+    const boost::optional<UUID>& newTargetUuid,
+    const std::vector<ShardId>& shardIds,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token);
+
+/**
  * Based on the FCV, get the where the DDL needs to act accordingly to the database
  * or collection metadata authoritativeness.
  */

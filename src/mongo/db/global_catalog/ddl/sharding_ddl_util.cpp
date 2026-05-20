@@ -47,6 +47,7 @@
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_gen.h"
 #include "mongo/db/global_catalog/ddl/set_allow_migrations_gen.h"
+#include "mongo/db/global_catalog/ddl/sharded_rename_collection_gen.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
@@ -964,6 +965,43 @@ void commitCreateCollectionMetadataToShardCatalog(
             **executor, token, std::move(request));
 
     sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+}
+
+void commitRenameCollectionMetadataToShardCatalog(
+    OperationContext* opCtx,
+    const NamespaceString& fromNss,
+    const NamespaceString& toNss,
+    const boost::optional<UUID>& sourceUuid,
+    const boost::optional<UUID>& targetUuid,
+    const boost::optional<UUID>& newTargetUuid,
+    const std::vector<ShardId>& shardIds,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    ShardsvrCommitRenameCollectionMetadata request{
+        fromNss, toNss, ShardingState::get(opCtx)->shardId()};
+    request.setDbName(DatabaseName::kAdmin);
+    request.setSourceUUID(sourceUuid);
+    request.setTargetUUID(targetUuid);
+    request.setNewTargetUUID(newTargetUuid);
+
+    // TODO SERVER-127216: Replace with the CRUD feature flag to check if we're upgrading or not.
+    //
+    // In the event the cluster is undergoing an FCV upgrade then metadata cannot be
+    // assumed to be present on the shard since it may or may not yet contain the
+    // authoritative catalog. As such the commit has to fetch the data. This is an
+    // idempotent operation so it poses no issues with the concurrent
+    // AuthoritativeCloningCoordinator.
+    const bool isUpgrading = true;
+    request.setShouldCloneEverything(isUpgrading);
+
+    generic_argument_util::setMajorityWriteConcern(request);
+    generic_argument_util::setOperationSessionInfo(request, osi);
+
+    auto opts =
+        std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCommitRenameCollectionMetadata>>(
+            **executor, token, request);
+    sendAuthenticatedCommandToShards(opCtx, std::move(opts), shardIds);
 }
 
 AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(

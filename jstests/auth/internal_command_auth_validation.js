@@ -806,6 +806,10 @@ const internalCommandsMap = {
             _shardsvrCommitCreateCollectionMetadata: "test.x",
         },
     },
+    _shardsvrCommitRenameCollectionMetadata: {
+        testname: "_shardsvrCommitRenameCollectionMetadata",
+        command: {_shardsvrCommitRenameCollectionMetadata: "", fromNss: "test.x", toNss: "test.y", primaryShardId: ""},
+    },
     _shardsvrSetAllowMigrations: {
         testname: "_shardsvrSetAllowMigrations",
         command: {_shardsvrSetAllowMigrations: "db.collection", allowMigrations: true},

@@ -84,9 +84,15 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
  */
 void dropCollectionLocally(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           bool markFromMigrate) {
-    DropCollectionCoordinator::dropCollectionLocally(
-        opCtx, nss, markFromMigrate, false /* dropSystemCollections */);
+                           bool markFromMigrate,
+                           bool isNonAuthoritative) {
+    DropCollectionCoordinator::dropCollectionLocally(opCtx,
+                                                     nss,
+                                                     markFromMigrate,
+                                                     false /* dropSystemCollections */,
+                                                     boost::none,
+                                                     false,
+                                                     isNonAuthoritative);
     LOGV2_DEBUG(5515100,
                 1,
                 "Dropped target collection locally on renameCollection participant.",
@@ -101,7 +107,8 @@ void renameOrDropTarget(OperationContext* opCtx,
                         const NamespaceString& toNss,
                         const RenameCollectionOptions& options,
                         const UUID& sourceUUID,
-                        const boost::optional<UUID>& targetUUID) {
+                        const boost::optional<UUID>& targetUUID,
+                        bool isNonAuthoritative) {
     {
         Lock::DBLock dbLock(opCtx, toNss.dbName(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, toNss, MODE_IS);
@@ -139,7 +146,7 @@ void renameOrDropTarget(OperationContext* opCtx,
                     1,
                     "Source namespace not found while trying to rename collection on participant",
                     logAttrs(fromNss));
-        dropCollectionLocally(opCtx, toNss, options.markFromMigrate);
+        dropCollectionLocally(opCtx, toNss, options.markFromMigrate, isNonAuthoritative);
         rangedeletionutil::deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
     }
 }
@@ -393,8 +400,13 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                     return thisShardId != primaryShardId;
                 }();
 
-                renameOrDropTarget(
-                    opCtx, fromNss, toNss, options, _doc.getSourceUUID(), _doc.getTargetUUID());
+                renameOrDropTarget(opCtx,
+                                   fromNss,
+                                   toNss,
+                                   options,
+                                   _doc.getSourceUUID(),
+                                   _doc.getTargetUUID(),
+                                   _doc.getClearCollMetadata());
 
                 rangedeletionutil::restoreRangeDeletionTasksForRename(opCtx, toNss);
             }))
@@ -452,21 +464,33 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                                    << NamespaceStringUtil::serialize(
                                           toNss, SerializationContext::stateDefault()));
                 auto service = ShardingRecoveryService::get(opCtx);
+
+                std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionFromPtr;
+                std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionToPtr;
+                if (_doc.getClearCollMetadata()) {
+                    actionFromPtr =
+                        std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>(
+                            true /*includeStepsForNamespaceDropped*/);
+                    actionToPtr =
+                        std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
+                } else {
+                    actionFromPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();
+                    actionToPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();
+                }
+
                 service->releaseRecoverableCriticalSection(
                     opCtx,
                     fromNss,
                     reason,
                     ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-                    ShardingRecoveryService::FilteringMetadataClearer(
-                        true /*includeStepsForNamespaceDropped*/),
+                    *actionFromPtr,
                     true /* throwIfReasonDiffers*/);
-                service->releaseRecoverableCriticalSection(
-                    opCtx,
-                    toNss,
-                    reason,
-                    defaultMajorityWriteConcern(),
-                    ShardingRecoveryService::FilteringMetadataClearer(),
-                    false /* throwIfReasonDiffers*/);
+                service->releaseRecoverableCriticalSection(opCtx,
+                                                           toNss,
+                                                           reason,
+                                                           defaultMajorityWriteConcern(),
+                                                           *actionToPtr,
+                                                           false /* throwIfReasonDiffers*/);
 
                 LOGV2(5515107, "CRUD unblocked", "fromNs"_attr = fromNss, "toNs"_attr = toNss);
             }))

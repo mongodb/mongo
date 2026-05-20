@@ -79,12 +79,6 @@ CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
             return true;
         });
 
-    // If the collection is tracked we must at least have a single chunk entry present for the
-    // collection.
-    tassert(12033904,
-            "Expected to have at least one chunk entry for the collection but there are none",
-            !chunks.empty());
-
     // At this point we can just sort it based on the lastmod version since we know the
     // timestamp/uuid is fixed across all chunks for that collection. This is necessary as
     // per the requirements of the routing table and could potentially go away if we used a

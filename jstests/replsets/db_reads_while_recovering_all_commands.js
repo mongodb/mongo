@@ -96,6 +96,7 @@ const allCommands = {
     _shardsvrCompactStructuredEncryptionData: {skip: isPrimaryOnly},
     _shardsvrCommitCreateDatabaseMetadata: {skip: isPrimaryOnly},
     _shardsvrCommitDropDatabaseMetadata: {skip: isPrimaryOnly},
+    _shardsvrCommitRenameCollectionMetadata: {skip: isPrimaryOnly},
     _shardsvrCommitReshardCollection: {skip: isPrimaryOnly},
     _shardsvrConvertToCapped: {skip: isPrimaryOnly},
     _shardsvrDropCollection: {skip: isPrimaryOnly},
