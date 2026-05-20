@@ -48,10 +48,6 @@ class test_layered_fast_truncate09(wttest.WiredTigerTestCase):
     nitems = 1000
 
     def setUp(self):
-        if wiredtiger.disagg_fast_truncate_build() == 0:
-            self.skipTest(
-                "fast truncate support is not enabled"
-                " - check if WT_DISAGG_FAST_TRUNCATE_BUILD is enabled in the build configuration")
         super().setUp()
 
         self.setup_follower()

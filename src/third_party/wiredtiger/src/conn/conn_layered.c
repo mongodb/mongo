@@ -1306,9 +1306,6 @@ __disagg_begin_checkpoint(WT_SESSION_IMPL *session)
         WT_RET(__wti_disagg_load_crypt_key(session, &metadata));
     }
 
-    WT_RET(disagg->npage_log->page_log->pl_begin_checkpoint(
-      disagg->npage_log->page_log, &session->iface, 0));
-
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Begin next disaggregated storage checkpoint: num_meta_put=%" PRIu64, disagg->num_meta_put);
 

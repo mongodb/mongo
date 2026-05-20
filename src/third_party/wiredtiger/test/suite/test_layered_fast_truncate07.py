@@ -32,7 +32,7 @@
 #   first/last visible key, both via the verbose log line and by the row set
 #   visible on subsequent reads.
 
-import wiredtiger, wttest
+import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
@@ -50,11 +50,6 @@ class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(disagg_storages, key_formats)
 
     nitems = 100
-
-    def setUp(self):
-        if wiredtiger.disagg_fast_truncate_build() == 0:
-            self.skipTest("fast truncate support is not enabled")
-        super().setUp()
 
     # Zero-padded string keys so lexicographic order matches numeric order.
     def key(self, n):

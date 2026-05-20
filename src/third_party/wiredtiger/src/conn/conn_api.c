@@ -1270,6 +1270,15 @@ err:
 
     __wt_verbose_info(
       session, WT_VERB_RECOVERY_PROGRESS, "%s", "closing some of the internal threads.");
+
+    /*
+     * The sweep server must be stopped before any thread group is destroyed: tearing down a thread
+     * group will cause session structures to be cleared. This will mess with the sweep's session
+     * walk. The sweep must also be stopped before the final checkpoint to prevent it from closing
+     * file handles while the checkpoint is reviewing open data handles.
+     */
+    WT_TRET(__wti_sweep_destroy(session));
+
     /* Shut down pre-fetching - it should not operate while closing the connection. */
     WT_TRET(__wti_prefetch_destroy(session));
 
@@ -1284,13 +1293,6 @@ err:
      * proceed without doing snapshot visibility checks.
      */
     session->txn->isolation = WT_ISO_READ_UNCOMMITTED;
-
-    /*
-     * The sweep server is still running and it can close file handles at the same time the final
-     * checkpoint is reviewing open data handles (forcing checkpoint to reopen handles). Shut down
-     * the sweep server.
-     */
-    WT_TRET(__wti_sweep_destroy(session));
 
     /*
      * Shut down the checkpoint, compact and capacity server threads: we don't want to throttle

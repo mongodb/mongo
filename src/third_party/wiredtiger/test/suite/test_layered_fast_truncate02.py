@@ -48,11 +48,6 @@ class test_layered_fast_truncate02(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages('test_layered_fast_truncate02', disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
-    def setUp(self):
-        if wiredtiger.disagg_fast_truncate_build() == 0:
-            self.skipTest("fast truncate support is not enabled")
-        super().setUp()
-
     def leader_checkpoint(self, ts):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(ts) +
                                 ',oldest_timestamp=' + self.timestamp_str(1))

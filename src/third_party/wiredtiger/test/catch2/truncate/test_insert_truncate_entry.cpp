@@ -82,7 +82,6 @@ private:
       "extensions=[./ext/page_log/palite/libwiredtiger_palite.so],"
       "disaggregated=(role=follower,page_log=palite)";
 
-    scoped_fast_truncate_enable _enable;
     connection_wrapper _wrapper{prepare_home_directory(home), connection_config};
     WT_SESSION_IMPL *_session_impl{_wrapper.create_session()};
     WT_CURSOR *_cursor{};

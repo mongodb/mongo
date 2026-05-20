@@ -1034,6 +1034,8 @@ struct __wt_connection_stats {
     int64_t live_restore_hist_source_read_latency_gt1000;
     int64_t live_restore_hist_source_read_latency_total_msecs;
     int64_t live_restore_state;
+    int64_t read_load;
+    int64_t write_load;
     int64_t lock_btree_page_count;
     int64_t lock_btree_page_wait_application;
     int64_t lock_btree_page_wait_internal;

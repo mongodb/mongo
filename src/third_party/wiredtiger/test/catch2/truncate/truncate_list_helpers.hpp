@@ -25,22 +25,6 @@ namespace truncate_list_helpers {
 
 using truncate_range = std::pair<WT_ITEM, WT_ITEM>;
 
-class scoped_fast_truncate_enable {
-public:
-    scoped_fast_truncate_enable() : _previous(__wt_process.disagg_fast_truncate_2026)
-    {
-        __wt_process.disagg_fast_truncate_2026 = true;
-    }
-
-    ~scoped_fast_truncate_enable()
-    {
-        __wt_process.disagg_fast_truncate_2026 = _previous;
-    }
-
-private:
-    bool _previous;
-};
-
 [[nodiscard]] WT_ITEM make_item(std::string_view view);
 
 [[nodiscard]] std::string_view as_view(const WT_ITEM &item);
@@ -79,7 +63,6 @@ public:
     WT_TRUNCATE *add_entry(const WT_ITEM &start, const WT_ITEM &stop);
 
 private:
-    scoped_fast_truncate_enable _enable;
     std::shared_ptr<mock_session> _mock;
     WT_SESSION_IMPL *_session{};
     mutable WT_LAYERED_TABLE _table{};

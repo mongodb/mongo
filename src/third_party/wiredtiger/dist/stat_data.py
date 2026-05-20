@@ -125,6 +125,10 @@ class LiveRestoreStat(Stat):
     prefix = 'live-restore'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, LiveRestoreStat.prefix, desc, flags)
+class LoadControlStat(Stat):
+    prefix = 'load-control'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, LoadControlStat.prefix, desc, flags)
 class LockStat(Stat):
     prefix = 'lock'
     def __init__(self, name, desc, flags=''):
@@ -647,6 +651,12 @@ conn_stats = [
     LiveRestoreStat('live_restore_source_read_count', 'number of reads from the source database'),
     LiveRestoreStat('live_restore_state', 'state', 'no_clear,no_scale'),
     LiveRestoreStat('live_restore_work_remaining', 'number of files remaining for migration completion', 'no_clear,no_scale'),
+
+    ##########################################
+    # Load Control statistics
+    ##########################################
+    LoadControlStat('read_load', 'read load at the system level'),
+    LoadControlStat('write_load', 'write load at the system level'),
 
     ##########################################
     # Locking statistics

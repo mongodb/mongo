@@ -212,8 +212,8 @@ config_bool(
 )
 
 config_bool(
-    WT_DISAGG_FAST_TRUNCATE_BUILD
-    "Support Disaggregated Fast Truncate POC on WT build"
+    WT_DISAGG_SLOW_TRUNCATE_BUILD
+    "Use slow truncate path on follower mode"
     DEFAULT OFF
 )
 

@@ -95,6 +95,7 @@ src/conn/conn_layered_ingest.c
 src/conn/conn_layered_page_log.c
 src/conn/conn_layered_table_manager.c
 src/conn/conn_layered.c
+src/conn/conn_load_control.c
 src/conn/conn_open.c
 src/conn/conn_page_history.c
 src/conn/conn_prefetch.c

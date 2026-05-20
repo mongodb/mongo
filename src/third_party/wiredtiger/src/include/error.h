@@ -144,6 +144,12 @@
         __wt_session_set_last_error(session, v, WT_NONE, __VA_ARGS__); \
         return (__ret);                                                \
     } while (0)
+#define WT_RET_MSG_CHK(session, v, ...)              \
+    do {                                             \
+        int __ret = (v);                             \
+        if (__ret != 0)                              \
+            WT_RET_MSG(session, __ret, __VA_ARGS__); \
+    } while (0)
 #define WT_RET_SUB(session, v, sub_v, ...)                           \
     do {                                                             \
         int __ret = (v);                                             \

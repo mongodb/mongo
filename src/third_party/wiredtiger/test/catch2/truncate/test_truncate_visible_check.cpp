@@ -34,8 +34,6 @@ struct TruncVisibleCheckFixture {
     {
         session = mock->get_wt_session_impl();
 
-        __wt_process.disagg_fast_truncate_2026 = true;
-
         /* Allocate a zeroed transaction and shared list. */
         WT_TXN_SHARED *txn_shared_list;
         REQUIRE(__wt_calloc(session, 1, sizeof(WT_TXN_SHARED), &txn_shared_list) == 0);
@@ -309,18 +307,19 @@ TEST_CASE_METHOD(
 }
 
 TEST_CASE_METHOD(
-  TruncVisibleCheckFixture, "truncate_delete_visible_check: feature flag disabled", "[truncate]")
+  TruncVisibleCheckFixture, "truncate_delete_visible_check: slow truncate mode", "[truncate]")
 {
     /*
-     * When disagg_fast_truncate_2026 is false the function must return WT_NOTFOUND immediately
+     * When disagg_slow_truncate_2026 is true the function must return WT_NOTFOUND immediately
      * without consulting the truncate list
      */
     SECTION("returns WT_NOTFOUND even when a matching entry exists")
     {
         add_truncate_entry("key100", "key200");
-        __wt_process.disagg_fast_truncate_2026 = false;
+        __wt_process.disagg_slow_truncate_2026 = true;
         WT_ITEM key = make_key("key150");
         CHECK(
           __wt_truncate_delete_visible_check(session, layered_table, &key, nullptr) == WT_NOTFOUND);
+        __wt_process.disagg_slow_truncate_2026 = false;
     }
 }

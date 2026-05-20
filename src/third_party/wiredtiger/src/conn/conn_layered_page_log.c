@@ -99,10 +99,12 @@ __wti_layered_get_disagg_checkpoint(WT_SESSION_IMPL *session, const char **cfg,
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_PAGE_LOG *page_log = NULL;
+    WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS args;
     char *page_log_name;
 
     conn = S2C(session);
     page_log_name = NULL;
+    WT_CLEAR(args);
 
     /*
      * We need our own copy of the page log config string, it must be NULL terminated to look it up.
@@ -116,14 +118,24 @@ __wti_layered_get_disagg_checkpoint(WT_SESSION_IMPL *session, const char **cfg,
      * only supported in test implementations of the page log interface. This function will never be
      * called in production.
      */
-    if (page_log->pl_get_complete_checkpoint_ext == NULL)
+    if (page_log->pl_get_complete_checkpoint == NULL)
         WT_ERR(ENOTSUP);
 
-    ret = page_log->pl_get_complete_checkpoint_ext(page_log, &session->iface,
-      complete_checkpoint_lsn, NULL, complete_checkpoint_timestamp, complete_checkpoint_metadata);
+    ret = page_log->pl_get_complete_checkpoint(page_log, &session->iface, &args);
     WT_ERR_NOTFOUND_OK(ret, true);
 
+    if (complete_checkpoint_lsn != NULL)
+        *complete_checkpoint_lsn = args.checkpoint_lsn;
+    if (complete_checkpoint_timestamp != NULL)
+        *complete_checkpoint_timestamp = args.checkpoint_timestamp;
+    if (complete_checkpoint_metadata != NULL) {
+        /* Transfer ownership of the metadata buffer to the caller. */
+        *complete_checkpoint_metadata = args.checkpoint_metadata;
+        WT_CLEAR(args.checkpoint_metadata);
+    }
+
 err:
+    __wt_buf_free(session, &args.checkpoint_metadata);
     if (page_log != NULL)
         WT_TRET(page_log->terminate(page_log, &session->iface)); /* dereference */
     __wt_free(session, page_log_name);

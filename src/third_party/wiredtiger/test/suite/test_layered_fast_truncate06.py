@@ -32,7 +32,7 @@
 #   before the fix it was discarded, causing truncated rows to reappear and the truncate
 #   to be torn down.
 
-import wttest, wiredtiger
+import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
@@ -49,11 +49,6 @@ class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages(
         'test_layered_fast_truncate06', disagg_only=True)
     scenarios = make_scenarios(disagg_storages, uris)
-
-    def setUp(self):
-        if wiredtiger.disagg_fast_truncate_build() == 0:
-            self.skipTest("fast truncate support is not enabled")
-        super().setUp()
 
     def visible_keys(self):
         c = self.session.open_cursor(self.uri)

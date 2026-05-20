@@ -325,7 +325,7 @@ functions:
           ${SPINLOCK_TYPE|} \
           ${ENABLE_COLORIZE_OUTPUT|-DENABLE_COLORIZE_OUTPUT=0} \
           ${CC_OPTIMIZE_LEVEL|} \
-          ${WT_DISAGG_FAST_TRUNCATE_BUILD|}"
+          ${WT_DISAGG_SLOW_TRUNCATE_BUILD|}"
 
         # The RHEL PPC platform does not have ZSTD. Strip it out.
         if [ "${build_variant|}" = "rhel8-ppc" ] && [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS" =~ (\-DHAVE_BUILTIN_EXTENSION_ZSTD=1) ]]; then
@@ -1698,6 +1698,11 @@ variables:
           format_args: disagg.mode=leader runs.timer=5:10
           times: 1
 
+  - &s-all-dep
+    - name: s-all
+      variant: ubuntu2004
+      patch_optional: true
+
   - &format-stress-test-disagg-follower
     depends_on:
       - name: compile
@@ -1709,10 +1714,13 @@ variables:
           times: 5
 
   - &format-stress-test-disagg-switch
-    depends_on:
-      - name: compile
+    depends_on: *s-all-dep
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
+      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
+      - func: "compile wiredtiger"
+        vars:
+          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - func: "format test script"
         vars:
           # FIXME-WT-17380: Enable prepare for switch mode once failures are resolved.
@@ -1726,10 +1734,13 @@ variables:
 
   # FIXME-WT-16113: Consolidate this logic in test/format itself.
   - &format-stress-test-disagg-switch-data-validation
-    depends_on:
-      - name: compile
+    depends_on: *s-all-dep
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
+      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
+      - func: "compile wiredtiger"
+        vars:
+          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - func: "format test script"
         vars:
           # FIXME-WT-17380: Enable prepare for switch mode once failures are resolved.
@@ -1743,10 +1754,13 @@ variables:
           times: 5
 
   - &format-stress-test-disagg-switch-pull-request
-    depends_on:
-      - name: compile
+    depends_on: *s-all-dep
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
+      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
+      - func: "compile wiredtiger"
+        vars:
+          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - func: "format test script"
         vars:
           # run for 10 minutes.
@@ -1767,9 +1781,7 @@ tasks:
   # Base compile task on posix flavors
   - name: compile
     tags: ["pull_request"]
-    depends_on: &s-all-dep
-      - name: s-all
-        variant: ubuntu2004
+    depends_on: *s-all-dep
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -3797,21 +3809,6 @@ tasks:
             cd dist
             bash -x s_all -E 2>&1
 
-  - name: s-outdated-fixmes
-    # Detect any FIXME comments in the codebase tied to closed Jira tickets.
-    # This will send a GET request to JIRA for each FIXME ticket so we don't
-    # want to run it too frequently.
-    commands:
-      - func: "get project"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/dist"
-          shell: bash
-          script: |
-            set -o errexit
-            set -o verbose
-            ${python_binary|python3} s_outdated_fixmes.py 2>&1
-
   - name: conf-dump-test
     tags: ["pull_request", "python"]
     depends_on:
@@ -4882,10 +4879,13 @@ tasks:
           run_test_checkpoint_args: -e -x -s 7 -C cache_size=1000MB
 
   - name: format-failure-configs-test
-    depends_on:
-    - name: compile
+    depends_on: *s-all-dep
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
+      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
+      - func: "compile wiredtiger"
+        vars:
+          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - command: shell.exec
         params:
           working_dir: "wiredtiger/test/evergreen"
@@ -5307,10 +5307,13 @@ tasks:
 
   - name: format-stress-test-disagg-switch-tsan
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
+    depends_on: *s-all-dep
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
+      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
+      - func: "compile wiredtiger"
+        vars:
+          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - func: "format test disagg"
         vars:
           # Limit the number of operations to avoid an internal TSAN issue; run more operations with detect_deadlocks=0.

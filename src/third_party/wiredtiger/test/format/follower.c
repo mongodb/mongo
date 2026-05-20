@@ -103,9 +103,9 @@ follower_try_pickup_checkpoint(WT_SESSION *session, WT_CONNECTION *conn, WT_PAGE
      * pinned timestamp, we cannot safely pick up this checkpoint yet - skip it and wait for the
      * next attempt when timestamps have caught up.
      *
-     * The checkpoint_metadata from pl_get_complete_checkpoint_ext() only contains pointer
-     * information (metadata_lsn, etc.). We need to fetch the actual metadata page from the page log
-     * to get the full checkpoint config with oldest_timestamp.
+     * The checkpoint_metadata from pl_get_complete_checkpoint() only contains pointer information
+     * (metadata_lsn, etc.). We need to fetch the actual metadata page from the page log to get the
+     * full checkpoint config with oldest_timestamp.
      */
     testutil_assert(g.transaction_timestamps_config);
     testutil_check(
@@ -142,29 +142,27 @@ follower_read_latest_checkpoint(void)
     SAP sap;
     WT_CONNECTION *conn;
     WT_DECL_RET;
-    WT_ITEM checkpoint_metadata;
     WT_PAGE_LOG *page_log;
+    WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS args;
     WT_SESSION *session;
     const char *disagg_page_log;
-    wt_timestamp_t checkpoint_ts;
 
     conn = g.wts_conn;
     disagg_page_log = (char *)GVS(DISAGG_PAGE_LOG);
-    memset(&checkpoint_metadata, 0, sizeof(checkpoint_metadata));
+    memset(&args, 0, sizeof(args));
 
     /* Only follower can pickup checkpoints. */
     testutil_assert(!g.disagg_leader);
     testutil_check(conn->get_page_log(conn, disagg_page_log, &page_log));
 
     wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
-    ret = page_log->pl_get_complete_checkpoint_ext(
-      page_log, session, NULL, NULL, &checkpoint_ts, &checkpoint_metadata);
+    ret = page_log->pl_get_complete_checkpoint(page_log, session, &args);
     testutil_check_error_ok(ret, WT_NOTFOUND);
     if (ret != WT_NOTFOUND)
         (void)follower_try_pickup_checkpoint(
-          session, conn, page_log, &checkpoint_metadata, checkpoint_ts);
+          session, conn, page_log, &args.checkpoint_metadata, args.checkpoint_timestamp);
 
-    free(checkpoint_metadata.mem);
+    free(args.checkpoint_metadata.mem);
     wt_wrap_close_session(session);
     testutil_check(page_log->terminate(page_log, NULL));
 }
@@ -179,18 +177,17 @@ follower(void *arg)
     SAP sap;
     WT_CONNECTION *conn;
     WT_DECL_RET;
-    WT_ITEM checkpoint_metadata;
     WT_PAGE_LOG *page_log;
+    WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS args;
     WT_SESSION *session;
     const char *disagg_page_log;
     u_int period;
-    wt_timestamp_t checkpoint_ts;
 
     (void)(arg); /* Unused parameter */
     conn = g.wts_conn;
     disagg_page_log = (char *)GVS(DISAGG_PAGE_LOG);
     memset(&sap, 0, sizeof(sap));
-    memset(&checkpoint_metadata, 0, sizeof(checkpoint_metadata));
+    memset(&args, 0, sizeof(args));
 
     wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
     testutil_check(conn->get_page_log(conn, disagg_page_log, &page_log));
@@ -199,20 +196,22 @@ follower(void *arg)
         /*
          * FIXME-WT-15788: Eventually have the leader send checkpoint metadata to the follower (via
          * shared memory or pipe) so it can be picked up. Required once we start running against the
-         * library version of PALI, which doesn't implement pl_get_complete_checkpoint_ext().
+         * library version of PALI, which doesn't implement pl_get_complete_checkpoint().
          */
-        ret = page_log->pl_get_complete_checkpoint_ext(
-          page_log, session, NULL, NULL, &checkpoint_ts, &checkpoint_metadata);
+        free(args.checkpoint_metadata.mem);
+        memset(&args, 0, sizeof(args));
+        ret = page_log->pl_get_complete_checkpoint(page_log, session, &args);
         testutil_check_error_ok(ret, WT_NOTFOUND);
         /* Only reconfigure if there's a new checkpoint. */
         if (ret != WT_NOTFOUND) {
             if (g.checkpoint_metadata[0] == '\0' ||
-              memcmp(g.checkpoint_metadata, (const char *)checkpoint_metadata.data,
-                checkpoint_metadata.size) != 0) {
-                if (follower_try_pickup_checkpoint(
-                      session, conn, page_log, &checkpoint_metadata, checkpoint_ts))
+              memcmp(g.checkpoint_metadata, (const char *)args.checkpoint_metadata.data,
+                args.checkpoint_metadata.size) != 0) {
+                if (follower_try_pickup_checkpoint(session, conn, page_log,
+                      &args.checkpoint_metadata, args.checkpoint_timestamp))
                     testutil_snprintf(g.checkpoint_metadata, sizeof(g.checkpoint_metadata), "%.*s",
-                      (int)checkpoint_metadata.size, (const char *)checkpoint_metadata.data);
+                      (int)args.checkpoint_metadata.size,
+                      (const char *)args.checkpoint_metadata.data);
             }
         }
         period = mmrand(&g.extra_rnd, 1, 3);
@@ -221,7 +220,7 @@ follower(void *arg)
             __wt_sleep(1, 0);
         }
     }
-    free(checkpoint_metadata.mem);
+    free(args.checkpoint_metadata.mem);
     wt_wrap_close_session(session);
     testutil_check(page_log->terminate(page_log, NULL));
 

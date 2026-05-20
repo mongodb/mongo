@@ -33,7 +33,6 @@
 
 from contextlib import closing
 from helper_disagg import disagg_test_class, gen_disagg_storages
-from wiredtiger import disagg_fast_truncate_build
 from wtscenario import make_scenarios
 import wttest
 
@@ -45,11 +44,6 @@ class test_layered_fast_truncate08(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages(test_name, disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
     conn_config = 'disaggregated=(role="leader"),'
-
-    def setUp(self):
-        if disagg_fast_truncate_build() == 0:
-            self.skipTest("fast truncate support is not enabled")
-        super().setUp()
 
     def setup_layered_table(self, layered_uri: str):
         # Create the table and produce the initial checkpoint that the follower

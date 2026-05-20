@@ -45,11 +45,6 @@ class test_layered_fast_truncate17(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages('test_layered_ft_replay', disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
-    def setUp(self):
-        if wiredtiger.disagg_fast_truncate_build() == 0:
-            self.skipTest("fast truncate support is not enabled.")
-        super().setUp()
-
     def get_stat(self, conn, stat_key):
         s = conn.open_session('')
         val = s.open_cursor('statistics:')[stat_key][2]

@@ -422,16 +422,16 @@ wt_disagg_pick_up_latest_checkpoint()
     WT_PAGE_LOG *page_log;
     testutil_check(conn->get_page_log(conn, "palite", &page_log));
 
-    WT_ITEM metadata{};
-    wt_timestamp_t timestamp;
-    testutil_check(page_log->pl_get_complete_checkpoint_ext(
-      page_log, session.get(), nullptr, nullptr, &timestamp, &metadata));
+    WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS args{};
+    testutil_check(page_log->pl_get_complete_checkpoint(page_log, session.get(), &args));
 
     page_log->terminate(page_log, NULL); /* dereference */
     page_log = NULL;
 
-    char *checkpoint_meta = strndup((const char *)metadata.data, metadata.size);
-    free(metadata.mem);
+    char *checkpoint_meta =
+      strndup((const char *)args.checkpoint_metadata.data, args.checkpoint_metadata.size);
+    free(args.checkpoint_metadata.mem);
+    wt_timestamp_t timestamp = args.checkpoint_timestamp;
 
     std::ostringstream config;
     config << "disaggregated=(checkpoint_meta=\"" << checkpoint_meta << "\")";

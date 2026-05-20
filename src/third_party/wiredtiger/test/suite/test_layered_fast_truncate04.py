@@ -50,11 +50,6 @@ class test_layered_fast_truncate04(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(disagg_storages, uris)
 
-    def setUp(self):
-        if wiredtiger.disagg_fast_truncate_build() == 0:
-            self.skipTest("fast truncate support is not enabled")
-        super().setUp()
-
     # Total number of keys inserted. String keys are zero-padded to four
     # digits so that lexicographic order matches numeric order.
     nitems = 1000

@@ -205,14 +205,14 @@ class DisaggConfigMixin:
             extlist.skip_if_missing = True
         extlist.extension('page_log', self.ds_name + config)
 
-    # Get the information about the last completed checkpoint: ID, LSN, and metadata
+    # Get the information about the last completed checkpoint: LSN, ID, timestamp, and metadata
     def disagg_get_complete_checkpoint_ext(self, conn=None):
         if conn is None:
             conn = self.conn
         page_log = conn.get_page_log(self.vars.page_log)
 
         session = conn.open_session('')
-        r = page_log.pl_get_complete_checkpoint_ext(session)
+        r = page_log.pl_get_complete_checkpoint(session)
         page_log.terminate(session) # dereference
         session.close()
         return r

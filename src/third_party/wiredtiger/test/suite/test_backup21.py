@@ -72,6 +72,9 @@ class test_backup21(backup_base):
                 bkup_c.close()
                 # Once we reach midway point, start drop operations.
                 if iteration == self.ops/2:
+                    # Drain the queue so every create lands in metadata before
+                    # the drop phase starts asserting tables are backed up.
+                    work_queue.join()
                     iteration = 0
                     op = 'd'
         except:

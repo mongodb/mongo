@@ -328,11 +328,11 @@ err:
 }
 
 /*
- * __wti_curfile_search_near --
+ * __curfile_search_near --
  *     WT_CURSOR->search_near method for the btree cursor type.
  */
-int
-__wti_curfile_search_near(WT_CURSOR *cursor, int *exact)
+static int
+__curfile_search_near(WT_CURSOR *cursor, int *exact)
 {
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
@@ -1034,7 +1034,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
       __curfile_prev,                                 /* prev */
       __curfile_reset,                                /* reset */
       __curfile_search,                               /* search */
-      __wti_curfile_search_near,                      /* search-near */
+      __curfile_search_near,                          /* search-near */
       __curfile_insert,                               /* insert */
       __wti_cursor_modify_value_format_notsup,        /* modify */
       __curfile_update,                               /* update */

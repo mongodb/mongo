@@ -32,7 +32,6 @@
 from contextlib import closing
 from typing import Iterable
 from helper_disagg import disagg_test_class, gen_disagg_storages
-from wiredtiger import disagg_fast_truncate_build
 from wtscenario import make_scenarios
 import wttest
 
@@ -49,11 +48,6 @@ class test_layered_fast_truncate14(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, uris)
     conn_config = 'disaggregated=(role="leader"),'
-
-    def setUp(self):
-        if disagg_fast_truncate_build() == 0:
-            self.skipTest("fast truncate support is not enabled")
-        super().setUp()
 
     def session_create_config(self):
         cfg = "key_format=i,value_format=S"

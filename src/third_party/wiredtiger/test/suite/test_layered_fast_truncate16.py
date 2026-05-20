@@ -43,11 +43,6 @@ class test_layered_fast_truncate_stepup(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages('test_layered_fast_truncate_stepup', disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
-    def setUp(self):
-        if wiredtiger.disagg_fast_truncate_build() == 0:
-            self.skipTest("fast truncate support is not enabled.")
-        super().setUp()
-
     def populate_on_leader(self, ts=10):
         cursor = self.session.open_cursor(self.uri)
         for i in range(self.nitems):

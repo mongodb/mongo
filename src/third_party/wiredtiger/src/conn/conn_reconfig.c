@@ -476,6 +476,7 @@ __wti_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
     WT_ERR(__wt_cache_config(session, cfg, true));
     WT_ERR(__wt_evict_config(session, cfg, true));
     WT_ERR(__wt_cache_pool_create(session, cfg));
+    WT_ERR(__wti_conn_load_control_config(session, cfg, true));
     WT_ERR(__wti_capacity_server_create(session, cfg));
     WT_ERR(__wt_checkpoint_server_create(session, cfg));
     WT_ERR(__wti_debug_mode_config(session, cfg));

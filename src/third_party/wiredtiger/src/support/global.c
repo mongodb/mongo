@@ -356,8 +356,8 @@ __global_once(void)
     __wt_process.tiered_shared_2023 = true;
 #endif
 
-#ifdef WT_DISAGG_FAST_TRUNCATE_BUILD
-    __wt_process.disagg_fast_truncate_2026 = true;
+#if defined(WT_DISAGG_SLOW_TRUNCATE_BUILD) && (WT_DISAGG_SLOW_TRUNCATE_BUILD == 1)
+    __wt_process.disagg_slow_truncate_2026 = true;
 #endif
 }
 

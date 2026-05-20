@@ -288,6 +288,8 @@ extern void __wt_ckptlist_free(WT_SESSION_IMPL *session, WT_CKPT **ckptbasep);
 extern void __wt_ckptlist_saved_free(WT_SESSION_IMPL *session);
 
 #ifdef HAVE_UNITTEST
+extern bool __ut_checkpoint_skip_ckptlist(WT_CKPT *ckptbase)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 
 #endif
 

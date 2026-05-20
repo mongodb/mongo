@@ -253,7 +253,7 @@ __wt_schema_range_truncate(WT_TRUNCATE_INFO *trunc_info)
     } else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __wt_table_range_truncate(trunc_info);
     else if (WT_PREFIX_MATCH(uri, "layered:") &&
-      (S2C(session)->layered_table_manager.leader || __wt_process.disagg_fast_truncate_2026))
+      (S2C(session)->layered_table_manager.leader || !__wt_process.disagg_slow_truncate_2026))
         ret = __layered_range_truncate(trunc_info);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL && dsrc->range_truncate != NULL)
         ret = dsrc->range_truncate(dsrc, &session->iface, trunc_info->start, trunc_info->stop);

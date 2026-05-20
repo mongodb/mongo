@@ -48,11 +48,6 @@ class test_layered_fast_truncate01(wttest.WiredTigerTestCase):
 
     nitems = 1000
 
-    def setUp(self):
-        if wiredtiger.disagg_fast_truncate_build() == 0:
-            self.skipTest("fast truncate support is not enabled.")
-        super().setUp()
-
     def session_create_config(self):
         cfg = 'key_format=S,value_format=S'
         if self.uri.startswith('table'):

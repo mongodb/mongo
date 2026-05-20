@@ -60,6 +60,9 @@ __wti_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
     WT_RET(__wt_rollback_to_stable_init(session, cfg));
     WT_STAT_CONN_SET(session, dh_conn_handle_size, sizeof(WT_DATA_HANDLE));
+
+    /* Depends on the cache and eviction configuration, should initialize after them. */
+    WT_RET(__wti_conn_load_control_config(session, cfg, false));
     return (0);
 }
 

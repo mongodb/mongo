@@ -118,9 +118,6 @@ class test_layered80(wttest.WiredTigerTestCase):
         If the dhandle were closed during this window, the truncate entries are
         discarded.
         """
-        if wiredtiger.disagg_fast_truncate_build() == 0:
-            self.skipTest("fast truncate support is not enabled.")
-
         self.session.create(self.uri, 'key_format=i,value_format=S')
 
         # Write data as follower with timestamps.

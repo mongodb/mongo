@@ -102,8 +102,6 @@ class test_layered100(wttest.WiredTigerTestCase):
         self.leader_checkpoint(ts)
 
     def test_fast_truncate_disables_internal_delta(self):
-        if wiredtiger.disagg_fast_truncate_build() == 0:
-            self.skipTest("fast truncate support is not enabled")
         # Phase 1: insert all rows, checkpoint to establish the base image, then
         # evict all leaf pages to WT_REF_DISK (required for fast delete eligibility).
         self.setup_leader(',' + self.page_cfg)
