@@ -283,6 +283,10 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
+    void _createChangeStreamsMonitor(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
+
     ExecutorFuture<void> _awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
@@ -298,7 +302,8 @@ private:
      * If verification is enabled, waits for the the change streams monitor to complete.
      */
     ExecutorFuture<void> _awaitChangeStreamsMonitorCompleted(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
     // Drops the original collection and throws if the returned status is not either Status::OK()
     // or NamespaceNotFound.

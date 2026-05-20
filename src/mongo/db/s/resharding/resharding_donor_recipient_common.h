@@ -146,5 +146,7 @@ MONGO_MOD_PUBLIC void clearFilteringMetadata(
 
 void refreshShardVersion(OperationContext* opCtx, const NamespaceString& nss);
 
+bool isRetryableChangeStreamsMonitorError(const Status& status);
+
 }  // namespace resharding
 }  // namespace mongo

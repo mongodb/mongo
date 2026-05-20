@@ -2831,6 +2831,57 @@ TEST_F(ReshardingRecipientServiceTest, AbortWhileChangeStreamsMonitorInProgress)
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
 }
 
+TEST_F(ReshardingRecipientServiceTest, RetryableErrorDuringChangeStreamsMonitorTriggersRecreation) {
+    TestOptions testOptions{.isAlsoDonor = false, .performVerification = true};
+    LOGV2(10903207,
+          "Running case",
+          "test"_attr = unittest::getTestName(),
+          "testOptions"_attr = testOptions);
+
+    // Fire the failpoint once with a retryable error. The monitor should clean up, recreate
+    // itself from the last persisted resume token, and complete normally.
+    auto fp = globalFailPointRegistry().find(
+        "reshardingRecipientFailsUpdatingChangeStreamsMonitorProgress");
+    fp->setMode(FailPoint::nTimes, 1, BSON("errorCode" << ErrorCodes::HostUnreachable));
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    notifyToStartCloning(opCtx.get(), *recipient, doc);
+    awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+    notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
+    awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
+    notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+
+    ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+    checkRecipientDocumentRemoved(opCtx.get());
+}
+
+// TODO SERVER-121788: Remove death test once validation no longer runs in critical section.
+DEATH_TEST_REGEX_F(ReshardingRecipientServiceTestDeathTest,
+                   UnrecoverableCSMErrorAfterStrictConsistencyFatals,
+                   "10903201") {
+    // _awaitChangeStreamsMonitorCompleted runs after kStrictConsistency is persisted.
+    // Any unrecoverable CSM error at this point triggers a fatal assertion.
+    TestOptions testOptions{.isAlsoDonor = false, .performVerification = true};
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    FailPointEnableBlock failpoint("reshardingRecipientFailsUpdatingChangeStreamsMonitorProgress",
+                                   BSON("errorCode" << ErrorCodes::InternalError));
+
+    notifyToStartCloning(opCtx.get(), *recipient, doc);
+    awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+    notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
+
+    recipient->getCompletionFuture().getNoThrow().ignore();
+}
+
 TEST_F(ReshardingRecipientServiceTest, AbortWhileWaitingForCriticalSectionStarted) {
     for (auto& testOptions : makeBasicTestOptions()) {
         setupFeatureFlags(testOptions);

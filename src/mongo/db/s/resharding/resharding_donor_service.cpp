@@ -56,6 +56,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -387,11 +388,11 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                                    "writeTransactionOplogEntryThenTransitionToBlockingWrites");
                     _writeTransactionOplogEntryThenTransitionToBlockingWrites(factory);
                 })
-                .then([this, executor, telemetryCtx = telemetryCtx->clone()]() mutable {
+                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
                     auto span =
                         _startSpan(telemetryCtx,
                                    "ReshardingDonorService::_awaitChangeStreamsMonitorCompleted");
-                    return _awaitChangeStreamsMonitorCompleted(executor);
+                    return _awaitChangeStreamsMonitorCompleted(executor, factory);
                 });
         })
         .onTransientError([](const Status& status) {
@@ -1108,71 +1109,76 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
             return ExecutorFuture<void>(**executor, Status::OK());
         })
         .then([this, executor, factory] {
-            auto batchCallback = [this, factory = factory, anchor = shared_from_this()](
-                                     const auto& batch) {
-                boost::optional<long long> lagSecs;
-                if (auto clusterTimeSecs = batch.getResumeTokenClusterTimeSecs()) {
-                    auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
-                    auto lastCommittedSecs =
-                        replCoord->getLastCommittedOpTime().getTimestamp().getSecs();
-                    auto lagMs =
-                        Milliseconds(std::max<int64_t>(0,
-                                                       static_cast<int64_t>(lastCommittedSecs) -
-                                                           static_cast<int64_t>(*clusterTimeSecs)) *
-                                     1000);
-                    _metrics->setChangeStreamMonitorLag(lagMs);
-                    lagSecs = durationCount<Seconds>(lagMs);
-                }
-
-                LOGV2(9858404,
-                      "Persisting change streams monitor's progress",
-                      "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                      "documentsDelta"_attr = batch.getDocumentsDelta(),
-                      "completed"_attr = batch.containsFinalEvent(),
-                      "changeStreamMonitorLagSecs"_attr = lagSecs);
-
-                auto changeStreamsMonitorCtx = _changeStreamsMonitorCtx.get();
-                changeStreamsMonitorCtx.setResumeToken(batch.getResumeToken().getOwned());
-                changeStreamsMonitorCtx.setDocumentsDelta(
-                    changeStreamsMonitorCtx.getDocumentsDelta() + batch.getDocumentsDelta());
-                changeStreamsMonitorCtx.setCompleted(batch.containsFinalEvent());
-
-                if (MONGO_unlikely(
-                        reshardingDonorFailsUpdatingChangeStreamsMonitorProgress.shouldFail())) {
-                    uasserted(ErrorCodes::InternalError,
-                              "Simulating an unrecoverable error for testing inside the donor's "
-                              "changeStreamsMonitor callback");
-                }
-
-                auto opCtx = _makeOperationContext(factory);
-                _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
-            };
-
-            _changeStreamsMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
-                _metadata.getReshardingUUID(),
-                _metadata.getSourceNss(),
-                _changeStreamsMonitorCtx->getStartAtOperationTime(),
-                _changeStreamsMonitorCtx->getResumeToken(),
-                batchCallback);
-
-            LOGV2(9858401,
-                  "Starting the change streams monitor",
-                  "reshardingUUID"_attr = _metadata.getReshardingUUID());
-            _changeStreamsMonitorQuiesced =
-                _changeStreamsMonitor
-                    ->startMonitoring(**executor,
-                                      _donorService->getInstanceCleanupExecutor(),
-                                      _cancelState->getAbortOrStepdownToken(),
-                                      factory)
-                    .share();
-            _metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
-                                  resharding::getCurrentTime());
+            _createChangeStreamsMonitor(executor, factory);
             _changeStreamsMonitorStarted.emplaceValue();
         });
 }
 
+void ReshardingDonorService::DonorStateMachine::_createChangeStreamsMonitor(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
+    auto batchCallback = [this, factory = factory, anchor = shared_from_this()](const auto& batch) {
+        boost::optional<long long> lagSecs;
+        if (auto clusterTimeSecs = batch.getResumeTokenClusterTimeSecs()) {
+            auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
+            auto lastCommittedSecs = replCoord->getLastCommittedOpTime().getTimestamp().getSecs();
+            auto lagMs =
+                Milliseconds(std::max<int64_t>(0,
+                                               static_cast<int64_t>(lastCommittedSecs) -
+                                                   static_cast<int64_t>(*clusterTimeSecs)) *
+                             1000);
+            _metrics->setChangeStreamMonitorLag(lagMs);
+            lagSecs = durationCount<Seconds>(lagMs);
+        }
+
+        LOGV2(9858404,
+              "Persisting change streams monitor's progress",
+              "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+              "documentsDelta"_attr = batch.getDocumentsDelta(),
+              "completed"_attr = batch.containsFinalEvent(),
+              "changeStreamMonitorLagSecs"_attr = lagSecs);
+
+        auto changeStreamsMonitorCtx = _changeStreamsMonitorCtx.get();
+        changeStreamsMonitorCtx.setResumeToken(batch.getResumeToken().getOwned());
+        changeStreamsMonitorCtx.setDocumentsDelta(changeStreamsMonitorCtx.getDocumentsDelta() +
+                                                  batch.getDocumentsDelta());
+        changeStreamsMonitorCtx.setCompleted(batch.containsFinalEvent());
+
+        reshardingDonorFailsUpdatingChangeStreamsMonitorProgress.execute([&](const BSONObj& data) {
+            const auto& errorCode = data.getIntField("errorCode");
+            uasserted(ErrorCodes::Error(errorCode),
+                      "Simulating an error in donor's changeStreamsMonitor callback "
+                      "via failpoint");
+        });
+
+        auto opCtx = _makeOperationContext(factory);
+        _updateDonorDocument(opCtx.get(), std::move(changeStreamsMonitorCtx));
+    };
+
+    _changeStreamsMonitor = std::make_shared<ReshardingChangeStreamsMonitor>(
+        _metadata.getReshardingUUID(),
+        _metadata.getSourceNss(),
+        _changeStreamsMonitorCtx->getStartAtOperationTime(),
+        _changeStreamsMonitorCtx->getResumeToken(),
+        batchCallback);
+
+    LOGV2(9858401,
+          "Starting the change streams monitor",
+          "reshardingUUID"_attr = _metadata.getReshardingUUID());
+    _changeStreamsMonitorQuiesced =
+        _changeStreamsMonitor
+            ->startMonitoring(**executor,
+                              _donorService->getInstanceCleanupExecutor(),
+                              _cancelState->getAbortOrStepdownToken(),
+                              factory)
+            .share();
+    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
+                          resharding::getCurrentTime());
+}
+
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_awaitChangeStreamsMonitorCompleted(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory) {
     if (!_metadata.getPerformVerification() ||
         _changeStreamsMonitorCompleted.getFuture().isReady()) {
         return ExecutorFuture<void>(**executor, Status::OK());
@@ -1182,31 +1188,62 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_awaitChangeStre
     return future_util::withCancellation(_changeStreamsMonitor->awaitFinalChangeEvent(),
                                          _cancelState->getAbortOrStepdownToken())
         .thenRunOn(**executor)
-        .onCompletion([this](Status status) {
+        .onCompletion([this, executor, factory](Status status) {
             std::lock_guard<std::mutex> lk(_mutex);
             if (status.isOK()) {
                 _metrics->setEndFor(ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
                                     resharding::getCurrentTime());
-            }
 
-            LOGV2(9858402,
-                  "The change streams monitor completed",
-                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                  "status"_attr = status,
-                  "changeStreamMonitorTotalTimeSecs"_attr = _metrics->getElapsed<Seconds>(
-                      ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
-                      _serviceContext->getFastClockSource()),
-                  "blockingWritesToMonitorCompletionSecs"_attr =
-                      _metrics->getCrossPhaseElapsed<Seconds>(
-                          ReshardingMetrics::TimedPhase::kCriticalSection,
-                          ReshardingMetrics::TimedPhase::kChangeStreamMonitor));
+                LOGV2(9858402,
+                      "The change streams monitor completed",
+                      "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                      "status"_attr = status,
+                      "changeStreamMonitorTotalTimeSecs"_attr = _metrics->getElapsed<Seconds>(
+                          ReshardingMetrics::TimedPhase::kChangeStreamMonitor,
+                          _serviceContext->getFastClockSource()),
+                      "blockingWritesToMonitorCompletionSecs"_attr =
+                          _metrics->getCrossPhaseElapsed<Seconds>(
+                              ReshardingMetrics::TimedPhase::kCriticalSection,
+                              ReshardingMetrics::TimedPhase::kChangeStreamMonitor));
 
-            if (status.isOK()) {
                 ensureFulfilledPromise(lk,
                                        _changeStreamsMonitorCompleted,
                                        _changeStreamsMonitorCtx->getDocumentsDelta());
+                return ExecutorFuture<void>(**executor, Status::OK());
             } else {
-                ensureFulfilledPromise(lk, _changeStreamsMonitorCompleted, status);
+                if (_cancelState->isAbortedOrSteppingDown() ||
+                    status.isA<ErrorCategory::NotPrimaryError>()) {
+                    ensureFulfilledPromise(lk, _changeStreamsMonitorCompleted, status);
+                    return ExecutorFuture<void>(**executor, Status::OK());
+                }
+
+                if (resharding::isRetryableChangeStreamsMonitorError(status)) {
+                    LOGV2_WARNING(10903203,
+                                  "Change streams monitor failed with retryable error, will "
+                                  "recreate",
+                                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                                  "error"_attr = status);
+                    return _changeStreamsMonitor->awaitCleanup()
+                        .thenRunOn(**executor)
+                        .then([this, executor, factory]() {
+                            _createChangeStreamsMonitor(executor, factory);
+                            return _awaitChangeStreamsMonitorCompleted(executor, factory);
+                        });
+                } else {
+                    if (_donorCtx.getState() >= DonorStateEnum::kBlockingWrites) {
+                        LOGV2_FATAL(
+                            10903204,
+                            "Change streams monitor failed with unrecoverable error past the "
+                            "point donor was prepared to complete the resharding operation",
+                            "error"_attr = status);
+                    }
+                    LOGV2_WARNING(10903205,
+                                  "Change streams monitor failed with unrecoverable error",
+                                  "reshardingUUID"_attr = _metadata.getReshardingUUID(),
+                                  "error"_attr = status);
+                    ensureFulfilledPromise(lk, _changeStreamsMonitorCompleted, status);
+                    return ExecutorFuture<void>(**executor, status);
+                }
             }
         });
 }

@@ -505,6 +505,15 @@ void clearFilteringMetadata(OperationContext* opCtx,
     }
 }
 
+bool isRetryableChangeStreamsMonitorError(const Status& status) {
+    return status.isA<ErrorCategory::RetriableError>() ||
+        status == ErrorCodes::FailedToSatisfyReadPreference ||
+        status.isA<ErrorCategory::CursorInvalidatedError>() || status == ErrorCodes::Interrupted ||
+        status.isA<ErrorCategory::ExceededTimeLimitError>() ||
+        status.isA<ErrorCategory::NetworkTimeoutError>() ||
+        status == ErrorCodes::ShardingStateNotInitialized;
+}
+
 }  // namespace resharding
 
 }  // namespace mongo

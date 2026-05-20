@@ -1506,6 +1506,60 @@ TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringPreparingToDonate) {
 //     }
 // }
 
+TEST_F(ReshardingDonorServiceTest, RetryableErrorDuringChangeStreamsMonitorTriggersRecreation) {
+    TestOptions testOptions{.isAlsoRecipient = false, .performVerification = true};
+    LOGV2(10903206,
+          "Running case",
+          "test"_attr = unittest::getTestName(),
+          "testOptions"_attr = testOptions);
+
+    auto doc = makeStateDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    createSourceCollection(opCtx.get(), doc);
+
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    // Fire the failpoint once with a retryable error. The monitor should clean up, recreate
+    // itself from the last persisted resume token, and complete normally.
+    auto fp =
+        globalFailPointRegistry().find("reshardingDonorFailsUpdatingChangeStreamsMonitorProgress");
+    fp->setMode(FailPoint::nTimes, 1, BSON("errorCode" << ErrorCodes::HostUnreachable));
+
+    notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    awaitChangeStreamsMonitorCompleted(opCtx.get(), *donor, doc);
+    notifyReshardingCommitting(opCtx.get(), *donor, doc);
+
+    ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+    checkStateDocumentRemoved(opCtx.get());
+}
+
+// TODO SERVER-121788: Remove death test once validation no longer runs in critical section.
+DEATH_TEST_REGEX_F(ReshardingDonorServiceTestDeathTest,
+                   UnrecoverableCSMErrorAfterBlockingWritesFatals,
+                   "10903204") {
+    // _awaitChangeStreamsMonitorCompleted runs after kBlockingWrites is persisted.
+    // Any unrecoverable CSM error at this point triggers a fatal assertion.
+    TestOptions testOptions{.isAlsoRecipient = false, .performVerification = true};
+
+    auto doc = makeStateDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    createSourceCollection(opCtx.get(), doc);
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    FailPointEnableBlock failpoint("reshardingDonorFailsUpdatingChangeStreamsMonitorProgress",
+                                   BSON("errorCode" << ErrorCodes::InternalError));
+
+    notifyToStartChangeStreamsMonitor(opCtx.get(), *donor, doc);
+    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+
+    donor->getCompletionFuture().getNoThrow().ignore();
+}
+
 TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringPreparingToBlockWrites) {
     externalState()->throwUnrecoverableErrorIn(DonorStateEnum::kPreparingToBlockWrites,
                                                kAbortUnpreparedTransactionIfNecessary);

@@ -401,6 +401,10 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
 
+    void _createChangeStreamsMonitor(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
+
     ExecutorFuture<void> _awaitChangeStreamsMonitorCompleted(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         std::shared_ptr<HierarchicalCancelableOperationContextFactory> factory);
