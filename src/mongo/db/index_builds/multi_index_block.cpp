@@ -1137,6 +1137,17 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                   _phase == IndexBuildPhaseEnum::kCollectionScan ||
                   _phase == IndexBuildPhaseEnum::kBulkLoad,
               idl::serialize(_phase));
+
+    // Finalize all builders (which may perform a final spill) before transitioning to the load
+    // phase.
+    try {
+        for (auto&& index : _indexes) {
+            index.bulk->done();
+        }
+    } catch (...) {
+        return exceptionToStatus();
+    }
+
     _phase = IndexBuildPhaseEnum::kBulkLoad;
 
     // Doesn't allow yielding when in a foreground index build.

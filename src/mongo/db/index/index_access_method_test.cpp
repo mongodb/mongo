@@ -417,6 +417,85 @@ TEST_F(IndexAccessMethodBulkBuilder, CommitRejectsZeroInterval) {
                        ErrorCodes::BadValue);
 }
 
+TEST_F(IndexAccessMethodBulkBuilder, DoneCalledTwiceThrows) {
+    ServiceContext::UniqueOperationContext opCtxRaii = cc().makeOperationContext();
+    auto* opCtx = opCtxRaii.get();
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        "IndexAccessMethodBulkBuilder.DoneCalledTwiceThrows");
+    auto indexName = "a_1";
+    auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                 << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
+    ASSERT_OK(createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
+
+    AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
+    auto indexEntry = autoColl->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
+
+    auto bulk = indexAccessMethod->initiateBulk(opCtx,
+                                                *autoColl,
+                                                indexEntry,
+                                                /*spiller=*/nullptr,
+                                                /*maxMemoryUsageBytes=*/128 * 1024 * 1024,
+                                                /*stateInfo=*/boost::none,
+                                                nss.dbName(),
+                                                ContainerWriteBehavior::kDoNotReplicate);
+    ASSERT(bulk);
+
+    bulk->done();
+    ASSERT_THROWS_WITH_CHECK(bulk->done(), DBException, [](const DBException& ex) {
+        EXPECT_EQ(ex.code(), 12723200);
+        assertionCount.tripwire.subtractAndFetch(1);
+    });
+}
+
+TEST_F(IndexAccessMethodBulkBuilder, CommitWithoutDoneThrows) {
+    ServiceContext::UniqueOperationContext opCtxRaii = cc().makeOperationContext();
+    auto* opCtx = opCtxRaii.get();
+    auto nss = NamespaceString::createNamespaceString_forTest(
+        "IndexAccessMethodBulkBuilder.CommitWithoutDoneThrows");
+    auto indexName = "a_1";
+    auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                 << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
+    ASSERT_OK(createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
+
+    AutoGetCollection autoColl{opCtx, nss, LockMode::MODE_X};
+    auto indexEntry = autoColl->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
+
+    auto bulk = indexAccessMethod->initiateBulk(opCtx,
+                                                *autoColl,
+                                                indexEntry,
+                                                /*spiller=*/nullptr,
+                                                /*maxMemoryUsageBytes=*/128 * 1024 * 1024,
+                                                /*stateInfo=*/boost::none,
+                                                nss.dbName(),
+                                                ContainerWriteBehavior::kDoNotReplicate);
+    ASSERT(bulk);
+
+    ASSERT_THROWS_WITH_CHECK(bulk->commit(opCtx,
+                                          *shard_role_details::getRecoveryUnit(opCtx),
+                                          &*autoColl,
+                                          indexEntry,
+                                          /*dupsAllowed=*/true,
+                                          /*yieldIterations=*/0,
+                                          IndexAccessMethod::KeyHandlerFn{
+                                              [](const CollectionPtr&, const key_string::View&) {
+                                                  return Status::OK();
+                                              }},
+                                          IndexAccessMethod::RecordIdHandlerFn{},
+                                          IndexAccessMethod::YieldFn{},
+                                          IndexAccessMethod::OnNKeysLoadedFn{[]() {
+                                          }},
+                                          /*onNKeysLoadedFnInterval=*/1,
+                                          /*keyBatchSize=*/1,
+                                          /*keyBatchBytes=*/1024),
+                             DBException,
+                             [](const DBException& ex) {
+                                 EXPECT_EQ(ex.code(), 12723201);
+                                 assertionCount.tripwire.subtractAndFetch(1);
+                             });
+}
+
 }  // namespace
 
 }  // namespace mongo

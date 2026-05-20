@@ -263,7 +263,14 @@ public:
                               const ShouldRelaxConstraintsFn& shouldRelaxConstraints = nullptr) = 0;
 
         /**
-         * Call this when you are ready to finish your bulk work.
+         * Signals to the builder that inserting has been completed. Must be called exactly once,
+         * before commit().
+         */
+        virtual void done() = 0;
+
+        /**
+         * Commit the data that was inserted. done() must have been called first.
+         *
          * @param dupsAllowed - If false and 'dupRecords' is not null, append with the RecordIds of
          *                      the uninserted duplicates.
          * @param yieldIterations - The number of iterations run before each yielding. Will not

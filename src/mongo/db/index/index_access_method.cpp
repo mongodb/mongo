@@ -964,6 +964,8 @@ public:
                   const OnSuppressedErrorFn& onSuppressedError = nullptr,
                   const ShouldRelaxConstraintsFn& shouldRelaxConstraints = nullptr) final;
 
+    void done() final;
+
     Status commit(OperationContext* opCtx,
                   RecoveryUnit& ru,
                   const CollectionPtr* collection,
@@ -1036,6 +1038,7 @@ private:
     MultikeyPaths _indexMultikeyPaths;
 
     std::unique_ptr<Sorter> _sorter;
+    std::unique_ptr<Iterator> _sortedIterator;
     ContainerWriteBehavior _containerWriteBehavior;
     // We start out with container::ExistingKeyPolicy::reject because it's not safe to write blindly
     // unless we know for certain that we're inserting something that is definitely not already in
@@ -1217,6 +1220,12 @@ Status BulkBuilderImpl::insert(OperationContext* opCtx,
     return Status::OK();
 }
 
+void BulkBuilderImpl::done() {
+    invariant(_sorter);
+    tassert(12723200, "BulkBuilder::done called more than once", !_sortedIterator);
+    _sortedIterator = _sorter->done();
+}
+
 Status BulkBuilderImpl::commit(OperationContext* opCtx,
                                RecoveryUnit& ru,
                                const CollectionPtr* collection,
@@ -1232,10 +1241,11 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
                                const size_t keyBatchBytes) {
     uassert(
         ErrorCodes::BadValue, "onNKeysLoadedFnInterval must be >= 1", onNKeysLoadedFnInterval >= 1);
+    tassert(12723201, "BulkBuilder::done must be called before commit", _sortedIterator);
     Timer timer;
 
     _ns = entry->getNSSFromCatalog(opCtx);
-    auto it = _sorter->done();
+    auto it = std::move(_sortedIterator);
 
     ProgressMeterHolder pm;
     {

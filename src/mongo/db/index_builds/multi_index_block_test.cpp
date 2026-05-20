@@ -2745,6 +2745,78 @@ TEST_F(MultiIndexBlockTest, DoNotWriteStateToContainerOnSpillWhenNotResumable) {
 
     indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
+
+TEST_F(MultiIndexBlockTest, AllSpillsDuringScanPersistScanPhase) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+    RAIIServerParameterControllerForTest memUsage{"maxIndexBuildMemoryUsageMegabytes", 2};
+    RAIIServerParameterControllerForTest iteratorsMemoryPct{"maxIteratorsMemoryUsagePercentage", 1};
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+    auto& observer = installResumeStateContainerObserver(operationContext());
+
+    auto& indexer = *getIndexer();
+    AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
+    CollectionWriter coll{operationContext(), autoColl};
+
+    auto buildUUID = UUID::gen();
+    indexer.setBuildUUID(buildUUID);
+    indexer.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer.setIsResumable(true);
+
+    {
+        WriteUnitOfWork wuow{operationContext()};
+        std::string val(64 * 1024, 'a');
+        for (auto i = 0; i < 300; ++i) {
+            ASSERT_OK(
+                Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+        }
+        wuow.commit();
+    }
+
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *operationContext()->getServiceContext()->getStorageEngine());
+
+    ASSERT_OK(indexer.init(operationContext(),
+                           coll,
+                           {indexBuildInfo},
+                           MultiIndexBlock::kNoopOnInitFn,
+                           MultiIndexBlock::InitMode::SteadyState,
+                           boost::none));
+
+    auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+
+    ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+    EXPECT_GE(observer.countInsertsForIdent(indexBuildIdent) +
+                  observer.countUpdatesForIdent(indexBuildIdent),
+              1);
+
+    // Every write must persist that the index build is in the scan phase.
+    auto check = [&](const std::vector<ResumeStateContainerInsertObserver::Op>& ops) {
+        for (const auto& op : ops) {
+            if (op.ident != indexBuildIdent) {
+                continue;
+            }
+            auto info = ResumeIndexInfo::parse(BSONObj(op.value.data()),
+                                               IDLParserContext("ResumeIndexInfo"));
+            EXPECT_EQ(IndexBuildPhaseEnum::kCollectionScan, info.getPhase());
+            EXPECT_EQ(buildUUID, info.getBuildUUID());
+        }
+    };
+    check(observer.inserts);
+    check(observer.updates);
+
+    indexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+
 TEST_F(MultiIndexBlockTest, LoadWritesResumeStatePeriodicallyForPrimaryDrivenBuild) {
     RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
     RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
