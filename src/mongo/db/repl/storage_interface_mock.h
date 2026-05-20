@@ -399,7 +399,7 @@ public:
 
     boost::optional<Timestamp> getLastStableRecoveryTimestamp(
         ServiceContext* serviceCtx) const override {
-        return boost::none;
+        return lastStableRecoveryTimestamp;
     }
 
     Timestamp getPointInTimeReadTimestamp(OperationContext* opCtx) const override {
@@ -484,6 +484,7 @@ public:
     Timestamp allDurableTimestamp = Timestamp::min();
     Timestamp oldestOpenReadTimestamp = Timestamp::min();
     Timestamp earliestOplogTimestamp = Timestamp::min();
+    boost::optional<Timestamp> lastStableRecoveryTimestamp = boost::none;
 
 private:
     mutable std::mutex _mutex;

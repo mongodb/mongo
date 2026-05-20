@@ -3179,6 +3179,8 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
         return Status(ErrorCodes::ShutdownInProgress, "shutdown in progress");
     }
 
+    _topCoord->setCachedLastStableRecoveryTimestamp(lastStableRecoveryTimestamp);
+
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
     _topCoord->prepareStatusResponse(
         TopologyCoordinator::ReplSetStatusArgs{
@@ -5180,6 +5182,31 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
 
         // Update our understanding of the oldest available snapshot timestamp.
         setOldestTimestampMetric(_storage->getOldestTimestamp(getServiceContext()));
+    }
+
+    _maybeUpdateCachedLastStableRecoveryTimestamp(lk, _replExecutor->now());
+}
+
+void ReplicationCoordinatorImpl::_maybeUpdateCachedLastStableRecoveryTimestamp(WithLock lk,
+                                                                               Date_t now) {
+    // Periodically refresh the cached lastStableRecoveryTimestamp so it can be gossiped to other
+    // replica set members via heartbeats. Once a value has been established, throttle to once per
+    // two checkpoint intervals to avoid querying the storage engine too frequently.
+    const bool needsRefresh = [&] {
+        if (!_topCoord->hasCachedLastStableRecoveryTimestamp()) {
+            return true;
+        }
+        const double syncDelaySeconds = storageGlobalParams.syncdelay.load();
+        const Seconds effectiveSyncDelay{
+            syncDelaySeconds > 0 ? static_cast<std::int64_t>(syncDelaySeconds) : 60LL};
+        return now - _lastStableRecoveryTimestampRefreshTime >= 2 * effectiveSyncDelay;
+    }();
+    if (needsRefresh) {
+        const auto ts = _storage->getLastStableRecoveryTimestamp(getServiceContext());
+        if (ts && *ts != Timestamp::min()) {
+            _topCoord->setCachedLastStableRecoveryTimestamp(ts);
+        }
+        _lastStableRecoveryTimestampRefreshTime = now;
     }
 }
 

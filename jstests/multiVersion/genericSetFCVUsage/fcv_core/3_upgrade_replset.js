@@ -71,6 +71,17 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     // Allow more valid writes to go through
     sleep(10 * 1000);
 
+    // Newer server binaries should always have gossiped their lastStableRecoveryTimestamp to each
+    // other via heartbeats. The presence of this information won't negatively affect heartbeats to
+    // older server versions.
+    assert.soon(() => {
+        const rsStatus = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
+        return (
+            rsStatus.members[0].lastStableRecoveryTimestamp !== undefined &&
+            rsStatus.members[1].lastStableRecoveryTimestamp !== undefined
+        );
+    });
+
     jsTest.log("Downgrading replica set from latest to " + oldVersion);
     rst.upgradeSet({binVersion: oldVersion});
     jsTest.log("Replica set downgraded.");

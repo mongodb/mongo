@@ -249,6 +249,14 @@ public:
     // Returns _electionIdTerm.
     MONGO_MOD_PRIVATE long long getElectionIdTerm() const;
 
+    MONGO_MOD_PRIVATE bool hasCachedLastStableRecoveryTimestamp() const {
+        return _cachedLastStableRecoveryTimestamp.has_value();
+    }
+
+    MONGO_MOD_PRIVATE boost::optional<Timestamp> getCachedLastStableRecoveryTimestamp() const {
+        return _cachedLastStableRecoveryTimestamp;
+    }
+
     ////////////////////////////////////////////////////////////
     //
     // Basic state manipulation methods.
@@ -396,6 +404,13 @@ public:
      * Sets the value of the maintenance mode counter to 0.
      */
     MONGO_MOD_PRIVATE void resetMaintenanceCount();
+
+    /**
+     * Update the cached last stable recovery timestamp used to gossip to other nodes.
+     */
+    MONGO_MOD_PRIVATE void setCachedLastStableRecoveryTimestamp(boost::optional<Timestamp> ts) {
+        _cachedLastStableRecoveryTimestamp = ts;
+    }
 
     ////////////////////////////////////////////////////////////
     //
@@ -1267,6 +1282,12 @@ private:
     // point. This allows us to skip more costly checks of if this parameter was recently turned
     // on/off in the normal case.
     bool _priorityPortUsageEverDisabled = false;
+
+    // Last stable recovery timestamp queried from the storage engine. The value is cached here so
+    // it can be included in heartbeat responses and gossiped to other replica set members. The
+    // cached value is updated periodically during _setStableTimestampForStorage(), but is throttled
+    // to update at most once per two checkpoint intervals.
+    boost::optional<Timestamp> _cachedLastStableRecoveryTimestamp;
 };
 
 /**

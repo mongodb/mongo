@@ -43,6 +43,8 @@
 
 #include <string>
 
+#include <boost/optional.hpp>
+
 namespace mongo {
 
 class BSONObj;
@@ -131,6 +133,12 @@ public:
         return _electableSet;
     }
     bool isElectable() const;
+    bool hasLastStableRecoveryTimestamp() const {
+        return _lastStableRecoveryTimestamp.has_value();
+    }
+    Timestamp getLastStableRecoveryTimestamp() const {
+        return *_lastStableRecoveryTimestamp;
+    }
 
     /**
      * Sets _setName to "name".
@@ -215,6 +223,9 @@ public:
         _electableSet = true;
         _electable = electable;
     }
+    void setLastStableRecoveryTimestamp(Timestamp ts) {
+        _lastStableRecoveryTimestamp = ts;
+    }
 
 private:
     bool _electionTimeSet = false;
@@ -249,6 +260,8 @@ private:
 
     bool _electableSet = false;
     bool _electable = false;
+
+    boost::optional<Timestamp> _lastStableRecoveryTimestamp;
 };
 
 }  // namespace repl

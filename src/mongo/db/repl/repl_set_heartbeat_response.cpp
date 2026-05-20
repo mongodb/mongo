@@ -67,6 +67,7 @@ const std::string kSyncSourceFieldName = "syncingTo";
 const std::string kTermFieldName = "term";
 const std::string kTimestampFieldName = "ts";
 const std::string kIsElectableFieldName = "electable";
+const std::string kLastStableRecoveryTimestampFieldName = "lastStableRecoveryTimestamp";
 
 }  // namespace
 
@@ -120,6 +121,9 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
     }
     if (_electableSet) {
         *builder << kIsElectableFieldName << _electable;
+    }
+    if (_lastStableRecoveryTimestamp) {
+        builder->append(kLastStableRecoveryTimestampFieldName, *_lastStableRecoveryTimestamp);
     }
 }
 
@@ -293,6 +297,20 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
                                     << typeName(syncingToElement.type()));
     } else {
         _syncingTo = HostAndPort(syncingToElement.String());
+    }
+
+    const BSONElement lastStableRecoveryTimestampElement =
+        doc[kLastStableRecoveryTimestampFieldName];
+    if (!lastStableRecoveryTimestampElement.eoo()) {
+        if (lastStableRecoveryTimestampElement.type() != BSONType::timestamp) {
+            return Status(ErrorCodes::TypeMismatch,
+                          str::stream()
+                              << "Expected \"" << kLastStableRecoveryTimestampFieldName
+                              << "\" field in response to replSetHeartbeat to have type Timestamp, "
+                                 "but found "
+                              << typeName(lastStableRecoveryTimestampElement.type()));
+        }
+        _lastStableRecoveryTimestamp = lastStableRecoveryTimestampElement.timestamp();
     }
 
     const BSONElement rsConfigElement = doc[kConfigFieldName];

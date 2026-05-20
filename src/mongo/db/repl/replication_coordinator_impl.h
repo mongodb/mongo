@@ -1604,8 +1604,17 @@ private:
 
     /**
      * Calculates and sets the value of the 'stable' replication optime for the storage engine.
+     *
+     * This function may also update the topology coordinator's cached value of the storage engine's
+     * recovery timestamp.
      */
     void _setStableTimestampForStorage(WithLock lk);
+
+    /**
+     * Updates the topology coordinator's cached value of the storage engine's recovery timestamp if
+     * enough wall-clock time has elapsed that a checkpoint is certain to have occurred.
+     */
+    void _maybeUpdateCachedLastStableRecoveryTimestamp(WithLock lk, Date_t now);
 
     /**
      * Clears the current committed snapshot.
@@ -2017,6 +2026,10 @@ private:
 
     // The cached value of the topology from the most recent SplitHorizonChange.
     int64_t _lastHorizonTopologyChange{-1};  // (M)
+
+    // The last time we queried the storage engine for lastStableRecoveryTimestamp and cached it in
+    // _topCoord. Used to throttle calls to at most once per two checkpoint intervals.
+    Date_t _lastStableRecoveryTimestampRefreshTime;  // (M)
 
     // This should be set during sharding initialization except on config shard.
     boost::optional<bool> _wasCWWCSetOnConfigServerOnStartup;

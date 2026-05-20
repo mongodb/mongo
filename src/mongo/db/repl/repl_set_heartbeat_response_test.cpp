@@ -57,6 +57,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     Date_t appliedWallTime = Date_t() + Seconds(appliedOpTime.getSecs());
     OpTime writtenOpTime = OpTime(Timestamp(50), 0);
     Date_t writtenWallTime = Date_t() + Seconds(writtenOpTime.getSecs());
+    Timestamp lastStableRecoveryTimestamp = Timestamp(9);
     ASSERT_EQUALS(false, hbResponse.hasState());
     ASSERT_EQUALS(false, hbResponse.hasElectionTime());
     ASSERT_EQUALS(false, hbResponse.hasDurableOpTime());
@@ -94,6 +95,8 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     // set writtenOpTime
     hbResponse.setWrittenOpTimeAndWallTime({writtenOpTime, writtenWallTime});
     fieldsSet += 2;  // OpTime and WallTime are separate fields
+    hbResponse.setLastStableRecoveryTimestamp(lastStableRecoveryTimestamp);
+    ++fieldsSet;
     // set config
     ReplSetConfig config;
     hbResponse.setConfig(config);
@@ -122,6 +125,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(appliedWallTime, hbResponse.getAppliedOpTimeAndWallTime().wallTime);
     ASSERT_EQUALS(writtenOpTime, hbResponse.getWrittenOpTime());
     ASSERT_EQUALS(writtenWallTime, hbResponse.getWrittenOpTimeAndWallTime().wallTime);
+    ASSERT_EQUALS(lastStableRecoveryTimestamp, hbResponse.getLastStableRecoveryTimestamp());
     ASSERT_EQUALS(config.toBSON().toString(), hbResponse.getConfig().toBSON().toString());
 
     hbResponseObj = hbResponse.toBSON();
@@ -258,6 +262,31 @@ TEST(ReplSetHeartbeatResponse, InitializeNoWrittenWallTime) {
     Status result = hbResponse.initialize(initializerObj, 0);
     ASSERT_EQUALS(ErrorCodes::OK, result);
     ASSERT_EQUALS("", result.reason());
+}
+
+TEST(ReplSetHeartbeatResponse, InitializeWrongLastStableRecoveryTimestampType) {
+    ReplSetHeartbeatResponse hbResponse;
+    BSONObj initializerObj =
+        BSON("ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+                  << "durableWallTime" << Date_t() + Seconds(100) << "opTime"
+                  << OpTime(Timestamp(100, 0), 0).toBSON() << "wallTime" << Date_t() + Seconds(100)
+                  << "v" << 2 << "lastStableRecoveryTimestamp" << 12345LL);
+    Status result = hbResponse.initialize(initializerObj, 0);
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, result);
+    ASSERT_STRING_CONTAINS(result.reason(), "Expected \"lastStableRecoveryTimestamp\" field");
+}
+
+TEST(ReplSetHeartbeatResponse, InitializeNoLastStableRecoveryTimestamp) {
+    // Verifies backward compatibility: responses which don't report lastStableRecoveryTimestamp
+    // (older versions) still initialize successfully and hasLastStableRecoveryTimestamp() returns
+    // false.
+    ReplSetHeartbeatResponse hbResponse;
+    BSONObj initializerObj = BSON(
+        "ok" << 1.0 << "durableOpTime" << OpTime(Timestamp(100, 0), 0).toBSON() << "durableWallTime"
+             << Date_t() + Seconds(100) << "opTime" << OpTime(Timestamp(100, 0), 0).toBSON()
+             << "wallTime" << Date_t() + Seconds(100) << "v" << 2);
+    ASSERT_OK(hbResponse.initialize(initializerObj, 0));
+    ASSERT_FALSE(hbResponse.hasLastStableRecoveryTimestamp());
 }
 
 TEST(ReplSetHeartbeatResponse, InitializeMemberStateWrongType) {

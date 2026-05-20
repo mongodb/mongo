@@ -42,6 +42,8 @@
 
 #include <string>
 
+#include <boost/optional.hpp>
+
 namespace MONGO_MOD_PUB mongo {
 namespace repl {
 
@@ -200,6 +202,10 @@ public:
 
     boost::optional<int> getPriorityPort() const {
         return _priorityPort;
+    }
+
+    boost::optional<Timestamp> getLastStableRecoveryTimestamp() const {
+        return _lastStableRecoveryTimestamp;
     }
 
     /*
@@ -394,6 +400,9 @@ private:
 
     // Optional priority port for this member.
     boost::optional<int> _priorityPort;
+
+    // Last known lastStableRecoveryTimestamp gossiped from this member via heartbeat.
+    boost::optional<Timestamp> _lastStableRecoveryTimestamp;
 };
 
 }  // namespace repl

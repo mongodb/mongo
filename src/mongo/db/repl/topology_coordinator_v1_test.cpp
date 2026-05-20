@@ -413,6 +413,10 @@ protected:
                                                                    int selfIndex,
                                                                    bool expectPriority);
     void testReplSetGetStatus(BSONObj config, bool expectPriority);
+    void testReplSetGetStatusLastStableRecoveryTimestamp(BSONObj config,
+                                                         int selfIndex,
+                                                         boost::optional<Timestamp> selfTs,
+                                                         boost::optional<Timestamp> remoteTs);
     void testMemberReplicationProgressAfterReconfig(BSONObj initialConfig,
                                                     BSONObj changedConfig,
                                                     int selfIndex,
@@ -2278,6 +2282,67 @@ TEST_F(TopoCoordTest,
     ASSERT_EQUALS(HostAndPort("h5").toString(), response2Obj["prevSyncTarget"].String());
 }
 
+void TopoCoordTest::testReplSetGetStatusLastStableRecoveryTimestamp(
+    BSONObj config,
+    int selfIndex,
+    boost::optional<Timestamp> selfTs,
+    boost::optional<Timestamp> remoteTs) {
+    updateConfig(config, selfIndex);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    OpTime remoteOpTime(Timestamp(3, 1), 20);
+    Date_t remoteWallTime = Date_t() + Seconds(remoteOpTime.getSecs());
+    ReplSetHeartbeatResponse hb;
+    hb.setConfigVersion(1);
+    hb.setState(MemberState::RS_SECONDARY);
+    hb.setElectionTime(Timestamp());
+    hb.setAppliedOpTimeAndWallTime({remoteOpTime, remoteWallTime});
+    hb.setWrittenOpTimeAndWallTime({remoteOpTime, remoteWallTime});
+    hb.setDurableOpTimeAndWallTime({remoteOpTime, remoteWallTime});
+    hb.setTerm(getTopoCoord().getTerm());
+    if (remoteTs) {
+        hb.setLastStableRecoveryTimestamp(*remoteTs);
+    }
+
+    getTopoCoord().prepareHeartbeatRequestV1(now()++, "rs0", HostAndPort("h2"));
+    getTopoCoord().processHeartbeatResponse(
+        now()++, Milliseconds(1), HostAndPort("h2"), StatusWith<ReplSetHeartbeatResponse>(hb));
+
+    getTopoCoord().setCachedLastStableRecoveryTimestamp(selfTs);
+
+    BSONObjBuilder statusBuilder;
+    Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
+    getTopoCoord().prepareStatusResponse(
+        TopologyCoordinator::ReplSetStatusArgs{
+            now()++, 10, OpTime(), BSONObj(), BSONObj(), BSONObj(), selfTs},
+        &statusBuilder,
+        &resultStatus);
+    ASSERT_OK(resultStatus);
+    BSONObj rsStatus = statusBuilder.obj();
+
+    std::vector<BSONElement> members = rsStatus["members"].Array();
+    ASSERT_EQUALS(2U, members.size());
+
+    BSONObj selfStatus = members[selfIndex].Obj();
+    BSONObj h2Status = members[1 - selfIndex].Obj();
+    ASSERT_EQUALS("hself:27017", selfStatus["name"].str());
+    ASSERT_EQUALS("h2:27017", h2Status["name"].str());
+
+    if (selfTs) {
+        ASSERT_TRUE(selfStatus.hasField("lastStableRecoveryTimestamp"));
+        ASSERT_EQUALS(*selfTs, selfStatus["lastStableRecoveryTimestamp"].timestamp());
+    } else {
+        ASSERT_FALSE(selfStatus.hasField("lastStableRecoveryTimestamp"));
+    }
+
+    if (remoteTs) {
+        ASSERT_TRUE(h2Status.hasField("lastStableRecoveryTimestamp"));
+        ASSERT_EQUALS(*remoteTs, h2Status["lastStableRecoveryTimestamp"].timestamp());
+    } else {
+        ASSERT_FALSE(h2Status.hasField("lastStableRecoveryTimestamp"));
+    }
+}
+
 void TopoCoordTest::testReplSetGetStatus(BSONObj config, bool expectPriority) {
     // This test starts by configuring a TopologyCoordinator as a member of a 4 node replica
     // set, with each node in a different state.
@@ -2481,7 +2546,8 @@ void TopoCoordTest::testReplSetGetStatus(BSONObj config, bool expectPriority) {
     ASSERT_TRUE(member2Status.hasField("optimeDurableDate"));
     ASSERT_TRUE(member2Status.hasField("optimeWritten"));
     ASSERT_TRUE(selfStatus.hasField("optimeWrittenDate"));
-    ASSERT_FALSE(selfStatus.hasField("lastStableRecoveryTimestamp"));
+    ASSERT_EQUALS(lastStableRecoveryTimestamp,
+                  selfStatus["lastStableRecoveryTimestamp"].timestamp());
     ASSERT_EQUALS(electionTime, selfStatus["electionTime"].timestamp());
     ASSERT_FALSE(selfStatus.hasField("pingMs"));
 
@@ -2534,6 +2600,26 @@ TEST_F(TopoCoordTest, ReplSetGetStatusPriority) {
                           << BSON("_id" << 2 << "host" << "test2:1234" << "priorityPort" << 5678)
                           << BSON("_id" << 3 << "host" << "test3:1234" << "priorityPort" << 5678))),
         true);
+}
+
+TEST_F(TopoCoordTest, ReplSetGetStatusShowsLastStableRecoveryTimestamp) {
+    testReplSetGetStatusLastStableRecoveryTimestamp(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
+                                 << BSON("_id" << 1 << "host" << "h2"))),
+        0,
+        Timestamp(15, 1),
+        Timestamp(20, 3));
+}
+
+TEST_F(TopoCoordTest, ReplSetGetStatusOmitsLastStableRecoveryTimestampWhenAbsentFromHeartbeat) {
+    testReplSetGetStatusLastStableRecoveryTimestamp(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
+                                 << BSON("_id" << 1 << "host" << "h2"))),
+        0,
+        boost::none,
+        boost::none);
 }
 
 TEST_F(TopoCoordTest, ReplSetGetStatusWriteMajorityDifferentFromMajorityVoteCount) {
@@ -3171,6 +3257,35 @@ TEST_F(TopoCoordTest, RespondToHeartbeatsWithNullLastAppliedAndLastDurableWhileI
     ASSERT_EQUALS(OpTime(), response.getAppliedOpTime());
     ASSERT_EQUALS(OpTime(), response.getWrittenOpTime());
     ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
+}
+
+TEST_F(PrepareHeartbeatResponseV1Test,
+       HeartbeatResponseIncludesLastStableRecoveryTimestampWhenCacheIsSet) {
+    getTopoCoord().setCachedLastStableRecoveryTimestamp(Timestamp(10, 5));
+
+    ReplSetHeartbeatArgsV1 args;
+    args.setConfigVersion(1);
+    args.setSetName("rs0");
+    args.setSenderId(20);
+    ReplSetHeartbeatResponse response;
+    Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+    prepareHeartbeatResponseV1(args, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_TRUE(response.hasLastStableRecoveryTimestamp());
+    ASSERT_EQUALS(Timestamp(10, 5), response.getLastStableRecoveryTimestamp());
+}
+
+TEST_F(PrepareHeartbeatResponseV1Test,
+       HeartbeatResponseOmitsLastStableRecoveryTimestampWhenCacheIsNotSet) {
+    ReplSetHeartbeatArgsV1 args;
+    args.setConfigVersion(1);
+    args.setSetName("rs0");
+    args.setSenderId(20);
+    ReplSetHeartbeatResponse response;
+    Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+    prepareHeartbeatResponseV1(args, &response, &result);
+    ASSERT_OK(result);
+    ASSERT_FALSE(response.hasLastStableRecoveryTimestamp());
 }
 
 void TopoCoordTest::testMemberReplicationProgressAfterReconfig(BSONObj initialConfig,

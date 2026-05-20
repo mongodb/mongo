@@ -1015,6 +1015,9 @@ StatusWith<bool> TopologyCoordinator::prepareHeartbeatResponseV1(
     response->setAppliedOpTimeAndWallTime(lastOpApplied);
     response->setWrittenOpTimeAndWallTime(lastOpWritten);
     response->setDurableOpTimeAndWallTime(lastOpDurable);
+    if (_cachedLastStableRecoveryTimestamp) {
+        response->setLastStableRecoveryTimestamp(*_cachedLastStableRecoveryTimestamp);
+    }
 
     if (_currentPrimaryIndex != -1) {
         response->setPrimaryId(_rsConfig.getMemberAt(_currentPrimaryIndex).getId().getData());
@@ -2166,6 +2169,9 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                 if (featureFlagMajorityWriteLatency) {
                     bb.appendDate("lastWrittenWallTime", it->getLastWrittenWallTime());
                 }
+                if (lastStableRecoveryTimestamp) {
+                    bb.append("lastStableRecoveryTimestamp", *lastStableRecoveryTimestamp);
+                }
             }
 
             if (!_syncSource.empty() && !_iAmPrimary()) {
@@ -2239,6 +2245,9 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                 bb.appendDate("lastDurableWallTime", it->getLastDurableWallTime());
                 if (featureFlagMajorityWriteLatency) {
                     bb.appendDate("lastWrittenWallTime", it->getLastWrittenWallTime());
+                }
+                if (const auto ts = it->getLastStableRecoveryTimestamp()) {
+                    bb.append("lastStableRecoveryTimestamp", *ts);
                 }
             }
             bb.appendDate("lastHeartbeat", it->getLastHeartbeat());

@@ -100,6 +100,10 @@ MemberData::HeartbeatChanges MemberData::setUpValues(Date_t now,
         _configVersion = hbResponse.getConfigVersion();
     }
 
+    if (hbResponse.hasLastStableRecoveryTimestamp()) {
+        _lastStableRecoveryTimestamp = hbResponse.getLastStableRecoveryTimestamp();
+    }
+
     _lastResponse = std::move(hbResponse);
 
     return {opTimeAdvanced, configChanged, memberStateChanged};
