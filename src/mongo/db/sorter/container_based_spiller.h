@@ -128,7 +128,9 @@ public:
         _compareChecksums();
 
         auto key = Key::deserializeForSorter(reader, _settings.first);
-        _deferredValue.emplace(result.data() + reader.offset(), result.size() - reader.offset());
+        // Eagerly deserialize the value so it owns its own memory. Otherwise, it could become
+        // invalidated by a cursor reset.
+        _deferredValue = Value::deserializeForSorter(reader, _settings.second);
 
         return std::move(key);
     }
@@ -137,11 +139,10 @@ public:
         uassert(
             10896303, "Must precede getDeferredValue with nextWithDeferredValue", _deferredValue);
 
-        BufReader reader{_deferredValue->data(), static_cast<unsigned>(_deferredValue->size())};
-        _deferredValue = boost::none;
         _consume();
-
-        return Value::deserializeForSorter(reader, _settings.second);
+        auto value = std::move(*_deferredValue);
+        _deferredValue = boost::none;
+        return value;
     }
 
     const Key& peek() override {
@@ -214,7 +215,7 @@ private:
     int64_t _end;
     bool _positioned = false;
     Iterator<Key, Value>::Settings _settings;
-    boost::optional<std::span<const char>> _deferredValue;
+    boost::optional<Value> _deferredValue;
 
     // Checksum value that is updated with each read of a data object from a container. We can
     // compare this value with _originalChecksum to check for data corruption if and only if the
