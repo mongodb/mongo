@@ -111,6 +111,8 @@ public:
 
     bool isHealthy() override;
 
+    void setUnhealthy();
+
     // Dump all connection callbacks
     static void clear();
 
@@ -139,6 +141,7 @@ private:
     static void processRefresh();
 
     HostAndPort _hostAndPort;
+    bool _healthy{true};
     SetupCallback _setupCallback;
     RefreshCallback _refreshCallback;
     TimerImpl _timer;

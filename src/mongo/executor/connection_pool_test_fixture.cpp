@@ -117,7 +117,11 @@ const HostAndPort& ConnectionImpl::getHostAndPort() const {
 }
 
 bool ConnectionImpl::isHealthy() {
-    return true;
+    return _healthy;
+}
+
+void ConnectionImpl::setUnhealthy() {
+    _healthy = false;
 }
 
 void ConnectionImpl::clear() {
