@@ -12,13 +12,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const dbName = jsTestName();
 const collName = "test";
 
-const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-// TODO (SERVER-124178 / SERVER-124153): Remove the failpoint.
-const failpointSetParameter = isMultiversion
-    ? {}
-    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
-
 function getShardCount(counts, shardName) {
     for (let i = 0; i < counts.length; i++) {
         if (counts[i]["shard"] == shardName) return counts[i];
@@ -31,10 +24,7 @@ function getShardCount(counts, shardName) {
  * on the i-th shard or no chunks assigned to that shard if shardDistribution[i] is null.
  */
 function runShardingTestExists(shardDistribution) {
-    const st = new ShardingTest({
-        shards: shardDistribution.length,
-        rsOptions: {setParameter: failpointSetParameter},
-    });
+    const st = new ShardingTest({shards: shardDistribution.length});
 
     const mongos = st.s0;
     const admin = mongos.getDB("admin");
@@ -89,10 +79,7 @@ function runShardingTestExists(shardDistribution) {
 }
 
 function runUnshardedCollectionShardTestExists(shardNum, docsNum) {
-    const st = new ShardingTest({
-        shards: shardNum,
-        rsOptions: {setParameter: failpointSetParameter},
-    });
+    const st = new ShardingTest({shards: shardNum});
 
     const mongos = st.s0;
     const admin = mongos.getDB("admin");
@@ -117,10 +104,7 @@ function runUnshardedCollectionShardTestExists(shardNum, docsNum) {
 
 function runReplicaSetTestExists(nodesNum, docsNum) {
     const namespace = dbName + "." + collName;
-    const rst = new ReplSetTest({
-        nodes: nodesNum,
-        nodeOptions: {setParameter: failpointSetParameter},
-    });
+    const rst = new ReplSetTest({nodes: nodesNum});
 
     rst.startSet();
     rst.initiate();
@@ -143,7 +127,7 @@ function runReplicaSetTestExists(nodesNum, docsNum) {
 
 function runStandaloneTestExists(docsNum) {
     const namespace = dbName + "." + collName;
-    const conn = MongoRunner.runMongod({setParameter: failpointSetParameter});
+    const conn = MongoRunner.runMongod({});
 
     const coll = conn.getCollection(namespace);
 
