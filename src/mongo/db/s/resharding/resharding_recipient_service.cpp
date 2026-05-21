@@ -193,7 +193,7 @@ bool inPotentialAbortScenario(const RecipientStateEnum& state) {
 }
 
 auto makeCancelState(const RecipientShardContext& recipientCtx) {
-    ReshardingParticipantCancelState cancelState;
+    primary_only_service_helpers::CancelState cancelState;
     if (recipientCtx.getState() == RecipientStateEnum::kDone && recipientCtx.getAbortReason()) {
         cancelState.abort();
     }

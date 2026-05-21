@@ -1522,7 +1522,7 @@ void ReshardingDonorService::DonorStateMachine::_initCancelState(
     reshardingPauseDonorBeforeInitCancelState.pauseWhileSet();
     {
         std::lock_guard<std::mutex> lk(_mutex);
-        _cancelState = std::make_unique<ReshardingParticipantCancelState>(stepdownToken);
+        _cancelState = std::make_unique<primary_only_service_helpers::CancelState>(stepdownToken);
     }
 
     if (_donorCtx.getState() == DonorStateEnum::kDone && _donorCtx.getAbortReason()) {
