@@ -372,6 +372,10 @@ private:
 
     BSONObj _constructStateObject() const;
 
+    ResumeIndexInfo _buildResumeIndexInfo() const;
+
+    IndexStateInfo _buildIndexStateInfo(const IndexToBuild& index) const;
+
     Status _failPointHangDuringBuild(OperationContext* opCtx,
                                      FailPoint* fp,
                                      StringData where,

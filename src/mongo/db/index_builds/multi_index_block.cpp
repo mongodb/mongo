@@ -1650,7 +1650,7 @@ void MultiIndexBlock::_writeStateToContainer(OperationContext* opCtx) const {
                 "details"_attr = obj);
 }
 
-BSONObj MultiIndexBlock::_constructStateObject() const {
+ResumeIndexInfo MultiIndexBlock::_buildResumeIndexInfo() const {
     ResumeIndexInfo resumeIndexInfo;
     resumeIndexInfo.setBuildUUID(*_buildUUID);
     resumeIndexInfo.setPhase(_phase);
@@ -1665,59 +1665,71 @@ BSONObj MultiIndexBlock::_constructStateObject() const {
         resumeIndexInfo.setCollectionScanPosition(_lastRecordIdInserted);
     }
 
+    return resumeIndexInfo;
+}
+
+IndexStateInfo MultiIndexBlock::_buildIndexStateInfo(const IndexToBuild& index) const {
+    IndexStateInfo indexStateInfo;
+
+    if (_phase != IndexBuildPhaseEnum::kDrainWrites) {
+        switch (_containerWriteBehavior) {
+            case ContainerWriteBehavior::kDoNotReplicate: {
+                // Persist the data to disk so that we see all of the data that has been inserted
+                // into the Sorter.
+                indexStateInfo = index.bulk->persistDataForShutdown();
+                break;
+            }
+            case ContainerWriteBehavior::kReplicate: {
+                // When replicating container writes, the persisted state is written via a callback
+                // that is run when a spill occurs. So, we can simply get persisted state without
+                // forcing another spill.
+                indexStateInfo = index.bulk->getPersistedState();
+                break;
+            }
+        }
+    }
+
+    if (_phase == IndexBuildPhaseEnum::kCollectionScan) {
+        indexStateInfo.setLastSpilledRecordId(index.lastSpilledRecordId);
+    }
+
+    auto& indexBuildInfo = index.block->getIndexBuildInfo();
+    indexStateInfo.setSideWritesTable(*indexBuildInfo.sideWritesIdent);
+    indexStateInfo.setSkippedRecordTrackerTable(*indexBuildInfo.skippedRecordsIdent);
+    // For compatibility with v8.0, the constraintViolationsIdent is not persisted in the resume
+    // state if the index is not unique given that version used to check explicitly for this case
+    // and fail otherwise.
+    if (index.block->getSpec()["unique"].trueValue()) {
+        if (auto& duplicateKeyTrackerIdent = indexBuildInfo.constraintViolationsIdent) {
+            indexStateInfo.setDuplicateKeyTrackerTable(*duplicateKeyTrackerIdent);
+        }
+    }
+
+    indexStateInfo.setSpec(index.block->getSpec());
+    indexStateInfo.setIsMultikey(index.bulk->isMultikey());
+
+    std::vector<MultikeyPath> multikeyPaths;
+    for (const auto& multikeyPath : index.bulk->getMultikeyPaths()) {
+        MultikeyPath multikeyPathObj;
+        std::vector<int32_t> multikeyComponents;
+        for (const auto& multikeyComponent : multikeyPath) {
+            multikeyComponents.emplace_back(multikeyComponent);
+        }
+        multikeyPathObj.setMultikeyComponents(std::move(multikeyComponents));
+        multikeyPaths.emplace_back(std::move(multikeyPathObj));
+    }
+    indexStateInfo.setMultikeyPaths(std::move(multikeyPaths));
+
+    return indexStateInfo;
+}
+
+BSONObj MultiIndexBlock::_constructStateObject() const {
+    auto resumeIndexInfo = _buildResumeIndexInfo();
+
     std::vector<IndexStateInfo> indexInfos;
+    indexInfos.reserve(_indexes.size());
     for (const auto& index : _indexes) {
-        IndexStateInfo indexStateInfo;
-
-        if (_phase != IndexBuildPhaseEnum::kDrainWrites) {
-            switch (_containerWriteBehavior) {
-                case ContainerWriteBehavior::kDoNotReplicate: {
-                    // Persist the data to disk so that we see all of the data that has been
-                    // inserted into the Sorter.
-                    indexStateInfo = index.bulk->persistDataForShutdown();
-                    break;
-                }
-                case ContainerWriteBehavior::kReplicate: {
-                    // When replicating container writes, the persisted state is written via a
-                    // callback that is run when a spill occurs. So, we can simply get persisted
-                    // state without forcing another spill.
-                    indexStateInfo = index.bulk->getPersistedState();
-                    break;
-                }
-            }
-        }
-
-        if (_phase == IndexBuildPhaseEnum::kCollectionScan) {
-            indexStateInfo.setLastSpilledRecordId(index.lastSpilledRecordId);
-        }
-
-        auto& indexBuildInfo = index.block->getIndexBuildInfo();
-        indexStateInfo.setSideWritesTable(*indexBuildInfo.sideWritesIdent);
-        indexStateInfo.setSkippedRecordTrackerTable(*indexBuildInfo.skippedRecordsIdent);
-        // For compatibility with v8.0, the constraintViolationsIdent is not persisted in the
-        // resume state if the index is not unique given that version used to check explicitly for
-        // this case and fail otherwise.
-        if (index.block->getSpec()["unique"].trueValue()) {
-            if (auto& duplicateKeyTrackerIdent = indexBuildInfo.constraintViolationsIdent) {
-                indexStateInfo.setDuplicateKeyTrackerTable(*duplicateKeyTrackerIdent);
-            }
-        }
-
-        indexStateInfo.setSpec(index.block->getSpec());
-        indexStateInfo.setIsMultikey(index.bulk->isMultikey());
-
-        std::vector<MultikeyPath> multikeyPaths;
-        for (const auto& multikeyPath : index.bulk->getMultikeyPaths()) {
-            MultikeyPath multikeyPathObj;
-            std::vector<int32_t> multikeyComponents;
-            for (const auto& multikeyComponent : multikeyPath) {
-                multikeyComponents.emplace_back(multikeyComponent);
-            }
-            multikeyPathObj.setMultikeyComponents(std::move(multikeyComponents));
-            multikeyPaths.emplace_back(std::move(multikeyPathObj));
-        }
-        indexStateInfo.setMultikeyPaths(std::move(multikeyPaths));
-        indexInfos.emplace_back(std::move(indexStateInfo));
+        indexInfos.emplace_back(_buildIndexStateInfo(index));
     }
     resumeIndexInfo.setIndexes(std::move(indexInfos));
 
