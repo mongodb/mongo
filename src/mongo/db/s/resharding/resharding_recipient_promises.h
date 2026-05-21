@@ -48,13 +48,20 @@ namespace mongo {
 
 /**
  * Owns all ReshardingPromise instances for the recipient state machine and drives their
- * fulfillment as the coordinator advances through its state machine.
+ * fulfillment as the coordinator or recipient advances through its state machine.
  *
  * Promises are fulfilled via onCoordinatorStateAdvanced(), called whenever the coordinator's
- * persisted state changes. Currently managed promises:
- *   _allDonorsPreparedToDonate  — fulfilled when the coordinator reaches kCloning and
- *                                 CloneDetails (clone timestamp, document/byte counts,
- *                                 and per-donor fetch timestamps) are available.
+ * persisted state changes, and via onRecipientStateAdvanced(), called after the recipient
+ * majority commits a new state. Currently managed promises:
+ *   _allDonorsPreparedToDonate    — fulfilled when the coordinator reaches kCloning and
+ *                                   CloneDetails (clone timestamp, document/byte counts,
+ *                                   and per-donor fetch timestamps) are available.
+ *   _inApplyingOrError            — fulfilled after the recipient majority commits
+ *                                   kApplying or kError.
+ *   _inStrictConsistencyOrError   — fulfilled after the recipient majority commits
+ *                                   kStrictConsistency or kError.
+ *   _transitionedToCreateCollection — fulfilled after the recipient majority commits
+ *                                     kCreatingCollection.
  *
  * CloneDetails packages the data the recipient needs to begin cloning: the clone timestamp,
  * approximate document and byte counts, and the per-donor fetch timestamps.
@@ -66,7 +73,9 @@ namespace mongo {
  *      re-fulfill any promises whose milestones were already reached in the previous term.
  *   3. onCoordinatorStateAdvanced() is called each time the coordinator's state advances;
  *      it fulfills whichever promises correspond to the new coordinator state.
- *   4. On any terminal error, setError() propagates the error to all unfulfilled promises
+ *   4. onRecipientStateAdvanced() is called each time the recipient majority commits a new
+ *      state; it fulfills whichever promises correspond to the new recipient state.
+ *   5. On any terminal error, setError() propagates the error to all unfulfilled promises
  *      via the registry.
  *
  * Thread safety: all methods that accept WithLock expect the caller to hold
@@ -107,13 +116,25 @@ public:
                                     CoordinatorStateEnum newState,
                                     boost::optional<CloneDetails> cloneDetails);
 
+    void onRecipientStateAdvanced(WithLock lk, RecipientStateEnum newState);
+
     SharedSemiFuture<CloneDetails> getAllDonorsPreparedToDonateFuture() const;
+    SharedSemiFuture<void> getInApplyingOrErrorFuture() const;
+    SharedSemiFuture<void> getInStrictConsistencyOrErrorFuture() const;
+    SharedSemiFuture<void> getTransitionedToCreateCollectionFuture() const;
 
 private:
     void _recoverAllDonorsPreparedToDonate(WithLock lk, const ReshardingRecipientDocument& doc);
+    void _recoverInApplyingOrError(WithLock lk, const ReshardingRecipientDocument& doc);
+    void _recoverInStrictConsistencyOrError(WithLock lk, const ReshardingRecipientDocument& doc);
+    void _recoverTransitionedToCreateCollection(WithLock lk,
+                                                const ReshardingRecipientDocument& doc);
 
     ReshardingPromiseRegistry<ReshardingRecipientDocument> _registry;
     ReshardingPromise<CloneDetails> _allDonorsPreparedToDonate;
+    ReshardingPromise<void> _inApplyingOrError;
+    ReshardingPromise<void> _inStrictConsistencyOrError;
+    ReshardingPromise<void> _transitionedToCreateCollection;
 };
 
 }  // namespace mongo

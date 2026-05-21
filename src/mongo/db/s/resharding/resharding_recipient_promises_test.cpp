@@ -143,12 +143,20 @@ TEST_F(ReshardingRecipientPromisesTest,
 }
 
 TEST_F(ReshardingRecipientPromisesTest,
-       OnCoordinatorStateAdvancedDoesNotFulfillAllDonorsPreparedWithoutCloneDetails) {
+       OnCoordinatorStateAdvancedDoesNotFulfillAllDonorsPreparedAfterCloning) {
     ReshardingRecipientPromises promises;
 
     promises.onCoordinatorStateAdvanced(
-        WithLock::withoutLock(), CoordinatorStateEnum::kCloning, boost::none);
+        WithLock::withoutLock(), CoordinatorStateEnum::kApplying, boost::none);
 
+    ASSERT_FALSE(promises.getAllDonorsPreparedToDonateFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnCoordinatorStateAdvancedDoesNotFulfillAllDonorsPreparedWhenCloningWithNoCloneDetails) {
+    ReshardingRecipientPromises promises;
+    promises.onCoordinatorStateAdvanced(
+        WithLock::withoutLock(), CoordinatorStateEnum::kCloning, boost::none);
     ASSERT_FALSE(promises.getAllDonorsPreparedToDonateFuture().isReady());
 }
 
@@ -162,6 +170,190 @@ TEST_F(ReshardingRecipientPromisesTest,
         WithLock::withoutLock(), CoordinatorStateEnum::kInitializing, details);
 
     ASSERT_FALSE(promises.getAllDonorsPreparedToDonateFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       RecoveryFulfillsInApplyingOrErrorWhenStateIsAtOrBeyondApplying) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kApplying);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_TRUE(promises.getInApplyingOrErrorFuture().isReady());
+    ASSERT_OK(promises.getInApplyingOrErrorFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest, RecoveryFulfillsInApplyingOrErrorWhenStateIsError) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kError);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_TRUE(promises.getInApplyingOrErrorFuture().isReady());
+    ASSERT_OK(promises.getInApplyingOrErrorFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       RecoveryDoesNotFulfillInApplyingOrErrorWhenStateIsBeforeApplying) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kCloning);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_FALSE(promises.getInApplyingOrErrorFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnRecipientStateAdvancedFulfillsInApplyingOrErrorAtApplying) {
+    ReshardingRecipientPromises promises;
+
+    promises.onRecipientStateAdvanced(WithLock::withoutLock(), RecipientStateEnum::kApplying);
+
+    ASSERT_TRUE(promises.getInApplyingOrErrorFuture().isReady());
+    ASSERT_OK(promises.getInApplyingOrErrorFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest, OnRecipientStateAdvancedFulfillsInApplyingOrErrorAtError) {
+    ReshardingRecipientPromises promises;
+
+    promises.onRecipientStateAdvanced(WithLock::withoutLock(), RecipientStateEnum::kError);
+
+    ASSERT_TRUE(promises.getInApplyingOrErrorFuture().isReady());
+    ASSERT_OK(promises.getInApplyingOrErrorFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnRecipientStateAdvancedDoesNotFulfillInApplyingOrErrorBeforeApplying) {
+    ReshardingRecipientPromises promises;
+
+    promises.onRecipientStateAdvanced(WithLock::withoutLock(), RecipientStateEnum::kCloning);
+
+    ASSERT_FALSE(promises.getInApplyingOrErrorFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       RecoveryFulfillsInStrictConsistencyOrErrorWhenStateIsAtOrBeyondStrictConsistency) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kStrictConsistency);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_TRUE(promises.getInStrictConsistencyOrErrorFuture().isReady());
+    ASSERT_OK(promises.getInStrictConsistencyOrErrorFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       RecoveryFulfillsInStrictConsistencyOrErrorWhenStateIsError) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kError);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_TRUE(promises.getInStrictConsistencyOrErrorFuture().isReady());
+    ASSERT_OK(promises.getInStrictConsistencyOrErrorFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       RecoveryDoesNotFulfillInStrictConsistencyOrErrorWhenStateIsBeforeError) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kApplying);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_FALSE(promises.getInStrictConsistencyOrErrorFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnRecipientStateAdvancedFulfillsInStrictConsistencyOrErrorAtStrictConsistency) {
+    ReshardingRecipientPromises promises;
+
+    promises.onRecipientStateAdvanced(WithLock::withoutLock(),
+                                      RecipientStateEnum::kStrictConsistency);
+
+    ASSERT_TRUE(promises.getInStrictConsistencyOrErrorFuture().isReady());
+    ASSERT_OK(promises.getInStrictConsistencyOrErrorFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnRecipientStateAdvancedFulfillsInStrictConsistencyOrErrorAtError) {
+    ReshardingRecipientPromises promises;
+
+    promises.onRecipientStateAdvanced(WithLock::withoutLock(), RecipientStateEnum::kError);
+
+    ASSERT_TRUE(promises.getInStrictConsistencyOrErrorFuture().isReady());
+    ASSERT_OK(promises.getInStrictConsistencyOrErrorFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnRecipientStateAdvancedDoesNotFulfillInStrictConsistencyOrErrorBeforeError) {
+    ReshardingRecipientPromises promises;
+
+    promises.onRecipientStateAdvanced(WithLock::withoutLock(), RecipientStateEnum::kApplying);
+
+    ASSERT_FALSE(promises.getInStrictConsistencyOrErrorFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       RecoveryFulfillsTransitionedToCreateCollectionWhenStateIsAtOrBeyondCreatingCollection) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kCreatingCollection);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_TRUE(promises.getTransitionedToCreateCollectionFuture().isReady());
+    ASSERT_OK(promises.getTransitionedToCreateCollectionFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       RecoveryFulfillsTransitionedToCreateCollectionWhenStateIsBeyondCreatingCollection) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kCloning);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_TRUE(promises.getTransitionedToCreateCollectionFuture().isReady());
+    ASSERT_OK(promises.getTransitionedToCreateCollectionFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       RecoveryDoesNotFulfillTransitionedToCreateCollectionWhenStateIsAwaitingFetchTimestamp) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kAwaitingFetchTimestamp);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_FALSE(promises.getTransitionedToCreateCollectionFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnRecipientStateAdvancedFulfillsTransitionedToCreateCollectionAtCreatingCollection) {
+    ReshardingRecipientPromises promises;
+
+    promises.onRecipientStateAdvanced(WithLock::withoutLock(),
+                                      RecipientStateEnum::kCreatingCollection);
+
+    ASSERT_TRUE(promises.getTransitionedToCreateCollectionFuture().isReady());
+    ASSERT_OK(promises.getTransitionedToCreateCollectionFuture().getNoThrow());
+}
+
+TEST_F(
+    ReshardingRecipientPromisesTest,
+    OnRecipientStateAdvancedDoesNotFulfillTransitionedToCreateCollectionBeforeCreatingCollection) {
+    ReshardingRecipientPromises promises;
+
+    promises.onRecipientStateAdvanced(WithLock::withoutLock(),
+                                      RecipientStateEnum::kAwaitingFetchTimestamp);
+
+    ASSERT_FALSE(promises.getTransitionedToCreateCollectionFuture().isReady());
 }
 
 }  // namespace

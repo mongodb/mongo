@@ -170,20 +170,28 @@ public:
     void prepareForCriticalSection();
 
     /**
-     * Returns a Future fulfilled once the recipient locally updates its state to
-     * RecipientStateEnum::kApplying or RecipientStateEnum::kError.
+     * Returns a future that becomes ready once the recipient has transitioned to
+     * RecipientStateEnum::kCreatingCollection and that state change has been majority committed.
      */
-    SharedSemiFuture<void> awaitInApplyingOrError() const {
-        return _inApplyingOrError.getFuture();
+    SharedSemiFuture<void> awaitTransitionedToCreateCollection() const {
+        return _promises.getTransitionedToCreateCollectionFuture();
     }
 
     /**
-     * Returns a Future fulfilled once the recipient locally persists its final state before the
-     * coordinator makes its decision to commit or abort (RecipientStateEnum::kError or
-     * RecipientStateEnum::kStrictConsistency).
+     * Returns a Future fulfilled once the recipient transitions to RecipientStateEnum::kApplying
+     * or RecipientStateEnum::kError and that state change has been majority committed.
+     */
+    SharedSemiFuture<void> awaitInApplyingOrError() const {
+        return _promises.getInApplyingOrErrorFuture();
+    }
+
+    /**
+     * Returns a Future fulfilled once the recipient majority commits its final state before the
+     * coordinator makes its decision to commit or abort (RecipientStateEnum::kStrictConsistency
+     * or RecipientStateEnum::kError).
      */
     SharedSemiFuture<void> awaitInStrictConsistencyOrError() const {
-        return _inStrictConsistencyOrError.getFuture();
+        return _promises.getInStrictConsistencyOrErrorFuture();
     }
 
     /**
@@ -244,12 +252,6 @@ public:
      */
     void onCoordinatorStateAdvanced(CoordinatorStateEnum newState,
                                     boost::optional<CloneDetails> cloneDetails = boost::none);
-
-    /**
-     * Returns a future that becomes ready once the recipient has transitioned to creating the
-     * temporary resharding collection.
-     */
-    SemiFuture<void> awaitTransitionedToCreateCollection();
 
     static void insertStateDocument(OperationContext* opCtx,
                                     const ReshardingRecipientDocument& recipientDoc);
@@ -521,16 +523,10 @@ private:
 
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
-    SharedPromise<void> _inApplyingOrError;
-    SharedPromise<void> _inStrictConsistencyOrError;
-
     SharedPromise<void> _coordinatorHasEngagedCriticalSection;
     SharedPromise<void> _coordinatorHasDecisionPersisted;
 
     SharedPromise<void> _completionPromise;
-
-    // This promise is emplaced if the recipient has majority committed the createCollection state.
-    SharedPromise<void> _transitionedToCreateCollection;
 };
 
 }  // namespace mongo

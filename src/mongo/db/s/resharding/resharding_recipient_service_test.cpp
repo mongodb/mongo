@@ -892,8 +892,8 @@ public:
             opCtx, recipientDoc.getTempReshardingNss(), options);
     }
 
-    SemiFuture<void> notifyToStartCloningUsingCmd(RecipientStateMachine& recipient,
-                                                  const ReshardingRecipientDocument& recipientDoc) {
+    SharedSemiFuture<void> notifyToStartCloningUsingCmd(
+        RecipientStateMachine& recipient, const ReshardingRecipientDocument& recipientDoc) {
         while (true) {
             try {
                 auto recipientFields = _makeRecipientFields(recipientDoc);

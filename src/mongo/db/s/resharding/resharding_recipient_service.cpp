@@ -471,7 +471,6 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                 std::lock_guard<std::mutex> lk(_mutex);
                 ensureFulfilledPromise(lk, _changeStreamsMonitorStarted, status);
                 ensureFulfilledPromise(lk, _changeStreamsMonitorCompleted, status);
-                ensureFulfilledPromise(lk, _transitionedToCreateCollection, status);
             }
 
             return _retryingCancelableOpCtxFactory
@@ -499,22 +498,14 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                 })
                 .runOn(**executor, _cancelState.getAbortOrStepdownToken());
         })
-        .onCompletion([this, executor](Status status) {
-            if (_cancelState.isAbortedOrSteppingDown()) {
-                return ExecutorFuture<void>(**executor, status);
-            }
-
-            {
-                // The recipient is done with all local transitions until the coordinator makes its
-                // decision.
-                std::lock_guard<std::mutex> lk(_mutex);
-                invariant(_recipientCtx.getState() >= RecipientStateEnum::kError);
-                ensureFulfilledPromise(lk, _inStrictConsistencyOrError);
-                if (_recipientCtx.getState() == RecipientStateEnum::kError) {
-                    _promises.setError(lk, resharding::getStatusFromAbortReason(_recipientCtx));
-                }
-            }
-            return ExecutorFuture<void>(**executor, status);
+        .then([this] {
+            // The recipient is done with all local transitions until the coordinator makes its
+            // decision.
+            std::lock_guard<std::mutex> lk(_mutex);
+            tassert(12727500,
+                    "Recipient state must be at least kError upon completion of "
+                    "_runUntilStrictConsistencyOrErrored",
+                    _recipientCtx.getState() >= RecipientStateEnum::kError);
         });
 }
 
@@ -872,13 +863,6 @@ void ReshardingRecipientService::RecipientStateMachine::_onCoordinatorStateAdvan
     }
 }
 
-SemiFuture<void>
-ReshardingRecipientService::RecipientStateMachine::awaitTransitionedToCreateCollection() {
-    std::lock_guard<std::mutex> lk(_mutex);
-    return future_util::withCancellation(_transitionedToCreateCollection.getFuture(),
-                                         _cancelState.getAbortOrStepdownToken());
-}
-
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -909,16 +893,6 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 
             _metrics->setDocumentsToProcessCounts(cloneDetails.approxDocumentsToCopy,
                                                   cloneDetails.approxBytesToCopy);
-        })
-        .then([this, factory] {
-            return resharding::waitForMajority(_cancelState.getAbortOrStepdownToken(), *factory);
-        })
-        .thenRunOn(**executor)
-        .then([this] {
-            {
-                std::lock_guard<std::mutex> lk(_mutex);
-                ensureFulfilledPromise(lk, _transitionedToCreateCollection);
-            }
         });
 }
 
@@ -1469,17 +1443,6 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                     }
                     _transitionToApplying(factory);
                 });
-        })
-        .onCompletion([this, executor](Status status) {
-            if (_cancelState.isAbortedOrSteppingDown()) {
-                return ExecutorFuture<void>(**executor, status);
-            }
-
-            {
-                std::lock_guard<std::mutex> lk(_mutex);
-                ensureFulfilledPromise(lk, _inApplyingOrError);
-            }
-            return ExecutorFuture<void>(**executor, status);
         });
 }
 
@@ -1706,6 +1669,19 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
                logAttrs(_metadata.getSourceNss()),
                "collectionUUID"_attr = _metadata.getSourceUUID(),
                "reshardingUUID"_attr = _metadata.getReshardingUUID());
+
+    // Wait for majority before fulfilling any promises, so that external callers waiting on a
+    // specific event will not observe state that may be rolled back.
+    auto opCtx = _makeOperationContext(factory);
+    resharding::waitForMajority(opCtx.get(), _cancelState.getAbortOrStepdownToken())
+        .get(opCtx.get());
+    {
+        std::lock_guard<std::mutex> lk(_mutex);
+        _promises.onRecipientStateAdvanced(lk, newState);
+        if (newState == RecipientStateEnum::kError) {
+            _promises.setError(lk, resharding::getStatusFromAbortReason(_recipientCtx));
+        }
+    }
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToCreatingCollection(
@@ -2358,11 +2334,7 @@ void ReshardingRecipientService::RecipientStateMachine::_fulfillPromisesOnStepup
     std::lock_guard<std::mutex> lk(_mutex);
     _promises.recover(lk, document);
 
-    if (_recipientCtx.getState() >= RecipientStateEnum::kApplying) {
-        ensureFulfilledPromise(lk, _inApplyingOrError);
-    }
     if (_recipientCtx.getState() >= RecipientStateEnum::kStrictConsistency) {
-        ensureFulfilledPromise(lk, _inStrictConsistencyOrError);
         // Fulfill coordinator-state-driven promises based on the inferred coordinator state.
         // The coordinator must have reached at least kBlockingWrites before the recipient could
         // enter kStrictConsistency, and at least kCommitting before kDone.
@@ -2372,15 +2344,6 @@ void ReshardingRecipientService::RecipientStateMachine::_fulfillPromisesOnStepup
             _onCoordinatorStateAdvanced(lk, CoordinatorStateEnum::kBlockingWrites, boost::none);
         }
     }
-
-    if (!resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(
-            resharding::getVersionContextOrDefault(_forwardableOpMetadata),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
-        _recipientCtx.getState() <= RecipientStateEnum::kAwaitingFetchTimestamp) {
-        return;
-    }
-
-    ensureFulfilledPromise(lk, _transitionedToCreateCollection);
 }
 
 otel::traces::Span ReshardingRecipientService::RecipientStateMachine::_startSpan(
