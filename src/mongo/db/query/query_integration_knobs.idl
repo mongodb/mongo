@@ -190,10 +190,10 @@ server_parameters:
 
     internalProfilingMaxAbandonedWritesPerSecondPerDb:
         description: >-
-            If there are at least this many lock timeouts when trying to profile, we will skip all
-            future profiling for a given database. Lasts until profiling is manually re-enabled. The
-            value can be zero, in which case even a single lock timeout will disable profiling for
-            the db.
+            If there are more than this many lock timeouts per second when trying to profile, we will
+            skip all future profiling for a given database. Lasts until profiling is manually
+            re-enabled. The value can be zero, in which case even a single lock timeout will disable
+            profiling for the db.
         set_at: [startup, runtime]
         cpp_varname: internalProfilingMaxAbandonedWritesPerSecondPerDb
         cpp_vartype: AtomicWord<int>

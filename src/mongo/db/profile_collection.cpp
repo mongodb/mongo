@@ -42,7 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
-#include "mongo/db/query/util/deferred.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/util/throughput_gauge.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -70,7 +70,6 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
-#include <queue>
 #include <string>
 #include <utility>
 
@@ -96,14 +95,13 @@ AtomicWord<int64_t> profilerWritesActive{0};
 // smoothly.
 struct AbandonedWriteMetrics {
     ThroughputGauge throughputGauge;
-    AtomicWord<Date_t> tsDisabled;
 };
 
 ConcurrentSharedValuesMap<DatabaseName, AbandonedWriteMetrics> profilerAbandonmentMetrics;
 
 // Track some overall counters to report in serverStatus. Reporting a map by dbName is potentially
 // too large for serverStatus.
-AtomicWord<int64_t> profilerWritesAbandondedGlobally{0};
+AtomicWord<int64_t> profilerWritesAbandonedGlobally{0};
 
 // Please note that this counter will not ever reset/decrease, but writes to the profiler can be
 // re-activated by raising the cap. If the cap is raised and then hit again, this counter will
@@ -136,7 +134,7 @@ public:
         BSONObjBuilder bob;
         bob.append("totalWrites", profilerWritesTotal.loadRelaxed());
         bob.append("activeWriters", profilerWritesActive.loadRelaxed());
-        bob.append("totalAbandonedWrites", profilerWritesAbandondedGlobally.loadRelaxed());
+        bob.append("totalAbandonedWrites", profilerWritesAbandonedGlobally.loadRelaxed());
         bob.append("dbsPastThreshold", dbsPastThreshold.loadRelaxed());
         return bob.obj();
     }
@@ -280,8 +278,8 @@ void doProfile(auto opCtx,
  * load. Let's log when this happens, but not every time.
  */
 bool noteThereWasAnAbandonedWrite(auto opCtx, const auto& abandonmentMetrics) {
-    abandonmentMetrics->throughputGauge.recordEvent(Date_t::now());
-    profilerWritesAbandondedGlobally.fetchAndAddRelaxed(1);
+    abandonmentMetrics->throughputGauge.recordEvent(opCtx->fastClockSource().now());
+    profilerWritesAbandonedGlobally.fetchAndAddRelaxed(1);
     static Rarely sampler;
     if (sampler.tick()) {
         // Every once and a while (Rarely's frequency), log the event.
@@ -381,7 +379,6 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     const auto nAbandonedInLastSecond =
         abandonmentMetrics->throughputGauge.nEventsInPreviousSecond(now);
     if (profilingHasBecomeProblematic(opCtx, now, nAbandonedInLastSecond)) {
-
         disableProblematicProfiling(opCtx, nss, now, abandonmentMetrics, nAbandonedInLastSecond);
     }
 }
