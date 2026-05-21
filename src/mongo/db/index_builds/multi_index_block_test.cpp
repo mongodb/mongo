@@ -51,6 +51,7 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -73,11 +74,10 @@ namespace {
  * Unit test for MultiIndexBlock to verify basic functionality.
  */
 class MultiIndexBlockTest : public CatalogTestFixture {
-private:
+protected:
     void setUp() override;
     void tearDown() override;
 
-protected:
     NamespaceString getNSS() const {
         return _nss;
     }
@@ -140,6 +140,24 @@ void MultiIndexBlockTest::tearDown() {
     CatalogTestFixture::tearDown();
 }
 
+// State produced by setUpKReplicatePrimaryDrivenBuild. Owned by the test body so assertions can
+// reference the input spec idents and the per-build resume-state ident.
+struct KReplicateBuildHandle {
+    UUID buildUUID;
+    IndexBuildInfo indexBuildInfo;
+    std::string indexBuildIdent;
+};
+
+KReplicateBuildHandle setUpKReplicatePrimaryDrivenBuild(OperationContext* opCtx,
+                                                        MultiIndexBlock* indexer,
+                                                        AutoGetCollection& autoColl,
+                                                        CollectionWriter& coll,
+                                                        const NamespaceString& nss);
+
+KReplicateBuildHandle initPrimaryDrivenResumableBuild(OperationContext* opCtx,
+                                                      MultiIndexBlock* indexer,
+                                                      CollectionWriter& coll);
+
 // Check if there is a resumable index build temporary table with a persisted resume state that
 // corresponds to the given index build UUID. If one matches, the ident is returned; if there are
 // multiple matches or persisted states in the temporary table, this will assert.
@@ -196,6 +214,37 @@ boost::optional<std::string> findPersistedResumeState(
 
     return foundResumeIdent;
 }
+
+// Count the number of records stored in the internal record store identified by `ident`.
+size_t countRecordsInIdent(OperationContext* opCtx,
+                           StorageEngine* storageEngine,
+                           StringData ident) {
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto rs = storageEngine->getEngine()->getInternalRecordStore(ru, ident, KeyFormat::Long);
+    auto cursor = rs->getCursor(opCtx, ru);
+    size_t count = 0;
+    while (cursor->next())
+        ++count;
+    return count;
+}
+
+class MultiIndexBlockResumableTest : public MultiIndexBlockTest {
+private:
+    void setUp() override {
+        MultiIndexBlockTest::setUp();
+        _containerWritesEnabled.emplace("featureFlagContainerWrites", true);
+        _pdibEnabled.emplace("featureFlagPrimaryDrivenIndexBuilds", true);
+        _resumableEnabled.emplace("featureFlagResumablePrimaryDrivenIndexBuilds", true);
+        static_cast<repl::ReplicationCoordinatorMock*>(
+            repl::ReplicationCoordinator::get(getServiceContext()))
+            ->alwaysAllowWrites(true);
+    }
+
+    boost::optional<RAIIServerParameterControllerForTest> _containerWritesEnabled;
+    boost::optional<RAIIServerParameterControllerForTest> _pdibEnabled;
+    boost::optional<RAIIServerParameterControllerForTest> _resumableEnabled;
+};
 
 TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
     auto indexer = getIndexer();
@@ -370,6 +419,152 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndCommit) {
 
     validateTempTableIdentsOnTeardown({*indexBuildInfo1.sideWritesIdent, *indexBuildIdent},
                                       /*droppable=*/true);
+}
+
+// persistResumeState survives a write conflict at the kInitialized phase.
+TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_Initialized) {
+    auto indexer = getIndexer();
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto handle = initPrimaryDrivenResumableBuild(operationContext(), indexer, coll);
+    auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+
+    {
+        auto failPoint = enableWriteConflictForWrites(
+            FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        const auto initialTimesEntered = failPoint->initialTimesEntered();
+        indexer->persistResumeState(operationContext(), coll.get());
+        // Exactly one WCE must have fired during _writeStateToContainer.
+        EXPECT_EQ(initialTimesEntered + 1,
+                  (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    }
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        storageEngine, operationContext(), handle.indexBuildIdent);
+    ASSERT_TRUE(resumeInfo);
+    EXPECT_EQ(handle.buildUUID, resumeInfo->getBuildUUID());
+    EXPECT_EQ(IndexBuildPhaseEnum::kInitialized, resumeInfo->getPhase());
+    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+
+    // The retry must not produce a duplicate record: exactly one record must exist.
+    EXPECT_EQ(1u, countRecordsInIdent(operationContext(), storageEngine, handle.indexBuildIdent));
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+// persistResumeState survives a write conflict at the kBulkLoad phase.
+TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_BulkLoad) {
+    auto indexer = getIndexer();
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto handle =
+        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, autoColl, coll, getNSS());
+
+    auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    {
+        auto failPoint = enableWriteConflictForWrites(
+            FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        const auto initialTimesEntered = failPoint->initialTimesEntered();
+        indexer->persistResumeState(operationContext(), coll.get());
+        // Exactly one WCE must have fired during _writeStateToContainer.
+        EXPECT_EQ(initialTimesEntered + 1,
+                  (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    }
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        storageEngine, operationContext(), handle.indexBuildIdent);
+    ASSERT_TRUE(resumeInfo);
+    EXPECT_EQ(IndexBuildPhaseEnum::kBulkLoad, resumeInfo->getPhase());
+    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+
+    // The retry must not produce a duplicate record: exactly one record must exist.
+    EXPECT_EQ(1u, countRecordsInIdent(operationContext(), storageEngine, handle.indexBuildIdent));
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+// drainBackgroundWrites' internal persistResumeState call survives a write conflict at the
+// kDrainWrites phase.
+TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_DrainWrites) {
+    auto indexer = getIndexer();
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto handle = initPrimaryDrivenResumableBuild(operationContext(), indexer, coll);
+    auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
+        wuow.commit();
+    }
+    ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    {
+        auto failPoint = enableWriteConflictForWrites(
+            FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        const auto initialTimesEntered = failPoint->initialTimesEntered();
+        ASSERT_OK(
+            indexer->drainBackgroundWrites(operationContext(),
+                                           RecoveryUnit::ReadSource::kNoTimestamp,
+                                           IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+        // Exactly one WCE must have fired during _writeStateToContainer.
+        EXPECT_EQ(initialTimesEntered + 1,
+                  (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    }
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        storageEngine, operationContext(), handle.indexBuildIdent);
+    ASSERT_TRUE(resumeInfo);
+    EXPECT_EQ(handle.buildUUID, resumeInfo->getBuildUUID());
+    EXPECT_EQ(IndexBuildPhaseEnum::kDrainWrites, resumeInfo->getPhase());
+    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+
+    // The retry must not produce a duplicate record: exactly one record must exist.
+    EXPECT_EQ(1u, countRecordsInIdent(operationContext(), storageEngine, handle.indexBuildIdent));
+
+    indexer->abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
+// _writeStateToContainer fired from abortWithoutCleanup survives a write conflict.
+TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_AbortWithoutCleanup) {
+    auto indexer = getIndexer();
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto handle = initPrimaryDrivenResumableBuild(operationContext(), indexer, coll);
+    auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+
+    {
+        auto failPoint = enableWriteConflictForWrites(
+            FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        const auto initialTimesEntered = failPoint->initialTimesEntered();
+        indexer->abortWithoutCleanup(operationContext(), coll.get());
+        // Exactly one WCE must have fired during the abortWithoutCleanup _writeStateToContainer.
+        EXPECT_EQ(initialTimesEntered + 1,
+                  (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    }
+
+    shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+    auto resumeInfo = index_builds::readAndParseResumeIndexInfo(
+        storageEngine, operationContext(), handle.indexBuildIdent);
+    ASSERT_TRUE(resumeInfo);
+    EXPECT_EQ(handle.buildUUID, resumeInfo->getBuildUUID());
+    // abortWithoutCleanup does not advance _phase, so the persisted state carries the phase the
+    // build was in when abort was called (kInitialized here, since the test stops after init()).
+    EXPECT_EQ(IndexBuildPhaseEnum::kInitialized, resumeInfo->getPhase());
+    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+
+    EXPECT_EQ(1u, countRecordsInIdent(operationContext(), storageEngine, handle.indexBuildIdent));
+
+    // abortWithoutCleanup leaves the resume-state ident in place for the resumable shutdown path.
+    EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
+        *shard_role_details::getRecoveryUnit(operationContext()), handle.indexBuildIdent));
 }
 
 TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndOnAbort) {
@@ -1613,14 +1808,6 @@ void promoteMockReplCoordToPrimary(ServiceContext* service) {
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 }
 
-// State produced by setUpKReplicatePrimaryDrivenBuild. Owned by the test body so assertions can
-// reference the input spec idents and the per-build resume-state ident.
-struct KReplicateBuildHandle {
-    UUID buildUUID;
-    IndexBuildInfo indexBuildInfo;
-    std::string indexBuildIdent;
-};
-
 // Setup for a primary-driven (kReplicate) build: assigns a build UUID, flips the container-write
 // behavior, inserts one document into the collection (so the scan doesn't short-circuit on
 // emptiness), constructs a single-spec IndexBuildInfo, runs init and the collection scan so
@@ -1658,6 +1845,33 @@ KReplicateBuildHandle setUpKReplicatePrimaryDrivenBuild(OperationContext* opCtx,
                             MultiIndexBlock::InitMode::SteadyState,
                             boost::none));
     ASSERT_OK(indexer->insertAllDocumentsInCollection(opCtx, nss));
+
+    return {buildUUID, std::move(indexBuildInfo), ident::generateNewIndexBuildIdent(buildUUID)};
+}
+
+KReplicateBuildHandle initPrimaryDrivenResumableBuild(OperationContext* opCtx,
+                                                      MultiIndexBlock* indexer,
+                                                      CollectionWriter& coll) {
+    const auto buildUUID = UUID::gen();
+    indexer->setBuildUUID(buildUUID);
+    indexer->setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    indexer->setIsResumable(true);
+
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       "index-1",
+                       *storageEngine);
+
+    unittest::assertGet(indexer->init(opCtx,
+                                      coll,
+                                      {indexBuildInfo},
+                                      MultiIndexBlock::kNoopOnInitFn,
+                                      MultiIndexBlock::InitMode::SteadyState,
+                                      boost::none));
 
     return {buildUUID, std::move(indexBuildInfo), ident::generateNewIndexBuildIdent(buildUUID)};
 }

@@ -87,6 +87,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/storage:record_store_test_harness",
         "//src/mongo/db/storage:spill_util",
         "//src/mongo/db/storage:storage_options",
+        # TODO SERVER-127391: Remove dependency on wiredtiger_record_store_test_harness.
         "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test_harness",
         "//src/third_party/snappy",
     ],
