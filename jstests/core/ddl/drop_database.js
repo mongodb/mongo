@@ -26,7 +26,11 @@ function assertNamespacesExist() {
         listDatabases({filter: {name: dbName}}).length,
         "database " + dbName + " not found in " + tojson(listDatabases()),
     );
-    const dbCollections = testDB.getCollectionNames();
+    let dbCollections = testDB.getCollectionNames();
+    if (TestData.runningWithBalancer) {
+        // Concurrent moveCollection can create temporary system.resharding.* collections.
+        dbCollections = dbCollections.filter((name) => !name.startsWith("system.resharding."));
+    }
     assert.sameMembers(dbCollections, collNames);
 }
 
