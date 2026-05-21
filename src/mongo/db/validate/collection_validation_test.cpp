@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/column/bsoncolumn.h"
@@ -147,7 +148,8 @@ std::vector<ValidateResults> foregroundValidate(
         {CollectionValidation::ValidateMode::kForeground,
          CollectionValidation::ValidateMode::kForegroundFull,
          CollectionValidation::ValidateMode::kForegroundFullCheckBSON},
-    CollectionValidation::RepairMode repairMode = CollectionValidation::RepairMode::kNone) {
+    CollectionValidation::RepairMode repairMode = CollectionValidation::RepairMode::kNone,
+    ValidationVersion validationVersion = currentValidationVersion) {
 
     std::vector<ValidateResults> results;
 
@@ -157,9 +159,8 @@ std::vector<ValidateResults> foregroundValidate(
                   CollectionValidation::validate(
                       opCtx,
                       nss,
-                      CollectionValidation::ValidationOptions{mode,
-                                                              repairMode,
-                                                              /*logDiagnostics=*/false},
+                      CollectionValidation::ValidationOptions{
+                          mode, repairMode, /*logDiagnostics=*/false, validationVersion},
                       &validateResults))
             << "Validation Mode: " << static_cast<int>(mode);
         BSONObjBuilder validateResultsBuilder;
@@ -1422,6 +1423,31 @@ TEST_F(TimeseriesCollectionValidationTest, ReportWarningForV3BucketWithMeasureme
     insertDoc(replaceNestedField(getSampleDoc(), version, 3));
     foregroundValidate(
         _nss, _opCtx, {.valid = true, .numRecords = 1, .numErrors = 0, .numWarnings = 1});
+}
+
+TEST_F(TimeseriesCollectionValidationTest, ReportInvalidBSONColumnReason) {
+    // 0xF1 = interleaved start byte; empty BSON object {} follows as the reference object.
+    // BSONColumn iteration immediately uasserts InvalidBSONColumn because the empty reference
+    // object has no fields, making interleaved.states empty.
+    // V2_Column wraps all column errors as NonConformantBSON; V1_Original lets InvalidBSONColumn
+    // propagate directly, which is the path under test (includeReason=true in validateRecord).
+    const char kInvalidColumnBytes[] = "\xF1\x05\x00\x00\x00\x00";
+    const BSONBinData invalidColumn{
+        kInvalidColumnBytes, sizeof(kInvalidColumnBytes) - 1, BinDataType::Column};
+    static constexpr std::array dataIdField = {"data"_sd, "_id"_sd};
+    insertDoc(replaceNestedField(getSampleDoc(), dataIdField, invalidColumn));
+
+    const auto results = foregroundValidate(
+        _nss,
+        _opCtx,
+        {.valid = false, .numRecords = 1, .numInvalidDocuments = 1, .numErrors = 1},
+        {_validateMode},
+        CollectionValidation::RepairMode::kNone,
+        V1_Original);
+
+    ASSERT_EQ(results.size(), 1U);
+    ASSERT_THAT(*results.front().getErrors().begin(),
+                ::testing::HasSubstr("Invalid BSONColumn encoding"));
 }
 
 }  // namespace

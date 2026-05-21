@@ -857,6 +857,7 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
             record.data(), record.size(), _validateState->getBSONValidateMode(), validationVersion);
 
         if (!bsonValidationStatus.isOK()) {
+            bool includeReason{false};
             switch (bsonValidationStatus.code()) {
                 case ErrorCodes::NonConformantBSON:
                     LOGV2_WARNING_OPTIONS(6825900,
@@ -867,6 +868,12 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
                     ++nNonCompliantDocuments;
                     results->addWarning(kBSONValidationNonConformantReason);
                     break;
+                case ErrorCodes::InvalidBSONColumn:
+                    // For these cases, include the reason with the validation results, the
+                    // cardinality of reasons is bounded.  For other error messages, keep these
+                    // separate.
+                    includeReason = true;
+                    [[fallthrough]];
                 default:
                     LOGV2_ERROR_OPTIONS(12395400,
                                         {logv2::LogTruncation::Disabled},
@@ -875,9 +882,12 @@ auto ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                         "reason"_attr = bsonValidationStatus);
                     return {.status = bsonValidationStatus,
                             .errorMessage = fmt::format(
-                                "BSON validation failed with error '{}'. For more info, see logs "
+                                "BSON validation failed with error '{}'{}. For more info, "
+                                "see logs "
                                 "with log id 12395400",
-                                ErrorCodes::errorString(bsonValidationStatus.code()))};
+                                ErrorCodes::errorString(bsonValidationStatus.code()),
+                                includeReason ? fmt::format(": {}", bsonValidationStatus.reason())
+                                              : std::string(""))};
             }
         } else if (!_validateState->nss().isOplog()) {
             // Additionally check size if the BSON object is compliant. Do not run this check on the
