@@ -80,6 +80,7 @@ idl_generator(
     src = "type_shard_identity.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/sharding_environment:sharding_types_gen",
     ],
 )
 

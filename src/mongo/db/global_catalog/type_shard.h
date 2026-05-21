@@ -34,8 +34,7 @@
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/global_catalog/shard_handle.h"
 #include "mongo/util/modules.h"
 
 #include <string>
@@ -74,6 +73,7 @@ public:
     static const BSONField<Timestamp> topologyTime;
     static const BSONField<long long> replSetConfigVersion;
     static const long long kUninitializedReplSetConfigVersion = -1;
+    static constexpr auto kShardRefFieldName = "shardRef";
 
     ShardType() = default;
     ShardType(std::string name, std::string host, std::vector<std::string> tags = {});
@@ -100,9 +100,10 @@ public:
      */
     std::string toString() const;
 
-    const std::string& getName() const {
-        return _name.get();
-    }
+    const ShardHandle& getHandle() const;
+    void setHandle(ShardHandle handle);
+
+    const std::string& getName() const;
     void setName(const std::string& name);
 
     const std::string& getHost() const {
@@ -130,11 +131,13 @@ public:
     }
     void setReplSetConfigVersion(long long replSetConfigVersion);
 
+    const ShardRef& getShardRef() const;
+
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
 
-    // (M)  shard's id
-    boost::optional<std::string> _name;
+    // (M) shard name and unique identifier (shardRef); shardRef defaults to name when absent
+    boost::optional<ShardHandle> _handle;
     // (M)  connection string for the host(s)
     boost::optional<std::string> _host;
     // (O) is it draining chunks?

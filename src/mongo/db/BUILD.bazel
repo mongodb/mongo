@@ -1386,6 +1386,7 @@ mongo_cc_library(
         "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/db/shard_role/lock_manager:dump_lock_manager.cpp",
         "//src/mongo/db/sharding_environment:shard_id.cpp",
+        "//src/mongo/db/sharding_environment:shard_ref.cpp",
         "//src/mongo/db/sharding_environment:sharding_types_gen",
         "//src/mongo/db/topology/vector_clock:vector_clock_gen",
         "//src/mongo/db/transaction:transaction_runtime_context_gen",

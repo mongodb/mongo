@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/uuid.h"
 
 namespace {
 
@@ -73,6 +74,57 @@ TEST(ShardType, AllOptionalsPresent) {
 
 TEST(ShardType, BadType) {
     BSONObj obj = BSON(ShardType::name() << 0);
+    StatusWith<ShardType> shardRes = ShardType::fromBSON(obj);
+    ASSERT_FALSE(shardRes.isOK());
+}
+
+TEST(ShardType, ShardRefAbsentDefaultsToName) {
+    BSONObj obj = BSON(ShardType::name("shard0000") << ShardType::host("localhost:27017"));
+    StatusWith<ShardType> shardRes = ShardType::fromBSON(obj);
+    ASSERT(shardRes.isOK());
+    const ShardType& shard = shardRes.getValue();
+    ASSERT_EQ(shard.getName(), "shard0000");
+    ASSERT_EQ(shard.getHandle().name().toString(), shard.getName());
+    const auto& ref = shard.getShardRef();
+    ASSERT(ref.isString());
+    ASSERT_EQ(ref.getString(), "shard0000");
+    ASSERT_EQ(shard.getHandle().ref(), ref);
+}
+
+TEST(ShardType, ShardRefString) {
+    BSONObj obj = BSON(ShardType::name("shard0000") << ShardType::host("localhost:27017")
+                                                    << ShardType::kShardRefFieldName << "myRef");
+    StatusWith<ShardType> shardRes = ShardType::fromBSON(obj);
+    ASSERT(shardRes.isOK());
+    const ShardType& shard = shardRes.getValue();
+    ASSERT_EQ(shard.getName(), "shard0000");
+    ASSERT_EQ(shard.getHandle().name().toString(), shard.getName());
+    const auto& ref = shard.getShardRef();
+    ASSERT(ref.isString());
+    ASSERT_EQ(ref.getString(), "myRef");
+    ASSERT_EQ(shard.getHandle().ref(), ref);
+}
+
+TEST(ShardType, ShardRefUUID) {
+    UUID uuid = UUID::gen();
+    BSONObjBuilder builder;
+    builder.append(ShardType::name(), "shard0000");
+    builder.append(ShardType::host(), "localhost:27017");
+    uuid.appendToBuilder(&builder, ShardType::kShardRefFieldName);
+    StatusWith<ShardType> shardRes = ShardType::fromBSON(builder.obj());
+    ASSERT(shardRes.isOK());
+    const ShardType& shard = shardRes.getValue();
+    ASSERT_EQ(shard.getName(), "shard0000");
+    ASSERT_EQ(shard.getHandle().name().toString(), shard.getName());
+    const auto& ref = shard.getShardRef();
+    ASSERT(ref.isUUID());
+    ASSERT_EQ(ref.getUUID(), uuid);
+    ASSERT_EQ(shard.getHandle().ref(), ref);
+}
+
+TEST(ShardType, ShardRefBadType) {
+    BSONObj obj = BSON(ShardType::name("shard0000") << ShardType::host("localhost:27017")
+                                                    << ShardType::kShardRefFieldName << 42);
     StatusWith<ShardType> shardRes = ShardType::fromBSON(obj);
     ASSERT_FALSE(shardRes.isOK());
 }

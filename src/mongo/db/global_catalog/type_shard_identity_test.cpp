@@ -36,7 +36,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -55,9 +59,57 @@ TEST(ShardIdentityType, RoundTrip) {
     auto shardIdentity = result.getValue();
     ASSERT_EQ("test/a:123", shardIdentity.getConfigsvrConnectionString().toString());
     ASSERT_EQ("s1", shardIdentity.getShardName());
+    ASSERT_EQ("s1", shardIdentity.getShardRef()->getString());
     ASSERT_EQ(clusterId, shardIdentity.getClusterId());
 
     ASSERT_BSONOBJ_EQ(doc, shardIdentity.toShardIdentityDocument());
+}
+
+TEST(ShardIdentityType, RoundTripWithShardRefString) {
+    auto clusterId(OID::gen());
+    auto doc = BSON("_id" << "shardIdentity"
+                          << "shardName"
+                          << "s1"
+                          << "shardRef"
+                          << "ref"
+                          << "clusterId" << clusterId << "configsvrConnectionString"
+                          << "test/a:123");
+
+    auto result = ShardIdentityType::fromShardIdentityDocument(doc);
+    ASSERT_OK(result.getStatus());
+
+    auto shardIdentity = result.getValue();
+    ASSERT_EQ("test/a:123", shardIdentity.getConfigsvrConnectionString().toString());
+    ASSERT_EQ("s1", shardIdentity.getShardName());
+    ASSERT_EQ("ref", shardIdentity.getShardRef()->getString());
+    ASSERT_EQ(clusterId, shardIdentity.getClusterId());
+
+    // toShardIdentityDocument strips shardRef (see SERVER-126210), so compare without it.
+    ASSERT_BSONOBJ_EQ(doc.removeField("shardRef"), shardIdentity.toShardIdentityDocument());
+}
+
+TEST(ShardIdentityType, RoundTripWithShardRefUUID) {
+    auto clusterId(OID::gen());
+    auto uuid = UUID::gen();
+    BSONObjBuilder builder;
+    builder.append("_id", "shardIdentity");
+    builder.append("shardName", "s1");
+    uuid.appendToBuilder(&builder, "shardRef");
+    builder.append("clusterId", clusterId);
+    builder.append("configsvrConnectionString", "test/a:123");
+    auto doc = builder.obj();
+
+    auto result = ShardIdentityType::fromShardIdentityDocument(doc);
+    ASSERT_OK(result.getStatus());
+
+    auto shardIdentity = result.getValue();
+    ASSERT_EQ("test/a:123", shardIdentity.getConfigsvrConnectionString().toString());
+    ASSERT_EQ("s1", shardIdentity.getShardName());
+    ASSERT_EQ(uuid, shardIdentity.getShardRef()->getUUID());
+    ASSERT_EQ(clusterId, shardIdentity.getClusterId());
+
+    // toShardIdentityDocument strips shardRef (see SERVER-126210), so compare without it.
+    ASSERT_BSONOBJ_EQ(doc.removeField("shardRef"), shardIdentity.toShardIdentityDocument());
 }
 
 TEST(ShardIdentityType, ParseMissingId) {
@@ -131,6 +183,95 @@ TEST(ShardIdentityType, CreateUpdateObject) {
     auto updateObj = ShardIdentityType::createConfigServerUpdateObject("test/a:1,b:2");
     auto expectedObj = BSON("$set" << BSON("configsvrConnectionString" << "test/a:1,b:2"));
     ASSERT_BSONOBJ_EQ(expectedObj, updateObj);
+}
+
+// Helpers for validate() tests that need a specific cluster role.
+namespace {
+struct ScopedClusterRole {
+    explicit ScopedClusterRole(ClusterRole role) : _saved(serverGlobalParams.clusterRole) {
+        serverGlobalParams.clusterRole = role;
+    }
+    ~ScopedClusterRole() {
+        serverGlobalParams.clusterRole = _saved;
+    }
+    ClusterRole _saved;
+};
+}  // namespace
+
+TEST(ShardIdentityType, ValidateShardRefConfigServerStringConfig) {
+    ScopedClusterRole role({ClusterRole::ShardServer, ClusterRole::ConfigServer});
+    auto clusterId(OID::gen());
+    auto doc = BSON("_id" << "shardIdentity"
+                          << "shardName"
+                          << "config"
+                          << "shardRef"
+                          << "config"
+                          << "clusterId" << clusterId << "configsvrConnectionString"
+                          << "test/a:123");
+    auto result = ShardIdentityType::fromShardIdentityDocument(doc);
+    ASSERT_OK(result.getStatus());
+    ASSERT_OK(result.getValue().validate());
+}
+
+TEST(ShardIdentityType, ValidateShardRefConfigServerWrongString) {
+    ScopedClusterRole role({ClusterRole::ShardServer, ClusterRole::ConfigServer});
+    auto clusterId(OID::gen());
+    auto doc = BSON("_id" << "shardIdentity"
+                          << "shardName"
+                          << "config"
+                          << "shardRef"
+                          << "other"
+                          << "clusterId" << clusterId << "configsvrConnectionString"
+                          << "test/a:123");
+    auto result = ShardIdentityType::fromShardIdentityDocument(doc);
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(ErrorCodes::UnsupportedFormat, result.getValue().validate());
+}
+
+TEST(ShardIdentityType, ValidateShardRefConfigServerUUID) {
+    ScopedClusterRole role({ClusterRole::ShardServer, ClusterRole::ConfigServer});
+    auto clusterId(OID::gen());
+    auto uuid = UUID::gen();
+    BSONObjBuilder builder;
+    builder.append("_id", "shardIdentity");
+    builder.append("shardName", "config");
+    uuid.appendToBuilder(&builder, "shardRef");
+    builder.append("clusterId", clusterId);
+    builder.append("configsvrConnectionString", "test/a:123");
+    auto doc = builder.obj();
+    auto result = ShardIdentityType::fromShardIdentityDocument(doc);
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(ErrorCodes::UnsupportedFormat, result.getValue().validate());
+}
+
+TEST(ShardIdentityType, ValidateShardRefShardServerCannotBeConfig) {
+    ScopedClusterRole role(ClusterRole::ShardServer);
+    auto clusterId(OID::gen());
+    auto doc = BSON("_id" << "shardIdentity"
+                          << "shardName"
+                          << "s1"
+                          << "shardRef" << ShardId::kConfigServerId.toString() << "clusterId"
+                          << clusterId << "configsvrConnectionString"
+                          << "test/a:123");
+    auto result = ShardIdentityType::fromShardIdentityDocument(doc);
+    ASSERT_OK(result.getStatus());
+    ASSERT_EQ(ErrorCodes::UnsupportedFormat, result.getValue().validate());
+}
+
+TEST(ShardIdentityType, ValidateShardRefShardServerUUIDIsValid) {
+    ScopedClusterRole role(ClusterRole::ShardServer);
+    auto clusterId(OID::gen());
+    auto uuid = UUID::gen();
+    BSONObjBuilder builder;
+    builder.append("_id", "shardIdentity");
+    builder.append("shardName", "s1");
+    uuid.appendToBuilder(&builder, "shardRef");
+    builder.append("clusterId", clusterId);
+    builder.append("configsvrConnectionString", "test/a:123");
+    auto doc = builder.obj();
+    auto result = ShardIdentityType::fromShardIdentityDocument(doc);
+    ASSERT_OK(result.getStatus());
+    ASSERT_OK(result.getValue().validate());
 }
 
 }  // namespace
