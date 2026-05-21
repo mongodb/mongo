@@ -110,6 +110,9 @@ groups:
       - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
       - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
   - name: "Durable Transactions & Availability"
+    thresholds:
+      hot: 50
+      cold: 25
     teams:
       - "RSSD"
       - "Replication"
