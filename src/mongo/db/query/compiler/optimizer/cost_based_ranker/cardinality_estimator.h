@@ -86,7 +86,7 @@ public:
 
     CEResult estimatePlan(const QuerySolution& plan);
 
-private:
+protected:
     // QuerySolutionNodes
     CEResult estimate(const QuerySolutionNode* node);
     CEResult estimate(const CollectionScanNode* node);
@@ -145,6 +145,8 @@ private:
      * additive per-stage minimum so structurally different plans still receive distinct costs.
      */
     void clampZeroEstimates();
+
+    CEResult estimateIndexSeeks(const IndexBounds& bounds, bool multiKey);
 
     // Internal helper functions
 

@@ -4,7 +4,7 @@
 
 "use strict";
 
-import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {getEngine, getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {getPlanRankerMode, isPlanCosted} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -96,7 +96,7 @@ function assertIndexScan(isTieBreakingHeuristicEnabled, filter, expectedIndexKey
     assert.eq(expectedIndexKeyPatterns.length, indexScans.length);
 
     for (let i = 0; i < expectedIndexKeyPatterns.length; ++i) {
-        assert.eq(indexScans[i]["keyPattern"], expectedIndexKeyPatterns[i], tojson(explain));
+        assert.eq(expectedIndexKeyPatterns[i], indexScans[i]["keyPattern"], tojson(explain));
     }
 }
 
@@ -194,23 +194,34 @@ function preferShortestIndexWithComparisonsInFilter(indexPruningActive) {
     const filter = {a: {$gt: 1}, b: "hello"};
     assert.commandWorked(coll.createIndexes(indexes));
 
-    // Index pruning would have removed the a/b/c index for us already, so a/b would win.
     if (indexPruningActive) {
+        // Index pruning removes the a/b/c index, so a/b wins regardless of heuristic.
         assertIndexScan(false, filter, [{a: 1, b: 1}]);
+        assertIndexScan(true, filter, [{a: 1, b: 1}]);
     } else {
         const explain = setParamsAndRunCommand(false, filter);
 
-        // If we fall back to CBR, we will choose the smaller index regardless of whether index pruning is used or not.
+        const abIndex = [{a: 1, b: 1}];
+        const abcIndex = [{a: 1, b: 1, c: 1}];
 
-        // TODO SERVER-100611: re-enable these tests.
-        // const winningPlan = getWinningPlanFromExplain(explain);
-        // if (isPlanCosted(winningPlan) && !checkSbeFullyEnabled(db)) {
-        //     assertIndexScan(false, filter, [{a: 1, b: 1}], explain);
-        // } else {
-        assertIndexScan(false, filter, [{a: 1, b: 1, c: 1}], explain);
-        // }
+        const isSBE = getEngine(explain) == "sbe";
+        const isCBR = getPlanRankerMode(db) !== "multiPlanning";
+
+        const [expectedWithoutTieBreaking, expectedWithTieBreaking] = (() => {
+            if (isSBE) {
+                // Planning for SBE selects longer index.
+                return [abcIndex, abcIndex];
+            }
+            if (isCBR) {
+                // CBR costs the plan using the shorter index lower, as fewer seeks will be required.
+                return [abIndex, abIndex];
+            }
+
+            return [abcIndex, abIndex];
+        })();
+        assertIndexScan(false, filter, expectedWithoutTieBreaking, explain);
+        assertIndexScan(true, filter, expectedWithTieBreaking, explain);
     }
-    assertIndexScan(true, filter, [{a: 1, b: 1}]);
 
     for (const index of indexes) {
         assert.commandWorked(coll.dropIndex(index));

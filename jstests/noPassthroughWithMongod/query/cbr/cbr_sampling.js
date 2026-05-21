@@ -103,9 +103,8 @@ try {
     assert.commandWorked(coll.createIndex({c: 1}));
     assertAllPlansUseSampling({a: {$lt: 100}});
     assertAllPlansUseSampling({b: {$lt: 100}});
-    // TODO SERVER-100611: re-enable these tests.
-    // assertAllPlansUseSampling({a: {$lt: 100}, b: {$lt: 500}});
-    // assertAllPlansUseSampling({a: {$lt: 100}, b: {$lt: 500}, c: {$exists: true}});
+    assertAllPlansUseSampling({a: {$lt: 100}, b: {$lt: 500}});
+    assertAllPlansUseSampling({a: {$lt: 100}, b: {$lt: 500}, c: {$exists: true}});
 
     // Test that invalid query does not error during Sampling CE. Every sampled document throws
     // during evaluation, so the effective sample size is 0 and the estimate is reported with

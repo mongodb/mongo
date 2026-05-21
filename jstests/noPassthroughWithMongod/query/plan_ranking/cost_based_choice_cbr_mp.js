@@ -285,16 +285,15 @@ try {
         mpEndCond: mpEndConditions.kMaxWorks,
         ranker: rankerStrategies.kCBR,
     });
-    // TODO SERVER-100611: re-enable these tests.
-    // checkRanker({
-    //     qID: "3.2",
-    //     cName: "20k",
-    //     query: {f1: {$lt: 505}, f2: {$gt: 100}},
-    //     order: {x1: 1},
-    //     limit: batchSize + 1,
-    //     mpEndCond: mpEndConditions.kMaxWorks,
-    //     ranker: rankerStrategies.kCBR,
-    // });
+    checkRanker({
+        qID: "3.2",
+        cName: "20k",
+        query: {f1: {$lt: 505}, f2: {$gt: 100}},
+        order: {x1: 1},
+        limit: batchSize + 1,
+        mpEndCond: mpEndConditions.kMaxWorks,
+        ranker: rankerStrategies.kCBR,
+    });
     // This is an interesting case with productivity = 0.0052 which is < 0.0101
     checkRanker({
         qID: "3.3",
@@ -338,16 +337,15 @@ try {
         mpEndCond: mpEndConditions.kMaxWorks,
         ranker: rankerStrategies.kCBR,
     });
-    // TODO SERVER-100611: re-enable these tests.
-    // checkRanker({
-    //     qID: "5.2",
-    //     cName: "20k",
-    //     query: {f1: {$lt: 505}, f2: {$gt: 100}},
-    //     order: {f3: 1},
-    //     limit: batchSize + 1,
-    //     mpEndCond: mpEndConditions.kFullBatch,
-    //     ranker: rankerStrategies.kCBR,
-    // });
+    checkRanker({
+        qID: "5.2",
+        cName: "20k",
+        query: {f1: {$lt: 505}, f2: {$gt: 100}},
+        order: {f3: 1},
+        limit: batchSize + 1,
+        mpEndCond: mpEndConditions.kFullBatch,
+        ranker: rankerStrategies.kCBR,
+    });
 } finally {
     setCBRConfig(db, prevCBRConfig);
 }
