@@ -43,8 +43,8 @@ StatusWith<std::unique_ptr<UserRequest>> UserRequestX509::makeUserRequestX509(
     std::shared_ptr<const SSLPeerInfo> peerInfo,
     bool forReacquire,
     bool insertAuthenticatedMechanism) {
-    auto request =
-        std::make_unique<UserRequestX509>(std::move(name), std::move(roles), std::move(peerInfo));
+    auto request = std::make_unique<UserRequestX509>(
+        Passkey{}, std::move(name), std::move(roles), std::move(peerInfo));
 
     if (!forReacquire) {
         return std::unique_ptr<UserRequest>(std::move(request));

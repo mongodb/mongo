@@ -51,14 +51,12 @@ namespace mongo {
  * SSLPeerInfo struct if they exist.
  */
 class UserRequestX509 : public UserRequestGeneral {
-public:
-    // We define this function as a friend so that makeUserRequestX509
-    // can use it.
-    friend std::unique_ptr<UserRequestX509> std::make_unique<UserRequestX509>(
-        mongo::UserName&& name,
-        boost::optional<std::set<mongo::RoleName>>&& roles,
-        std::shared_ptr<const mongo::SSLPeerInfo>&& peerInfo);
+private:
+    struct Passkey {
+        Passkey() = default;
+    };
 
+public:
     /**
      * Makes a new UserRequestX509. Toggling for re-acquire to true enables
      * a re-fetch of the roles from the certificate.
@@ -90,8 +88,8 @@ public:
 
     UserRequestCacheKey generateUserRequestCacheKey() const final;
 
-protected:
-    UserRequestX509(UserName name,
+    UserRequestX509(Passkey,
+                    UserName name,
                     boost::optional<std::set<RoleName>> roles,
                     std::shared_ptr<const SSLPeerInfo> peerInfo)
         : UserRequestGeneral(std::move(name), std::move(roles)), _peerInfo(std::move(peerInfo)) {}
