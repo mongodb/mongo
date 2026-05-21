@@ -64,6 +64,10 @@ class ScopedDonateChunk;
 class ScopedReceiveChunk;
 class ScopedSplitMergeChunk;
 
+namespace migrationutil {
+void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
+}  // namespace migrationutil
+
 /**
  * This class is used to synchronise all the active routing info operations for chunks owned by this
  * shard. There is only one instance of it per ServiceContext.
@@ -88,12 +92,62 @@ public:
     static ActiveMigrationsRegistry& get(OperationContext* opCtx);
 
     /**
+     * Interface injected to let the registry wait for the sharding coordinator service recovery
+     * to complete before acquiring any of its locks. Any code path that acquires the
+     * ActiveMigrationsRegistry must first await completion of the sharding coordinator's recovery,
+     * so that recovered coordinators obtain their ActiveMigrationsRegistry before newly-submitted
+     * operations.
+     */
+    class MONGO_MOD_OPEN Recoverable {
+    public:
+        virtual ~Recoverable() = default;
+
+        virtual void waitForRecovery(OperationContext* opCtx) const = 0;
+    };
+
+    // Injects the Recoverable instance the registry will block on before acquiring any of its
+    // locks. Expected to be called once per ServiceContext at shard-server startup.
+    void setRecoverable(Recoverable* recoverable);
+
+    /**
+     * PassKey token that authorises a registry-lock acquisition to skip the waitForRecovery()
+     * step. The friend list below is the complete set of sites that can construct one, each for
+     * the same underlying reason — they run inside the recovery sequence and would otherwise
+     * deadlock or fail by waiting on it:
+     *
+     *   - ChunkOperationShardingCoordinator<StateDoc> (the base template for chunk-operation
+     *     coordinators), when a coordinator reacquires the registry from inside its own recovery /
+     *     lock-acquisition phase. Waiting on the coordinator service's recovery from that context
+     *     would deadlock, since the caller is itself part of what's holding recovery open. The
+     *     template is the friend (rather than each concrete coordinator) so that the bypass token
+     *     can only be obtained via the protected static helper
+     *     `ChunkOperationShardingCoordinator::makeRegistryRecoveryBypass()`, which is the single
+     *     sanctioned construction site for the token within the coordinator hierarchy.
+     *   - migrationutil::resumeMigrationRecipientsOnStepUp, which executes synchronously on the
+     *     OplogApplier thread during step-up — before ShardingCoordinatorService has transitioned
+     *     out of kPaused. Without the bypass, waitForRecovery would uassert NotWritablePrimary and
+     *     crash the node.
+     *
+     * Because the default constructor is private and the friend list above is the only way to
+     * reach it, code outside these two surfaces cannot bypass the recovery wait.
+     */
+    class BypassRecoveryWait {
+    private:
+        template <typename StateDoc>
+        friend class ChunkOperationShardingCoordinator;
+        friend void migrationutil::resumeMigrationRecipientsOnStepUp(OperationContext*);
+        BypassRecoveryWait() = default;
+    };
+
+    /**
      * These methods can be used to block migrations temporarily. The lock() method will block if
      * there is a migration operation in progress and will return once it is completed. Any
      * subsequent migration operations will return ConflictingOperationInProgress until the unlock()
      * method is called.
      */
-    void lock(OperationContext* opCtx, StringData reason);
+    void lock(OperationContext* opCtx,
+              StringData reason,
+              boost::optional<BypassRecoveryWait> bypass = boost::none);
     void unlock(StringData reason);
 
     /**
@@ -107,8 +161,10 @@ public:
      *
      * Otherwise returns a ConflictingOperationInProgress error.
      */
-    StatusWith<ScopedDonateChunk> registerDonateChunk(OperationContext* opCtx,
-                                                      const ShardsvrMoveRange& args);
+    StatusWith<ScopedDonateChunk> registerDonateChunk(
+        OperationContext* opCtx,
+        const ShardsvrMoveRange& args,
+        boost::optional<BypassRecoveryWait> bypass = boost::none);
 
     /**
      * Registers an active receive chunk operation with the specified session id and returns a
@@ -122,20 +178,24 @@ public:
      * - return a ConflictingOperationInProgress error
      * based on the value of the waitForCompletionOfConflictingOps parameter
      */
-    StatusWith<ScopedReceiveChunk> registerReceiveChunk(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        const ChunkRange& chunkRange,
-                                                        const ShardId& fromShardId,
-                                                        bool waitForCompletionOfConflictingOps);
+    StatusWith<ScopedReceiveChunk> registerReceiveChunk(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ChunkRange& chunkRange,
+        const ShardId& fromShardId,
+        bool waitForCompletionOfConflictingOps,
+        boost::optional<BypassRecoveryWait> bypass = boost::none);
 
     /**
      * If there are no migrations running on this shard, registers an active split or merge
      * operation for the specified namespace and returns a scoped object which will in turn disallow
      * other migrations or splits/merges for the same namespace (but not for other namespaces).
      */
-    StatusWith<ScopedSplitMergeChunk> registerSplitOrMergeChunk(OperationContext* opCtx,
-                                                                const NamespaceString& nss,
-                                                                const ChunkRange& chunkRange);
+    StatusWith<ScopedSplitMergeChunk> registerSplitOrMergeChunk(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const ChunkRange& chunkRange,
+        boost::optional<BypassRecoveryWait> bypass = boost::none);
 
     /**
      * If a migration has been previously registered through a call to registerDonateChunk, returns
@@ -223,6 +283,11 @@ private:
      * previous call to registerSplitOrMergeChunk has succeeded.
      */
     void _clearSplitMergeChunk(const NamespaceString& nss);
+
+    // Recoverable on which waitForRecovery() is invoked before acquiring any registry lock. Set
+    // once at shard-server startup and never cleared; nullptr on non-shard-server contexts and
+    // in unit tests that don't wire one up. Not owned.
+    Recoverable* _recoverable{nullptr};
 
     // Protects the state below
     std::mutex _mutex;

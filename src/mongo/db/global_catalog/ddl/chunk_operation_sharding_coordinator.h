@@ -56,6 +56,24 @@ protected:
         return this->_docWrapper;
     }
 
+    /**
+     * Returns a token that lets a chunk-operation coordinator acquire ActiveMigrationsRegistry
+     * locks without waiting for the sharding coordinator service's own recovery. Required when the
+     * acquisition happens inside the coordinator recovery path — waiting on recovery from that
+     * context would deadlock, since the caller is itself part of what's holding recovery open.
+     *
+     * The helper is intentionally `protected` (not public): only the template — which is the sole
+     * `BypassRecoveryWait` friend within the coordinator hierarchy — and its derived classes can
+     * call it. Unrelated code in the codebase cannot reach a constructed token. Subclasses must
+     * still only invoke it from their recovery / lock-acquisition phase; calling it from a
+     * steady-state code path (e.g. `_runImpl` after locks are held) re-opens the very window the
+     * bypass exists to close, since the bypassed wait is the guard that orders newly-submitted
+     * chunk commands behind recovered coordinators across failover.
+     */
+    static ActiveMigrationsRegistry::BypassRecoveryWait makeRegistryRecoveryBypass() {
+        return {};
+    }
+
 private:
     void _initialize(OperationContext* opCtx) override {}
 

@@ -518,13 +518,22 @@ void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx) {
             // Register this receiveChunk on the ActiveMigrationsRegistry before completing step-up
             // to prevent a new migration from starting while a receiveChunk was ongoing. Wait for
             // any migrations that began in a previous term to complete if there are any.
+            //
+            // Bypass the registry's waitForRecovery() hook: this code runs synchronously on the
+            // OplogApplier thread during step-up, before ShardingCoordinatorService has had a
+            // chance to transition out of kPaused. Without the bypass, the registry's recovery
+            // wait would uassert NotWritablePrimary and crash the node. The bypass is safe here
+            // because the recipient recovery executes before the node accepts client writes that
+            // could submit new chunk operations, so the ordering invariant the wait normally
+            // protects is preserved by construction.
             auto scopedReceiveChunk(
                 uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerReceiveChunk(
                     opCtx,
                     nss,
                     doc.getRange(),
                     doc.getDonorShardIdForLoggingPurposesOnly(),
-                    true /* waitForCompletionOfConflictingOps */)));
+                    true /* waitForCompletionOfConflictingOps */,
+                    ActiveMigrationsRegistry::BypassRecoveryWait{})));
 
             const auto mdm = MigrationDestinationManager::get(opCtx);
             uassertStatusOK(

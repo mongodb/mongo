@@ -144,6 +144,7 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/router_role/routing_cache/routing_information_cache.h"
 #include "mongo/db/rss/replicated_storage_service.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/query_analysis_op_observer_configsvr.h"
@@ -451,6 +452,8 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         auto shardingCoordinatorService =
             std::make_unique<ShardingCoordinatorService>(serviceContext);
         DDLLockManager::get(serviceContext)->setRecoverable(shardingCoordinatorService.get());
+        ActiveMigrationsRegistry::get(serviceContext)
+            .setRecoverable(shardingCoordinatorService.get());
 
         services.emplace_back(std::move(shardingCoordinatorService));
         services.push_back(std::make_unique<RenameCollectionParticipantService>(serviceContext));

@@ -97,7 +97,7 @@ ExecutorFuture<void> MergeAllChunksCoordinator::_acquireLocksAsync(
                const auto chunkRange = ChunkRange(kMinBSONKey, kMaxBSONKey);
                _scopedSplitMergeChunk.emplace(uassertStatusOK(
                    ActiveMigrationsRegistry::get(newOpCtx).registerSplitOrMergeChunk(
-                       newOpCtx, nss(), chunkRange)));
+                       newOpCtx, nss(), chunkRange, makeRegistryRecoveryBypass())));
            })
         .until([this, anchor = shared_from_this()](Status status) {
             if (!status.isOK()) {

@@ -75,9 +75,22 @@ ActiveMigrationsRegistry& ActiveMigrationsRegistry::get(OperationContext* opCtx)
     return get(opCtx->getServiceContext());
 }
 
-void ActiveMigrationsRegistry::lock(OperationContext* opCtx, StringData reason) {
-    // The method requires the requesting operation to be interruptible
+void ActiveMigrationsRegistry::setRecoverable(Recoverable* recoverable) {
+    _recoverable = recoverable;
+}
+
+void ActiveMigrationsRegistry::lock(OperationContext* opCtx,
+                                    StringData reason,
+                                    boost::optional<BypassRecoveryWait> bypass) {
+    // The method requires the requesting operation to be interruptible. Asserted before
+    // waitForRecovery() so a misused non-interruptible opCtx fails fast instead of hanging on the
+    // recovery condvar.
     invariant(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
+
+    if (!bypass && _recoverable) {
+        _recoverable->waitForRecovery(opCtx);
+    }
+
     std::unique_lock<std::mutex> lock(_mutex);
 
     // This wait is to hold back additional lock requests while there is already one in progress
@@ -119,7 +132,12 @@ void ActiveMigrationsRegistry::unlock(StringData reason) {
 }
 
 StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
-    OperationContext* opCtx, const ShardsvrMoveRange& args) {
+    OperationContext* opCtx,
+    const ShardsvrMoveRange& args,
+    boost::optional<BypassRecoveryWait> bypass) {
+    if (!bypass && _recoverable) {
+        _recoverable->waitForRecovery(opCtx);
+    }
     std::unique_lock<std::mutex> ul(_mutex);
 
     opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
@@ -176,7 +194,11 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
     const NamespaceString& nss,
     const ChunkRange& chunkRange,
     const ShardId& fromShardId,
-    bool waitForCompletionOfConflictingOps) {
+    bool waitForCompletionOfConflictingOps,
+    boost::optional<BypassRecoveryWait> bypass) {
+    if (!bypass && _recoverable) {
+        _recoverable->waitForRecovery(opCtx);
+    }
     std::unique_lock<std::mutex> ul(_mutex);
 
     if (waitForCompletionOfConflictingOps) {
@@ -209,7 +231,13 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
 }
 
 StatusWith<ScopedSplitMergeChunk> ActiveMigrationsRegistry::registerSplitOrMergeChunk(
-    OperationContext* opCtx, const NamespaceString& nss, const ChunkRange& chunkRange) {
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ChunkRange& chunkRange,
+    boost::optional<BypassRecoveryWait> bypass) {
+    if (!bypass && _recoverable) {
+        _recoverable->waitForRecovery(opCtx);
+    }
     std::unique_lock<std::mutex> ul(_mutex);
 
     opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {

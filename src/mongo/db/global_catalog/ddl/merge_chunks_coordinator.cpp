@@ -94,7 +94,7 @@ ExecutorFuture<void> MergeChunksCoordinator::_acquireLocksAsync(
                auto chunkRange = ChunkRange(bounds[0], bounds[1]);
                _scopedSplitMergeChunk.emplace(
                    uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
-                       opCtx, nss(), chunkRange)));
+                       opCtx, nss(), chunkRange, makeRegistryRecoveryBypass())));
            })
         .until([this, anchor = shared_from_this()](Status status) {
             if (!status.isOK()) {

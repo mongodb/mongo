@@ -182,6 +182,14 @@ public:
             if (tryRunMergeAllChunksCoordinator(opCtx, nss, req, &response)) {
                 return response;
             }
+            // Legacy path: acquire a namespace-wide guard in the active migrations registry so
+            // concurrent split/merge operations on this namespace are serialized with this
+            // mergeAllChunks (matching the MergeAllChunksCoordinator's _acquireLocksAsync). The
+            // guard is released when `scopedSplitOrMergeChunk` goes out of scope below.
+            auto scopedSplitOrMergeChunk(
+                uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
+                    opCtx, nss, ChunkRange(kMinBSONKey, kMaxBSONKey))));
+
 
             // Because this is a non-authoritative update, we must mark the CSR metadata as
             // kNonAuthoritative so that the following refresh will fetch the metadata from the

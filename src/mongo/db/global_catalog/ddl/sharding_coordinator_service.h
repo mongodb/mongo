@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -61,7 +62,8 @@ class ShardingCoordinator;
 
 class MONGO_MOD_NEEDS_REPLACEMENT ShardingCoordinatorService final
     : public repl::PrimaryOnlyService,
-      public DDLLockManager::Recoverable {
+      public DDLLockManager::Recoverable,
+      public ActiveMigrationsRegistry::Recoverable {
 public:
     static constexpr StringData kServiceName = "ShardingCoordinator"_sd;
 
