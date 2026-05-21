@@ -13,13 +13,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1, config: 1});
 
-// TODO (SERVER-124050): Investigate failure in this test when authoritative shards are enabled.
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsCRUD")) {
-    jsTestLog("Skipping test because featureFlagAuthoritativeShardsCRUD is enabled");
-    st.stop();
-    quit();
-}
-
+const drainLsid = {id: UUID()};
 const kDbName = "testDb";
 const kCollName = "testColl";
 const mongosTestColl = st.s.getCollection(kDbName + "." + kCollName);
@@ -27,6 +21,17 @@ const mongosTestColl = st.s.getCollection(kDbName + "." + kCollName);
 // implicitly from setting up the test collection.
 assert.commandWorked(st.rs0.getPrimary().adminCommand({setParameter: 1, internalSessionsReapThreshold: 1}));
 assert.commandWorked(mongosTestColl.insert({x: 1})); // Set up the collection.
+
+// Draining any sessions left in the test initialization, forcing the eviction before the test cases.
+// In case if featureFlagShardAuthoritativeCollMetadata flag is enabled, collection insertion consists
+// of two transactions and not one (collection metadata transaction is separate)
+runInternalTxn(st.s, drainLsid, 0);
+runInternalTxn(st.s, drainLsid, 1);
+assertNumEntriesSoon(st.rs0.getPrimary(), {
+    sessionUUID: drainLsid.id,
+    numImageCollectionEntries: TestData.doesNotSupportFindAndModifyImageCollection ? 0 : 1,
+    numTransactionsCollEntries: 1,
+});
 
 function assertNumEntries(conn, {sessionUUID, numImageCollectionEntries, numTransactionsCollEntries}) {
     const filter = {"_id.id": sessionUUID};
