@@ -874,6 +874,7 @@ mongo_cc_library(
         "//src/mongo/db/replicated_fast_count:init_replicated_fast_count_oplog_entry_idl",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_enabled",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_init",
+        "//src/mongo/db/replicated_fast_count:replicated_fast_count_op_observer",
         "//src/mongo/db/replicated_fast_count:replicated_fast_count_uncommitted_changes",
         "//src/mongo/db/rss:replicated_storage_service",
         "//src/mongo/db/session:session_catalog_mongod",

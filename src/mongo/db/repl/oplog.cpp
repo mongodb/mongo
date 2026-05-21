@@ -89,6 +89,7 @@
 #include "mongo/db/replicated_fast_count/init_replicated_fast_count_oplog_entry_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_op_observer.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_uncommitted_changes.h"
 #include "mongo/db/rss/persistence_provider.h"
 #include "mongo/db/rss/replicated_storage_service.h"
@@ -3045,6 +3046,20 @@ Status applyContainerOperations(OperationContext* opCtx,
                           << redact(firstOp->toBSONForLogging()),
             !assignOperationTimestamp || !timestamp.isNull());
 
+    // TODO SERVER-127343: Is this the best way to handle this edge case?
+    // Container ops that target a 'local' collection must not be re-logged to the oplog. The op
+    // observer otherwise uses the reserved admin.$container namespace to gate replication,
+    // which would incorrectly attempt to reserve an oplog slot even though the underlying
+    // collection is unreplicated (and the surrounding DBLock only declared a LocalWrite intent).
+    //
+    // Internal container writes always use the admin.$container namespace so this is only possible
+    // for container writes from applyOps. The block is placed after the timestamp-assignment
+    // decision above, which keys off of writesAreReplicated().
+    boost::optional<UnreplicatedWritesBlock> unreplicatedWritesBlock;
+    if (firstOp->getNss().isLocalDB()) {
+        unreplicatedWritesBlock.emplace(opCtx);
+    }
+
     WriteUnitOfWork wuow{opCtx};
     if (assignOperationTimestamp && !timestamp.isNull()) {
         const auto existingTimestamp = ru->getCommitTimestamp();
@@ -3088,8 +3103,13 @@ Status applyContainerOperations(OperationContext* opCtx,
                     o, IDLParserContext("ContainerInsertOplogEntryO"));
                 auto valSpan = parsed.getValue().data();
                 s = parsed.getKey().visit([&](auto key) {
-                    return storage_engine_direct_crud::insert(
+                    auto status = storage_engine_direct_crud::insert(
                         *engine, *ru, ident, key, valSpan, policy);
+                    if (status.isOK()) {
+                        opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
+                            opCtx, ident, key, valSpan);
+                    }
+                    return status;
                 });
                 break;
             }
@@ -3098,8 +3118,13 @@ Status applyContainerOperations(OperationContext* opCtx,
                     o, IDLParserContext("ContainerUpdateOplogEntryO"));
                 auto valSpan = parsed.getValue().data();
                 s = parsed.getKey().visit([&](auto key) {
-                    return storage_engine_direct_crud::update(
+                    auto status = storage_engine_direct_crud::update(
                         *engine, *ru, ident, key, valSpan, policy);
+                    if (status.isOK()) {
+                        opCtx->getServiceContext()->getOpObserver()->onContainerUpdate(
+                            opCtx, ident, key, valSpan);
+                    }
+                    return status;
                 });
                 break;
             }
@@ -3107,7 +3132,13 @@ Status applyContainerOperations(OperationContext* opCtx,
                 auto parsed = repl::ContainerDeleteOplogEntryO::parse(
                     o, IDLParserContext("ContainerDeleteOplogEntryO"));
                 s = parsed.getKey().visit([&](auto key) {
-                    return storage_engine_direct_crud::remove(*engine, *ru, ident, key, policy);
+                    auto status =
+                        storage_engine_direct_crud::remove(*engine, *ru, ident, key, policy);
+                    if (status.isOK()) {
+                        opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
+                            opCtx, ident, key);
+                    }
+                    return status;
                 });
                 break;
             }

@@ -37,6 +37,11 @@
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
@@ -552,6 +557,174 @@ TEST_F(CheckpointScanMetricsTest, ApplyOpsWithUserAndInternalEntriesExercisesAll
     EXPECT_EQ(capturer.readInt64Counter(
                   MetricNames::kReplicatedFastCountCheckpointSizeCountEntriesProcessed),
               3);
+}
+
+enum class TimestampStoreMode { kCollection, kContainer };
+
+// Tests that writes through `SizeCountTimestampStore::write` advance `oplog_lag_secs` via the
+// `ReplicatedFastCountOpObserver` hooks — collection writes fire `onInserts`/`onUpdate`, container
+// writes fire `onContainerInsert`/`onContainerUpdate`. Runs both backends from the same bodies.
+class TimestampStoreMetricsTest : public CatalogTestFixture,
+                                  public ::testing::WithParamInterface<TimestampStoreMode> {
+protected:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        opCtx = operationContext();
+        resetOplogLagState_ForTest();
+        registerReplicatedFastCountOpObserver(opCtx->getServiceContext());
+
+        if (GetParam() == TimestampStoreMode::kCollection) {
+            ASSERT_OK(createReplicatedFastCountTimestampCollection(storageInterface(), opCtx));
+            store = std::make_unique<CollectionSizeCountTimestampStore>();
+            return;
+        }
+
+        _ffDurability = std::make_unique<RAIIServerParameterControllerForTest>(
+            "featureFlagReplicatedFastCountDurability", true);
+        _ffContainerWrites = std::make_unique<RAIIServerParameterControllerForTest>(
+            "featureFlagContainerWrites", true);
+
+        ASSERT_OK(createInternalFastCountContainers(opCtx,
+                                                    NamespaceString::kAdminCommandNamespace,
+                                                    ident::kFastCountMetadataStore,
+                                                    KeyFormat::String,
+                                                    ident::kFastCountMetadataStoreTimestamps,
+                                                    KeyFormat::Long,
+                                                    /*writeToOplog=*/false));
+
+        auto* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+        auto recordStore =
+            engine->getRecordStore(opCtx,
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStoreTimestamps,
+                                   RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                   /*uuid=*/boost::none);
+        store = std::make_unique<ContainerSizeCountTimestampStore>(std::move(recordStore));
+    }
+
+    OperationContext* opCtx;
+    std::unique_ptr<SizeCountTimestampStore> store;
+    OtelMetricsCapturer capturer;
+
+private:
+    std::unique_ptr<RAIIServerParameterControllerForTest> _ffDurability;
+    std::unique_ptr<RAIIServerParameterControllerForTest> _ffContainerWrites;
+};
+
+TEST_P(TimestampStoreMetricsTest, WriteAdvancesOplogLagSecsOnCommit) {
+    // applied=1000, checkpoint=400 -> expect lag=600.
+    recordAppliedOpTime(Timestamp(1000, 1));
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        store->write(opCtx, Timestamp(400, 1));
+        // Pre-commit the gauge must remain at its prior value; the on-commit hook hasn't fired.
+        EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 0);
+        wuow.commit();
+    }
+
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 600);
+}
+
+TEST_P(TimestampStoreMetricsTest, RolledBackWriteDoesNotAdvanceOplogLagSecs) {
+    recordAppliedOpTime(Timestamp(1000, 1));
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        store->write(opCtx, Timestamp(400, 1));
+        // No commit; WUOW destructor rolls back.
+    }
+
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 0);
+}
+
+TEST_P(TimestampStoreMetricsTest, RepeatedWritesAdvanceOplogLagSecs) {
+    recordAppliedOpTime(Timestamp(1000, 1));
+
+    {
+        WriteUnitOfWork wuow(opCtx);
+        store->write(opCtx, Timestamp(200, 1));
+        wuow.commit();
+    }
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 800);
+
+    // Second write should overwrite the existing record (update path) and update the gauge.
+    {
+        WriteUnitOfWork wuow(opCtx);
+        store->write(opCtx, Timestamp(900, 1));
+        wuow.commit();
+    }
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 100);
+}
+
+INSTANTIATE_TEST_SUITE_P(,
+                         TimestampStoreMetricsTest,
+                         ::testing::Values(TimestampStoreMode::kCollection,
+                                           TimestampStoreMode::kContainer),
+                         [](const ::testing::TestParamInfo<TimestampStoreMode>& info) {
+                             return info.param == TimestampStoreMode::kCollection ? "Collection"
+                                                                                  : "Container";
+                         });
+
+// Tests for `recordContainerWriteForFastCountTimestamp`, the helper called both by the
+// `ReplicatedFastCountOpObserver` container hooks and by `applyContainerOperations` on the
+// secondary apply path. The helper must filter on ident and only update the gauge when the op
+// targets the fast-count timestamps container.
+class ContainerApplyHookTest : public CatalogTestFixture {
+protected:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        opCtx = operationContext();
+        resetOplogLagState_ForTest();
+        recordAppliedOpTime(Timestamp{1000, 1});
+    }
+
+    void scheduleAndCommit(StringData identArg, std::span<const char> valueBytes) {
+        WriteUnitOfWork wuow(opCtx);
+        recordContainerWriteForFastCountTimestamp(opCtx, identArg, valueBytes);
+        wuow.commit();
+    }
+
+    OperationContext* opCtx;
+    OtelMetricsCapturer capturer;
+};
+
+TEST_F(ContainerApplyHookTest, FiresForTimestampsIdent) {
+    const auto value = BSON(kValidAsOfKey << Timestamp(300, 1));
+    scheduleAndCommit(ident::kFastCountMetadataStoreTimestamps,
+                      std::span<const char>(value.objdata(), static_cast<size_t>(value.objsize())));
+
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 700);
+}
+
+TEST_F(ContainerApplyHookTest, NoOpForOtherIdent) {
+    const auto value = BSON(kValidAsOfKey << Timestamp(300, 1));
+    scheduleAndCommit(ident::kFastCountMetadataStore,
+                      std::span<const char>(value.objdata(), static_cast<size_t>(value.objsize())));
+
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 0);
+}
+
+TEST_F(ContainerApplyHookTest, NoOpForEmptyValue) {
+    // Mirrors what `applyContainerOperations` passes for kContainerDelete: an empty span. The
+    // helper must not crash and must not register an on-commit hook.
+    scheduleAndCommit(ident::kFastCountMetadataStoreTimestamps, std::span<const char>{});
+
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 0);
+}
+
+TEST_F(ContainerApplyHookTest, NoOpForRolledBackWuow) {
+    const auto value = BSON(kValidAsOfKey << Timestamp(300, 1));
+    {
+        WriteUnitOfWork wuow(opCtx);
+        recordContainerWriteForFastCountTimestamp(
+            opCtx,
+            ident::kFastCountMetadataStoreTimestamps,
+            std::span<const char>(value.objdata(), static_cast<size_t>(value.objsize())));
+        // No commit; on-commit hook must not fire.
+    }
+
+    EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kReplicatedFastCountOplogLagSecs), 0);
 }
 }  // namespace
 }  // namespace mongo::replicated_fast_count

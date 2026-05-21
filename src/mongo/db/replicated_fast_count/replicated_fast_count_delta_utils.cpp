@@ -39,7 +39,10 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -243,10 +246,19 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOpImpl(const T& op)
     return CollectionSizeCount{.size = perOpMd->getSz(), .count = computeCountDeltaForOp(opType)};
 }
 
+// Returns true if the oplog entry is a container operation on a replicated fast count ident.
+bool isContainerOpOnFastCountIdent(const repl::OplogEntry& oplogEntry) {
+    auto container = oplogEntry.getContainer();
+    return container && ident::isReplicatedFastCountIdent(*container);
+}
+
 // Returns true if all operations within the provided oplog entry are on the internal fast count
-// collections.
-bool operationsOnFastCountCollections(const NamespaceString& nss,
-                                      const repl::OplogEntry& oplogEntry) {
+// collections or containers.
+bool operationsOnFastCountStores(const NamespaceString& nss, const repl::OplogEntry& oplogEntry) {
+    if (isContainerOpOnFastCountIdent(oplogEntry)) {
+        return true;
+    }
+
     const auto fastCountStoreNss =
         NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
     const auto fastCountTimestampNss = NamespaceString::makeGlobalConfigCollection(
@@ -274,6 +286,9 @@ bool operationsOnFastCountCollections(const NamespaceString& nss,
             oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
 
         for (const auto& op : innerEntries) {
+            if (isContainerOpOnFastCountIdent(op)) {
+                continue;
+            }
             const auto& nss = op.getNss();
             if (nss != fastCountStoreNss && nss != fastCountTimestampNss) {
                 return false;
@@ -609,7 +624,7 @@ OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCurso
         // Do not advance lastTimestamp for writes to the fast count store collections themselves.
         // Otherwise, we create a feedback loop where we'd advance the timestamp in response to
         // seeing oplog entries for advancing the timestamp.
-        if (operationsOnFastCountCollections(nss, entry)) {
+        if (operationsOnFastCountStores(nss, entry)) {
             if (isCheckpoint) {
                 recordCheckpointOplogEntrySkipped();
             }
@@ -636,31 +651,6 @@ OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCurso
     return result;
 }
 
-void readAndIncrementSizeCounts(OperationContext* opCtx, SizeCountDeltas& deltas) {
-    const auto acquisition = acquireFastCountCollectionForRead(opCtx).value();
-    const CollectionPtr& coll = acquisition.getCollectionPtr();
-
-    for (auto& [uuid, delta] : deltas) {
-        // Only incorporate persisted size/count for collections that were not created or dropped in
-        // this checkpoint window. kCreated has no prior persisted entry, kDropped will be removed,
-        // and kDroppedAndRecreated represents a new collection that should ignore previous stale,
-        // persisted size/count data.
-        if (delta.state != DDLState::kNone) {
-            continue;
-        }
-        const RecordId rid = record_id_helpers::keyForDoc(
-                                 BSON("_id" << uuid),
-                                 clustered_util::makeDefaultClusteredIdIndex().getIndexSpec(),
-                                 /*collator=*/nullptr)
-                                 .getValue();
-        Snapshotted<BSONObj> doc;
-        if (coll->findDoc(opCtx, rid, &doc)) {
-            const BSONObj& data = doc.value();
-            delta.sizeCount.count += data.getField(kMetadataKey).Obj().getField(kCountKey).Long();
-            delta.sizeCount.size += data.getField(kMetadataKey).Obj().getField(kSizeKey).Long();
-        }
-    }
-}
 }  // namespace replicated_fast_count
 
 }  // namespace mongo

@@ -29,12 +29,25 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::replicated_fast_count {
@@ -463,6 +476,229 @@ TEST_F(ReplicatedFastCountManagerFindLatestTest, FindLatestFiltersToRequestedUui
     const CollectionSizeCount resultB = manager->findLatest(operationContext(), collB.uuid);
     EXPECT_EQ(resultB.size, 100 + 200);
     EXPECT_EQ(resultB.count, 10 + 1);
+}
+
+/**
+ * Cold-boot fixture that bypasses `setUpReplicatedFastCount()` so tests can exercise
+ * `initializeMetadata` against on-disk state that the manager has not yet been told about.
+ * Use this for tests that validate the manager's ability to discover existing fast count
+ * containers directly from the storage engine at startup.
+ */
+class ReplicatedFastCountManagerColdBootTest : public CatalogTestFixture {
+public:
+    ReplicatedFastCountManagerColdBootTest()
+        : CatalogTestFixture(Options().setPersistenceProvider(
+              std::make_unique<replicated_fast_count_test_helpers::
+                                   ReplicatedFastCountTestPersistenceProvider>())) {}
+
+protected:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        _opCtx = operationContext();
+
+        auto* registry = dynamic_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+        ASSERT(registry);
+        registry->addObserver(
+            std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
+
+        _fastCountManager = &ReplicatedFastCountManager::get(_opCtx->getServiceContext());
+        _fastCountManager->disablePeriodicWrites_ForTest();
+        // Intentionally do NOT call setUpReplicatedFastCount() — the test exercises the
+        // cold-boot path where on-disk containers exist before the manager is configured.
+
+        // Create two collections so their UUIDs exist in the CollectionCatalog
+        ASSERT_OK(storageInterface()->createCollection(
+            _opCtx, _coll1.nss, CollectionOptions{.uuid = _coll1.uuid}));
+        ASSERT_OK(storageInterface()->createCollection(
+            _opCtx, _coll2.nss, CollectionOptions{.uuid = _coll2.uuid}));
+    }
+
+    OperationContext* _opCtx;
+    ReplicatedFastCountManager* _fastCountManager;
+
+    test_helpers::NsAndUUID _coll1 = {
+        .nss = NamespaceString::createNamespaceString_forTest("coldboot_test", "coll1"),
+        .uuid = UUID::gen()};
+    test_helpers::NsAndUUID _coll2 = {
+        .nss = NamespaceString::createNamespaceString_forTest("coldboot_test", "coll2"),
+        .uuid = UUID::gen()};
+};
+
+TEST_F(ReplicatedFastCountManagerColdBootTest,
+       InitializePopulatesMetadataFromExistingInternalCollection) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
+
+    // Pre-populate the internal replicated fast count collection with two entries.
+    const int64_t expectedCount1 = 5;
+    const int64_t expectedSize1 = 100;
+
+    const int64_t expectedCount2 = 10;
+    const int64_t expectedSize2 = 250;
+
+    {
+        ASSERT_OK(repl::StorageInterface::get(_opCtx->getServiceContext())
+                      ->createCollection(
+                          _opCtx,
+                          NamespaceString::makeGlobalConfigCollection(
+                              NamespaceString::kReplicatedFastCountStore),
+                          CollectionOptions{.clusteredIndex =
+                                                clustered_util::makeDefaultClusteredIdIndex()}));
+        ASSERT_OK(repl::StorageInterface::get(_opCtx->getServiceContext())
+                      ->createCollection(
+                          _opCtx,
+                          NamespaceString::makeGlobalConfigCollection(
+                              NamespaceString::kReplicatedFastCountStoreTimestamps),
+                          CollectionOptions{.clusteredIndex =
+                                                clustered_util::makeDefaultClusteredIdIndex()}));
+
+        AutoGetCollection fastCountColl(
+            _opCtx,
+            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
+            LockMode::MODE_IX);
+        ASSERT(fastCountColl);
+
+        WriteUnitOfWork wuow{_opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations};
+
+        ASSERT_OK(Helpers::insert(
+            _opCtx,
+            *fastCountColl,
+            BSON("_id" << _coll1.uuid << kValidAsOfKey << Timestamp(1, 1) << kMetadataKey
+                       << BSON(kCountKey << expectedCount1 << kSizeKey << expectedSize1))));
+
+        ASSERT_OK(Helpers::insert(
+            _opCtx,
+            *fastCountColl,
+            BSON("_id" << _coll2.uuid << kValidAsOfKey << Timestamp(1, 1) << kMetadataKey
+                       << BSON(kCountKey << expectedCount2 << kSizeKey << expectedSize2))));
+
+        wuow.commit();
+    }
+
+    replicated_fast_count_test_helpers::checkFastCountMetadataInInternalStore(
+        _opCtx,
+        _fastCountManager,
+        _coll1.uuid,
+        /*expectPersisted=*/true,
+        expectedCount1,
+        expectedSize1);
+    replicated_fast_count_test_helpers::checkFastCountMetadataInInternalStore(
+        _opCtx,
+        _fastCountManager,
+        _coll2.uuid,
+        /*expectPersisted=*/true,
+        expectedCount2,
+        expectedSize2);
+
+    const auto* rs1 = getRecordStoreForUuid(_opCtx, _coll1.uuid);
+    const auto* rs2 = getRecordStoreForUuid(_opCtx, _coll2.uuid);
+
+    EXPECT_EQ(rs1->accurateNumRecords(), 0);
+    EXPECT_EQ(rs1->accurateDataSize(), 0);
+    EXPECT_EQ(rs2->accurateNumRecords(), 0);
+    EXPECT_EQ(rs2->accurateDataSize(), 0);
+
+    _fastCountManager->initializeMetadata(_opCtx);
+
+    // The in-memory RecordStore should reflect the persisted values.
+    EXPECT_EQ(rs1->accurateNumRecords(), expectedCount1);
+    EXPECT_EQ(rs1->accurateDataSize(), expectedSize1);
+    EXPECT_EQ(rs2->accurateNumRecords(), expectedCount2);
+    EXPECT_EQ(rs2->accurateDataSize(), expectedSize2);
+}
+
+TEST_F(ReplicatedFastCountManagerColdBootTest,
+       InitializePopulatesMetadataFromExistingInternalContainer) {
+    RAIIServerParameterControllerForTest ffFastCount("featureFlagReplicatedFastCount", true);
+    RAIIServerParameterControllerForTest ffDurability("featureFlagReplicatedFastCountDurability",
+                                                      true);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+
+    ASSERT_OK(createInternalFastCountContainers(_opCtx,
+                                                NamespaceString::kAdminCommandNamespace,
+                                                ident::kFastCountMetadataStore,
+                                                KeyFormat::String,
+                                                ident::kFastCountMetadataStoreTimestamps,
+                                                KeyFormat::Long,
+                                                /*writeToOplog=*/true));
+
+    auto* engine = _opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto metadataRS = engine->getRecordStore(_opCtx,
+                                             NamespaceString::kAdminCommandNamespace,
+                                             ident::kFastCountMetadataStore,
+                                             RecordStore::Options{.keyFormat = KeyFormat::String},
+                                             /*uuid=*/boost::none);
+    auto timestampsRS = engine->getRecordStore(_opCtx,
+                                               NamespaceString::kAdminCommandNamespace,
+                                               ident::kFastCountMetadataStoreTimestamps,
+                                               RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                               /*uuid=*/boost::none);
+
+    const int64_t expectedCount1 = 5;
+    const int64_t expectedSize1 = 100;
+
+    const int64_t expectedCount2 = 10;
+    const int64_t expectedSize2 = 250;
+
+    const BSONObj entry1Bson = test_helpers::makeEntryBson(expectedCount1, expectedSize1);
+    const BSONObj entry2Bson = test_helpers::makeEntryBson(expectedCount2, expectedSize2);
+
+    {
+        auto containerVariant = metadataRS->getContainer();
+        auto& container =
+            std::get<std::reference_wrapper<StringKeyedContainer>>(containerVariant).get();
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
+
+        WriteUnitOfWork wuow(_opCtx);
+        ASSERT_OK(container.insert(ru,
+                                   test_helpers::uuidSpan(_coll1.uuid),
+                                   test_helpers::bsonSpan(entry1Bson),
+                                   container::ExistingKeyPolicy::reject));
+        ASSERT_OK(container.insert(ru,
+                                   test_helpers::uuidSpan(_coll2.uuid),
+                                   test_helpers::bsonSpan(entry2Bson),
+                                   container::ExistingKeyPolicy::reject));
+        wuow.commit();
+    }
+
+    auto checkFastCountMetadataInContainer =
+        [&](const UUID& uuid, int64_t expectedCount, int64_t expectedSize) {
+            BSONObj persisted;
+            const bool found = replicated_fast_count_test_helpers::findPersistedDocInContainer(
+                _opCtx, uuid, persisted);
+            ASSERT_TRUE(found);
+
+            const int64_t persistedCount = persisted.getField(replicated_fast_count::kMetadataKey)
+                                               .Obj()
+                                               .getField(replicated_fast_count::kCountKey)
+                                               .Long();
+            const int64_t persistedSize = persisted.getField(replicated_fast_count::kMetadataKey)
+                                              .Obj()
+                                              .getField(replicated_fast_count::kSizeKey)
+                                              .Long();
+            EXPECT_EQ(persistedCount, expectedCount);
+            EXPECT_EQ(persistedSize, expectedSize);
+
+            ASSERT_TRUE(persisted.hasField(replicated_fast_count::kValidAsOfKey));
+        };
+
+    checkFastCountMetadataInContainer(_coll1.uuid, expectedCount1, expectedSize1);
+    checkFastCountMetadataInContainer(_coll2.uuid, expectedCount2, expectedSize2);
+
+    const auto* rs1 = getRecordStoreForUuid(_opCtx, _coll1.uuid);
+    const auto* rs2 = getRecordStoreForUuid(_opCtx, _coll2.uuid);
+
+    EXPECT_EQ(rs1->accurateNumRecords(), 0);
+    EXPECT_EQ(rs1->accurateDataSize(), 0);
+    EXPECT_EQ(rs2->accurateNumRecords(), 0);
+    EXPECT_EQ(rs2->accurateDataSize(), 0);
+
+    _fastCountManager->initializeMetadata(_opCtx);
+
+    // The in-memory RecordStore should reflect the persisted values.
+    EXPECT_EQ(rs1->accurateNumRecords(), expectedCount1);
+    EXPECT_EQ(rs1->accurateDataSize(), expectedSize1);
+    EXPECT_EQ(rs2->accurateNumRecords(), expectedCount2);
+    EXPECT_EQ(rs2->accurateDataSize(), expectedSize2);
 }
 
 }  // namespace

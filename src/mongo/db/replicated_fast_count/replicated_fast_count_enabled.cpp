@@ -33,6 +33,7 @@
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/version_context.h"
 
 namespace mongo {
@@ -82,6 +83,16 @@ bool shouldReadFromReplicatedFastCount(OperationContext* opCtx, const NamespaceS
         (nss.isOplog() && shouldReadFromSizeStorerForOplog(opCtx));
     return isReplicatedFastCountEnabled(opCtx) && isReplicatedFastCountEligible(nss) &&
         !isOplogAndShouldReadFromSizeStorer;
+}
+
+bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx) {
+    // TODO SERVER-125446: Also consult persistence provider for container writes enablement.
+    return gFeatureFlagReplicatedFastCountDurability.isEnabledUseLatestFCVWhenUninitialized(
+               VersionContext::getDecoration(opCtx),
+               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        feature_flags::gContainerWrites.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 }  // namespace mongo

@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/assert_util.h"
@@ -118,6 +119,19 @@ public:
      * Removes the entry for `uuid` from the store if one exists, otherwise does nothing.
      */
     virtual void remove(OperationContext* opCtx, UUID uuid) = 0;
+
+    /**
+     * For each entry in `deltas`, looks up the persisted size and count for that UUID in the
+     * on-disk fast count store and adds the persisted values to the entry's size and count
+     * in place. If a UUID has no on-disk entry, its delta is left unchanged.
+     *
+     * Implementations are expected to acquire any underlying storage handles once and reuse them
+     * across all UUIDs in `deltas`, since this is the checkpoint hot path.
+     */
+    virtual void readAndIncrementSizeCounts(OperationContext* opCtx,
+                                            SizeCountDeltas& deltas) const = 0;
+
+    virtual bool usesContainers() const = 0;
 };
 
 /**
@@ -132,6 +146,12 @@ public:
     void write(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     void remove(OperationContext* opCtx, UUID uuid) override;
+    void readAndIncrementSizeCounts(OperationContext* opCtx,
+                                    SizeCountDeltas& deltas) const override;
+
+    bool usesContainers() const override {
+        return false;
+    }
 };
 
 /**
@@ -149,6 +169,12 @@ public:
     void write(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     void insert(OperationContext* opCtx, UUID uuid, const Entry& entry) override;
     void remove(OperationContext* opCtx, UUID uuid) override;
+    void readAndIncrementSizeCounts(OperationContext* opCtx,
+                                    SizeCountDeltas& deltas) const override;
+
+    bool usesContainers() const override {
+        return true;
+    }
 
     /**
      * Encodes `uuid` as the container key. The returned span views into `uuid` and is valid only

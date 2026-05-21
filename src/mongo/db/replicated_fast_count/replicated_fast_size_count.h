@@ -31,8 +31,11 @@
 
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #include <cstdint>
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 
@@ -114,5 +117,17 @@ struct SizeCountDelta {
         return fmt::format("sizeCount: {}, state: {}", sizeCount.toString(), stateStr);
     }
 };
+
+namespace replicated_fast_count {
+
+/**
+ * Data structure mapping collection UUIDs to their size and count deltas.
+ *
+ * Useful for tracking changes to collections' size and count while scanning the oplog during
+ * both checkpoints and size/count lookups.
+ */
+using SizeCountDeltas = absl::flat_hash_map<UUID, SizeCountDelta>;
+
+}  // namespace replicated_fast_count
 
 }  // namespace mongo

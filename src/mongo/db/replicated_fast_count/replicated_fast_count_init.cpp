@@ -34,6 +34,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/replicated_fast_count/init_replicated_fast_count_oplog_entry_gen.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/write_concern.h"
@@ -114,12 +116,11 @@ void _writeInitReplicatedFastCountOplogEntry(OperationContext* opCtx) {
 }  // namespace
 
 void setUpReplicatedFastCount(OperationContext* opCtx) {
-    _createInternalFastCountCollections(repl::StorageInterface::get(opCtx->getServiceContext()),
-                                        opCtx);
+    auto& manager =
+        replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext());
 
-    if (gFeatureFlagReplicatedFastCountDurability.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    // Containers and collections should be mutually exclusive.
+    if (shouldUseReplicatedFastCountContainers(opCtx)) {
         auto status = createInternalFastCountContainers(opCtx,
                                                         NamespaceString::kAdminCommandNamespace,
                                                         ident::kFastCountMetadataStore,
@@ -129,16 +130,33 @@ void setUpReplicatedFastCount(OperationContext* opCtx) {
                                                         /*writeToOplog=*/true);
         if (status == ErrorCodes::ObjectAlreadyExists) {
             LOGV2(12309403,
-                  "Replicated fast count idents already exist during stepup",
+                  "Replicated fast count idents already exist",
                   "metadataIdent"_attr = ident::kFastCountMetadataStore,
                   "timestampsIdent"_attr = ident::kFastCountMetadataStoreTimestamps);
         } else {
             massertStatusOK(status);
         }
+
+        auto* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+        auto metadataRS =
+            engine->getRecordStore(opCtx,
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStore,
+                                   RecordStore::Options{.keyFormat = KeyFormat::String},
+                                   /*uuid=*/boost::none);
+        auto timestampsRS =
+            engine->getRecordStore(opCtx,
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStoreTimestamps,
+                                   RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                   /*uuid=*/boost::none);
+        manager.initializeContainerStores(std::move(metadataRS), std::move(timestampsRS));
+    } else {
+        _createInternalFastCountCollections(repl::StorageInterface::get(opCtx->getServiceContext()),
+                                            opCtx);
     }
 
-    replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
-        .startup(opCtx);
+    manager.startup(opCtx);
 }
 
 namespace {
@@ -244,6 +262,10 @@ Status createInternalFastCountContainers(OperationContext* opCtx,
             _writeInitReplicatedFastCountOplogEntry(opCtx);
         }
         wuow.commit();
+        LOGV2(12231704,
+              "Created replicated fast count idents",
+              "metadataIdent"_attr = ident::kFastCountMetadataStore,
+              "timestampsIdent"_attr = ident::kFastCountMetadataStoreTimestamps);
         return Status::OK();
     }
 

@@ -47,14 +47,6 @@ namespace mongo {
 namespace replicated_fast_count {
 
 /**
- * Data structure mapping collection UUIDs to their size and count deltas.
- *
- * Useful for tracking changes to collections' size and count while scanning the oplog during
- * both checkpoints and size/count lookups.
- */
-using SizeCountDeltas = absl::flat_hash_map<UUID, SizeCountDelta>;
-
-/**
  * Returns the size and count delta extracted from the oplog entry's size metadata ('m' field), if
  * present.
  *
@@ -117,12 +109,6 @@ OplogScanResult aggregateSizeCountDeltasInOplog(
     bool isCheckpoint = false,
     const boost::optional<UUID>& oplogUuid = boost::none);
 
-/**
- * For each entry in 'deltas', looks up the persisted size and count for that UUID in the
- * on-disk fast count collection and adds the persisted values to the entry's size and count
- * in place. If a UUID has no on-disk entry, its delta is left unchanged.
- */
-void readAndIncrementSizeCounts(OperationContext* opCtx, SizeCountDeltas& deltas);
 }  // namespace replicated_fast_count
 
 

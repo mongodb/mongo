@@ -35,6 +35,7 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/container_oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
@@ -46,45 +47,87 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::replicated_fast_count_test_helpers {
 
-void checkFastCountMetadataInInternalCollection(OperationContext* opCtx,
-                                                const UUID& uuid,
-                                                bool expectPersisted,
-                                                int64_t expectedCount,
-                                                int64_t expectedSize) {
-    {
-        auto fastCountColl = acquireCollection(
+namespace {
+bool findPersistedDocInCollection(OperationContext* opCtx, const UUID& uuid, BSONObj& outDoc) {
+    auto fastCountColl = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
             opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx,
-                                                    NamespaceString::makeGlobalConfigCollection(
-                                                        NamespaceString::kReplicatedFastCountStore),
-                                                    AcquisitionPrerequisites::kRead),
-            MODE_IS);
+            NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore),
+            AcquisitionPrerequisites::kRead),
+        MODE_IS);
 
-        BSONObj persisted;
-        bool found = Helpers::findById(
-            opCtx, fastCountColl.getCollectionPtr()->ns(), BSON("_id" << uuid), persisted);
+    return Helpers::findById(
+        opCtx, fastCountColl.getCollectionPtr()->ns(), BSON("_id" << uuid), outDoc);
+}
 
-        EXPECT_EQ(found, expectPersisted);
-        if (!expectPersisted) {
-            return;
-        }
-        int64_t persistedCount = persisted.getField(replicated_fast_count::kMetadataKey)
-                                     .Obj()
-                                     .getField(replicated_fast_count::kCountKey)
-                                     .Long();
-        int64_t persistedSize = persisted.getField(replicated_fast_count::kMetadataKey)
-                                    .Obj()
-                                    .getField(replicated_fast_count::kSizeKey)
-                                    .Long();
-        EXPECT_EQ(persistedCount, expectedCount);
-        EXPECT_EQ(persistedSize, expectedSize);
+}  // namespace
 
-        ASSERT_TRUE(persisted.hasField(replicated_fast_count::kValidAsOfKey));
+bool findPersistedDocInContainer(OperationContext* opCtx, const UUID& uuid, BSONObj& outDoc) {
+    Lock::GlobalLock globalLock(opCtx, MODE_IS);
+    auto* engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto rs = engine->getRecordStore(opCtx,
+                                     NamespaceString::kAdminCommandNamespace,
+                                     ident::kFastCountMetadataStore,
+                                     RecordStore::Options{.keyFormat = KeyFormat::String},
+                                     /*uuid=*/boost::none);
+    auto containerVariant = rs->getContainer();
+    invariant(
+        std::holds_alternative<std::reference_wrapper<StringKeyedContainer>>(containerVariant),
+        "Fast count metadata store is expected to be a StringKeyedContainer in container "
+        "mode");
+    auto& container =
+        std::get<std::reference_wrapper<StringKeyedContainer>>(containerVariant).get();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    auto cursor = container.getCursor(ru);
+
+    auto cdr = uuid.toCDR();
+    const std::span<const char> keySpan{reinterpret_cast<const char*>(cdr.data()), cdr.length()};
+    auto result = cursor->find(keySpan);
+    if (!result) {
+        return false;
     }
+    // Copy the BSON out of the cursor-owned span so 'outDoc' outlives the cursor.
+    outDoc = BSONObj(result->data()).getOwned();
+    return true;
+}
+
+void checkFastCountMetadataInInternalStore(
+    OperationContext* opCtx,
+    replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
+    const UUID& uuid,
+    bool expectPersisted,
+    int64_t expectedCount,
+    int64_t expectedSize) {
+    BSONObj persisted;
+    const bool found = fastCountManager->usesContainers_ForTest()
+        ? findPersistedDocInContainer(opCtx, uuid, persisted)
+        : findPersistedDocInCollection(opCtx, uuid, persisted);
+
+    EXPECT_EQ(found, expectPersisted);
+    if (!expectPersisted) {
+        return;
+    }
+    const int64_t persistedCount = persisted.getField(replicated_fast_count::kMetadataKey)
+                                       .Obj()
+                                       .getField(replicated_fast_count::kCountKey)
+                                       .Long();
+    const int64_t persistedSize = persisted.getField(replicated_fast_count::kMetadataKey)
+                                      .Obj()
+                                      .getField(replicated_fast_count::kSizeKey)
+                                      .Long();
+    EXPECT_EQ(persistedCount, expectedCount);
+    EXPECT_EQ(persistedSize, expectedSize);
+
+    ASSERT_TRUE(persisted.hasField(replicated_fast_count::kValidAsOfKey));
 }
 
 void checkUncommittedFastCountChanges(OperationContext* opCtx,
@@ -277,20 +320,204 @@ std::vector<repl::OplogEntry> getApplyOpsForNss(OperationContext* opCtx,
 
 repl::OplogEntry getLatestApplyOpsForNss(OperationContext* opCtx, const NamespaceString& innerNss) {
     auto entries = getApplyOpsForNss(opCtx, innerNss);
-    EXPECT_FALSE(entries.empty()) << "Expected at least one applyOps entry for "
+    ASSERT_FALSE(entries.empty()) << "Expected at least one applyOps entry for "
                                   << innerNss.toStringForErrorMsg();
     return entries.back();
 }
 
-void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
-                                    const NamespaceString& internalNss,
-                                    const std::vector<ExpectedFastCountOp>& expectedOps) {
+std::vector<repl::OplogEntry> getApplyOpsForFastCountStore(OperationContext* opCtx) {
+    const auto fastCountStoreNss =
+        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
 
+    auto predicate = [&](const repl::OplogEntry& entry) {
+        if (entry.getOpType() != repl::OpTypeEnum::kCommand ||
+            entry.getCommandType() != repl::OplogEntry::CommandType::kApplyOps) {
+            return false;
+        }
+
+        std::vector<repl::OplogEntry> inner;
+        repl::ApplyOps::extractOperationsTo(entry, entry.getEntry().toBSON(), &inner);
+
+        for (const auto& innerEntry : inner) {
+            // Collection-backed path: inner op on the fast count metadata collection.
+            if (innerEntry.getNss() == fastCountStoreNss) {
+                return true;
+            }
+            // Container-backed path: inner op is a container op on the fast count metadata ident.
+            if (auto container = innerEntry.getContainer();
+                container && ident::isReplicatedFastCountIdent(*container)) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    return getOplogEntriesMatching(opCtx, predicate);
+}
+
+repl::OplogEntry getLatestApplyOpsForFastCountStore(OperationContext* opCtx) {
+    auto entries = getApplyOpsForFastCountStore(opCtx);
+    ASSERT_FALSE(entries.empty())
+        << "Expected at least one applyOps entry for the replicated fast count store";
+    return entries.back();
+}
+
+namespace {
+struct ObservedApplyOp {
+    FastCountOpType opType{FastCountOpType::kInsert};
+    UUID uuid{UUID::gen()};
+    boost::optional<int64_t> observedCount;
+    boost::optional<int64_t> observedSize;
+};
+
+// Parses the meta subobject of a persisted Entry BSON into count/size observed values.
+void readMetaFieldsInto(const BSONObj& entryBson, ObservedApplyOp& out) {
+    const auto metaField = entryBson.getField(replicated_fast_count::kMetadataKey);
+    ASSERT_TRUE(metaField.isABSONObj())
+        << "Entry meta field missing or not an object for UUID " << out.uuid << ": " << entryBson;
+    const BSONObj metaObj = metaField.Obj();
+    const auto countElem = metaObj.getField(replicated_fast_count::kCountKey);
+    const auto sizeElem = metaObj.getField(replicated_fast_count::kSizeKey);
+    EXPECT_TRUE(countElem.isNumber())
+        << "Count field not numeric for UUID " << out.uuid << ": " << countElem;
+    EXPECT_TRUE(sizeElem.isNumber())
+        << "Size field not numeric for UUID " << out.uuid << ": " << sizeElem;
+    out.observedCount = countElem.safeNumberLong();
+    out.observedSize = sizeElem.safeNumberLong();
+}
+
+ObservedApplyOp parseCollectionInnerOp(const repl::OplogEntry& innerEntry) {
+    ObservedApplyOp out;
+    EXPECT_EQ(repl::OplogEntry::CommandType::kNotCommand, innerEntry.getCommandType());
+    switch (innerEntry.getOpType()) {
+        case repl::OpTypeEnum::kInsert: {
+            out.opType = FastCountOpType::kInsert;
+            const auto& obj = innerEntry.getObject();
+            out.uuid = UUID::parse(obj["_id"]).getValue();
+
+            const auto metaElem = obj[replicated_fast_count::kMetadataKey];
+            EXPECT_TRUE(metaElem.isABSONObj())
+                << "Meta field not an object for UUID " << out.uuid << ": " << metaElem;
+            readMetaFieldsInto(obj, out);
+            break;
+        }
+        case repl::OpTypeEnum::kUpdate: {
+            out.opType = FastCountOpType::kUpdate;
+            const auto& o2 = innerEntry.getObject2();
+            EXPECT_TRUE(o2);
+            out.uuid = UUID::parse(o2->getField("_id")).getValue();
+
+            // Extract the size from the update diff. The diff algorithm may either use a
+            // subdiff for the meta object (smeta: {u: {sz: N}}) or replace the whole meta
+            // field as part of the top-level update (u: {meta: {sz: N}}), depending on which
+            // representation is more compact. In practice, the former is used when only `sz`
+            // changes and the latter is used when count + size both change.
+            const auto& obj = innerEntry.getObject();
+            const auto diffField = obj.getField("diff");
+            ASSERT_TRUE(diffField.isABSONObj()) << "Expected 'diff' object in kUpdate op for UUID "
+                                                << out.uuid << ": " << obj.toString();
+            const BSONObj diffBson = diffField.Obj();
+
+            const std::string smetaKey = "s" + std::string(replicated_fast_count::kMetadataKey);
+            const BSONElement smetaField = diffBson.getField(smetaKey);
+            BSONElement sizeElem;
+            if (smetaField.isABSONObj()) {
+                // Subdiff format: {diff: {smeta: {u: {sz: N}}}}
+                const BSONObj smetaBson = smetaField.Obj();
+                const BSONElement uField = smetaBson.getField("u");
+                if (uField.isABSONObj()) {
+                    sizeElem = uField.Obj().getField(replicated_fast_count::kSizeKey);
+                }
+            } else {
+                // Full-replacement format: {diff: {u: {meta: {sz: N}}}}
+                const BSONElement uField = diffBson.getField("u");
+                if (uField.isABSONObj()) {
+                    const BSONObj uBson = uField.Obj();
+                    const BSONElement metaField =
+                        uBson.getField(replicated_fast_count::kMetadataKey);
+                    if (metaField.isABSONObj()) {
+                        sizeElem = metaField.Obj().getField(replicated_fast_count::kSizeKey);
+                    }
+                }
+            }
+            EXPECT_TRUE(sizeElem.isNumber())
+                << "Size field not numeric for UUID " << out.uuid << ": " << sizeElem;
+            out.observedSize = sizeElem.safeNumberLong();
+
+            ASSERT_BSONOBJ_EQ(o2.get(), BSON("_id" << out.uuid));
+            break;
+        }
+        case repl::OpTypeEnum::kDelete: {
+            out.opType = FastCountOpType::kDelete;
+            const auto& obj = innerEntry.getObject();
+            out.uuid = UUID::parse(obj["_id"]).getValue();
+            break;
+        }
+        default: {
+            FAIL(std::string("Unexpected opType for collection fast-count applyOps inner op: ") +
+                 std::string{idl::serialize(innerEntry.getOpType())});
+        }
+    }
+    return out;
+}
+
+ObservedApplyOp parseContainerInnerOp(const repl::OplogEntry& innerEntry) {
+    ObservedApplyOp out;
+    // Container writes carry the full Entry BSON (no diff), so both kInsert and kUpdate surface
+    // both count and size.
+    repl::ContainerKey key;
+    repl::ContainerVal val;
+    switch (innerEntry.getOpType()) {
+        case repl::OpTypeEnum::kContainerInsert: {
+            out.opType = FastCountOpType::kInsert;
+            const auto parsed = repl::ContainerInsertOplogEntryO::parse(
+                innerEntry.getObject(), IDLParserContext("ContainerInsertOplogEntryO"));
+            key = parsed.getKey();
+            val = parsed.getValue();
+            break;
+        }
+        case repl::OpTypeEnum::kContainerUpdate: {
+            out.opType = FastCountOpType::kUpdate;
+            const auto parsed = repl::ContainerUpdateOplogEntryO::parse(
+                innerEntry.getObject(), IDLParserContext("ContainerUpdateOplogEntryO"));
+            key = parsed.getKey();
+            val = parsed.getValue();
+            break;
+        }
+        case repl::OpTypeEnum::kContainerDelete: {
+            out.opType = FastCountOpType::kDelete;
+            const auto parsed = repl::ContainerDeleteOplogEntryO::parse(
+                innerEntry.getObject(), IDLParserContext("ContainerDeleteOplogEntryO"));
+            key = parsed.getKey();
+            break;
+        }
+        default: {
+            FAIL(std::string("Unexpected opType for container fast-count applyOps inner op: ") +
+                 std::string{idl::serialize(innerEntry.getOpType())});
+            return out;
+        }
+    }
+
+    ASSERT_FALSE(key.isIntKey());
+    const auto keyBytes = key.getBytesKey();
+    out.uuid = UUID::fromCDR(ConstDataRange(keyBytes.data(), keyBytes.data() + keyBytes.size()));
+
+    if (out.opType == FastCountOpType::kDelete) {
+        return out;
+    }
+
+    const BSONObj entryBson = BSONObj(val.data().data()).getOwned();
+    readMetaFieldsInto(entryBson, out);
+    return out;
+}
+}  // namespace
+
+void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
+                                    const std::vector<ExpectedFastCountOp>& expectedOps) {
     EXPECT_EQ(repl::OpTypeEnum::kCommand, applyOpsEntry.getOpType());
     EXPECT_EQ(repl::OplogEntry::CommandType::kApplyOps, applyOpsEntry.getCommandType());
     EXPECT_EQ("admin.$cmd"_sd, applyOpsEntry.getNss().ns_forTest());
 
-    // Index expectations by UUID so we can match each inner op to one expected op.
     std::map<UUID, ExpectedFastCountOp> expectedByUuid;
     for (const auto& e : expectedOps) {
         auto [it, inserted] = expectedByUuid.emplace(e.uuid, e);
@@ -300,170 +527,59 @@ void assertFastCountApplyOpsMatches(const repl::OplogEntry& applyOpsEntry,
     std::vector<repl::OplogEntry> innerOperations;
     repl::ApplyOps::extractOperationsTo(
         applyOpsEntry, applyOpsEntry.getEntry().toBSON(), &innerOperations);
-    int seenFastCountOps = 0;
 
+    const auto fastCountStoreNss =
+        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
     const auto timestampStoreNss = NamespaceString::makeGlobalConfigCollection(
         NamespaceString::kReplicatedFastCountStoreTimestamps);
 
+    int seenFastCountOps = 0;
     for (const auto& innerEntry : innerOperations) {
-        if (innerEntry.getNss() == timestampStoreNss) {
-            // TODO SERVER-123384: Add explicit validation for the timestamp store writes.
-            //
-            // Timestamp-store ops are written alongside metadata ops in the same applyOps; skip
-            // them here since they aren't part of the per-collection metadata being validated.
-            continue;
+        // TODO SERVER-123384: Add explicit validation for the timestamp store writes.
+        //
+        // Timestamp-store ops are written alongside metadata ops in the same applyOps; skip them
+        // here since they aren't part of the per-collection metadata being validated.
+        ObservedApplyOp observed;
+        if (auto container = innerEntry.getContainer(); container) {
+            if (*container == ident::kFastCountMetadataStoreTimestamps) {
+                continue;
+            }
+            EXPECT_EQ(ident::kFastCountMetadataStore, *container)
+                << "Found unexpected non-fast-count container op in applyOps payload. "
+                << applyOpsEntry.toStringForLogging() << " Inner operation "
+                << innerEntry.toStringForLogging();
+            observed = parseContainerInnerOp(innerEntry);
+        } else {
+            if (innerEntry.getNss() == timestampStoreNss) {
+                continue;
+            }
+            EXPECT_EQ(fastCountStoreNss, innerEntry.getNss())
+                << "Found unexpected non-fast-count operation in applyOps payload. "
+                << applyOpsEntry.toStringForLogging() << " Inner operation "
+                << innerEntry.toStringForLogging();
+            observed = parseCollectionInnerOp(innerEntry);
         }
 
-        EXPECT_EQ(internalNss, innerEntry.getNss())
-            << "Found unexpected non-fast-count operation in applyOps payload. "
-            << applyOpsEntry.toStringForLogging() << " Inner operation "
-            << innerEntry.toStringForLogging();
-
-        EXPECT_EQ(repl::OplogEntry::CommandType::kNotCommand, innerEntry.getCommandType());
-
-        FastCountOpType observedType = FastCountOpType::kInsert;
-        UUID uuid = UUID::gen();
-
-        // Get the UUID from the entry.
-        switch (innerEntry.getOpType()) {
-            case repl::OpTypeEnum::kInsert: {
-                observedType = FastCountOpType::kInsert;
-                const auto& obj = innerEntry.getObject();
-                auto idElem = obj["_id"];
-                uuid = UUID::parse(idElem).getValue();
-                break;
-            }
-            case repl::OpTypeEnum::kUpdate: {
-                observedType = FastCountOpType::kUpdate;
-                const auto& o2 = innerEntry.getObject2();
-                EXPECT_TRUE(o2);
-                auto idElem = o2->getField("_id");
-                uuid = UUID::parse(idElem).getValue();
-                break;
-            }
-            case repl::OpTypeEnum::kDelete: {
-                observedType = FastCountOpType::kDelete;
-                const auto& obj = innerEntry.getObject();
-                auto idElem = obj["_id"];
-                uuid = UUID::parse(idElem).getValue();
-                break;
-            }
-            default: {
-                FAIL(std::string("Unexpected opType for observed fast-count applyOps entry: ") +
-                     std::string{idl::serialize(innerEntry.getOpType())});
-                break;
-            }
-        }
-
-        auto it = expectedByUuid.find(uuid);
+        auto it = expectedByUuid.find(observed.uuid);
         if (it == expectedByUuid.end()) {
             continue;
         }
-
         const auto& expected = it->second;
-        EXPECT_EQ(expected.opType, observedType) << "Mismatched op type for UUID " << uuid;
+        EXPECT_EQ(expected.opType, observed.opType)
+            << "Mismatched op type for UUID " << observed.uuid;
 
-        switch (observedType) {
-            case FastCountOpType::kInsert: {
-                const auto& obj = innerEntry.getObject();
-
-                auto metaElem = obj[replicated_fast_count::kMetadataKey];
-                EXPECT_TRUE(metaElem.isABSONObj())
-                    << "Meta field not numeric for UUID " << uuid << ": " << metaElem;
-
-                auto metaObj = metaElem.Obj();
-                auto countElem = metaObj[replicated_fast_count::kCountKey];
-                auto sizeElem = metaObj[replicated_fast_count::kSizeKey];
-
-                EXPECT_TRUE(countElem.isNumber())
-                    << "Count field not numeric for UUID " << uuid << ": " << countElem;
-                EXPECT_TRUE(sizeElem.isNumber())
-                    << "Size field not numeric for UUID " << uuid << ": " << sizeElem;
-
-                auto actualCount = countElem.safeNumberLong();
-                auto actualSize = sizeElem.safeNumberLong();
-
-                if (expected.expectedCount) {
-                    EXPECT_EQ(*expected.expectedCount, actualCount)
-                        << "Mismatched fast-count 'count' for UUID " << uuid;
-                }
-                if (expected.expectedSize) {
-                    EXPECT_EQ(*expected.expectedSize, actualSize)
-                        << "Mismatched fast-count 'size' for UUID " << uuid;
-                }
-                break;
-            }
-            case FastCountOpType::kUpdate: {
-                const auto& obj = innerEntry.getObject();
-
-                // Extract the size from the update diff. The diff algorithm may either use a
-                // subdiff for the meta object (smeta: {u: {sz: N}}) or replace the whole meta
-                // field as part of the top-level update (u: {meta: {sz: N}}), depending on which
-                // representation is more compact. In practice, the former will be used when we are
-                // updating only one field (sz) and the latter will be used when we replace both
-                // fields.
-                BSONElement sizeElem;
-                {
-                    auto diffField = obj.getField("diff");
-                    ASSERT_TRUE(diffField.isABSONObj())
-                        << "Expected 'diff' object in kUpdate op for UUID " << uuid << ": "
-                        << obj.toString();
-                    const BSONObj diffBson = diffField.Obj();
-
-                    const std::string smetaKey =
-                        "s" + std::string(replicated_fast_count::kMetadataKey);
-                    auto smetaField = diffBson.getField(smetaKey);
-                    if (smetaField.isABSONObj()) {
-                        // Subdiff format: {diff: {smeta: {u: {sz: N}}}}
-                        const BSONObj smetaBson = smetaField.Obj();
-                        auto uField = smetaBson.getField("u");
-                        if (uField.isABSONObj()) {
-                            const BSONObj uBson = uField.Obj();
-                            sizeElem = uBson.getField(replicated_fast_count::kSizeKey);
-                        }
-                    } else {
-                        // Full-replacement format: {diff: {u: {meta: {sz: N}}}}
-                        auto uField = diffBson.getField("u");
-                        if (uField.isABSONObj()) {
-                            const BSONObj uBson = uField.Obj();
-                            auto metaField = uBson.getField(replicated_fast_count::kMetadataKey);
-                            if (metaField.isABSONObj()) {
-                                const BSONObj metaBson = metaField.Obj();
-                                sizeElem = metaBson.getField(replicated_fast_count::kSizeKey);
-                            }
-                        }
-                    }
-                }
-                EXPECT_TRUE(sizeElem.isNumber())
-                    << "Size field not numeric for UUID " << uuid << ": " << sizeElem;
-
-                auto actualNewSize = sizeElem.safeNumberLong();
-
-                if (expected.expectedSize) {
-                    EXPECT_EQ(*expected.expectedSize, actualNewSize)
-                        << "Mismatched fast-count 'size' for UUID " << uuid;
-                }
-
-                const auto& o2 = innerEntry.getObject2();
-                ASSERT_BSONOBJ_EQ(o2.get(), BSON("_id" << uuid));
-                break;
-            }
-            case FastCountOpType::kDelete: {
-                const auto& obj = innerEntry.getObject();
-                ASSERT_BSONOBJ_EQ(obj, BSON("_id" << uuid));
-                break;
-            }
-            default: {
-                FAIL(std::string("Unexpected opType for inputted fast-count applyOps entry: ") +
-                     std::string{idl::serialize(innerEntry.getOpType())});
-                break;
-            }
+        if (expected.expectedCount && observed.observedCount) {
+            EXPECT_EQ(*expected.expectedCount, *observed.observedCount)
+                << "Mismatched fast-count 'count' for UUID " << observed.uuid;
+        }
+        if (expected.expectedSize && observed.observedSize) {
+            EXPECT_EQ(*expected.expectedSize, *observed.observedSize)
+                << "Mismatched fast-count 'size' for UUID " << observed.uuid;
         }
 
         ++seenFastCountOps;
     }
 
-    // Ensure we saw every expected UUID exactly once.
     EXPECT_EQ(seenFastCountOps, expectedByUuid.size())
         << "Expected " << expectedByUuid.size() << " fast-count ops in applyOps, saw "
         << seenFastCountOps;
@@ -667,4 +783,20 @@ void insertSizeCountTimestamp(OperationContext* opCtx,
     store.write(opCtx, timestamp);
     wuow.commit();
 }
+
+BSONObj makeEntryBson(int64_t count, int64_t size) {
+    return BSON(replicated_fast_count::kValidAsOfKey
+                << Timestamp(1, 1) << replicated_fast_count::kMetadataKey
+                << BSON(replicated_fast_count::kCountKey << count << replicated_fast_count::kSizeKey
+                                                         << size));
+}
+
+std::span<const char> uuidSpan(const UUID& u) {
+    auto cdr = u.toCDR();
+    return std::span<const char>{reinterpret_cast<const char*>(cdr.data()), cdr.length()};
+}
+
+std::span<const char> bsonSpan(const BSONObj& obj) {
+    return std::span<const char>{obj.objdata(), static_cast<size_t>(obj.objsize())};
+};
 }  // namespace mongo::replicated_fast_count::test_helpers

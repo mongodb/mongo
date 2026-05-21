@@ -114,8 +114,9 @@ TEST_F(ReplicatedFastCountInitTest,
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesRecordStoreIdents) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicatedFastCountDurability", true);
+    RAIIServerParameterControllerForTest ffDurability("featureFlagReplicatedFastCountDurability",
+                                                      true);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
@@ -138,8 +139,9 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesRecordStoreId
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicatedFastCountDurability", true);
+    RAIIServerParameterControllerForTest ffDurability("featureFlagReplicatedFastCountDurability",
+                                                      true);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
@@ -177,8 +179,9 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountIdempotentIdents) {
 }
 
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountSkipsContainersWhenFlagDisabled) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicatedFastCountDurability", false);
+    RAIIServerParameterControllerForTest ffDurability("featureFlagReplicatedFastCountDurability",
+                                                      false);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", false);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* ru = shard_role_details::getRecoveryUnit(_opCtx);
@@ -196,8 +199,9 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountSkipsContainersWhenF
 }
 
 TEST_F(ReplicatedFastCountInitTest, StartingUpThenShuttingDownDoesNotHang) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicatedFastCountDurability", true);
+    RAIIServerParameterControllerForTest ffDurability("featureFlagReplicatedFastCountDurability",
+                                                      true);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
 
     const int numIterations = 100;
     for (int i = 0; i < numIterations; ++i) {
@@ -209,8 +213,9 @@ TEST_F(ReplicatedFastCountInitTest, StartingUpThenShuttingDownDoesNotHang) {
 // TODO SERVER-122317 Add a similar test case where metadata is non-empty. Creation should then
 // fail.
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyMetadataExists) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicatedFastCountDurability", true);
+    RAIIServerParameterControllerForTest ffDurability("featureFlagReplicatedFastCountDurability",
+                                                      true);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* engine = storageEngine->getEngine();
@@ -241,8 +246,9 @@ TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyM
 // TODO SERVER-122317 Add a similar test case where timestamps is non-empty. Creation should then
 // fail.
 TEST_F(ReplicatedFastCountInitTest, setUpReplicatedFastCountCreatesBothWhenOnlyTimestampsExists) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicatedFastCountDurability", true);
+    RAIIServerParameterControllerForTest ffDurability("featureFlagReplicatedFastCountDurability",
+                                                      true);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
 
     auto* storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto* engine = storageEngine->getEngine();

@@ -43,6 +43,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -141,6 +142,20 @@ ValidateState::ValidateState(OperationContext* opCtx,
 }
 
 Status ValidateState::_checkReplicatedFastCountCollectionExists(OperationContext* opCtx) const {
+    if (shouldUseReplicatedFastCountContainers(opCtx)) {
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        auto* engine = storageEngine->getEngine();
+
+        if (!engine->hasIdent(ru, ident::kFastCountMetadataStore)) {
+            return Status(
+                ErrorCodes::Error{12231705},
+                str::stream()
+                    << "Internal FastCount container ident '" << ident::kFastCountMetadataStore
+                    << "' does not exist to validate. Required for enforcing fast count.");
+        }
+        return Status::OK();
+    }
     const NamespaceString fastCountNss =
         NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
     const auto catalog = CollectionCatalog::get(opCtx);

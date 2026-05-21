@@ -39,6 +39,7 @@ CollectionSizeCount readLatest(OperationContext* opCtx,
                                SeekableRecordCursor& cursor,
                                UUID uuid,
                                boost::optional<UUID> oplogUuid) {
+    Lock::GlobalLock readLock(opCtx, MODE_IS, {.skipRSTLLock = opCtx->isLockFreeReadsOp()});
     const auto entry =
         sizeCountStore.read(opCtx, uuid)
             .value_or(SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 0, .count = 0});

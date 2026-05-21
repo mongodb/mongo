@@ -65,4 +65,10 @@ MONGO_MOD_PUBLIC bool shouldReadFromSizeStorerForOplog(OperationContext* opCtx);
  */
 MONGO_MOD_PUBLIC bool shouldReadFromReplicatedFastCount(OperationContext* opCtx,
                                                         const NamespaceString& nss);
+
+/**
+ * Returns true if size metadata and timestamps are persisted in containers instead of collections.
+ */
+MONGO_MOD_PUBLIC bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx);
+
 }  // namespace mongo
