@@ -817,9 +817,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     // for updating the shard catalog with current information. This flag is
                     // evaluated at insertion time because on secondaries, metadata is cleared
                     // during the onDelete of the critical section document.
-                    if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                            VersionContext::getDecoration(opCtx),
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    bool isDDLAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+                    if (isDDLAuthoritative) {
                         blockCRUDOperationsRequest.setClearCollMetadata(false);
                     }
 
@@ -945,9 +945,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 // for updating the shard catalog with current information. This flag is
                 // evaluated at insertion time because on secondaries, metadata is cleared
                 // during the onDelete of the critical section document.
-                if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                bool isDDLAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+                if (isDDLAuthoritative) {
                     renameCollParticipantRequest.setClearCollMetadata(false);
                 }
 
@@ -1049,9 +1049,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                                           session);
                 }
 
-                if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                        VersionContext::getDecoration(opCtx),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                bool isDDLAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+                if (isDDLAuthoritative) {
                     const auto session = getNewSession(opCtx);
                     sharding_ddl_util::commitRenameCollectionMetadataToShardCatalog(
                         opCtx,
