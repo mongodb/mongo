@@ -10,6 +10,11 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 . "$DIR/bazel_evergreen_shutils.sh"
 
+if [[ "${resmoke_disable_rbe_mirror}" == "true" && "${build_variant}" == "enterprise-amazon-linux2023-arm64-all-feature-flags-rbe" ]]; then
+    echo "Skipping: resmoke_disable_rbe_mirror=true on RBE mirror variant. We have force-disabled testing on this variant while resolving remote execution issues. Report to #ask-devprod-test-infrastructure if you have any issues."
+    exit 0
+fi
+
 # Result tasks re-invoke this script to conditionally re-execute the test. The test should
 # execute unless the task was activated by the resmoke_tests task that already ran all tests.
 exit_early_if_result_task() {

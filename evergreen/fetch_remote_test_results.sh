@@ -14,6 +14,11 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "$DIR/bazel_test_results_shutils.sh"
 
+if [[ "${resmoke_disable_rbe_mirror}" == "true" && "${build_variant}" == "enterprise-amazon-linux2023-arm64-all-feature-flags-rbe" ]]; then
+    echo "Skipping: resmoke_disable_rbe_mirror=true on RBE mirror variant. We have force-disabled testing on this variant while resolving remote execution issues. Report to #ask-devprod-test-infrastructure if you have any issues."
+    exit 0
+fi
+
 # Enumerates test results for each execution of ${test_label}. Shards/retries are individual executions with their own results.
 function enumerate_test_results() {
     jq --raw-output --compact-output --arg test_label "${test_label}" 'select(.testResult.testActionOutput != null) |
