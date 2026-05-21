@@ -49,6 +49,7 @@
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
+#include "mongo/db/index_builds/resumable_index_builds_common.h"
 #include "mongo/db/index_builds/resumable_index_builds_gen.h"
 #include "mongo/db/index_builds/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -3490,7 +3491,11 @@ void IndexBuildsCoordinator::_resumeHybridIndexBuildFromPhase(
     if (resumeInfo.getPhase() == IndexBuildPhaseEnum::kInitialized ||
         resumeInfo.getPhase() == IndexBuildPhaseEnum::kCollectionScan) {
         boost::optional<RecordId> resumeAfterRecordId;
-        if (resumeInfo.getCollectionScanPosition()) {
+        if (replState->protocol == IndexBuildProtocol::kPrimaryDriven) {
+            // Resume the scan after the lowest spilled record id across all indexes, or restart it
+            // from the beginning if any index never spilled.
+            resumeAfterRecordId = index_builds::minLastSpilledRecordId(resumeInfo.getIndexes());
+        } else if (resumeInfo.getCollectionScanPosition()) {
             resumeAfterRecordId = *resumeInfo.getCollectionScanPosition();
         }
 

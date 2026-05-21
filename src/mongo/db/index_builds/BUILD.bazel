@@ -120,6 +120,7 @@ mongo_cc_library(
         ":index_build_knobs_idl",
         ":index_build_oplog_entry",
         ":multi_index_block",
+        ":resumable_index_builds_common",
         ":resumable_index_builds_idl",
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db:index_repair",
@@ -342,6 +343,7 @@ mongo_cc_unit_test(
         "index_builds_coordinator_test.cpp",
         "index_builds_manager_test.cpp",
         "multi_index_block_test.cpp",
+        "resumable_index_builds_common_test.cpp",
     ],
     tags = [
         "cpu:2",

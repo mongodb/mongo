@@ -134,4 +134,18 @@ ResumeIndexInfo synthesizeResumeIndexInfo(const UUID& buildUUID,
     return resumeInfo;
 }
 
+boost::optional<RecordId> minLastSpilledRecordId(const std::vector<IndexStateInfo>& indexes) {
+    boost::optional<RecordId> result;
+    for (auto&& index : indexes) {
+        auto& lastSpilled = index.getLastSpilledRecordId();
+        if (!lastSpilled) {
+            return boost::none;
+        }
+        if (!result || *lastSpilled < *result) {
+            result = *lastSpilled;
+        }
+    }
+    return result;
+}
+
 }  // namespace mongo::index_builds

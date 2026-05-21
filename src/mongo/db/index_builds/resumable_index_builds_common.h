@@ -29,8 +29,14 @@
 #pragma once
 
 #include "mongo/db/index_builds/index_builds_common.h"
+#include "mongo/db/index_builds/resumable_index_builds_gen.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/modules.h"
+
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo::index_builds {
 
@@ -66,5 +72,11 @@ ResumeIndexInfo synthesizeResumeIndexInfo(const UUID& buildUUID,
                                           IndexBuildPhaseEnum phase,
                                           const UUID& collectionUUID,
                                           const std::vector<IndexBuildInfo>& indexes);
+
+/**
+ * Returns the minimum `lastSpilledRecordId` across `indexes`, or boost::none if any index has no
+ * `lastSpilledRecordId` (including when `indexes` is empty).
+ */
+boost::optional<RecordId> minLastSpilledRecordId(const std::vector<IndexStateInfo>& indexes);
 
 }  // namespace mongo::index_builds
