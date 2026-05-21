@@ -30,6 +30,7 @@
 
 #include "mongo/util/log_and_backoff.h"
 
+#include "mongo/platform/random.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -37,18 +38,28 @@
 
 namespace mongo::log_backoff_detail {
 
+namespace {
+// Per-thread PRNG used to jitter backoff sleeps so competing threads wake at different times.
+thread_local PseudoRandom tlsPrng{SecureRandom{}.nextInt64()};
+}  // namespace
+
 void logAndBackoffImpl(size_t numAttempts) {
+    int64_t base = 0;
     if (numAttempts < 4) {
-        // no-op
+        return;
     } else if (numAttempts < 10) {
-        sleepmillis(1);
+        base = 1;
     } else if (numAttempts < 100) {
-        sleepmillis(5);
+        base = 5;
     } else if (numAttempts < 200) {
-        sleepmillis(10);
+        base = 10;
     } else {
-        sleepmillis(100);
+        base = 100;
     }
+    // Full jitter: uniform in [base, 2*base] ms. Competing threads that hit this path
+    // simultaneously sleep for different durations, spreading their wakeups over time
+    // instead of flooding the ticket queue as a synchronized burst.
+    sleepmillis(base + tlsPrng.nextInt64(base + 1));
 }
 
 }  // namespace mongo::log_backoff_detail

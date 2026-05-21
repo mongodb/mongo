@@ -531,9 +531,16 @@ void PlanExecutorImpl::_handleNeedYield(size_t& writeConflictsInARow,
 
         writeConflictsInARow++;
 
-        // Set this member variable to indicate that when we yield, after resources are
-        // relinquished, we should log and backoff.
-        if (internalQueryEnableWriteConflictBackoffWithoutTicket.load()) {
+        // Fall back to the legacy hold-ticket sleep path once the op has hit the threshold.
+        // Holding the ticket during the sleep throttles concurrent ops entering the conflict
+        // zone, which helps under a write-conflict storm.
+        const bool releaseTicketEnabled =
+            internalQueryEnableWriteConflictBackoffWithoutTicket.loadRelaxed();
+        const bool fallbackToHoldTicket = releaseTicketEnabled &&
+            static_cast<int64_t>(writeConflictsInARow) >
+                gInternalQueryWriteConflictBackoffMaxReleaseTicketCycles.loadRelaxed();
+
+        if (releaseTicketEnabled && !fallbackToHoldTicket) {
             // Defer the logAndBackoff() call to the yield handler.
             _writeConflictsInARowToLog = writeConflictsInARow;
         } else {

@@ -16,6 +16,125 @@ import {isExpress} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
+/**
+ * Drives one scenario end-to-end on a fresh ReplSet. When expectTicketHeld is false the
+ * concurrent insert succeeds (the delete thread released its ticket before sleeping); when
+ * expectTicketHeld is true the concurrent insert is expected to time out (the delete thread
+ * still holds the ticket during the sleep).
+ */
+function runScenario({maxReleaseCycles, expectTicketHeld}) {
+    jsTestLog(`Running scenario: maxReleaseCycles=${maxReleaseCycles} expectTicketHeld=${expectTicketHeld}`);
+
+    const rst = new ReplSetTest({
+        nodes: 1,
+        nodeOptions: {
+            setParameter: {
+                // Fixed ticket count so we can force writers to compete for the single ticket.
+                executionControlConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
+                // Defensive: this is the default, but set it explicitly so the test is robust
+                // against future default flips.
+                internalQueryEnableWriteConflictBackoffWithoutTicket: true,
+                internalQueryWriteConflictBackoffMaxReleaseTicketCycles: maxReleaseCycles,
+            },
+        },
+    });
+
+    rst.startSet();
+    rst.initiate();
+
+    const primary = rst.getPrimary();
+    const db = primary.getDB("test");
+    const coll = db.write_conflict_test;
+
+    const numDocs = 1050;
+    assert.commandWorked(
+        coll.insertMany(
+            [...Array(numDocs).keys()].map((x) => ({_id: x, a: "foo", b: x})),
+            {ordered: false},
+        ),
+    );
+
+    // Verify the batched delete does NOT use the express executor.
+    {
+        const explainCmd = {
+            explain: {delete: coll.getName(), deletes: [{q: {a: "foo"}, limit: 0}]},
+            verbosity: "queryPlanner",
+        };
+        const explain = assert.commandWorked(db.runCommand(explainCmd));
+        assert(!isExpress(db, explain), "Batched delete should not use express executor", {explain});
+    }
+
+    // Hang before logAndBackoff so we can probe ticket state while the delete is suspended.
+    const hangFp = configureFailPoint(primary, "planExecutorHangBeforeLogAndBackoff");
+    // Force the delete stage to throw WriteConflict on every attempt.
+    const writeConflictFp = configureFailPoint(primary, "throwWriteConflictExceptionInBatchedDeleteStage");
+
+    const deleteThread = new Thread(function (host) {
+        const conn = new Mongo(host);
+        const db = conn.getDB("test");
+        const coll = db.write_conflict_test;
+
+        return db.runCommand({
+            delete: coll.getName(),
+            deletes: [{q: {a: "foo"}, limit: 0}],
+        });
+    }, primary.host);
+
+    deleteThread.start();
+    hangFp.wait();
+    jsTestLog("Batched delete thread has hit the planExecutorHangBeforeLogAndBackoff failpoint");
+
+    // Only one write ticket available from now on. Whether the delete thread holds it or not
+    // is what this test is verifying.
+    assert.commandWorked(
+        primary.adminCommand({
+            setParameter: 1,
+            executionControlConcurrentWriteTransactions: 1,
+        }),
+    );
+
+    // Probe with a concurrent insert under a short deadline.
+    const insertRes = db.runCommand({
+        insert: coll.getName(),
+        documents: [{_id: numDocs + 1, a: "bar", b: 100}],
+        maxTimeMS: 30000,
+    });
+
+    if (expectTicketHeld) {
+        // With M=0 the delete falls back to the legacy hold-ticket path. The insert must time
+        // out because the sole write ticket is held by the hanging delete.
+        assert.commandFailedWithCode(
+            insertRes,
+            ErrorCodes.MaxTimeMSExpired,
+            "insert was expected to time out while the delete held the write ticket",
+        );
+        jsTestLog("Insert timed out as expected -- delete thread is holding the write ticket");
+    } else {
+        // With the default (M = INT_MAX) the delete releases its ticket before sleeping, so
+        // the concurrent insert should get the ticket promptly.
+        assert.commandWorked(insertRes);
+        jsTestLog("Insert succeeded -- delete thread released the write ticket");
+    }
+
+    hangFp.off();
+    writeConflictFp.off();
+
+    deleteThread.join();
+    jsTest.log("Delete thread completed with result: " + tojson(deleteThread.returnData()));
+
+    rst.stopSet();
+}
+
+// Default behavior: release ticket before sleep (M = INT_MAX).
+runScenario({maxReleaseCycles: 2147483647, expectTicketHeld: false});
+
+// Fallback behavior: M = 0 forces hold-ticket + sleep from the first WCE.
+runScenario({maxReleaseCycles: 0, expectTicketHeld: true});
+
+// =====================================================================================
+// Tests 2-5: Express executor tests on a shared ReplSet.
+// =====================================================================================
+
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
@@ -34,7 +153,7 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const db = primary.getDB("test");
-const coll = db.concurrent_update_test;
+const coll = db.write_conflict_test;
 
 // Insert test documents
 const numDocs = 1050;
@@ -45,79 +164,11 @@ assert.commandWorked(
     ),
 );
 
-// Verify the batched delete does NOT use the express executor.
-{
-    const explainCmd = {
-        explain: {delete: coll.getName(), deletes: [{q: {a: "foo"}, limit: 0}]},
-        verbosity: "queryPlanner",
-    };
-    const explain = assert.commandWorked(db.runCommand(explainCmd));
-    assert(!isExpress(db, explain), "Batched delete should not use express executor: " + tojson(explain));
-}
-
-// Enable the failpoint to hang before logging and backoff.
-const hangFp = configureFailPoint(primary, "planExecutorHangBeforeLogAndBackoff");
-
-// Enable the failpoint to throw write conflicts during batched delete.
-const writeConflictFp = configureFailPoint(primary, "throwWriteConflictExceptionInBatchedDeleteStage");
-
-// Create a thread that will run a batched delete.
-const deleteThread = new Thread(function (host) {
-    const conn = new Mongo(host);
-    const db = conn.getDB("test");
-    const coll = db.concurrent_update_test;
-
-    // Run a batched delete operation.
-    const result = db.runCommand({
-        delete: coll.getName(),
-        deletes: [{q: {a: "foo"}, limit: 0}],
-    });
-
-    return result;
-}, primary.host);
-
-deleteThread.start();
-
-// Wait until the failpoint has been hit.
-hangFp.wait();
-
-jsTestLog("Batched delete thread has hit the planExecutorHangBeforeLogAndBackoff failpoint");
-
-// Set concurrent write transactions to 1 to force other writes to compete for tickets. If the delete
-// thread is holding write tickets then there should be no available write tickets.
-assert.commandWorked(
-    primary.adminCommand({
-        setParameter: 1,
-        executionControlConcurrentWriteTransactions: 1,
-    }),
-);
-
-// Attempt to do a write. If this doesn't block it means the delete thread is not holding write tickets.
-assert.commandWorked(
-    db.runCommand({
-        insert: coll.getName(),
-        documents: [{_id: numDocs + 1, a: "bar", b: 100}],
-        maxTimeMS: 30000,
-    }),
-);
-
-jsTestLog("Successfully inserted document, confirming delete thread is not holding write tickets");
-
-// Disable the failpoints and allow the delete operation to finish.
-hangFp.off();
-writeConflictFp.off();
-jsTestLog("Failpoints disabled, allowing blocked delete operation to proceed");
-
-// Wait for the delete thread to complete.
-deleteThread.join();
-const result = deleteThread.returnData();
-jsTest.log("Delete thread completed with result: " + tojson(result));
-
 // =====================================================================================
 // Test 2: Express executor does not hold write tickets while sleeping for backoff.
 // =====================================================================================
 
-// Reset the write ticket limit before starting the express test.
+// Set an explicit ticket limit so tests start from a known state.
 assert.commandWorked(
     primary.adminCommand({
         setParameter: 1,
@@ -125,8 +176,7 @@ assert.commandWorked(
     }),
 );
 
-// Insert a fresh document for the express update test. (The batched delete above may have
-// deleted all the original documents.)
+// Insert a fresh document for the express update test.
 const expressTestDocId = numDocs + 10;
 assert.commandWorked(coll.insertOne({_id: expressTestDocId, a: "foo", b: 10}));
 
@@ -154,7 +204,7 @@ const expressUpdateThread = new Thread(
     function (host, docId) {
         const conn = new Mongo(host);
         const db = conn.getDB("test");
-        const coll = db.concurrent_update_test;
+        const coll = db.write_conflict_test;
 
         // Update by _id so the express executor is chosen.
         const result = db.runCommand({
@@ -246,7 +296,7 @@ const expressDeleteThread = new Thread(
     function (host, docId) {
         const conn = new Mongo(host);
         const db = conn.getDB("test");
-        const coll = db.concurrent_update_test;
+        const coll = db.write_conflict_test;
 
         // Delete by _id so the express executor is chosen.
         const result = db.runCommand({
@@ -353,7 +403,7 @@ const fallbackThread = new Thread(
     function (host, docId) {
         const conn = new Mongo(host);
         const db = conn.getDB("test");
-        const coll = db.concurrent_update_test;
+        const coll = db.write_conflict_test;
 
         const result = db.runCommand({
             update: coll.getName(),
@@ -367,7 +417,7 @@ const fallbackThread = new Thread(
 
 fallbackThread.start();
 
-// Wait for the second hang activation — the thread is now in the hold-ticket fallback path.
+// Wait for the second hang activation - the thread is now in the hold-ticket fallback path.
 fallbackHangFp.wait();
 
 jsTestLog("Express fallback thread is paused in the hold-ticket backoff path");
@@ -392,7 +442,7 @@ assert.commandFailedWithCode(
     [ErrorCodes.MaxTimeMSExpired, ErrorCodes.LockTimeout],
 );
 
-jsTestLog("Concurrent write correctly failed — express fallback thread is holding the ticket");
+jsTestLog("Concurrent write correctly failed - express fallback thread is holding the ticket");
 
 // Disable the failpoints and allow the express thread to finish.
 fallbackHangFp.off();
@@ -444,7 +494,7 @@ const tuThread = new Thread(
     function (host, docId) {
         const conn = new Mongo(host);
         const db = conn.getDB("test");
-        const coll = db.concurrent_update_test;
+        const coll = db.write_conflict_test;
 
         const result = db.runCommand({
             update: coll.getName(),
