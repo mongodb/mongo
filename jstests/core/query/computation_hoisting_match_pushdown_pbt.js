@@ -18,7 +18,11 @@
 
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
-import {dottedDollarFieldArb, dottedFieldArb, intArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {
+    nonEmptyDottedDollarFieldArb,
+    nonEmptyDottedFieldArb,
+    intArb,
+} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -44,7 +48,7 @@ lookupColl.insertOne({});
 
 // We use $multiply for the expression. $convert ensures we get a numeric input.
 // Prime numbers should make it less likely that the result is correct due to chance in case of an incorrect rewrite.
-const safeFieldArb = dottedDollarFieldArb.map((f) => ({
+const safeFieldArb = nonEmptyDottedDollarFieldArb.map((f) => ({
     $convert: {input: f, to: "double", onError: 11, onNull: 13},
 }));
 const exprArb = fc.oneof(
@@ -62,7 +66,7 @@ const exprArb = fc.oneof(
 const lookupStage = {$lookup: {from: lookupColl.getName(), pipeline: [], as: "a"}};
 
 // Generate 1-2 dotted fields with distinct base fields.
-const distinctBaseFieldsArb = fc.uniqueArray(dottedFieldArb, {
+const distinctBaseFieldsArb = fc.uniqueArray(nonEmptyDottedFieldArb, {
     minLength: 1,
     maxLength: 2,
     selector: (f) => f.split(".")[0],

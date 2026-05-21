@@ -17,9 +17,9 @@
 
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 import {
-    assignableFieldArb,
-    dottedDollarFieldArb,
-    dottedFieldArb,
+    getAssignableFieldArb,
+    nonEmptyDottedDollarFieldArb,
+    nonEmptyDottedFieldArb,
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {getDatasetModel} from "jstests/libs/property_test_helpers/models/document_models.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -52,21 +52,29 @@ const leafArb = fc.oneof(
 );
 
 // {$project: {[dest]: "$src"}} using dotted paths on both sides.
-const projectRenameArb = getComputedProjectArb(dottedFieldArb, dottedDollarFieldArb);
+const projectRenameArb = getComputedProjectArb(nonEmptyDottedFieldArb, nonEmptyDottedDollarFieldArb);
 
 // {$addFields: {[dest]: "$src"}} using dotted paths on both sides.
-const addFieldsRenameArb = getAddFieldsVarArb(dottedFieldArb, dottedDollarFieldArb);
+const addFieldsRenameArb = getAddFieldsVarArb(nonEmptyDottedFieldArb, nonEmptyDottedDollarFieldArb);
 
 // {$set: {[field]: <array>}}.
-const setFieldArb = fc.oneof({arbitrary: assignableFieldArb, weight: 3}, {arbitrary: dottedFieldArb, weight: 1});
+// Use non-empty field arbitraries because MongoDB rejects empty strings in FieldPath expressions.
+const setFieldArb = fc.oneof(
+    {arbitrary: getAssignableFieldArb(false /*allowEmpty*/), weight: 3},
+    {arbitrary: nonEmptyDottedFieldArb, weight: 1},
+);
 const literalArraySetArb = fc
     .tuple(
         setFieldArb,
         fc.array(
-            fc.dictionary(assignableFieldArb, fc.oneof(scalarArb, fc.array(scalarArb, {minLength: 1, maxLength: 2})), {
-                minKeys: 1,
-                maxKeys: 3,
-            }),
+            fc.dictionary(
+                getAssignableFieldArb(false /*allowEmpty*/),
+                fc.oneof(scalarArb, fc.array(scalarArb, {minLength: 1, maxLength: 2})),
+                {
+                    minKeys: 1,
+                    maxKeys: 3,
+                },
+            ),
             {minLength: 1, maxLength: 3},
         ),
     )
@@ -74,7 +82,9 @@ const literalArraySetArb = fc
 
 // The reshaping done by a complex rename affects $eq, so it's redundant to model a larger subset
 // of MatchExpressions.
-const dottedMatchArb = fc.record({field: dottedFieldArb}).map(({field}) => ({$match: {[field]: {$eq: "equal"}}}));
+const dottedMatchArb = fc
+    .record({field: nonEmptyDottedFieldArb})
+    .map(({field}) => ({$match: {[field]: {$eq: "equal"}}}));
 // The top-level field is never an array, but subfields might be.
 const nestedObjArb = fc.record({a: leafArb, b: leafArb, t: leafArb, m: leafArb});
 const docModel = fc.record({
@@ -87,7 +97,7 @@ const docModel = fc.record({
 
 // Only single-field indexes to avoid CannotIndexParallelArrays errors.
 const dottedIndexDefArb = fc
-    .record({field: dottedFieldArb.filter((f) => f !== "_id"), dir: fc.constantFrom(1, -1)})
+    .record({field: nonEmptyDottedFieldArb.filter((f) => f !== "_id"), dir: fc.constantFrom(1, -1)})
     .map(({field, dir}) => ({[field]: dir}));
 const indexModel = fc.record({def: dottedIndexDefArb, options: fc.constant({})});
 

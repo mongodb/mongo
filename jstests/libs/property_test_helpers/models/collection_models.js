@@ -15,5 +15,13 @@ export function getCollectionModel({isTS = false, indexesModel, docsModel} = {})
     if (!indexesModel) {
         indexesModel = getIndexesModel({isTS: isTSCollection});
     }
-    return fc.record({isTS: fc.constant(isTSCollection), docs: docsModel, indexes: indexesModel});
+
+    // TODO SERVER-121084: Reevaluate whether metaField='' should be allowed.
+    const metaFieldArb = isTSCollection ? fc.constant("m") : fc.constant(undefined);
+    return fc.record({
+        isTS: fc.constant(isTSCollection),
+        metaField: metaFieldArb,
+        docs: docsModel,
+        indexes: indexesModel,
+    });
 }

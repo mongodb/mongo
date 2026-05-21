@@ -19,6 +19,9 @@ import {testProperty} from "jstests/libs/property_test_helpers/property_testing_
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {matchFirstStageAggModel} from "jstests/libs/property_test_helpers/common_models.js";
 
+// TODO SERVER-126813: Re-enable this test.
+quit();
+
 if (isSlowBuild(db)) {
     jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();

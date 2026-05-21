@@ -8,9 +8,9 @@
  * See property_test_helpers/README.md for more detail on the design.
  */
 import {
-    assignableFieldArb,
+    getAssignableFieldArb,
     dollarFieldArb,
-    fieldArb,
+    nonEmptyFieldArb,
     leafParameterArb,
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {collationArb} from "jstests/libs/property_test_helpers/models/collation_models.js";
@@ -26,7 +26,7 @@ import {
 } from "jstests/libs/property_test_helpers/models/project_models.js";
 
 // Add field with a constant argument. {$addFields: {a: 5}}
-export const addFieldsConstArb = fc.tuple(fieldArb, leafParameterArb).map(function ([destField, leafParams]) {
+export const addFieldsConstArb = fc.tuple(nonEmptyFieldArb, leafParameterArb).map(function ([destField, leafParams]) {
     return {$addFields: {[destField]: leafParams}};
 });
 // Add field from source field, parameterized on the dest and src field arbs.
@@ -36,9 +36,12 @@ export function getAddFieldsVarArb(destFieldArb, srcFieldArb) {
         return {$addFields: {[destField]: sourceField}};
     });
 }
-export const addFieldsVarArb = getAddFieldsVarArb(fieldArb, dollarFieldArb);
+export const addFieldsVarArb = getAddFieldsVarArb(nonEmptyFieldArb, dollarFieldArb);
 // $replaceRoot projection
-export const replaceRootArb = fc.tuple(assignableFieldArb, dollarFieldArb).map(function ([destField, sourceField]) {
+export const replaceRootArb = fc.tuple(getAssignableFieldArb(false /*allowEmpty*/), dollarFieldArb).map(function ([
+    destField,
+    sourceField,
+]) {
     // We use $$ROOT to keep the overall schema in order to better cooperate with other stages.
     return {$replaceRoot: {newRoot: {$mergeObjects: ["$$ROOT", {[destField]: sourceField}]}}};
 });
@@ -56,7 +59,7 @@ export const replaceRootArb = fc.tuple(assignableFieldArb, dollarFieldArb).map(f
  */
 export function getSortArb(maxNumSortComponents = 1) {
     const sortDirectionArb = fc.constantFrom(1, -1);
-    const sortComponent = fc.record({field: fieldArb, dir: sortDirectionArb});
+    const sortComponent = fc.record({field: nonEmptyFieldArb, dir: sortDirectionArb});
     return fc
         .uniqueArray(sortComponent, {
             minLength: 1,
@@ -80,7 +83,7 @@ export const unwindArb = fc
         path: dollarFieldArb,
         preserveNullAndEmptyArrays: fc.boolean(),
         includeArrayIndex: fc.boolean(),
-        indexFieldName: assignableFieldArb,
+        indexFieldName: getAssignableFieldArb(false /*allowEmpty*/),
     })
     .map(({path, preserveNullAndEmptyArrays, includeArrayIndex, indexFieldName}) => {
         const unwindSpec = {path: path};
