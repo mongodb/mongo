@@ -4,6 +4,8 @@
  *   # The test caches authenticated connections, so we do not support stepdowns
  *   does_not_support_stepdowns,
  *   requires_fcv_83,
+ *   # The test is not compatible with multiversion
+ *   multiversion_incompatible,
  *   # The test creates a sharded cluster with a dedicated config server, so the test is incompatible with fixtures with embedded config servers
  *   config_shard_incompatible,
  * ]

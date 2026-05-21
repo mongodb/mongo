@@ -2,6 +2,11 @@
  * @tags: [
  *   requires_persistence,
  *   requires_fcv_83,
+ *   # The test exercises replicaSetConfigShardMaintenanceMode and FCV transitions, both of
+ *   # which require all participating binaries to be 8.3+. In multiversion suites with mixed
+ *   # binaries the FCV after initiate() is driven down to lastLTSFCV, making these scenarios
+ *   # impossible to validate.
+ *   multiversion_incompatible,
  * ]
  */
 import {afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

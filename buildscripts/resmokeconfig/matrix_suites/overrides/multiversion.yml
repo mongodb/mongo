@@ -393,11 +393,6 @@
     exclude_files:
       # TODO (SERVER-122386) Re-enable the following tests
       - jstests/sharding/flush_resharding_state_change_errors.js
-      # TODO (SERVER-122385) Re-enable the following tests
-      - jstests/sharding/replica_set_to_csrs_promotion.js
-      - jstests/sharding/add_shard_fails_promotion_from_lastlts_to_lastcontinuous.js
-      - jstests/sharding/direct_shard_connection_ddls_on_replicaset.js
-      - jstests/sharding/direct_shard_connection_ddls_during_promotion_to_dedicated.js
 
 - name: sharding_jscore_passthrough_last_continuous_new_old_old_new_excluded_files
   value:

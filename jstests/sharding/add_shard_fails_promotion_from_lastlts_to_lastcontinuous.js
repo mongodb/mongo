@@ -5,6 +5,11 @@
  *   config_shard_incompatible,
  *   # This restriction was introduced in binary v8.3.
  *   requires_fcv_83,
+ *   # The test drives the cluster through lastLTS -> lastContinuous -> latest FCV transitions
+ *   # using setFeatureCompatibilityVersion: latestFCV. In multiversion suites where mongos is on
+ *   # the last-continuous binary, latestFCV is not reachable. The body also requires the new shard
+ *   # to start at lastLTSFCV, which is not guaranteed when nodes get random binaries.
+ *   multiversion_incompatible,
  * ]
  */
 import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
