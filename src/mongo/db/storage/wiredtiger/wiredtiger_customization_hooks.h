@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -36,7 +37,6 @@
 #include <vector>
 
 namespace mongo {
-class StringData;
 class ServiceContext;
 
 // Interface and default implementation for WiredTiger customization hooks

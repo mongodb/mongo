@@ -41,8 +41,6 @@
 
 namespace mongo {
 
-class StringData;
-
 class MONGO_MOD_PUBLIC IndexSpec {
 public:
     // An enumeration of symbolic names for index types.

@@ -41,7 +41,6 @@
 namespace mongo {
 
 class BSONArrayBuilder;
-class StringData;
 
 struct DocumentStructureEnumeratorConfig {
     DocumentStructureEnumeratorConfig(std::set<StringData> fields_,

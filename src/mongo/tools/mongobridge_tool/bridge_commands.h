@@ -47,7 +47,6 @@ struct HostAndPort;
 class Status;
 template <typename T>
 class StatusWith;
-class StringData;
 
 struct HostSettings {
     enum class State { kForward, kHangUp, kDiscard };

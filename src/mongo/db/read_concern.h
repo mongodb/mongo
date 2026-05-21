@@ -45,7 +45,6 @@ template <typename T>
 class StatusWith;
 
 enum class PrepareConflictBehavior;
-class StringData;
 
 namespace repl {
 class ReadConcernArgs;

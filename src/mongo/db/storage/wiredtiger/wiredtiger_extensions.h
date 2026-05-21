@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <string>
@@ -36,7 +37,6 @@
 
 namespace mongo {
 
-class StringData;
 class ServiceContext;
 
 // NEEDS_REPLACEMENT: extentions are hard-coded config strings we shouldn't allow other modules to

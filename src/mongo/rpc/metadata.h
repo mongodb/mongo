@@ -47,7 +47,6 @@ namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
 class OperationContext;
-class StringData;
 
 /**
  * Utilities for dealing with what used to be called metadata.

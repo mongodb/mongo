@@ -76,7 +76,6 @@ class OperationContext;
 
 class OpObserverRegistry;
 class ServiceContext;
-class StringData;
 class UserName;
 
 namespace mutablebson {

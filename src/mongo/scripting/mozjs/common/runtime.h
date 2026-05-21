@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
@@ -42,7 +43,6 @@
 
 namespace mongo {
 class Status;
-class StringData;
 }  // namespace mongo
 
 namespace mongo::mozjs {

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/modules.h"
@@ -44,7 +45,6 @@ namespace MONGO_MOD_PUBLIC mongo {
 class Status;
 template <typename T>
 class StatusWith;
-class StringData;
 
 /**
  * Validate that a string is either empty or is parseable to a HostAndPort. This is intended for use
