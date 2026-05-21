@@ -40,6 +40,10 @@ namespace mongo {
 WhereNoOpMatchExpression::WhereNoOpMatchExpression(WhereParams params)
     : WhereMatchExpressionBase(std::move(params)) {}
 
+bool WhereNoOpMatchExpression::runPredicate(const BSONObj& doc) const {
+    MONGO_UNREACHABLE_TASSERT(12712900);
+}
+
 std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::clone() const {
     WhereParams params;
     params.code = getCode();

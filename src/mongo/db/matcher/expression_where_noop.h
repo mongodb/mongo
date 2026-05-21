@@ -57,6 +57,8 @@ public:
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
     }
+
+    bool runPredicate(const BSONObj& doc) const final;
 };
 
 }  // namespace mongo

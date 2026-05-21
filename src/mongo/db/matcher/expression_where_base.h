@@ -99,6 +99,14 @@ public:
         return _code;
     }
 
+    virtual bool runPredicate(const BSONObj& doc) const = 0;
+
+    // Out-of-line virtual dispatch helper: calls runPredicate() through a WhereMatchExpressionBase*
+    // in a separate TU so the compiler cannot devirtualize it at call sites that know the concrete
+    // derived type (e.g. WhereMatchExpression). Callers in query_expressions use this instead of
+    // calling runPredicate() directly on a derived pointer.
+    static bool evaluateWherePredicate(const WhereMatchExpressionBase* expr, const BSONObj& doc);
+
 private:
     const std::string _code;
 

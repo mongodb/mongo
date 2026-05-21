@@ -29,14 +29,14 @@
 
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_where.h"
+#include "mongo/db/matcher/expression_where_noop.h"
 
 namespace mongo {
 
 namespace exec::matcher {
 
 void MatchExpressionEvaluator::visit(const WhereMatchExpression* expr) {
-    expr->validateState();
-    _result = expr->getPredicate().runAsPredicate(_doc->toBSON());
+    _result = WhereMatchExpressionBase::evaluateWherePredicate(expr, _doc->toBSON());
 }
 
 void MatchExpressionEvaluator::visit(const WhereNoOpMatchExpression* expr) {

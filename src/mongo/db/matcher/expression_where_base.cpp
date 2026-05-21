@@ -62,4 +62,8 @@ bool WhereMatchExpressionBase::equivalent(const MatchExpression* other) const {
     return getCode() == realOther->getCode();
 }
 
+bool WhereMatchExpressionBase::evaluateWherePredicate(const WhereMatchExpressionBase* expr,
+                                                      const BSONObj& doc) {
+    return expr->runPredicate(doc);
+}
 }  // namespace mongo
