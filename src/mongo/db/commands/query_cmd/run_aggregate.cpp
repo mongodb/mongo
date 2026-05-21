@@ -1307,10 +1307,12 @@ Status executeResolvedAggregate(const AggExState& aggExState,
                                             attachExecutorCallback,
                                             {} /* additionalExecutors */,
                                             false /* hasGeoNear */);
+    } else if (dynamic_cast<DocumentSourceInternalJoinHint*>(pipeline->peekFront())) {
+        uasserted(
+            swResForJoin.getStatus().code(),
+            str::stream() << "$_internalJoinHint is not permitted without join optimization :: "
+                          << swResForJoin.getStatus().reason());
     } else {
-        uassert(12016316,
-                "$_internalJoinHint is not permitted without join optimization",
-                !dynamic_cast<DocumentSourceInternalJoinHint*>(pipeline->peekFront()));
         execs = prepareExecutors(aggExState, aggCatalogState, std::move(pipeline));
     }
 

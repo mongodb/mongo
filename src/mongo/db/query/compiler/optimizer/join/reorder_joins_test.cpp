@@ -399,6 +399,29 @@ IndexedJoinPredicate makeIndexedPredicate(std::string path) {
     };
 }
 
+TEST(IndexSatisfiesJoinPredicates, SingleFieldIndex) {
+    ASSERT_TRUE(indexSatisfiesJoinPredicates(fromjson("{a: 1}"),
+                                             std::vector<IndexedJoinPredicate>{
+                                                 makeIndexedPredicate("a"),
+                                             }));
+    // Field not in index.
+    ASSERT_FALSE(indexSatisfiesJoinPredicates(fromjson("{a: 1}"),
+                                              std::vector<IndexedJoinPredicate>{
+                                                  makeIndexedPredicate("b"),
+                                              }));
+    // Predicate on _id satisfied by the _id index.
+    ASSERT_TRUE(indexSatisfiesJoinPredicates(fromjson("{_id: 1}"),
+                                             std::vector<IndexedJoinPredicate>{
+                                                 makeIndexedPredicate("_id"),
+                                             }));
+    // Multiple predicates cannot be satisfied by a single-field index.
+    ASSERT_FALSE(indexSatisfiesJoinPredicates(fromjson("{a: 1}"),
+                                              std::vector<IndexedJoinPredicate>{
+                                                  makeIndexedPredicate("a"),
+                                                  makeIndexedPredicate("b"),
+                                              }));
+}
+
 TEST(IndexSatisfiesJoinPredicates, CompoundIndex) {
     ASSERT_TRUE(indexSatisfiesJoinPredicates(
         fromjson("{a: 1, b: 1}"), std::vector<IndexedJoinPredicate>{makeIndexedPredicate("a")}));

@@ -188,9 +188,8 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
 
 bool indexIsValidForINLJ(const std::shared_ptr<const IndexCatalogEntry>& ice) {
     auto desc = ice->descriptor();
-    return !desc->isHashedIdIndex() && !desc->hidden() && !desc->isPartial() &&
-        !desc->isSetSparseByUser() && desc->collation().isEmpty() &&
-        !dynamic_cast<WildcardAccessMethod*>(ice->accessMethod());
+    return desc->getIndexType() == IndexType::INDEX_BTREE && !desc->hidden() &&
+        !desc->isPartial() && !desc->behavesAsSparse() && desc->collation().isEmpty();
 }
 
 /**

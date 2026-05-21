@@ -225,7 +225,7 @@ SubsetLevelMode SubsetLevelMode::fromBSON(const BSONObj& obj) {
         }
     }
 
-    uassert(12016310, "", mode && level);
+    uassert(12016310, "Expected both mode & level to be initialized", mode && level);
     return SubsetLevelMode(*level, *mode, std::move(hint));
 }
 

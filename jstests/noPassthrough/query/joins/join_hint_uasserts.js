@@ -156,6 +156,9 @@ assert.commandWorked(
         internalEnableJoinOptimization: false,
     }),
 );
-assert.commandFailedWithCode(runWithHint({perSubsetLevelMode: [{level: NumberInt(0), mode: "CHEAPEST"}]}), 12016316);
+assert.commandFailedWithCode(
+    runWithHint({perSubsetLevelMode: [{level: NumberInt(0), mode: "CHEAPEST"}]}),
+    ErrorCodes.QueryFeatureNotAllowed,
+);
 
 MongoRunner.stopMongod(conn);
