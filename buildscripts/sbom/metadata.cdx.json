@@ -781,6 +781,18 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/private/arrow/scripts/getsources.py"
+        },
+        {
+          "name": "internal:generate_sbom:import_script_variable_name",
+          "value": "THRIFT_OVERRIDE_VERSION"
+        },
+        {
+          "name": "internal:generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ]
     },
