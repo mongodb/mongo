@@ -1058,7 +1058,7 @@ value::TagValueMaybeOwned ByteCode::builtinArrayToObject(ArityType arity) {
 
             uassert(5153212,
                     "$arrayToObject requires an object with keys 'k' and 'v'.",
-                    ((keyName == "k" && valueName == "v") || (keyName == "k" && valueName == "v")));
+                    ((keyName == "k" && valueName == "v") || (keyName == "v" && valueName == "k")));
             if (keyName == "v" && valueName == "k") {
                 std::swap(key, val);
             }
