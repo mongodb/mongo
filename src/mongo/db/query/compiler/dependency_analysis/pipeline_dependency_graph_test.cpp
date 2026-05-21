@@ -49,8 +49,10 @@
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/strings/str_split.h"
@@ -90,6 +92,21 @@ protected:
         auto p = parsePipeline(array);
         pipeline_optimization::optimizePipeline(*p);
         setPipeline(std::move(p));
+    }
+
+    /**
+     * Asserts that 'graph->getDeadFields()' produces the given (stage, path) pairs.
+     */
+    void assertDeadFieldsEq(std::vector<std::pair<const DocumentSource*, std::string>> expected) {
+        auto dead = graph->getDeadFields();
+        std::vector<std::pair<const DocumentSource*, std::string>> actual;
+        actual.reserve(dead.size());
+        for (const auto& df : dead) {
+            actual.emplace_back(df.stage.get(), df.path.fullPath());
+        }
+        std::sort(actual.begin(), actual.end());
+        std::sort(expected.begin(), expected.end());
+        ASSERT_EQ(actual, expected);
     }
 
     /**
@@ -2775,6 +2792,225 @@ TEST_F(PipelineDependencyGraphTest, CanPathBeArrayDeepScalarShadow) {
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d"));
         ASSERT_FALSE(graph->canPathBeArray(nullptr, "a.b.c.d.e"));
     });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessFlagsUnreadAddFields) {
+    setPipeline("[{$addFields: {foo: 1}}, {$group: {_id: '$bar'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[0].get(), "foo"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessKeepsAliveAddFields) {
+    setPipeline("[{$addFields: {foo: 1}}, {$group: {_id: '$foo'}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessPartialAddFields) {
+    setPipeline("[{$addFields: {foo: 1, bar: 2}}, {$group: {_id: '$bar'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[0].get(), "foo"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessUsedInMatchThenDropped) {
+    setPipeline("[{$match: {foo: 5}}, {$project: {_id: 1}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessOverwriteMakesEarlierDead) {
+    setPipeline("[{$set: {foo: 1}}, {$set: {foo: 2}}, {$group: {_id: '$foo'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[0].get(), "foo"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessRenameTargetUnreadIsDead) {
+    setPipeline("[{$set: {foo: 1}}, {$set: {bar: '$foo'}}, {$group: {_id: '$foo'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[1].get(), "bar"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessRenameTargetAliveKeepsSource) {
+    setPipeline("[{$set: {foo: 1}}, {$set: {bar: '$foo'}}, {$group: {_id: '$bar'}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessFieldOnlyUsedByDeadFieldIsDead) {
+    setPipeline("[{$set: {foo: 1}}, {$set: {bar: '$foo'}}, {$group: {_id: '$baz'}}]");
+    runTest([&] {
+        // To be done (follow-up): This should include "foo" from the first stage.
+        assertDeadFieldsEq({{stages[1].get(), "bar"}});
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessFinalScopePreservation) {
+    // foo survives to the pipeline output, so it is alive even though no stage reads it.
+    setPipeline("[{$set: {foo: 1}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessNestedPath) {
+    setPipeline("[{$set: {'a.b': 1}}, {$group: {_id: '$x'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[0].get(), "a.b"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessUnsetReported) {
+    setPipeline("[{$unset: 'foo'}, {$project: {bar: 1}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[0].get(), "foo"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessExclusionProjectionReported) {
+    setPipeline("[{$project: {foo: 0}}, {$project: {bar: 1}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[0].get(), "foo"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessUnwindNotReported) {
+    setPipeline("[{$unwind: '$arr'}, {$group: {_id: 1}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessGroupIdRenameNotReported) {
+    // $group emits the _id rename via kAllExcept, but $group is not a single-document
+    // transformation so we do not report its _id as dead even when it's unused.
+    setPipeline("[{$group: {_id: '$foo'}}, {$project: {bar: 1}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessReturnsAllDeadAtOnce) {
+    // Two independent dead fields in different stages.
+    setPipeline("[{$set: {foo: 1}}, {$set: {bar: 2}}, {$group: {_id: '$baz'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[0].get(), "foo"}, {stages[1].get(), "bar"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessSubpipelineNotAnalyzedAtTopLevel) {
+    // 'deadInner' is written and then dropped by $group inside the sub-pipeline, but the
+    // top-level analysis does not recurse into it.
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "a",
+        foreignField: "b",
+        as: "docs",
+        let: {},
+        pipeline: [
+            {$set: {deadInner: 1}},
+            {$group: {_id: "$other"}}
+        ]
+    }}])");
+    runTest([&] {
+        assertDeadFieldsEq({});
+
+        const auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        auto dead = subGraph->getDeadFields();
+        ASSERT_EQ(dead.size(), 1u);
+        ASSERT_EQ(dead[0].path.fullPath(), "deadInner");
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessSubpipelineAliveFieldIsNotReported) {
+    // 'extra' survives to the sub-pipeline's final scope, so it is alive in the sub-graph too.
+    setPipeline(R"([{$lookup: {
+        from: "coll_b",
+        localField: "a",
+        foreignField: "b",
+        as: "docs",
+        let: {},
+        pipeline: [{$set: {extra: 1}}]
+    }}])");
+    runTest([&] {
+        assertDeadFieldsEq({});
+        const auto* subGraph = graph->getSubpipelineGraph(stages[0].get());
+        ASSERT_NOT_EQUALS(subGraph, nullptr);
+        ASSERT_EQ(subGraph->getDeadFields().size(), 0u);
+    });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessRenameFromBaseCollectionFieldAliveIsNotDead) {
+    // Rename whose source is a base-collection field. The target is referenced downstream, so
+    // nothing is dead.
+    setPipeline("[{$set: {bar: '$foo'}}, {$group: {_id: '$bar'}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessRenameFromBaseCollectionFieldUnreadIsDead) {
+    // Rename whose source is a base-collection field but the target is never referenced.
+    setPipeline("[{$set: {bar: '$foo'}}, {$group: {_id: '$baz'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[0].get(), "bar"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessRenameFromExplicitlyMissingFieldIsNotDead) {
+    // After the inclusion projection, every field other than 'x' is known to be missing, so
+    // '$z' resolves to the explicitly-missing field. The rename target is referenced downstream and
+    // must stay alive.
+    setPipeline("[{$project: {x: 1}}, {$set: {y: '$z'}}, {$group: {_id: '$y'}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessRenameFromExplicitlyMissingFieldIsDead) {
+    // Same as above, but the rename target is unread, so 'y' is reported as dead.
+    setPipeline("[{$project: {x: 1}}, {$set: {y: '$z'}}, {$group: {_id: '$x'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[1].get(), "y"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessExpressionWithDepsTargetAlive) {
+    // The expression at the rename target references two upstream fields; the target itself is
+    // referenced by $group, so nothing is dead.
+    setPipeline(
+        "[{$set: {a: 1, b: 2}}, {$set: {c: {$add: ['$a', '$b']}}}, "
+        "{$group: {_id: '$c'}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessExpressionWithDepsTargetDead) {
+    // The expression's dependents stay alive through the transitive worklist propagation
+    // (because they are referenced by an alive field), but 'c' itself is unread and dead.
+    setPipeline(
+        "[{$set: {a: 1, b: 2}}, {$set: {c: {$add: ['$a', '$b']}}}, "
+        "{$group: {_id: '$a'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[1].get(), "c"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessExpressionDepsKeepBaseFieldsAlive) {
+    pathArrayness->addPath("base", {}, false);
+    setPipeline(
+        "[{$set: {a: 1}}, {$set: {c: {$add: ['$a', '$base']}}}, "
+        "{$group: {_id: '$c'}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessRenameOfRenameOuterDead) {
+    // 'b' renames the base field 'a', then 'c' renames 'b'. 'b' is still considered alive because
+    // it's referenced by the (itself dead) rename in stage 1; only 'c' is reported as dead.
+    // TODO(SERVER-127211): a field referenced only by a dead stage should also be reported as dead.
+    pathArrayness->addPath("a", {}, false);
+    setPipeline("[{$set: {b: '$a'}}, {$set: {c: '$b'}}, {$group: {_id: '$other'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[1].get(), "c"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessRenameOfRenameTargetAliveKeepsChain) {
+    // 'b' renames 'a' and then 'c' renames 'b'; 'c' is referenced downstream so the whole chain is
+    // alive.
+    pathArrayness->addPath("a", {}, false);
+    setPipeline("[{$set: {b: '$a'}}, {$set: {c: '$b'}}, {$group: {_id: '$c'}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessRenameOfRenameOnlyMiddleAlive) {
+    // 'b' renames 'a' and 'c' renames 'b'; only 'b' is referenced downstream, so 'c' is dead but
+    // 'b' is alive.
+    pathArrayness->addPath("a", {}, false);
+    setPipeline("[{$set: {b: '$a'}}, {$set: {c: '$b'}}, {$group: {_id: '$b'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[1].get(), "c"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessThreeLevelNestedPathDead) {
+    setPipeline("[{$set: {'a.b.c': 1}}, {$group: {_id: '$x'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[0].get(), "a.b.c"}}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessThreeLevelNestedPathAlive) {
+    setPipeline("[{$set: {'a.b.c': 1}}, {$group: {_id: '$a.b.c'}}]");
+    runTest([&] { assertDeadFieldsEq({}); });
+}
+
+TEST_F(PipelineDependencyGraphTest, AlivenessThreeLevelNestedPathSiblingDead) {
+    // 'a.b.c' is referenced, but 'a.b.d' isn't, so the latter is dead.
+    setPipeline("[{$set: {'a.b.c': 1, 'a.b.d': 2}}, {$group: {_id: '$a.b.c'}}]");
+    runTest([&] { assertDeadFieldsEq({{stages[0].get(), "a.b.d"}}); });
 }
 
 }  // namespace

@@ -36,8 +36,10 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/dependency_analysis/document_transformation_helpers.h"
+#include "mongo/util/dynamic_bitset.h"
 #include "mongo/util/string_map.h"
 
+#include <algorithm>
 #include <utility>
 #include <vector>
 
@@ -537,6 +539,28 @@ struct CanPathBeArrayForNss {
 };
 }  // namespace
 
+namespace {
+/// RAII helper that appends a dotted path component to 'buf' on construction and restores
+/// 'buf' to its prior length on destruction. Modeled after FieldRef::FieldRefTempAppend.
+class ScopedPathComponent {
+public:
+    ScopedPathComponent(std::string& buf, StringData component) : _buf(buf), _prevLen(buf.size()) {
+        if (!_buf.empty()) {
+            _buf.push_back('.');
+        }
+        _buf.append(component.data(), component.size());
+    }
+
+    ~ScopedPathComponent() {
+        _buf.resize(_prevLen);
+    }
+
+private:
+    std::string& _buf;
+    size_t _prevLen;
+};
+}  // namespace
+
 class DependencyGraph::Impl {
 public:
     explicit Impl(const DocumentSourceContainer& container,
@@ -753,13 +777,134 @@ public:
 
     BSONObj toBSON() const;
 
+    /// Implements DependencyGraph::getDeadFields. Sub-pipelines are not analyzed here.
+    void collectDeadFields(std::vector<DeadField>& out) const {
+        if (_stages.empty()) {
+            return;
+        }
+        auto alive = computeAliveFields();
+        std::string pathBuf;
+        for (StageId stageId{0}; stageId < _stages.getNextId(); stageId.value++) {
+            if (const auto& stage = _stages[stageId]; stage.isSingleDocumentTransformation) {
+                walkPotentiallyDeadFields(stage.scope, alive, pathBuf, out);
+            }
+        }
+    }
+
 private:
     using ParsedPath = boost::container::small_vector<StringPool::Id, 8>;
     using ParsedPathView = std::span<StringPool::Id>;
     using FieldList = boost::container::small_vector<FieldId, 8>;
+    using Bitset = DynamicBitset<size_t, 1>;
 
     class Serializer;
 
+    /**
+     * Builds a bitmap indexed by FieldIds where 'true' means the field's value is accessed
+     * somewhere downstream. I.e., the field is either read by a stage, surviving in the pipeline's
+     * final output scope, or transitively required by another alive field's dependencies.
+     *
+     * The algorithm works as follows:
+     * We first seed the alive set with every field directly read by a stage and every field
+     * surviving in the pipeline's final output scope, then iteratively drain a worklist, marking
+     * each alive field's own dependencies alive, until the bitset reaches a fixpoint.
+     */
+    Bitset computeAliveFields() const {
+        Bitset alive(_fields.size());
+        if (_stages.empty()) {
+            return alive;
+        }
+
+        std::vector<FieldId> worklist;
+
+        auto markAlive = [&](FieldId fieldId) {
+            if (fieldId && !alive.test(fieldId.value)) {
+                alive.set(fieldId.value);
+                worklist.push_back(fieldId);
+            }
+        };
+        auto markAllScopeFieldsAlive = [&](ScopeId scopeId) {
+            if (scopeId) {
+                for (auto&& [name, fieldId] : _scopes[scopeId].fields) {
+                    markAlive(fieldId);
+                }
+                // The 'missing' field is always alive.
+                markAlive(_scopes[scopeId].missingField);
+            }
+        };
+        // A 'whole document' dependency reads every field visible at the reader's input, which
+        // is the scope produced by the previous stage. For the first stage that is the base
+        // document, but base-document fields don't have FieldIds, so there is nothing to mark.
+        auto markPredecessorScopeAlive = [&](StageId scopeId) {
+            if (scopeId > StageId(0)) {
+                StageId prevStage{scopeId.value - 1};
+                markAllScopeFieldsAlive(_stages[prevStage].scope);
+            }
+        };
+        auto markDependenciesAlive = [&](const FieldDependencies& deps, StageId scopeId) {
+            if (deps.dependsOnWholeDocument()) {
+                markPredecessorScopeAlive(scopeId);
+            } else {
+                for (FieldId dep : deps) {
+                    markAlive(dep);
+                }
+            }
+        };
+
+        // Seed: every stage's direct dependencies plus the pipeline's final output scope.
+        for (StageId stageId{0}; stageId.value < static_cast<int32_t>(_stages.size());
+             stageId.value++) {
+            markDependenciesAlive(_stages[stageId].dependencies, stageId);
+        }
+        markAllScopeFieldsAlive(_stages.back().scope);
+
+        // Propagate: every alive field implicitly requires its own dependencies to be alive too.
+        while (!worklist.empty()) {
+            FieldId aliveField = worklist.back();
+            worklist.pop_back();
+            const auto& field = _fields[aliveField];
+            markDependenciesAlive(field.dependencies, _scopes[field.declaringScope].stage);
+        }
+        return alive;
+    }
+
+    /// Emits a DeadField for each leaf field newly declared by the stage that owns 'scopeId' (or
+    /// any of its embedded scopes) and is not in 'alive'. The 'pathBuf' parameter is reused across
+    /// recursive calls to avoid reallocating the string buffer separately for each field.
+    void walkPotentiallyDeadFields(ScopeId scopeId,
+                                   const Bitset& alive,
+                                   std::string& pathBuf,
+                                   std::vector<DeadField>& out) const {
+        const StageId stageId = _scopes[scopeId].stage;
+        for (auto&& [nameId, fieldId] : _scopes[scopeId].fields) {
+            if (!fieldId) {
+                continue;
+            }
+
+            const auto& field = _fields[fieldId];
+            if (_scopes[field.declaringScope].stage != stageId) {
+                continue;
+            }
+
+            const bool hasOwnEmbeddedScope = field.embeddedScope != ScopeId::none() &&
+                _scopes[field.embeddedScope].stage == stageId;
+            const bool isDead = !hasOwnEmbeddedScope && !alive.test(fieldId.value);
+            if (!isDead && !hasOwnEmbeddedScope) {
+                continue;
+            }
+
+            ScopedPathComponent component{pathBuf, _strings.get(nameId)};
+            if (isDead) {
+                out.push_back(DeadField{_stages[stageId].documentSource,
+                                        FieldPath{pathBuf,
+                                                  /*precomputeHashes*/ false,
+                                                  /*validateFieldNames*/ false}});
+            }
+            if (hasOwnEmbeddedScope) {
+                walkPotentiallyDeadFields(field.embeddedScope, alive, pathBuf, out);
+            }
+        }
+    }
 
     /**
      * Declares a scope (or embedded scope), which is defined by the given state and
@@ -1690,7 +1835,6 @@ private:
         absl::erase_if(_constants,
                        [invalidField](const auto& entry) { return entry.first >= invalidField; });
 
-
         // Clean up for invalidated stages.
         size_t subpipelinesToRemove = 0;
         for (auto sid = invalidStage; sid < _stages.getNextId(); sid.value++) {
@@ -1828,6 +1972,12 @@ BSONObj DependencyGraph::toBSON() const {
 std::string DependencyGraph::toDebugString() const {
     auto bson = toBSON();
     return tojson(bson, ExtendedRelaxedV2_0_0, true /*pretty*/);
+}
+
+std::vector<DeadField> DependencyGraph::getDeadFields() const {
+    std::vector<DeadField> out;
+    _impl->collectDeadFields(out);
+    return out;
 }
 
 class DependencyGraph::Impl::Serializer {

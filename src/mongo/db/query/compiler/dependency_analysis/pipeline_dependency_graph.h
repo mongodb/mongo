@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -60,6 +61,18 @@ struct DeclaringStageResult {
 
     // True when the declaring stage was resolved inside a sub-pipeline (e.g. $lookup, $unionWith).
     bool fromSubpipeline = false;
+};
+
+/**
+ * A "dead" field detected by the aliveness analysis, i.e. a field path that was introduced by a
+ * pipeline stage but whose value is never used by any downstream stage and does not appear
+ * in the pipeline's final output.
+ */
+struct DeadField {
+    /// The stage which introduced this path.
+    boost::intrusive_ptr<mongo::DocumentSource> stage;
+    /// The field path that was introduced.
+    FieldPath path;
 };
 
 /**
@@ -186,6 +199,19 @@ public:
      *   - resize(container.end()) -> grows the graph to [A, B, X, C, D, E].
      */
     void resize(DocumentSourceContainer::const_iterator newEndIt);
+
+    /**
+     * Returns the set of "dead" fields introduced by single-document transformation stages
+     * that are guaranteed to never affect the pipeline output.
+     *
+     * TODO(SERVER-127211): a field referenced by an intermediate stage is not dead, even if that
+     * stage is itself dead.
+     *
+     * TODO(SERVER-127212): also walk sub-pipelines and return their dead fields. For now,
+     * sub-pipelines are not analyzed; call getSubpipelineGraph(stage)->getDeadFields() to
+     * inspect a sub-pipeline.
+     */
+    std::vector<DeadField> getDeadFields() const;
 
     std::string toDebugString() const;
     BSONObj toBSON() const;
