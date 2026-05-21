@@ -66,13 +66,11 @@ namespace {
  */
 BSONObj makeOplogEntryDoc(DurableOplogEntryParams p) {
     BSONObjBuilder builder;
-    if (p.idField) {
-        p.idField->addToBsonObj(&builder, OplogEntryBase::k_idFieldName);
-    }
+
+    // OperationSessionInfo
     p.sessionInfo.serialize(&builder);
-    builder.append(OplogEntryBase::kTimestampFieldName, p.opTime.getTimestamp());
-    builder.append(OplogEntryBase::kTermFieldName, p.opTime.getTerm());
-    builder.append(OplogEntryBase::kVersionFieldName, p.version);
+
+    // DurableReplOperation fields
     builder.append(OplogEntryBase::kOpTypeFieldName, idl::serialize(p.opType));
     if (p.nss.tenantId() && gMultitenancySupport &&
         gFeatureFlagRequireTenantID.isEnabled(
@@ -81,22 +79,11 @@ BSONObj makeOplogEntryDoc(DurableOplogEntryParams p) {
     }
     builder.append(OplogEntryBase::kNssFieldName,
                    NamespaceStringUtil::serialize(p.nss, SerializationContext::stateDefault()));
-    builder.append(OplogEntryBase::kWallClockTimeFieldName, p.wallClockTime);
     if (p.uuid) {
         p.uuid->appendToBuilder(&builder, OplogEntryBase::kUuidFieldName);
     }
     if (p.container) {
         builder.append(OplogEntryBase::kContainerFieldName, p.container.value());
-    }
-    if (p.fromMigrate) {
-        builder.append(OplogEntryBase::kFromMigrateFieldName, p.fromMigrate.value());
-    }
-    if (p.checkExistenceForDiffInsert) {
-        builder.append(OplogEntryBase::kCheckExistenceForDiffInsertFieldName,
-                       p.checkExistenceForDiffInsert.value());
-    }
-    if (p.versionContext) {
-        builder.append(OplogEntryBase::kVersionContextFieldName, p.versionContext.value().toBSON());
     }
     builder.append(OplogEntryBase::kObjectFieldName, p.oField);
     if (p.o2Field) {
@@ -120,15 +107,6 @@ BSONObj makeOplogEntryDoc(DurableOplogEntryParams p) {
         invariant(p.o2Field);
         builder.append(OplogEntryBase::kUpsertFieldName, p.isUpsert.value());
     }
-    if (p.statementIds.size() == 1) {
-        builder.append(OplogEntryBase::kStatementIdsFieldName, p.statementIds.front());
-    } else if (!p.statementIds.empty()) {
-        builder.append(OplogEntryBase::kStatementIdsFieldName, p.statementIds);
-    }
-    if (p.prevWriteOpTimeInTransaction) {
-        const BSONObj localObject = p.prevWriteOpTimeInTransaction.value().toBSON();
-        builder.append(OplogEntryBase::kPrevWriteOpTimeInTransactionFieldName, localObject);
-    }
     if (p.preImageOpTime) {
         const BSONObj localObject = p.preImageOpTime.value().toBSON();
         builder.append(OplogEntryBase::kPreImageOpTimeFieldName, localObject);
@@ -137,16 +115,45 @@ BSONObj makeOplogEntryDoc(DurableOplogEntryParams p) {
         const BSONObj localObject = p.postImageOpTime.value().toBSON();
         builder.append(OplogEntryBase::kPostImageOpTimeFieldName, localObject);
     }
-
-    if (p.destinedRecipient) {
-        builder.append(OplogEntryBase::kDestinedRecipientFieldName,
-                       p.destinedRecipient.value().toString());
-    }
-
     if (p.needsRetryImage) {
         builder.append(OplogEntryBase::kNeedsRetryImageFieldName,
                        idl::serialize(p.needsRetryImage.value()));
     }
+    if (p.destinedRecipient) {
+        builder.append(OplogEntryBase::kDestinedRecipientFieldName,
+                       p.destinedRecipient.value().toString());
+    }
+    if (p.statementIds.size() == 1) {
+        builder.append(OplogEntryBase::kStatementIdsFieldName, p.statementIds.front());
+    } else if (!p.statementIds.empty()) {
+        builder.append(OplogEntryBase::kStatementIdsFieldName, p.statementIds);
+    }
+    if (p.fromMigrate) {
+        builder.append(OplogEntryBase::kFromMigrateFieldName, p.fromMigrate.value());
+    }
+    if (p.checkExistenceForDiffInsert) {
+        builder.append(OplogEntryBase::kCheckExistenceForDiffInsertFieldName,
+                       p.checkExistenceForDiffInsert.value());
+    }
+    if (p.versionContext) {
+        builder.append(OplogEntryBase::kVersionContextFieldName, p.versionContext.value().toBSON());
+    }
+
+    // OpTimeBase fields
+    builder.append(OplogEntryBase::kTimestampFieldName, p.opTime.getTimestamp());
+    builder.append(OplogEntryBase::kTermFieldName, p.opTime.getTerm());
+
+    // OplogEntryBase own fields
+    builder.append(OplogEntryBase::kVersionFieldName, p.version);
+    builder.append(OplogEntryBase::kWallClockTimeFieldName, p.wallClockTime);
+    if (p.idField) {
+        p.idField->addToBsonObj(&builder, OplogEntryBase::k_idFieldName);
+    }
+    if (p.prevWriteOpTimeInTransaction) {
+        const BSONObj localObject = p.prevWriteOpTimeInTransaction.value().toBSON();
+        builder.append(OplogEntryBase::kPrevWriteOpTimeInTransactionFieldName, localObject);
+    }
+
     return builder.obj();
 }
 }  // namespace

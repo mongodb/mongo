@@ -4206,18 +4206,6 @@ function checkOplogs(rst, msgPrefix = "checkOplogs", secondaries) {
         oplogEntry1 = bsonGetImmutable(oplogEntry1);
 
         if (!bsonBinaryEqual(oplogEntry0, oplogEntry1)) {
-            // TODO SERVER-124392: Investigate if "new primary" noop oplog entries can be generated with consistent
-            // field ordering to avoid the need for this special case.
-            if (
-                oplogEntry0.o &&
-                oplogEntry0.o.msg === "new primary" &&
-                oplogEntry1.o &&
-                oplogEntry1.o.msg === "new primary" &&
-                bsonUnorderedFieldsCompare(oplogEntry0, oplogEntry1) === 0
-            ) {
-                return;
-            }
-
             const query = prevOplogEntry ? {ts: {$lte: prevOplogEntry.ts}} : {};
             rst.nodes.forEach((node) => rst.dumpOplog(node, query, 100));
             const logLines = [
