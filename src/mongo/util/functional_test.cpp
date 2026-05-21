@@ -35,6 +35,8 @@
 
 #include <string>
 
+#include <boost/optional.hpp>
+
 /**
  * Note that tests in this file are deliberately outside the mongodb namespace to ensure that
  * deduction works appropriately via adl.  I.e. this set of tests doesn't follow our usual
@@ -803,6 +805,15 @@ TEST(UniqueFunctionTest, functionDominanceExample) {
     };
 
     ASSERT_TRUE(accept(std::move(uf), nullptr));
+}
+
+TEST(UniqueFunctionTest, ConvertibilitySimple) {
+    using Muf = mongo::unique_function<int(int)>;
+    static_assert(!std::is_constructible_v<Muf, boost::optional<Muf>&&>);
+
+    auto lam = [](int) {
+    };
+    static_assert(std::is_constructible_v<mongo::unique_function<void(int)>, decltype(lam)&&>);
 }
 
 // Enable these tests to manually verify that we get warnings (which are promoted to errors).

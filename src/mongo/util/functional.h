@@ -161,24 +161,9 @@ class unique_function;
  */
 template <typename RetType, typename... Args>
 class unique_function<RetType(Args...)> {
-private:
-    // `TagTypeBase` is used as a base for the `TagType` type, to prevent it from being an
-    // aggregate.
-    struct TagTypeBase {
-    protected:
-        TagTypeBase() = default;
-    };
-    // `TagType` is used as a placeholder type in parameter lists for `enable_if` clauses.  They
-    // have to be real parameters, not template parameters, due to MSVC limitations.
-    class TagType : TagTypeBase {
-        TagType() = default;
-        friend unique_function;
-    };
-
 public:
     using result_type = RetType;
 
-    ~unique_function() noexcept = default;
     unique_function() = default;
 
     unique_function(const unique_function&) = delete;
@@ -189,7 +174,7 @@ public:
 
     void swap(unique_function& that) noexcept {
         using std::swap;
-        swap(this->impl, that.impl);
+        swap(_impl, that._impl);
     }
 
     friend void swap(unique_function& a, unique_function& b) noexcept {
@@ -200,30 +185,20 @@ public:
     // `void *` accepting function object.  This will permit reusing the core impl object when
     // converting between related function types, such as
     // `int (std::string)` -> `void (const char *)`
-    template <typename Functor>
-    /* implicit */
-    unique_function(
-        Functor&& functor,
-        // The remaining arguments here are only for SFINAE purposes to enable this ctor when our
-        // requirements are met.  They must be concrete parameters not template parameters to work
-        // around bugs in some compilers that we presently use.  We may be able to revisit this
-        // design after toolchain upgrades for C++17.
-        std::enable_if_t<std::is_invocable_r<RetType, Functor, Args...>::value, TagType> =
-            makeTag(),
-        std::enable_if_t<std::is_move_constructible<Functor>::value, TagType> = makeTag(),
-        std::enable_if_t<!std::is_same<std::decay_t<Functor>, unique_function>::value, TagType> =
-            makeTag())
-        : impl(makeImpl(std::forward<Functor>(functor))) {}
+    template <typename F>
+    requires(!std::same_as<std::decay_t<F>, unique_function> &&
+             std::is_invocable_r_v<RetType, F, Args...> && std::move_constructible<F>)
+    explicit(false) unique_function(F&& f) : _impl(_makeImpl(std::forward<F>(f))) {}
 
-    unique_function(std::nullptr_t) noexcept {}
+    explicit(false) unique_function(std::nullptr_t) noexcept {}
 
     RetType operator()(Args... args) const {
         invariant(static_cast<bool>(*this));
-        return impl->call(std::forward<Args>(args)...);
+        return _impl->call(std::forward<Args>(args)...);
     }
 
     explicit operator bool() const noexcept {
-        return static_cast<bool>(this->impl);
+        return static_cast<bool>(_impl);
     }
 
     // Needed to make `std::is_convertible<mongo::unique_function<...>, std::function<...>>` be
@@ -240,22 +215,20 @@ public:
     template <typename Signature>
     operator std::function<Signature>() const = delete;
 
-private:
-    // The `TagType` type cannot be constructed as a default function-parameter in Clang.  So we use
-    // a static member function that initializes that default parameter.
-    static TagType makeTag() {
-        return {};
+    bool operator==(std::nullptr_t) const noexcept {
+        return !*this;
     }
 
+private:
     struct Impl {
-        virtual ~Impl() noexcept = default;
+        virtual ~Impl() = default;
         virtual RetType call(Args&&... args) = 0;
     };
 
-    template <typename Functor>
-    static auto makeImpl(Functor&& functor) {
+    template <typename F>
+    static auto _makeImpl(F&& f) {
         struct SpecificImpl : Impl {
-            explicit SpecificImpl(Functor&& func) : f(std::forward<Functor>(func)) {}
+            explicit SpecificImpl(F&& f) : f(std::forward<F>(f)) {}
 
             RetType call(Args&&... args) override {
                 if constexpr (std::is_void_v<RetType>) {
@@ -267,13 +240,13 @@ private:
                 }
             }
 
-            std::decay_t<Functor> f;
+            std::decay_t<F> f;
         };
 
-        return std::make_unique<SpecificImpl>(std::forward<Functor>(functor));
+        return std::make_unique<SpecificImpl>(std::forward<F>(f));
     }
 
-    std::unique_ptr<Impl> impl;
+    std::unique_ptr<Impl> _impl;
 };
 
 namespace MONGO_MOD_FILE_PRIVATE functional_details {
@@ -304,23 +277,4 @@ template <
     typename Sig = typename functional_details::UFDeductionHelper<decltype(&T::operator())>::type>
 unique_function(T) -> unique_function<Sig>;
 
-template <typename Signature>
-bool operator==(const unique_function<Signature>& lhs, std::nullptr_t) noexcept {
-    return !lhs;
-}
-
-template <typename Signature>
-bool operator!=(const unique_function<Signature>& lhs, std::nullptr_t) noexcept {
-    return static_cast<bool>(lhs);
-}
-
-template <typename Signature>
-bool operator==(std::nullptr_t, const unique_function<Signature>& rhs) noexcept {
-    return !rhs;
-}
-
-template <typename Signature>
-bool operator!=(std::nullptr_t, const unique_function<Signature>& rhs) noexcept {
-    return static_cast<bool>(rhs);
-}
 }  // namespace MONGO_MOD_PUB mongo
