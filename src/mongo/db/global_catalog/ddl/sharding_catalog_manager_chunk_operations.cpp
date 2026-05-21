@@ -839,6 +839,11 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
     return splitChunkResult;
 }
 
+// Invariant: this method only performs config-server-local work (reads and writes against
+// config.collections, config.chunks and config.changelog, plus client bookkeeping). It must not
+// add any shard-side interaction. Authoritative chunk-op coordinators rely on this property: the
+// shard-side install (oplog invalidation + CSR refresh) is driven by the coordinator on the
+// originating shard, not from here.
 StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions>
 ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                                          const NamespaceString& nss,
@@ -847,11 +852,6 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                                          const ChunkRange& range,
                                          const std::vector<BSONObj>& splitPoints,
                                          const std::string& shardName) {
-
-    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
-    // under the exclusive _kChunkOpLock happen on the same term.
-    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
@@ -1074,6 +1074,11 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
     txn.run(opCtx, updateChunksFn);
 }
 
+// Invariant: this method only performs config-server-local work (reads and writes against
+// config.collections, config.chunks and config.changelog, plus client bookkeeping). It must not
+// add any shard-side interaction. Authoritative chunk-op coordinators rely on this property: the
+// shard-side install (oplog invalidation + CSR refresh) is driven by the coordinator on the
+// originating shard, not from here.
 StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions>
 ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
                                           const NamespaceString& nss,
@@ -1082,11 +1087,6 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
                                           const UUID& requestCollectionUUID,
                                           const ChunkRange& chunkRange,
                                           const ShardId& shardId) {
-
-    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
-    // under the exclusive _kChunkOpLock happen on the same term.
-    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection placement versions
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
@@ -1228,16 +1228,17 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
                                                mergeVersion /*collectionPlacementVersion*/};
 }
 
+// Invariant: this method only performs config-server-local work (reads and writes against
+// config.collections, config.chunks, config.tags and config.changelog, plus client bookkeeping).
+// It must not add any shard-side interaction. Authoritative chunk-op coordinators rely on this
+// property: the shard-side install (oplog invalidation + CSR refresh) is driven by the
+// coordinator on the originating shard, not from here.
 StatusWith<std::pair<ShardingCatalogManager::ShardAndCollectionPlacementVersions, int>>
 ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                                     const NamespaceString& nss,
                                                     const ShardId& shardId,
                                                     int maxNumberOfChunksToMerge,
                                                     int maxTimeProcessingChunksMS) {
-    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
-    // under the exclusive _kChunkOpLock happen on the same term.
-    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
     // Retry the commit a fixed number of  times before failing: the discovery of chunks to merge
     // happens before acquiring the `_kChunkOpLock` in order not to block  for too long concurrent
     // chunk operations. This implies that other chunk operations for the same collection could
