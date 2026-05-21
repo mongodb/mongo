@@ -40,6 +40,8 @@ StringData toString(MetricUnit unit) {
         // Generic
         case MetricUnit::kEvents:
             return "events";
+        case MetricUnit::kCount:
+            return "count";
 
         // Time
         case MetricUnit::kMicroseconds:
