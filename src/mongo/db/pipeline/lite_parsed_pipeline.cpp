@@ -262,9 +262,7 @@ void LiteParsedPipeline::_stitchFront(LiteParsedPipeline&& prefix) {
 
 void LiteParsedPipeline::handleView(const ViewInfo& viewInfo,
                                     const ResolvedNamespaceMap& resolvedNamespaces) {
-    for (auto& stage : _stageSpecs) {
-        stage->bindViewInfo(viewInfo, resolvedNamespaces);
-    }
+    bindViewInfoToStages(viewInfo, resolvedNamespaces);
 
     const auto firstStagePolicy = _stageSpecs.empty()
         ? FirstStageViewApplicationPolicy::kDefaultPrepend
@@ -274,6 +272,13 @@ void LiteParsedPipeline::handleView(const ViewInfo& viewInfo,
         // pipeline to the current pipeline.
         auto clonedViewPipe = viewInfo.getViewPipeline();
         _stitchFront(std::move(clonedViewPipe));
+    }
+}
+
+void LiteParsedPipeline::bindViewInfoToStages(const ViewInfo& viewInfo,
+                                              const ResolvedNamespaceMap& resolvedNamespaces) {
+    for (auto& stage : _stageSpecs) {
+        stage->bindViewInfo(viewInfo, resolvedNamespaces);
     }
 }
 

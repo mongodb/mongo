@@ -1005,7 +1005,15 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
     // TODO SERVER-115069 Remove this once search queries are desugared at LiteParsed time and
     // handle the view through a bindViewInfo() override.
     if (search_helpers::isMongotLiteParsedPipeline(*desugaredLPP)) {
-        LOGV2_DEBUG(11856001, 4, "Skipping view application because this is a mongot query");
+        LOGV2_DEBUG(11856001, 4, "Skipping view pipeline prepend because this is a mongot query");
+        // Still call bindViewInfo() on all stages so that any extension stages further in the
+        // pipeline get properly validated against the view.
+        PipelineResolver::validateStagesOnView(
+            desugaredLPP,
+            aggExState.getResolvedView(),
+            aggExState.getOriginalNss(),
+            uassertStatusOK(aggCatalogState.resolveInvolvedNamespaces(aggExState.getOpCtx())),
+            LiteParserOptions{.ifrContext = aggExState.getIfrContext()});
         return currentRequirement;
     }
 

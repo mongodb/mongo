@@ -70,6 +70,17 @@ public:
                                       const ResolvedNamespaceMap& resolvedNamespaces,
                                       const LiteParserOptions& options = LiteParserOptions{});
 
+    /**
+     * Calls bindViewInfo() on each stage in 'userLPP' without prepending the view pipeline. Used
+     * for mongot pipelines on views where the legacy first stage handles view resolution itself,
+     * but subsequent extension stages still need view validation.
+     */
+    static void validateStagesOnView(LiteParsedPipeline* userLPP,
+                                     const ResolvedView& resolvedView,
+                                     const NamespaceString& viewNss,
+                                     const ResolvedNamespaceMap& resolvedNamespaces,
+                                     const LiteParserOptions& options = LiteParserOptions{});
+
     using MakeExpressionContextFn = std::function<boost::intrusive_ptr<ExpressionContext>(
         OperationContext*,
         const AggregateCommandRequest&,

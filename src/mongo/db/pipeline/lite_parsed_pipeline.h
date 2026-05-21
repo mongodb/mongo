@@ -480,6 +480,12 @@ public:
      */
     void handleView(const ViewInfo& viewInfo, const ResolvedNamespaceMap& resolvedNamespaces);
 
+    /**
+     * Calls bindViewInfo() on each stage in the pipeline.
+     */
+    void bindViewInfoToStages(const ViewInfo& viewInfo,
+                              const ResolvedNamespaceMap& resolvedNamespaces);
+
 private:
     friend struct ViewInfo;
 
