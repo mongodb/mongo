@@ -122,8 +122,18 @@ constexpr std::size_t kLargeNumberOfKeys = 100 * 1000;
 constexpr std::size_t kAggressiveSpillMemLimit = 16 * 1024;
 constexpr std::size_t kManualSpillEveryN = 10;
 
-constexpr std::size_t dataMemLimitFromTotal(std::size_t totalMemLimit) {
-    return totalMemLimit - totalMemLimit / 10;
+// Returns the data-memory budget production will choose: total memory minus the iterator budget,
+// where the iterator budget is the 10% reservation rounded down to a multiple of `iteratorSize`.
+inline std::size_t dataMemLimitFromTotal(std::size_t totalMemLimit, std::size_t iteratorSize) {
+    constexpr std::size_t kIteratorsMaxBytesSizeDefault = 1 * 1024 * 1024;
+    std::size_t reserved = kIteratorsMaxBytesSizeDefault;
+    const auto requested =
+        static_cast<std::size_t>(totalMemLimit * maxIteratorsMemoryUsagePercentage.load());
+    if (requested < reserved) {
+        reserved = std::max(iteratorSize, requested);
+    }
+    reserved = iteratorSize * (reserved / iteratorSize);
+    return reserved >= totalMemLimit ? 0 : totalMemLimit - reserved;
 }
 
 std::string makeSpillDirName() {
@@ -179,12 +189,12 @@ struct RangeCoverageExpectation {
 };
 
 RangeCoverageExpectation expectedRangeCoverageForAggressiveSpilling() {
-    const auto dataMemLimit = dataMemLimitFromTotal(kAggressiveSpillMemLimit);
+    constexpr auto iteratorSize = sizeof(FileIterator<IntWrapper, IntWrapper>);
+    const auto dataMemLimit = dataMemLimitFromTotal(kAggressiveSpillMemLimit, iteratorSize);
     const auto expectedNumRanges =
         std::max<std::size_t>(dataMemLimit / sorter::kSortedFileBufferSize, 2);
-    const auto maximumNumberOfIterators = std::max<std::size_t>(
-        (kAggressiveSpillMemLimit - dataMemLimit) / sizeof(FileIterator<IntWrapper, IntWrapper>),
-        1);
+    const auto maximumNumberOfIterators =
+        std::max<std::size_t>((kAggressiveSpillMemLimit - dataMemLimit) / iteratorSize, 1);
 
     const auto recordsPerRange = dataMemLimit / sizeof(IWPair) + 1;
     std::size_t documentsToAdd = kLargeNumberOfKeys;
