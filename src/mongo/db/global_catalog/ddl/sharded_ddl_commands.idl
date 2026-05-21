@@ -1104,6 +1104,11 @@ commands:
         namespace: type
         type: namespacestring
         api_version: ""
+        fields:
+            primaryShardId:
+                type: shard_id
+                description: Primary shard identifier, used to determine whether the shard needs to durably persist collection metadata or not.
+                optional: false
         reply_type: OkReply
 
     _shardsvrCommitCollModCollectionMetadata:
@@ -1114,6 +1119,11 @@ commands:
         namespace: type
         type: namespacestring
         api_version: ""
+        fields:
+            primaryShardId:
+                type: shard_id
+                description: Primary shard identifier, used to determine whether the shard needs to durably persist collection metadata or not.
+                optional: false
         reply_type: OkReply
 
     _shardsvrCommitDropCollectionMetadata:
@@ -1138,6 +1148,11 @@ commands:
         namespace: type
         type: namespacestring
         api_version: ""
+        fields:
+            primaryShardId:
+                type: shard_id
+                description: Primary shard identifier, used to determine whether the shard needs to durably persist collection metadata or not.
+                optional: false
         reply_type: OkReply
 
     _shardsvrCommitRenameCollectionMetadata:

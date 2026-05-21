@@ -58,17 +58,13 @@ StorageEngine::TimestampMonitor::TimestampListener kShardCatalogHistoryCleanupTi
 
         auto shardId = shardingState->shardId();
 
-        // TODO(SERVER-126200): Remove reference to ChunklessPlaceholder.
         PersistentTaskStore<ChunkType> chunkStore{
             NamespaceString::kConfigShardCatalogChunksNamespace};
         try {
-            chunkStore.remove(
-                opCtx,
-                BSON(ChunkType::shard()
-                     << BSON("$nin" << BSON_ARRAY(
-                                 shardId.toString()
-                                 << shard_catalog_commit::kChunklessPlaceholderShardId.toString()))
-                     << ChunkType::onCurrentShardSince() << BSON("$lt" << oldest)));
+            chunkStore.remove(opCtx,
+                              BSON(ChunkType::shard()
+                                   << BSON("$ne" << shardId.toString())
+                                   << ChunkType::onCurrentShardSince() << BSON("$lt" << oldest)));
         } catch (const ExceptionFor<ErrorCodes::FailedToSatisfyReadPreference>&) {
             // Primary can be killed in the middle of the removal.
             return;

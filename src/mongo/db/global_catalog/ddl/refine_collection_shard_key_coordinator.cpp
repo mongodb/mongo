@@ -342,20 +342,12 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
 
                 if (_doc.getAuthoritativeMetadataAccessLevel() >=
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                    const auto involvedShards = getShardsWithDataForCollection(opCtx, nss());
+                    // The DB primary shard must always know that a collection is tracked, even when
+                    // it does not own any chunks.
+                    const auto involvedShards = getDataShardsAndDbPrimaryShard(opCtx, nss());
                     const auto session = getNewSession(opCtx);
                     sharding_ddl_util::commitRefineCollectionShardKeyToShardCatalog(
                         opCtx, nss(), involvedShards, session, executor, token);
-
-                    // The DB primary shard must always know that a collection is tracked, even when
-                    // it does not own any chunks. We persist a placeholder chunk locally so that
-                    // disk recovery can distinguish a chunkless-tracked collection from an
-                    // untracked one.
-                    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-                    if (std::find(involvedShards.begin(), involvedShards.end(), primaryShardId) ==
-                        involvedShards.end()) {
-                        shard_catalog_commit::commitChunklessCollectionLocally(opCtx, nss());
-                    }
                 }
 
                 // Checkpoint the configTime to ensure that, in the case of a stepdown, the new

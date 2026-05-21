@@ -410,17 +410,19 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     // Install the new incarnation of the collection in the shard catalog.
                     if (isAuthoritative) {
                         const auto session = getNewSession(opCtx);
-                        sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
-                            opCtx, nss(), {*(_doc.getDataShard())}, session, executor, token);
-
                         // The DB primary shard must always know that the collection is tracked,
-                        // even when it does not own any chunks. Persist a chunkless placeholder
-                        // locally so that disk recovery can tell a chunkless-tracked collection
-                        // apart from an untracked one.
-                        const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-                        if (primaryShardId != *_doc.getDataShard()) {
-                            shard_catalog_commit::commitChunklessCollectionLocally(opCtx, nss());
-                        }
+                        // even when it does not own any chunks.
+                        std::set<ShardId> involvedShards;
+                        involvedShards.emplace(ShardingState::get(opCtx)->shardId());
+                        involvedShards.emplace(*(_doc.getDataShard()));
+
+                        sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
+                            opCtx,
+                            nss(),
+                            {involvedShards.begin(), involvedShards.end()},
+                            session,
+                            executor,
+                            token);
                     }
 
                     // Checkpoint the configTime to ensure that, in the case of a stepdown/crash,

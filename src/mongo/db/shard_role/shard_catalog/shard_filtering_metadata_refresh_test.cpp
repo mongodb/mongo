@@ -999,21 +999,11 @@ TEST_F(AuthoritativeRefreshFixture, TrackedCollectionWithNoChunksOnDiskRecovered
     const Timestamp timestamp(Date_t::now());
     CollectionType collType{kTestNss, epoch, timestamp, Date_t::now(), uuid, kShardKeyPattern};
 
-    auto keyPattern = KeyPattern(kShardKeyPattern);
-    auto range = ChunkRange(keyPattern.globalMin(), keyPattern.globalMax());
-    ChunkType placeholder(uuid,
-                          std::move(range),
-                          ChunkVersion({epoch, timestamp}, {1, 0}),
-                          shard_catalog_commit::kChunklessPlaceholderShardId);
-    placeholder.setName(OID::gen());
-
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
     {
         DBDirectClient client(opCtx);
         client.insert(NamespaceString::kConfigShardCatalogCollectionsNamespace, collType.toBSON());
-        client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
-                      placeholder.toConfigBSON());
     }
 
     {

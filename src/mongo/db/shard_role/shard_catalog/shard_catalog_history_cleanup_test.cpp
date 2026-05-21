@@ -77,7 +77,6 @@ public:
 TEST_F(ShardCatalogHistoryCleanupTest, ShardCatalogHistoryCleanupCalledOnTimestampMonitorAdvance) {
     const ShardId kShardName{"testShard"};
     const ShardId kAnotherShardName{"anotherTestShard"};
-    const ShardId kChunklessPlaceholderShardId{"__chunkless_placeholder__"};
 
     // Imagining the test is running on a primary in sharded cluster
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
@@ -133,13 +132,6 @@ TEST_F(ShardCatalogHistoryCleanupTest, ShardCatalogHistoryCleanupCalledOnTimesta
     notOutdatedPreviouslyOwnedChunkType.setHistory(
         {ChunkHistory(newTimestamp, kAnotherShardName), ChunkHistory(oldestTimestamp, kShardName)});
     notOutdatedPreviouslyOwnedChunkType.setOnCurrentShardSince(newTimestamp);
-    // Note: in reality placeholder would always store MINKEY, MAXKEY range, but in this unit test
-    // we can disregard it
-    auto placehoderOwnedChunkType =
-        ChunkType(collectionUUID,
-                  ChunkRange(BSON("_id" << 300), BSON("_id" << MAXKEY)),
-                  ChunkVersion(CollectionGeneration{epoch, Timestamp(0, 0)}, placement),
-                  kChunklessPlaceholderShardId);
 
     DBDirectClient client(opCtx.get());
     client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
@@ -148,8 +140,6 @@ TEST_F(ShardCatalogHistoryCleanupTest, ShardCatalogHistoryCleanupCalledOnTimesta
                   outdatedPreviouslyOwnedChunkType.toConfigBSON());
     client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
                   notOutdatedPreviouslyOwnedChunkType.toConfigBSON());
-    client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
-                  placehoderOwnedChunkType.toConfigBSON());
 
     waitForTimestampMonitorPass();
     waitForTimestampMonitorPass();
@@ -164,11 +154,11 @@ TEST_F(ShardCatalogHistoryCleanupTest, ShardCatalogHistoryCleanupCalledOnTimesta
         chunks.push_back(chunkRes.getValue());
     }
 
-    ASSERT_EQ(chunks.size(), 3u);
+    ASSERT_EQ(chunks.size(), 2u);
 
     // Note: Parsing from ChunkType overrode the chunk version, so we have to set it manually
-    std::vector<ChunkType> expectedChunks = {
-        currentlyOwnedChunkType, notOutdatedPreviouslyOwnedChunkType, placehoderOwnedChunkType};
+    std::vector<ChunkType> expectedChunks = {currentlyOwnedChunkType,
+                                             notOutdatedPreviouslyOwnedChunkType};
     for (auto& chunk : expectedChunks) {
         chunk.setVersion(ChunkVersion(CollectionGeneration(epoch, newTimestamp), placement));
     }

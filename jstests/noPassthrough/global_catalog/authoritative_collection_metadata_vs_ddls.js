@@ -424,8 +424,7 @@ describe("Authoritative collection metadata vs DDLs", function () {
     describe("convertToCapped", function () {
         // For a convertToCapped on a tracked unsplittable collection: no node must retain chunks
         // for the original UUID, the data shard must hold the new UUID's entry with real chunks,
-        // the DB primary must hold the new UUID's entry (chunkless if it is not the data shard),
-        // and any other shard must have no entry for the collection.
+        // the DB primary must hold the new UUID's entry, and any other shard must have no entry for the collection.
         function assertShardCatalogAfterConvertToCapped(
             ns,
             {dataShardRs, primaryRs, newUuid, originalUuid, unsplittableKey},
@@ -452,8 +451,7 @@ describe("Authoritative collection metadata vs DDLs", function () {
             });
 
             if (primaryRs !== dataShardRs) {
-                // Primary is not the data shard: it owns no real chunks but must carry a chunkless
-                // placeholder so disk recovery recognize the collection as tracked.
+                // Primary is not the data shard: it owns no real chunks but must carry the collection entry so disk recovery recognize the collection as tracked.
                 primaryRs.nodes.forEach((node) => {
                     const meta = getShardCatalogCollMetadata(node, ns);
                     assert.neq(null, meta, `${node.host}: chunkless primary is missing collection metadata`);
@@ -464,11 +462,7 @@ describe("Authoritative collection metadata vs DDLs", function () {
                     );
 
                     const shardChunks = getShardCatalogChunks(node, newUuid);
-                    assert.eq(
-                        1,
-                        shardChunks.length,
-                        `${node.host}: chunkless primary must carry exactly one placeholder chunk`,
-                    );
+                    assert.eq(0, shardChunks.length, `${node.host}: chunkless primary must not have any chunks`);
                 });
             }
 

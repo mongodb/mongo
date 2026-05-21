@@ -94,7 +94,10 @@ public:
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
                 newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-                shard_catalog_commit::commitRefineShardKeyLocally(newOpCtx.get(), nss);
+                bool isPrimaryDbShard =
+                    ShardingState::get(newOpCtx.get())->shardId() == request().getPrimaryShardId();
+                shard_catalog_commit::commitCollectionMetadataLocally(
+                    newOpCtx.get(), nss, isPrimaryDbShard);
             }
 
             LOGV2_INFO(10281504,

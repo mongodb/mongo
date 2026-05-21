@@ -145,7 +145,6 @@ void commitToShardCatalog(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const std::vector<ShardId>& participantsOwningChunks,
                           const ShardId& primaryShard,
-                          bool isPrimaryOwningChunks,
                           GetSessionFn&& getSession,
                           const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                           const CancellationToken& token) {
@@ -153,20 +152,14 @@ void commitToShardCatalog(OperationContext* opCtx,
         return;
     }
 
-    std::vector<ShardId> involvedShards = participantsOwningChunks;
-    if (isPrimaryOwningChunks) {
-        involvedShards.push_back(primaryShard);
+    auto shardIds = participantsOwningChunks;
+    if (std::find(shardIds.begin(), shardIds.end(), primaryShard) == shardIds.end()) {
+        shardIds.emplace_back(primaryShard);
     }
 
     const auto session = getSession();
     sharding_ddl_util::commitCollModCollectionMetadataToShardCatalog(
-        opCtx, nss, involvedShards, session, executor, token);
-
-    // The DB primary shard must always know that a collection is tracked, even when it does not own
-    // any chunks.
-    if (!isPrimaryOwningChunks) {
-        shard_catalog_commit::commitChunklessCollectionLocally(opCtx, nss);
-    }
+        opCtx, nss, shardIds, session, executor, token);
 }
 
 }  // namespace
@@ -427,7 +420,6 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         _collInfo->nsForTargeting,
                         _shardingInfo->participantsOwningChunks,
                         _shardingInfo->primaryShard,
-                        _shardingInfo->isPrimaryOwningChunks,
                         [&] { return getNewSession(opCtx); },
                         executor,
                         token);

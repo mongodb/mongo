@@ -293,38 +293,6 @@ void clearShardCatalogCacheForDroppedCollection(OperationContext* opCtx,
 
 }  // namespace
 
-void commitRefineShardKeyLocally(OperationContext* opCtx, const NamespaceString& nss) {
-    auto coll = fetchCollection(opCtx, nss);
-    auto ownedChunks = fetchOwnedChunks(opCtx, nss, coll);
-
-    // Write to `config.shard.catalog.(collections|chunks)` to insert collection metadata.
-    writeCollectionMetadataLocally(opCtx, nss, coll.asShardCatalogType(), ownedChunks);
-
-    // Delete stale chunks from config.shard.catalog.chunks whose shard key bounds do not match the
-    // refined key pattern. This can occur when the shard catalog has an out-of-date view of the
-    // owned chunk ranges (e.g., due to splits or merges).
-    // TODO (SERVER-121709): Evaluate if this holds once merge/split are authoritative.
-    const int numKeyFields = coll.getKeyPattern().toBSON().nFields();
-    {
-        DBDirectClient dbClient(opCtx);
-        executeLocalDelete(
-            dbClient,
-            NamespaceString::kConfigShardCatalogChunksNamespace,
-            BSON(ChunkType::collectionUUID()
-                 << coll.getUuid() << "$expr"
-                 << BSON("$ne" << BSON_ARRAY(BSON("$size" << BSON("$objectToArray" << "$min"))
-                                             << numKeyFields))),
-            true /* multi */);
-    }
-
-    // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
-    invalidateCollectionMetadataOnSecondaries(
-        opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
-
-    // Update this node CSR with collection metadata and chunks.
-    updateShardCatalogCache(opCtx, nss, coll, ownedChunks);
-}
-
 void commitDropCollectionLocally(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const UUID& uuid) {
@@ -478,35 +446,6 @@ void commitCollectionMetadataLocally(OperationContext* opCtx,
     // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
     invalidateCollectionMetadataOnSecondaries(
         opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
-}
-
-void commitChunklessCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
-    auto coll = fetchCollection(opCtx, nss);
-
-    // Drop all existing chunk entries for this collection to start from a clean slate. This removes
-    // both real chunks and any prior chunkless placeholder.
-    deleteCollectionChunksMetadataLocally(opCtx, coll.getUuid());
-
-    // This shard does not own any chunks, but we still need the CSS to know the collection is
-    // tracked. Persist a single placeholder chunk so that disk recovery can distinguish a
-    // chunkless-tracked collection from an untracked one without special-case logic.
-    auto range = ChunkRange(coll.getKeyPattern().globalMin(), coll.getKeyPattern().globalMax());
-    ChunkType placeholder(coll.getUuid(),
-                          std::move(range),
-                          ChunkVersion({coll.getEpoch(), coll.getTimestamp()}, {1, 0}),
-                          kChunklessPlaceholderShardId);
-    placeholder.setName(OID::gen());
-    std::vector<ChunkType> placeholderChunks{std::move(placeholder)};
-
-    // Write the collection document and the placeholder chunk to the shard catalog.
-    writeCollectionMetadataLocally(opCtx, nss, coll.asShardCatalogType(), placeholderChunks);
-
-    // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
-    invalidateCollectionMetadataOnSecondaries(
-        opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
-
-    // Update this node CSR with chunkless tracked metadata.
-    updateShardCatalogCache(opCtx, nss, coll, placeholderChunks);
 }
 
 }  // namespace shard_catalog_commit

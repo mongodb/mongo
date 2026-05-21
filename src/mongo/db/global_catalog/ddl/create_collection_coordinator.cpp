@@ -2319,19 +2319,13 @@ void CreateCollectionCoordinator::_commitOnShardCatalog(
     const auto& cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
     cm.getAllShardIds(&involvedShards);
+    // The DB primary shard must always know that a collection is tracked, even when it does not
+    // own any chunks.
+    involvedShards.emplace(ShardingState::get(opCtx)->shardId());
 
     const auto session = getNewSession(opCtx);
     sharding_ddl_util::commitCreateCollectionMetadataToShardCatalog(
         opCtx, nss(), {involvedShards.begin(), involvedShards.end()}, session, executor, token);
-
-    // The DB primary shard must always know that a collection is tracked, even when it does not
-    // own any chunks. We persist a placeholder chunk locally so that (1) disk recovery can
-    // distinguish a chunkless-tracked collection from an untracked one without special-case
-    // logic, and (2) CheckMetadataConsistency can verify the DB primary always has an entry.
-    const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-    if (involvedShards.find(primaryShardId) == involvedShards.end()) {
-        shard_catalog_commit::commitChunklessCollectionLocally(opCtx, nss());
-    }
 }
 
 void CreateCollectionCoordinator::_setPostCommitMetadata(

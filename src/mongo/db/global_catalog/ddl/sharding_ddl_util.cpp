@@ -893,7 +893,7 @@ void commitRefineCollectionShardKeyToShardCatalog(
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    ShardsvrCommitRefineCollectionShardKey request(nss);
+    ShardsvrCommitRefineCollectionShardKey request(nss, ShardingState::get(opCtx)->shardId());
     request.setDbName(DatabaseName::kAdmin);
 
     generic_argument_util::setMajorityWriteConcern(request);
@@ -913,7 +913,7 @@ void commitCollModCollectionMetadataToShardCatalog(
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    ShardsvrCommitCollModCollectionMetadata request(nss);
+    ShardsvrCommitCollModCollectionMetadata request(nss, ShardingState::get(opCtx)->shardId());
     request.setDbName(DatabaseName::kAdmin);
 
     generic_argument_util::setMajorityWriteConcern(request);
@@ -954,7 +954,7 @@ void commitCreateCollectionMetadataToShardCatalog(
     const OperationSessionInfo& osi,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
-    ShardsvrCommitCreateCollectionMetadata request(nss);
+    ShardsvrCommitCreateCollectionMetadata request(nss, ShardingState::get(opCtx)->shardId());
     request.setDbName(DatabaseName::kAdmin);
 
     generic_argument_util::setMajorityWriteConcern(request);

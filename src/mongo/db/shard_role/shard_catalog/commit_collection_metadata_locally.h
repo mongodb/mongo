@@ -38,20 +38,6 @@ MONGO_MOD_PARENT_PRIVATE;
 namespace mongo {
 namespace shard_catalog_commit {
 
-/**
- * Shard id for the placeholder chunk when a collection is tracked on a shard but owns no real
- * chunks (see commitCreateCollectionChunklessLocally).
- */
-inline const ShardId kChunklessPlaceholderShardId{"__chunkless_placeholder__"};
-
-/**
- * Fetches the latest collection metadata and owned chunks from the global catalog, persists them
- * to the shard catalog (config.shard.catalog.collections and config.shard.catalog.chunks), removes
- * any stale chunks whose shard key bounds don't match the refined key pattern, writes an oplog
- * entry to invalidate collection metadata on secondaries, and updates the in-memory
- * CollectionShardingRuntime (CSR) with the new routing information.
- */
-void commitRefineShardKeyLocally(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Deletes the collection and chunk metadata from the shard catalog
@@ -98,15 +84,6 @@ void commitRenameOfCollectionMetadata(OperationContext* opCtx,
 void commitCollectionMetadataLocally(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      bool isDbPrimaryShard = false);
-
-/**
- * Fetches the collection metadata from the global catalog, removes any existing chunk entries for
- * this collection UUID, persists a chunkless placeholder chunk and the updated collection document
- * to the shard catalog, writes an oplog entry to invalidate secondaries, and refreshes the
- * in-memory CollectionShardingRuntime. Used for shards that participate in a tracked collection
- * but own no chunks.
- */
-void commitChunklessCollectionLocally(OperationContext* opCtx, const NamespaceString& nss);
 
 }  // namespace shard_catalog_commit
 }  // namespace mongo
