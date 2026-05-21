@@ -811,7 +811,8 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
         return makeDbResponseErrorForRateLimiting(_work->in(), status);
     }
 
-    networkCounter.hitLogicalIn(NetworkCounter::ConnectionType::kIngress, _work->in().size());
+    globalNetworkCounter().hitLogicalIn(NetworkCounter::ConnectionType::kIngress,
+                                        _work->in().size());
 
     // Pass sourced Message to handler to generate response.
     _work->initOperation();
@@ -871,7 +872,7 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     // the dbresponses continue to indicate the exhaust stream should continue.
     _nextWork = work.synthesizeExhaust(response);
 
-    networkCounter.hitLogicalOut(NetworkCounter::ConnectionType::kIngress, toSink.size());
+    globalNetworkCounter().hitLogicalOut(NetworkCounter::ConnectionType::kIngress, toSink.size());
 
     beforeCompressingExhaustResponse.executeIf(
         [&](auto&&) {}, [&](auto&&) { return work.hasCompressorId() && _nextWork; });

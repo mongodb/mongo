@@ -406,7 +406,7 @@ Future<void> CommonAsioSession::sinkMessageImpl(Message message, const BatonHand
         .then([this, message /*keep the buffer alive*/]() {
             auto connectionType = _isIngressSession ? NetworkCounter::ConnectionType::kIngress
                                                     : NetworkCounter::ConnectionType::kEgress;
-            networkCounter.hitPhysicalOut(connectionType, message.size());
+            globalNetworkCounter().hitPhysicalOut(connectionType, message.size());
         })
         .onCompletion([this](Status status) {
             _asyncOpState.complete();
@@ -712,7 +712,7 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
                                                     : NetworkCounter::ConnectionType::kEgress;
             if (msgLen == kHeaderSize) {
                 // This probably isn't a real case since all (current) messages have bodies.
-                networkCounter.hitPhysicalIn(connectionType, msgLen);
+                globalNetworkCounter().hitPhysicalIn(connectionType, msgLen);
                 return Future<Message>::makeReady(Message(std::move(headerBuffer)));
             }
 
@@ -722,7 +722,7 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
             MsgData::View msgView(buffer.get());
             return read(asio::buffer(msgView.data(), msgView.dataLen()), baton)
                 .then([this, buffer = std::move(buffer), connectionType, msgLen]() mutable {
-                    networkCounter.hitPhysicalIn(connectionType, msgLen);
+                    globalNetworkCounter().hitPhysicalIn(connectionType, msgLen);
                     return Message(std::move(buffer));
                 });
         })

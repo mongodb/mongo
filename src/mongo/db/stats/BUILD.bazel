@@ -168,6 +168,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/storage:index_entry_comparison",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util/concurrency:spin_lock",
     ],
 )
@@ -234,6 +235,18 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":opcounters",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "counters_test",
+    srcs = [
+        "counters_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":counters",
         "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )

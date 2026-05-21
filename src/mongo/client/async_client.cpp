@@ -301,7 +301,7 @@ Future<void> AsyncDBClient::_call(Message request,
                                   int32_t msgId,
                                   const BatonHandle& baton,
                                   const CancellationToken& token) {
-    networkCounter.hitLogicalOut(NetworkCounter::ConnectionType::kEgress, request.size());
+    globalNetworkCounter().hitLogicalOut(NetworkCounter::ConnectionType::kEgress, request.size());
 
     auto swm = _compressorManager.compressMessage(request);
     if (!swm.isOK()) {
@@ -344,8 +344,8 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
                 ? _compressorManager.decompressMessage(response)
                 : response;
             if (swMessage.isOK()) {
-                networkCounter.hitLogicalIn(NetworkCounter::ConnectionType::kEgress,
-                                            swMessage.getValue().size());
+                globalNetworkCounter().hitLogicalIn(NetworkCounter::ConnectionType::kEgress,
+                                                    swMessage.getValue().size());
             }
             return swMessage;
         });

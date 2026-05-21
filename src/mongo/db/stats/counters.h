@@ -37,6 +37,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/stats/opcounters.h"
 #include "mongo/db/topology/cluster_role.h"
+#include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/aligned.h"
@@ -63,6 +64,12 @@ namespace MONGO_MOD_PUBLIC mongo {
 class NetworkCounter {
 public:
     enum class ConnectionType { kIngress = 1, kEgress = 2 };
+
+    NetworkCounter();
+
+    NetworkCounter(const NetworkCounter&) = delete;
+    NetworkCounter& operator=(const NetworkCounter&) = delete;
+
     // Increment the counters for the number of bytes read directly off the wire
     void hitPhysicalIn(ConnectionType connectionType, long long bytes);
     void hitPhysicalOut(ConnectionType connectionType, long long bytes);
@@ -96,28 +103,21 @@ public:
     void append(BSONObjBuilder& b);
 
 private:
+    // Physical byte counters — not OTel-exported.
     CacheExclusive<AtomicWord<long long>> _ingressPhysicalBytesIn{0};
     CacheExclusive<AtomicWord<long long>> _ingressPhysicalBytesOut{0};
-
     CacheExclusive<AtomicWord<long long>> _egressPhysicalBytesIn{0};
     CacheExclusive<AtomicWord<long long>> _egressPhysicalBytesOut{0};
 
-    // These two counters are always incremented at the same time, so
-    // we place them on the same cache line. We use
-    // CacheCombinedExclusive to ensure that they are combined within
-    // the scope of a constructive interference region, and protected
-    // from false sharing by padding out to destructive interference
-    // size.
-    struct Together {
-        AtomicWord<long long> logicalBytesIn{0};
-        AtomicWord<long long> requests{0};
-    };
+    // Logical ingress counters.
+    otel::metrics::Counter<int64_t>& _ingressLogicalBytesIn;
+    otel::metrics::Counter<int64_t>& _ingressNumRequests;
+    otel::metrics::Counter<int64_t>& _ingressLogicalBytesOut;
 
-    CacheCombinedExclusive<Together> _ingressTogether{};
-    CacheExclusive<AtomicWord<long long>> _ingressLogicalBytesOut{0};
-
-    CacheCombinedExclusive<Together> _egressTogether{};
-    CacheExclusive<AtomicWord<long long>> _egressLogicalBytesOut{0};
+    // Logical egress counters.
+    otel::metrics::Counter<int64_t>& _egressLogicalBytesIn;
+    otel::metrics::Counter<int64_t>& _egressNumRequests;
+    otel::metrics::Counter<int64_t>& _egressLogicalBytesOut;
 
     CacheExclusive<AtomicWord<long long>> _numSlowDNSOperations{0};
     CacheExclusive<AtomicWord<long long>> _numSlowSSLOperations{0};
@@ -131,7 +131,8 @@ private:
     bool _tfoKernelSupportClient{false};
 };
 
-extern NetworkCounter networkCounter;
+/** Returns the process-global NetworkCounter. */
+NetworkCounter& globalNetworkCounter();
 
 class AuthCounter {
     struct MechanismData;

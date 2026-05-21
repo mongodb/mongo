@@ -978,7 +978,7 @@ void runTfoScenario(bool serverOn, bool clientOn, bool expectTfo) {
 
     auto extractTfoAccepted = [] {
         BSONObjBuilder bob;
-        networkCounter.append(bob);
+        globalNetworkCounter().append(bob);
         auto obj = bob.obj();
         auto accepted = obj["tcpFastOpen"]["accepted"].numberInt();
         return std::pair{accepted, obj};

@@ -34,6 +34,10 @@
 #include "mongo/client/authenticate.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/util/static_immortal.h"
 
 #include <tuple>
 
@@ -43,6 +47,35 @@
 
 namespace mongo {
 
+using ::mongo::otel::metrics::MetricNames;
+using ::mongo::otel::metrics::MetricsService;
+using ::mongo::otel::metrics::MetricUnit;
+
+NetworkCounter::NetworkCounter()
+    : _ingressLogicalBytesIn(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkIngressBytesIn,
+          "Total number of logical bytes received from ingress (wire-protocol) clients.",
+          MetricUnit::kBytes)),
+      _ingressNumRequests(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkIngressNumRequests,
+          "Total number of requests received from ingress (wire-protocol) clients.",
+          MetricUnit::kOperations)),
+      _ingressLogicalBytesOut(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkIngressBytesOut,
+          "Total number of logical bytes sent to ingress (wire-protocol) clients.",
+          MetricUnit::kBytes)),
+      _egressLogicalBytesIn(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkEgressBytesIn,
+          "Total number of logical bytes received on egress (outbound client) connections.",
+          MetricUnit::kBytes)),
+      _egressNumRequests(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkEgressNumRequests,
+          "Total number of requests sent on egress (outbound client) connections.",
+          MetricUnit::kOperations)),
+      _egressLogicalBytesOut(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkEgressBytesOut,
+          "Total number of logical bytes sent on egress (outbound client) connections.",
+          MetricUnit::kBytes)) {}
 
 void NetworkCounter::hitPhysicalIn(ConnectionType connectionType, long long bytes) {
     static const int64_t MAX = 1ULL << 60;
@@ -75,36 +108,23 @@ void NetworkCounter::hitPhysicalOut(ConnectionType connectionType, long long byt
 }
 
 void NetworkCounter::hitLogicalIn(ConnectionType connectionType, long long bytes) {
-    static const int64_t MAX = 1ULL << 60;
-    auto& ref = connectionType == ConnectionType::kIngress ? _ingressTogether : _egressTogether;
-
-    // don't care about the race as its just a counter
-    const bool overflow = ref->logicalBytesIn.loadRelaxed() > MAX;
-
-    if (overflow) {
-        ref->logicalBytesIn.store(bytes);
-        // The requests field only gets incremented here (and not in hitPhysical) because the
-        // hitLogical and hitPhysical are each called for each operation. Incrementing it in both
-        // functions would double-count the number of operations.
-        ref->requests.store(1);
+    // The requests field only gets incremented here (and not in hitPhysical) because
+    // hitLogical and hitPhysical are each called for each operation. Incrementing it in both
+    // functions would double-count the number of operations.
+    if (connectionType == ConnectionType::kIngress) {
+        _ingressLogicalBytesIn.add(bytes);
+        _ingressNumRequests.add(1);
     } else {
-        ref->logicalBytesIn.fetchAndAdd(bytes);
-        ref->requests.fetchAndAdd(1);
+        _egressLogicalBytesIn.add(bytes);
+        _egressNumRequests.add(1);
     }
 }
 
 void NetworkCounter::hitLogicalOut(ConnectionType connectionType, long long bytes) {
-    static const int64_t MAX = 1ULL << 60;
-    auto& ref = connectionType == ConnectionType::kIngress ? _ingressLogicalBytesOut
-                                                           : _egressLogicalBytesOut;
-
-    // don't care about the race as its just a counter
-    const bool overflow = ref->loadRelaxed() > MAX;
-
-    if (overflow) {
-        ref->store(bytes);
+    if (connectionType == ConnectionType::kIngress) {
+        _ingressLogicalBytesOut.add(bytes);
     } else {
-        ref->fetchAndAdd(bytes);
+        _egressLogicalBytesOut.add(bytes);
     }
 }
 
@@ -121,26 +141,24 @@ void NetworkCounter::acceptedTFOIngress() {
 }
 
 void NetworkCounter::append(BSONObjBuilder& b) {
-    b.append("bytesIn", static_cast<long long>(_ingressTogether->logicalBytesIn.loadRelaxed()));
-    b.append("bytesOut", static_cast<long long>(_ingressLogicalBytesOut->loadRelaxed()));
+    b.append("bytesIn", _ingressLogicalBytesIn.valueForLegacyUse());
+    b.append("bytesOut", _ingressLogicalBytesOut.valueForLegacyUse());
     b.append("physicalBytesIn", static_cast<long long>(_ingressPhysicalBytesIn->loadRelaxed()));
     b.append("physicalBytesOut", static_cast<long long>(_ingressPhysicalBytesOut->loadRelaxed()));
 
     BSONObjBuilder egressBuilder(b.subobjStart("egress"));
-    egressBuilder.append("bytesIn",
-                         static_cast<long long>(_egressTogether->logicalBytesIn.loadRelaxed()));
-    egressBuilder.append("bytesOut", static_cast<long long>(_egressLogicalBytesOut->loadRelaxed()));
+    egressBuilder.append("bytesIn", _egressLogicalBytesIn.valueForLegacyUse());
+    egressBuilder.append("bytesOut", _egressLogicalBytesOut.valueForLegacyUse());
     egressBuilder.append("physicalBytesIn",
                          static_cast<long long>(_egressPhysicalBytesIn->loadRelaxed()));
     egressBuilder.append("physicalBytesOut",
                          static_cast<long long>(_egressPhysicalBytesOut->loadRelaxed()));
-    egressBuilder.append("numRequests",
-                         static_cast<long long>(_egressTogether->requests.loadRelaxed()));
+    egressBuilder.append("numRequests", _egressNumRequests.valueForLegacyUse());
     egressBuilder.done();
 
     b.append("numSlowDNSOperations", static_cast<long long>(_numSlowDNSOperations->loadRelaxed()));
     b.append("numSlowSSLOperations", static_cast<long long>(_numSlowSSLOperations->loadRelaxed()));
-    b.append("numRequests", static_cast<long long>(_ingressTogether->requests.loadRelaxed()));
+    b.append("numRequests", _ingressNumRequests.valueForLegacyUse());
 
     BSONObjBuilder tfo;
 #ifdef __linux__
@@ -150,6 +168,11 @@ void NetworkCounter::append(BSONObjBuilder& b) {
     tfo.append("clientSupported", _tfoKernelSupportClient);
     tfo.append("accepted", _tfoAccepted->loadRelaxed());
     b.append("tcpFastOpen", tfo.obj());
+}
+
+NetworkCounter& globalNetworkCounter() {
+    static StaticImmortal<NetworkCounter> instance;
+    return *instance;
 }
 
 const std::vector<std::string> kAllMechanisms{std::string(auth::kMechanismMongoX509),
@@ -325,7 +348,6 @@ void AuthCounter::append(BSONObjBuilder* b) {
 }
 
 
-NetworkCounter networkCounter;
 AuthCounter authCounter;
 AggStageCounters aggStageCounters{"aggStageCounters."};
 DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;

@@ -340,7 +340,7 @@ struct NetworkConnectionStats {
 
     static NetworkConnectionStats get(NetworkCounter::ConnectionType type) {
         BSONObjBuilder bob;
-        networkCounter.append(bob);
+        globalNetworkCounter().append(bob);
         BSONObj metrics = bob.obj();
         if (type == NetworkCounter::ConnectionType::kEgress) {
             metrics = metrics.getField("egress").Obj().getOwned();

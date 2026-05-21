@@ -138,14 +138,14 @@ bool tryTcpSockOpt(int opt, int val) {
 
 /**
  * Probe the socket API support for TFO-related options on TCP sockets, and
- * record the results in the global `networkCounter` object.
+ * record the results in the global network counter object.
  */
 void checkRelevantSocketOptionsAccepted() {
 #ifdef TCP_FASTOPEN
-    networkCounter.setTFOServerSupport(tryTcpSockOpt(TCP_FASTOPEN, 1));
+    globalNetworkCounter().setTFOServerSupport(tryTcpSockOpt(TCP_FASTOPEN, 1));
 #endif
 #ifdef TCP_FASTOPEN_CONNECT
-    networkCounter.setTFOClientSupport(tryTcpSockOpt(TCP_FASTOPEN_CONNECT, 1));
+    globalNetworkCounter().setTFOClientSupport(tryTcpSockOpt(TCP_FASTOPEN_CONNECT, 1));
 #endif
 }
 
@@ -204,7 +204,7 @@ void checkEnabledByKernel(bool srv, bool cli) {
 
     int64_t k;  // The kernel setting.
     f >> k;
-    networkCounter.setTFOKernelSetting(k);
+    globalNetworkCounter().setTFOKernelSetting(k);
 
     // Return an integer composed of all bits from 'm' that are missing from 'x'.
     auto maskBitsMissing = [](uint64_t x, uint64_t m) {

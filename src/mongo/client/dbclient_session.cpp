@@ -536,7 +536,7 @@ Message DBClientSession::_call(Message& toSend, string* actualServer) {
         OpMsg::appendChecksum(&toSend);
 #endif
     }
-    networkCounter.hitLogicalOut(NetworkCounter::ConnectionType::kEgress, toSend.size());
+    globalNetworkCounter().hitLogicalOut(NetworkCounter::ConnectionType::kEgress, toSend.size());
     auto swm = _compressorManager.compressMessage(toSend);
     uassertStatusOK(swm.getStatus());
 
@@ -568,7 +568,7 @@ Message DBClientSession::_call(Message& toSend, string* actualServer) {
     if (response.operation() == dbCompressed) {
         response = uassertStatusOK(_compressorManager.decompressMessage(response));
     }
-    networkCounter.hitLogicalIn(NetworkCounter::ConnectionType::kEgress, response.size());
+    globalNetworkCounter().hitLogicalIn(NetworkCounter::ConnectionType::kEgress, response.size());
 
     killSessionOnError.dismiss();
     return response;

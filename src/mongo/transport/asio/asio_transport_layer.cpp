@@ -925,7 +925,7 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
     Milliseconds dnsResolveLatency = Date_t::now() - timeBefore;
     _dnsResolveStatsMillis.record(durationCount<Milliseconds>(dnsResolveLatency));
     if (dnsResolveLatency > kSlowOperationThreshold) {
-        networkCounter.incrementNumSlowDNSOperations();
+        globalNetworkCounter().incrementNumSlowDNSOperations();
     }
 
     if (!swEndpoints.isOK()) {
@@ -995,7 +995,7 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
         Date_t timeAfter = Date_t::now();
 
         if (timeAfter - timeBefore > kSlowOperationThreshold) {
-            networkCounter.incrementNumSlowSSLOperations();
+            globalNetworkCounter().incrementNumSlowSSLOperations();
         }
 
         if (finishLine->arriveStrongly()) {
@@ -1210,7 +1210,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                                   "DNS resolution while connecting to peer was slow",
                                   "peer"_attr = connector->peer,
                                   "duration"_attr = resolveLatency);
-                    networkCounter.incrementNumSlowDNSOperations();
+                    globalNetworkCounter().incrementNumSlowDNSOperations();
                 }
 
                 std::lock_guard<std::mutex> lk(connector->mutex);
@@ -1278,7 +1278,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                         connectionMetrics->onTLSHandshakeFinished();
 
                         if (duration > kSlowOperationThreshold) {
-                            networkCounter.incrementNumSlowSSLOperations();
+                            globalNetworkCounter().incrementNumSlowSSLOperations();
                         }
                         return Status::OK();
                     });
@@ -1642,7 +1642,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
             TcpInfoOption tcpi{};
             peerSocket.get_option(tcpi);
             if (tcpi->tcpi_options & TCPI_OPT_SYN_DATA)
-                networkCounter.acceptedTFOIngress();
+                globalNetworkCounter().acceptedTFOIngress();
         } catch (const asio::system_error&) {
         }
 #endif

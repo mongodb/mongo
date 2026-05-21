@@ -67,7 +67,7 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder b;
-        networkCounter.append(b);
+        globalNetworkCounter().append(b);
         appendMessageCompressionStats(&b);
 
 

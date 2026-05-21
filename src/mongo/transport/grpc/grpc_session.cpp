@@ -177,8 +177,8 @@ IngressSession::~IngressSession() {
 
 StatusWith<Message> IngressSession::_readFromStream() {
     if (auto maybeBuffer = _stream->read()) {
-        networkCounter.hitPhysicalIn(NetworkCounter::ConnectionType::kIngress,
-                                     MsgData::ConstView(maybeBuffer->get()).getLen());
+        globalNetworkCounter().hitPhysicalIn(NetworkCounter::ConnectionType::kIngress,
+                                             MsgData::ConstView(maybeBuffer->get()).getLen());
         return Message(std::move(*maybeBuffer));
     }
 
@@ -194,7 +194,8 @@ StatusWith<Message> IngressSession::_readFromStream() {
 
 Status IngressSession::_writeToStream(Message message) {
     if (_stream->write(message.sharedBuffer())) {
-        networkCounter.hitPhysicalOut(NetworkCounter::ConnectionType::kIngress, message.size());
+        globalNetworkCounter().hitPhysicalOut(NetworkCounter::ConnectionType::kIngress,
+                                              message.size());
         return Status::OK();
     }
 
@@ -293,8 +294,8 @@ Future<Message> EgressSession::_asyncReadFromStream() {
         })
         .then([this, msg = std::move(msg)]() {
             _updateWireVersion();
-            networkCounter.hitPhysicalIn(NetworkCounter::ConnectionType::kEgress,
-                                         MsgData::ConstView(msg->get()).getLen());
+            globalNetworkCounter().hitPhysicalIn(NetworkCounter::ConnectionType::kEgress,
+                                                 MsgData::ConstView(msg->get()).getLen());
             return Message(std::move(*msg));
         });
 }
@@ -318,7 +319,7 @@ Future<void> EgressSession::_asyncWriteToStream(Message message) {
             });
         })
         .then([msgLen]() {
-            networkCounter.hitPhysicalOut(NetworkCounter::ConnectionType::kEgress, msgLen);
+            globalNetworkCounter().hitPhysicalOut(NetworkCounter::ConnectionType::kEgress, msgLen);
         });
 }
 

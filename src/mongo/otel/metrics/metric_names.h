@@ -91,6 +91,18 @@ class MONGO_MOD_FILE_PRIVATE MetricNameMaker{public : static constexpr MetricNam
 class MetricNames {
 public:
     // Networking & Observability Team Metrics
+    static constexpr MetricName kNetworkIngressBytesIn =
+        MetricNameMaker::make("serverStatus.network.bytesIn");
+    static constexpr MetricName kNetworkIngressBytesOut =
+        MetricNameMaker::make("serverStatus.network.bytesOut");
+    static constexpr MetricName kNetworkIngressNumRequests =
+        MetricNameMaker::make("serverStatus.network.numRequests");
+    static constexpr MetricName kNetworkEgressBytesIn =
+        MetricNameMaker::make("serverStatus.network.egress.bytesIn");
+    static constexpr MetricName kNetworkEgressBytesOut =
+        MetricNameMaker::make("serverStatus.network.egress.bytesOut");
+    static constexpr MetricName kNetworkEgressNumRequests =
+        MetricNameMaker::make("serverStatus.network.egress.numRequests");
     static constexpr MetricName kPrometheusFileExporterWrites =
         MetricNameMaker::make("metrics.prometheus_file_exporter.writes");
     static constexpr MetricName kPrometheusFileExporterWritesFailed =
