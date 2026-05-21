@@ -1122,7 +1122,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx,
 Status MultiIndexBlock::dumpInsertsFromBulk(
     OperationContext* opCtx,
     const CollectionAcquisition& collection,
-    const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord) {
+    const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord) try {
     opCtx->checkForInterrupt();
     invariant(!_buildIsCleanedUp);
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
@@ -1140,12 +1140,8 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
 
     // Finalize all builders (which may perform a final spill) before transitioning to the load
     // phase.
-    try {
-        for (auto&& index : _indexes) {
-            index.bulk->done();
-        }
-    } catch (...) {
-        return exceptionToStatus();
+    for (auto&& index : _indexes) {
+        index.bulk->done();
     }
 
     _phase = IndexBuildPhaseEnum::kBulkLoad;
@@ -1171,105 +1167,95 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                     "index"_attr = entry->descriptor()->indexName(),
                     "buildUUID"_attr = _buildUUID);
 
-        // SERVER-41918 This call to bulk->commit() results in file I/O that may result in an
-        // exception.
-        try {
-            const IndexCatalogEntry* entry =
-                _indexes[i].block->getEntry(opCtx, collection.getCollectionPtr());
+        /**
+         * Abandon the current snapshot and release then reacquire locks. Tests that target the
+         * behavior of bulk index builds that yield can use failpoints to stall this yield.
+         */
+        const auto yieldFn = [&collection, indexIdent = entry->getIdent()](OperationContext* opCtx)
+            -> std::pair<const CollectionPtr*, const IndexCatalogEntry*> {
+            // Releasing locks means a new snapshot should be acquired when restored.
+            auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx);
+            shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
-            /**
-             * Abandon the current snapshot and release then reacquire locks. Tests that target the
-             * behavior of bulk index builds that yield can use failpoints to stall this yield.
-             */
-            const auto yieldFn = [&collection,
-                                  indexIdent = entry->getIdent()](OperationContext* opCtx)
-                -> std::pair<const CollectionPtr*, const IndexCatalogEntry*> {
-                // Releasing locks means a new snapshot should be acquired when restored.
-                auto yieldedTransactionResources =
-                    yieldTransactionResourcesFromOperationContext(opCtx);
-                shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+            // Track the number of yields in CurOp.
+            CurOp::get(opCtx)->yielded();
 
-                // Track the number of yields in CurOp.
-                CurOp::get(opCtx)->yielded();
-
-                auto failPointHang = [opCtx, ns = collection.nss()](FailPoint* fp) {
-                    fp->executeIf(
-                        [fp](auto&&) {
-                            LOGV2(5180600, "Hanging index build during bulk load yield");
-                            fp->pauseWhileSet();
-                        },
-                        [opCtx, &ns](auto&& config) {
-                            return NamespaceStringUtil::parseFailPointData(config, "namespace") ==
-                                ns;
-                        });
-                };
-                failPointHang(&hangDuringIndexBuildBulkLoadYield);
-                failPointHang(&hangDuringIndexBuildBulkLoadYieldSecond);
-
-                restoreTransactionResourcesToOperationContext(
-                    opCtx, std::move(yieldedTransactionResources));
-
-                // After yielding, the latest instance of the collection is fetched and can be
-                // different from the collection instance prior to yielding. For this reason we need
-                // to refresh the index entry pointer.
-                if (!collection.exists()) {
-                    return {&collection.getCollectionPtr(), nullptr};
-                }
-
-                return {&collection.getCollectionPtr(),
-                        collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(
-                            opCtx, indexIdent, IndexCatalog::InclusionPolicy::kUnfinished)};
+            auto failPointHang = [opCtx, ns = collection.nss()](FailPoint* fp) {
+                fp->executeIf(
+                    [fp](auto&&) {
+                        LOGV2(5180600, "Hanging index build during bulk load yield");
+                        fp->pauseWhileSet();
+                    },
+                    [opCtx, &ns](auto&& config) {
+                        return NamespaceStringUtil::parseFailPointData(config, "namespace") == ns;
+                    });
             };
+            failPointHang(&hangDuringIndexBuildBulkLoadYield);
+            failPointHang(&hangDuringIndexBuildBulkLoadYieldSecond);
 
-            const bool periodicResumeStateWrites =
-                _isResumable && _containerWriteBehavior == ContainerWriteBehavior::kReplicate;
-            Status status = _indexes[i].bulk->commit(
-                opCtx,
-                *shard_role_details::getRecoveryUnit(opCtx),
-                &collection.getCollectionPtr(),
-                entry,
-                dupsAllowed,
-                kYieldIterations,
-                [&](const CollectionPtr& coll, const key_string::View& duplicateKey) {
-                    // Do not record duplicates when explicitly ignored. This may be the case on
-                    // secondaries.
-                    if (!dupsAllowed || onDuplicateRecord || _ignoreUnique ||
-                        !entry->indexBuildInterceptor()) {
-                        return Status::OK();
-                    }
-                    return writeConflictRetry(
-                        opCtx, "recordingDuplicateKey", entry->getNSSFromCatalog(opCtx), [&] {
-                            WriteUnitOfWork wuow(opCtx);
-                            Status status = entry->indexBuildInterceptor()->recordDuplicateKey(
-                                opCtx, coll, entry, duplicateKey);
-                            if (status.isOK()) {
-                                wuow.commit();
-                            }
-                            return status;
-                        });
-                },
-                onDuplicateRecord,
-                yieldFn,
-                periodicResumeStateWrites ? IndexAccessMethod::OnNKeysLoadedFn(
-                                                [this, opCtx] { _writeStateToContainer(opCtx); })
-                                          : IndexAccessMethod::OnNKeysLoadedFn([]() {}),
-                primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys.load(),
-                (this->_containerWriteBehavior == ContainerWriteBehavior::kReplicate)
-                    ? primaryDrivenIndexBuildIndexInsertionBatchSize.load()
-                    : 1,
-                (this->_containerWriteBehavior == ContainerWriteBehavior::kReplicate)
-                    ? primaryDrivenIndexBuildIndexInsertionBatchBytes.load()
-                    : std::numeric_limits<size_t>::max());
+            restoreTransactionResourcesToOperationContext(opCtx,
+                                                          std::move(yieldedTransactionResources));
 
-            if (!status.isOK()) {
-                return status;
+            // After yielding, the latest instance of the collection is fetched and can be
+            // different from the collection instance prior to yielding. For this reason we need
+            // to refresh the index entry pointer.
+            if (!collection.exists()) {
+                return {&collection.getCollectionPtr(), nullptr};
             }
-        } catch (...) {
-            return exceptionToStatus();
+
+            return {&collection.getCollectionPtr(),
+                    collection.getCollectionPtr()->getIndexCatalog()->findIndexByIdent(
+                        opCtx, indexIdent, IndexCatalog::InclusionPolicy::kUnfinished)};
+        };
+
+        const bool periodicResumeStateWrites =
+            _isResumable && _containerWriteBehavior == ContainerWriteBehavior::kReplicate;
+        Status status = _indexes[i].bulk->commit(
+            opCtx,
+            *shard_role_details::getRecoveryUnit(opCtx),
+            &collection.getCollectionPtr(),
+            entry,
+            dupsAllowed,
+            kYieldIterations,
+            [&](const CollectionPtr& coll, const key_string::View& duplicateKey) {
+                // Do not record duplicates when explicitly ignored. This may be the case on
+                // secondaries.
+                if (!dupsAllowed || onDuplicateRecord || _ignoreUnique ||
+                    !entry->indexBuildInterceptor()) {
+                    return Status::OK();
+                }
+                return writeConflictRetry(
+                    opCtx, "recordingDuplicateKey", entry->getNSSFromCatalog(opCtx), [&] {
+                        WriteUnitOfWork wuow(opCtx);
+                        Status status = entry->indexBuildInterceptor()->recordDuplicateKey(
+                            opCtx, coll, entry, duplicateKey);
+                        if (status.isOK()) {
+                            wuow.commit();
+                        }
+                        return status;
+                    });
+            },
+            onDuplicateRecord,
+            yieldFn,
+            periodicResumeStateWrites ? IndexAccessMethod::OnNKeysLoadedFn(
+                                            [this, opCtx] { _writeStateToContainer(opCtx); })
+                                      : IndexAccessMethod::OnNKeysLoadedFn([]() {}),
+            primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys.load(),
+            (this->_containerWriteBehavior == ContainerWriteBehavior::kReplicate)
+                ? primaryDrivenIndexBuildIndexInsertionBatchSize.load()
+                : 1,
+            (this->_containerWriteBehavior == ContainerWriteBehavior::kReplicate)
+                ? primaryDrivenIndexBuildIndexInsertionBatchBytes.load()
+                : std::numeric_limits<size_t>::max());
+
+        if (!status.isOK()) {
+            return status;
         }
     }
 
     return Status::OK();
+} catch (...) {
+    return exceptionToStatus();
 }
 
 Status MultiIndexBlock::drainBackgroundWrites(
