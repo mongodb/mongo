@@ -2362,6 +2362,177 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
     resumedIndexer.abortIndexBuild(operationContext(), coll, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+TEST_F(MultiIndexBlockTest, PdibResumedScanSkipsRecordsAtOrBeforePerIndexLastSpilledRecordId) {
+    RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};
+    RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
+                                                     true};
+
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
+
+    promoteMockReplCoordToPrimary(getServiceContext());
+
+    auto buildUUID = UUID::gen();
+    auto configurePdib = [&](MultiIndexBlock& idx) {
+        idx.setBuildUUID(buildUUID);
+        idx.setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+        idx.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+        idx.setIsResumable(true);
+    };
+
+    auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
+    auto makeInfo = [&](StringData field, StringData ident) {
+        return IndexBuildInfo{BSON("key" << BSON(field << 1) << "name"
+                                         << (std::string(field) + "_1") << "v"
+                                         << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                              std::string(ident),
+                              engine};
+    };
+    std::vector<IndexBuildInfo> infos{
+        makeInfo("a", "index-1"), makeInfo("b", "index-2"), makeInfo("c", "index-3")};
+
+    // The setup runs phase 1 with `initialDocs` docs, capturing a real ResumeIndexInfo whose
+    // originalLastSpilled falls in (0, initialDocs]. Then `extraDocs` more docs are inserted before
+    // resume, so the resumed scan has records originalLastSpilled+1..totalDocs available to
+    // differentiate per-index skip behavior. Choosing offsets 0, 3, 6 ensures
+    // originalLastSpilled + 6 < totalDocs for any originalLastSpilled in (0, initialDocs] = (0,
+    // 20].
+    constexpr auto initialDocs = 20;
+    constexpr auto extraDocs = 10;
+    constexpr auto totalDocs = initialDocs + extraDocs;
+
+    boost::optional<ResumeIndexInfo> resumeInfo;
+    {
+        AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
+        CollectionWriter coll{operationContext(), autoColl};
+
+        {
+            WriteUnitOfWork wuow{operationContext()};
+            std::string val(64 * 1024, 'a');
+            for (auto i = 0; i < initialDocs; ++i) {
+                ASSERT_OK(
+                    Helpers::insert(operationContext(),
+                                    *autoColl,
+                                    BSON("_id" << i << "a" << val << "b" << val << "c" << val)));
+            }
+            wuow.commit();
+        }
+
+        auto& indexer = *getIndexer();
+        configurePdib(indexer);
+        ASSERT_OK(indexer.init(operationContext(),
+                               coll,
+                               infos,
+                               MultiIndexBlock::kNoopOnInitFn,
+                               MultiIndexBlock::InitMode::SteadyState,
+                               boost::none));
+
+        // Run phase 1 to completion. The three indexes share a small per-index memory budget, so
+        // the sorters spill repeatedly during the scan; the last spill captures
+        // lastSpilledRecordId = originalLastSpilled for some value in (0, initialDocs].
+        ASSERT_OK(indexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+        auto indexBuildIdent = ident::generateNewIndexBuildIdent(buildUUID);
+        shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
+        resumeInfo =
+            index_builds::readAndParseResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
+        ASSERT_TRUE(resumeInfo);
+        ASSERT_EQ(resumeInfo->getIndexes().size(), infos.size());
+
+        indexer.markAsCleanedUp();
+    }
+
+    // Insert `extraDocs` more documents so the resumed scan sees records beyond
+    // originalLastSpilled. These docs exist on disk but aren't represented in any sorter's spilled
+    // state.
+    {
+        AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
+        WriteUnitOfWork wuow{operationContext()};
+        std::string val(64 * 1024, 'a');
+        for (auto i = initialDocs; i < totalDocs; ++i) {
+            ASSERT_OK(Helpers::insert(operationContext(),
+                                      *autoColl,
+                                      BSON("_id" << i << "a" << val << "b" << val << "c" << val)));
+        }
+        wuow.commit();
+    }
+
+    auto persistedIndexes = resumeInfo->getIndexes();
+    ASSERT_TRUE(persistedIndexes[0].getLastSpilledRecordId());
+    auto originalLastSpilled = persistedIndexes[0].getLastSpilledRecordId()->getLong();
+
+    // The expected per-index numEntries below is originalLastSpilled pre-existing spilled keys plus
+    // `totalDocs - mutated` keys added by the resumed scan, which simplifies to
+    // `totalDocs - offset` independent of originalLastSpilled. Offsets 0, 3, 6 keep the test stable
+    // for any originalLastSpilled in (0, initialDocs].
+    ASSERT_GTE(originalLastSpilled, 1);
+    ASSERT_LE(originalLastSpilled, initialDocs);
+
+    persistedIndexes[0].setLastSpilledRecordId(RecordId{originalLastSpilled});
+    persistedIndexes[1].setLastSpilledRecordId(RecordId{originalLastSpilled + 3});
+    persistedIndexes[2].setLastSpilledRecordId(RecordId{originalLastSpilled + 6});
+    resumeInfo->setIndexes(std::move(persistedIndexes));
+
+    MultiIndexBlock resumedIndexer;
+    configurePdib(resumedIndexer);
+    {
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(getNSS(),
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        CollectionWriter collWriter{operationContext(), &coll};
+        ASSERT_OK(resumedIndexer.init(operationContext(),
+                                      collWriter,
+                                      infos,
+                                      MultiIndexBlock::kNoopOnInitFn,
+                                      MultiIndexBlock::InitMode::SteadyState,
+                                      resumeInfo));
+    }
+
+    // Resume the collection scan from the beginning.
+    ASSERT_OK(resumedIndexer.insertAllDocumentsInCollection(operationContext(), getNSS()));
+
+    // Per-index numEntries = originalLastSpilled (pre-existing spilled keys) + (totalDocs -
+    // mutated) keys added by the resumed scan. With mutated_i = originalLastSpilled + offset_i,
+    // this collapses to totalDocs - offset_i, independent of originalLastSpilled.
+    {
+        auto coll = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(getNSS(),
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        auto numEntries = [&](StringData name) {
+            auto* entry = coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(
+                operationContext(), name, IndexCatalog::InclusionPolicy::kUnfinished);
+            ASSERT(entry);
+            return entry->accessMethod()->asSortedData()->getSortedDataInterface()->numEntries(
+                operationContext(), *shard_role_details::getRecoveryUnit(operationContext()));
+        };
+        EXPECT_EQ(numEntries("a_1"), totalDocs);
+        EXPECT_EQ(numEntries("b_1"), totalDocs - 3);
+        EXPECT_EQ(numEntries("c_1"), totalDocs - 6);
+    }
+
+    {
+        auto collForAbort = acquireCollection(
+            operationContext(),
+            CollectionAcquisitionRequest(getNSS(),
+                                         PlacementConcern::kPretendUnsharded,
+                                         repl::ReadConcernArgs::get(operationContext()),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        CollectionWriter collWriter{operationContext(), &collForAbort};
+        resumedIndexer.abortIndexBuild(
+            operationContext(), collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
+    }
+}
+
 TEST_F(MultiIndexBlockTest, ResumeRestoresLastSpilledRecordId) {
     RAIIServerParameterControllerForTest ffContainerWrites{"featureFlagContainerWrites", true};
     RAIIServerParameterControllerForTest ffPDIB{"featureFlagPrimaryDrivenIndexBuilds", true};

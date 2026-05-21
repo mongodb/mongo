@@ -1084,6 +1084,10 @@ Status MultiIndexBlock::_insert(
     _lastRecordIdInserted = loc;
 
     for (size_t i = 0; i < _indexes.size(); i++) {
+        if (_indexes[i].lastSpilledRecordId && loc <= *_indexes[i].lastSpilledRecordId) {
+            // This record was already inserted for this index.
+            continue;
+        }
         if (_indexes[i].filterExpression &&
             !exec::matcher::matchesBSON(_indexes[i].filterExpression, doc)) {
             continue;
