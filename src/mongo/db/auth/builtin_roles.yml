@@ -371,6 +371,7 @@ roles:
           - cleanupOrphaned
           - getDefaultRWConcern # clusterMonitor gets this also
           - blockReplicaSetWrites
+          - bypassReplicaSetWriteBlocking
           - setDefaultRWConcern
           - setFeatureCompatibilityVersion
           - setClusterParameter

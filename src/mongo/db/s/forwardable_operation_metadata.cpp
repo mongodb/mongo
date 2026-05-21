@@ -38,8 +38,10 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/client.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/stats/direct_system_buckets_access.h"
-#include "mongo/db/topology/user_write_block/write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/telemetry_context_serialization.h"
@@ -88,6 +90,12 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
 
     setMayBypassWriteBlocking(WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
 
+    const auto fcvSnap = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (feature_flags::gFeatureFlagBlockReplicaSetWrites.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx), fcvSnap)) {
+        setMayBypassReplicaSetWriteBlocking(ReplicaSetWriteBlockBypass::get(opCtx).isEnabled());
+    }
+
     setRawData(isRawDataOperation(opCtx));
 
     setIsDirectSystemBucketsAccess(isDirectSystemBucketsAccess(opCtx));
@@ -120,6 +128,8 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
     }
 
     WriteBlockBypass::get(opCtx).set(getMayBypassWriteBlocking());
+
+    ReplicaSetWriteBlockBypass::get(opCtx).set(getMayBypassReplicaSetWriteBlocking());
 
     isRawDataOperation(opCtx) = getRawData();
 

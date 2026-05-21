@@ -50,7 +50,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
-#include "mongo/db/topology/user_write_block/user_writes_recoverable_critical_section_service.h"
+#include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"

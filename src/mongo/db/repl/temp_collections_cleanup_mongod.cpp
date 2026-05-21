@@ -33,7 +33,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/topology/user_write_block/write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication

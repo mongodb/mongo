@@ -60,6 +60,20 @@ idl_generator(
     src = "sharding_feature_flags.idl",
 )
 
+mongo_cc_library(
+    name = "sharding_feature_flags",
+    srcs = [
+        "sharding_feature_flags.cpp",
+        ":sharding_feature_flags_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_options",
+        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
+    ],
+)
+
 idl_generator(
     name = "sharding_types_gen",
     src = "sharding_types.idl",

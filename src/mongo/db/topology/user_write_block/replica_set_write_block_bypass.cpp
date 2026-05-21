@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/topology/user_write_block/write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
@@ -41,37 +42,39 @@
 namespace mongo {
 
 namespace {
-static const auto getWriteBlockBypass = OperationContext::declareDecoration<WriteBlockBypass>();
+const auto getReplicaSetWriteBlockBypass =
+    OperationContext::declareDecoration<ReplicaSetWriteBlockBypass>();
 }
 
-bool WriteBlockBypass::isWriteBlockBypassEnabled() const {
-    return _writeBlockBypassEnabled;
+bool ReplicaSetWriteBlockBypass::isEnabled() const {
+    return _enabled;
 }
 
-void WriteBlockBypass::setFromMetadata(OperationContext* opCtx, boost::optional<bool> val) {
+void ReplicaSetWriteBlockBypass::setFromMetadata(OperationContext* opCtx,
+                                                 boost::optional<bool> val) {
     auto as = AuthorizationSession::get(opCtx->getClient());
 
-    // The caller should ensure those preconditions are met
+    // The caller should ensure those preconditions are met.
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(
         !val.has_value() ||
         as->isAuthorizedForActionsOnResource(
             ResourcePattern::forClusterResource(as->getUserTenantId()), ActionType::internal));
 
-    // If the mayBypassWriteBlocking field is set, set our state from that field.
+    // If the mayBypassReplicaSetWriteBlocking field is set, set our state from that field.
     // Otherwise, set our state based on the AuthorizationSession state.
-    set(val.has_value() ? *val : as->mayBypassWriteBlockingMode());
+    set(val.has_value() ? *val : as->mayBypassReplicaSetWriteBlocking());
 }
 
-void WriteBlockBypass::set(bool bypassEnabled) {
-    _writeBlockBypassEnabled = bypassEnabled;
+void ReplicaSetWriteBlockBypass::set(bool bypassEnabled) {
+    _enabled = bypassEnabled;
 }
 
-void WriteBlockBypass::writeAsMetadata(BSONObjBuilder* builder) {
-    builder->append(fieldName(), _writeBlockBypassEnabled);
+void ReplicaSetWriteBlockBypass::writeAsMetadata(BSONObjBuilder* builder) {
+    builder->append(GenericArguments::kMayBypassReplicaSetWriteBlockingFieldName, _enabled);
 }
 
-WriteBlockBypass& WriteBlockBypass::get(OperationContext* opCtx) {
-    return getWriteBlockBypass(opCtx);
+ReplicaSetWriteBlockBypass& ReplicaSetWriteBlockBypass::get(OperationContext* opCtx) {
+    return getReplicaSetWriteBlockBypass(opCtx);
 }
 }  // namespace mongo

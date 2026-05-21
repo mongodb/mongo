@@ -122,7 +122,6 @@ public:
 
     // Should be called at the beginning of every new request.  This performs the checks
     // necessary to determine if localhost connections should be given full access.
-    // TODO: try to eliminate the need for this call.
     virtual void startRequest(OperationContext* opCtx) = 0;
 
     /**
@@ -298,6 +297,10 @@ public:
     // Returns true if any user has the privilege to bypass write blocking mode for the cluster
     // resource.
     virtual bool mayBypassWriteBlockingMode() const = 0;
+
+    // Returns true if any user has the privilege to bypass replica set write blocking mode for the
+    // cluster resource.
+    virtual bool mayBypassReplicaSetWriteBlocking() const = 0;
 
     // Returns true if the authorization session is expired. When this returns true,
     // isAuthenticated() is also expected to return false.

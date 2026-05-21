@@ -50,7 +50,7 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/user_write_block/set_user_write_block_mode_gen.h"
-#include "mongo/db/topology/user_write_block/user_writes_recoverable_critical_section_service.h"
+#include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"

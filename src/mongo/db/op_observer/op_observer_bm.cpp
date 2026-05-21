@@ -50,6 +50,7 @@
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/timeseries/timeseries_op_observer.h"
 #include "mongo/db/topology/cluster_parameters/cluster_server_parameter_op_observer.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_op_observer.h"
 #include "mongo/db/topology/user_write_block/user_write_block_mode_op_observer.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/platform/compiler.h"
@@ -92,6 +93,7 @@ void setUpObservers(ServiceContext* serviceContext,
         opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
+        opObserverRegistry->addObserver(std::make_unique<ReplicaSetWriteBlockOpObserver>());
 
         if (!gMultitenancySupport) {
             opObserverRegistry->addObserver(
@@ -114,6 +116,7 @@ void setUpObservers(ServiceContext* serviceContext,
         opObserverRegistry->addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
+        opObserverRegistry->addObserver(std::make_unique<ReplicaSetWriteBlockOpObserver>());
 
         if (!gMultitenancySupport) {  // && replCoord && replCoord->getSettings().isReplSet()) {
             opObserverRegistry->addObserver(

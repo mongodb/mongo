@@ -79,7 +79,8 @@ mongo_cc_library(
         "//src/mongo/db/repl:optime",
         "//src/mongo/db/shard_role/shard_catalog:raw_data_operation",
         "//src/mongo/db/stats:direct_system_buckets_access",
-        "//src/mongo/db/topology/user_write_block:write_block_bypass",
+        "//src/mongo/db/topology/user_write_block:replica_set_write_block_bypass",
+        "//src/mongo/db/topology/user_write_block:user_write_block_bypass",
         "//src/mongo/util/concurrency:spin_lock",
     ],
 )

@@ -13,8 +13,6 @@
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   featureFlagBlockReplicaSetWrites,
- *   # TODO(SERVER-120970): Re-enable this test
- *  __TEMPORARILY_DISABLED__,
  * ]
  */
 

@@ -32,7 +32,9 @@
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/routing_context.h"
-#include "mongo/db/topology/user_write_block/write_block_bypass.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
+#include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_targeter.h"
@@ -62,6 +64,12 @@ void preprocessCommand(OperationContext* opCtx, CommandType& cmd) {
         cmd.setVersionContext(vCtx);
     }
     cmd.setMayBypassWriteBlocking(WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
+
+    const auto fcvSnap = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (feature_flags::gFeatureFlagBlockReplicaSetWrites.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx), fcvSnap)) {
+        cmd.setMayBypassReplicaSetWriteBlocking(ReplicaSetWriteBlockBypass::get(opCtx).isEnabled());
+    }
 }
 
 template <typename CommandType, typename GetShardId, typename BuildFutures>
