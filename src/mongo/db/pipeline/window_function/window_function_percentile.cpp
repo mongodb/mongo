@@ -29,6 +29,8 @@
 
 #include "mongo/db/pipeline/window_function/window_function_percentile.h"
 
+#include <cmath>
+
 namespace mongo {
 
 void WindowFunctionPercentileCommon::add(Value value) {
@@ -36,7 +38,13 @@ void WindowFunctionPercentileCommon::add(Value value) {
     if (!value.numeric()) {
         return;
     }
-    _values.insert(value.coerceToDouble());
+    const double d = value.coerceToDouble();
+    // NaN violates the strict-weak-ordering required by boost::container::flat_multiset
+    // and would corrupt _values, so skip it (matching AccuratePercentile::incorporate).
+    if (std::isnan(d)) {
+        return;
+    }
+    _values.insert(d);
     _memUsageTracker.add(sizeof(double));
 }
 
@@ -45,8 +53,12 @@ void WindowFunctionPercentileCommon::remove(Value value) {
     if (!value.numeric()) {
         return;
     }
+    const double d = value.coerceToDouble();
+    if (std::isnan(d)) {
+        return;
+    }
 
-    auto iter = _values.find(value.coerceToDouble());
+    auto iter = _values.find(d);
     tassert(7455904,
             "Cannot remove a value not tracked by WindowFunctionPercentile",
             iter != _values.end());

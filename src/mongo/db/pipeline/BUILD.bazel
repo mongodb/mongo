@@ -1367,6 +1367,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline/window_function:window_function_min_max_scaler_util_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_min_max_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_n_test.cpp",
+        "//src/mongo/db/pipeline/window_function:window_function_percentile_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_push_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_set_union_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_std_dev_test.cpp",
