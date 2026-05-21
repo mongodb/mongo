@@ -562,11 +562,12 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
         _progressMeter.hit(int(docs.size()));
         invariant(_collLoader);
 
-        CollectionBulkLoader::ParseRecordIdAndDocFunc fn = (_recordIdsReplicated)
-            ? ([](const BSONObj& doc) {
-                  return std::make_pair(RecordId(doc["r"].Long()), doc["d"].Obj());
-              })
-            : ([](const BSONObj& doc) { return std::make_pair(RecordId(0), doc); });
+        auto fn = [recordIdsReplicated =
+                       _recordIdsReplicated](const BSONObj& doc) -> std::pair<RecordId, BSONObj> {
+            if (recordIdsReplicated)
+                return {RecordId(doc["r"].Long()), doc["d"].Obj()};
+            return {RecordId(0), doc};
+        };
         // The insert must be done within the lock, because CollectionBulkLoader is not
         // thread safe.
         uassertStatusOK(_collLoader->insertDocuments(docs, fn));
