@@ -157,6 +157,12 @@ void OID::initFromTermNumber(int64_t term) {
     _view().write<BigEndian<int64_t>>(term, kInstanceUniqueOffset);
 }
 
+void OID::initFromInt64(int64_t val) {
+    // Clear the top 4 bytes.
+    setTimestamp(0);
+    _view().write<BigEndian<int64_t>>(val, kInstanceUniqueOffset);
+}
+
 void OID::init(StringData s) {
     MONGO_verify(s.size() == (2 * kOIDSize));
     std::string blob = hexblob::decode(s.substr(0, 2 * kOIDSize));

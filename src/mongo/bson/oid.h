@@ -172,6 +172,12 @@ public:
      */
     void initFromTermNumber(int64_t term);
 
+    /**
+     * Sets the contents to contain a leading zero Timestamp followed by a big endian 8 byte
+     * int64 value.
+     */
+    void initFromInt64(int64_t val);
+
     time_t asTimeT() const;
     Date_t asDateT() const {
         return Date_t::fromMillisSinceEpoch(asTimeT() * 1000LL);
