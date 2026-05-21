@@ -931,5 +931,12 @@ NO_HOOKS = False
 # Whether ASAN (AddressSanitizer) is enabled, determined by the presence of ASAN_OPTIONS.
 IS_ASAN = bool(os.environ.get("ASAN_OPTIONS"))
 
+# Whether any sanitizer build is active (ASAN, TSAN, or UBSAN), which results in slower execution.
+IS_SAN = bool(
+    os.environ.get("ASAN_OPTIONS")
+    or os.environ.get("TSAN_OPTIONS")
+    or os.environ.get("UBSAN_OPTIONS")
+)
+
 # Skips signature verification for extensions loaded into the server. This option has no effect on release builds.
 SKIP_EXTENSIONS_SIGNATURE_VERIFICATION = False

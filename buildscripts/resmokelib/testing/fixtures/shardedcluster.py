@@ -130,6 +130,17 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             ].get("maxTransactionLockRequestTimeoutMillis", 10 * 1000)
         )
 
+        self.mongos_options["set_parameters"] = self.fixturelib.make_historic(
+            self.mongos_options.get("set_parameters", {})
+        ).copy()
+        if _config.IS_SAN:
+            # On sanitizer builds, mongos may not detect a new primary within the default 15-second
+            # defaultFindReplicaSetHostTimeoutMS window due to sanitizer overhead. Increase the
+            # timeout so that FailedToSatisfyReadPreference errors don't occur spuriously.
+            self.mongos_options["set_parameters"].setdefault(
+                "defaultFindReplicaSetHostTimeoutMS", 2 * 60 * 1000
+            )
+
         # Misc other options for the fixture.
         self.config_shard = config_shard
         self.preserve_dbpath = preserve_dbpath
