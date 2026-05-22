@@ -389,6 +389,7 @@ def _get_core_analyzer_commands(
                 "permissions": "public-read",
                 "content_type": "application/gzip",
                 "display_name": "Core Analyzer Output - Execution ${execution}",
+                "optional": True,
             },
         ),
         # We delete the core dumps after we are done processing them so they are not

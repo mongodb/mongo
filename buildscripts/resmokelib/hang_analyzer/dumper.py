@@ -18,6 +18,7 @@ from io import StringIO
 from typing import Optional
 
 import psutil
+import yaml
 from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
 
@@ -76,75 +77,6 @@ def get_dumpers(root_logger: logging.Logger, dbg_output: str, include_terminatin
 def find_files(file_name: str, path: str) -> list[str]:
     matches = glob.glob(f"{path}/**/{file_name}", recursive=True)
     return [f for f in matches if os.path.isfile(f)]
-
-
-def filter_core_dumps(
-    core_files: list[str],
-    boring_core_dump_pids: set,
-    max_core_dumps: int,
-    logger: logging.Logger,
-) -> list[str]:
-    """
-    Filter core dump files by removing boring PIDs and applying a maximum cap.
-
-    :param core_files: List of core dump file paths
-    :param boring_core_dump_pids: Set of PIDs to filter out (can be None or empty)
-    :param max_core_dumps: Maximum number of core dumps to process
-    :param logger: Logger for output
-    :return: Filtered list of core dump file paths
-    """
-    if boring_core_dump_pids is None:
-        boring_core_dump_pids = set()
-
-    original_count = len(core_files)
-
-    # Only filter if we have boring PIDs to filter out (empty set is falsy)
-    if boring_core_dump_pids:
-        logger.info(
-            f"Found {original_count} total core dumps. Filtering out boring PIDs: {boring_core_dump_pids}"
-        )
-        interesting_core_dumps = []
-        boring_core_dump_names = []
-        for core_file in core_files:
-            basename = os.path.basename(core_file)
-            # Expected format: dump_<binary>.<pid>.core or dump_<binary>-<version>.<pid>.core
-            parts = basename.split(".")
-            if len(parts) >= 3 and parts[-2].isdigit():
-                pid = parts[-2]
-                if pid in boring_core_dump_pids:
-                    boring_core_dump_names.append(basename)
-                else:
-                    interesting_core_dumps.append(core_file)
-            else:
-                # If we can't parse the PID, assume it's interesting to be safe
-                logger.warning(
-                    f"Could not parse PID from core file name: {basename}, treating as interesting"
-                )
-                interesting_core_dumps.append(core_file)
-
-        core_files = interesting_core_dumps
-        logger.info(
-            f"Filtered out {len(boring_core_dump_names)} boring core dumps. {len(core_files)} interesting core dumps remain."
-        )
-        if boring_core_dump_names:
-            logger.info(
-                f"Skipped boring core dumps: {boring_core_dump_names[:10]}{'...' if len(boring_core_dump_names) > 10 else ''}"
-            )
-    else:
-        logger.info(
-            f"Found {original_count} total core dumps. No boring PIDs list provided, analyzing all core dumps."
-        )
-
-    # Apply cap to limit maximum number of core dumps analyzed
-    if len(core_files) > max_core_dumps:
-        logger.warning(
-            f"Found {len(core_files)} core dumps, which exceeds the maximum of {max_core_dumps}. "
-            f"Only the first {max_core_dumps} core dumps will be analyzed. "
-            f"The remaining {len(core_files) - max_core_dumps} core dumps will be skipped to avoid execution timeout."
-        )
-        core_files = core_files[:max_core_dumps]
-
-    return core_files
 
 
 class Dumper(metaclass=ABCMeta):
@@ -369,22 +301,11 @@ class WindowsDumper(Dumper):
         core_file_dir: str,
         install_dir: str,
         analysis_dir: str,
-        boring_core_dump_pids: set = None,
-        max_core_dumps: int = 10,
     ):
         install_dir = os.path.abspath(install_dir)
         core_files = find_files(f"*.{self.get_dump_ext()}", core_file_dir)
         if not core_files:
             raise RuntimeError(f"No core dumps found in {core_file_dir}")
-
-        # Filter and cap core dumps
-        core_files = filter_core_dumps(
-            core_files, boring_core_dump_pids, max_core_dumps, self._root_logger
-        )
-
-        if not core_files:
-            self._root_logger.warning("No interesting core dumps to analyze after filtering.")
-            return
 
         for filename in core_files:
             file_path = os.path.abspath(filename)
@@ -598,6 +519,60 @@ class GDBDumper(Dumper):
         ]
         return cmds
 
+    def get_dump_commands(self, pname, pid, logger):
+        # Dump to file, dump_<process name>.<pid>.core
+        dump_file = "dump_%s.%d.%s" % (pname, pid, self.get_dump_ext())
+        dump_command = "gcore %s" % dump_file
+        self._root_logger.info("Dumping core to %s", dump_file)
+        cmds = [
+            "set width 0",
+            "attach %d" % pid,
+            "handle SIGSTOP ignore noprint",
+            # Lock the scheduler, before running commands, which execute code in the attached process.
+            "set scheduler-locking on",
+            dump_command,
+        ]
+        if pname == "mongo":
+            jsscope_debug_file = f"jsscope_debug_{pid}.yml"
+            # TODO: Figure out how to get this to support multiple js stack traces from a single process
+            if os.path.exists(jsscope_debug_file):
+                logger.info(
+                    f"Found JSScope debug file {jsscope_debug_file}, attempting to print stacktraces for JSScope instances."
+                )
+                with open(jsscope_debug_file, "r") as f:
+                    documents = yaml.safe_load_all(f)
+                    for i, document in enumerate(documents):
+                        logger.info(f"Document {i}: {document}")
+                        current_js_scope = document.get("current_js_scope")
+                        build_stack_string_for_gdb = document.get("build_stack_string_for_gdb")
+                        thread_id = document.get("thread_id")
+                        lwp = document.get("lwp")
+                        output_file_name = f"debugger_jsscope_{pid}_{i}.txt"
+                        cmds += [
+                            "set logging file " + output_file_name,
+                            "set logging enabled on",
+                            "info threads",
+                            # Switch to the thread that owns this JS scope. buildStackStringForGdb
+                            # must run on the owning thread because SpiderMonkey asserts thread identity.
+                            f"thread find {lwp}",
+                            "bt 32",
+                            f"echo \\nPrinting javascript stacktrace for thread_id: {thread_id}\\n",
+                            # Recover gracefully if buildStackStringForGdb triggers a signal (e.g. SIGSEGV).
+                            "set unwind-on-signal on",
+                            f'printf "%s\\n", ((char* (*) (void*)) {build_stack_string_for_gdb}) ({current_js_scope})',
+                            "set unwind-on-signal off",
+                            "info threads",
+                            f"thread find {lwp}",
+                            "bt 32",
+                            "set logging enabled off",
+                        ]
+                cmds += [f"source {jsscope_debug_file}"]
+
+        cmds += [
+            "detach",
+        ]
+        return cmds
+
     def _process_specific(self, pinfo, take_dump, logger=None):
         """Return the commands that attach to each process, dump info and detach."""
         cmds = []
@@ -609,11 +584,39 @@ class GDBDumper(Dumper):
                 dump_command = "gcore %s" % dump_file
                 self._root_logger.info("Dumping core to %s", dump_file)
                 cmds += [
+                    "set width 0",
                     "attach %d" % pid,
                     "handle SIGSTOP ignore noprint",
                     # Lock the scheduler, before running commands, which execute code in the attached process.
                     "set scheduler-locking on",
                     dump_command,
+                ]
+                if pinfo.name == "mongo":
+                    jsscope_debug_file = f"jsscope_debug_{pid}.yml"
+                    if os.path.exists(jsscope_debug_file):
+                        logger.info(
+                            f"Found JSScope debug file {jsscope_debug_file}, attempting to print stacktraces for JSScope instances."
+                        )
+                        with open(jsscope_debug_file, "r") as f:
+                            documents = yaml.safe_load_all(f)
+                            for i, document in enumerate(documents):
+                                current_js_scope = document.get("current_js_scope")
+                                build_stack_string_for_gdb = document.get(
+                                    "build_stack_string_for_gdb"
+                                )
+                                lwp = document.get("lwp")
+                                output_file_name = f"debugger_jsscope_{pid}_{i}.txt"
+                                cmds += [
+                                    "set logging file " + output_file_name,
+                                    "set logging enabled on",
+                                    f"thread find {lwp}",
+                                    "set unwind-on-signal on",
+                                    f'printf "%s\\n", ((char* (*) (void*)) {build_stack_string_for_gdb}) ({current_js_scope})',
+                                    "set unwind-on-signal off",
+                                    "set logging enabled off",
+                                ]
+                        cmds += [f"source {jsscope_debug_file}"]
+                cmds += [
                     "detach",
                 ]
         else:
@@ -719,14 +722,26 @@ class GDBDumper(Dumper):
         # supported in the hang analyzer. The only gdb commands we run here are to take core
         # dumps of the running processes.
         if take_dump:
-            call(
-                [dbg, "--quiet", "--nx"]
-                + skip_reading_symbols_on_take_dump
-                + list(itertools.chain.from_iterable([["-ex", b] for b in cmds])),
-                logger,
-                self._time_limit.total_seconds(),
-                pinfo,
-            )
+            for pid in pinfo.pidv:
+                cmds = (
+                    self._prefix()
+                    + self.get_dump_commands(pinfo.name, pid, logger)
+                    + self._postfix()
+                )
+                exit_code = call(
+                    [dbg, "--quiet", "--nx"]
+                    + skip_reading_symbols_on_take_dump
+                    + list(itertools.chain.from_iterable([["-ex", b] for b in cmds])),
+                    logger,
+                    self._time_limit.total_seconds(),
+                    pinfo,
+                )
+                self._root_logger.info(
+                    "gdb exited with code %d while analyzing %s processes with PIDs %s",
+                    exit_code,
+                    pinfo.name,
+                    str(pinfo.pidv),
+                )
 
         self._root_logger.info(
             "Done analyzing %s processes with PIDs %s", pinfo.name, str(pinfo.pidv)
@@ -741,8 +756,6 @@ class GDBDumper(Dumper):
         multiversion_dir: str,
         sysroot_dir: Optional[str],
         gdb_index_cache: str,
-        boring_core_dump_pids: set = None,
-        max_core_dumps: int = 10,
     ) -> Report:
         core_files = find_files(f"*.{self.get_dump_ext()}", core_file_dir)
         analyze_cores_span = get_default_current_span()
@@ -752,17 +765,6 @@ class GDBDumper(Dumper):
                 "analyze_cores_error", f"No core dumps found in {core_file_dir}"
             )
             raise RuntimeError(f"No core dumps found in {core_file_dir}")
-
-        original_count = len(core_files)
-
-        # Filter and cap core dumps
-        core_files = filter_core_dumps(
-            core_files, boring_core_dump_pids, max_core_dumps, self._root_logger
-        )
-
-        if not core_files:
-            self._root_logger.warning("No interesting core dumps to analyze after filtering.")
-            return Report({"failures": 0, "results": []})
 
         tmp_dir = os.path.join(analysis_dir, "tmp")
         os.makedirs(tmp_dir, exist_ok=True)
@@ -830,10 +832,6 @@ class GDBDumper(Dumper):
             {
                 "failures": report["failures"],
                 "core_dump_count": len(core_files),
-                "original_core_dump_count": original_count,
-                "boring_core_dumps_filtered": original_count - len(core_files)
-                if boring_core_dump_pids
-                else 0,
             }
         )
         shutil.rmtree(tmp_dir)
@@ -883,6 +881,22 @@ class GDBDumper(Dumper):
         basename = os.path.basename(core_file_path)
         logging_dir = os.path.join(analysis_dir, basename)
         os.makedirs(logging_dir, exist_ok=True)
+
+        # Copy any JS stack trace files captured by the live hang analyzer into the logging dir.
+        # These files are named debugger_jsscope_<pid>_<i>.txt and were produced by the hang
+        # analyzer attaching to the live process before the core dump was taken. The PID in the
+        # core dump filename matches the PID in the JS stack trace filenames.
+        core_pid = basename.split(".")[-2]
+        core_dump_dir = os.path.dirname(core_file_path)
+        for js_stack_file in sorted(
+            glob.glob(os.path.join(core_dump_dir, f"debugger_jsscope_{core_pid}_*.txt"))
+        ):
+            shutil.copy(js_stack_file, logging_dir)
+            js_stack_name = os.path.basename(js_stack_file)
+            self._root_logger.info("Copied JS stack trace %s into analysis dir", js_stack_name)
+            logger.info("\n=== JavaScript Stack Trace (%s) ===", js_stack_name)
+            with open(js_stack_file) as f:
+                logger.info(f.read())
 
         if sysroot_dir:
             cmds.append(f"set sysroot {sysroot_dir}")
