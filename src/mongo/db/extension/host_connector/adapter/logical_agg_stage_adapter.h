@@ -215,6 +215,16 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _hostGetDocsNeededBounds(
+        const ::MongoExtensionLogicalAggStage* logicalStage,
+        ::MongoExtensionByteBuf** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([]() {
+            tasserted(
+                11842301,
+                "_hostGetDocsNeededBounds should not be called on a host-allocated logical stage.");
+        });
+    }
+
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_hostDestroy,
         .get_name = &_hostGetName,
@@ -232,9 +242,9 @@ private:
         .apply_pipeline_suffix_dependencies = &_hostApplyPipelineSuffixDependencies,
         .get_sort_pattern = &_hostGetSortPattern,
         .skip_stream = &_hostSkipStream,
+        .get_docs_needed_bounds = &_hostGetDocsNeededBounds,
     };
 
     std::unique_ptr<host::LogicalAggStage> _logicalAggStage;
 };
-
 };  // namespace mongo::extension::host_connector

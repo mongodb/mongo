@@ -28,6 +28,10 @@
  */
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 
+#include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
+#include "mongo/db/extension/host/document_source_extension_optimizable.h"
+#include "mongo/db/extension/public/extension_agg_stage_static_properties_gen.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
@@ -365,10 +369,49 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSequentialDocumentC
     // the first in the pipeline, where it populates the result stream.
 }
 
+namespace {
+void applyDocsNeededBoundsEffect(DocsNeededBoundsContext* ctx,
+                                 extension::MongoExtensionDocsNeededBoundsEffectEnum effect,
+                                 boost::optional<std::int64_t> value) {
+    // The IDL validator validateDocsNeededBoundsInfo guarantees that 'value' is set iff 'effect' is
+    // kLimit or kSkip, so the dereferences below are safe.
+    using Effect = extension::MongoExtensionDocsNeededBoundsEffectEnum;
+    switch (effect) {
+        case Effect::kUnknown:
+            ctx->applyUnknownStage();
+            return;
+        case Effect::kBlocking:
+            ctx->applyBlockingStage();
+            return;
+        case Effect::kPossibleDecrease:
+            ctx->applyPossibleDecreaseStage();
+            return;
+        case Effect::kPossibleIncrease:
+            ctx->applyPossibleIncreaseStage();
+            return;
+        case Effect::kNoEffect:
+            return;
+        case Effect::kLimit:
+            ctx->applyLimit(*value);
+            return;
+        case Effect::kSkip:
+            ctx->applySkip(*value);
+            return;
+    }
+    MONGO_UNREACHABLE;
+}
+}  // namespace
+
 void visitExtensionStage(DocsNeededBoundsContext* ctx,
                          const extension::host::DocumentSourceExtensionOptimizable& source) {
-    // TODO SERVER-118423: Allow extension stages to report their own bounds.
-    ctx->applyUnknownStage();
+    auto boundsInfo = source.getDocsNeededBounds();
+    if (!boundsInfo) {
+        // Default to unknown bounds.
+        ctx->applyUnknownStage();
+        return;
+    }
+
+    applyDocsNeededBoundsEffect(ctx, boundsInfo->getEffect(), boundsInfo->getValue());
 }
 
 void visitExtensionStage(DocsNeededBoundsContext* ctx,

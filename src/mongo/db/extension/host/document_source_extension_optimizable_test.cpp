@@ -50,6 +50,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_documents.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
@@ -2685,6 +2686,350 @@ TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsRet
 
     ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMinBounds()));
     ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
+}
+
+// DocsNeededBounds callback tests for effects.
+
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsBlockingAlone) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "blocking")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto pipeline = Pipeline::create({extensionStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::NeedAll>(bounds.getMinBounds()));
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::NeedAll>(bounds.getMaxBounds()));
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       ExtensionStageDocsNeededBoundsBlockingOverridesLimit) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "blocking")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto limitStage = DocumentSourceLimit::create(getExpCtx(), 10);
+    auto pipeline = Pipeline::create({extensionStage, limitStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::NeedAll>(bounds.getMinBounds()));
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::NeedAll>(bounds.getMaxBounds()));
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsNoEffectWithLimit) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "noEffect")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto limitStage = DocumentSourceLimit::create(getExpCtx(), 10);
+    auto pipeline = Pipeline::create({extensionStage, limitStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMinBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMinBounds()), 10);
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMaxBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMaxBounds()), 10);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsNoEffectAlone) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "noEffect")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto pipeline = Pipeline::create({extensionStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMinBounds()));
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       ExtensionStageDocsNeededBoundsPossibleDecreaseWithLimit) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "possibleDecrease")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto limitStage = DocumentSourceLimit::create(getExpCtx(), 10);
+    auto pipeline = Pipeline::create({extensionStage, limitStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMinBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMinBounds()), 10);
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       ExtensionStageDocsNeededBoundsPossibleDecreaseAlone) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "possibleDecrease")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto pipeline = Pipeline::create({extensionStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMinBounds()));
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       ExtensionStageDocsNeededBoundsPossibleIncreaseWithLimit) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "possibleIncrease")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto limitStage = DocumentSourceLimit::create(getExpCtx(), 10);
+    auto pipeline = Pipeline::create({extensionStage, limitStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMinBounds()));
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMaxBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMaxBounds()), 10);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       ExtensionStageDocsNeededBoundsPossibleIncreaseAlone) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "possibleIncrease")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto pipeline = Pipeline::create({extensionStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMinBounds()));
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       ExtensionStageDocsNeededBoundsExplicitUnknownWithLimit) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "unknown")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto limitStage = DocumentSourceLimit::create(getExpCtx(), 10);
+    auto pipeline = Pipeline::create({extensionStage, limitStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMinBounds()));
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsExplicitUnknownAlone) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "unknown")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto pipeline = Pipeline::create({extensionStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMinBounds()));
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
+}
+
+// DocsNeededBounds callback tests for concrete limit/skip bounds.
+
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsLimit) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "limit" << "value" << 10)));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto pipeline = Pipeline::create({extensionStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMinBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMinBounds()), 10);
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMaxBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMaxBounds()), 10);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       ExtensionStageDocsNeededBoundsLimitWithSmallerDownstreamLimit) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "limit" << "value" << 10)));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto limitStage = DocumentSourceLimit::create(getExpCtx(), 5);
+    auto pipeline = Pipeline::create({extensionStage, limitStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMinBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMinBounds()), 5);
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMaxBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMaxBounds()), 5);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       ExtensionStageDocsNeededBoundsLimitWithLargerDownstreamLimit) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "limit" << "value" << 5)));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto limitStage = DocumentSourceLimit::create(getExpCtx(), 10);
+    // Pipeline: [ext_limit(5), $limit(10)]. Reverse walk: apply $limit(10) → min=10,max=10,
+    // then apply ext_limit(5) → min=5,max=5 (smaller limit wins).
+    auto pipeline = Pipeline::create({extensionStage, limitStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMinBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMinBounds()), 5);
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMaxBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMaxBounds()), 5);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsSkipWithLimit) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "skip" << "value" << 5)));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto limitStage = DocumentSourceLimit::create(getExpCtx(), 10);
+    // Pipeline: [ext_skip(5), $limit(10)]. Reverse walk: apply $limit(10) → min=10,max=10,
+    // then apply ext_skip(5) → min=15,max=15.
+    auto pipeline = Pipeline::create({extensionStage, limitStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMinBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMinBounds()), 15);
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMaxBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMaxBounds()), 15);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsSkipAlone) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "skip" << "value" << 5)));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto pipeline = Pipeline::create({extensionStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    // Skip on Unknown bounds stays Unknown.
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMinBounds()));
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
+}
+
+// Test that a null callback return (empty BSONObj) defaults to Unknown, even with downstream limit.
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       ExtensionStageDocsNeededBoundsNullCallbackDefaultsToUnknown) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(BSONObj(), BSONObj()));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto limitStage = DocumentSourceLimit::create(getExpCtx(), 10);
+    auto pipeline = Pipeline::create({extensionStage, limitStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMinBounds()));
+    ASSERT_TRUE(std::holds_alternative<docs_needed_bounds::Unknown>(bounds.getMaxBounds()));
+}
+
+// Two consecutive extension stages with concrete DocsNeededBounds compose correctly.
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsConsecutiveExtStages) {
+    auto skipAstNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "skip" << "value" << 3)));
+    AggStageAstNodeHandle skipHandle{skipAstNode};
+    auto skipExtensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(skipHandle));
+
+    auto limitAstNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "limit" << "value" << 7)));
+    AggStageAstNodeHandle limitHandle{limitAstNode};
+    auto limitExtensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(limitHandle));
+
+    // Pipeline: [ext_skip(3), ext_limit(7)]. Reverse walk: ext_limit(7) -> (7, 7),
+    // then ext_skip(3) -> (10, 10).
+    auto pipeline = Pipeline::create({skipExtensionStage, limitExtensionStage}, getExpCtx());
+    auto bounds = extractDocsNeededBounds(*pipeline);
+
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMinBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMinBounds()), 10);
+    ASSERT_TRUE(std::holds_alternative<long long>(bounds.getMaxBounds()));
+    ASSERT_EQUALS(std::get<long long>(bounds.getMaxBounds()), 10);
+}
+
+// The IDL validator rejects a limit/skip effect that is missing the 'value' field.
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsLimitMissingValue) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(BSONObj(),
+                                                                       BSON("effect" << "limit")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto pipeline = Pipeline::create({extensionStage}, getExpCtx());
+    ASSERT_THROWS_CODE(extractDocsNeededBounds(*pipeline), DBException, 11842302);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsSkipMissingValue) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(BSONObj(),
+                                                                       BSON("effect" << "skip")));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto pipeline = Pipeline::create({extensionStage}, getExpCtx());
+    ASSERT_THROWS_CODE(extractDocsNeededBounds(*pipeline), DBException, 11842302);
+}
+
+// The IDL validator rejects an effect that erroneously specifies a 'value' field.
+TEST_F(DocumentSourceExtensionOptimizableTest, ExtensionStageDocsNeededBoundsUnknownWithValue) {
+    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
+        std::make_unique<sdk::shared_test_stages::CustomBoundsAstNode>(
+            BSONObj(), BSON("effect" << "unknown" << "value" << 5)));
+    AggStageAstNodeHandle handle{astNode};
+    auto extensionStage =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(handle));
+
+    auto pipeline = Pipeline::create({extensionStage}, getExpCtx());
+    ASSERT_THROWS_CODE(extractDocsNeededBounds(*pipeline), DBException, 11842303);
 }
 
 // Tests for registerStageRules / _extensionRuleRegistry.
