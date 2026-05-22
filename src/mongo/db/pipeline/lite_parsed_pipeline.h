@@ -98,6 +98,20 @@ public:
     }
 
     /**
+     * Constructs a LiteParsedPipeline from already-parsed StageSpecs without re-parsing. Useful
+     * when a desugarer assembles a subpipeline from existing LiteParsedDocumentSources.
+     */
+    LiteParsedPipeline(NamespaceString nss,
+                       StageSpecs stages,
+                       bool isRunningAgainstView_ForHybridSearch = false)
+        : _stageSpecs(std::move(stages)),
+          _originalParseNss(std::move(nss)),
+          _isRunningAgainstView_ForHybridSearch(isRunningAgainstView_ForHybridSearch) {
+        // _hasChangeStream and _involvedNamespaces are intentionally left at their in-class
+        // defaults; they are Deferred and will be computed on demand from _stageSpecs.
+    }
+
+    /**
      * Copy constructor. Calls clone on each LiteParsedDocumentSource in the pipeline and copies
      * member variables.
      */
@@ -278,6 +292,16 @@ public:
     bool isScoredPipeline() const {
         return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
             return spec->isScoredStage();
+        });
+    }
+
+    /**
+     * Returns true if any stage in the pipeline is a scoreDetails stage (produces scoreDetails
+     * metadata).
+     */
+    bool isScoreDetailsPipeline() const {
+        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
+            return spec->isScoreDetailsStage();
         });
     }
 

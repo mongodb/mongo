@@ -138,6 +138,11 @@ public:
         return true;
     }
 
+    // $scoreFusion produces scoreDetails metadata when the user requests it via the spec.
+    bool isScoreDetailsStage() const final {
+        return _parsedSpec.getScoreDetails();
+    }
+
     // $scoreFusion does not modify documents, only combines and reorders them.
     bool isSelectionStage() const final {
         return true;
@@ -164,6 +169,10 @@ public:
     std::unique_ptr<StageParams> getStageParams() const override {
         return std::make_unique<ScoreFusionStageParams>(
             _parsedSpec, _pipelines, getOriginalBson().wrap().getOwned());
+    }
+
+    const ScoreFusionSpec& getSpec() const {
+        return _parsedSpec;
     }
 
 private:

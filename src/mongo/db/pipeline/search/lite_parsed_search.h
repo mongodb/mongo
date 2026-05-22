@@ -35,6 +35,7 @@
 namespace mongo {
 
 static constexpr StringData kReturnStoredSourceFieldName = "returnStoredSource"_sd;
+static constexpr StringData kScoreDetailsFieldName = "scoreDetails"_sd;
 
 /**
  * A 'LiteParsed' representation of a search stage. This is the parent class for the
@@ -92,6 +93,20 @@ protected:
             if (specObj.hasField(kReturnStoredSourceFieldName)) {
                 auto rss = specObj[kReturnStoredSourceFieldName];
                 return rss.isBoolean() && rss.boolean();
+            }
+        }
+        return false;
+    }
+
+    // Returns true if the stage spec has scoreDetails: true inside the mongotQuery.
+    bool hasScoreDetails() const {
+        if (this->_originalBson.type() == BSONType::object) {
+            auto specObj = this->_originalBson.Obj();
+            // SearchLiteParsed's BSON shape mirrors DocumentSourceSearch::hasScoreDetails():
+            // top-level $search spec is the mongotQuery, so 'scoreDetails' lives directly on it.
+            if (specObj.hasField(kScoreDetailsFieldName)) {
+                auto sd = specObj[kScoreDetailsFieldName];
+                return sd.isBoolean() && sd.boolean();
             }
         }
         return false;

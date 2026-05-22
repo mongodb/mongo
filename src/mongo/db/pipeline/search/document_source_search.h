@@ -68,6 +68,11 @@ public:
         return true;
     }
 
+    // $search produces scoreDetails metadata when the user requests it via the mongotQuery.
+    bool isScoreDetailsStage() const final {
+        return hasScoreDetails();
+    }
+
     // $search is not a selection stage when returnStoredSource is true since it might have an
     // implicit projection applied.
     bool isSelectionStage() const final {

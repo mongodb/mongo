@@ -539,6 +539,15 @@ public:
     }
 
     /**
+     * Returns true if this stage produces scoreDetails metadata.
+     * TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
+     * search stage.
+     */
+    virtual bool isScoreDetailsStage() const {
+        return false;
+    }
+
+    /**
      * Returns true if this stage is a selection stage. A selection stage does not modify or
      * transform documents.
      * TODO SERVER-121091 This can be removed once hybrid search desugars into the internal hybrid
