@@ -188,4 +188,16 @@ assert.gte(sampleFromBucketStage.dupsTested, 150, sampleFromBucketStage);
 const multiIteratorStage = getPlanStage(sampleFromBucketStage, "MULTI_ITERATOR");
 assert.neq(multiIteratorStage, null, explainRes);
 
+// $sample followed by an inclusion projection that omits the time field should still return all
+// projected data fields. Only the time field should be absent from the results.
+{
+    const sampleSize = 20;
+    const result = coll.aggregate([{$sample: {size: sampleSize}}, {$project: {[metaFieldName]: 1, x: 1}}]).toArray();
+    assert.eq(result.length, sampleSize, result);
+    for (const doc of result) {
+        assert(!doc.hasOwnProperty(timeFieldName), `time field should be excluded: ${tojson(doc)}`);
+        assert(doc.hasOwnProperty("x"), `data field 'x' missing from $sample result: ${tojson(doc)}`);
+    }
+}
+
 MongoRunner.stopMongod(conn);

@@ -957,6 +957,49 @@ TEST_F(BucketUnpackerTest, ExtractSingleMeasurementSparse) {
     ASSERT_DOCUMENT_EQ(next, expected);
 }
 
+// Extracting a measurement from a V2 bucket with an inclusion projection that omits the time field
+// should still return all other projected fields. The time field should be absent from the result.
+TEST_F(BucketUnpackerTest, ExtractSingleMeasurementV2ExcludeTimeField) {
+    auto d1 = dateFromISOString("2020-02-17T00:00:00.000Z").getValue();
+    auto d2 = dateFromISOString("2020-02-17T01:00:00.000Z").getValue();
+
+    // Build an uncompressed V1 bucket with two measurements.
+    auto bucket = BSON("control" << BSON("version" << 1) << "meta"
+                                 << BSON("m1" << 999 << "m2" << 9999) << "data"
+                                 << BSON("_id" << BSON("0" << 1 << "1" << 2) << "time"
+                                               << BSON("0" << d1 << "1" << d2) << "a"
+                                               << BSON("0" << 10 << "1" << 20)));
+
+    // Compress to a V2 bucket.
+    auto compressedBucket =
+        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
+    ASSERT(compressedBucket);
+
+    // Inclusion projection that omits the time field.
+    std::set<std::string> fields{"_id", std::string{kUserDefinedMetaName}, "a"};
+    auto spec = BucketSpec{std::string{kUserDefinedTimeName},
+                           std::string{kUserDefinedMetaName},
+                           std::move(fields),
+                           BucketSpec::Behavior::kInclude};
+    auto unpacker = BucketUnpacker{std::move(spec)};
+    unpacker.reset(std::move(*compressedBucket));
+
+    // Measurement 0: time excluded, but "a" must still be present.
+    auto next = unpacker.extractSingleMeasurement(0);
+    auto expected =
+        Document{{"myMeta", Document{{"m1", 999}, {"m2", 9999}}}, {"_id", 1}, {"a", 10}};
+    ASSERT_DOCUMENT_EQ(next, expected);
+    ASSERT(next.getField(kUserDefinedTimeName).missing())
+        << "time field should be excluded but was present: " << next.toString();
+
+    // Measurement 1: time excluded, but "a" must still be present.
+    next = unpacker.extractSingleMeasurement(1);
+    expected = Document{{"myMeta", Document{{"m1", 999}, {"m2", 9999}}}, {"_id", 2}, {"a", 20}};
+    ASSERT_DOCUMENT_EQ(next, expected);
+    ASSERT(next.getField(kUserDefinedTimeName).missing())
+        << "time field should be excluded but was present: " << next.toString();
+}
+
 TEST_F(BucketUnpackerTest, SimpleGetNextBson) {
     // We use array representation for '_id', 'time', and 'a' but can't use array representation for
     // 'b' since it doesn't exist for the first document.

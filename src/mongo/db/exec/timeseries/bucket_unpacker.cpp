@@ -373,12 +373,10 @@ void BucketUnpackerV2::extractSingleMeasurement(
         measurement.addField(*spec.metaFieldHashed(), metaValue);
     }
 
-    if (includeTimeField) {
-        for (auto& fieldColumn : _fieldColumns) {
-            auto val = fieldColumn.column[j];
-            uassert(6067600, "Bucket unexpectedly contained fewer values than count", val);
-            measurement.addField(fieldColumn.fieldName, Value{*val});
-        }
+    for (auto& fieldColumn : _fieldColumns) {
+        auto val = fieldColumn.column[j];
+        uassert(6067600, "Bucket unexpectedly contained fewer values than count", val);
+        measurement.addField(fieldColumn.fieldName, Value{*val});
     }
 }
 
