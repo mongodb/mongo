@@ -199,6 +199,16 @@ void PipelineResolver::applyViewToLiteParsed(LiteParsedPipeline* userLPP,
     userLPP->handleView(viewInfo, resolvedNamespaces);
 }
 
+void PipelineResolver::validateStagesOnView(LiteParsedPipeline* userLPP,
+                                            const ResolvedView& resolvedView,
+                                            const NamespaceString& viewNss,
+                                            const ResolvedNamespaceMap& resolvedNamespaces,
+                                            const LiteParserOptions& options) {
+    auto viewInfo = resolvedView.toViewInfo(viewNss, options);
+    LiteParsedDesugarer::desugar(viewInfo.viewPipeline.get());
+    userLPP->bindViewInfoToStages(viewInfo, resolvedNamespaces);
+}
+
 PipelineResolver::MongosViewRequestResult PipelineResolver::buildResolvedMongosViewRequest(
     OperationContext* opCtx,
     const AggregateCommandRequest& request,
@@ -218,6 +228,21 @@ PipelineResolver::MongosViewRequestResult PipelineResolver::buildResolvedMongosV
         resolvedView.timeseries()) {
         resolvedPipeline =
             buildResolvedPipelineForSimpleCase(ifrContext, resolvedView, request.getPipeline());
+
+        // For mongot pipelines on views, validate that extension stages are allowed. The legacy
+        // first stage handles view resolution itself, but subsequent extension stages still need
+        // view validation. Timeseries views are skipped; their pipeline is fully resolved above via
+        // buildResolvedPipelineForSimpleCase.
+        if (!resolvedView.timeseries()) {
+            LiteParserOptions options{.ifrContext = ifrContext};
+            auto lpp = LiteParsedPipeline(request, true, options);
+            lpp.makeOwned();
+            LiteParsedDesugarer::desugar(&lpp);
+            auto resolvedNamespaces =
+                helpers.resolveInvolvedNamespaces(lpp.getInvolvedNamespaces());
+            validateStagesOnView(&lpp, resolvedView, requestedNss, resolvedNamespaces, options);
+        }
+
         userLPP = boost::none;
     } else {
         std::tie(resolvedPipeline, userLPP) = buildResolvedPipelineForRegularView(
