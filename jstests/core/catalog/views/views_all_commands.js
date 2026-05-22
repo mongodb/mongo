@@ -805,6 +805,7 @@ let viewsCommandTests = {
         isAdminCommand: true,
     },
     update: {command: {update: "view", updates: [{q: {x: 1}, u: {x: 2}}]}, expectFailure: true},
+    updateESECMKIdentifierList: {skip: isUnrelated},
     updateRole: {
         command: {
             updateRole: "testrole",

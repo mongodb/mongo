@@ -976,6 +976,10 @@ const allTestCases = {
                 },
             },
         },
+        updateESECMKIdentifierList: {
+            skip: "executes locally on mongos (not sent to any remote node)",
+            conditional: true,
+        },
         updateRole: {skip: "always targets the config server"},
         updateSearchIndex: {skip: "executes locally on mongos", conditional: true},
         updateUser: {skip: "always targets the config server"},
@@ -1464,6 +1468,7 @@ const allTestCases = {
         top: {skip: "TODO"},
         transitionToShardedCluster: {skip: "TODO"},
         update: {skip: "TODO"},
+        updateESECMKIdentifierList: {skip: "TODO", conditional: true},
         updateRole: {skip: "TODO"},
         updateSearchIndex: {skip: "TODO"},
         updateUser: {skip: "TODO"},

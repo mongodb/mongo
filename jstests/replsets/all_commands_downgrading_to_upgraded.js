@@ -1694,6 +1694,7 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
+    updateESECMKIdentifierList: {skip: "requires additional setup"},
     updateRole: {
         setUp: function (conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({createRole: "foo", privileges: [], roles: []}));

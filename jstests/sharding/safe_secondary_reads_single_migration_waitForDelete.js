@@ -432,6 +432,7 @@ let testCases = {
     unshardCollection: {skip: "primary only"},
     untrackUnshardedCollection: {skip: "primary only"},
     update: {skip: "primary only"},
+    updateESECMKIdentifierList: {skip: "does not return user data"},
     updateRole: {skip: "primary only"},
     updateSearchIndex: {skip: "does not return user data"},
     updateUser: {skip: "primary only"},

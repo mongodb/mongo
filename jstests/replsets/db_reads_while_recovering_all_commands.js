@@ -468,6 +468,7 @@ const allCommands = {
     top: {skip: isNotAUserDataRead},
     transitionToShardedCluster: {skip: isNotAUserDataRead},
     update: {skip: isPrimaryOnly},
+    updateESECMKIdentifierList: {skip: isNotAUserDataRead},
     updateRole: {skip: isPrimaryOnly},
     updateSearchIndex: {skip: isNotAUserDataRead},
     updateUser: {skip: isPrimaryOnly},
