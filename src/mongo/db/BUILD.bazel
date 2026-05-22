@@ -2858,6 +2858,7 @@ mongo_cc_binary(
     srcs = [
         "mongod.cpp",
     ],
+    bolt_profile = "@bolt_data//:bolt_fdata",
     cxxopts = select({
         "//bazel/config:pgo_profile_generate_clang_enabled": [
             "-fprofile-generate=mongod_perf",

@@ -35,17 +35,17 @@ bolt_instrument = rule(
     attrs = {
         "binary_to_instrument": attr.label(allow_files = True),
         "instrumentation_output_file": attr.string(),
-        "_bolt_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bolt", executable = True, cfg = "host"),
+        "_bolt_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bolt", executable = True, cfg = "exec"),
         "_bolt_needed_lib": attr.label(allow_single_file = True, default = "@bolt_binaries//:libbolt_rt_instr"),
     },
 )
 
 def _bolt_optimize_impl(ctx):
     input_binary = ctx.files.binary_to_optimize[0]
-    output_binary = ctx.actions.declare_file(ctx.files.binary_to_optimize[0].basename)
+    output_binary = ctx.actions.declare_file(ctx.label.name + "/" + input_binary.basename)
     functions_to_skip = ",".join(SKIP_FUNCTIONS)
     ctx.actions.run(
-        inputs = [input_binary],
+        inputs = [input_binary, ctx.files.perf_data[0]],
         outputs = [output_binary],
         executable = ctx.executable._bolt_binary,
         arguments = [
@@ -62,17 +62,36 @@ def _bolt_optimize_impl(ctx):
             "-dyno-stats",
             "--lite",
             "--update-debug-sections",
+            # objcopy will leave bad data like program headers in the .debug file without this
+            "--use-gnu-stack",
             "-skip-funcs=" + functions_to_skip,
         ],
         mnemonic = "BoltOptimize",
+        execution_requirements = {
+            "no-cache": "1",
+            "no-sandbox": "1",
+            "no-remote": "1",
+            "local": "1",
+        },
     )
-    return DefaultInfo(files = depset([output_binary]))
+
+    return [
+        DefaultInfo(files = depset([output_binary]), executable = output_binary),
+        ctx.attr.binary_to_optimize[CcInfo],
+        ctx.attr.binary_to_optimize[DebugPackageInfo],
+        RunEnvironmentInfo(
+            environment = ctx.attr.binary_to_optimize[RunEnvironmentInfo].environment,
+            inherited_environment = ctx.attr.binary_to_optimize[RunEnvironmentInfo].inherited_environment,
+        ),
+    ]
 
 bolt_optimize = rule(
     implementation = _bolt_optimize_impl,
     attrs = {
-        "binary_to_optimize": attr.label(allow_files = True),
+        "binary_to_optimize": attr.label(allow_files = True, providers = [CcInfo]),
         "perf_data": attr.label(allow_single_file = True),
-        "_bolt_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bolt", executable = True, cfg = "host"),
+        "_bolt_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bolt", executable = True, cfg = "exec"),
     },
+    executable = True,
+    provides = [CcInfo, DefaultInfo],
 )

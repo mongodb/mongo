@@ -13,6 +13,7 @@ load(
 )
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("//bazel/install_rules:bolt.bzl", "bolt_optimize")
 load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
 load("@poetry//:dependencies.bzl", "dependency")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_shared_library")
@@ -545,6 +546,7 @@ def _mongo_cc_binary_and_test(
         skip_global_deps = [],
         env = {},
         _program_type = "",
+        bolt_profile = None,
         skip_windows_crt_flags = False,
         auto_header = True,
         srcs_select = None,
@@ -720,9 +722,24 @@ def _mongo_cc_binary_and_test(
 
     if _program_type == "binary":
         cc_binary(**args)
+
+        if bolt_profile != None:
+            bolt_optimize(
+                name = name + "_bolt",
+                binary_to_optimize = ":" + name + WITH_DEBUG_SUFFIX,
+                perf_data = bolt_profile,
+                target_compatible_with = select({
+                    "//bazel/config:bolt_profile_use_enabled": [],
+                    "//conditions:default": ["@platforms//:incompatible"],
+                }),
+            )
+
         extract_debuginfo_binary(
             name = name,
-            binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
+            binary_with_debug = select({
+                "//bazel/config:bolt_profile_use_enabled": ":" + name + "_bolt",
+                "//conditions:default": ":" + name + WITH_DEBUG_SUFFIX,
+            }) if bolt_profile != None else ":" + name + WITH_DEBUG_SUFFIX,
             type = "program",
             tags = original_tags + ["final_target"],
             enabled = SEPARATE_DEBUG_ENABLED,
@@ -766,6 +783,7 @@ def mongo_cc_binary(
         exec_properties = {},
         skip_global_deps = [],
         env = {},
+        bolt_profile = None,
         **kwargs):
     """Wrapper around cc_binary.
 
@@ -818,6 +836,7 @@ def mongo_cc_binary(
         skip_global_deps,
         env,
         _program_type = "binary",
+        bolt_profile = bolt_profile,
         **kwargs
     )
 

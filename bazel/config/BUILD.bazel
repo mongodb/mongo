@@ -2543,8 +2543,13 @@ bool_flag(
 
 config_setting(
     name = "bolt_profile_use_enabled",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
     flag_values = {
         "//bazel/config:bolt_profile_use": "True",
+        "//bazel/config:compiler_type": "clang",
     },
 )
 
