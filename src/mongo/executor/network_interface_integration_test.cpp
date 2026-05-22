@@ -974,51 +974,37 @@ TEST_F(NetworkInterfaceTest, NumRequestsTimedOutBeforeSentToRemoteMetric) {
     resetIsInternalClient(true);
     ON_BLOCK_EXIT([&] { resetIsInternalClient(false); });
 
-    // Pre-warm the pool with 2 connection.
+    // Pre-warm the pool with a connection so the command acquires one immediately.
     {
         auto fpGuard = configureFailCommand("echo", {}, Milliseconds(500));
-        auto f1 = runCommand(makeCallbackHandle(), makeTestCommand(Seconds(5), makeEchoCmdObj()));
-        auto f2 = runCommand(makeCallbackHandle(), makeTestCommand(Seconds(5), makeEchoCmdObj()));
-        f1.get(interruptible());
-        f2.get(interruptible());
+        runCommand(makeCallbackHandle(), makeTestCommand(Seconds(5), makeEchoCmdObj()))
+            .get(interruptible());
     }
 
     auto metricBefore = getMetric("numRequestsTimedOutBeforeSentToRemote");
 
-    boost::optional<FailPointEnableBlock> fpb("networkInterfaceHangCommandsAfterAcquireConn");
+    // Configure the failpoint to sleep for longer than the command's deadline. The deadline
+    // check runs after the failpoint, so it is guaranteed to see an expired deadline.
+    constexpr auto kDeadline = Milliseconds(100);
+    boost::optional<FailPointEnableBlock> fpb;
+    fpb.emplace("networkInterfaceDelayCommandsAfterAcquireConn",
+                BSON("delayMs" << (kDeadline.count() + 1)));
 
-    auto cbA = makeCallbackHandle();
-    auto futA = runCommand(cbA, makeTestCommand(kMaxWait, BSON("ping" << 1)));
+    auto cb = makeCallbackHandle();
+    auto fut =
+        runCommand(cb,
+                   makeTestCommand(
+                       kDeadline, BSON("ping" << 1), nullptr, false, ErrorCodes::MaxTimeMSExpired));
 
-    // Wait for A to reach the failpoint, confirming the reactor thread is blocked.
+    // Wait for the command to enter the failpoint, then reset it. The failpoint sleeps
+    // internally for kDeadline+1ms, so by the time it exits the deadline is guaranteed expired.
     fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
-
-    auto cbB = makeCallbackHandle();
-    auto futB = runCommand(
-        cbB,
-        makeTestCommand(
-            Seconds(2), BSON("ping" << 1), nullptr, false, ErrorCodes::MaxTimeMSExpired));
-
-    // Wait for B's deadline to expire while its sendRequest is blocked behind A.
-    // B's 2-second deadline is long enough to survive any OS scheduling jitter between
-    // makeTestCommand() stamping the deadline and getClient() checking it, while still
-    // expiring well before the failpoint releases.
-    sleepmillis(2500);
-
-    // Release the failpoint. A's sendRequest continues (sends ping), then the reactor picks
-    // up B's queued sendRequest, which finds its deadline expired and increments the metric.
     fpb.reset();
 
-    // B should have timed out before sending.
-    auto resultB = futB.get(interruptible());
-    ASSERT(!resultB.isOK());
-    ASSERT_EQ(resultB.status.code(), ErrorCodes::MaxTimeMSExpired);
+    auto result = fut.get(interruptible());
+    ASSERT(!result.isOK());
+    ASSERT_EQ(result.status.code(), ErrorCodes::MaxTimeMSExpired);
 
-    // A should succeed normally.
-    auto resultA = futA.get(interruptible());
-    ASSERT(resultA.isOK());
-
-    // Verify the metric was incremented.
     auto metricAfter = getMetric("numRequestsTimedOutBeforeSentToRemote");
     ASSERT_GT(metricAfter, metricBefore);
 }
