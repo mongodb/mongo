@@ -25,6 +25,21 @@
       "group": "mongodb",
       "name": "mongodb/mongo",
       "version": "{{VERSION}}",
+      "description": "The MongoDB Database",
+      "licenses": [
+        {
+          "license": {
+            "id": "SSPL-1.0",
+            "url": "https://www.mongodb.com/legal/licensing/community-edition"
+          }
+        },
+        {
+          "license": {
+            "name": "MongoDB Enterprise Advanced License",
+            "url": "https://www.mongodb.com/products/self-managed/enterprise-advanced"
+          }
+        }
+      ],
       "cpe": "cpe:2.3:a:mongodb:mongodb:{{VERSION}}:*:*:*:*:*:*:*",
       "purl": "pkg:github/mongodb/mongo@{{VERSION}}",
       "externalReferences": [

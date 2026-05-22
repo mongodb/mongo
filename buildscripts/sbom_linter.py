@@ -129,13 +129,14 @@ def validate_license(component: dict, error_manager: ErrorManager) -> None:
 
         if not valid_license:
             licensing_validate = get_spdx_licensing().validate(expression, validate=True)
-            # ExpressionInfo(
-            #   original_expression='',
-            #   normalized_expression='',
-            #   errors=[],
-            #   invalid_symbols=[]
-            # )
-            valid_license = not licensing_validate.errors or not licensing_validate.invalid_symbols
+            # LicenseRef- prefixed identifiers are valid per the SPDX/CycloneDX spec for custom
+            # or proprietary licenses not in the SPDX catalog; exclude them before checking.
+            non_licenseref_invalid = [
+                s
+                for s in licensing_validate.invalid_symbols
+                if not str(s).lower().startswith("licenseref-")
+            ]
+            valid_license = not licensing_validate.errors or not non_licenseref_invalid
             if not valid_license:
                 error_manager.append_full_error_message(licensing_validate)
                 return

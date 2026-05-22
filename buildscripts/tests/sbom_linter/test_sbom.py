@@ -142,6 +142,14 @@ class TestSbom(unittest.TestCase):
             error_manager.print_errors()
         self.assertTrue(error_manager.zero_error())
 
+    def test_licenseref_license(self):
+        test_file = os.path.join(self.input_dir, "sbom_licenseref.json")
+        third_party_libs = {"murmurhash3"}
+        error_manager = sbom_linter.lint_sbom(test_file, test_file, third_party_libs, False)
+        if not error_manager.zero_error():
+            error_manager.print_errors()
+        self.assertTrue(error_manager.zero_error())
+
 
 if __name__ == "__main__":
     unittest.main()

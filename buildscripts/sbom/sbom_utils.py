@@ -141,8 +141,12 @@ def check_components_and_dependencies(sbom: dict, label: str = "") -> None:
 def reconcile_dependency_refs(sbom: dict) -> None:
     """Add stub dependency entries for missing component refs; remove and warn about orphaned refs."""
     component_refs = {c["bom-ref"] for c in sbom.get("components", [])}
-    if primary_ref := sbom.get("metadata", {}).get("component", {}).get("bom-ref"):
+    meta_component = sbom.get("metadata", {}).get("component", {})
+    if primary_ref := meta_component.get("bom-ref"):
         component_refs.add(primary_ref)
+    for sub in meta_component.get("components", []):
+        if sub_ref := sub.get("bom-ref"):
+            component_refs.add(sub_ref)
     dependency_refs = {d["ref"] for d in sbom.get("dependencies", [])}
 
     missing = component_refs - dependency_refs

@@ -553,12 +553,6 @@ def main() -> None:
         component = endor_bom["components"][i]
         removed = False
         for remove in endor_components_remove:
-            if "components" in endor_bom["metadata"]["component"]:
-                endor_bom["metadata"]["component"]["components"] = [
-                    c
-                    for c in endor_bom["metadata"]["component"]["components"]
-                    if not c.get("bom-ref", "").startswith(remove)
-                ]
             if component["bom-ref"].startswith(remove):
                 logger.info("ENDOR SBOM PRE-PROCESS: removing %s", component["bom-ref"])
                 del endor_bom["components"][i]
