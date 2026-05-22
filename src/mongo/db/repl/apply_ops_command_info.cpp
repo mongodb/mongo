@@ -69,6 +69,8 @@ bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd) {
             continue;
         } else if (opType == "u"_sd) {
             continue;
+        } else if (opType == "cu"_sd) {
+            continue;
         } else if (opType == "n"_sd) {
             continue;
         } else {

@@ -51,6 +51,9 @@ TEST(ApplyOpsCommandInfoTest, TestParseAreOpsCrudOnlySingleOps) {
     const BSONObj updateOp = BSON("applyOps" << BSON_ARRAY(BSON("op" << "u")));
     ASSERT_TRUE(_parseAreOpsCrudOnly(updateOp));
 
+    const BSONObj containerUpdateOp = BSON("applyOps" << BSON_ARRAY(BSON("op" << "cu")));
+    ASSERT_TRUE(_parseAreOpsCrudOnly(containerUpdateOp));
+
     const BSONObj noop = BSON("applyOps" << BSON_ARRAY(BSON("op" << "n")));
     ASSERT_TRUE(_parseAreOpsCrudOnly(noop));
 
