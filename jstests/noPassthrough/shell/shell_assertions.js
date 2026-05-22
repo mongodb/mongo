@@ -858,6 +858,27 @@ it("assertJsonFormat", function () {
     );
 });
 
+function assertThrowsErrorWithAttr(assertFailureTriggerFn, {msg, attr}) {
+    try {
+        assertFailureTriggerFn();
+    } catch (e) {
+        assert.eq(msg, e.message, "unexpected error message");
+        assert.eq(toJsonForLog(attr), toJsonForLog(e.extraAttr), "unexpected extra attributes in plain mode");
+        return;
+    }
+    // Call the 'assertFailureTriggerFn' second time to make sure it actually throws.
+    assert.throws(assertFailureTriggerFn, [], "assertFailureTriggerFn");
+}
+
+it("assertPlainModeAttr", function () {
+    assertThrowsErrorWithAttr(
+        () => {
+            assert(false, "lorem ipsum", kAttr);
+        },
+        {msg: "assert failed : lorem ipsum", attr: {...kAttr}},
+    );
+});
+
 it("assertEqMessage", function () {
     assertThrowsError(
         () => {

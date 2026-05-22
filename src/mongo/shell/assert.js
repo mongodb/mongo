@@ -178,7 +178,7 @@ function _doassert(msg, prefix, attr) {
         }
         doassert(_buildAssertionMessage(msg, prefix), attr);
     }
-    doassert(_buildAssertionMessage(msg, formatErrorMsg(prefix, attr, tojson)), attr?.res);
+    doassert(_buildAssertionMessage(msg, formatErrorMsg(prefix, attr, tojson)), attr);
 }
 
 /**

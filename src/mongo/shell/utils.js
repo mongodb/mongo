@@ -31,10 +31,8 @@ function reconnect(db) {
 function _getErrorWithCode(codeOrObj, message) {
     let e = new Error(message);
     if (typeof codeOrObj === "object" && codeOrObj !== null) {
-        if (TestData?.logFormat === "json") {
-            e.extraAttr = codeOrObj;
-            codeOrObj = codeOrObj.res ?? codeOrObj;
-        }
+        e.extraAttr = codeOrObj;
+        codeOrObj = codeOrObj.res ?? codeOrObj;
         if (codeOrObj.hasOwnProperty("code")) {
             e.code = codeOrObj.code;
         }
