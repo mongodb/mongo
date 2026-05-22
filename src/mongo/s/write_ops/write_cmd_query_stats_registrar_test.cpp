@@ -31,6 +31,7 @@
 #include "mongo/s/write_ops/write_cmd_query_stats_registrar.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_stats/mock_key.h"
@@ -449,6 +450,64 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedTe
         queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, opIndex, updateOpEntry);
         ASSERT_FALSE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
     }
+}
+
+TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedForInsertTest) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+
+    auto makeInsertRequest = [&]() {
+        write_ops::InsertCommandRequest insertReq(nss);
+        insertReq.setDocuments({BSON("_id" << 1)});
+        return insertReq;
+    };
+
+    auto registerMockKey = [&](OperationContext* ctx) {
+        OpDebug::QueryStatsInfo qsi;
+        qsi.key = std::make_unique<query_stats::MockKey>(ctx);
+        qsi.keyHash = 42;
+        CurOp::get(ctx)->debug().setQueryStatsInfoAtOpIndex(0 /* kInsertOpIndex */, std::move(qsi));
+    };
+
+    // Runs 'fn' with a fresh opCtx on a dedicated client. AlternativeClientRegion stays alive
+    // for the duration of the call, ensuring the client swap is active throughout 'fn'.
+    auto withFreshOpCtx = [&](std::string clientName, auto fn) {
+        auto client = getServiceContext()->getService()->makeClient(clientName);
+        AlternativeClientRegion acr(client);
+        auto opCtxHolder = cc().makeOperationContext();
+        fn(opCtxHolder.get());
+    };
+
+    // No query stats entry registered: the flag is explicitly cleared, even if the client pre-set
+    // it.
+    withFreshOpCtx("no-key-client", [&](OperationContext* localOpCtx) {
+        WriteCmdQueryStatsRegistrar queryStatsRegistrar;
+        auto insertReq = makeInsertRequest();
+        insertReq.setIncludeQueryStatsMetrics(true);
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequestedForInsert(localOpCtx, insertReq);
+        ASSERT_FALSE(insertReq.getIncludeQueryStatsMetrics());
+    });
+
+    // Query stats entry registered: the flag is set to true.
+    withFreshOpCtx("key-registered-client", [&](OperationContext* localOpCtx) {
+        registerMockKey(localOpCtx);
+        WriteCmdQueryStatsRegistrar queryStatsRegistrar;
+        auto insertReq = makeInsertRequest();
+        ASSERT_FALSE(insertReq.getIncludeQueryStatsMetrics());
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequestedForInsert(localOpCtx, insertReq);
+        ASSERT_TRUE(insertReq.getIncludeQueryStatsMetrics());
+    });
+
+    // Command forwarded from router: function returns early without modifying the request.
+    withFreshOpCtx("forwarded-from-router-client", [&](OperationContext* localOpCtx) {
+        localOpCtx->setCommandForwardedFromRouter();
+        registerMockKey(localOpCtx);
+        WriteCmdQueryStatsRegistrar queryStatsRegistrar;
+        auto insertReq = makeInsertRequest();
+        insertReq.setIncludeQueryStatsMetrics(true);
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequestedForInsert(localOpCtx, insertReq);
+        // Pre-set value is left untouched since the function returns early.
+        ASSERT_TRUE(insertReq.getIncludeQueryStatsMetrics());
+    });
 }
 
 TEST_F(WriteCmdQueryStatsRegistrarTest, PassthroughMetricsOpIndexForCoordinateMultiUpdateTest) {

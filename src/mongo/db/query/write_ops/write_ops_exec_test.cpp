@@ -194,6 +194,10 @@ TEST_F(WriteOpsExecTest, TestInsertRequestSizeEstimationLogic) {
     wcb.setOriginalCollation(fromjson("{locale: 'fr'}"));
     insert.setWriteCommandRequestBase(wcb);
     ASSERT(write_ops::verifySizeEstimate(insert));
+
+    // includeQueryStatsMetrics
+    insert.setIncludeQueryStatsMetrics(true);
+    ASSERT(write_ops::verifySizeEstimate(insert));
 }
 
 TEST_F(WriteOpsExecTest, TestUpdateRequestSizeEstimationLogic) {
@@ -484,7 +488,6 @@ protected:
 
     OpObserverMock* _opObserverMock;
 };
-
 
 TEST_F(WriteOpsExecOplogTest, VerifySingleInsertOplogDoesntBatch) {
     NamespaceString ns =

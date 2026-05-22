@@ -307,35 +307,45 @@ public:
             auto [preConditions, isTimeseriesLogicalRequest] =
                 timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
                     opCtx, ns(), request(), request().getCollectionUUID());
+
+            // An insert command always has exactly one operation; its QueryStatsMetrics index is 0.
+            auto maybeAttachQueryStatsMetrics = [&](write_ops::InsertCommandReply& reply) {
+                if (request().getIncludeQueryStatsMetrics()) {
+                    std::vector<write_ops::QueryStatsMetrics> metrics;
+                    metrics.emplace_back(0, CurOp::get(opCtx)->debug().getCursorMetrics());
+                    reply.setQueryStatsMetrics(std::move(metrics));
+                }
+            };
+
+            write_ops::InsertCommandReply insertReply;
             if (isTimeseriesLogicalRequest) {
                 // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's
                 // constructor.
                 try {
-                    return timeseries::write_ops::performTimeseriesWrites(
+                    insertReply = timeseries::write_ops::performTimeseriesWrites(
                         opCtx, request(), preConditions);
                 } catch (DBException& ex) {
                     ex.addContext(str::stream()
                                   << "time-series insert failed: " << ns().toStringForErrorMsg());
                     throw;
                 }
+            } else {
+                if (hangInsertBeforeWrite.shouldFail([&](const BSONObj& data) {
+                        const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                        return fpNss == request().getNamespace();
+                    })) {
+                    hangInsertBeforeWrite.pauseWhileSet();
+                }
+
+                auto reply = write_ops_exec::performInserts(opCtx, request(), preConditions);
+                populateReply(opCtx,
+                              !request().getWriteCommandRequestBase().getOrdered(),
+                              request().getDocuments().size(),
+                              std::move(reply),
+                              &insertReply);
             }
 
-            if (hangInsertBeforeWrite.shouldFail([&](const BSONObj& data) {
-                    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
-                    return fpNss == request().getNamespace();
-                })) {
-                hangInsertBeforeWrite.pauseWhileSet();
-            }
-
-            auto reply = write_ops_exec::performInserts(opCtx, request(), preConditions);
-
-            write_ops::InsertCommandReply insertReply;
-            populateReply(opCtx,
-                          !request().getWriteCommandRequestBase().getOrdered(),
-                          request().getDocuments().size(),
-                          std::move(reply),
-                          &insertReply);
-
+            maybeAttachQueryStatsMetrics(insertReply);
             return insertReply;
         } catch (const DBException& ex) {
             NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(ex.code());

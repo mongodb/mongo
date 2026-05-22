@@ -1431,6 +1431,12 @@ WriteResult performInserts(
     const bool bypassEmptyTsReplacement = (source == OperationSource::kFromMigrate) ||
         static_cast<bool>(wholeOp.getBypassEmptyTsReplacement());
 
+    // If the router requested insert metrics, mark the CurOp so that end-of-op metrics are
+    // captured and returned in the response.
+    if (wholeOp.getIncludeQueryStatsMetrics()) {
+        curOp.debug().getQueryStatsInfo().metricsRequested = true;
+    }
+
     // Register query stats once before the batch loop.
     // we read from 'preConditions' rather than calling acquireCollection(MODE_IS) to avoid
     // lock acquisition on the hot path.

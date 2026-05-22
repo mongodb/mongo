@@ -608,6 +608,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                 return BatchedCommandRequest([&] {
                     write_ops::InsertCommandRequest insertOp(targeter.getNS());
                     insertOp.setDocuments(std::move(*insertDocs));
+                    registrar.setIncludeQueryStatsMetricsIfRequestedForInsert(_opCtx, insertOp);
                     return insertOp;
                 }());
             case BatchedCommandRequest::BatchType_Update: {

@@ -30,12 +30,16 @@
 #pragma once
 
 #include "mongo/db/curop.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/s/write_ops/write_command_ref.h"
 #include "mongo/util/modules.h"
 
 #include <absl/container/flat_hash_set.h>
 
 namespace mongo::query_stats {
+
+// An insert command always has exactly one operation; this is its fixed QueryStatsMetrics index.
+inline constexpr size_t kInsertOpIndex = 0;
 
 class WriteCmdQueryStatsRegistrar {
 public:
@@ -66,6 +70,13 @@ public:
     void setIncludeQueryStatsMetricsIfRequested(OperationContext* opCtx,
                                                 int opIndex,
                                                 write_ops::UpdateOpEntry& updateOpEntry);
+
+    /**
+     * Sets includeQueryStatsMetrics in 'insertRequest' to request shard-side execution metrics
+     * when the router has registered the insert for query stats collection.
+     */
+    void setIncludeQueryStatsMetricsIfRequestedForInsert(
+        OperationContext* opCtx, write_ops::InsertCommandRequest& insertRequest);
 
 private:
     size_t _numOpsWithMetricsRequested = 0;

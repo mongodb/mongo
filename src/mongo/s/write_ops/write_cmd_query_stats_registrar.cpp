@@ -31,12 +31,16 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_shape/insert_cmd_shape.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_shape/update_cmd_shape.h"
+#include "mongo/db/query/query_stats/insert_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/update_key.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/query/write_ops/update_request.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 
 namespace mongo::query_stats {
 
@@ -162,6 +166,55 @@ void parseAndRegisterUpdateOp(OperationContext* opCtx,
 }
 
 /**
+ * Registers query stats for a single insert command on the mongos (router) side.
+ * Stores the key in queryStatsInfoByBatchOp at opIndex 0, matching the per-batch-op
+ * tracking used by the update path.
+ */
+void parseAndRegisterInsertOp(OperationContext* opCtx,
+                              const write_ops::InsertCommandRequest& insertRequest,
+                              bool skipRegistration) {
+    if (!feature_flags::gFeatureFlagQueryStatsInsert.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return;
+    }
+
+    if (opCtx->isCommandForwardedFromRouter()) {
+        return;
+    }
+
+    if (insertRequest.getEncryptionInformation()) {
+        return;
+    }
+
+    query_shape::DeferredQueryShape deferredShape{[&]() {
+        return shape_helpers::tryMakeShape<query_shape::InsertCmdShape>(insertRequest);
+    }};
+
+    // QueryShapeHash(QSH) will be recorded in CurOp, but it is not being used for anything else
+    // downstream yet until we support inserts in PQS. Using std::ignore to indicate that discarding
+    // the returned QSH is intended.
+    std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
+        opCtx, [&]() -> boost::optional<query_shape::QueryShapeHash> {
+            return shape_helpers::computeQueryShapeHash(opCtx,
+                                                        deferredShape,
+                                                        insertRequest.getNamespace(),
+                                                        true /*skipInternalClientCheck*/);
+        });
+
+    if (skipRegistration) {
+        return;
+    }
+
+    query_stats::registerWriteRequest(opCtx, insertRequest.getNamespace(), kInsertOpIndex, [&]() {
+        uassertStatusOKWithContext(deferredShape->getStatus(),
+                                   "Failed to compute insert query shape");
+        return std::make_unique<query_stats::InsertKey>(
+            opCtx, insertRequest, std::move(deferredShape->getValue()));
+    });
+}
+
+/**
  * Helper function to check if a command is an aggregation pipeline. This is useful because a
  * pipeline having a $merge stage may call cluster::write() to update documents and unexpectedly
  * enter the query stats registration for write commands.
@@ -191,11 +244,15 @@ void WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(OperationContext* opCt
         return;
     }
 
-    // Skip as we only support batch update commands now.
-    // TODO: Remove or update this filter after we support other write commands.
-    if (!cmdRef.isBatchWriteCommand() ||
-        cmdRef.getBatchedCommandRequest().getBatchType() !=
-            BatchedCommandRequest::BatchType_Update) {
+    if (!cmdRef.isBatchWriteCommand()) {
+        return;
+    }
+
+    const auto batchType = cmdRef.getBatchedCommandRequest().getBatchType();
+
+    // Only insert and update commands are currently supported.
+    if (batchType != BatchedCommandRequest::BatchType_Insert &&
+        batchType != BatchedCommandRequest::BatchType_Update) {
         return;
     }
 
@@ -210,25 +267,40 @@ void WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(OperationContext* opCt
     // Initializes the map to indicate that we have already processed the command.
     opDebug.ensureQueryStatsInfoForBatchWrites();
 
-    size_t nOps = cmdRef.getNumOps();
-    for (size_t opIndex = 0; opIndex < nOps; opIndex++) {
-        const auto& updateOp = cmdRef.getOp(opIndex).getUpdateOp();
+    if (batchType == BatchedCommandRequest::BatchType_Insert) {
+        const auto& insertRequest = cmdRef.getBatchedCommandRequest().getInsertRequest();
         if (opCtx->isCommandForwardedFromRouter()) {
-            // Create QueryStatsInfo if the 'updateOp' is requested for the metrics.
-            if (auto requestedOpIndex = updateOp.getIncludeQueryStatsMetricsForOpIndex();
-                requestedOpIndex) {
-                opDebug.setQueryStatsInfoAtOpIndex(*requestedOpIndex, {});
+            // For the embedded-router case, create QueryStatsInfo at the requested opIndex so
+            // that aggregateQueryStatsMetrics can store the shard metrics.
+            if (insertRequest.getIncludeQueryStatsMetrics()) {
+                opDebug.setQueryStatsInfoAtOpIndex(kInsertOpIndex, {});
             }
         } else {
-            parseAndRegisterUpdateOp(opCtx, updateOp.getNss(), opIndex, updateOp, skipRegistration);
+            parseAndRegisterInsertOp(opCtx, insertRequest, skipRegistration);
         }
-    }
+    } else if (batchType == BatchedCommandRequest::BatchType_Update) {
+        size_t nOps = cmdRef.getNumOps();
 
-    // If we are collecting query stats for any of the ops, record the batch size now.
-    opDebug.forEachQueryStatsInfoForBatchWrites(
-        [nOps](size_t opIndex, OpDebug::QueryStatsInfo& info) {
-            info.additiveMetrics.nUpdateOps = nOps;
-        });
+        for (size_t opIndex = 0; opIndex < nOps; opIndex++) {
+            const auto& updateOp = cmdRef.getOp(opIndex).getUpdateOp();
+            if (opCtx->isCommandForwardedFromRouter()) {
+                // Create QueryStatsInfo if the 'updateOp' is requested for the metrics.
+                if (auto requestedOpIndex = updateOp.getIncludeQueryStatsMetricsForOpIndex();
+                    requestedOpIndex) {
+                    opDebug.setQueryStatsInfoAtOpIndex(*requestedOpIndex, {});
+                }
+            } else {
+                parseAndRegisterUpdateOp(
+                    opCtx, updateOp.getNss(), opIndex, updateOp, skipRegistration);
+            }
+        }
+
+        // If we are collecting query stats for any of the ops, record the batch size now.
+        opDebug.forEachQueryStatsInfoForBatchWrites(
+            [nOps](size_t opIndex, OpDebug::QueryStatsInfo& info) {
+                info.additiveMetrics.nUpdateOps = nOps;
+            });
+    }
 }
 
 void WriteCmdQueryStatsRegistrar::setIncludeQueryStatsMetricsIfRequested(
@@ -253,6 +325,28 @@ void WriteCmdQueryStatsRegistrar::setIncludeQueryStatsMetricsIfRequested(
         // Explicitly unset it to stop propagating the field and ignore it, in case if the field is
         // set from user.
         updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(boost::none);
+    }
+}
+
+void WriteCmdQueryStatsRegistrar::setIncludeQueryStatsMetricsIfRequestedForInsert(
+    OperationContext* opCtx, write_ops::InsertCommandRequest& insertRequest) {
+    CurOp* curOp = CurOp::get(opCtx);
+    if (isAggregationPipeline(curOp)) {
+        return;
+    }
+
+    if (opCtx->isCommandForwardedFromRouter()) {
+        return;
+    }
+
+    if (query_stats::shouldRequestRemoteMetrics(curOp->debug(), kInsertOpIndex) &&
+        _numOpsWithMetricsRequested < kMaxBatchOpsMetricsRequested) {
+        insertRequest.setIncludeQueryStatsMetrics(true);
+        _numOpsWithMetricsRequested++;
+    } else {
+        // Explicitly unset it to stop propagating the field and ignore it in case the field is
+        // set from user.
+        insertRequest.setIncludeQueryStatsMetrics(OptionalBool{});
     }
 }
 

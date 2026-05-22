@@ -20,8 +20,8 @@ const kQueryStatsServerParams = {
     internalQueryStatsWriteCmdSampleRate: 1,
 };
 
-function testSingleDocInsert(testDB, coll, collName) {
-    coll.drop();
+function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
+    assert.commandWorked(coll.deleteMany({}));
 
     const cmd = {
         insert: collName,
@@ -51,10 +51,25 @@ function testSingleDocInsert(testDB, coll, collName) {
         expectedDocsReturnedMin: 0,
         expectedDocsReturnedSumOfSq: 0,
     });
+
+    if (shardConn) {
+        // Verify the shard also recorded the insert in its own query stats store.
+        const shardEntries = getQueryStatsInsertCmd(shardConn, {collName: collName});
+        assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {shardEntries});
+        assertAggregatedMetricsSingleExec(shardEntries[0], {
+            keysExamined: 0,
+            docsExamined: 0,
+            hasSortStage: false,
+            usedDisk: false,
+            fromMultiPlanner: false,
+            fromPlanCache: false,
+            writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 1, nUpdateOps: 0},
+        });
+    }
 }
 
-function testMultiDocInsert(testDB, coll, collName) {
-    coll.drop();
+function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
+    assert.commandWorked(coll.deleteMany({}));
 
     const cmd = {
         insert: collName,
@@ -84,6 +99,21 @@ function testMultiDocInsert(testDB, coll, collName) {
         expectedDocsReturnedMin: 0,
         expectedDocsReturnedSumOfSq: 0,
     });
+
+    if (shardConn) {
+        // Verify the shard also recorded the insert in its own query stats store.
+        const shardEntries = getQueryStatsInsertCmd(shardConn, {collName: collName});
+        assert.eq(shardEntries.length, 1, "Expected shard to have a query stats entry", {shardEntries});
+        assertAggregatedMetricsSingleExec(shardEntries[0], {
+            keysExamined: 0,
+            docsExamined: 0,
+            hasSortStage: false,
+            usedDisk: false,
+            fromMultiPlanner: false,
+            fromPlanCache: false,
+            writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 3, nUpdateOps: 0},
+        });
+    }
 }
 
 describe("query stats insert command metrics (replica set)", function () {
@@ -289,9 +319,7 @@ describe("query stats insert command metrics (replica set)", function () {
     });
 });
 
-// TODO SERVER-122076: Enable once query stats collection for inserts is wired through the
-// sharded write path. Currently this branch only implements collection for standalone/replica set.
-describe.skip("query stats insert command metrics (sharded)", function () {
+describe("query stats insert command metrics (sharded)", function () {
     const collName = jsTestName() + "_sharded";
     let st;
     let testDB;
@@ -301,10 +329,20 @@ describe.skip("query stats insert command metrics (sharded)", function () {
         st = new ShardingTest({
             shards: 2,
             mongosOptions: {setParameter: kQueryStatsServerParams},
+            rsOptions: {setParameter: kQueryStatsServerParams},
         });
         testDB = st.s.getDB("test");
         coll = testDB[collName];
-        st.shardColl(coll, {_id: 1}, {_id: 0});
+        // Pin shard1 as primary so routing is deterministic: negative _ids stay on shard1
+        // (primary), non-negative _ids move to shard0 (non-primary).
+        assert.commandWorked(
+            testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard1.shardName}),
+        );
+        assert.commandWorked(st.s.adminCommand({shardcollection: coll.getFullName(), key: {_id: 1}}));
+        assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
+        assert.commandWorked(
+            st.s.adminCommand({movechunk: coll.getFullName(), find: {_id: 0}, to: st.shard0.shardName}),
+        );
     });
 
     after(function () {
@@ -313,13 +351,15 @@ describe.skip("query stats insert command metrics (sharded)", function () {
 
     beforeEach(function () {
         resetQueryStatsStore(st.s, "1MB");
+        resetQueryStatsStore(st.shard0, "1MB");
+        resetQueryStatsStore(st.shard1, "1MB");
     });
 
-    it("should record single-doc insert metrics", function () {
-        testSingleDocInsert(testDB, coll, collName);
+    it("should record single-doc insert metrics for a sharded collection", function () {
+        testSingleDocInsert(testDB, coll, collName, st.shard0);
     });
 
-    it("should record multi-doc insert metrics", function () {
-        testMultiDocInsert(testDB, coll, collName);
+    it("should record multi-doc insert metrics for a sharded collection", function () {
+        testMultiDocInsert(testDB, coll, collName, st.shard0);
     });
 });

@@ -540,6 +540,10 @@ bool verifySizeEstimate(const write_ops::UpdateOpEntry& update) {
 bool verifySizeEstimate(const InsertCommandRequest& insertReq,
                         const OpMsgRequest* unparsedRequest) {
     int size = getInsertHeaderSizeEstimate(insertReq);
+    if (insertReq.getIncludeQueryStatsMetrics()) {
+        size += InsertCommandRequest::kIncludeQueryStatsMetricsFieldName.size() + kBoolSize +
+            kPerElementOverhead;
+    }
     for (auto&& docToInsert : insertReq.getDocuments()) {
         size += docToInsert.objsize() + kWriteCommandBSONArrayPerElementOverheadBytes;
     }
@@ -610,6 +614,7 @@ int getInsertHeaderSizeEstimate(const InsertCommandRequest& insertReq) {
 
     size += InsertCommandRequest::kCommandName.size() + kPerElementOverhead +
         insertReq.getNamespace().size() + 1 /* ns string null terminator */;
+
     return size;
 }
 

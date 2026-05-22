@@ -379,6 +379,12 @@ BatchedCommandRequest WriteBatchExecutor::buildBatchWriteRequest(
 
             write_ops::InsertCommandRequest insertRequest(targetedNss);
             insertRequest.setDocuments(std::move(insertDocs));
+
+            // Request shard-side metrics if the router registered an insert query stats key.
+            // All documents in a single insert command share one query stats entry (opIndex 0).
+            query_stats::WriteCmdQueryStatsRegistrar registrar;
+            registrar.setIncludeQueryStatsMetricsIfRequestedForInsert(opCtx, insertRequest);
+
             return std::move(insertRequest);
         } else if (batchType == BatchedCommandRequest::BatchType_Update) {
             // Copy the UpdateOpEntry from the original command, and then update the "sampleId"

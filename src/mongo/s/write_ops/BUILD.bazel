@@ -78,6 +78,7 @@ mongo_cc_library(
         "write_cmd_query_stats_registrar.cpp",
     ],
     deps = [
+        "//src/mongo/db/query/query_stats:insert_key",
         "//src/mongo/db/query/query_stats:update_key",
     ],
 )

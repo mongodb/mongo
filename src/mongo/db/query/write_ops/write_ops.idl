@@ -133,6 +133,18 @@ structs:
         is_command_reply: true
         chained_structs:
             WriteCommandReplyBase: writeCommandReplyBase
+        fields:
+            queryStatsMetrics:
+                description: >-
+                    Metrics for the insert command if requested by the router. Uses
+                    array<QueryStatsMetrics> (the same type as UpdateCommandReply) rather than
+                    optional<CursorMetrics> so that batch_write_exec.cpp can aggregate shard metrics
+                    for both insert and update via the same uniform loop that dispatches on
+                    QueryStatsMetrics::originalOpIndex. An insert command always produces at most one
+                    element (originalOpIndex == 0).
+                type: array<QueryStatsMetrics>
+                optional: true
+                stability: internal
 
     Upserted:
         description: "Contains documents that have been upserted."
@@ -462,6 +474,10 @@ commands:
                 type: array<object>
                 supports_doc_sequence: true
                 stability: stable
+            includeQueryStatsMetrics:
+                description: "Whether to include query stats metrics in the response."
+                type: optionalBool
+                stability: internal
 
     # IMPORTANT: If any changes are made to the fields here, please update the corresponding update
     # size estimation functions in 'write_ops.cpp'.

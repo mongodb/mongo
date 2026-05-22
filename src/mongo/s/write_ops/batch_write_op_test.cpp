@@ -3227,5 +3227,42 @@ TEST_F(BatchWriteOpTest,
     ASSERT_FALSE(clientResponse.areQueryStatsMetricsSet());
 }
 
+TEST_F(BatchWriteOpTest, BuildBatchRequestSetsIncludeQueryStatsMetricsForInsert) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpoint(
+        ShardId("shard"), ShardVersionFactory::make(ChunkVersion::IGNORED()), boost::none);
+    auto targeter = initTargeterFullRange(nss, endpoint);
+
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setDocuments({BSON("x" << 1)});
+        return insertOp;
+    }());
+
+    auto targetAndBuild = [&] {
+        BatchWriteOp batchOp(_opCtx, request);
+        std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+        ASSERT_OK(batchOp.targetBatch(targeter, false, &targeted));
+        ASSERT_EQUALS(targeted.size(), 1u);
+        return batchOp.buildBatchRequest(*targeted.begin()->second, targeter, boost::none);
+    };
+
+    // No query stats entry registered: includeQueryStatsMetrics is not set.
+    {
+        auto built = targetAndBuild();
+        ASSERT_FALSE(built.getInsertRequest().getIncludeQueryStatsMetrics());
+    }
+
+    // Query stats entry registered at opIndex 0: includeQueryStatsMetrics is set to true.
+    {
+        OpDebug::QueryStatsInfo qsi;
+        qsi.keyHash = 42;
+        CurOp::get(_opCtx)->debug().setQueryStatsInfoAtOpIndex(0, std::move(qsi));
+
+        auto built = targetAndBuild();
+        ASSERT_TRUE(built.getInsertRequest().getIncludeQueryStatsMetrics());
+    }
+}
+
 }  // namespace
 }  // namespace mongo
