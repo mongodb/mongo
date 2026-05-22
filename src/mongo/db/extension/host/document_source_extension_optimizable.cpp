@@ -701,7 +701,7 @@ REGISTER_RULES_WITH_FEATURE_FLAG(
         .name = "EXTENSION_APPLY_PIPELINE_SUFFIX_DEPENDENCIES",
         .precondition = mongo::extension::host::extensionApplyDependenciesPrecondition,
         .transform = mongo::extension::host::extensionApplyDependenciesTransform,
-        .priority = kDefaultOptimizeInPlacePriority,
+        .priority = kDefaultOptimizeInPlacePriority + 1,
         .tags = PipelineRewriteContext::Tags::InPlace,
     });
 REGISTER_RULES(DocumentSourceExtensionOptimizable,
