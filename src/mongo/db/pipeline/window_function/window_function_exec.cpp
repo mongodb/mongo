@@ -232,6 +232,9 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
             iter, expr->input(), expr->bounds(), expr->defaultVal(), &functionMemTracker);
     } else if (auto expr =
                    dynamic_cast<window_function::ExpressionLinearFill*>(functionStmt.expr.get())) {
+        tassert(12728000,
+                "$linearFill requires a 1-field non-expression sortBy",
+                sortBy && sortBy->size() == 1 && !sortBy->begin()->expression);
         auto sortByExpr = ExpressionFieldPath::createPathFromString(
             expCtx, sortBy->begin()->fieldPath->fullPath(), expCtx->variablesParseState);
         return std::make_unique<WindowFunctionExecLinearFill>(
