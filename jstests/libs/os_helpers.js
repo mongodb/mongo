@@ -234,7 +234,7 @@ export function isAmazon2023() {
 /**
  * Determine whether the Windows host supports TLS 1.3 for clients.
  * Prefer querying the registry key created for TLS 1.3 support and fall
- * back to parsing `systeminfo` for Windows 11 / Windows Server 2022.
+ * back to checking the Windows build number via the `ver` command.
  */
 export function windowsSupportsTLS13() {
     if (!_isWindows()) {
@@ -252,17 +252,22 @@ export function windowsSupportsTLS13() {
             return true;
         }
     } catch (e) {
-        // ignore and fall back to systeminfo parsing
+        // ignore and fall back to build number check
     }
 
-    // Fallback: parse `systeminfo` output for Windows 11 / Windows Server 2022.
+    // Fallback: check Windows build number via the `ver` command.
+    // Windows Server 2022 (build 20348+) and Windows 11 (build 22000+) support TLS 1.3.
+    // `ver` is a cmd.exe built-in and outputs "Microsoft Windows [Version 10.0.XXXXX.YYY]",
+    // avoiding the argument-escaping pitfalls of registry paths that contain spaces.
     try {
         clearRawMongoProgramOutput();
-        runProgram("cmd.exe", "/c", "systeminfo");
-        const sysinfo = rawMongoProgramOutput(".*");
+        runProgram("cmd.exe", "/c", "ver");
+        const output = rawMongoProgramOutput(".*");
         clearRawMongoProgramOutput();
-        if (sysinfo.includes("Windows 11") || sysinfo.includes("Windows Server 2022")) {
-            return true;
+        const match = output.match(/\[Version \d+\.\d+\.(\d+)\./);
+        if (match) {
+            const buildNum = parseInt(match[1]);
+            return buildNum >= 20348;
         }
     } catch (e) {
         // If we can't determine, conservatively return false.
