@@ -641,13 +641,13 @@ bool ReshardingOplogFetcher::consume(
     auto tickSource = opCtxRaii->getServiceContext()->getTickSource();
     Timer batchTimer(tickSource);
 
-    const auto originalStartAt = [&] {
+    const auto [originalStartAt,
+                originalTotalNumBatchesProcessed,
+                originalLastUpdatedProgressMarkAt] = [&] {
         std::lock_guard lk(_mutex);
-        return _startAt;
+        return std::make_tuple(_startAt, _totalNumBatchesProcessed, _lastUpdatedProgressMarkAt);
     }();
     const auto originalNumOplogEntriesCopied = _numOplogEntriesCopied;
-    const auto originalTotalNumBatchesProcessed = _totalNumBatchesProcessed;
-    const auto originalLastUpdatedProgressMarkAt = _lastUpdatedProgressMarkAt;
 
     // Note that the oplog entries are *not* being copied with a tailable cursor.
     // Shard::runAggregation() will instead return upon hitting the end of the donor's oplog.
@@ -849,10 +849,10 @@ bool ReshardingOplogFetcher::consume(
             {
                 std::lock_guard lk(_mutex);
                 _startAt = originalStartAt;
+                _totalNumBatchesProcessed = originalTotalNumBatchesProcessed;
+                _lastUpdatedProgressMarkAt = originalLastUpdatedProgressMarkAt;
             }
             _numOplogEntriesCopied = originalNumOplogEntriesCopied;
-            _totalNumBatchesProcessed = originalTotalNumBatchesProcessed;
-            _lastUpdatedProgressMarkAt = originalLastUpdatedProgressMarkAt;
             currentNumBatchesProcessed = 0;
             moreToCome = true;
         }));
