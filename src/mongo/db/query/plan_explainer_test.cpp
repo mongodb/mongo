@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -659,6 +660,70 @@ TEST_F(PlanExplainerTest, PlanExplainerDataMergeFull) {
     ASSERT(data1.rejectedPlansWithStages[1].solution != nullptr);
     ASSERT_EQ(data1.planStageQsnMap.size(), 2);
     ASSERT_EQ(data1.estimates.size(), 2);
+}
+
+TEST_F(PlanExplainerTest, CBRSamplingMetadataSerializedInExplain) {
+    // Verify that when CBR uses sampling CE, the 'ceSamplingMetadata' section appears in the
+    // queryPlanner explain output and contains the expected fields for each collection.
+    RAIIServerParameterControllerForTest samplingController("internalQueryCBRCEMode", "samplingCE");
+
+    const auto verbosity = ExplainOptions::Verbosity::kQueryPlanner;
+    expCtx->setExplain(verbosity);
+
+    auto coll = acquireCollection(
+        operationContext(),
+        CollectionAcquisitionRequest::fromOpCtx(
+            operationContext(), kNss, AcquisitionPrerequisites::OperationType::kRead),
+        MODE_IS);
+    MultipleCollectionAccessor colls{coll};
+
+    auto findCommand = std::make_unique<FindCommandRequest>(kNss);
+    findCommand->setFilter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = expCtx,
+        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)}});
+
+    Command* cmd = CommandHelpers::findCommand(operationContext(), "find");
+    {
+        std::lock_guard<Client> clientLock(*operationContext()->getClient());
+        CurOp::get(operationContext())
+            ->setGenericOpRequestDetails(clientLock, kNss, cmd, BSONObj(), NetworkOp::dbQuery);
+    }
+
+    auto swExec = getExecutorFind(
+        operationContext(), colls, std::move(cq), PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+    ASSERT_OK(swExec);
+
+    BSONObjBuilder bob;
+    Explain::explainStages(swExec.getValue().get(),
+                           colls,
+                           verbosity,
+                           Status::OK(),
+                           boost::none,
+                           BSONObj(),
+                           SerializationContext::stateCommandReply(),
+                           BSONObj(),
+                           &bob);
+    const BSONObj explained = bob.obj();
+
+    auto queryPlanner = explained["queryPlanner"];
+    ASSERT(queryPlanner.isABSONObj()) << "Missing queryPlanner in: " << explained;
+
+    auto ceSamplingMeta = queryPlanner["ceSamplingMetadata"];
+    ASSERT(ceSamplingMeta.isABSONObj())
+        << "Missing ceSamplingMetadata in queryPlanner: " << queryPlanner;
+
+    // Exactly one namespace entry expected.
+    ASSERT_EQ(ceSamplingMeta.Obj().nFields(), 1) << ceSamplingMeta;
+    const BSONElement nsElem = ceSamplingMeta.Obj().firstElement();
+    ASSERT_EQ(nsElem.type(), BSONType::object);
+    const BSONObj nsMeta = nsElem.Obj();
+
+    ASSERT_EQ(nsMeta["sampleSource"].String(), "onTheFly");
+    ASSERT(nsMeta.hasField("sampleTechnique")) << nsMeta;
+    ASSERT(nsMeta.hasField("sampleDocCount")) << nsMeta;
+    ASSERT(nsMeta.hasField("sampleRequestedDocCount")) << nsMeta;
+    ASSERT(nsMeta.hasField("sampleMemorySizeBytes")) << nsMeta;
 }
 
 }  // namespace

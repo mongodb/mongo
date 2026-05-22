@@ -36,6 +36,7 @@
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/stats/counters.h"
 
@@ -211,7 +212,7 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
                                                samplingEstimator.get(),
                                                exactCardinality.get(),
                                                std::move(statusWithMultiPlanSolns),
-                                               query.getExplain().has_value());
+                                               query);
 
     // Calculate duration for server status metrics
     auto durationMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);

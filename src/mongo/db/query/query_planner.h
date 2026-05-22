@@ -136,7 +136,7 @@ public:
         ce::SamplingEstimator* samplingEstimator,
         const ce::ExactCardinalityEstimator* exactCardinality,
         StatusWith<std::vector<std::unique_ptr<QuerySolution>>> statusWithMultiPlanSolns,
-        bool isExplain);
+        const CanonicalQuery& query);
 
     /**
      * Generates and returns a query solution, given data retrieved from the plan cache.

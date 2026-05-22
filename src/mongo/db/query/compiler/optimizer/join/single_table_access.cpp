@@ -148,7 +148,7 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
                                                                   samplingEstimator.get(),
                                                                   nullptr /*exactCardinality*/,
                                                                   std::move(swSolns.getValue()),
-                                                                  isExplain);
+                                                                  *node.accessPath);
         // Return bad status if CBR is unable to produce a plan
         if (!swCbrResult.isOK()) {
             return swCbrResult.getStatus();

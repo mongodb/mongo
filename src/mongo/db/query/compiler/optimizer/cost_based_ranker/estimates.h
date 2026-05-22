@@ -577,6 +577,29 @@ CardinalityEstimate operator*(const SelectivityEstimate& s, const CardinalityEst
 CardinalityEstimate operator*(const CardinalityEstimate& ce, const SelectivityEstimate& s);
 
 /**
+ * The actual strategy used to generate the sample.
+ */
+enum class SamplingTechnique {
+    kRandom,
+    kChunk,
+    kFullCollScan,
+    kSeqScan,
+};
+
+/**
+ * Metadata about the sample used when 'ceSource == Sampling'.
+ */
+struct SamplingMetadata {
+    bool isPersisted;
+    size_t docCount;           // number of documents in the sample
+    size_t requestedDocCount;  // number of documents originally requested
+    size_t memorySizeBytes;
+    SamplingTechnique technique;
+    boost::optional<int> numChunks;
+    boost::optional<Date_t> createdAt;
+};
+
+/**
  * The optimizer's estimate of a single QSN in the physical plan.
  */
 struct QSNEstimate {

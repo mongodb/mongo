@@ -39,6 +39,7 @@
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -59,6 +60,9 @@ struct PlanExplainerData {
     boost::optional<double> multiPlannerWinningPlanScore;
     stage_builder::PlanStageToQsnMap planStageQsnMap;
     cost_based_ranker::EstimateMap estimates;
+    // Namespace-keyed map of sampling metadata emitted under queryPlanner.ceSamplingMetadata.
+    // Populated on the explain path when CBR used a sampling estimator.
+    StringMap<cost_based_ranker::SamplingMetadata> ceSamplingMetadata;
     bool fromPlanCache = false;
 };
 
@@ -69,6 +73,12 @@ inline PlanExplainerData& operator<<(PlanExplainerData& lhs, PlanExplainerData&&
     lhs.planStageQsnMap.insert(rhs.planStageQsnMap.begin(), rhs.planStageQsnMap.end());
     for (auto& [k, v] : rhs.estimates) {
         lhs.estimates.insert_or_assign(k, std::move(v));
+    }
+    for (auto& [ns, meta] : rhs.ceSamplingMetadata) {
+        tassert(12433205,
+                "ceSamplingMetadata already has an entry for namespace during merge",
+                !lhs.ceSamplingMetadata.contains(ns));
+        lhs.ceSamplingMetadata.emplace(ns, std::move(meta));
     }
     return lhs;
 }
@@ -193,6 +203,16 @@ public:
 
     void setQuerySolution(const QuerySolution* qs) {
         _solution = qs;
+    }
+
+    /**
+     * Returns the per-collection sampling metadata to be emitted under
+     * queryPlanner.ceSamplingMetadata in explain output. Returns boost::none if no sampling
+     * metadata is available (e.g., CBR was not used, or this is not a classic-engine plan).
+     */
+    virtual boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> getCeSamplingMetadata()
+        const {
+        return boost::none;
     }
 
 protected:
