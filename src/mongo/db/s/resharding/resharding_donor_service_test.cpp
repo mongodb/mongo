@@ -100,6 +100,7 @@ class ExternalStateForTestImpl {
 public:
     enum class ExternalFunction {
         kRefreshCollectionPlacementInfo,
+        kUpdateCoordinatorDocument,
         kAbortUnpreparedTransactionIfNecessary,
     };
 
@@ -111,7 +112,9 @@ public:
 
     void updateCoordinatorDocument(OperationContext* opCtx,
                                    const BSONObj& query,
-                                   const BSONObj& update) {}
+                                   const BSONObj& update) {
+        _maybeThrowErrorForFunction(opCtx, ExternalFunction::kUpdateCoordinatorDocument);
+    }
 
     void refreshCollectionPlacementInfo(OperationContext* opCtx, const NamespaceString& sourceNss) {
         _maybeThrowErrorForFunction(opCtx, ExternalFunction::kRefreshCollectionPlacementInfo);
@@ -527,7 +530,7 @@ private:
                               DonorStateMachine& donor,
                               const ReshardingDonorDocument& donorDoc,
                               DonorStateEnum targetState) {
-        if (targetState >= DonorStateEnum::kDonatingInitialData) {
+        if (targetState > DonorStateEnum::kDonatingInitialData) {
             notifyToStartChangeStreamsMonitor(opCtx, donor, donorDoc);
         }
 
@@ -1489,22 +1492,19 @@ TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringPreparingToDonate) {
     }
 }
 
-// TODO (SERVER-108852): Enable this test once the resharding donor is able to handle
-// errors from the resharding change streams monitor.
-// TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringDonatingInitialData) {
-//     for (auto& test :
-//          std::vector<TestOptions>{{.isAlsoRecipient = false}, {.isAlsoRecipient = true}}) {
-//         LOGV2(10885200,
-//               "Running case",
-//               "test"_attr = unittest::getTestName(),
-//               "testOptions"_attr = test);
+TEST_F(ReshardingDonorServiceTest, UnrecoverableErrorDuringDonatingInitialData) {
+    externalState()->throwUnrecoverableErrorIn(DonorStateEnum::kDonatingInitialData,
+                                               kUpdateCoordinatorDocument);
 
-//         FailPointEnableBlock
-//         failpoint("reshardingDonorFailsUpdatingChangeStreamsMonitorProgress");
+    for (auto& test : makeAllTestOptions()) {
+        LOGV2(12732500,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testOptions"_attr = test);
 
-//         runUnrecoverableErrorTest(test, DonorStateEnum::kDonatingInitialData);
-//     }
-// }
+        runUnrecoverableErrorTest(test, DonorStateEnum::kDonatingInitialData);
+    }
+}
 
 TEST_F(ReshardingDonorServiceTest, RetryableErrorDuringChangeStreamsMonitorTriggersRecreation) {
     TestOptions testOptions{.isAlsoRecipient = false, .performVerification = true};
