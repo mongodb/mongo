@@ -230,6 +230,11 @@ function getPredicateFromIxscan(stage) {
  * we need to do a lot of heavy lifting to reconstruct the original predicate.
  */
 function parseIndexBound(boundStr) {
+    // MongoDB's IXSCAN explain output renders "no lower/upper bound" on a date-typed index as
+    // new Date(INT64_MIN) / new Date(INT64_MAX).
+    const DATE_INT64_MIN_LITERAL = "new Date(-9223372036854775808)";
+    const DATE_INT64_MAX_LITERAL = "new Date(9223372036854775807)";
+
     // Bounds look like this: '["abc", "abc"]', '(5.0, 10.0]', '[MinKey, MaxKey]'
     const match = boundStr.match(/^([\[\(])\s*(.+?)\s*,\s*(.+?)\s*([\]\)])$/);
     if (!match) {
@@ -243,8 +248,15 @@ function parseIndexBound(boundStr) {
 
     const lowerInclusive = match[1] === "[";
     const upperInclusive = match[4] === "]";
-    const lowerVal = parseIndexBoundLiteral(match[2].trim());
-    const upperVal = parseIndexBoundLiteral(match[3].trim());
+    const lowerRaw = match[2].trim();
+    const upperRaw = match[3].trim();
+
+    // Only re-map on the side that semantically means "no bound": INT64_MIN as the lower bound,
+    // INT64_MAX as the upper bound. The inverse positions can appear as legitimate type-bracketing
+    // bounds, e.g. {$lt: null} on a date IXSCAN produces [MinKey, new Date(INT64_MIN)), and must
+    // stay intact.
+    const lowerVal = lowerRaw === DATE_INT64_MIN_LITERAL ? "MinKey" : parseIndexBoundLiteral(lowerRaw);
+    const upperVal = upperRaw === DATE_INT64_MAX_LITERAL ? "MaxKey" : parseIndexBoundLiteral(upperRaw);
 
     const isEquality =
         lowerInclusive &&
@@ -264,7 +276,7 @@ function parseIndexBound(boundStr) {
 }
 
 /**
- * Parse an individual literal as seen in an index bound
+ * Parse an individual literal as seen in an index bound.
  */
 function parseIndexBoundLiteral(str) {
     if (str === "MinKey") return "MinKey";

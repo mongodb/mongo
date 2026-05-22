@@ -3104,7 +3104,7 @@ db.supplier.aggregate(EJSON.deserialize(
 {"$match":{"$and":[{"o_clerk":{"$not":{"$eq":"Clerk#000000567"}}},{}]}}]}},
 {"$unwind":"$orders"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$orders"]}}},
 {"$lookup":{"from":"lineitem","localField":"o_orderkey","foreignField":"l_orderkey","as":"lineitem","pipeline":[
-{"$match":{"l_commitdate":{"$gte":null,"$lte":"1992-04-13T00:00:00.000Z"}}}]}},
+{"$match":{"l_commitdate":{"$lte":"1992-04-13T00:00:00.000Z"}}}]}},
 {"$unwind":"$lineitem"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$lineitem"]}}}]
 ));
 ```
