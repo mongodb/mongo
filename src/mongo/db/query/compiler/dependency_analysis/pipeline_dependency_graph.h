@@ -202,10 +202,8 @@ public:
 
     /**
      * Returns the set of "dead" fields introduced by single-document transformation stages
-     * that are guaranteed to never affect the pipeline output.
-     *
-     * TODO(SERVER-127211): a field referenced by an intermediate stage is not dead, even if that
-     * stage is itself dead.
+     * that are guaranteed to never affect the pipeline output. Deadness is transitive: a field
+     * whose only usages are themselves dead is also reported.
      *
      * TODO(SERVER-127212): also walk sub-pipelines and return their dead fields. For now,
      * sub-pipelines are not analyzed; call getSubpipelineGraph(stage)->getDeadFields() to

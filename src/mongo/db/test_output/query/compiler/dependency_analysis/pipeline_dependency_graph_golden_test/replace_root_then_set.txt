@@ -67,7 +67,9 @@ output: {
             "fields": {
                 "<missing>:3": {
                     "declaringScope": "scope:1",
-                    "dependencies": []
+                    "dependencies": [
+                        "a:1"
+                    ]
                 }
             }
         },

@@ -29,7 +29,9 @@ output: {
             "fields": {
                 "<missing>:0": {
                     "declaringScope": "scope:0",
-                    "dependencies": []
+                    "dependencies": [
+                        "<base document>:-1"
+                    ]
                 }
             }
         },

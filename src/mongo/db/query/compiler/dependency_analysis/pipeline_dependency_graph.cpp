@@ -800,14 +800,14 @@ private:
     class Serializer;
 
     /**
-     * Builds a bitmap indexed by FieldIds where 'true' means the field's value is accessed
-     * somewhere downstream. I.e., the field is either read by a stage, surviving in the pipeline's
-     * final output scope, or transitively required by another alive field's dependencies.
+     * Returns a bitset of FieldIds whose value is needed downstream: present in some stage's
+     * dependencies, surviving in the pipeline's final output scope, or transitively required
+     * by another alive field's dependencies.
      *
-     * The algorithm works as follows:
-     * We first seed the alive set with every field directly read by a stage and every field
-     * surviving in the pipeline's final output scope, then iteratively drain a worklist, marking
-     * each alive field's own dependencies alive, until the bitset reaches a fixpoint.
+     * Deadness is transitive: single-document transformation stages (e.g. $set, $project, $unset,
+     * $replaceWith) contribute only their per-field dependencies, propagated when one of their
+     * declared fields is shown to be needed downstream. A chain of such stages whose final output
+     * is unused is therefore considered dead.
      */
     Bitset computeAliveFields() const {
         Bitset alive(_fields.size());
@@ -816,7 +816,6 @@ private:
         }
 
         std::vector<FieldId> worklist;
-
         auto markAlive = [&](FieldId fieldId) {
             if (fieldId && !alive.test(fieldId.value)) {
                 alive.set(fieldId.value);
@@ -832,9 +831,9 @@ private:
                 markAlive(_scopes[scopeId].missingField);
             }
         };
-        // A 'whole document' dependency reads every field visible at the reader's input, which
-        // is the scope produced by the previous stage. For the first stage that is the base
-        // document, but base-document fields don't have FieldIds, so there is nothing to mark.
+        // A 'whole document' dependency covers every field visible at the stage's input, which is
+        // the scope produced by the previous stage. For the first stage that is the base document,
+        // but base-document fields are not represented in the graph, so there is nothing to mark.
         auto markPredecessorScopeAlive = [&](StageId scopeId) {
             if (scopeId > StageId(0)) {
                 StageId prevStage{scopeId.value - 1};
@@ -851,19 +850,25 @@ private:
             }
         };
 
-        // Seed: every stage's direct dependencies plus the pipeline's final output scope.
+        // Eagerly mark the stage-level dependencies of stages that are always alive. We currently
+        // consider everything except single doc transformation stages to be always alive.
         for (StageId stageId{0}; stageId.value < static_cast<int32_t>(_stages.size());
              stageId.value++) {
-            markDependenciesAlive(_stages[stageId].dependencies, stageId);
+            if (!_stages[stageId].isSingleDocumentTransformation) {
+                markDependenciesAlive(_stages[stageId].dependencies, stageId);
+            }
         }
         markAllScopeFieldsAlive(_stages.back().scope);
 
-        // Propagate: every alive field implicitly requires its own dependencies to be alive too.
+        // Walk the dependency graph depth-first: pop the most recently marked field and propagate
+        // its per-field dependencies. Stage-level dependencies of the remaining stages were already
+        // marked above.
         while (!worklist.empty()) {
             FieldId aliveField = worklist.back();
             worklist.pop_back();
             const auto& field = _fields[aliveField];
-            markDependenciesAlive(field.dependencies, _scopes[field.declaringScope].stage);
+            const StageId stageId = _scopes[field.declaringScope].stage;
+            markDependenciesAlive(field.dependencies, stageId);
         }
         return alive;
     }
@@ -1436,9 +1441,14 @@ private:
                     // field not explicitly added is truly missing. Otherwise (e.g. $replaceRoot
                     // with expression), unknown fields may still exist.
                     declareScope(stage, scopeId /*exhaustiveScope*/, ScopeId::none());
+                    auto& missingField = _fields[_scopes[scopeId].missingField];
                     if (op.isEmpty()) {
-                        auto& missingField = _fields[_scopes[scopeId].missingField];
                         updateMetadataForMissingValue(missingField.metadata);
+                    } else if (ds.isSingleDocumentTransformation()) {
+                        // The new root is produced entirely by the stage's expression and the stage
+                        // emits no per-field operations (e.g. $replaceWith only emits ReplaceRoot).
+                        // Attach the expression's dependencies to the missing field.
+                        missingField.dependencies = depsFromStage;
                     }
                     tassert(
                         11996201, "Did not expect ReplaceRoot in this position", !hasDeclaredScope);
