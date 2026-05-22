@@ -407,4 +407,94 @@ runTestCaseEligiblePipeline({
     expectedCount: 1,
 });
 
+// Rooted $ors on the base collection disqualify the query completely.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {$match: {$or: [{a: 1}, {a: 2}, {a: {$gt: 12}}]}},
+        {
+            $lookup: {
+                from: coll12.getName(),
+                localField: "a",
+                foreignField: "a",
+                as: "coll12",
+            },
+        },
+        {$unwind: "$coll12"},
+    ],
+    expectedCount: 1,
+});
+
+// Same goes for a rooted $or on the first collection we're joining on.
+runTestCaseIneligiblePipeline({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                localField: "a",
+                foreignField: "a",
+                as: "coll12",
+                pipeline: [{$match: {$or: [{a: 1}, {a: 2}, {a: {$gt: 12}}]}}],
+            },
+        },
+        {$unwind: "$coll12"},
+    ],
+    expectedCount: 1,
+});
+
+// But, we will permit a prefix to a rooted-$or query.
+runTestCaseIneligibleSuffix({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                localField: "a",
+                foreignField: "a",
+                as: "coll12",
+            },
+        },
+        {$unwind: "$coll12"},
+        {
+            $lookup: {
+                from: coll13.getName(),
+                let: {
+                    "a": "$a",
+                },
+                pipeline: [{$match: {$or: [{a: 1}, {a: 2}, {a: {$gt: 12}}], $expr: {$eq: ["$$a", "$a"]}}}],
+                as: "coll13",
+            },
+        },
+        {$unwind: "$coll13"},
+    ],
+    expectedCount: 1,
+    expectedJoinNodesInPrefix: 1,
+});
+
+// We don't bail out if our predicate is too complex to run as a rooted-$or.
+runTestCaseIneligibleSuffix({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                localField: "a",
+                foreignField: "a",
+                as: "coll12",
+            },
+        },
+        {$unwind: "$coll12"},
+        {
+            $lookup: {
+                from: coll13.getName(),
+                let: {
+                    "a": "$a",
+                },
+                pipeline: [{$match: {$or: [{a: 1}, {a: 2}, {a: {$gt: 12}}], $expr: {$eq: ["$$a", "$a"]}, d: "foo"}}],
+                as: "coll13",
+            },
+        },
+        {$unwind: "$coll13"},
+    ],
+    expectedCount: 1,
+    expectedJoinNodesInPrefix: 2,
+});
+
 MongoRunner.stopMongod(conn);

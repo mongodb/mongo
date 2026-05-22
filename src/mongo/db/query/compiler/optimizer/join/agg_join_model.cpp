@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/classic/subplan.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
@@ -81,6 +82,10 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQueryFromSingleMatchE
     CanonicalQueryParams params{.expCtx = expCtx, .parsedFind = std::move(pfc.getValue())};
     auto cq = CanonicalQuery::make(std::move(params));
     expCtx->setPlanCache(oldPlanCache);
+    if (cq.isOK() && SubplanStage::canUseSubplanning(*cq.getValue())) {
+        return Status(ErrorCodes::QueryFeatureNotAllowed,
+                      "Encountered rooted $or, can't use subplanning together with join opt");
+    }
     return cq;
 }
 
@@ -329,6 +334,11 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
         // Bail out & return the failure status- we failed to generate a CanonicalQuery from a
         // pipeline prefix.
         return swCQ.getStatus();
+    }
+
+    if (SubplanStage::canUseSubplanning(*swCQ.getValue())) {
+        return Status(ErrorCodes::QueryFeatureNotAllowed,
+                      "Encountered rooted $or, can't use subplanning together with join opt");
     }
 
     if (swCQ.getValue()->getSortPattern()) {
