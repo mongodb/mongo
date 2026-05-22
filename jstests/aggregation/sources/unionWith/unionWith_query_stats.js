@@ -11,6 +11,9 @@
  *     does_not_support_repeated_reads,
  *     # Multi clients run concurrently and may modify the serverStatus metrices read in this test.
  *     multi_clients_incompatible,
+ *     # The config fuzzer can enable logical session refresh, which will
+ *     # increment serverStatus metrics with system.sessions operations.
+ *     does_not_support_config_fuzzer,
  * ]
  */
 const testDB = db.getSiblingDB("union_with_query_stats");
