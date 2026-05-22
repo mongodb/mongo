@@ -30,34 +30,34 @@
 #pragma once
 
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
+#include "mongo/util/uuid.h"
 
 #include <utility>
 
 namespace mongo {
 
 /**
- * Bundles a shard's ShardId with its unique identifier (shardRef), which may be either a string
- * name or a UUID. When no explicit shardRef is available the name is used as the ref, preserving
- * backward compatibility with older documents that only store the shard name.
+ * Data type that bundles a shard's ShardId with its UUID (if available),
+ * supporting lookup operations through the ShardRegistry API.
  */
 class ShardHandle {
 public:
-    explicit ShardHandle(ShardId name) : _name(std::move(name)), _ref(_name.toString()) {}
-
-    ShardHandle(ShardId name, ShardRef ref) : _name(std::move(name)), _ref(std::move(ref)) {}
+    ShardHandle(ShardId name, boost::optional<UUID> uuid)
+        : _name(std::move(name)), _uuid(std::move(uuid)) {}
 
     const ShardId& name() const {
         return _name;
     }
 
-    const ShardRef& ref() const {
-        return _ref;
+    const boost::optional<UUID>& uuid() const {
+        return _uuid;
     }
 
 private:
+    // The Shard ID.
     ShardId _name;
-    ShardRef _ref;
+    // The Shard internal UUID. Declared as optional for backward compatibility.
+    boost::optional<UUID> _uuid;
 };
 
 }  // namespace mongo

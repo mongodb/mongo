@@ -36,6 +36,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/shard_handle.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/uuid.h"
 
 #include <string>
 #include <vector>
@@ -66,6 +67,7 @@ public:
 
     // Field names and types in the shards collection type.
     static const BSONField<std::string> name;
+    static const BSONField<UUID> uuid;
     static const BSONField<std::string> host;
     static const BSONField<bool> draining;
     static const BSONField<BSONArray> tags;
@@ -73,10 +75,12 @@ public:
     static const BSONField<Timestamp> topologyTime;
     static const BSONField<long long> replSetConfigVersion;
     static const long long kUninitializedReplSetConfigVersion = -1;
-    static constexpr auto kShardRefFieldName = "shardRef";
-
     ShardType() = default;
     ShardType(std::string name, std::string host, std::vector<std::string> tags = {});
+    ShardType(std::string name,
+              boost::optional<UUID> uuid,
+              std::string host,
+              std::vector<std::string> tags = {});
 
     /**
      * Constructs a new ShardType object from BSON.
@@ -100,11 +104,13 @@ public:
      */
     std::string toString() const;
 
-    const ShardHandle& getHandle() const;
-    void setHandle(ShardHandle handle);
-
     const std::string& getName() const;
     void setName(const std::string& name);
+
+    const boost::optional<UUID>& getUuid() const;
+
+    const ShardHandle& getHandle() const;
+    void setHandle(ShardHandle handle);
 
     const std::string& getHost() const {
         return _host.get();
@@ -131,12 +137,11 @@ public:
     }
     void setReplSetConfigVersion(long long replSetConfigVersion);
 
-    const ShardRef& getShardRef() const;
-
 private:
     // Convention: (M)andatory, (O)ptional, (S)pecial rule.
 
-    // (M) shard name and unique identifier (shardRef); shardRef defaults to name when absent
+    // (M) Handle object embedding the shard name (the _id field of the persisted doc)
+    // and internal UUID.
     boost::optional<ShardHandle> _handle;
     // (M)  connection string for the host(s)
     boost::optional<std::string> _host;

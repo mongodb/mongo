@@ -34,7 +34,6 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/sharding_environment/sharding_types.idl"
 
 structs:
     ShardIdentity:
@@ -54,7 +53,9 @@ structs:
                 description: "If true, the writing of shard identity does not imply sharding initializations"
                 type: bool
                 optional: true
-            shardRef:
-                description: "A unique identifier for this shard, either a human-readable string name or a UUID. Should generally not be exposed to end user through command responses."
-                type: shard_ref
+            uuid:
+                description:
+                    "A unique identifier for this shard. Should generally not be exposed to end user through command responses.
+                    The field is optional for backward compatibility."
+                type: uuid
                 optional: true
