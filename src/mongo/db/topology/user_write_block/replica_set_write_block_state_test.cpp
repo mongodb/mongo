@@ -30,6 +30,7 @@
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -38,10 +39,28 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
+#include <utility>
+
 namespace mongo {
 namespace {
 
 class ReplicaSetWriteBlockStateTest : public ServiceContextMongoDTest {};
+
+struct ReplicaSetWritesBlockRejectedSnapshot {
+    long long inserts;
+    long long updates;
+    long long deletes;
+};
+
+auto readReplicaSetWritesBlockRejected(const ReplicaSetWriteBlockState* state) {
+    BSONObjBuilder bob;
+    state->appendReplicaSetWriteBlockRejectionMetrics(bob);
+    BSONObj metrics = bob.obj();
+    const auto sub = metrics.getObjectField("replicaSetWritesBlockRejected");
+    return ReplicaSetWritesBlockRejectedSnapshot{sub["inserts"].safeNumberLong(),
+                                                 sub["updates"].safeNumberLong(),
+                                                 sub["deletes"].safeNumberLong()};
+}
 
 TEST_F(ReplicaSetWriteBlockStateTest, GetFromServiceContextMatchesGetFromOperationContext) {
     auto opCtx = cc().makeOperationContext();
@@ -60,7 +79,8 @@ TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingDisabledAllowsUserNamespace) 
     ASSERT_FALSE(state->isReplicaSetWriteBlockingEnabled());
 
     const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
-    ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(opCtx.get(), nss));
+    ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(
+        opCtx.get(), nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert));
 }
 
 TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingEnabledBlocksUserNamespace) {
@@ -74,10 +94,11 @@ TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingEnabledBlocksUserNamespace) {
     state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
     ASSERT_TRUE(state->isReplicaSetWriteBlockingEnabled());
     ASSERT_EQ(state->getReplicaSetWriteBlockingReason(opCtx.get()),
-              ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+              static_cast<int>(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace));
 
     const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
-    ASSERT_THROWS_CODE(state->checkReplicaSetWritesAllowed(opCtx.get(), nss),
+    ASSERT_THROWS_CODE(state->checkReplicaSetWritesAllowed(
+                           opCtx.get(), nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert),
                        AssertionException,
                        ErrorCodes::UserWritesBlocked);
 }
@@ -91,11 +112,17 @@ TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingAllowsInternalDatabaseNamespa
     ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
 
     ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(
-        opCtx.get(), NamespaceString::createNamespaceString_forTest("admin.coll")));
+        opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("admin.coll"),
+        ReplicaSetWriteBlockRejectedWriteOp::kInsert));
     ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(
-        opCtx.get(), NamespaceString::createNamespaceString_forTest("config.coll")));
+        opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("config.coll"),
+        ReplicaSetWriteBlockRejectedWriteOp::kInsert));
     ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(
-        opCtx.get(), NamespaceString::createNamespaceString_forTest("local.coll")));
+        opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("local.coll"),
+        ReplicaSetWriteBlockRejectedWriteOp::kInsert));
 }
 
 TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingAllowsSystemDotProfile) {
@@ -108,7 +135,8 @@ TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingAllowsSystemDotProfile) {
 
     const auto nss = NamespaceString::createNamespaceString_forTest("userDB", "system.profile");
     ASSERT(nss.isSystemDotProfile());
-    ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(opCtx.get(), nss));
+    ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(
+        opCtx.get(), nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert));
 }
 
 TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingAllowsWhenBypassEnabled) {
@@ -124,7 +152,8 @@ TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingAllowsWhenBypassEnabled) {
     ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
 
     const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
-    ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(opCtx.get(), nss));
+    ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(
+        opCtx.get(), nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert));
 }
 
 TEST_F(ReplicaSetWriteBlockStateTest, DisableWriteBlockingClearsIsEnabled) {
@@ -139,7 +168,8 @@ TEST_F(ReplicaSetWriteBlockStateTest, DisableWriteBlockingClearsIsEnabled) {
     ASSERT_FALSE(state->isReplicaSetWriteBlockingEnabled());
 
     const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
-    ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(opCtx.get(), nss));
+    ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(
+        opCtx.get(), nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert));
 }
 
 TEST_F(ReplicaSetWriteBlockStateTest, DisableDeletionsBlockingClearsIsEnabled) {
@@ -212,6 +242,129 @@ TEST_F(ReplicaSetWriteBlockStateTest, DeletionsBlockingAllowsWhenBypassEnabled) 
 
     const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
     ASSERT_DOES_NOT_THROW(state->checkReplicaSetDeletionsAllowed(opCtx.get(), nss));
+}
+
+
+TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingIncrementsOnlyRejectedInsertAndUpdateMetrics) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->disableReplicaSetWriteBlocking();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    const auto before = readReplicaSetWritesBlockRejected(state);
+
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    for (int i = 0; i < 2; ++i) {
+        ASSERT_THROWS_CODE(state->checkReplicaSetWritesAllowed(
+                               opCtx.get(), nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert),
+                           AssertionException,
+                           ErrorCodes::UserWritesBlocked);
+    }
+    ASSERT_THROWS_CODE(state->checkReplicaSetWritesAllowed(
+                           opCtx.get(), nss, ReplicaSetWriteBlockRejectedWriteOp::kUpdate),
+                       AssertionException,
+                       ErrorCodes::UserWritesBlocked);
+
+    const auto after = readReplicaSetWritesBlockRejected(state);
+    ASSERT_EQ(after.inserts, before.inserts + 2);
+    ASSERT_EQ(after.updates, before.updates + 1);
+    ASSERT_EQ(after.deletes, before.deletes);
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingRejectedWritesMetricUnchangedForExemptions) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    const auto before = readReplicaSetWritesBlockRejected(state);
+
+    ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(
+        opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("admin.coll"),
+        ReplicaSetWriteBlockRejectedWriteOp::kInsert));
+    ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(
+        opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("userDB", "system.profile"),
+        ReplicaSetWriteBlockRejectedWriteOp::kInsert));
+
+    const auto after = readReplicaSetWritesBlockRejected(state);
+    ASSERT_EQ(after.inserts, before.inserts);
+    ASSERT_EQ(after.updates, before.updates);
+    ASSERT_EQ(after.deletes, before.deletes);
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingRejectedWritesMetricUnchangedWhenBypassEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    authSession->grantInternalAuthorization();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
+
+    const auto before = readReplicaSetWritesBlockRejected(state);
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    ASSERT_DOES_NOT_THROW(state->checkReplicaSetWritesAllowed(
+        opCtx.get(), nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert));
+
+    const auto after = readReplicaSetWritesBlockRejected(state);
+    ASSERT_EQ(after.inserts, before.inserts);
+    ASSERT_EQ(after.updates, before.updates);
+    ASSERT_EQ(after.deletes, before.deletes);
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest,
+       DeletionBlockingIncrementsOnlyRejectedDeletesMetricOnEachBlock) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->disableReplicaSetDeletionsBlocking();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    const auto before = readReplicaSetWritesBlockRejected(state);
+
+    state->enableReplicaSetDeletionsBlocking();
+
+    const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
+    for (int i = 0; i < 2; ++i) {
+        ASSERT_THROWS_CODE(state->checkReplicaSetDeletionsAllowed(opCtx.get(), nss),
+                           AssertionException,
+                           ErrorCodes::UserWritesBlocked);
+    }
+
+    const auto after = readReplicaSetWritesBlockRejected(state);
+    ASSERT_EQ(after.inserts, before.inserts);
+    ASSERT_EQ(after.updates, before.updates);
+    ASSERT_EQ(after.deletes, before.deletes + 2);
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, BlockReplicaSetWritesCommandCountersIncrementPerEnable) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->disableReplicaSetWriteBlocking();
+
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    state->disableReplicaSetWriteBlocking();
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+
+    BSONObjBuilder bob;
+    state->appendReplicaSetWritesBlockCounters(bob);
+    BSONObj doc = bob.obj();
+    const auto sub = doc.getObjectField("replicaSetWritesBlockCounters");
+    ASSERT_EQ(sub["InsufficientDiskSpace"].safeNumberLong(), 2);
 }
 
 }  // namespace

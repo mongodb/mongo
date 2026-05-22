@@ -50,15 +50,17 @@ bool ReplicaSetWriteBlockOpObserver::_isReplSetAndCanAcceptWritesForNamespace(
     return replCoord->getSettings().isReplSet() && replCoord->canAcceptWritesFor(opCtx, nss);
 }
 
-void ReplicaSetWriteBlockOpObserver::_checkReplicaSetWriteAllowed(OperationContext* opCtx,
-                                                                  const NamespaceString& nss,
-                                                                  bool fromMigrate) {
+void ReplicaSetWriteBlockOpObserver::_checkReplicaSetWriteAllowed(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    bool fromMigrate,
+    ReplicaSetWriteBlockRejectedWriteOp opType) {
     if (!_isReplSetAndCanAcceptWritesForNamespace(opCtx, nss)) {
         return;
     }
     auto* replicaSetWriteBlockState = ReplicaSetWriteBlockState::get(opCtx);
     if (!fromMigrate) {
-        replicaSetWriteBlockState->checkReplicaSetWritesAllowed(opCtx, nss);
+        replicaSetWriteBlockState->checkReplicaSetWritesAllowed(opCtx, nss, opType);
     }
 }
 
@@ -83,7 +85,8 @@ void ReplicaSetWriteBlockOpObserver::onInserts(OperationContext* opCtx,
                                                OpStateAccumulator* opAccumulator) {
     const auto nss = coll->ns();
 
-    _checkReplicaSetWriteAllowed(opCtx, nss, defaultFromMigrate);
+    _checkReplicaSetWriteAllowed(
+        opCtx, nss, defaultFromMigrate, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
 
     // TODO (SERVER-91506): Determine if we should change this to check isDataConsistent.
     if (nss == NamespaceString::kReplicaSetWritesCriticalSectionsNamespace &&
@@ -118,7 +121,8 @@ void ReplicaSetWriteBlockOpObserver::onUpdate(OperationContext* opCtx,
     const auto nss = args.coll->ns();
 
     const bool fromMigrate = args.updateArgs->source == OperationSource::kFromMigrate;
-    _checkReplicaSetWriteAllowed(opCtx, nss, fromMigrate);
+    _checkReplicaSetWriteAllowed(
+        opCtx, nss, fromMigrate, ReplicaSetWriteBlockRejectedWriteOp::kUpdate);
 
     // TODO (SERVER-91506): Determine if we should change this to check isDataConsistent.
     if (nss == NamespaceString::kReplicaSetWritesCriticalSectionsNamespace &&

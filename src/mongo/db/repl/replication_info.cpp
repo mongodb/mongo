@@ -76,6 +76,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
@@ -221,6 +222,7 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
 class ReplicationInfoServerStatus : public ServerStatusSection {
 public:
     enum class UserWriteBlockState { kUnknown = 0, kDisabled = 1, kEnabled = 2 };
+    enum class ReplicaSetLevelWriteBlockState { kUnknown = 0, kDisabled = 1, kEnabled = 2 };
 
     using ServerStatusSection::ServerStatusSection;
 
@@ -253,6 +255,8 @@ public:
         {
             auto state = UserWriteBlockState::kUnknown;
             auto reason = UserWritesBlockReasonEnum::kUnspecified;
+            auto replicaSetState = ReplicaSetLevelWriteBlockState::kUnknown;
+            boost::optional<int> replicaSetReason;
             // Try to lock. If we fail (i.e. lock is already held in write mode), don't read the
             // GlobalUserWriteBlockState and set the userWriteBlockMode field to kUnknown.
             Lock::GlobalLock lk(
@@ -262,16 +266,32 @@ public:
                     return options;
                 }());
             if (!lk.isLocked()) {
-                LOGV2_DEBUG(6345700, 2, "Failed to retrieve user write block state");
+                LOGV2_DEBUG(6345700, 2, "Failed to retrieve write block states");
             } else {
                 state = GlobalUserWriteBlockState::get(opCtx)->isUserWriteBlockingEnabled(opCtx)
                     ? UserWriteBlockState::kEnabled
                     : UserWriteBlockState::kDisabled;
                 reason = GlobalUserWriteBlockState::get(opCtx)->getUserWriteBlockingReason(opCtx);
+                replicaSetState =
+                    ReplicaSetWriteBlockState::get(opCtx)->isReplicaSetWriteBlockingEnabled()
+                    ? ReplicaSetLevelWriteBlockState::kEnabled
+                    : ReplicaSetLevelWriteBlockState::kDisabled;
+                if (replicaSetState == ReplicaSetLevelWriteBlockState::kEnabled) {
+                    replicaSetReason =
+                        ReplicaSetWriteBlockState::get(opCtx)->getReplicaSetWriteBlockingReason(
+                            opCtx);
+                }
             }
             result.append("userWriteBlockMode", state);
             result.append("userWriteBlockReason", reason);
             GlobalUserWriteBlockState::get(opCtx)->appendUserWriteBlockModeCounters(result);
+            result.append("replicaSetWriteBlock", replicaSetState);
+            if (replicaSetReason) {
+                result.append("replicaSetWriteBlockReason", *replicaSetReason);
+            }
+            ReplicaSetWriteBlockState::get(opCtx)->appendReplicaSetWritesBlockCounters(result);
+            ReplicaSetWriteBlockState::get(opCtx)->appendReplicaSetWriteBlockRejectionMetrics(
+                result);
         }
 
         return result.obj();

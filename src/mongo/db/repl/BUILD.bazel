@@ -1100,6 +1100,7 @@ mongo_cc_library(
         "//src/mongo/db:dbhelpers",
         "//src/mongo/db:query_exec",
         "//src/mongo/db:read_write_concern_defaults",
+        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:saslauth",
         "//src/mongo/db/commands:test_commands_enabled",

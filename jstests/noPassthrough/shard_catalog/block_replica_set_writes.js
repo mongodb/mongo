@@ -70,6 +70,98 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         this.st.stop();
     });
 
+    it("Test blockReplicaSetWrites command counter increments on enable", function () {
+        // Enable per-shard write blocking on shard0.
+        assert.commandWorked(
+            this.shard0PrimaryAdminDB.runCommand({
+                blockReplicaSetWrites: 1,
+                enabled: true,
+                allowDeletions: false,
+                reason: "InsufficientDiskSpace",
+            }),
+        );
+
+        // Check replica set write block, reason, and command counter metrics when blockReplicaSetWrites is enabled.
+        let replStatus = assert.commandWorked(this.shard0PrimaryAdminDB.serverStatus()).repl;
+        assert.eq(replStatus.replicaSetWriteBlock, 2, "replicaSetWriteBlock metric should be 2 (Enabled)");
+        assert.eq(
+            replStatus.replicaSetWriteBlockReason,
+            0,
+            "replicaSetWriteBlockReason metric should be 0 (InsufficientDiskSpace)",
+        );
+        assert.eq(
+            replStatus.replicaSetWritesBlockCounters.InsufficientDiskSpace,
+            1,
+            "repl.replicaSetWritesBlockCounters counter for InsufficientDiskSpace should be 1",
+        );
+
+        //Disable per-shard write blocking on shard0.
+        assert.commandWorked(
+            this.shard0PrimaryAdminDB.runCommand({
+                blockReplicaSetWrites: 1,
+                enabled: false,
+                allowDeletions: false,
+                reason: "InsufficientDiskSpace",
+            }),
+        );
+
+        // Check replica set write block, reason, and command counter when blockReplicaSetWrites is disabled.
+        replStatus = assert.commandWorked(this.shard0PrimaryAdminDB.serverStatus()).repl;
+        assert.eq(replStatus.replicaSetWriteBlock, 1, "replicaSetWriteBlock metric should be 1 (Disabled)");
+        assert(
+            !replStatus.hasOwnProperty("replicaSetWriteBlockReason"),
+            "replicaSetWriteBlockReason should be absent when replica set write block is disabled",
+        );
+        assert.eq(
+            replStatus.replicaSetWritesBlockCounters.InsufficientDiskSpace,
+            1,
+            "repl.replicaSetWritesBlockCounters counter for InsufficientDiskSpace should not change on disable",
+        );
+    });
+
+    it("Test blocked inserts, updates, and deletes counters increment after blockReplicaSetWrites is enabled", function () {
+        assert.commandWorked(this.testShardedColl.insert({x: 0}));
+
+        // Enable per-shard write blocking on shard0.
+        assert.commandWorked(
+            this.shard0PrimaryAdminDB.runCommand({
+                blockReplicaSetWrites: 1,
+                enabled: true,
+                allowDeletions: false,
+                reason: "InsufficientDiskSpace",
+            }),
+        );
+
+        // Check blocked inserts, updates, and deletes are blocked and counters are incremented.
+        let replStatus = assert.commandWorked(this.shard0PrimaryAdminDB.serverStatus()).repl;
+        assert(replStatus.hasOwnProperty("replicaSetWritesBlockRejected"));
+        const insertsAfterEnable = replStatus.replicaSetWritesBlockRejected.inserts;
+        const updatesAfterEnable = replStatus.replicaSetWritesBlockRejected.updates;
+        const deletesAfterEnable = replStatus.replicaSetWritesBlockRejected.deletes;
+
+        assert.commandFailedWithCode(this.testShardedColl.insert({x: 1}), ErrorCodes.UserWritesBlocked);
+        assert.commandFailedWithCode(this.testShardedColl.insert({x: 2}), ErrorCodes.UserWritesBlocked);
+        assert.commandFailedWithCode(this.testShardedColl.update({x: 0}, {$set: {y: 1}}), ErrorCodes.UserWritesBlocked);
+        assert.commandFailedWithCode(this.testShardedColl.remove({x: 0}), ErrorCodes.UserWritesBlocked);
+
+        replStatus = assert.commandWorked(this.shard0PrimaryAdminDB.serverStatus()).repl;
+        assert.eq(
+            replStatus.replicaSetWritesBlockRejected.inserts,
+            insertsAfterEnable + 2,
+            "Each blocked insert should increment repl.replicaSetWritesBlockRejected.inserts",
+        );
+        assert.eq(
+            replStatus.replicaSetWritesBlockRejected.updates,
+            updatesAfterEnable + 1,
+            "Each blocked update should increment repl.replicaSetWritesBlockRejected.updates",
+        );
+        assert.eq(
+            replStatus.replicaSetWritesBlockRejected.deletes,
+            deletesAfterEnable + 1,
+            "Each blocked delete should increment repl.replicaSetWritesBlockRejected.deletes",
+        );
+    });
+
     it("Test user writes respect both setUserWriteBlockMode and blockReplicaSetWrites on a shard", function () {
         // Insert a document on shard0.
         assert.commandWorked(this.testShardedColl.insert({x: 1}));

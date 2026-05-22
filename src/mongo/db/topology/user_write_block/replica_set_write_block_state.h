@@ -39,10 +39,16 @@
 
 #include <array>
 #include <atomic>
+#include <cstdint>
 
 #include <boost/optional.hpp>
 
 namespace mongo {
+
+// Identifies the kind of write rejected by checkReplicaSetWritesAllowed so the matching counter
+// can be incremented. Deletes are not included since they are validated separately by
+// checkReplicaSetDeletionsAllowed and tracked through their own counter.
+enum class ReplicaSetWriteBlockRejectedWriteOp { kInsert, kUpdate };
 
 class MONGO_MOD_NEEDS_REPLACEMENT ReplicaSetWriteBlockState {
 public:
@@ -60,20 +66,21 @@ public:
     /**
      * Gets the reason why the replica set writes are blocked.
      */
-    boost::optional<ReplicaSetWritesBlockReasonEnum> getReplicaSetWriteBlockingReason(
-        OperationContext* opCtx) const {
+    boost::optional<int> getReplicaSetWriteBlockingReason(OperationContext* opCtx) const {
         const auto info = _writeBlockInfo.load();
         if (!info.blocked) {
             return boost::none;
         }
-        return info.reason;
+        return static_cast<int>(info.reason);
     }
 
     /**
      * Checks that replica set writes are allowed on the specified namespace. Throws
      * UserWritesBlocked if user writes are disallowed.
      */
-    void checkReplicaSetWritesAllowed(OperationContext* opCtx, const NamespaceString& nss) const;
+    void checkReplicaSetWritesAllowed(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      ReplicaSetWriteBlockRejectedWriteOp opKind) const;
 
     /**
      * Returns whether replica set write blocking is enabled, disregarding a specific namespace
@@ -99,6 +106,16 @@ public:
      */
     MONGO_MOD_FILE_PRIVATE bool isReplicaSetDeletionsBlockingEnabled_forTest() const;
 
+    /**
+     * Reports replica set write blocking counters, specifying one counter per blocking reason.
+     */
+    void appendReplicaSetWritesBlockCounters(BSONObjBuilder& bob) const;
+
+    /**
+     * Reports how many operations were rejected by replica set write/deletion blocking.
+     */
+    void appendReplicaSetWriteBlockRejectionMetrics(BSONObjBuilder& bob) const;
+
 private:
     struct WriteBlockInfo {
         bool blocked{false};
@@ -108,6 +125,11 @@ private:
     // Atomic<T> enforces lock-free access at compile time.
     Atomic<WriteBlockInfo> _writeBlockInfo{WriteBlockInfo{}};
     Atomic<bool> _deletionsBlocked{false};
+    std::array<AtomicWord<std::uint64_t>, idlEnumCount<ReplicaSetWritesBlockReasonEnum>>
+        _replicaSetWritesBlockCounters{};
+    mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedInserts{0};
+    mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedUpdates{0};
+    mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedDeletes{0};
 };
 
 }  // namespace mongo

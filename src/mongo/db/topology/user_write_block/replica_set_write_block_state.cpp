@@ -30,10 +30,12 @@
 #include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
@@ -58,6 +60,7 @@ ReplicaSetWriteBlockState* ReplicaSetWriteBlockState::get(OperationContext* opCt
 void ReplicaSetWriteBlockState::enableReplicaSetWriteBlocking(
     ReplicaSetWritesBlockReasonEnum reason) {
     _writeBlockInfo.store(WriteBlockInfo{.blocked = true, .reason = reason});
+    _replicaSetWritesBlockCounters[static_cast<size_t>(reason)].fetchAndAdd(1);
     LOGV2(12097000, "Blocking replica set writes", "reason"_attr = idl::serialize(reason));
 }
 
@@ -73,15 +76,27 @@ void ReplicaSetWriteBlockState::disableReplicaSetWriteBlocking() {
     }
 }
 
-void ReplicaSetWriteBlockState::checkReplicaSetWritesAllowed(OperationContext* opCtx,
-                                                             const NamespaceString& nss) const {
+void ReplicaSetWriteBlockState::checkReplicaSetWritesAllowed(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    ReplicaSetWriteBlockRejectedWriteOp opType) const {
     const auto info = _writeBlockInfo.load();
-    if (!info.blocked || ReplicaSetWriteBlockBypass::get(opCtx).isEnabled() ||
-        nss.isOnInternalDb() || nss.isTemporaryReshardingCollection() || nss.isSystemDotProfile()) {
-        return;
+    const bool writesAllowed = !info.blocked ||
+        ReplicaSetWriteBlockBypass::get(opCtx).isEnabled() || nss.isOnInternalDb() ||
+        nss.isTemporaryReshardingCollection() || nss.isSystemDotProfile();
+    if (!writesAllowed) {
+        switch (opType) {
+            case ReplicaSetWriteBlockRejectedWriteOp::kInsert:
+                _replicaSetWriteBlockRejectedInserts.fetchAndAdd(1);
+                break;
+            case ReplicaSetWriteBlockRejectedWriteOp::kUpdate:
+                _replicaSetWriteBlockRejectedUpdates.fetchAndAdd(1);
+                break;
+        }
+        uasserted(
+            ErrorCodes::UserWritesBlocked,
+            fmt::format("Replica set write blocked, reason: {}", idl::serialize(info.reason)));
     }
-    uasserted(ErrorCodes::UserWritesBlocked,
-              fmt::format("Replica set write blocked, reason: {}", idl::serialize(info.reason)));
 }
 
 bool ReplicaSetWriteBlockState::isReplicaSetWriteBlockingEnabled() const {
@@ -98,14 +113,38 @@ void ReplicaSetWriteBlockState::disableReplicaSetDeletionsBlocking() {
 
 void ReplicaSetWriteBlockState::checkReplicaSetDeletionsAllowed(OperationContext* opCtx,
                                                                 const NamespaceString& nss) const {
-    uassert(ErrorCodes::UserWritesBlocked,
-            "User writes blocked",
-            !_deletionsBlocked.load() || ReplicaSetWriteBlockBypass::get(opCtx).isEnabled() ||
-                nss.isOnInternalDb() || nss.isSystemDotProfile());
+    const bool deletesAllowed = !_deletionsBlocked.load() ||
+        ReplicaSetWriteBlockBypass::get(opCtx).isEnabled() || nss.isOnInternalDb() ||
+        nss.isSystemDotProfile();
+    if (!deletesAllowed) {
+        _replicaSetWriteBlockRejectedDeletes.fetchAndAdd(1);
+        uasserted(ErrorCodes::UserWritesBlocked, "User writes blocked");
+    }
 }
 
 bool ReplicaSetWriteBlockState::isReplicaSetDeletionsBlockingEnabled_forTest() const {
     return _deletionsBlocked.load();
+}
+
+void ReplicaSetWriteBlockState::appendReplicaSetWritesBlockCounters(BSONObjBuilder& bob) const {
+    BSONObjBuilder result(bob.subobjStart("replicaSetWritesBlockCounters"));
+    for (size_t reasonIdx = 0; reasonIdx < idlEnumCount<ReplicaSetWritesBlockReasonEnum>;
+         ++reasonIdx) {
+        result.appendNumber(
+            idl::serialize(static_cast<ReplicaSetWritesBlockReasonEnum>(reasonIdx)),
+            static_cast<long long>(_replicaSetWritesBlockCounters[reasonIdx].load()));
+    }
+}
+
+void ReplicaSetWriteBlockState::appendReplicaSetWriteBlockRejectionMetrics(
+    BSONObjBuilder& bob) const {
+    BSONObjBuilder sub(bob.subobjStart("replicaSetWritesBlockRejected"));
+    sub.appendNumber("inserts",
+                     static_cast<long long>(_replicaSetWriteBlockRejectedInserts.load()));
+    sub.appendNumber("updates",
+                     static_cast<long long>(_replicaSetWriteBlockRejectedUpdates.load()));
+    sub.appendNumber("deletes",
+                     static_cast<long long>(_replicaSetWriteBlockRejectedDeletes.load()));
 }
 
 }  // namespace mongo

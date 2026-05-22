@@ -32,6 +32,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -76,7 +77,8 @@ private:
 
     void _checkReplicaSetWriteAllowed(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      bool fromMigrate);
+                                      bool fromMigrate,
+                                      ReplicaSetWriteBlockRejectedWriteOp opType);
 
     void _checkReplicaSetDeleteAllowed(OperationContext* opCtx, const NamespaceString& nss);
 };
