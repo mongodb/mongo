@@ -40,7 +40,6 @@
 
 namespace mongo {
 
-const char* TrialStage::kStageType = "TRIAL";
 
 TrialStage::TrialStage(ExpressionContext* expCtx,
                        WorkingSet* ws,

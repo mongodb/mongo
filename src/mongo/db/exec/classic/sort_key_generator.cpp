@@ -44,7 +44,6 @@
 
 namespace mongo {
 
-const char* SortKeyGeneratorStage::kStageType = "SORT_KEY_GENERATOR";
 
 SortKeyGeneratorStage::SortKeyGeneratorStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                              std::unique_ptr<PlanStage> child,

@@ -38,8 +38,6 @@ namespace mongo {
 
 using std::unique_ptr;
 
-// static
-const char* CountStage::kStageType = "COUNT";
 
 CountStage::CountStage(
     ExpressionContext* expCtx, long long limit, long long skip, WorkingSet* ws, PlanStage* child)

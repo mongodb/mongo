@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/container_size_helper.h"
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -86,9 +87,9 @@ struct MONGO_MOD_NEEDS_REPLACEMENT SpecificStats {
 struct CommonStats {
     CommonStats() = delete;
 
-    CommonStats(const char* type) : CommonStats(type, nullptr /*originalPlanStage*/) {}
+    CommonStats(StringData type) : CommonStats(type, nullptr /*originalPlanStage*/) {}
 
-    CommonStats(const char* type, PlanStageKey originalPlanStage)
+    CommonStats(StringData type, PlanStageKey originalPlanStage)
         : stageTypeStr(type),
           planStage(originalPlanStage),
           works(0),
@@ -104,7 +105,7 @@ struct CommonStats {
         return filter.objsize() + sizeof(*this);
     }
     // String giving the type of the stage. Not owned.
-    const char* stageTypeStr;
+    StringData stageTypeStr;
 
     // Store an identifier to the plan stage which this object is describing.
     PlanStageKey planStage;

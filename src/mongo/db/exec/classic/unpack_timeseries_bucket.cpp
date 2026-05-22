@@ -48,7 +48,6 @@ void transitionToOwnedObj(Document&& doc, WorkingSetMember* member) {
 }
 }  // namespace
 
-const char* UnpackTimeseriesBucket::kStageType = "UNPACK_BUCKET";
 
 UnpackTimeseriesBucket::UnpackTimeseriesBucket(ExpressionContext* expCtx,
                                                WorkingSet* ws,

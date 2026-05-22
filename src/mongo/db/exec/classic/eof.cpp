@@ -35,8 +35,6 @@ namespace mongo {
 
 using std::unique_ptr;
 
-// static
-const char* EOFStage::kStageType = "EOF";
 
 EOFStage::EOFStage(ExpressionContext* expCtx, eof_node::EOFType type)
     : PlanStage(kStageType, expCtx), _specificStats(EofStats(type)) {}

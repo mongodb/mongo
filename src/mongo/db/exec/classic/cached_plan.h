@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_all_indices_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -84,7 +85,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static const char* kStageType;
+    static constexpr StringData kStageType = "CACHED_PLAN"_sd;
 
     /**
      * Runs the cached plan for a trial period, yielding during the trial period according to

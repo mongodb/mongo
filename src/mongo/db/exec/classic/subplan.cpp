@@ -59,7 +59,6 @@ namespace mongo {
 using std::unique_ptr;
 using std::vector;
 
-const char* SubplanStage::kStageType = "SUBPLAN";
 
 SubplanStage::SubplanStage(ExpressionContext* expCtx,
                            CollectionAcquisition collection,

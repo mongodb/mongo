@@ -75,8 +75,6 @@ namespace mongo {
 using namespace cost_based_ranker;
 using std::unique_ptr;
 
-// static
-const char* MultiPlanStage::kStageType = "MULTI_PLAN";
 
 namespace {
 void markShouldCollectTimingInfoOnSubtree(PlanStage* root) {

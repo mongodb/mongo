@@ -62,8 +62,6 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(throwDuringIndexScanRestore);
 
-// static
-const char* IndexScan::kStageType = "IXSCAN";
 
 IndexScan::IndexScan(ExpressionContext* expCtx,
                      CollectionAcquisition collection,

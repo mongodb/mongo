@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -103,7 +104,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static const char* kStageType;
+    static constexpr StringData kStageType = "TEXT_MATCH"_sd;
 
 private:
     // Text-specific phrase and negated term matcher.

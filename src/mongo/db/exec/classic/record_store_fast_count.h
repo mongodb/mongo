@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_collection_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -49,7 +50,7 @@ namespace mongo {
  */
 class RecordStoreFastCountStage final : public RequiresCollectionStage {
 public:
-    static const char* kStageType;
+    static constexpr StringData kStageType = "RECORD_STORE_FAST_COUNT"_sd;
 
     RecordStoreFastCountStage(ExpressionContext* expCtx,
                               CollectionAcquisition collection,

@@ -34,8 +34,7 @@
 
 namespace mongo {
 
-MockStage::MockStage(ExpressionContext* expCtx, WorkingSet*)
-    : PlanStage(kStageType.data(), expCtx) {}
+MockStage::MockStage(ExpressionContext* expCtx, WorkingSet*) : PlanStage(kStageType, expCtx) {}
 
 std::unique_ptr<PlanStageStats> MockStage::getStats() {
     _commonStats.isEOF = isEOF();

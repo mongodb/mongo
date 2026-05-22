@@ -48,8 +48,6 @@ namespace mongo {
 
 using std::unique_ptr;
 
-// static
-const char* FetchStage::kStageType = "FETCH";
 
 FetchStage::FetchStage(ExpressionContext* expCtx,
                        WorkingSet* ws,

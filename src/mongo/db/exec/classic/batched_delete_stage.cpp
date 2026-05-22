@@ -139,7 +139,7 @@ BatchedDeleteStage::BatchedDeleteStage(
     WorkingSet* ws,
     CollectionAcquisition collection,
     PlanStage* child)
-    : DeleteStage::DeleteStage(kStageType.data(), expCtx, std::move(params), ws, collection, child),
+    : DeleteStage::DeleteStage(kStageType, expCtx, std::move(params), ws, collection, child),
       _batchedDeleteParams(std::move(batchedDeleteParams)),
       _stagedDeletesBuffer(ws),
       _stagedDeletesWatermarkBytes(0),

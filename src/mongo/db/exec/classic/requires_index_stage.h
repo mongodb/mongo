@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/requires_collection_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/index/index_access_method.h"
@@ -54,7 +55,7 @@ namespace mongo {
  */
 class RequiresIndexStage : public RequiresCollectionStage {
 public:
-    RequiresIndexStage(const char* stageType,
+    RequiresIndexStage(StringData stageType,
                        ExpressionContext* expCtx,
                        CollectionAcquisition collection,
                        const IndexCatalogEntry* indexEntry,

@@ -31,6 +31,7 @@
 
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/multi_plan_rate_limiter.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_collection_stage.h"
@@ -68,7 +69,7 @@ extern FailPoint sleepWhileMultiplanning;
  */
 class MultiPlanStage final : public RequiresCollectionStage {
 public:
-    static const char* kStageType;
+    static constexpr StringData kStageType = "MULTI_PLAN"_sd;
 
     struct EstimationResult {
         // The total cost of all plans (sum of plan costs).

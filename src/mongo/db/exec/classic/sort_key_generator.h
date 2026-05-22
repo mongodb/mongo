@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -70,7 +71,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static const char* kStageType;
+    static constexpr StringData kStageType = "SORT_KEY_GENERATOR"_sd;
 
 protected:
     StageState doWork(WorkingSetID* out) final;

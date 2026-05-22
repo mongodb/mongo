@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -47,7 +48,7 @@ namespace mongo {
  */
 class UnpackTimeseriesBucket final : public PlanStage {
 public:
-    static const char* kStageType;
+    static constexpr StringData kStageType = "UNPACK_BUCKET"_sd;
 
     UnpackTimeseriesBucket(ExpressionContext* expCtx,
                            WorkingSet* ws,

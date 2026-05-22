@@ -64,7 +64,6 @@ mongo::PlanStage::StageState allocateResultAndAdvance(mongo::WorkingSet* ws,
 
 namespace mongo {
 
-const char* SpoolStage::kStageType = "SPOOL";
 
 SpoolStage::SpoolStage(ExpressionContext* expCtx, WorkingSet* ws, std::unique_ptr<PlanStage> child)
     : PlanStage(expCtx, std::move(child), kStageType),

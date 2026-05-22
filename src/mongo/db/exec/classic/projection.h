@@ -59,7 +59,7 @@ protected:
                     const BSONObj& projObj,
                     WorkingSet* ws,
                     std::unique_ptr<PlanStage> child,
-                    const char* stageType);
+                    StringData stageType);
 
 public:
     bool isEOF() const final;

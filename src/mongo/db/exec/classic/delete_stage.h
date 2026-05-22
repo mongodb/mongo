@@ -118,7 +118,7 @@ public:
                 CollectionAcquisition collection,
                 PlanStage* child);
 
-    DeleteStage(const char* stageType,
+    DeleteStage(StringData stageType,
                 ExpressionContext* expCtx,
                 DeleteStageParams params,
                 WorkingSet* ws,

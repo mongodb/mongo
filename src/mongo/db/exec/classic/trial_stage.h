@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -61,7 +62,7 @@ namespace mongo {
  */
 class TrialStage final : public PlanStage {
 public:
-    static const char* kStageType;
+    static constexpr StringData kStageType = "TRIAL"_sd;
 
     /**
      * Constructor. Both 'trialPlan' and 'backupPlan' must be non-nullptr; 'maxTrialEWorks' must be

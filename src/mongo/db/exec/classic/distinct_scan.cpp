@@ -56,8 +56,6 @@ namespace mongo {
 
 using std::unique_ptr;
 
-// static
-const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 
 DistinctScan::DistinctScan(ExpressionContext* expCtx,
                            CollectionAcquisition collection,

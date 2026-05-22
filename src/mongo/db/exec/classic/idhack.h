@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
@@ -85,7 +86,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static const char* kStageType;
+    static constexpr StringData kStageType = "IDHACK"_sd;
 
 protected:
     void doSaveStateRequiresIndex() final;

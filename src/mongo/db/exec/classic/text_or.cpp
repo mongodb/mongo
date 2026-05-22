@@ -66,7 +66,6 @@ int64_t getMemoryLimit() {
 
 }  // namespace
 
-const char* TextOrStage::kStageType = "TEXT_OR";
 
 TextOrStage::TextOrStage(ExpressionContext* expCtx,
                          size_t keyPrefixSize,

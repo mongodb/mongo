@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/classic/delete_stage.h"
@@ -138,7 +139,7 @@ struct TimeseriesModifyParams {
  */
 class TimeseriesModifyStage : public RequiresWritableCollectionStage {
 public:
-    static const char* kStageType;
+    static constexpr StringData kStageType = "TS_MODIFY"_sd;
 
     TimeseriesModifyStage(ExpressionContext* expCtx,
                           TimeseriesModifyParams&& params,

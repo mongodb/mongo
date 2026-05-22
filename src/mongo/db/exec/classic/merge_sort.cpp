@@ -47,8 +47,6 @@ namespace mongo {
 using std::string;
 using std::unique_ptr;
 
-// static
-const char* MergeSortStage::kStageType = "SORT_MERGE";
 
 MergeSortStage::MergeSortStage(ExpressionContext* expCtx,
                                const MergeSortStageParams& params,

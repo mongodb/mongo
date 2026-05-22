@@ -42,8 +42,6 @@ namespace mongo {
 using std::numeric_limits;
 using std::unique_ptr;
 
-// static
-const char* AndSortedStage::kStageType = "AND_SORTED";
 
 AndSortedStage::AndSortedStage(ExpressionContext* expCtx, WorkingSet* ws)
     : PlanStage(kStageType, expCtx),

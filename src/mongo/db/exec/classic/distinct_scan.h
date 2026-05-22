@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/orphan_chunk_skipper.h"
 #include "mongo/db/exec/classic/plan_stage.h"
@@ -137,7 +138,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    static const char* kStageType;
+    static constexpr StringData kStageType = "DISTINCT_SCAN"_sd;
 
 protected:
     void doSaveStateRequiresIndex() final;

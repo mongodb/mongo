@@ -132,7 +132,7 @@ ProjectionStage::ProjectionStage(ExpressionContext* expCtx,
                                  const BSONObj& projObj,
                                  WorkingSet* ws,
                                  std::unique_ptr<PlanStage> child,
-                                 const char* stageType)
+                                 StringData stageType)
     : PlanStage{expCtx, std::move(child), stageType},
       _projObj{expCtx->getExplain() ? boost::make_optional(projObj.getOwned()) : boost::none},
       _ws{*ws} {}

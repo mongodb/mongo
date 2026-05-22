@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stage_timer.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -124,7 +125,7 @@ class RecordId;
  */
 class PlanStage {
 public:
-    PlanStage(const char* typeName, ExpressionContext* expCtx)
+    PlanStage(StringData typeName, ExpressionContext* expCtx)
         : _commonStats(typeName, this), _opCtx(expCtx->getOperationContext()), _expCtx(expCtx) {
         invariant(expCtx);
         if (expCtx->getExplain() || expCtx->getMayDbProfile()) {
@@ -137,7 +138,7 @@ protected:
      * Obtain a PlanStage given a child stage. Called during the construction of derived
      * PlanStage types with a single direct descendant.
      */
-    PlanStage(ExpressionContext* expCtx, std::unique_ptr<PlanStage> child, const char* typeName)
+    PlanStage(ExpressionContext* expCtx, std::unique_ptr<PlanStage> child, StringData typeName)
         : PlanStage(typeName, expCtx) {
         _children.push_back(std::move(child));
     }

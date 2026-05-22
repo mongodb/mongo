@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -103,7 +104,7 @@ protected:
      * Subclasses of NearStage must provide basics + a stats object which gets owned here.
      */
     NearStage(ExpressionContext* expCtx,
-              const char* typeName,
+              StringData typeName,
               StageType type,
               WorkingSet* workingSet,
               CollectionAcquisition collection,

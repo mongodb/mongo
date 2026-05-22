@@ -37,8 +37,6 @@ namespace mongo {
 
 using std::unique_ptr;
 
-// static
-const char* SkipStage::kStageType = "SKIP";
 
 SkipStage::SkipStage(ExpressionContext* expCtx,
                      long long toSkip,

@@ -35,7 +35,6 @@
 
 namespace mongo {
 
-const char* RecordStoreFastCountStage::kStageType = "RECORD_STORE_FAST_COUNT";
 
 RecordStoreFastCountStage::RecordStoreFastCountStage(ExpressionContext* expCtx,
                                                      CollectionAcquisition collection,

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
@@ -151,7 +152,7 @@ public:
         return &_specificStats;
     }
 
-    static const char* kStageType;
+    static constexpr StringData kStageType = "IXSCAN"_sd;
 
     const BSONObj& getKeyPattern() const {
         return _keyPattern;

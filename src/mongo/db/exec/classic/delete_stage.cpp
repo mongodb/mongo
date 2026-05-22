@@ -84,9 +84,9 @@ DeleteStage::DeleteStage(ExpressionContext* expCtx,
                          WorkingSet* ws,
                          CollectionAcquisition collection,
                          PlanStage* child)
-    : DeleteStage(kStageType.data(), expCtx, std::move(params), ws, collection, child) {}
+    : DeleteStage(kStageType, expCtx, std::move(params), ws, collection, child) {}
 
-DeleteStage::DeleteStage(const char* stageType,
+DeleteStage::DeleteStage(StringData stageType,
                          ExpressionContext* expCtx,
                          DeleteStageParams params,
                          WorkingSet* ws,

@@ -42,7 +42,6 @@ namespace mongo {
 
 using std::unique_ptr;
 
-const char* TextMatchStage::kStageType = "TEXT_MATCH";
 
 TextMatchStage::TextMatchStage(ExpressionContext* expCtx,
                                unique_ptr<PlanStage> child,

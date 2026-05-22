@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/requires_collection_stage.h"
 #include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -43,7 +44,7 @@ namespace mongo {
  */
 class RequiresAllIndicesStage : public RequiresCollectionStage {
 public:
-    RequiresAllIndicesStage(const char* stageType,
+    RequiresAllIndicesStage(StringData stageType,
                             ExpressionContext* expCtx,
                             CollectionAcquisition coll)
         : RequiresCollectionStage(stageType, expCtx, coll) {

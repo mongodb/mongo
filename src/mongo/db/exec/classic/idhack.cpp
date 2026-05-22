@@ -49,8 +49,6 @@ namespace mongo {
 
 using std::unique_ptr;
 
-// static
-const char* IDHackStage::kStageType = "IDHACK";
 
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          const CanonicalQuery* query,

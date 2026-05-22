@@ -44,8 +44,6 @@ namespace mongo {
 
 using std::unique_ptr;
 
-// static
-const char* OrStage::kStageType = "OR";
 
 OrStage::OrStage(ExpressionContext* expCtx,
                  WorkingSet* ws,

@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-RequiresIndexStage::RequiresIndexStage(const char* stageType,
+RequiresIndexStage::RequiresIndexStage(StringData stageType,
                                        ExpressionContext* expCtx,
                                        CollectionAcquisition collection,
                                        const IndexCatalogEntry* indexEntry,

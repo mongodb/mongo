@@ -47,8 +47,6 @@ namespace mongo {
 
 using std::unique_ptr;
 
-// static
-const char* ShardFilterStage::kStageType = "SHARDING_FILTER";
 
 ShardFilterStage::ShardFilterStage(ExpressionContext* expCtx,
                                    ScopedCollectionFilter collectionFilter,

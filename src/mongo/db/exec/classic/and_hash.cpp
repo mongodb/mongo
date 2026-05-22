@@ -54,8 +54,6 @@ using std::unique_ptr;
 
 const size_t AndHashStage::kLookAheadWorks = 10;
 
-// static
-const char* AndHashStage::kStageType = "AND_HASH";
 
 AndHashStage::AndHashStage(ExpressionContext* expCtx, WorkingSet* ws)
     : PlanStage(kStageType, expCtx),

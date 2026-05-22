@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
@@ -86,7 +87,7 @@ public:
         return _memoryTracker;
     }
 
-    static const char* kStageType;
+    static constexpr StringData kStageType = "SORT_MERGE"_sd;
 
 private:
     struct StageWithValue {

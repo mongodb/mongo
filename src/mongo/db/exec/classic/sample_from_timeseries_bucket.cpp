@@ -53,7 +53,6 @@
 
 
 namespace mongo {
-const char* SampleFromTimeseriesBucket::kStageType = "SAMPLE_FROM_TIMESERIES_BUCKET";
 
 SampleFromTimeseriesBucket::SampleFromTimeseriesBucket(
     ExpressionContext* expCtx,

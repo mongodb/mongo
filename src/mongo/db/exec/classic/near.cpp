@@ -43,7 +43,7 @@
 namespace mongo {
 
 NearStage::NearStage(ExpressionContext* expCtx,
-                     const char* typeName,
+                     StringData typeName,
                      StageType type,
                      WorkingSet* workingSet,
                      CollectionAcquisition collection,

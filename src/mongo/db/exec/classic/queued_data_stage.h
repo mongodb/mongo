@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -84,7 +85,7 @@ public:
      */
     void pushBack(const WorkingSetID& id);
 
-    static const char* kStageType;
+    static constexpr StringData kStageType = "QUEUED_DATA"_sd;
 
 private:
     // The data we return.

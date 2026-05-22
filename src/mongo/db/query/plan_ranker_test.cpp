@@ -31,6 +31,7 @@
  * This file contains tests for mongo/db/query/plan_ranker.h
  */
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -61,7 +62,7 @@ unique_ptr<CanonicalQuery> makeCanonicalQuery() {
         .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 }
 
-unique_ptr<PlanStageStats> makeStats(const char* name,
+unique_ptr<PlanStageStats> makeStats(StringData name,
                                      StageType type,
                                      unique_ptr<SpecificStats> specific,
                                      size_t works = 1,

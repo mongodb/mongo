@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_collection_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -106,7 +107,7 @@ public:
         return _memoryTracker;
     }
 
-    static const char* kStageType;
+    static constexpr StringData kStageType = "TEXT_OR"_sd;
 
     class Comparator {
     public:

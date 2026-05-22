@@ -67,8 +67,6 @@ MONGO_FAIL_POINT_DEFINE(planCacheAlwaysReplanClassic);
 
 namespace mongo {
 
-// static
-const char* CachedPlanStage::kStageType = "CACHED_PLAN";
 
 CachedPlanStage::CachedPlanStage(ExpressionContext* expCtx,
                                  CollectionAcquisition collection,

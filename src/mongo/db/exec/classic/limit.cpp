@@ -37,8 +37,6 @@ namespace mongo {
 
 using std::unique_ptr;
 
-// static
-const char* LimitStage::kStageType = "LIMIT";
 
 LimitStage::LimitStage(ExpressionContext* expCtx,
                        long long limit,

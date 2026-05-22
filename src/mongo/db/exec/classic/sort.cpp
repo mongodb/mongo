@@ -47,7 +47,7 @@ SortStage::SortStage(boost::intrusive_ptr<ExpressionContext> expCtx,
                      SortPattern sortPattern,
                      bool addSortKeyMetadata,
                      std::unique_ptr<PlanStage> child)
-    : PlanStage(kStageType.data(), expCtx.get()),
+    : PlanStage(kStageType, expCtx.get()),
       _ws(ws),
       _sortKeyGen(sortPattern, expCtx->getCollator()),
       _addSortKeyMetadata(addSortKeyMetadata),
