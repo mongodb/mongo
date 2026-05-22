@@ -164,6 +164,10 @@ public:
             // Take a global IS lock to ensure the storage engine is not shutdown
             auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
             Lock::GlobalLock global(opCtx, MODE_IS);
+            // callerHoldsReadLock=true routes through UseJournalListener::kUpdateUnderReadLock,
+            // advancing durableOpTime to lastWritten without the IX-requiring truncate-after-point
+            // write. IS and IX are compatible for concurrent threads, but the locker prohibits
+            // upgrading IS to IX on the same thread (no global lock upgrades allowed).
             storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ true);
 
             // This field has had a dummy value since MMAP went away. It is undocumented.
@@ -487,6 +491,9 @@ void FSyncLockThread::run() {
         StorageEngine* storageEngine = _serviceContext->getStorageEngine();
 
         try {
+            // callerHoldsReadLock=true routes the listener through
+            // UseJournalListener::kUpdateUnderReadLock, advancing durableOpTime to lastWritten
+            // without the IX-requiring truncate-after-point write.
             storageEngine->flushAllFiles(&opCtx, /*callerHoldsReadLock*/ true);
         } catch (const std::exception& e) {
             if (!_allowFsyncFailure) {

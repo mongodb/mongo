@@ -692,7 +692,19 @@ public:
      * Controls whether or not WiredTigerConnection::waitUntilDurable() updates the
      * JournalListener.
      */
-    enum class UseJournalListener { kUpdate, kSkip };
+    enum class UseJournalListener {
+        // Standard path: JournalListener may take Global IX (e.g. to write the oplog
+        // truncate-after point on a primary). Used by JournalFlusher's periodic cycle and any
+        // direct waitUntilDurable() caller that does not already hold the global lock.
+        kUpdate,
+
+        // Caller already holds the global lock in a mode incompatible with IX (typically MODE_S
+        // held by fsyncLockWorker). JournalListener must take a path that does not require IX,
+        // so it skips the oplog truncate-after-point write. It still produces a token so
+        // onDurable advances durableOpTime in-memory. The truncate-after-point write is deferred
+        // to JournalFlusher's next cycle after the global lock is released.
+        kUpdateUnderReadLock,
+    };
 
     /**
      * Waits until all commits that happened before this call are made durable.

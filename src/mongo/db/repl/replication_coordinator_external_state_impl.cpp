@@ -1181,16 +1181,21 @@ std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherInitialSyncM
 }
 
 std::unique_ptr<JournalListener::Token> ReplicationCoordinatorExternalStateImpl::getToken(
-    OperationContext* opCtx) {
-    // If in state PRIMARY, the oplogTruncateAfterPoint must be used for the Durable timestamp
-    // in order to avoid majority confirming any writes that could later be truncated.
-    if (auto truncatePoint = repl::ReplicationProcess::get(opCtx)
-                                 ->getConsistencyMarkers()
-                                 ->refreshOplogTruncateAfterPointIfPrimary(opCtx)) {
-        return std::make_unique<ReplDurabilityToken>(*truncatePoint, true /*isPrimary*/);
+    OperationContext* opCtx, TokenMode mode) {
+    // If in state PRIMARY, the oplogTruncateAfterPoint must be used for the Durable timestamp to
+    // avoid majority-confirming writes that could later be truncated. That write requires Global
+    // IX, so it is skipped when the caller holds an incompatible lock mode (see
+    // TokenMode::kReadLockHeld).
+    if (mode == TokenMode::kDefault) {
+        if (auto truncatePoint = repl::ReplicationProcess::get(opCtx)
+                                     ->getConsistencyMarkers()
+                                     ->refreshOplogTruncateAfterPointIfPrimary(opCtx)) {
+            return std::make_unique<ReplDurabilityToken>(*truncatePoint, true /*isPrimary*/);
+        }
     }
 
-    // All other repl states use the 'lastWritten'.
+    // All other repl states (and primaries called under TokenMode::kReadLockHeld) use the
+    // 'lastWritten'.
     //
     // Setting 'rollbackSafe' will ensure that a safe lastWritten value is returned if we're rolling
     // back, which may happen in ROLLBACK or REMOVED states. 'lastWritten' may be momentarily set to

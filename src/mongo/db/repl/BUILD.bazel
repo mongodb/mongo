@@ -2195,6 +2195,7 @@ mongo_cc_unit_test(
         ":replication_recovery",
         ":storage_interface",
         "//src/mongo/db/session:session_catalog_mongod",
+        "//src/mongo/db/storage:journal_flusher",
     ],
 )
 
