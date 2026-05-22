@@ -156,9 +156,9 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             }),
         );
 
-        assert.commandFailedWithCode(testColl.insert({_id: 2, x: 2}), ErrorCodes.UserWritesBlocked);
-        assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 100}}), ErrorCodes.UserWritesBlocked);
-        assert.commandFailedWithCode(testColl.remove({_id: 1}), ErrorCodes.UserWritesBlocked);
+        assert.commandFailedWithCode(testColl.insert({_id: 2, x: 2}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 100}}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.commandFailedWithCode(testColl.remove({_id: 1}), ErrorCodes.ReplicaSetWritesBlocked);
 
         assert.eq(1, testColl.find({_id: 1, x: 1}).itcount());
 
@@ -299,7 +299,53 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         assert.commandWorked(testDB.testColl1.dropIndex("idx"));
     });
 
-    it("Test that interation between global write block and replica set write block (disable global write block first)", function () {
+    it("Test that when global and replica set write blocks are enabled concurrently, writes return the global error code", function () {
+        const testDB = this.replicaSetPrimary.getDB(this.testDbName);
+        const testColl = testDB.getCollection("testColl");
+        assert.commandWorked(testColl.insert({_id: 1, x: 0}));
+
+        assert.commandWorked(
+            this.replicaSetPrimaryAdminDB.runCommand({
+                blockReplicaSetWrites: 1,
+                enabled: true,
+                allowDeletions: false,
+                reason: "InsufficientDiskSpace",
+            }),
+        );
+        assert.commandWorked(
+            this.replicaSetPrimaryAdminDB.runCommand({
+                setUserWriteBlockMode: 1,
+                global: true,
+                reason: "DiskUseThresholdExceeded",
+            }),
+        );
+
+        // With both blocks active, writes must fail with the global error code (UserWritesBlocked),
+        // not ReplicaSetWritesBlocked.
+        const insertRes = assert.commandFailedWithCode(testColl.insert({_id: 2}), ErrorCodes.UserWritesBlocked);
+        assert(
+            insertRes.getWriteError().errmsg.includes("DiskUseThresholdExceeded"),
+            "Expected reason DiskUseThresholdExceeded in error message",
+            {insertRes},
+        );
+        const updateRes = assert.commandFailedWithCode(
+            testColl.update({_id: 1}, {$set: {x: 1}}),
+            ErrorCodes.UserWritesBlocked,
+        );
+        assert(
+            updateRes.getWriteError().errmsg.includes("DiskUseThresholdExceeded"),
+            "Expected reason DiskUseThresholdExceeded in error message",
+            {updateRes},
+        );
+        const deleteRes = assert.commandFailedWithCode(testColl.remove({_id: 1}), ErrorCodes.UserWritesBlocked);
+        assert(
+            deleteRes.getWriteError().errmsg.includes("DiskUseThresholdExceeded"),
+            "Expected reason DiskUseThresholdExceeded in error message",
+            {deleteRes},
+        );
+    });
+
+    it("Test interaction between global write block and replica set write block (disable global write block first)", function () {
         const testDB = this.replicaSetPrimary.getDB(this.testDbName);
         const testColl0 = testDB.getCollection("testColl0");
 
@@ -348,7 +394,10 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         assert(testDB.testColl1.drop());
 
         // CUD still blocked by replica set write block.
-        assert.commandFailedWithCode(testDB.getCollection("testColl0").insert({_id: 2}), ErrorCodes.UserWritesBlocked);
+        assert.commandFailedWithCode(
+            testDB.getCollection("testColl0").insert({_id: 2}),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
     });
 
     it("Test interaction between global write block and replica set write block (disable replica set write block first)", function () {

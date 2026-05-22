@@ -143,7 +143,7 @@ TEST_F(WritesRecoverableCriticalSectionServiceTest,
     const auto userNss = NamespaceString::createNamespaceString_forTest("userDB.coll");
     ASSERT_THROWS_CODE(state->checkReplicaSetDeletionsAllowed(opCtx.get(), userNss),
                        AssertionException,
-                       ErrorCodes::UserWritesBlocked);
+                       ErrorCodes::ReplicaSetWritesBlocked);
 }
 
 }  // namespace

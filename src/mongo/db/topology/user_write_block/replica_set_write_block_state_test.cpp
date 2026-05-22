@@ -100,7 +100,7 @@ TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingEnabledBlocksUserNamespace) {
     ASSERT_THROWS_CODE(state->checkReplicaSetWritesAllowed(
                            opCtx.get(), nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert),
                        AssertionException,
-                       ErrorCodes::UserWritesBlocked);
+                       ErrorCodes::ReplicaSetWritesBlocked);
 }
 
 TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingAllowsInternalDatabaseNamespaces) {
@@ -201,7 +201,7 @@ TEST_F(ReplicaSetWriteBlockStateTest, DeletionsBlockingBlocksUserNamespace) {
     const auto nss = NamespaceString::createNamespaceString_forTest("userDB.coll");
     ASSERT_THROWS_CODE(state->checkReplicaSetDeletionsAllowed(opCtx.get(), nss),
                        AssertionException,
-                       ErrorCodes::UserWritesBlocked);
+                       ErrorCodes::ReplicaSetWritesBlocked);
 }
 
 TEST_F(ReplicaSetWriteBlockStateTest, DeletionsBlockingAllowsSystemDotProfile) {
@@ -262,12 +262,12 @@ TEST_F(ReplicaSetWriteBlockStateTest, WriteBlockingIncrementsOnlyRejectedInsertA
         ASSERT_THROWS_CODE(state->checkReplicaSetWritesAllowed(
                                opCtx.get(), nss, ReplicaSetWriteBlockRejectedWriteOp::kInsert),
                            AssertionException,
-                           ErrorCodes::UserWritesBlocked);
+                           ErrorCodes::ReplicaSetWritesBlocked);
     }
     ASSERT_THROWS_CODE(state->checkReplicaSetWritesAllowed(
                            opCtx.get(), nss, ReplicaSetWriteBlockRejectedWriteOp::kUpdate),
                        AssertionException,
-                       ErrorCodes::UserWritesBlocked);
+                       ErrorCodes::ReplicaSetWritesBlocked);
 
     const auto after = readReplicaSetWritesBlockRejected(state);
     ASSERT_EQ(after.inserts, before.inserts + 2);
@@ -340,7 +340,7 @@ TEST_F(ReplicaSetWriteBlockStateTest,
     for (int i = 0; i < 2; ++i) {
         ASSERT_THROWS_CODE(state->checkReplicaSetDeletionsAllowed(opCtx.get(), nss),
                            AssertionException,
-                           ErrorCodes::UserWritesBlocked);
+                           ErrorCodes::ReplicaSetWritesBlocked);
     }
 
     const auto after = readReplicaSetWritesBlockRejected(state);

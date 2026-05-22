@@ -94,7 +94,7 @@ void ReplicaSetWriteBlockState::checkReplicaSetWritesAllowed(
                 break;
         }
         uasserted(
-            ErrorCodes::UserWritesBlocked,
+            ErrorCodes::ReplicaSetWritesBlocked,
             fmt::format("Replica set write blocked, reason: {}", idl::serialize(info.reason)));
     }
 }
@@ -117,8 +117,11 @@ void ReplicaSetWriteBlockState::checkReplicaSetDeletionsAllowed(OperationContext
         ReplicaSetWriteBlockBypass::get(opCtx).isEnabled() || nss.isOnInternalDb() ||
         nss.isSystemDotProfile();
     if (!deletesAllowed) {
+        const auto info = _writeBlockInfo.load();
         _replicaSetWriteBlockRejectedDeletes.fetchAndAdd(1);
-        uasserted(ErrorCodes::UserWritesBlocked, "User writes blocked");
+        uasserted(
+            ErrorCodes::ReplicaSetWritesBlocked,
+            fmt::format("Replica set writes blocked, reason: {}", idl::serialize(info.reason)));
     }
 }
 

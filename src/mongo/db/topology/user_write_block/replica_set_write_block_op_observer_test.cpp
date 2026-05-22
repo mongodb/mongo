@@ -194,7 +194,8 @@ protected:
         if (shouldSucceed) {
             ASSERT_DOES_NOT_THROW(invokeDelete());
         } else {
-            ASSERT_THROWS_CODE(invokeDelete(), AssertionException, ErrorCodes::UserWritesBlocked);
+            ASSERT_THROWS_CODE(
+                invokeDelete(), AssertionException, ErrorCodes::ReplicaSetWritesBlocked);
         }
     }
 

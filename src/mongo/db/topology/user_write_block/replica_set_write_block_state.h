@@ -76,7 +76,7 @@ public:
 
     /**
      * Checks that replica set writes are allowed on the specified namespace. Throws
-     * UserWritesBlocked if user writes are disallowed.
+     * ReplicaSetWritesBlocked if user writes are disallowed.
      */
     void checkReplicaSetWritesAllowed(OperationContext* opCtx,
                                       const NamespaceString& nss,
@@ -96,7 +96,7 @@ public:
 
     /**
      * Checks that replica set deletions are allowed on the specified namespace. Throws
-     * UserWritesBlocked if deletions are disallowed.
+     * ReplicaSetWritesBlocked if deletions are disallowed.
      */
     void checkReplicaSetDeletionsAllowed(OperationContext* opCtx, const NamespaceString& nss) const;
 
