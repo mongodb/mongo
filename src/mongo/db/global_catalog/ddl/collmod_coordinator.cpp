@@ -43,6 +43,8 @@
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
+#include "mongo/db/matcher/doc_validation/constraint_validation_level_upgrade.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
@@ -55,6 +57,7 @@
 #include "mongo/db/shard_role/shard_catalog/coll_mod.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/timeseries/catalog_helper.h"
@@ -342,6 +345,16 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
             }
 
             _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
+
+            if (_doc.getPhase() == Phase::kUnset &&
+                _request.getValidationLevel() == ValidationLevelEnum::constraint) {
+                // Only scan on the first execution.
+                // TODO SERVER-125951: skip scan if collection is already at constraint level.
+                uassertStatusOK(noDocumentsViolatingValidator(opCtx,
+                                                              _collInfo->nsForTargeting,
+                                                              PlacementConcern::kPretendUnsharded,
+                                                              makeClusterValidatorScanFn(opCtx)));
+            }
 
             auto isGranularityUpdate = (_request.getTimeseries().has_value() &&
                                         !_request.getTimeseries()->toBSON().isEmpty());

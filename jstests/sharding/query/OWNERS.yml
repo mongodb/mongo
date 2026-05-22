@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/query
+  - "collmod_upgrade_to_constraint_sharded.js":
+    approvers:
+      - 10gen/query-execution
   - "bulk_write*":
     approvers:
       - 10gen/query-execution-router

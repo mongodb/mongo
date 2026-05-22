@@ -29,18 +29,17 @@
 
 #include "mongo/db/matcher/doc_validation/constraint_validation_level_upgrade.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/util/str.h"
 
 #include <vector>
@@ -48,10 +47,62 @@
 #include <boost/none.hpp>
 
 namespace mongo {
+namespace {
+
+Status makeViolatingValidatorStatus(const BSONObj& validator, StringData collName) {
+    str::stream msg;
+    msg << "Cannot upgrade validationLevel to 'constraint': the collection contains documents "
+           "that do not satisfy the validator.";
+    constexpr size_t kMaxValidatorInErrorMessage = 10 * 1024;
+    StringBuilder validatorStr;
+    validator.toString(validatorStr, /*isArray=*/false, /*full=*/true);
+    auto validatorStrMaterialized =
+        static_cast<size_t>(validatorStr.len()) < kMaxValidatorInErrorMessage
+        ? validatorStr.str()
+        : "<your collection's validator>";
+    msg << " Run db." << collName << ".find({\"$nor\": [" << validatorStrMaterialized
+        << "]}) to find non-compliant documents.";
+    return {ErrorCodes::Error(12370902), msg};
+}
+
+}  // namespace
+
+// TODO SERVER-127395: Replace runAggregate/ClusterAggregate::runAggregate with public API calls
+// (e.g. CommandHelpers::runCommandDirectly) and pass isSharded as a bool instead of a function.
+ValidatorScanFn makeLocalValidatorScanFn(OperationContext* opCtx) {
+    return
+        [opCtx](AggregateCommandRequest& req, const PrivilegeVector& privs) -> StatusWith<BSONObj> {
+            rpc::OpMsgReplyBuilder reply;
+            if (auto s = runAggregate(
+                    opCtx, req, LiteParsedPipeline{req}, req.toBSON(), privs, boost::none, &reply);
+                !s.isOK()) {
+                return s;
+            }
+            auto b = reply.getBodyBuilder();
+            CommandHelpers::appendSimpleCommandStatus(b, true);
+            b.doneFast();
+            return reply.releaseBody();
+        };
+}
+
+ValidatorScanFn makeClusterValidatorScanFn(OperationContext* opCtx) {
+    return [opCtx](AggregateCommandRequest& req,
+                   const PrivilegeVector& privs) -> StatusWith<BSONObj> {
+        auto ns = req.getNamespace();
+        BSONObjBuilder result;
+        if (auto s =
+                ClusterAggregate::runAggregate(opCtx, {ns, ns}, req, privs, boost::none, &result);
+            !s.isOK()) {
+            return s;
+        }
+        return result.obj();
+    };
+}
 
 Status noDocumentsViolatingValidator(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     PlacementConcern placementConcern) {
+                                     PlacementConcern placementConcern,
+                                     ValidatorScanFn runAgg) {
     BSONObj validator;
     {
         auto coll =
@@ -80,29 +131,14 @@ Status noDocumentsViolatingValidator(OperationContext* opCtx,
     AggregateCommandRequest aggRequest(nss, std::move(pipeline));
     aggRequest.setHint(BSON("$natural" << 1));
 
-    auto aggCmdObj = aggRequest.toBSON();
-    rpc::OpMsgReplyBuilder replyBuilder;
+    PrivilegeVector privs{Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)};
 
-    // We use runAggregate here instead of something like DBDirectClient because in a sharded
-    // environment we want the DDL coordinating shard to do targeting and send sub aggregations to
-    // the other participants.
-    auto status =
-        runAggregate(opCtx,
-                     aggRequest,
-                     {aggRequest},
-                     aggCmdObj,
-                     {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
-                     boost::none,
-                     &replyBuilder);
-    if (!status.isOK()) {
-        return status;
+    auto resultOrStatus = runAgg(aggRequest, privs);
+    if (!resultOrStatus.isOK()) {
+        return resultOrStatus.getStatus();
     }
 
-    auto bodyBuilder = replyBuilder.getBodyBuilder();
-    CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);
-    bodyBuilder.doneFast();
-
-    auto cursorResponse = CursorResponse::parseFromBSON(replyBuilder.releaseBody(),
+    auto cursorResponse = CursorResponse::parseFromBSON(resultOrStatus.getValue(),
                                                         nullptr,
                                                         nss.tenantId(),
                                                         SerializationContext::stateCommandReply());
@@ -114,19 +150,7 @@ Status noDocumentsViolatingValidator(OperationContext* opCtx,
         return Status::OK();
     }
 
-    str::stream msg;
-    msg << "Cannot upgrade validationLevel to 'constraint': the collection contains documents "
-           "that do not satisfy the validator.";
-    constexpr size_t kMaxValidatorInErrorMessage = 10 * 1024;
-    StringBuilder validatorStr;
-    validator.toString(validatorStr, /*isArray=*/false, /*full=*/true);
-    auto validatorStrMaterialized =
-        static_cast<size_t>(validatorStr.len()) < kMaxValidatorInErrorMessage
-        ? validatorStr.str()
-        : "<your collection's validator>";
-    msg << " Run db." << nss.coll() << ".find({\"$nor\": [" << validatorStrMaterialized
-        << "]}) to find non-compliant documents.";
-    return {ErrorCodes::Error(12370902), msg};
+    return makeViolatingValidatorStatus(validator, nss.coll());
 }
 
 }  // namespace mongo

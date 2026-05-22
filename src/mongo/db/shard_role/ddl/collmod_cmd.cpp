@@ -186,12 +186,14 @@ public:
                                 .isEnabledUseLastLTSFCVWhenUninitialized(
                                     VersionContext::getDecoration(opCtx), fcvSnapshot));
 
+                    // TODO SERVER-125951: skip scan if collection is already at
+                    // 'constraint' level, since existing docs must already conform.
                     auto& oss = OperationShardingState::get(opCtx);
                     uassertStatusOK(noDocumentsViolatingValidator(
                         opCtx,
                         nss,
-                        PlacementConcern{oss.getDbVersion(nss.dbName()),
-                                         oss.getShardVersion(nss)}));
+                        PlacementConcern{oss.getDbVersion(nss.dbName()), oss.getShardVersion(nss)},
+                        makeLocalValidatorScanFn(opCtx)));
                 }
             }
 

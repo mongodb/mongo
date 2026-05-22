@@ -772,6 +772,7 @@ mongo_cc_library(
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/global_catalog/ddl:notify_sharding_event_idl",
         "//src/mongo/db/index_builds:index_builds_coordinator",
+        "//src/mongo/db/matcher/doc_validation:constraint_validation_level_upgrade",
         "//src/mongo/db/pipeline/process_interface:shardsvr_process_interface",
         "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/repl:change_stream_oplog_notification",

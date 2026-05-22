@@ -30,23 +30,52 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/util/modules.h"
+
+#include <functional>
 
 namespace mongo {
 
 /**
- * Reads the collection validator from the local catalog and runs an aggregation to find any
- * document that violates it. Returns a non-OK status if such a document exists, or Status::OK()
- * if all documents conform or if the collection has no validator.
+ * Callback type for executing the violation-scan aggregate. Receives the pre-built request and
+ * the required privilege vector; returns the raw cursor-response BSONObj or a non-OK status.
+ * The shared impl handles everything else (collection read, pipeline, privilege construction,
+ * cursor parsing, and error formatting).
+ */
+using ValidatorScanFn =
+    std::function<StatusWith<BSONObj>(AggregateCommandRequest&, const PrivilegeVector&)>;
+
+/**
+ * Returns a ValidatorScanFn that runs the aggregate locally via runAggregate.
+ * Use on standalone nodes and shard-local collMod execution.
+ */
+MONGO_MOD_PUBLIC ValidatorScanFn makeLocalValidatorScanFn(OperationContext* opCtx);
+
+/**
+ * Returns a ValidatorScanFn that runs the aggregate via ClusterAggregate, fanning out to all
+ * shards. Use on the DDL coordinator for sharded collections.
+ */
+MONGO_MOD_PUBLIC ValidatorScanFn makeClusterValidatorScanFn(OperationContext* opCtx);
+
+/**
+ * Reads the collection validator from the local catalog, builds a violation-scan aggregate, and
+ * executes it via 'runAgg'. Returns a non-OK status if any document violates the validator, or
+ * Status::OK() if all documents conform or the collection has no validator.
  *
- * 'placementConcern' is used only when acquiring the collection to read its validator; the
- * subsequent aggregation acquires the collection itself or sends commands to remote shards.
+ * 'placementConcern' is passed to the collection acquisition used to read the validator.
+ * 'runAgg' is responsible only for dispatching the aggregate and returning the raw response;
+ * the caller supplies the appropriate executor (local runAggregate or ClusterAggregate).
  */
 MONGO_MOD_PUBLIC Status noDocumentsViolatingValidator(OperationContext* opCtx,
                                                       const NamespaceString& nss,
-                                                      PlacementConcern placementConcern);
+                                                      PlacementConcern placementConcern,
+                                                      ValidatorScanFn runAgg);
 
 }  // namespace mongo
