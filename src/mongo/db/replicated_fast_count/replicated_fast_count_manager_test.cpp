@@ -701,5 +701,95 @@ TEST_F(ReplicatedFastCountManagerColdBootTest,
     EXPECT_EQ(rs2->accurateDataSize(), expectedSize2);
 }
 
+// Regression test for SERVER-127435: initializeMetadata() in container mode used to always scan
+// the oplog from Timestamp::min() because _timestampStore->read() returned boost::none
+// (the collection-backed implementation was still in place before initializeContainerStores()).
+TEST_F(ReplicatedFastCountManagerInitializeMetadataTest,
+       ContainerModeReadsTimestampFromIdentToFilterOplogScan) {
+    RAIIServerParameterControllerForTest ffFastCount("featureFlagReplicatedFastCount", true);
+    RAIIServerParameterControllerForTest ffDurability("featureFlagReplicatedFastCountDurability",
+                                                      true);
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+
+    ASSERT_OK(storageInterface()->createCollection(
+        operationContext(), collA.nss, CollectionOptions{.uuid = collA.uuid}));
+
+    ASSERT_OK(createInternalFastCountContainers(operationContext(),
+                                                NamespaceString::kAdminCommandNamespace,
+                                                ident::kFastCountMetadataStore,
+                                                KeyFormat::String,
+                                                ident::kFastCountMetadataStoreTimestamps,
+                                                KeyFormat::Long,
+                                                /*writeToOplog=*/false));
+
+    auto* engine = operationContext()->getServiceContext()->getStorageEngine()->getEngine();
+
+    // Persist metadata: collA has 5 records, 100 bytes.
+    {
+        auto metadataRS =
+            engine->getRecordStore(operationContext(),
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStore,
+                                   RecordStore::Options{.keyFormat = KeyFormat::String},
+                                   /*uuid=*/boost::none);
+        auto containerVariant = metadataRS->getContainer();
+        auto& container =
+            std::get<std::reference_wrapper<StringKeyedContainer>>(containerVariant).get();
+        auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+
+        const BSONObj entryBson = test_helpers::makeEntryBson(/*count=*/5, /*size=*/100);
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(container.insert(ru,
+                                   test_helpers::uuidSpan(collA.uuid),
+                                   test_helpers::bsonSpan(entryBson),
+                                   container::ExistingKeyPolicy::reject));
+        wuow.commit();
+    }
+
+    // Persist checkpoint timestamp Timestamp(3, 3) directly to the container
+    // (bypass container_write to avoid the oplog write path).
+    const Timestamp checkpointTs(3, 3);
+    {
+        auto timestampsRS =
+            engine->getRecordStore(operationContext(),
+                                   NamespaceString::kAdminCommandNamespace,
+                                   ident::kFastCountMetadataStoreTimestamps,
+                                   RecordStore::Options{.keyFormat = KeyFormat::Long},
+                                   /*uuid=*/boost::none);
+        auto containerVariant = timestampsRS->getContainer();
+        auto& container =
+            std::get<std::reference_wrapper<IntegerKeyedContainer>>(containerVariant).get();
+        auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+        const BSONObj tsVal = BSON(kValidAsOfKey << checkpointTs);
+        const std::span<const char> valSpan{tsVal.objdata(), static_cast<size_t>(tsVal.objsize())};
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(container.insert(ru, int64_t{0}, valSpan, container::ExistingKeyPolicy::reject));
+        wuow.commit();
+    }
+
+    // Write oplog entries: two at or before the checkpoint, one after. No OpObserverImpl is
+    // registered in this fixture so these are the only oplog entries — no conflicting creates.
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(
+            Timestamp(1, 1), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/10));
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(
+            Timestamp(3, 3), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/20));
+    test_helpers::writeToOplog(
+        operationContext(),
+        test_helpers::makeOplogEntry(
+            Timestamp(4, 4), collA, repl::OpTypeEnum::kInsert, /*sizeDelta=*/30));
+
+    manager->initializeMetadata(operationContext());
+
+    // Only the entry at Timestamp(4, 4) should be accumulated — entries at or before
+    // checkpointTs are already captured in the persisted metadata.
+    const RecordStore* rs = getRecordStoreForUuid(operationContext(), collA.uuid);
+    EXPECT_EQ(rs->accurateNumRecords(), 5 + 1);
+    EXPECT_EQ(rs->accurateDataSize(), 100 + 30);
+}
+
 }  // namespace
 }  // namespace mongo::replicated_fast_count

@@ -203,6 +203,7 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
     SizeCountAccumulator accumulator;
 
     Lock::GlobalLock readLock(opCtx, MODE_IS, {.skipRSTLLock = opCtx->isLockFreeReadsOp()});
+    bool useContainers = shouldUseReplicatedFastCountContainers(opCtx);
     {
         // Initialize the in-memory map by loading all persisted collection size/count information.
         // The block scope is required to avoid a lock cycle fassert in the collection path when
@@ -210,7 +211,6 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
         const auto startTime = Date_t::now();
         int numRecordsScanned = 0;
 
-        bool useContainers = shouldUseReplicatedFastCountContainers(opCtx);
         if (useContainers) {
             // TODO SERVER-126250: We should only need the nullptr check since we won't have a
             // non-null CollectionSizeCountStore pointer.
@@ -252,13 +252,41 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
               "duration"_attr = Date_t::now() - startTime);
     }
 
+    // In container mode, _timestampStore is still the collection-backed implementation because
+    // initializeContainerStores() is called after initializeMetadata(). Read directly from the
+    // storage engine like the metadata hydration above does.
+    const boost::optional<Timestamp> persistedTimestamp = [&]() -> boost::optional<Timestamp> {
+        if (useContainers) {
+            auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+            if (!storageEngine->getEngine()->hasIdent(ru,
+                                                      ident::kFastCountMetadataStoreTimestamps)) {
+                LOGV2_WARNING(12743500,
+                              "Internal fastcount Timestamps container did not exist during "
+                              "initialization even though the Metadata container did");
+                return boost::none;
+            }
+            auto timestampRS = storageEngine->getEngine()->getRecordStore(
+                opCtx,
+                NamespaceString::kAdminCommandNamespace,
+                ident::kFastCountMetadataStoreTimestamps,
+                RecordStore::Options{.keyFormat = KeyFormat::Long},
+                /*uuid=*/boost::none);
+            massert(
+                12580002, "Storage engine returned a null RecordStore for timestamps", timestampRS);
+            ContainerSizeCountTimestampStore tempStore(std::move(timestampRS));
+            return tempStore.read(opCtx);
+        }
+        return _timestampStore->read(opCtx);
+    }();
+
     // TODO (SERVER-126366): Remove the feature flag guarding.
     if (gFeatureFlagReplicatedFastCountDurability.isEnabledUseLatestFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         const Date_t oplogScanStartTime = Date_t::now();
-        const Timestamp seekAfterTimestamp =
-            _timestampStore->read(opCtx).value_or(Timestamp::min());
+
+        const Timestamp seekAfterTimestamp = persistedTimestamp.value_or(Timestamp::min());
 
         // Scan the oplog from seekAfterTimestamp and accumulate size and count deltas for every
         // UUID that has been updated since the last checkpoint.
@@ -325,8 +353,8 @@ void ReplicatedFastCountManager::initializeMetadata(OperationContext* opCtx) {
     // baseline on warm restart. Without this, the gauge would stay at 0 until the first post-boot
     // checkpoint flush (primary) or the first oplog-applied write to the timestamp store
     // (secondary).
-    if (const auto persistedCheckpoint = _timestampStore->read(opCtx)) {
-        recordCheckpointAdvanced(*persistedCheckpoint);
+    if (persistedTimestamp) {
+        recordCheckpointAdvanced(*persistedTimestamp);
     }
 }
 
