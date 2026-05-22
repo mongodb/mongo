@@ -72,6 +72,7 @@
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher_progress_gen.h"
+#include "mongo/db/s/resharding/resharding_promise_util.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -148,38 +149,7 @@ namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
-/**
- * Fulfills the promise if it is not already. Otherwise, does nothing.
- */
-void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp) {
-    if (!sp.getFuture().isReady()) {
-        sp.emplaceValue();
-    }
-}
-
-void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp, Status error) {
-    if (!sp.getFuture().isReady()) {
-        sp.setError(error);
-    }
-}
-
-template <typename T>
-void ensureFulfilledPromise(WithLock lk, SharedPromise<T>& sp, Status error) {
-    if (!sp.getFuture().isReady()) {
-        sp.setError(error);
-    }
-}
-
-template <class T>
-void ensureFulfilledPromise(WithLock lk, SharedPromise<T>& sp, T value) {
-    auto future = sp.getFuture();
-    if (!future.isReady()) {
-        sp.emplaceValue(std::move(value));
-    } else {
-        // Ensure that we would only attempt to fulfill the promise with the same value.
-        invariant(future.get() == value);
-    }
-}
+using resharding::ensureFulfilledPromise;
 
 /**
  * Returns whether it is possible for the recipient to be in 'state' when resharding will

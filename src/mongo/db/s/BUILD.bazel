@@ -313,6 +313,8 @@ mongo_cc_library(
         "//src/mongo/db/repl:replica_set_aware_service",
         "//src/mongo/db/repl:wait_for_majority_service",
         "//src/mongo/db/s/resharding:resharding_change_event_o2_field",
+        "//src/mongo/db/s/resharding:resharding_donor_promises",
+        "//src/mongo/db/s/resharding:resharding_promise_util",
         "//src/mongo/db/s/resharding:resharding_recipient_promises",
         "//src/mongo/db/session:kill_sessions_local",
         "//src/mongo/db/session:session_catalog_mongod",

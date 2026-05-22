@@ -44,6 +44,7 @@
 #include "mongo/db/s/primary_only_service_helpers/cancel_state.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/resharding_change_streams_monitor.h"
+#include "mongo/db/s/resharding/resharding_donor_promises.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/service_context.h"
@@ -150,8 +151,8 @@ public:
      * all earlier coordinator states.
      *
      * Promises fulfilled here:
-     *   newState >= kApplying        -> _allRecipientsDoneCloning
-     *   newState >= kBlockingWrites  -> _allRecipientsDoneApplying
+     *   newState >= kApplying        -> _allRecipientsDoneCloning   (via _promises)
+     *   newState >= kBlockingWrites  -> _allRecipientsDoneApplying  (via _promises)
      *   newState >= kCommitting      -> _coordinatorHasDecisionPersisted
      */
     void onCoordinatorStateAdvanced(CoordinatorStateEnum newState);
@@ -187,15 +188,15 @@ public:
      * reaching that state.
      */
     SharedSemiFuture<void> awaitInDonatingOplogEntries() const {
-        return _inDonatingOplogEntries.getFuture();
+        return _promises.getInDonatingOplogEntriesFuture();
     }
 
     SharedSemiFuture<void> awaitAllRecipientsDoneCloningForTest() {
-        return _allRecipientsDoneCloning.getFuture();
+        return _promises.getAllRecipientsDoneCloningFuture();
     }
 
     SharedSemiFuture<void> awaitAllRecipientsDoneApplyingForTest() {
-        return _allRecipientsDoneApplying.getFuture();
+        return _promises.getAllRecipientsDoneApplyingFuture();
     }
 
     /**
@@ -204,7 +205,7 @@ public:
      * DonorStateEnum::kBlockingWrites).
      */
     SharedSemiFuture<void> awaitInBlockingWritesOrError() const {
-        return _inBlockingWritesOrError.getFuture();
+        return _promises.getInBlockingWritesOrErrorFuture();
     }
 
     static void insertStateDocument(OperationContext* opCtx,
@@ -226,8 +227,10 @@ public:
 private:
     /**
      * Fulfills in-memory promises that can be inferred from the persisted donor state on step-up.
+     * The workflow promises are recovered via _promises.recover(); the remaining SharedPromise
+     * members (coordinator decision and change-streams-monitor promises) are recovered inline.
      */
-    void _fulfillPromisesOnStepup();
+    void _fulfillPromisesOnStepup(const ReshardingDonorDocument& donorDoc);
 
     /**
      * With-lock implementation of onCoordinatorStateAdvanced. Used by callers that already hold
@@ -410,29 +413,34 @@ private:
     // It states whether the current node has also the recipient role.
     const bool _isAlsoRecipient;
 
-    // Each promise below corresponds to a state on the donor state machine. They are listed in
-    // ascending order, such that the first promise below will be the first promise fulfilled -
-    // fulfillment order is not necessarily maintained if the operation gets aborted.
-    SharedPromise<void> _allRecipientsDoneCloning;
+    // Owns the donor-state-machine workflow promises (allRecipientsDoneCloning,
+    // allRecipientsDoneApplying, inDonatingOplogEntries, inBlockingWritesOrError,
+    // critSecWasAcquired, critSecWasPromoted). Stepup recovery, terminal-error broadcast, and
+    // per-state fulfillment all flow through this wrapper. See ReshardingDonorPromises for the
+    // per-promise recovery rules.
+    ReshardingDonorPromises _promises;
 
-    SharedPromise<void> _inDonatingOplogEntries;
+    // Fulfilled once the coordinator has persisted its commit/abort decision. Set with success
+    // by commit(), with an abort status by abort(), or by stepup recovery when the donor
+    // already reflects the coordinator decision locally.
+    SharedPromise<void> _coordinatorHasDecisionPersisted;
 
-    SharedPromise<void> _allRecipientsDoneApplying;
+    // Fulfilled when all the work associated with this Instance has finished, including the
+    // local state document being removed. Errored from interrupt() so that consumers waiting on
+    // completion observe an error rather than hang if run() is never called by POS during
+    // stepdown.
+    SharedPromise<void> _completionPromise;
 
-    SharedPromise<void> _inBlockingWritesOrError;
-
+    // Change-streams-monitor SharedPromises (only used when verification is enabled). Kept out
+    // of _promises because they have independent error semantics from the donor's main state
+    // machine: a monitor failure does not necessarily error the workflow promises and vice
+    // versa.
     SharedPromise<Timestamp> _changeStreamMonitorStartTimeSelected;
     SharedPromise<void> _changeStreamsMonitorStarted;
     SharedPromise<int64_t> _changeStreamsMonitorCompleted;
+
+    // The change-streams-monitor quiesce future is wired up by the monitor itself.
     SharedSemiFuture<void> _changeStreamsMonitorQuiesced;
-
-    SharedPromise<void> _coordinatorHasDecisionPersisted;
-
-    SharedPromise<void> _completionPromise;
-
-    // Promises used to synchronize the acquisition/promotion of the recoverable critical section.
-    SharedPromise<void> _critSecWasAcquired;
-    SharedPromise<void> _critSecWasPromoted;
 };
 
 /**
