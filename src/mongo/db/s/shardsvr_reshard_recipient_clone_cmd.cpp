@@ -102,7 +102,7 @@ public:
                         request().getApproxCopySize().getApproxDocumentsToCopy().get_value_or(0),
                         request().getApproxCopySize().getApproxBytesToCopy().get_value_or(0),
                         request().getDonorShards()});
-                (*machine)->awaitTransitionedToCreateCollection().get(opCtx);
+                (*machine)->awaitInCreatingCollection().get(opCtx);
             } else {
                 // If state machine does not exist, either this message was delayed and the
                 // resharding operation is done, or this node is no longer a primary.

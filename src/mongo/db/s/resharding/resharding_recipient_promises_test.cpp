@@ -29,6 +29,8 @@
 
 #include "mongo/db/s/resharding/resharding_recipient_promises.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -143,11 +145,173 @@ TEST_F(ReshardingRecipientPromisesTest,
 }
 
 TEST_F(ReshardingRecipientPromisesTest,
+       OnCoordinatorStateAdvancedFulfillsCoordinatorBlockingWritesAtBlockingWrites) {
+    ReshardingRecipientPromises promises;
+
+    promises.onCoordinatorStateAdvanced(WithLock::withoutLock(),
+                                        CoordinatorStateEnum::kBlockingWrites);
+
+    ASSERT_TRUE(promises.getCoordinatorBlockingWritesFuture().isReady());
+    ASSERT_OK(promises.getCoordinatorBlockingWritesFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnCoordinatorStateAdvancedDoesNotFulfillCoordinatorBlockingWritesBeforeBlockingWrites) {
+    ReshardingRecipientPromises promises;
+
+    promises.onCoordinatorStateAdvanced(WithLock::withoutLock(), CoordinatorStateEnum::kApplying);
+
+    ASSERT_FALSE(promises.getCoordinatorBlockingWritesFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnCoordinatorStateAdvancedFulfillsCoordinatorBlockingWritesAfterBlockingWrites) {
+    ReshardingRecipientPromises promises;
+
+    promises.onCoordinatorStateAdvanced(WithLock::withoutLock(), CoordinatorStateEnum::kCommitting);
+
+    ASSERT_TRUE(promises.getCoordinatorBlockingWritesFuture().isReady());
+    ASSERT_OK(promises.getCoordinatorBlockingWritesFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       RecoveryFulfillsCoordinatorBlockingWritesAtStrictConsistency) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kStrictConsistency);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_TRUE(promises.getCoordinatorBlockingWritesFuture().isReady());
+    ASSERT_OK(promises.getCoordinatorBlockingWritesFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest, RecoveryFulfillsCoordinatorBlockingWritesWithErrorAtDone) {
+    // Whether the coordinator engaged the critical section cannot be determined from kDone alone:
+    // the recipient may have reached kDone via kError (never engaged) or via kStrictConsistency
+    // (engaged). An error is set defensively to surface any code that incorrectly awaits the
+    // promise in the kDone path.
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kDone);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_TRUE(promises.getCoordinatorBlockingWritesFuture().isReady());
+    ASSERT_NOT_OK(promises.getCoordinatorBlockingWritesFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest, RecoveryDoesNotFulfillCoordinatorBlockingWritesAtError) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kError);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_FALSE(promises.getCoordinatorBlockingWritesFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest, SetRunnerErrorFulfillsCoordinatorBlockingWritesWithError) {
+    ReshardingRecipientPromises promises;
+
+    promises.setRunnerError(WithLock::withoutLock(), {ErrorCodes::InternalError, "test"});
+
+    ASSERT_TRUE(promises.getCoordinatorBlockingWritesFuture().isReady());
+    ASSERT_NOT_OK(promises.getCoordinatorBlockingWritesFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnCoordinatorStateAdvancedFulfillsCoordinatorCommittedAtCommitting) {
+    ReshardingRecipientPromises promises;
+
+    promises.onCoordinatorStateAdvanced(WithLock::withoutLock(), CoordinatorStateEnum::kCommitting);
+
+    ASSERT_TRUE(promises.getCoordinatorCommittedFuture().isReady());
+    ASSERT_OK(promises.getCoordinatorCommittedFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnCoordinatorStateAdvancedDoesNotFulfillCoordinatorCommittedBeforeCommitting) {
+    ReshardingRecipientPromises promises;
+
+    promises.onCoordinatorStateAdvanced(WithLock::withoutLock(),
+                                        CoordinatorStateEnum::kBlockingWrites);
+
+    ASSERT_FALSE(promises.getCoordinatorCommittedFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       OnCoordinatorStateAdvancedFulfillsCoordinatorCommittedAfterCommitting) {
+    ReshardingRecipientPromises promises;
+
+    promises.onCoordinatorStateAdvanced(WithLock::withoutLock(), CoordinatorStateEnum::kDone);
+
+    ASSERT_TRUE(promises.getCoordinatorCommittedFuture().isReady());
+    ASSERT_OK(promises.getCoordinatorCommittedFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest, FulfillCoordinatorCommitFulfillsCoordinatorCommitted) {
+    ReshardingRecipientPromises promises;
+
+    promises.fulfillCoordinatorCommit(WithLock::withoutLock());
+
+    ASSERT_TRUE(promises.getCoordinatorCommittedFuture().isReady());
+    ASSERT_OK(promises.getCoordinatorCommittedFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       RecoveryFulfillsCoordinatorCommittedAtDoneWithoutAbortReason) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kDone);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_TRUE(promises.getCoordinatorCommittedFuture().isReady());
+    ASSERT_OK(promises.getCoordinatorCommittedFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       RecoveryFulfillsCoordinatorCommittedWithErrorAtDoneWithAbortReason) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kDone);
+    AbortReason abortReasonStruct;
+    abortReasonStruct.setAbortReason(BSON("code" << static_cast<int>(ErrorCodes::InternalError)
+                                                 << "errmsg"
+                                                 << "test"));
+    document.getMutableState().setAbortReasonStruct(std::move(abortReasonStruct));
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_TRUE(promises.getCoordinatorCommittedFuture().isReady());
+    ASSERT_NOT_OK(promises.getCoordinatorCommittedFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest, RecoveryDoesNotFulfillCoordinatorCommittedBeforeDone) {
+    ReshardingRecipientPromises promises;
+
+    auto document = makeDocument(RecipientStateEnum::kStrictConsistency);
+
+    promises.recover(WithLock::withoutLock(), document);
+
+    ASSERT_FALSE(promises.getCoordinatorCommittedFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest, SetRunnerErrorFulfillsCoordinatorCommittedWithError) {
+    ReshardingRecipientPromises promises;
+
+    promises.setRunnerError(WithLock::withoutLock(), {ErrorCodes::InternalError, "test"});
+
+    ASSERT_TRUE(promises.getCoordinatorCommittedFuture().isReady());
+    ASSERT_NOT_OK(promises.getCoordinatorCommittedFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
        OnCoordinatorStateAdvancedDoesNotFulfillAllDonorsPreparedAfterCloning) {
     ReshardingRecipientPromises promises;
 
-    promises.onCoordinatorStateAdvanced(
-        WithLock::withoutLock(), CoordinatorStateEnum::kApplying, boost::none);
+    promises.onCoordinatorStateAdvanced(WithLock::withoutLock(), CoordinatorStateEnum::kApplying);
 
     ASSERT_FALSE(promises.getAllDonorsPreparedToDonateFuture().isReady());
 }
@@ -155,8 +319,7 @@ TEST_F(ReshardingRecipientPromisesTest,
 TEST_F(ReshardingRecipientPromisesTest,
        OnCoordinatorStateAdvancedDoesNotFulfillAllDonorsPreparedWhenCloningWithNoCloneDetails) {
     ReshardingRecipientPromises promises;
-    promises.onCoordinatorStateAdvanced(
-        WithLock::withoutLock(), CoordinatorStateEnum::kCloning, boost::none);
+    promises.onCoordinatorStateAdvanced(WithLock::withoutLock(), CoordinatorStateEnum::kCloning);
     ASSERT_FALSE(promises.getAllDonorsPreparedToDonateFuture().isReady());
 }
 
@@ -300,60 +463,90 @@ TEST_F(ReshardingRecipientPromisesTest,
 }
 
 TEST_F(ReshardingRecipientPromisesTest,
-       RecoveryFulfillsTransitionedToCreateCollectionWhenStateIsAtOrBeyondCreatingCollection) {
+       RecoveryFulfillsInCreatingCollectionWhenStateIsAtOrBeyondCreatingCollection) {
     ReshardingRecipientPromises promises;
 
     auto document = makeDocument(RecipientStateEnum::kCreatingCollection);
 
     promises.recover(WithLock::withoutLock(), document);
 
-    ASSERT_TRUE(promises.getTransitionedToCreateCollectionFuture().isReady());
-    ASSERT_OK(promises.getTransitionedToCreateCollectionFuture().getNoThrow());
+    ASSERT_TRUE(promises.getInCreatingCollectionFuture().isReady());
+    ASSERT_OK(promises.getInCreatingCollectionFuture().getNoThrow());
 }
 
 TEST_F(ReshardingRecipientPromisesTest,
-       RecoveryFulfillsTransitionedToCreateCollectionWhenStateIsBeyondCreatingCollection) {
+       RecoveryFulfillsInCreatingCollectionWhenStateIsBeyondCreatingCollection) {
     ReshardingRecipientPromises promises;
 
     auto document = makeDocument(RecipientStateEnum::kCloning);
 
     promises.recover(WithLock::withoutLock(), document);
 
-    ASSERT_TRUE(promises.getTransitionedToCreateCollectionFuture().isReady());
-    ASSERT_OK(promises.getTransitionedToCreateCollectionFuture().getNoThrow());
+    ASSERT_TRUE(promises.getInCreatingCollectionFuture().isReady());
+    ASSERT_OK(promises.getInCreatingCollectionFuture().getNoThrow());
 }
 
 TEST_F(ReshardingRecipientPromisesTest,
-       RecoveryDoesNotFulfillTransitionedToCreateCollectionWhenStateIsAwaitingFetchTimestamp) {
+       RecoveryDoesNotFulfillInCreatingCollectionWhenStateIsAwaitingFetchTimestamp) {
     ReshardingRecipientPromises promises;
 
     auto document = makeDocument(RecipientStateEnum::kAwaitingFetchTimestamp);
 
     promises.recover(WithLock::withoutLock(), document);
 
-    ASSERT_FALSE(promises.getTransitionedToCreateCollectionFuture().isReady());
+    ASSERT_FALSE(promises.getInCreatingCollectionFuture().isReady());
 }
 
 TEST_F(ReshardingRecipientPromisesTest,
-       OnRecipientStateAdvancedFulfillsTransitionedToCreateCollectionAtCreatingCollection) {
+       OnRecipientStateAdvancedFulfillsInCreatingCollectionAtCreatingCollection) {
     ReshardingRecipientPromises promises;
 
     promises.onRecipientStateAdvanced(WithLock::withoutLock(),
                                       RecipientStateEnum::kCreatingCollection);
 
-    ASSERT_TRUE(promises.getTransitionedToCreateCollectionFuture().isReady());
-    ASSERT_OK(promises.getTransitionedToCreateCollectionFuture().getNoThrow());
+    ASSERT_TRUE(promises.getInCreatingCollectionFuture().isReady());
+    ASSERT_OK(promises.getInCreatingCollectionFuture().getNoThrow());
 }
 
-TEST_F(
-    ReshardingRecipientPromisesTest,
-    OnRecipientStateAdvancedDoesNotFulfillTransitionedToCreateCollectionBeforeCreatingCollection) {
+TEST_F(ReshardingRecipientPromisesTest,
+       OnRecipientStateAdvancedDoesNotFulfillInCreatingCollectionBeforeCreatingCollection) {
     ReshardingRecipientPromises promises;
 
     promises.onRecipientStateAdvanced(WithLock::withoutLock(),
                                       RecipientStateEnum::kAwaitingFetchTimestamp);
 
-    ASSERT_FALSE(promises.getTransitionedToCreateCollectionFuture().isReady());
+    ASSERT_FALSE(promises.getInCreatingCollectionFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       SetRecipientErrorFulfillsCoordinatorBlockingWritesWithError) {
+    ReshardingRecipientPromises promises;
+
+    promises.onRecipientStateAdvanced(WithLock::withoutLock(), RecipientStateEnum::kError);
+    promises.setRecipientError(WithLock::withoutLock(), {ErrorCodes::InternalError, "test"});
+
+    ASSERT_TRUE(promises.getCoordinatorBlockingWritesFuture().isReady());
+    ASSERT_NOT_OK(promises.getCoordinatorBlockingWritesFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientPromisesTest, SetRecipientErrorDoesNotFulfillCoordinatorCommitted) {
+    ReshardingRecipientPromises promises;
+
+    promises.onRecipientStateAdvanced(WithLock::withoutLock(), RecipientStateEnum::kError);
+    promises.setRecipientError(WithLock::withoutLock(), {ErrorCodes::InternalError, "test"});
+
+    ASSERT_FALSE(promises.getCoordinatorCommittedFuture().isReady());
+}
+
+TEST_F(ReshardingRecipientPromisesTest,
+       SetRecipientErrorFulfillsInCreatingCollectionIfNotYetReached) {
+    ReshardingRecipientPromises promises;
+
+    promises.onRecipientStateAdvanced(WithLock::withoutLock(), RecipientStateEnum::kError);
+    promises.setRecipientError(WithLock::withoutLock(), {ErrorCodes::InternalError, "test"});
+
+    ASSERT_TRUE(promises.getInCreatingCollectionFuture().isReady());
+    ASSERT_NOT_OK(promises.getInCreatingCollectionFuture().getNoThrow());
 }
 
 }  // namespace

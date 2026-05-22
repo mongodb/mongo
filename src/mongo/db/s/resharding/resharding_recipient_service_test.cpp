@@ -904,7 +904,7 @@ public:
                         recipientFields.getApproxDocumentsToCopy().get(),
                         recipientFields.getApproxBytesToCopy().get(),
                         recipientFields.getDonorShards()});
-                return recipient.awaitTransitionedToCreateCollection();
+                return recipient.awaitInCreatingCollection();
             } catch (const ExceptionFor<ErrorCodes::PrimaryOnlyServiceInitializing>&) {
                 sleepmillis(100);
             }
@@ -932,7 +932,7 @@ public:
             // A recipient only explicitly waits for the critical section to start before
             // transitioning to "strict-consistency" when it skips cloning and applying.
             ASSERT_OK(recipient.awaitInApplyingOrError().getNoThrow());
-            recipient.onCriticalSectionStarted();
+            recipient.onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
         }
     }
 
@@ -2927,11 +2927,8 @@ TEST_F(ReshardingRecipientServiceTest, AbortWhileWaitingForCriticalSectionStarte
             auto changeStreamsMonitorCompletedStatus =
                 recipient->awaitChangeStreamsMonitorCompletedForTest().getNoThrow();
             ASSERT_EQ(changeStreamsMonitorCompletedStatus, ErrorCodes::IllegalOperation);
-            // TODO (SERVER-114077): Make sure that there can never be dangling
-            // _shardsvrRecipientCriticalSectionStarted threads when resharding gets aborted both
-            // implicitly and explicitly.
-            // ASSERT_EQ(recipient->awaitInStrictConsistencyOrError().getNoThrow(),
-            //           ErrorCodes::ReshardCollectionAborted);
+            ASSERT_EQ(recipient->awaitInStrictConsistencyOrError().getNoThrow(),
+                      ErrorCodes::ReshardCollectionAborted);
             ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
             checkRecipientDocumentRemoved(opCtx.get());
         }

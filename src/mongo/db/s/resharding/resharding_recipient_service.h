@@ -146,8 +146,9 @@ public:
 
     /**
      * Notifies the coordinator if the recipient is in kStrictConsistency or kError and waits for
-     * _coordinatorHasDecisionPersisted to be fulfilled (success) or for the abortToken to be
-     * canceled (failure or stepdown).
+     * _coordinatorCommitted to become ready — either successfully (commit) or with an error
+     * (coordinator abort via setCoordinatorError() or stepdown via setRunnerError()), or for the
+     * abortToken to be canceled.
      */
     ExecutorFuture<void> _notifyCoordinatorAndAwaitDecision(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
@@ -170,11 +171,11 @@ public:
     void prepareForCriticalSection();
 
     /**
-     * Returns a future that becomes ready once the recipient has transitioned to
-     * RecipientStateEnum::kCreatingCollection and that state change has been majority committed.
+     * Returns a future that becomes ready once the recipient has majority committed
+     * RecipientStateEnum::kCreatingCollection.
      */
-    SharedSemiFuture<void> awaitTransitionedToCreateCollection() const {
-        return _promises.getTransitionedToCreateCollectionFuture();
+    SharedSemiFuture<void> awaitInCreatingCollection() const {
+        return _promises.getInCreatingCollectionFuture();
     }
 
     /**
@@ -239,16 +240,17 @@ public:
     /**
      * Fulfills the subset of recipient promises that are driven by the coordinator advancing
      * through its state machine. Shared entry point for command handlers and
-     * onReshardingFieldsChanges. Idempotent and cascading: invoking with a later state also
-     * fulfills promises associated with all earlier coordinator states.
-     *
-     * Throws PrimaryOnlyServiceInitializing if the recipient is not yet initialized.
+     * onReshardingFieldsChanges. Idempotent and cascading: calling with the same state multiple
+     * times is safe, and calling with a later state fulfills all promises up to and including that
+     * state (via >= checks in ReshardingRecipientPromises::onCoordinatorStateAdvanced).
      *
      * Promises fulfilled here:
-     *   newState >= kCloning && cloneDetails -> _allDonorsPreparedToDonate (in _promises)
-     *   newState >= kBlockingWrites          -> _dataReplication->prepareForCriticalSection()
-     *   newState >= kBlockingWrites          -> _coordinatorHasEngagedCriticalSection
-     *   newState >= kCommitting              -> _coordinatorHasDecisionPersisted
+     *   newState >= kCloning && cloneDetails -> _allDonorsPreparedToDonate
+     *   newState >= kBlockingWrites          -> _coordinatorBlockingWrites
+     *   newState >= kCommitting              -> _coordinatorCommitted
+     *
+     * Side effects:
+     *   newState == kBlockingWrites          -> _dataReplication->prepareForCriticalSection()
      */
     void onCoordinatorStateAdvanced(CoordinatorStateEnum newState,
                                     boost::optional<CloneDetails> cloneDetails = boost::none);
@@ -257,14 +259,7 @@ public:
                                     const ReshardingRecipientDocument& recipientDoc);
 
     /**
-     * Indicates that the coordinator has engaged the critical section. Unblocks the
-     * _coordinatorHasEngagedCriticalSection promise.
-     */
-    void onCriticalSectionStarted();
-
-    /**
-     * Indicates that the coordinator has persisted a decision. Unblocks the
-     * _coordinatorHasDecisionPersisted promise.
+     * Indicates that the coordinator has committed. Unblocks the _coordinatorCommitted promise.
      */
     void commit();
 
@@ -520,11 +515,6 @@ private:
     boost::optional<bool> _userCanceled;
 
     ReshardingRecipientPromises _promises;
-
-    // Each promise below corresponds to a state on the recipient state machine. They are listed in
-    // ascending order, such that the first promise below will be the first promise fulfilled.
-    SharedPromise<void> _coordinatorHasEngagedCriticalSection;
-    SharedPromise<void> _coordinatorHasDecisionPersisted;
 
     SharedPromise<void> _completionPromise;
 };

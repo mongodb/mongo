@@ -92,7 +92,7 @@ public:
                       "_shardsvrRecipientCriticalSectionStarted command.",
                       "reshardingUUID"_attr = uuid());
 
-                (*machine)->onCriticalSectionStarted();
+                (*machine)->onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
                 (*machine)->awaitInStrictConsistencyOrError().get(opCtx);
 
                 LOGV2(11400402,
