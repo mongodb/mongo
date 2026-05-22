@@ -90,6 +90,7 @@ public:
                                          const Result& result);
     void setResultAndCancelRemainingWork(const std::unique_lock<std::mutex>& lock,
                                          const Result& result);
+    void setResultAndCancelRemainingWork(WithLock lock, const Result& result);
 
 private:
     /**
@@ -134,6 +135,12 @@ void CallbackCompletionGuard<Result>::setResultAndCancelRemainingWork(
 template <typename Result>
 void CallbackCompletionGuard<Result>::setResultAndCancelRemainingWork(
     const std::unique_lock<std::mutex>& lock, const Result& result) {
+    _setResultAndCancelRemainingWork(lock, result);
+}
+
+template <typename Result>
+void CallbackCompletionGuard<Result>::setResultAndCancelRemainingWork(WithLock lock,
+                                                                      const Result& result) {
     _setResultAndCancelRemainingWork(lock, result);
 }
 

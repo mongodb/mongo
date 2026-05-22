@@ -54,6 +54,13 @@ function setupTest({
     // Skip clearing initial sync progress after a successful initial sync attempt so that we
     // can check initialSyncStatus fields after initial sync is complete.
     secondaryStartupParams["failpoint.skipClearInitialSyncState"] = tojson({mode: "alwaysOn"});
+    // We must disable this parameter because the primary may be able to advance the stable
+    // timestamp after initiate prior to this restart. As a result, the initial sync
+    // node may see that it is no longer initiating the set, and wait for stable
+    // to advance to beginApplying in initial sync. Since the majority of this
+    // set is 2, the primary will be unable to advance its stable, leaving this node
+    // stuck in initial sync. We must disable the wait to avoid this scenario.
+    secondaryStartupParams["initialSyncWaitForSyncSourceLastStableRecoveryTs"] = false;
     secondary = rst.start(secondary, {startClean: true, setParameter: secondaryStartupParams});
     secondaryDB = secondary.getDB(dbName);
     secondaryColl = secondaryDB[collName];

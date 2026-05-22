@@ -165,6 +165,10 @@ using LockGuard = std::lock_guard<std::mutex>;
 // Used to reset the oldest timestamp during initial sync to a non-null timestamp.
 const Timestamp kTimestampOne(0, 1);
 
+// Maximum amount of time we will pause in-between waits for our sync source to advance stable
+// timestamp.
+const int kMaxExponentialBackoffMillis = 30000;
+
 ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
 }
@@ -1269,6 +1273,13 @@ void InitialSyncer::_initiatingSetStableTimestampCallback(
         return;
     }
 
+    status = getStatusFromCommandResult(callbackArgs.response.data);
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+        _initialSyncState.reset();
+        return;
+    }
+
     auto stableElem = callbackArgs.response.data["lastStableRecoveryTimestamp"];
     if (!stableElem) {
         LOGV2_WARNING(11318414,
@@ -1334,18 +1345,194 @@ void InitialSyncer::_initiatingSetStableTimestampCallback(
           "isInitiatingSet"_attr = isInitiatingSet,
           "earliestOplogEntryTs"_attr = earliestTs,
           "lastStableRecoveryTs"_attr = lastStableRecoveryTs);
-    _initialSyncState->waitForSyncSourceStableTimestampAdvanceMaxRetryDeadline =
-        (*_attemptExec)->now() +
-        Seconds(initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs.load());
-    // TODO (SERVER-125965): Wait for lastStableRecoveryTimestamp to advance in this case instead of
-    // proceeding directly to _initializeOplogFetcherAndDbCloners.
-    status = _scheduleWorkAndSaveHandle(
+    _initialSyncState->waitForSyncSourceStableTimestampAdvanceStartTime = (*_attemptExec)->now();
+    _checkStableTimestampAdvancementLocked(
+        lock, lastStableRecoveryTs, onCompletionGuard, beginFetchingOpTime);
+}
+
+void InitialSyncer::_runFsyncOnSyncSource(const executor::TaskExecutor::CallbackArgs& callbackArgs,
+                                          std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+                                          const OpTime& beginFetchingOpTime) {
+    std::unique_lock<std::mutex> lock(_mutex);
+    if (!_checkForShutdownAndHandleError(
+            lock, callbackArgs, onCompletionGuard, "error scheduling fsync on sync source")) {
+        return;
+    }
+
+    executor::RemoteCommandRequest fsyncRequest(
+        _syncSource, DatabaseName::kAdmin, BSON("fsync" << 1), nullptr);
+    auto cbHandle =
+        (*_attemptExec)
+            ->scheduleRemoteCommand(
+                std::move(fsyncRequest),
+                [this, onCompletionGuard, beginFetchingOpTime](
+                    TaskExecutor::RemoteCommandCallbackArgs args) {
+                    // fsync is fire-and-forget: proceed to replSetGetStatus regardless of outcome.
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    auto status = _scheduleWorkAndSaveHandle(
+                        lock,
+                        [=, this](const executor::TaskExecutor::CallbackArgs& args) {
+                            _runReplSetGetStatusOnSyncSource(
+                                args, onCompletionGuard, beginFetchingOpTime);
+                        },
+                        &_waitForSyncSourceStableTimestampHandle,
+                        "_runReplSetGetStatusOnSyncSource");
+                    if (!status.isOK()) {
+                        onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+                        _initialSyncState.reset();
+                    }
+                });
+    if (!cbHandle.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, cbHandle.getStatus());
+        _initialSyncState.reset();
+        return;
+    }
+
+    // Save the handle so that it can be cancelled if initial sync shuts down.
+    _waitForSyncSourceStableTimestampHandle = cbHandle.getValue();
+}
+
+void InitialSyncer::_runReplSetGetStatusOnSyncSource(
+    const executor::TaskExecutor::CallbackArgs& callbackArgs,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    const OpTime& beginFetchingOpTime) {
+    std::unique_lock<std::mutex> lock(_mutex);
+    if (!_checkForShutdownAndHandleError(lock,
+                                         callbackArgs,
+                                         onCompletionGuard,
+                                         "error scheduling replSetGetStatus on sync source")) {
+        return;
+    }
+
+    executor::RemoteCommandRequest replSetGetStatusRequest(
+        _syncSource, DatabaseName::kAdmin, BSON("replSetGetStatus" << 1), nullptr);
+    auto cbHandle =
+        (*_attemptExec)
+            ->scheduleRemoteCommand(std::move(replSetGetStatusRequest),
+                                    [this, onCompletionGuard, beginFetchingOpTime](
+                                        TaskExecutor::RemoteCommandCallbackArgs args) {
+                                        _handleLastStableRecoveryTsResponse(
+                                            args, onCompletionGuard, beginFetchingOpTime);
+                                    });
+    if (!cbHandle.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, cbHandle.getStatus());
+        _initialSyncState.reset();
+        return;
+    }
+
+    // Save the handle so that it can be cancelled if initial sync shuts down.
+    _waitForSyncSourceStableTimestampHandle = cbHandle.getValue();
+}
+
+void InitialSyncer::_handleLastStableRecoveryTsResponse(
+    const executor::TaskExecutor::RemoteCommandCallbackArgs& callbackArgs,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    const OpTime& beginFetchingOpTime) {
+    std::unique_lock<std::mutex> lock(_mutex);
+
+    auto status = _checkForShutdownAndConvertStatus(
         lock,
+        callbackArgs.response.status,
+        "error waiting for sync source lastStableRecoveryTimestamp to advance");
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+        _initialSyncState.reset();
+        return;
+    }
+
+    status = getStatusFromCommandResult(callbackArgs.response.data);
+    if (!status.isOK()) {
+        onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+        _initialSyncState.reset();
+        return;
+    }
+
+    auto stableElem = callbackArgs.response.data["lastStableRecoveryTimestamp"];
+    if (!stableElem) {
+        onCompletionGuard->setResultAndCancelRemainingWork(
+            lock,
+            Status(ErrorCodes::InvalidSyncSource,
+                   "sync source replSetGetStatus response is missing lastStableRecoveryTimestamp"));
+        _initialSyncState.reset();
+        return;
+    }
+
+    _checkStableTimestampAdvancementLocked(
+        lock, stableElem.timestamp(), onCompletionGuard, beginFetchingOpTime);
+}
+
+void InitialSyncer::_checkStableTimestampAdvancementLocked(
+    WithLock lock,
+    Timestamp lastStableRecoveryTs,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    const OpTime& beginFetchingOpTime) {
+    const auto beginApplyingTs = _initialSyncState->beginApplyingTimestamp;
+
+    LOGV2_DEBUG(11318415,
+                2,
+                "Checking sync source lastStableRecoveryTimestamp",
+                "lastStableRecoveryTimestamp"_attr = lastStableRecoveryTs,
+                "beginApplyingTimestamp"_attr = beginApplyingTs);
+
+    if (lastStableRecoveryTs >= beginApplyingTs) {
+        LOGV2(11318400,
+              "Sync source lastStableRecoveryTimestamp has advanced; continuing with initial sync",
+              "lastStableRecoveryTimestamp"_attr = lastStableRecoveryTs,
+              "beginApplyingTimestamp"_attr = beginApplyingTs);
+        auto status = _scheduleWorkAndSaveHandle(
+            lock,
+            [=, this](const executor::TaskExecutor::CallbackArgs& args) {
+                _initializeOplogFetcherAndDbCloners(args, onCompletionGuard, beginFetchingOpTime);
+            },
+            &_initializeOplogFetcherAndDbClonersHandle,
+            "_initializeOplogFetcherAndDbCloners");
+        if (!status.isOK()) {
+            onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
+            _initialSyncState.reset();
+        }
+        return;
+    }
+
+    const auto now = (*_attemptExec)->now();
+    const auto deadline = _initialSyncState->waitForSyncSourceStableTimestampAdvanceStartTime +
+        Seconds(initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs.load());
+    if (now >= deadline) {
+        LOGV2_WARNING(11318417,
+                      "Timed out waiting for sync source lastStableRecoveryTimestamp to advance",
+                      "lastStableRecoveryTimestamp"_attr = lastStableRecoveryTs,
+                      "beginApplyingTimestamp"_attr = beginApplyingTs,
+                      "deadline"_attr = deadline);
+        onCompletionGuard->setResultAndCancelRemainingWork(
+            lock,
+            Status(ErrorCodes::ExceededTimeLimit,
+                   "Failed to wait for stable recovery timestamp to advance. To resolve this, "
+                   "ensure that the sync source is healthy and able to advance its checkpoint "
+                   "timestamp."));
+        _initialSyncState.reset();
+        return;
+    }
+
+    // Retry after exponential backoff. Maximum amount of time for exponential backoff is 30s.
+    const auto sleepMillis = _initialSyncState->waitForSyncSourceStableTimestampAdvanceSleepMillis;
+    _initialSyncState->waitForSyncSourceStableTimestampAdvanceSleepMillis =
+        std::min(sleepMillis * 2, kMaxExponentialBackoffMillis);
+    const auto when = std::min(now + Milliseconds(sleepMillis), deadline);
+
+    LOGV2_DEBUG(11318418,
+                2,
+                "Sync source lastStableRecoveryTimestamp not yet advanced; retrying after backoff",
+                "lastStableRecoveryTimestamp"_attr = lastStableRecoveryTs,
+                "beginApplyingTimestamp"_attr = beginApplyingTs,
+                "retryAfterMillis"_attr = sleepMillis);
+
+    auto status = _scheduleWorkAtAndSaveHandle(
+        lock,
+        when,
         [=, this](const executor::TaskExecutor::CallbackArgs& args) {
-            _initializeOplogFetcherAndDbCloners(args, onCompletionGuard, beginFetchingOpTime);
+            _runFsyncOnSyncSource(args, onCompletionGuard, beginFetchingOpTime);
         },
-        &_initializeOplogFetcherAndDbClonersHandle,
-        "_initializeOplogFetcherAndDbCloners");
+        &_waitForSyncSourceStableTimestampHandle,
+        "_runFsyncOnSyncSource");
     if (!status.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork(lock, status);
         _initialSyncState.reset();

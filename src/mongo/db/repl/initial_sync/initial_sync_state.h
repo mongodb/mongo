@@ -59,7 +59,13 @@ struct InitialSyncState {
 
     bool earliestOplogEntryIsInitiatingSet = false;
     Timestamp earliestOplogEntryTimestamp;
-    Date_t waitForSyncSourceStableTimestampAdvanceMaxRetryDeadline;
+    Date_t waitForSyncSourceStableTimestampAdvanceStartTime;  // Time at which we started waiting
+                                                              // for the sync source's last
+                                                              // checkpoint to advance. Used with
+                                                              // the retry period parameter to
+                                                              // compute the deadline on each loop.
+    int waitForSyncSourceStableTimestampAdvanceSleepMillis =
+        100;  // How long to sleep in-between attempts. Increases exponentially.
 };
 
 }  // namespace repl
