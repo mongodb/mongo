@@ -120,15 +120,18 @@ function runTest(getShardKey, performChunkSplit) {
     }
 
     // TODO SERVER-101784 remove this check once only viewless timeseries exist.
-    // TODO SERVER-107138 update once drop on the buckets namespace fails on FCV 9.0.
-    if (!areViewlessTimeseriesEnabled(mainDB)) {
+    {
         // Confirm it's illegal to directly drop the time-series buckets collection.
-        assert.commandFailedWithCode(
-            mainDB.runCommand({drop: getTimeseriesBucketsColl(collName)}),
+        //
+        // Starting from FCV 9.0 the server is emitting CommandNotSupportedOnLegacyTimeseriesBucketsNamespace instead of IllegalOperation
+        assert.commandFailedWithCode(mainDB.runCommand({drop: getTimeseriesBucketsColl(collName)}), [
             ErrorCodes.IllegalOperation,
-        );
+            ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
+        ]);
         ensureCollectionExists(collName, mainDB);
-        ensureCollectionExists(getTimeseriesBucketsColl(collName), mainDB);
+        if (!areViewlessTimeseriesEnabled(mainDB)) {
+            ensureCollectionExists(getTimeseriesBucketsColl(collName), mainDB);
+        }
     }
 
     // Drop the time-series collection.

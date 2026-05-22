@@ -8,6 +8,7 @@
 
 import {
     areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl,
     getTimeseriesCollForDDLOps,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -263,17 +264,17 @@ const zoneShardingTestCases = [
             mongo.s0.adminCommand({reshardCollection: collNss, key: {[metaField]: 1, [controlTimeField]: 1}}),
             [ErrorCodes.NotImplemented, ErrorCodes.IllegalOperation],
         );
-        // TODO SERVER-107138 Ensure that resharding fails when issued on the buckets
-        // collection on FCV 9.0.
-        if (!areViewlessTimeseriesEnabled(mongo.s.getDB(dbName))) {
-            assert.commandFailedWithCode(
-                mongo.s0.adminCommand({
-                    reshardCollection: getTimeseriesCollForDDLOps(db, coll).getFullName(),
-                    key: {[metaField]: 1, [controlTimeField]: 1},
-                }),
-                [ErrorCodes.NotImplemented, ErrorCodes.IllegalOperation],
-            );
-        }
+        assert.commandFailedWithCode(
+            mongo.s0.adminCommand({
+                reshardCollection: getTimeseriesBucketsColl(coll).getFullName(),
+                key: {[metaField]: 1, [controlTimeField]: 1},
+            }),
+            [
+                ErrorCodes.NotImplemented,
+                ErrorCodes.IllegalOperation,
+                ErrorCodes.CommandNotSupportedOnLegacyTimeseriesBucketsNamespace,
+            ],
+        );
         assert(coll.drop());
     } else {
         jsTestLog(`Skipping resharding for timeseries not implemented test.`);
