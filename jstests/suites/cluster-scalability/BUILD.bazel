@@ -150,3 +150,159 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "analyze_shard_key_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/analyze_shard_key_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "common",
+        "multi_shard",
+        "requires_replicated_fast_count_recovery",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "multi_shard_multi_stmt_txn_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/multi_shard_multi_stmt_txn_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "common",
+        "multi_shard",
+        "multi_stmt",
+        "requires_replicated_fast_count_recovery",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "multi_shard",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "multi_shard",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "multi_stmt_txn_jscore_passthrough_with_migration",
+    config = "//buildscripts/resmokeconfig:suites/multi_stmt_txn_jscore_passthrough_with_migration.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "multi_stmt",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "retryable_writes_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/retryable_writes_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "retry",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "retryable_writes_jscore_stepdown_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/retryable_writes_jscore_stepdown_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "retry",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_multi_stmt_txn_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/sharded_multi_stmt_txn_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "jscore",
+        "multi_stmt",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_hello_failures",
+    config = "//buildscripts/resmokeconfig:suites/sharding_hello_failures.yml",
+    shard_count = 4,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "sharded",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
