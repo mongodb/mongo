@@ -293,9 +293,8 @@ Status SideWritesTracker::drainWritesIntoIndex(
             feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
                 VersionContext::getDecoration(opCtx), fcvSnapshot);
         WriteUnitOfWork wuow(opCtx,
-                             primaryDrivenFeatureFlagEnabled
-                                 ? WriteUnitOfWork::kGroupForPossiblyRetryableOperations
-                                 : WriteUnitOfWork::kDontGroup);
+                             primaryDrivenFeatureFlagEnabled ? WriteUnitOfWork::kGroupForTransaction
+                                                             : WriteUnitOfWork::kDontGroup);
 
         int32_t batchSize = 0;
         int64_t batchSizeBytes = 0;
