@@ -80,6 +80,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/duration.h"
@@ -103,6 +104,12 @@
     LOGV2_DEBUG_OPTIONS(                               \
         ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
+// When active on a standby, causes it to handle replSetHeartbeat requests via the non-exhaust
+// path (i.e. as if the node predates exhaust heartbeat support), returning moreToCome=false on
+// every response. Used to test mixed-version compatibility where the standby is on an old version.
+// TODO(SERVER-125577): Remove once mixed-version support is no longer needed.
+MONGO_FAIL_POINT_DEFINE(simulateOldStandbyHeartbeat);
+
 namespace mongo {
 namespace repl {
 
@@ -116,6 +123,11 @@ struct ExecutorMetricPolicy {
 };
 
 auto& replExecutorSSM = *CustomMetricBuilder<ExecutorMetricPolicy>{"repl.executor"};
+
+// Stores the stream-end deadline for an exhaust replSetHeartbeat session. The same Client is reused
+// across exhaust iterations so we are able to use a decoration on it to store the timestamp between
+// invocations.
+const auto exhaustHeartbeatStreamDeadline = Client::declareDecoration<Date_t>();
 }  // namespace
 
 // Test-only, enabled via command-line. See docs/test_commands.md.
@@ -740,6 +752,55 @@ bool replHasDatabases(OperationContext* opCtx) {
 class CmdReplSetHeartbeat : public ReplSetCommand {
 public:
     CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") {}
+
+    bool runWithReplyBuilder(OperationContext* opCtx,
+                             const DatabaseName& dbName,
+                             const BSONObj& cmdObj,
+                             rpc::ReplyBuilderInterface* replyBuilder) override {
+        if (!opCtx->isExhaust() || MONGO_unlikely(simulateOldStandbyHeartbeat.shouldFail())) {
+            // Non-exhaust path: standard request/response heartbeat (or simulated old standby).
+            return BasicCommand::runWithReplyBuilder(opCtx, dbName, cmdObj, replyBuilder);
+        }
+
+        auto* replCoord = ReplicationCoordinator::get(opCtx);
+
+        // Compute the stream deadline once per stream and cache it on the Client for subsequent
+        // exhaust iterations. This allows us to close and reopen the stream once per heartbeat
+        // interval so the standby can receive updated replData from the primary node to calculate
+        // lag metrics.
+        auto& streamDeadline = exhaustHeartbeatStreamDeadline(opCtx->getClient());
+        if (streamDeadline == Date_t{}) {
+            streamDeadline = opCtx->getServiceContext()->getFastClockSource()->now() +
+                replCoord->getConfig().getHeartbeatInterval();
+        }
+        // Block until lastApplied advances (if getNextAppliedOpTimeFuture is overridden) or the
+        // heartbeat interval expires. Timeout is intentional — it drives the periodic liveness
+        // signal.
+        auto future = replCoord->getNextAppliedOpTimeFuture();
+        const auto waitStatus = opCtx->runWithDeadline(
+            streamDeadline, ErrorCodes::MaxTimeMSExpired, [&] { return future.getNoThrow(opCtx); });
+        if (!waitStatus.isOK() && waitStatus != ErrorCodes::MaxTimeMSExpired) {
+            uassertStatusOK(waitStatus);
+        }
+
+        // Delegate heartbeat processing and response building to run() via the standard path.
+        const bool ok = BasicCommand::runWithReplyBuilder(opCtx, dbName, cmdObj, replyBuilder);
+
+        // Keep the exhaust stream alive when lastApplied advanced so the primary is notified
+        // promptly for each advance within an interval. End the stream on interval expiry so the
+        // primary reschedules with fresh $replData gossip (lastApplied, lastSent, lastCheckpoint).
+        const bool intervalExpired = (waitStatus == ErrorCodes::MaxTimeMSExpired);
+        if (intervalExpired) {
+            // Reset so the next stream computes a fresh deadline.
+            streamDeadline = Date_t{};
+        } else {
+            // Signal the transport layer to re-invoke this command on the same connection without
+            // waiting for a new client request (sets kMoreToCome on the outgoing response).
+            replyBuilder->setNextInvocation(boost::none);
+        }
+        return ok;
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,

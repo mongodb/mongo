@@ -1317,6 +1317,15 @@ public:
     virtual void addAppliedOpTimeObserver(std::unique_ptr<OpTimeObserver> observer) = 0;
 
     /**
+     * Returns a future that becomes ready the next time lastApplied advances on this node.
+     * The default implementation returns an already-ready future; nodes that support push-based
+     * exhaust heartbeat notifications should override this to return a pending future.
+     */
+    virtual SharedSemiFuture<void> getNextAppliedOpTimeFuture() {
+        return SemiFuture<void>::makeReady().share();
+    }
+
+    /**
      * Returns true if the node undergoes initial sync or rollback.
      */
     virtual bool isInInitialSyncOrRollback() const;

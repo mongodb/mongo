@@ -32,8 +32,18 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/future.h"
 
 #include <memory>
 #include <ostream>
@@ -473,6 +483,124 @@ TEST(ReplSetHeartbeatResponse, ServerError) {
     Status result = hbResp.initialize(BSON("ok" << 0.0 << "errmsg" << errMsg), 0);
     ASSERT_EQUALS(ErrorCodes::UnknownError, result.code());
     ASSERT_EQUALS(errMsg, result.reason());
+}
+
+// ============================================================
+// CmdReplSetHeartbeat exhaust streaming tests
+// ============================================================
+
+// Lets the test choose whether getNextAppliedOpTimeFuture() resolves immediately (simulating an
+// optime advance) or stays pending (simulating no progress), so we can drive both exhaust paths.
+class ExhaustReplCoordMock : public ReplicationCoordinatorMock {
+public:
+    using ReplicationCoordinatorMock::ReplicationCoordinatorMock;
+
+    SharedSemiFuture<void> getNextAppliedOpTimeFuture() override {
+        return _future;
+    }
+
+    void setFuture(SharedSemiFuture<void> f) {
+        _future = std::move(f);
+    }
+
+private:
+    SharedSemiFuture<void> _future = SemiFuture<void>::makeReady().share();
+};
+
+class ExhaustHeartbeatTest : public ServiceContextMongoDTest {
+public:
+    ExhaustHeartbeatTest() : ServiceContextMongoDTest(Options{}.useMockClock(true)) {}
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+
+        ReplSettings replSettings;
+        replSettings.setReplSetString("rs0/host1:1");
+
+        auto mock = std::make_unique<ExhaustReplCoordMock>(getServiceContext(), replSettings);
+        _replCoord = mock.get();
+        ReplicationCoordinator::set(getServiceContext(), std::move(mock));
+
+        // Use a 2-second heartbeat interval so we can advance the mock clock past it cleanly.
+        _replCoord->setGetConfigReturnValue(ReplSetConfig::parse(
+            BSON("_id" << "rs0" << "version" << 1 << "members"
+                       << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                << "host1:1"))
+                       << "settings" << BSON("heartbeatIntervalMillis" << 2000))));
+    }
+
+protected:
+    ClockSourceMock* mockClock() {
+        return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
+    }
+
+    BasicCommand* heartbeatCmd() {
+        auto* cmd = CommandHelpers::findCommand(getService(), "replSetHeartbeat");
+        ASSERT(cmd) << "replSetHeartbeat command not found; ensure repl_set_commands is linked";
+        return checked_cast<BasicCommand*>(cmd);
+    }
+
+    // Minimal valid cmdObj: "replSetHeartbeat" doubles as the set-name field.
+    BSONObj heartbeatCmdObj() const {
+        return BSON("replSetHeartbeat" << "rs0"
+                                       << "configVersion" << 1LL << "from"
+                                       << "host1:1"
+                                       << "term" << 1LL);
+    }
+
+    ExhaustReplCoordMock* _replCoord = nullptr;
+};
+
+// When getNextAppliedOpTimeFuture() resolves before the interval deadline, the node keeps the
+// exhaust stream open so the primary gets a prompt response for each optime advance.
+TEST_F(ExhaustHeartbeatTest, FutureResolved_StreamStaysOpen) {
+    _replCoord->setFuture(SemiFuture<void>::makeReady().share());
+
+    auto opCtx = cc().makeOperationContext();
+    opCtx->setExhaust(true);
+
+    rpc::OpMsgReplyBuilder replyBuilder;
+    heartbeatCmd()->runWithReplyBuilder(
+        opCtx.get(), DatabaseName::kAdmin, heartbeatCmdObj(), &replyBuilder);
+
+    ASSERT_TRUE(replyBuilder.shouldRunAgainForExhaust())
+        << "expected exhaust stream to remain open when optime advanced before interval expired";
+}
+
+// When the heartbeat interval deadline expires before getNextAppliedOpTimeFuture() resolves, the
+// node closes the exhaust stream so the primary is forced to issue a fresh request carrying updated
+// $replData gossip.
+TEST_F(ExhaustHeartbeatTest, IntervalExpired_StreamCloses) {
+    // First call with a ready future: initialises the per-Client streamDeadline to now() + 2s and
+    // verifies the normal path works.
+    _replCoord->setFuture(SemiFuture<void>::makeReady().share());
+    {
+        auto opCtx = cc().makeOperationContext();
+        opCtx->setExhaust(true);
+        rpc::OpMsgReplyBuilder replyBuilder;
+        heartbeatCmd()->runWithReplyBuilder(
+            opCtx.get(), DatabaseName::kAdmin, heartbeatCmdObj(), &replyBuilder);
+        ASSERT_TRUE(replyBuilder.shouldRunAgainForExhaust());
+    }
+
+    // Advance the mock clock past the 2-second deadline cached on the Client decoration.
+    // ClockSourceMock's waitForConditionUntil() returns timeout immediately when deadline <= now(),
+    // so runWithDeadline will time out on the very first interrupt check without blocking.
+    mockClock()->advance(Milliseconds(2001));
+
+    // Switch to a pending future. With the clock past the cached deadline, runWithDeadline will
+    // observe MaxTimeMSExpired immediately and return without calling setNextInvocation.
+    auto [promise, pendingFuture] = makePromiseFuture<void>();
+    _replCoord->setFuture(std::move(pendingFuture).share());
+
+    auto opCtx2 = cc().makeOperationContext();
+    opCtx2->setExhaust(true);
+    rpc::OpMsgReplyBuilder replyBuilder2;
+    heartbeatCmd()->runWithReplyBuilder(
+        opCtx2.get(), DatabaseName::kAdmin, heartbeatCmdObj(), &replyBuilder2);
+
+    ASSERT_FALSE(replyBuilder2.shouldRunAgainForExhaust())
+        << "expected exhaust stream to close when interval deadline expired";
 }
 
 }  // namespace
