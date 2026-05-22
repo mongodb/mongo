@@ -425,5 +425,22 @@ TEST_F(DocumentSourceGraphLookUpTest, LiteParsedGraphLookupHasEmptySubPipelines)
     ASSERT_TRUE(liteParsed->getMutableSubPipelines()->empty());
 }
 
+TEST_F(DocumentSourceGraphLookUpTest, CreateFromBsonRejectsDuplicateFields) {
+    auto spec = BSON("$graphLookup" << BSON("from" << "coll"
+                                                   << "startWith"
+                                                   << "$x"
+                                                   << "connectFromField"
+                                                   << "id"
+                                                   << "connectToField"
+                                                   << "id"
+                                                   << "as"
+                                                   << "results"
+                                                   << "from"
+                                                   << "other_coll"));
+    ASSERT_THROWS_CODE(DocumentSourceGraphLookUp::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       12735700);
+}
+
 }  // namespace
 }  // namespace mongo
