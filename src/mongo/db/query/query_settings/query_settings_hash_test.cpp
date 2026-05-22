@@ -30,16 +30,27 @@
 #include "mongo/db/query/query_settings/query_settings_hash.h"
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_knob.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/query_settings/query_knob_overrides_test_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/unittest/unittest.h"
 
+#include <boost/container_hash/hash.hpp>
 #include <fmt/format.h>
 
 namespace mongo::query_settings {
+
+// QueryKnob<T> descriptors bound to the test ServerParameters in query_knob_overrides_test.idl.
+namespace hash_test_knobs {
+inline QueryKnob<int> intKnob{"overridesTestInt", &readGlobalValue<gOverridesTestInt>};
+inline QueryKnob<bool> boolKnob{"overridesTestBool", &readGlobalValue<gOverridesTestBool>};
+}  // namespace hash_test_knobs
 
 TEST(QuerySettingsHashTest, QuerySettingsHashIncludesRejection) {
     // Change reject in query settings, verify that the hash differs.
@@ -90,6 +101,56 @@ TEST(QuerySettingsHashTest, QuerySettingsHashStability) {
 
     ASSERT_EQ(observedHash, expectedHash)
         << fmt::format("{:#016x} != {:#016x}", observedHash, expectedHash);
+}
+
+// Wire names for the test PQS-settable knobs defined in query_knob_overrides_test.idl.
+static constexpr StringData kIntKnobWire = "overridesTestIntWire"_sd;
+static constexpr StringData kBoolKnobWire = "overridesTestBoolWire"_sd;
+
+TEST(QuerySettingsKnobOverridesHashTest, HashDeterministicForEmpty) {
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSONObj{});
+    boost::hash<QuerySettingsKnobOverrides> hasher;
+    ASSERT_EQ(hasher(overrides), hasher(overrides));
+}
+
+TEST(QuerySettingsKnobOverridesHashTest, HashStableForIdentical) {
+    auto bson = BSON(kIntKnobWire << 42);
+    auto a = QuerySettingsKnobOverrides::fromBSON(bson);
+    auto b = QuerySettingsKnobOverrides::fromBSON(bson);
+    boost::hash<QuerySettingsKnobOverrides> hasher;
+    ASSERT_EQ(hasher(a), hasher(b));
+}
+
+TEST(QuerySettingsKnobOverridesHashTest, HashDiffersForDifferentValues) {
+    auto a = QuerySettingsKnobOverrides::fromBSON(BSON(kIntKnobWire << 1));
+    auto b = QuerySettingsKnobOverrides::fromBSON(BSON(kIntKnobWire << 2));
+    boost::hash<QuerySettingsKnobOverrides> hasher;
+    ASSERT_NE(hasher(a), hasher(b));
+}
+
+TEST(QuerySettingsKnobOverridesHashTest, HashDiffersForDifferentKnobs) {
+    auto a = QuerySettingsKnobOverrides::fromBSON(BSON(kIntKnobWire << 1));
+    auto b = QuerySettingsKnobOverrides::fromBSON(BSON(kBoolKnobWire << true));
+    boost::hash<QuerySettingsKnobOverrides> hasher;
+    ASSERT_NE(hasher(a), hasher(b));
+}
+
+TEST(QuerySettingsKnobOverridesHashTest, HashStableForDifferentKnobsOrder) {
+    // fromBSON sorts entries by id, so insertion order must not affect the hash.
+    auto a =
+        QuerySettingsKnobOverrides::fromBSON(BSON(kIntKnobWire << 7 << kBoolKnobWire << false));
+    auto b =
+        QuerySettingsKnobOverrides::fromBSON(BSON(kBoolKnobWire << false << kIntKnobWire << 7));
+    boost::hash<QuerySettingsKnobOverrides> hasher;
+    ASSERT_EQ(hasher(a), hasher(b));
+}
+
+TEST(QuerySettingsKnobOverridesHashTest, HashStableForDuplicatedKnobDifferentOrder) {
+    // fromBSON sorts entries by id, so insertion order must not affect the hash.
+    auto a = QuerySettingsKnobOverrides::fromBSON(BSON(kIntKnobWire << 4 << kIntKnobWire << 2));
+    auto b = QuerySettingsKnobOverrides::fromBSON(BSON(kIntKnobWire << 2 << kIntKnobWire << 4));
+    boost::hash<QuerySettingsKnobOverrides> hasher;
+    ASSERT_EQ(hasher(a), hasher(b));
 }
 
 }  // namespace mongo::query_settings

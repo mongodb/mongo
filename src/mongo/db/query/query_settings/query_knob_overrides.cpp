@@ -34,6 +34,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
+#include <cmath>
 #include <variant>
 
 namespace mongo::query_settings {
@@ -62,6 +64,27 @@ QuerySettingsKnobOverrides QuerySettingsKnobOverrides::fromBSON(const BSONObj& o
                                     << ": " << ex.reason());
         }
     }
+    // Sort the entries so order is deterministic. Use a total order: sort by id, then by variant
+    // type index, then by value, to handle duplicate ids from BSON with repeated field names.
+    std::sort(
+        overrides._entries.begin(), overrides._entries.end(), [](const Entry& a, const Entry& b) {
+            if (a.id.value != b.id.value)
+                return a.id.value < b.id.value;
+            if (a.value.index() != b.value.index())
+                return a.value.index() < b.value.index();
+            return std::visit(
+                [](const auto& x, const auto& y) -> bool {
+                    using X = std::decay_t<decltype(x)>;
+                    using Y = std::decay_t<decltype(y)>;
+                    if constexpr (std::is_same_v<X, Y> &&
+                                  !std::is_same_v<X, DeleteQueryKnobOverride>) {
+                        return x < y;
+                    }
+                    return false;
+                },
+                a.value,
+                b.value);
+        });
     return overrides;
 }
 

@@ -33,11 +33,13 @@ mongo_cc_library(
         ":query_settings_gen",
     ],
     deps = [
+        ":query_knob_overrides",
         ":query_settings_service_dependencies",
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:index_hint",
-        "//src/mongo/db/query:query_knobs",
+        # TODO SERVER-127247: Replace this with 'query_knobs' once the knob initialization is explicit.
+        "//src/mongo/db/query:query_knob_configuration",
         "//src/mongo/db/query/query_shape:query_shape_hash",
     ],
 )
@@ -107,6 +109,7 @@ mongo_cc_unit_test(
         "query_settings_service_test.cpp",
         "query_settings_validation_test.cpp",
         "query_shape_representative_queries_test.cpp",
+        ":query_knob_overrides_test_gen",
     ],
     tags = ["mongo_unittest_seventh_group"],
     deps = [

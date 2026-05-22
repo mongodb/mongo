@@ -31,6 +31,9 @@
 
 #include "mongo/db/basic_types.h"
 
+#include <type_traits>
+#include <variant>
+
 #include <absl/container/inlined_vector.h>
 #include <boost/container_hash/hash.hpp>
 
@@ -60,6 +63,23 @@ std::size_t hash_value(const optional<T>& v) {
 }  // namespace boost
 
 namespace mongo {
+size_t hash_value(const QueryKnobId& id) {
+    return boost::hash_value(id.value);
+}
+
+size_t hash_value(const QueryKnobValue& val) {
+    size_t seed = boost::hash_value(val.index());
+    std::visit(
+        [&seed](const auto& v) {
+            using V = std::decay_t<decltype(v)>;
+            if constexpr (!std::is_same_v<V, DeleteQueryKnobOverride>) {
+                boost::hash_combine(seed, v);
+            }
+        },
+        val);
+    return seed;
+}
+
 size_t hash_value(const OptionalBool& v) {
     // OptionalBool hash needs to be consistent with equality. OptionalBool currently relies on
     // implicit conversion to bool for ==. Thus, OptionalBool() == OptionalBool(false).
@@ -77,6 +97,18 @@ size_t hash_value(const NamespaceSpec& ns) {
 }  // namespace mongo
 
 namespace mongo::query_settings {
+size_t hash_value(const QuerySettingsKnobOverrides::Entry& e) {
+    size_t seed = 0;
+    boost::hash_combine(seed, e.id);
+    boost::hash_combine(seed, e.value);
+    return seed;
+}
+
+size_t hash_value(const QuerySettingsKnobOverrides& overrides) {
+    auto e = overrides.entries();
+    return boost::hash_range(e.begin(), e.end());
+}
+
 size_t hash_value(const IndexHintSpec& v) {
     const auto& indexes = v.getAllowedIndexes();
     size_t hash = boost::hash_range(indexes.begin(), indexes.end());

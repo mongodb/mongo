@@ -200,7 +200,9 @@ struct ConverterTraits<long long> {
 template <>
 struct ConverterTraits<double> {
     static QueryKnobValue fromBSON(const BSONElement& elem) {
-        return elem.Double();
+        const double val = elem.Double();
+        tassert(12324700, "query knob double value must not be NaN", !std::isnan(val));
+        return val;
     }
     static void toBSON(BSONObjBuilder& b, StringData field, const QueryKnobValue& val) {
         b.append(field, std::get<double>(val));

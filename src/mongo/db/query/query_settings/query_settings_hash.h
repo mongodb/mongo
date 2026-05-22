@@ -29,10 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/query/query_settings/query_knob_overrides.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::query_settings {
+
+size_t hash_value(const QuerySettingsKnobOverrides& overrides);
 
 /**
  * Computes hash of 'querySettings'.
