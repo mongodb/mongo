@@ -228,14 +228,16 @@ private:
      */
     void _scheduleGetMore(OperationContext* opCtx);
 
+    // RAII-style token for the (pinned, underlying) executor pair. Declared before
+    // _executor/_underlyingExecutor so it is destroyed after them, ensuring the PCTE stays
+    // registered in the shutdown registry until it is fully destroyed.
+    std::unique_ptr<PinnedExecutorRegistryToken> _pcteToken;
+
     std::shared_ptr<executor::TaskExecutor> _executor;
     // If we are pinning connections, we need to keep a separate reference to the
     // non-pinning, normal executor, so that we can shut down the pinned executor
     // out-of-line.
     std::shared_ptr<executor::TaskExecutor> _underlyingExecutor;
-
-    // RAII-style token for the (pinned, underlying) executor pair.
-    std::unique_ptr<PinnedExecutorRegistryToken> _pcteToken;
 
     // Used as a scratch pad for the successive scheduleRemoteCommand calls
     RemoteCommandRequest _rcr;
