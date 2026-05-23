@@ -162,6 +162,10 @@ public:
             .count();
     }
 
+    Milliseconds nowInMillis() {
+        return _tickSource->ticksTo<Milliseconds>(_tickSource->getTicks());
+    }
+
 private:
     WriteRarelyRWMutex _rwMutex;
     TickSource* _tickSource;
@@ -169,9 +173,10 @@ private:
 };
 
 RateLimiter::DeferredToken::DeferredToken(RateLimiterPrivate* impl,
-                                          Milliseconds napTime,
-                                          double numTokens)
-    : _impl(impl), _napTime(napTime), _numTokens(numTokens) {}
+                                          double numTokens,
+                                          Milliseconds timeEnqueued,
+                                          Milliseconds napTime)
+    : _impl(impl), _numTokens(numTokens), _timeEnqueued(timeEnqueued), _napTime(napTime) {}
 
 
 RateLimiter::DeferredToken::~DeferredToken() {
@@ -201,13 +206,24 @@ Status RateLimiter::DeferredToken::get(OperationContext* opCtx) && {
         impl->queued.fetchAndSubtract(1);
     });
 
-    Date_t deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() + _napTime;
+    // The system can wait arbitrarily long between acquiring a deferred token and calling get() on
+    // it, so calculate an adjusted nap time before the actual sleep.
+    auto adjustedNapTime =
+        std::max(Milliseconds{0}, (_timeEnqueued + _napTime) - impl->nowInMillis());
+    if (adjustedNapTime == Milliseconds{0}) {
+        impl->stats.successfulAdmissions.incrementRelaxed();
+        impl->stats.averageTimeQueuedMicros.addSample(
+            static_cast<double>(durationCount<Microseconds>(_napTime)));
+        return Status::OK();
+    }
+
+    Date_t deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() + adjustedNapTime;
     try {
         LOGV2_DEBUG(10550200,
                     4,
                     "Going to sleep waiting for token acquisition",
                     "rateLimiterName"_attr = impl->name,
-                    "napTimeMillis"_attr = _napTime.toString());
+                    "napTimeMillis"_attr = adjustedNapTime.toString());
         opCtx->sleepUntil(deadline);
     } catch (const DBException& e) {
         impl->stats.interruptedInQueue.incrementRelaxed();
@@ -229,7 +245,7 @@ Status RateLimiter::DeferredToken::get(OperationContext* opCtx) && {
 
 void RateLimiter::DeferredToken::recordExemption() && {
     invariant(_impl);
-    invariant(_napTime > Milliseconds{0});  // Exemptions are only supported for queued requests.
+    invariant(!isReady());  // Exemptions are only supported for queued requests.
 
     // This method only records the exemption, token/queue cleanup is covered by the destructor.
     _impl->stats.exemptedAdmissions.incrementRelaxed();
@@ -262,7 +278,7 @@ StatusWith<RateLimiter::DeferredToken> RateLimiter::acquireToken(double numToken
             return status;
         }
         _impl->stats.averageTimeQueuedMicros.addSample(0);
-        return DeferredToken(_impl.get(), Milliseconds{0}, numTokensToConsume);
+        return DeferredToken(_impl.get(), numTokensToConsume, Milliseconds{0}, Milliseconds{0});
     }
 
     _impl->stats.attemptedAdmissions.incrementRelaxed();
@@ -286,13 +302,13 @@ StatusWith<RateLimiter::DeferredToken> RateLimiter::acquireToken(double numToken
             return status;
         }
         _impl->stats.addedToQueue.incrementRelaxed();
-        return DeferredToken(_impl.get(), napTime, numTokensToConsume);
+        return DeferredToken(_impl.get(), numTokensToConsume, _impl->nowInMillis(), napTime);
     }
 
     // Token immediately available.
     _impl->stats.successfulAdmissions.incrementRelaxed();
     _impl->stats.averageTimeQueuedMicros.addSample(0);
-    return DeferredToken(_impl.get(), Milliseconds{0}, numTokensToConsume);
+    return DeferredToken(_impl.get(), numTokensToConsume, Milliseconds{0}, Milliseconds{0});
 }
 
 Status RateLimiter::acquireToken(OperationContext* opCtx, double numTokensToConsume) {

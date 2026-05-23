@@ -70,8 +70,9 @@ public:
         // to perform the necessary std::exchange.
         DeferredToken(DeferredToken&& other) noexcept
             : _impl(std::exchange(other._impl, nullptr)),
-              _napTime(other._napTime),
-              _numTokens(other._numTokens) {}
+              _numTokens(other._numTokens),
+              _timeEnqueued(other._timeEnqueued),
+              _napTime(other._napTime) {}
 
         ~DeferredToken();
 
@@ -102,11 +103,15 @@ public:
     private:
         friend class RateLimiter;
 
-        DeferredToken(RateLimiterPrivate* impl, Milliseconds napTime, double numTokens);
+        DeferredToken(RateLimiterPrivate* impl,
+                      double numTokens,
+                      Milliseconds timeEnqueued,
+                      Milliseconds napTime);
 
         RateLimiterPrivate* _impl{nullptr};
-        Milliseconds _napTime{0};
         double _numTokens{1.0};
+        Milliseconds _timeEnqueued{0};
+        Milliseconds _napTime{0};
     };
 
     struct Stats {

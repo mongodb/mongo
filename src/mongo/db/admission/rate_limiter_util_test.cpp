@@ -60,6 +60,73 @@ auto constexpr convertBurstSizeToBurstCapacitySecs(double refreshRate, double bu
     return burstSize / refreshRate;
 }
 
+// Spy clock source used to detect whether sleepUntil is called inside DeferredToken::get().
+// Intercepts setAlarm (the hook used by waitForConditionUntil on non-system clocks) to:
+//   - record the attempt, and
+//   - immediately fire the callback so the wait resolves without real-time blocking.
+class PreciseClockSourceSpy : public ClockSourceMock {
+public:
+    bool sleepWasAttempted() const {
+        return _sleepAttempted;
+    }
+
+    void setAlarm(Date_t when, unique_function<void()> action) override {
+        _sleepAttempted = true;
+        // Fire the callback immediately so the caller unblocks without any real-time wait.
+        // waitForConditionUntil detects the inline execution and returns timeout right away.
+        action();
+    }
+
+private:
+    bool _sleepAttempted = false;
+};
+
+// Test fixture that injects PreciseClockSourceSpy as the ServiceContext's precise clock.
+class RateLimiterWithPreciseClockSpyTest : public ServiceContextTest {
+public:
+    RateLimiterWithPreciseClockSpyTest()
+        : ServiceContextTest(_initContext(&_clockSpy, &_tickSource)) {}
+
+    void setUp() override {
+        static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())->reset();
+        _tickSource->reset(0);
+    }
+
+    RateLimiter makeRateLimiter(std::string name,
+                                double refreshRate = 1.0,
+                                double burstCapacitySecs = 1.0,
+                                int64_t maxQueueDepth = INT_MAX) {
+        return RateLimiter(refreshRate, burstCapacitySecs, maxQueueDepth, name, _tickSource);
+    }
+
+    void advanceTime(Milliseconds d) {
+        static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())->advance(d);
+        _tickSource->advance(d);
+    }
+
+    PreciseClockSourceSpy* clockSpy() {
+        return _clockSpy;
+    }
+
+private:
+    // Written by _initContext before ServiceContextTest base is constructed (safe for raw ptrs).
+    PreciseClockSourceSpy* _clockSpy;
+    TickSourceMock<Milliseconds>* _tickSource;
+
+    static std::unique_ptr<ScopedGlobalServiceContextForTest> _initContext(
+        PreciseClockSourceSpy** spyOut, TickSourceMock<Milliseconds>** tickOut) {
+        auto spy = std::make_unique<PreciseClockSourceSpy>();
+        *spyOut = spy.get();
+        auto tick = std::make_unique<TickSourceMock<Milliseconds>>();
+        *tickOut = tick.get();
+        return std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
+            std::make_unique<ClockSourceMock>(), std::move(spy), std::move(tick)));
+    }
+
+    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
+                                                          logv2::LogSeverity::Debug(4)};
+};
+
 class RateLimiterWithMockClockTest : public ClockSourceMockServiceContextTest {
 public:
     void setUp() override {
@@ -344,6 +411,44 @@ TEST_F(RateLimiterWithMockClockTest, InterruptedDueToKillAllOperations) {
     });
 }
 
+// Verify that DeferredToken::get() skips sleepUntil when the clock is advanced past the token's
+// ready time before get() is called.
+TEST_F(RateLimiterWithPreciseClockSpyTest,
+       DeferredTokenGetCompletesAfterClockAdvancedPastReadyTime) {
+    const int refreshRate = 4;
+    const Milliseconds tokenInterval = Milliseconds(1000) / refreshRate;
+    const double burstCapacitySecs = convertBurstSizeToBurstCapacitySecs(refreshRate, 1);
+
+    RateLimiter rateLimiter =
+        makeRateLimiter("DeferredTokenGetCompletesAfterClockAdvancedPastReadyTime",
+                        refreshRate,
+                        burstCapacitySecs,
+                        INT_MAX);
+    auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 1);
+
+    // Consume the burst token so the next request must queue (napTime > 0).
+    ASSERT_OK(rateLimiter.acquireToken(clientsWithOps[0].second.get()));
+
+    // Acquire a deferred token: non-ready, positive napTime.
+    auto deferredResult = rateLimiter.acquireToken();
+    ASSERT_OK(deferredResult);
+    auto& deferred = deferredResult.getValue();
+    ASSERT_FALSE(deferred.isReady());
+
+    // Advance both tick source and clock past the token's ready time. This simulates the race
+    // where time elapsed between enqueue() in acquireToken() and the caller invoking get().
+    advanceTime(tokenInterval * 3);
+
+    // get() should return synchronously without calling sleepUntil because adjustedNapTime == 0.
+    ASSERT_OK(std::move(deferred).get(clientsWithOps[0].second.get()));
+
+    ASSERT_FALSE(clockSpy()->sleepWasAttempted())
+        << "get() should not call sleepUntil when the token ready time has already passed";
+    ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 2);
+    ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 1);
+    ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 1);
+}
+
 // Verify that `RateLimiter::recordExemption()` increments the exemption metric but no others.
 TEST_F(RateLimiterWithMockClockTest, RecordExemption) {
     RateLimiter rateLimiter = makeRateLimiter("RecordExemption");
@@ -417,13 +522,14 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         ASSERT_APPROX_EQUAL(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0, .1);
 
         // Make sure we've enqueued all the remaining waiters so that we don't race with advancing
-        // the mock clock.
-        int64_t numRetries = 0;
-        const int64_t maxRetries = 5;
-        int64_t backoffTimeMillis{5};
-        while (rateLimiter.queued() != numThreads - maxTokens && numRetries++ < maxRetries) {
-            sleepmillis(backoffTimeMillis);
-            backoffTimeMillis *= 5;
+        // the mock clock. Use a real-time deadline instead of a bounded retry loop so the wait
+        // scales correctly under slow sanitizer builds (e.g. AUBSAN ~10x slower).
+        const auto enqueueDeadline = Date_t::now() + Seconds(60);
+        while (rateLimiter.queued() != numThreads - maxTokens) {
+            if (Date_t::now() >= enqueueDeadline) {
+                break;
+            }
+            sleepmillis(5);
         }
 
         // Until we start moving the mock clock forward, no other requests will be fulfilled and all
@@ -444,14 +550,11 @@ TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
         advanceTime(smallAdvance);
         ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens);
 
-        // Advance time enough for all remaining tokens and wait for them all to complete.
-        // Time out overall after 20 seconds, though, so the test doesn't hang on failure.
-        const auto deadline = (Date_t::now() + Seconds(20)).toSystemTimePoint();
-        const int64_t remainingTokens = numThreads - maxTokens;
-
         // Advance time by enough for all remaining tokens, with some extra buffer to ensure all
         // remaining threads can acquire tokens after this time advance. Each token needs
         // tokenInterval, so advance by (remainingTokens + buffer) * tokenInterval.
+        const auto deadline = (Date_t::now() + Seconds(30)).toSystemTimePoint();
+        const int64_t remainingTokens = numThreads - maxTokens;
         Milliseconds totalAdvance = tokenInterval * (remainingTokens + 2);
         advanceTime(totalAdvance);
 
