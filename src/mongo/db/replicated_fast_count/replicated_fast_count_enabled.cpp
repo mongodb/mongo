@@ -87,12 +87,9 @@ bool shouldReadFromReplicatedFastCount(OperationContext* opCtx, const NamespaceS
 
 bool shouldUseReplicatedFastCountContainers(OperationContext* opCtx) {
     // TODO SERVER-125446: Also consult persistence provider for container writes enablement.
-    return gFeatureFlagReplicatedFastCountDurability.isEnabledUseLatestFCVWhenUninitialized(
-               VersionContext::getDecoration(opCtx),
-               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        feature_flags::gContainerWrites.isEnabledUseLatestFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    return feature_flags::gContainerWrites.isEnabledUseLatestFCVWhenUninitialized(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 }  // namespace mongo
