@@ -35,12 +35,14 @@
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 
@@ -75,34 +77,39 @@ Status createIndexFromSpec(OperationContext* opCtx,
     };
 
     {
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         WriteUnitOfWork wunit(opCtx);
-        CollectionWriter writer{opCtx, nss};
-        auto coll = writer.getWritableCollection(opCtx);
-        if (!coll) {
-            auto db = autoDb.ensureDbExists(opCtx);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        if (!acq.exists()) {
+            auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
             invariant(db);
-            coll = db->createCollection(opCtx, NamespaceString::createNamespaceString_forTest(ns));
+            auto coll =
+                db->createCollection(opCtx, NamespaceString::createNamespaceString_forTest(ns));
+            invariant(coll);
         }
-        invariant(coll);
         wunit.commit();
     }
 
     MultiIndexBlock indexer;
     ScopeGuard abortOnExit([&] {
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-        CollectionWriter collection(opCtx, nss);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        CollectionWriter collection(opCtx, &acq);
         indexer.abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
     });
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     IndexBuildInfo indexBuildInfo(spec, *storageEngine, nss.dbName());
     {
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-        CollectionWriter collection(opCtx, nss);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        CollectionWriter collection(opCtx, &acq);
         Status status = indexer
                             .init(
                                 opCtx,
@@ -132,9 +139,11 @@ Status createIndexFromSpec(OperationContext* opCtx,
         return status;
     }
 
-    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
-    Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-    CollectionWriter collection(opCtx, nss);
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    CollectionWriter collection(opCtx, &acq);
     if (auto status = indexer.retrySkippedRecords(opCtx, collection.get()); !status.isOK()) {
         return status;
     }

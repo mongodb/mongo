@@ -46,6 +46,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/ident.h"
@@ -150,7 +151,7 @@ struct KReplicateBuildHandle {
 
 KReplicateBuildHandle setUpKReplicatePrimaryDrivenBuild(OperationContext* opCtx,
                                                         MultiIndexBlock* indexer,
-                                                        AutoGetCollection& autoColl,
+                                                        CollectionAcquisition& acq,
                                                         CollectionWriter& coll,
                                                         const NamespaceString& nss);
 
@@ -325,8 +326,12 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
 TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
     auto indexer = getIndexer();
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto specs = unittest::assertGet(indexer->init(operationContext(),
                                                    coll,
@@ -350,8 +355,12 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnAbortWithoutCleanup) {
     const auto buildUUID = UUID::gen();
     indexer->setBuildUUID(buildUUID);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo1 =
@@ -372,7 +381,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnAbortWithoutCleanup) {
     indexer->setIsResumable(true);
     indexer->abortWithoutCleanup(operationContext(), coll.get());
     auto indexBuildIdent = findPersistedResumeState(
-        operationContext(), buildUUID, IndexBuildPhaseEnum::kInitialized, autoColl->uuid());
+        operationContext(), buildUUID, IndexBuildPhaseEnum::kInitialized, coll->uuid());
     ASSERT_TRUE(indexBuildIdent);
 
     validateTempTableIdentsOnTeardown({*indexBuildInfo1.sideWritesIdent, *indexBuildIdent});
@@ -383,8 +392,12 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndCommit) {
     const auto buildUUID = UUID::gen();
     indexer->setBuildUUID(buildUUID);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo1 =
@@ -405,7 +418,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndCommit) {
     indexer->setIsResumable(true);
     indexer->persistResumeState(operationContext(), coll.get());
     auto indexBuildIdent = findPersistedResumeState(
-        operationContext(), buildUUID, IndexBuildPhaseEnum::kInitialized, autoColl->uuid());
+        operationContext(), buildUUID, IndexBuildPhaseEnum::kInitialized, coll->uuid());
     ASSERT_TRUE(indexBuildIdent);
 
     {
@@ -424,8 +437,12 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndCommit) {
 // persistResumeState survives a write conflict at the kInitialized phase.
 TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_Initialized) {
     auto indexer = getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto handle = initPrimaryDrivenResumableBuild(operationContext(), indexer, coll);
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
@@ -446,7 +463,7 @@ TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_Ini
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(handle.buildUUID, resumeInfo->getBuildUUID());
     EXPECT_EQ(IndexBuildPhaseEnum::kInitialized, resumeInfo->getPhase());
-    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+    EXPECT_EQ(coll->uuid(), resumeInfo->getCollectionUUID());
 
     // The retry must not produce a duplicate record: exactly one record must exist.
     EXPECT_EQ(1u, countRecordsInIdent(operationContext(), storageEngine, handle.indexBuildIdent));
@@ -457,11 +474,15 @@ TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_Ini
 // persistResumeState survives a write conflict at the kBulkLoad phase.
 TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_BulkLoad) {
     auto indexer = getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto handle =
-        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, autoColl, coll, getNSS());
+        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, acq, coll, getNSS());
 
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     {
@@ -479,7 +500,7 @@ TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_Bul
         storageEngine, operationContext(), handle.indexBuildIdent);
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(IndexBuildPhaseEnum::kBulkLoad, resumeInfo->getPhase());
-    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+    EXPECT_EQ(coll->uuid(), resumeInfo->getCollectionUUID());
 
     // The retry must not produce a duplicate record: exactly one record must exist.
     EXPECT_EQ(1u, countRecordsInIdent(operationContext(), storageEngine, handle.indexBuildIdent));
@@ -491,15 +512,19 @@ TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_Bul
 // kDrainWrites phase.
 TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_DrainWrites) {
     auto indexer = getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto handle = initPrimaryDrivenResumableBuild(operationContext(), indexer, coll);
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << 1)));
         wuow.commit();
     }
     ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
@@ -523,7 +548,7 @@ TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_Dra
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(handle.buildUUID, resumeInfo->getBuildUUID());
     EXPECT_EQ(IndexBuildPhaseEnum::kDrainWrites, resumeInfo->getPhase());
-    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+    EXPECT_EQ(coll->uuid(), resumeInfo->getCollectionUUID());
 
     // The retry must not produce a duplicate record: exactly one record must exist.
     EXPECT_EQ(1u, countRecordsInIdent(operationContext(), storageEngine, handle.indexBuildIdent));
@@ -534,8 +559,12 @@ TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_Dra
 // _writeStateToContainer fired from abortWithoutCleanup survives a write conflict.
 TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_AbortWithoutCleanup) {
     auto indexer = getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto handle = initPrimaryDrivenResumableBuild(operationContext(), indexer, coll);
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
@@ -558,7 +587,7 @@ TEST_F(MultiIndexBlockResumableTest, PersistResumeStateSurvivesWriteConflict_Abo
     // abortWithoutCleanup does not advance _phase, so the persisted state carries the phase the
     // build was in when abort was called (kInitialized here, since the test stops after init()).
     EXPECT_EQ(IndexBuildPhaseEnum::kInitialized, resumeInfo->getPhase());
-    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+    EXPECT_EQ(coll->uuid(), resumeInfo->getCollectionUUID());
 
     EXPECT_EQ(1u, countRecordsInIdent(operationContext(), storageEngine, handle.indexBuildIdent));
 
@@ -572,8 +601,12 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndOnAbort) {
     const auto buildUUID = UUID::gen();
     indexer->setBuildUUID(buildUUID);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo1 =
@@ -594,7 +627,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndOnAbort) {
     indexer->setIsResumable(true);
     indexer->persistResumeState(operationContext(), coll.get());
     auto indexBuildIdent = findPersistedResumeState(
-        operationContext(), buildUUID, IndexBuildPhaseEnum::kInitialized, autoColl->uuid());
+        operationContext(), buildUUID, IndexBuildPhaseEnum::kInitialized, coll->uuid());
     EXPECT_TRUE(indexBuildIdent);
 
     indexer->abortWithoutCleanup(operationContext(), coll.get());
@@ -607,8 +640,12 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndOnAbort) {
 TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
     auto indexer = getIndexer();
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -652,8 +689,12 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
 TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
     auto indexer = getIndexer();
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo1 =
@@ -758,8 +799,11 @@ TEST_F(MultiIndexBlockTest, InitMultipleSpecs) {
 TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
     auto indexer = getIndexer();
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -770,6 +814,7 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
                        *storageEngine);
 
     {
+        CollectionWriter coll(operationContext(), &acq);
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(indexer
                       ->init(operationContext(),
@@ -784,7 +829,8 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(
+            operationContext(), acq.getCollectionPtr(), BSON("_id" << 0 << "a" << 1)));
         wuow.commit();
     }
 
@@ -794,6 +840,7 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
 
     {
+        CollectionWriter coll(operationContext(), &acq);
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(indexer->commit(operationContext(),
                                   coll.getWritableCollection(operationContext()),
@@ -821,10 +868,14 @@ TEST_F(MultiIndexBlockTest, DrainBackgroundWritesYieldIsTracked) {
                        *storageEngine);
 
     {
-        AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-        CollectionWriter coll(operationContext(), autoColl);
+        auto acq =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                              MODE_X);
 
         {
+            CollectionWriter coll(operationContext(), &acq);
             WriteUnitOfWork wuow(operationContext());
             ASSERT_OK(indexer
                           ->init(operationContext(),
@@ -839,7 +890,8 @@ TEST_F(MultiIndexBlockTest, DrainBackgroundWritesYieldIsTracked) {
 
         {
             WriteUnitOfWork wuow(operationContext());
-            ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
+            ASSERT_OK(Helpers::insert(
+                operationContext(), acq.getCollectionPtr(), BSON("_id" << 0 << "a" << 1)));
             wuow.commit();
         }
 
@@ -847,7 +899,11 @@ TEST_F(MultiIndexBlockTest, DrainBackgroundWritesYieldIsTracked) {
     }
 
     {
-        AutoGetCollection autoColl(operationContext(), getNSS(), MODE_IX);
+        auto acq =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                              MODE_IX);
         ASSERT_OK(indexer->drainBackgroundWrites(operationContext(),
                                                  RecoveryUnit::ReadSource::kNoTimestamp,
                                                  IndexBuildInterceptor::DrainYieldPolicy::kYield));
@@ -860,8 +916,12 @@ TEST_F(MultiIndexBlockTest, DrainBackgroundWritesYieldIsTracked) {
     }
 
     {
-        AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-        CollectionWriter coll(operationContext(), autoColl);
+        auto acq =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                              MODE_X);
+        CollectionWriter coll(operationContext(), &acq);
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(indexer->commit(operationContext(),
                                   coll.getWritableCollection(operationContext()),
@@ -876,8 +936,12 @@ TEST_F(MultiIndexBlockTest, CommitUsesCommitTimestampForTemporaryTableDrops) {
     const auto buildUUID = UUID::gen();
     indexer->setBuildUUID(buildUUID);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -934,8 +998,12 @@ TEST_F(MultiIndexBlockTest, CommitWithNoCommitTimestampDropsImmediately) {
     const auto buildUUID = UUID::gen();
     indexer->setBuildUUID(buildUUID);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -979,8 +1047,12 @@ TEST_F(MultiIndexBlockTest, CommitWithNoCommitTimestampDropsImmediately) {
 TEST_F(MultiIndexBlockTest, AbortDropsTemporaryTables) {
     auto indexer = getIndexer();
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -1026,8 +1098,12 @@ TEST_F(MultiIndexBlockTest, CommitDropsResumablePrimaryDrivenIndexBuildTable) {
     indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
     indexer->setIsResumable(true);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -1075,8 +1151,12 @@ TEST_F(MultiIndexBlockTest, InitSkipsResumablePrimaryDrivenIndexBuildTableWhenNo
     indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
     // Intentionally leave _isResumable at its default (false).
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -1115,8 +1195,12 @@ TEST_F(MultiIndexBlockTest, AbortDropsResumablePrimaryDrivenIndexBuildTable) {
     indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
     indexer->setIsResumable(true);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -1167,8 +1251,12 @@ TEST_F(MultiIndexBlockTest, PdibPersistsResumeStateOnFirstDrain) {
     indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
     indexer->setIsResumable(true);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -1190,7 +1278,7 @@ TEST_F(MultiIndexBlockTest, PdibPersistsResumeStateOnFirstDrain) {
     // creates the bulk loader for the kReplicate path.
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << 1)));
         wuow.commit();
     }
 
@@ -1215,7 +1303,7 @@ TEST_F(MultiIndexBlockTest, PdibPersistsResumeStateOnFirstDrain) {
         storageEngine, operationContext(), ident::generateNewIndexBuildIdent(buildUUID));
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(IndexBuildPhaseEnum::kDrainWrites, resumeInfo->getPhase());
-    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+    EXPECT_EQ(coll->uuid(), resumeInfo->getCollectionUUID());
 
     // Re-entering drain (second/third pass in production) must not error and must leave the
     // record intact. Subsequent calls hit firstDrain == false and skip the persist.
@@ -1252,8 +1340,12 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringDrain) {
     indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
     indexer->setIsResumable(true);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -1273,7 +1365,7 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringDrain) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << 1)));
         wuow.commit();
     }
 
@@ -1289,7 +1381,7 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringDrain) {
     // (openExisting) rather than recreating it (immediate).
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 1 << "a" << 2)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 1 << "a" << 2)));
         wuow.commit();
     }
 
@@ -1388,8 +1480,12 @@ TEST_F(MultiIndexBlockTest, ResumedPdibPersistsStateOnFirstDrainWithNoNewRecords
         idx.setIsResumable(true);
     };
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -1406,7 +1502,7 @@ TEST_F(MultiIndexBlockTest, ResumedPdibPersistsStateOnFirstDrainWithNoNewRecords
         std::string val(64 * 1024, 'a');
         for (auto i = 0; i < 20; ++i) {
             ASSERT_OK(
-                Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+                Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
         }
         wuow.commit();
     }
@@ -1483,8 +1579,12 @@ TEST_F(MultiIndexBlockTest, PdibSkipsResumeStateOnEmptyCollection) {
     indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
     indexer->setIsResumable(true);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -1537,8 +1637,12 @@ TEST_F(MultiIndexBlockTest, PdibDoesNotPersistResumeStateWhenFeatureFlagOff) {
     // mirror that here so init() takes the non-replicated path (no resume table created).
     indexer->setContainerWriteBehavior(ContainerWriteBehavior::kDoNotReplicate);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -1573,8 +1677,12 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupDoesNotDropTables) {
     const auto buildUUID = UUID::gen();
     indexer->setBuildUUID(buildUUID);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -1622,8 +1730,12 @@ TEST_F(MultiIndexBlockTest, BasicMetrics) {
             capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan);
     }
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto spec1 =
@@ -1655,8 +1767,8 @@ TEST_F(MultiIndexBlockTest, BasicMetrics) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 1 << "a" << 2)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 1 << "a" << 2)));
         wuow.commit();
     }
     constexpr size_t numDocsInColl = 2;
@@ -1701,8 +1813,12 @@ TEST_F(MultiIndexBlockTest, BasicMetrics) {
 TEST_F(MultiIndexBlockTest, AbortWithNoCommitTimestampDropsImmediately) {
     auto indexer = getIndexer();
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -1811,11 +1927,11 @@ void promoteMockReplCoordToPrimary(ServiceContext* service) {
 // Setup for a primary-driven (kReplicate) build: assigns a build UUID, flips the container-write
 // behavior, inserts one document into the collection (so the scan doesn't short-circuit on
 // emptiness), constructs a single-spec IndexBuildInfo, runs init and the collection scan so
-// index.bulk is populated for _constructStateObject. Caller still owns the AutoGetCollection /
+// index.bulk is populated for _constructStateObject. Caller still owns the CollectionAcquisition /
 // CollectionWriter and the feature-flag scope.
 KReplicateBuildHandle setUpKReplicatePrimaryDrivenBuild(OperationContext* opCtx,
                                                         MultiIndexBlock* indexer,
-                                                        AutoGetCollection& autoColl,
+                                                        CollectionAcquisition& acq,
                                                         CollectionWriter& coll,
                                                         const NamespaceString& nss) {
     const auto buildUUID = UUID::gen();
@@ -1826,7 +1942,7 @@ KReplicateBuildHandle setUpKReplicatePrimaryDrivenBuild(OperationContext* opCtx,
 
     {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(Helpers::insert(opCtx, *autoColl, BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(opCtx, coll.get(), BSON("_id" << 0 << "a" << 1)));
         wuow.commit();
     }
 
@@ -1895,12 +2011,16 @@ TEST_F(MultiIndexBlockTest, CommitToleratesKeysAlreadyInContainer) {
     indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
     indexer->setIsResumable(true);
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     {
         WriteUnitOfWork wuow{operationContext()};
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << 1)));
         wuow.commit();
     }
 
@@ -1920,13 +2040,13 @@ TEST_F(MultiIndexBlockTest, CommitToleratesKeysAlreadyInContainer) {
                             boost::none));
     ASSERT_OK(indexer->insertAllDocumentsInCollection(operationContext(), getNSS()));
 
-    auto* indexEntry = autoColl->getIndexCatalog()->findIndexByName(
+    auto* indexEntry = coll.get()->getIndexCatalog()->findIndexByName(
         operationContext(), "a_1", IndexCatalog::InclusionPolicy::kUnfinished);
     ASSERT(indexEntry);
     auto* iam = indexEntry->accessMethod()->asSortedData();
     ASSERT(iam);
 
-    auto record = autoColl->getCursor(operationContext())->next();
+    auto record = coll.get()->getCursor(operationContext())->next();
     ASSERT(record);
     auto recordId = record->id;
 
@@ -1936,7 +2056,7 @@ TEST_F(MultiIndexBlockTest, CommitToleratesKeysAlreadyInContainer) {
     KeyStringSet multikeyMetadataKeys;
     auto multikeyPaths = containerPool.multikeyPaths();
     iam->getKeys(operationContext(),
-                 *autoColl,
+                 coll.get(),
                  indexEntry,
                  pooledBuilder,
                  BSON("_id" << 0 << "a" << 1),
@@ -1989,11 +2109,15 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateUsesContainerWrites) {
     auto& observer = installResumeStateContainerObserver(operationContext());
 
     auto indexer = getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto handle =
-        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, autoColl, coll, getNSS());
+        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, acq, coll, getNSS());
 
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     EXPECT_TRUE(storageEngine->getEngine()->hasIdent(
@@ -2014,7 +2138,7 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateUsesContainerWrites) {
         storageEngine, operationContext(), handle.indexBuildIdent);
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(handle.buildUUID, resumeInfo->getBuildUUID());
-    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+    EXPECT_EQ(coll->uuid(), resumeInfo->getCollectionUUID());
 
     // Per-index IndexStateInfo round-trips with the input spec / idents.
     ASSERT_EQ(1U, resumeInfo->getIndexes().size());
@@ -2049,11 +2173,15 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateOverwritesPriorState) {
     auto& observer = installResumeStateContainerObserver(operationContext());
 
     auto indexer = getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto handle =
-        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, autoColl, coll, getNSS());
+        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, acq, coll, getNSS());
 
     // The load phase already produced one write; each persistResumeState() must add exactly one
     // more, and the second must be an update (key already exists after the first).
@@ -2093,11 +2221,15 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupUsesContainerWrites) {
     auto& observer = installResumeStateContainerObserver(operationContext());
 
     auto indexer = getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto handle =
-        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, autoColl, coll, getNSS());
+        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, acq, coll, getNSS());
 
     // The load phase already produced one write; abortWithoutCleanup must add exactly one more.
     const auto writesBefore = observer.countInsertsForIdent(handle.indexBuildIdent) +
@@ -2113,7 +2245,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupUsesContainerWrites) {
         storageEngine, operationContext(), handle.indexBuildIdent);
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(handle.buildUUID, resumeInfo->getBuildUUID());
-    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+    EXPECT_EQ(coll->uuid(), resumeInfo->getCollectionUUID());
     EXPECT_EQ(1U, resumeInfo->getIndexes().size());
 
     // After abortWithoutCleanup the per-build table must still exist (resumable shutdown).
@@ -2133,11 +2265,15 @@ TEST_F(MultiIndexBlockTest, PersistResumeStateNoOpWhenNotResumable) {
     auto& observer = installResumeStateContainerObserver(operationContext());
 
     auto indexer = getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto handle =
-        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, autoColl, coll, getNSS());
+        setUpKReplicatePrimaryDrivenBuild(operationContext(), indexer, acq, coll, getNSS());
     indexer->setIsResumable(false);
 
     // The load phase already produced one write; with isResumable=false, persistResumeState
@@ -2176,8 +2312,12 @@ TEST_F(MultiIndexBlockTest, HybridBuildDoesNotUseContainerWrites) {
     indexer->setIsResumable(true);
     // No setContainerWriteBehavior — defaults to kDoNotReplicate (hybrid).
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto* storageEngine = operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -2216,8 +2356,12 @@ TEST_F(MultiIndexBlockTest, WriteStateToContainerOnSpillWhenResumable) {
     auto& observer = installResumeStateContainerObserver(operationContext());
 
     auto& indexer = *getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto buildUUID = UUID::gen();
     indexer.setBuildUUID(buildUUID);
@@ -2230,7 +2374,7 @@ TEST_F(MultiIndexBlockTest, WriteStateToContainerOnSpillWhenResumable) {
     WriteUnitOfWork wuow(operationContext());
     std::string val(64 * 1024, 'a');
     for (auto i = 0; i < 20; ++i) {
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
     }
     wuow.commit();
 
@@ -2264,7 +2408,7 @@ TEST_F(MultiIndexBlockTest, WriteStateToContainerOnSpillWhenResumable) {
         index_builds::readAndParseResumeIndexInfo(&engine, operationContext(), indexBuildIdent);
     ASSERT_TRUE(resumeInfo.has_value());
     EXPECT_EQ(resumeInfo->getBuildUUID(), buildUUID);
-    EXPECT_EQ(resumeInfo->getCollectionUUID(), autoColl->uuid());
+    EXPECT_EQ(resumeInfo->getCollectionUUID(), coll->uuid());
     ASSERT_EQ(resumeInfo->getIndexes().size(), 1);
     EXPECT_EQ(resumeInfo->getIndexes()[0].getSpec()["name"].String(), "a_1");
 
@@ -2283,8 +2427,12 @@ TEST_F(MultiIndexBlockTest, OnSpillCallbackSeesLatestRecordIdAndKeyCount) {
     promoteMockReplCoordToPrimary(getServiceContext());
 
     auto& indexer = *getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto buildUUID = UUID::gen();
     indexer.setBuildUUID(buildUUID);
@@ -2294,7 +2442,7 @@ TEST_F(MultiIndexBlockTest, OnSpillCallbackSeesLatestRecordIdAndKeyCount) {
 
     {
         WriteUnitOfWork wuow{operationContext()};
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << 1)));
         wuow.commit();
     }
 
@@ -2343,8 +2491,12 @@ TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordId) {
     promoteMockReplCoordToPrimary(getServiceContext());
 
     auto& indexer = *getIndexer();
-    AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
-    CollectionWriter coll{operationContext(), autoColl};
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
 
     auto buildUUID = UUID::gen();
     indexer.setBuildUUID(buildUUID);
@@ -2356,7 +2508,7 @@ TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordId) {
     std::string val(64 * 1024, 'a');
     auto numDocs = 20;
     for (auto i = 0; i < numDocs; ++i) {
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
     }
     wuow.commit();
 
@@ -2408,8 +2560,12 @@ TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordIdForMultipleIndexes)
     promoteMockReplCoordToPrimary(getServiceContext());
 
     auto& indexer = *getIndexer();
-    AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
-    CollectionWriter coll{operationContext(), autoColl};
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
 
     auto buildUUID = UUID::gen();
     indexer.setBuildUUID(buildUUID);
@@ -2422,7 +2578,7 @@ TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordIdForMultipleIndexes)
     auto numDocs = 20;
     for (auto i = 0; i < numDocs; ++i) {
         ASSERT_OK(Helpers::insert(operationContext(),
-                                  *autoColl,
+                                  coll.get(),
                                   BSON("_id" << i << "a" << val << "b" << val << "c" << val)));
     }
     wuow.commit();
@@ -2491,8 +2647,12 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
         idx.setIsResumable(true);
     };
 
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -2517,7 +2677,7 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
         std::string val(64 * 1024, 'a');
         for (auto i = 0; i < 20; ++i) {
             ASSERT_OK(
-                Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+                Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
         }
         wuow.commit();
     }
@@ -2531,7 +2691,7 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
     ASSERT_TRUE(resumeInfo);
     EXPECT_EQ(buildUUID, resumeInfo->getBuildUUID());
     EXPECT_EQ(IndexBuildPhaseEnum::kCollectionScan, resumeInfo->getPhase());
-    EXPECT_EQ(autoColl->uuid(), resumeInfo->getCollectionUUID());
+    EXPECT_EQ(coll->uuid(), resumeInfo->getCollectionUUID());
 
     // The persisted scan position is a valid RecordId inside the 20-doc collection.
     // A valid spill checkpoint must satisfy 0 < position <= 20.
@@ -2618,8 +2778,12 @@ TEST_F(MultiIndexBlockTest, PdibResumedScanSkipsRecordsAtOrBeforePerIndexLastSpi
 
     boost::optional<ResumeIndexInfo> resumeInfo;
     {
-        AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
-        CollectionWriter coll{operationContext(), autoColl};
+        auto acq =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                              MODE_X);
+        CollectionWriter coll{operationContext(), &acq};
 
         {
             WriteUnitOfWork wuow{operationContext()};
@@ -2627,7 +2791,7 @@ TEST_F(MultiIndexBlockTest, PdibResumedScanSkipsRecordsAtOrBeforePerIndexLastSpi
             for (auto i = 0; i < initialDocs; ++i) {
                 ASSERT_OK(
                     Helpers::insert(operationContext(),
-                                    *autoColl,
+                                    coll.get(),
                                     BSON("_id" << i << "a" << val << "b" << val << "c" << val)));
             }
             wuow.commit();
@@ -2661,12 +2825,16 @@ TEST_F(MultiIndexBlockTest, PdibResumedScanSkipsRecordsAtOrBeforePerIndexLastSpi
     // originalLastSpilled. These docs exist on disk but aren't represented in any sorter's spilled
     // state.
     {
-        AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
+        auto acq =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                              MODE_X);
         WriteUnitOfWork wuow{operationContext()};
         std::string val(64 * 1024, 'a');
         for (auto i = initialDocs; i < totalDocs; ++i) {
             ASSERT_OK(Helpers::insert(operationContext(),
-                                      *autoColl,
+                                      acq.getCollectionPtr(),
                                       BSON("_id" << i << "a" << val << "b" << val << "c" << val)));
         }
         wuow.commit();
@@ -2766,8 +2934,12 @@ TEST_F(MultiIndexBlockTest, ResumeRestoresLastSpilledRecordId) {
         idx.setIsResumable(true);
     };
 
-    AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
-    CollectionWriter coll{operationContext(), autoColl};
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
 
     auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
     auto indexBuildInfo =
@@ -2791,7 +2963,7 @@ TEST_F(MultiIndexBlockTest, ResumeRestoresLastSpilledRecordId) {
         std::string val(64 * 1024, 'a');
         for (auto i = 0; i < 20; ++i) {
             ASSERT_OK(
-                Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+                Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
         }
         wuow.commit();
     }
@@ -2867,9 +3039,13 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringLoad) {
     UUID collectionUUID = UUID::gen();
     auto numDocs = 20;
     {
-        AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-        CollectionWriter coll(operationContext(), autoColl);
-        collectionUUID = autoColl->uuid();
+        auto acq =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                              MODE_X);
+        CollectionWriter coll(operationContext(), &acq);
+        collectionUUID = acq.uuid();
 
         auto& indexer = *getIndexer();
         configurePdib(indexer);
@@ -2884,8 +3060,8 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringLoad) {
             WriteUnitOfWork wuow(operationContext());
             std::string val(64 * 1024, 'a');
             for (auto i = 0; i < numDocs; ++i) {
-                ASSERT_OK(
-                    Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+                ASSERT_OK(Helpers::insert(
+                    operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
             }
             wuow.commit();
         }
@@ -2985,8 +3161,12 @@ TEST_F(MultiIndexBlockTest, ResumedPdibSpillerContinuesContainerKeysPastPriorRan
         idx.setIsResumable(true);
     };
 
-    AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
-    CollectionWriter coll{operationContext(), autoColl};
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
     auto& engine = *operationContext()->getServiceContext()->getStorageEngine();
 
     IndexBuildInfo indexBuildInfo{BSON("key" << BSON("a" << 1) << "name"
@@ -3001,7 +3181,7 @@ TEST_F(MultiIndexBlockTest, ResumedPdibSpillerContinuesContainerKeysPastPriorRan
         std::string val(64 * 1024, 'a');
         for (int i = 0; i < count; ++i) {
             ASSERT_OK(Helpers::insert(
-                operationContext(), *autoColl, BSON("_id" << (firstId + i) << "a" << val)));
+                operationContext(), coll.get(), BSON("_id" << (firstId + i) << "a" << val)));
         }
         wuow.commit();
     };
@@ -3085,8 +3265,12 @@ TEST_F(MultiIndexBlockTest, DoNotWriteStateToContainerOnSpillWhenNotResumable) {
     auto& observer = installResumeStateContainerObserver(operationContext());
 
     auto& indexer = *getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto buildUUID = UUID::gen();
     indexer.setBuildUUID(buildUUID);
@@ -3099,7 +3283,7 @@ TEST_F(MultiIndexBlockTest, DoNotWriteStateToContainerOnSpillWhenNotResumable) {
     WriteUnitOfWork wuow(operationContext());
     std::string val(64 * 1024, 'a');
     for (auto i = 0; i < 20; ++i) {
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
     }
     wuow.commit();
 
@@ -3143,8 +3327,12 @@ TEST_F(MultiIndexBlockTest, AllSpillsDuringScanPersistScanPhase) {
     auto& observer = installResumeStateContainerObserver(operationContext());
 
     auto& indexer = *getIndexer();
-    AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
-    CollectionWriter coll{operationContext(), autoColl};
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
 
     auto buildUUID = UUID::gen();
     indexer.setBuildUUID(buildUUID);
@@ -3157,7 +3345,7 @@ TEST_F(MultiIndexBlockTest, AllSpillsDuringScanPersistScanPhase) {
         std::string val(64 * 1024, 'a');
         for (auto i = 0; i < 300; ++i) {
             ASSERT_OK(
-                Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+                Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
         }
         wuow.commit();
     }
@@ -3217,8 +3405,12 @@ TEST_F(MultiIndexBlockTest, LoadWritesResumeStatePeriodicallyForPrimaryDrivenBui
     auto& observer = installResumeStateContainerObserver(operationContext());
 
     auto& indexer = *getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto buildUUID = UUID::gen();
     indexer.setBuildUUID(buildUUID);
@@ -3228,7 +3420,7 @@ TEST_F(MultiIndexBlockTest, LoadWritesResumeStatePeriodicallyForPrimaryDrivenBui
 
     WriteUnitOfWork wuow(operationContext());
     for (auto i = 0; i < 50; ++i) {
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << i)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << i)));
     }
     wuow.commit();
 
@@ -3298,8 +3490,12 @@ TEST_F(MultiIndexBlockTest, LoadDoesNotPeriodicallyWriteWhenNotResumable) {
     auto& observer = installResumeStateContainerObserver(operationContext());
 
     auto& indexer = *getIndexer();
-    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
-    CollectionWriter coll(operationContext(), autoColl);
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll(operationContext(), &acq);
 
     auto buildUUID = UUID::gen();
     indexer.setBuildUUID(buildUUID);
@@ -3309,7 +3505,7 @@ TEST_F(MultiIndexBlockTest, LoadDoesNotPeriodicallyWriteWhenNotResumable) {
 
     WriteUnitOfWork wuow(operationContext());
     for (auto i = 0; i < 50; ++i) {
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << i)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << i)));
     }
     wuow.commit();
 
@@ -3355,8 +3551,12 @@ TEST_F(MultiIndexBlockTest, LastSpilledRecordIdIsNotPersistedDuringLoadPhase) {
     auto& observer = installResumeStateContainerObserver(operationContext());
 
     auto& indexer = *getIndexer();
-    AutoGetCollection autoColl{operationContext(), getNSS(), MODE_X};
-    CollectionWriter coll{operationContext(), autoColl};
+    auto acq =
+        acquireCollection(operationContext(),
+                          CollectionAcquisitionRequest::fromOpCtx(
+                              operationContext(), getNSS(), AcquisitionPrerequisites::kWrite),
+                          MODE_X);
+    CollectionWriter coll{operationContext(), &acq};
 
     auto buildUUID = UUID::gen();
     indexer.setBuildUUID(buildUUID);
@@ -3367,7 +3567,7 @@ TEST_F(MultiIndexBlockTest, LastSpilledRecordIdIsNotPersistedDuringLoadPhase) {
     WriteUnitOfWork wuow{operationContext()};
     std::string val(16 * 1024, 'a');
     for (auto i = 0; i < 50; ++i) {
-        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << i << "a" << val)));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
     }
     wuow.commit();
 

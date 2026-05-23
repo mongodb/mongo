@@ -39,8 +39,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
@@ -99,8 +99,13 @@ void checkIfEqual(IndexBuildEntry lhs, IndexBuildEntry rhs) {
 }
 
 Status removeIndexBuildEntry(OperationContext* opCtx, UUID indexBuildUUID) {
-    AutoGetCollection autoColl(opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-    return indexbuildentryhelpers::removeIndexBuildEntry(opCtx, *autoColl, indexBuildUUID);
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, NamespaceString::kIndexBuildEntryNamespace, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    return indexbuildentryhelpers::removeIndexBuildEntry(
+        opCtx, acq.getCollectionPtr(), indexBuildUUID);
 }
 
 class IndexBuildEntryHelpersTest : public CatalogTestFixture {

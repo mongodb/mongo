@@ -44,11 +44,11 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/unittest/unittest.h"
@@ -248,8 +248,11 @@ TEST_F(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) 
                                  << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
     ASSERT_OK(createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
-    AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
-    const auto& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        LockMode::MODE_X);
+    const auto& coll = acq.getCollectionPtr();
     auto indexEntry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
     auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
 
@@ -291,8 +294,11 @@ TEST_F(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
                                  << "v" << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
     ASSERT_OK(createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
-    AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
-    const auto& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        LockMode::MODE_X);
+    const auto& coll = acq.getCollectionPtr();
     auto indexEntry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
     auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
 
@@ -327,8 +333,11 @@ TEST_F(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
                                  << "v" << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
     ASSERT_OK(createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
-    AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
-    const auto& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        LockMode::MODE_X);
+    const auto& coll = acq.getCollectionPtr();
     auto indexEntry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
     auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
 
@@ -380,8 +389,11 @@ TEST_F(IndexAccessMethodBulkBuilder, CommitRejectsZeroInterval) {
                                  << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
     ASSERT_OK(createIndexFromSpec(opCtx, nss.ns_forTest(), indexSpec));
 
-    AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
-    const auto& coll = *autoColl;
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        LockMode::MODE_X);
+    const auto& coll = acq.getCollectionPtr();
     auto indexEntry = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
     auto indexAccessMethod = indexEntry->accessMethod()->asSortedData();
 

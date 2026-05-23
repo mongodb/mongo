@@ -39,6 +39,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -86,8 +87,11 @@ void IndexBuildsManagerTest::createCollection(const NamespaceString& nss) {
 }
 
 UUID IndexBuildsManagerTest::getCollectionUUID() const {
-    AutoGetCollection autoColl(operationContext(), _nss, MODE_IS);
-    return autoColl->uuid();
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), _nss, AcquisitionPrerequisites::kRead),
+                                 MODE_IS);
+    return acq.uuid();
 }
 
 std::vector<IndexBuildInfo> IndexBuildsManagerTest::makeSpecs(std::vector<std::string> keys) {
@@ -106,8 +110,11 @@ std::vector<IndexBuildInfo> IndexBuildsManagerTest::makeSpecs(std::vector<std::s
 }
 
 TEST_F(IndexBuildsManagerTest, IndexBuildsManagerSetUpAndTearDown) {
-    AutoGetCollection autoColl(operationContext(), _nss, MODE_X);
-    CollectionWriter collection(operationContext(), autoColl);
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), _nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_X);
+    CollectionWriter collection(operationContext(), &acq);
 
     auto indexes = makeSpecs({"a", "b"});
     ASSERT_OK(_indexBuildsManager.setUpIndexBuild(
@@ -119,8 +126,11 @@ TEST_F(IndexBuildsManagerTest, IndexBuildsManagerSetUpAndTearDown) {
 }
 
 TEST_F(IndexBuildsManagerTest, SetUpPrimaryDrivenIndexBuildAddsToRegistry) {
-    AutoGetCollection autoColl{operationContext(), _nss, MODE_X};
-    CollectionWriter collection{operationContext(), autoColl};
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), _nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_X);
+    CollectionWriter collection{operationContext(), &acq};
 
     auto indexes = makeSpecs({"a", "b"});
 
@@ -154,8 +164,11 @@ TEST_F(IndexBuildsManagerTest, SetUpPrimaryDrivenIndexBuildAddsToRegistry) {
 }
 
 TEST_F(IndexBuildsManagerTest, SetUpFailureDoesNotAddPrimaryDrivenIndexBuildToRegistry) {
-    AutoGetCollection autoColl{operationContext(), _nss, MODE_X};
-    CollectionWriter collection{operationContext(), autoColl};
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), _nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_X);
+    CollectionWriter collection{operationContext(), &acq};
 
     auto indexes = makeSpecs({"a"});
 
@@ -178,8 +191,11 @@ TEST_F(IndexBuildsManagerTest, SetUpFailureDoesNotAddPrimaryDrivenIndexBuildToRe
 }
 
 TEST_F(IndexBuildsManagerTest, SetUpNonPrimaryDrivenIndexBuildDoesNotAddToRegistry) {
-    AutoGetCollection autoColl{operationContext(), _nss, MODE_X};
-    CollectionWriter collection{operationContext(), autoColl};
+    auto acq = acquireCollection(operationContext(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     operationContext(), _nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_X);
+    CollectionWriter collection{operationContext(), &acq};
 
     auto indexes = makeSpecs({"a"});
     ASSERT_OK(_indexBuildsManager.setUpIndexBuild(
@@ -202,12 +218,16 @@ TEST_F(IndexBuildsManagerTest, CommitIndexBuildMultikeysAreResetWhenWceFiresAfte
     auto opCtx = operationContext();
     const auto collectionUUID = getCollectionUUID();
 
-    AutoGetCollection lockHolder(opCtx, _nss, MODE_X);
-    CollectionWriter collection(opCtx, collectionUUID);
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, _nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    CollectionWriter collection(opCtx, &acq);
 
     {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(Helpers::insert(opCtx, *lockHolder, BSON("_id" << 0 << "a" << 1 << "b" << 2)));
+        ASSERT_OK(
+            Helpers::insert(opCtx, collection.get(), BSON("_id" << 0 << "a" << 1 << "b" << 2)));
         wuow.commit();
     }
 
