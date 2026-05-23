@@ -77,14 +77,6 @@ public:
     std::vector<PlanStatsDetails> getCachedPlanStats(const plan_cache_debug_info::DebugInfo&,
                                                      ExplainOptions::Verbosity) const;
 
-    boost::optional<StringMap<cost_based_ranker::SamplingMetadata>> getCeSamplingMetadata()
-        const override {
-        if (_explainData.ceSamplingMetadata.empty()) {
-            return boost::none;
-        }
-        return _explainData.ceSamplingMetadata;
-    }
-
 private:
     /**
      * A helper that formats the plan stats into a BSON object and collects summary stats.

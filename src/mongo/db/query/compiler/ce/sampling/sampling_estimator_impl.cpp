@@ -557,11 +557,7 @@ void SamplingEstimatorImpl::generateChunkSample() {
 }
 
 void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams) {
-    tassert(12433201, "SamplingEstimatorImpl must not be reused", !_isSampleGenerated);
-    // The final sample size (_sampleSize) may not be exactly the requested one
-    // (_requestedSampleSize). Capturing here the requested sample size before it gets updated.
-    _requestedSampleSize = _sampleSize;
-
+    _isSampleGenerated = true;
     if (auto topLevelSampleFieldNames =
             std::get_if<ce::TopLevelFieldsProjection>(&projectionParams)) {
         validateTopLevelSampleFieldNames(*topLevelSampleFieldNames);
@@ -574,25 +570,17 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
 
     if (internalQuerySamplingBySequentialScan.load()) {
         // This is only used for testing purposes when a repeatable sample is needed.
-        _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kSeqScan;
         generateSampleBySeqScanningForTesting();
     } else if (_sampleSize >= _collectionCard.cardinality().v()) {
         // If the required sample is larger than the collection, the sample is generated from all
         // the documents on the collection.
-        _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kFullCollScan;
         generateFullCollScanSample();
     } else if (_samplingStyle == SamplingCEMethodEnum::kRandom) {
-        _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kRandom;
         generateRandomSample();
     } else {
         tassert(9372901, "The number of chunks should be positive.", _numChunks && *_numChunks > 0);
-        _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kChunk;
         generateChunkSample();
     }
-    if (!_wasSamplePersisted) {
-        _sampleCreatedAt = Date_t::now();
-    }
-    _isSampleGenerated = true;
 }
 
 void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
@@ -1006,33 +994,8 @@ Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingCEMethodEnum metho
     _sample = parsed.getValue().getDocs();
     _sampleSize = _sample.size();
     _uniqueDocCount = boost::none;
-    _wasSamplePersisted = true;
-    _sampleCreatedAt = parsed.getValue().getCreatedAt();
+    _isSampleGenerated = true;
     return Status::OK();
-}
-
-SamplingMetadata SamplingEstimatorImpl::getSamplingMetadata() const {
-    tassert(
-        12433200, "getSamplingMetadata() called before sample was generated", _isSampleGenerated);
-    // Account for: vector metadata, BSONObj object overhead per slot, and per-document
-    // buffer allocation (BSON data + SharedBuffer::Holder ref-count header).
-    size_t memorySizeBytes = sizeof(std::vector<BSONObj>) + sizeof(BSONObj) * _sample.capacity();
-    for (const auto& doc : _sample) {
-        tassert(12433202, "Sample documents must be owned BSONObjs", doc.isOwned());
-        // TODO SERVER-126975. Read this from the persisted doc.
-        memorySizeBytes += SharedBuffer::kHolderSize + static_cast<size_t>(doc.objsize());
-    }
-    SamplingMetadata meta;
-    meta.isPersisted = _wasSamplePersisted;
-    meta.docCount = _sample.size();
-    meta.requestedDocCount = _requestedSampleSize;
-    meta.memorySizeBytes = memorySizeBytes;
-    meta.technique = *_usedSamplingTechnique;
-    if (*_usedSamplingTechnique == cost_based_ranker::SamplingTechnique::kChunk) {
-        meta.numChunks = _numChunks;
-    }
-    meta.createdAt = _sampleCreatedAt;
-    return meta;
 }
 
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}

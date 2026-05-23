@@ -172,38 +172,6 @@ void generatePlannerInfo(PlanExecutor* exec,
     }
 
     auto&& explainer = exec->getPlanExplainer();
-
-    if (const auto ceSamplingMeta = explainer.getCeSamplingMetadata(); ceSamplingMeta.has_value()) {
-        BSONObjBuilder ceSamplingMetaBob(plannerBob.subobjStart("ceSamplingMetadata"));
-        for (const auto& [ns, meta] : ceSamplingMeta.value()) {
-            BSONObjBuilder nsMetaBob(ceSamplingMetaBob.subobjStart(ns));
-            nsMetaBob.append("sampleSource", meta.isPersisted ? "persisted" : "onTheFly");
-            static constexpr auto techniqueToStr =
-                [](cost_based_ranker::SamplingTechnique t) -> StringData {
-                switch (t) {
-                    case cost_based_ranker::SamplingTechnique::kRandom:
-                        return "random"_sd;
-                    case cost_based_ranker::SamplingTechnique::kChunk:
-                        return "chunk"_sd;
-                    case cost_based_ranker::SamplingTechnique::kFullCollScan:
-                        return "fullCollScan"_sd;
-                    case cost_based_ranker::SamplingTechnique::kSeqScan:
-                        return "seqScan"_sd;
-                }
-                MONGO_UNREACHABLE;
-            };
-            nsMetaBob.append("sampleTechnique", techniqueToStr(meta.technique));
-            if (meta.technique == cost_based_ranker::SamplingTechnique::kChunk && meta.numChunks) {
-                nsMetaBob.appendNumber("sampleNumChunks", *meta.numChunks);
-            }
-            nsMetaBob.appendNumber("sampleRequestedDocCount",
-                                   static_cast<long long>(meta.requestedDocCount));
-            nsMetaBob.appendNumber("sampleDocCount", static_cast<long long>(meta.docCount));
-            nsMetaBob.appendNumber("sampleMemorySizeBytes",
-                                   static_cast<long long>(meta.memorySizeBytes));
-            nsMetaBob.appendDate("sampleCreatedAt", *meta.createdAt);
-        }
-    }
     auto&& enumeratorInfo = explainer.getEnumeratorInfo();
     plannerBob.append("maxIndexedOrSolutionsReached", enumeratorInfo.hitIndexedOrLimit);
     plannerBob.append("maxIndexedAndSolutionsReached", enumeratorInfo.hitIndexedAndLimit);

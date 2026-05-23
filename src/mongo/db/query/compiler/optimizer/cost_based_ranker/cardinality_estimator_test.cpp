@@ -29,15 +29,16 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_rewrites.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/unittest/unittest.h"
 
 #include <limits>
-
-#include <gmock/gmock.h>
 
 namespace mongo::cost_based_ranker {
 namespace {
@@ -1053,9 +1054,6 @@ public:
     size_t getSampleSize() const override {
         return 100;
     }
-    ce::SamplingMetadata getSamplingMetadata() const override {
-        MONGO_UNREACHABLE;
-    }
 };
 
 // Build IndexBounds with a single-point OIL on "a" and 'bIntervalCount' point intervals on "b".
@@ -1472,9 +1470,6 @@ public:
     }
     size_t getSampleSize() const override {
         MONGO_UNIMPLEMENTED;
-    }
-    ce::SamplingMetadata getSamplingMetadata() const override {
-        MONGO_UNREACHABLE;
     }
 
 private:
