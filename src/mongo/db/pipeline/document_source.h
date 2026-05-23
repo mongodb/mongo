@@ -259,8 +259,6 @@ public:
         const boost::optional<OrderedPathSet>& shardKeyPaths;
     };
 
-    ~DocumentSource() override {}
-
     /**
      * Makes a deep clone of the DocumentSource by serializing and re-parsing it. DocumentSources
      * that cannot be safely cloned this way should override this method. Callers can optionally
@@ -310,7 +308,7 @@ public:
     /**
      * Get the stage's name.
      */
-    virtual const char* getSourceName() const = 0;
+    virtual StringData getSourceName() const = 0;
 
     /**
      * Returns the DocumentSource::Id value of a given stage object.

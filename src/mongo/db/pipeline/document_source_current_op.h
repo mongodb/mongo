@@ -157,7 +157,7 @@ public:
         boost::optional<CursorMode> idleCursors = boost::none,
         boost::optional<bool> targetAllNodes = boost::none);
 
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     static const Id& id;
 

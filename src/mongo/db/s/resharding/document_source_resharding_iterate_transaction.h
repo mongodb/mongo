@@ -94,8 +94,8 @@ public:
         return boost::none;
     }
 
-    const char* getSourceName() const override {
-        return DocumentSourceReshardingIterateTransaction::kStageName.data();
+    StringData getSourceName() const override {
+        return DocumentSourceReshardingIterateTransaction::kStageName;
     }
 
     static const Id& id;

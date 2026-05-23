@@ -116,8 +116,8 @@ void DocumentSourceMatch::rebuild(BSONObj predicate, std::unique_ptr<MatchExpres
         std::move(expr), std::move(dependencies), std::move(predicate));
 }
 
-const char* DocumentSourceMatch::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceMatch::getSourceName() const {
+    return kStageName;
 }
 
 Value DocumentSourceMatch::serialize(const SerializationOptions& opts) const {

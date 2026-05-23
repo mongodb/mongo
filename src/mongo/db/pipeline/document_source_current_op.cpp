@@ -121,8 +121,8 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
         spec, nss.tenantId(), allUsers, localOps);
 }
 
-const char* DocumentSourceCurrentOp::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceCurrentOp::getSourceName() const {
+    return kStageName;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(

@@ -70,8 +70,8 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(redact, DocumentSourceRedact,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(redact, DocumentSourceRedact::id)
 
-const char* DocumentSourceRedact::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceRedact::getSourceName() const {
+    return kStageName;
 }
 
 static const Value descendVal = Value("descend"_sd);

@@ -138,13 +138,13 @@ bool isMongotStage(DocumentSource* stage);
  * Check if this is a $vectorSearch-as-an-extension stage.
  * TODO SERVER-116021 Remove this function when the extension can do this through bindViewInfo().
  */
-bool isExtensionVectorSearchStage(std::string stageName);
+bool isExtensionVectorSearchStage(StringData stageName);
 
 /**
  * Check if this is a $search or $searchMeta extension stage.
  * TODO SERVER-116021 Remove this function when the extension can do this through bindViewInfo().
  */
-bool isExtensionSearchStage(std::string stageName);
+bool isExtensionSearchStage(StringData stageName);
 
 /**
  * Check if the pipeline contains any extension-implemented mongot stage ($vectorSearch,

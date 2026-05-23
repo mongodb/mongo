@@ -81,7 +81,7 @@ class DocumentSourceChangeStreamCheckResumability : public DocumentSourceInterna
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamCheckResumability"_sd;
 
-    const char* getSourceName() const override;
+    StringData getSourceName() const override;
 
     StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,

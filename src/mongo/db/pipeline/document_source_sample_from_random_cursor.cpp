@@ -59,8 +59,8 @@ DocumentSourceSampleFromRandomCursor::DocumentSourceSampleFromRandomCursor(
       _idField(std::move(idField)),
       _nDocsInColl(nDocsInCollection) {}
 
-const char* DocumentSourceSampleFromRandomCursor::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceSampleFromRandomCursor::getSourceName() const {
+    return kStageName;
 }
 
 Value DocumentSourceSampleFromRandomCursor::serialize(const SerializationOptions& opts) const {

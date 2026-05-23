@@ -43,8 +43,8 @@ public:
     DocumentSourceTestOptimizations(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(DocumentSourceTestOptimizations::kStageName, expCtx) {}
     ~DocumentSourceTestOptimizations() override = default;
-    const char* getSourceName() const override {
-        return DocumentSourceTestOptimizations::kStageName.data();
+    StringData getSourceName() const override {
+        return DocumentSourceTestOptimizations::kStageName;
     }
 
     Id getId() const override {

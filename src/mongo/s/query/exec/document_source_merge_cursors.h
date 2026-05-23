@@ -94,8 +94,8 @@ public:
      */
     std::unique_ptr<RouterStageMerge> convertToRouterStage();
 
-    const char* getSourceName() const final {
-        return kStageName.data();
+    StringData getSourceName() const final {
+        return kStageName;
     }
 
     static const Id& id;

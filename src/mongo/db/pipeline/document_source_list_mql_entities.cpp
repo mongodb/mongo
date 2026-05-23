@@ -102,8 +102,8 @@ StageConstraints DocumentSourceListMqlEntities::constraints(PipelineSplitState p
     return constraints;
 }
 
-const char* DocumentSourceListMqlEntities::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceListMqlEntities::getSourceName() const {
+    return kStageName;
 }
 
 DocumentSourceContainer::iterator DocumentSourceListMqlEntities::optimizeAt(

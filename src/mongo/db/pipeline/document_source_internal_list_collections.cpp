@@ -113,8 +113,8 @@ DocumentSourceContainer::iterator DocumentSourceInternalListCollections::optimiz
     }
 }
 
-const char* DocumentSourceInternalListCollections::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceInternalListCollections::getSourceName() const {
+    return kStageName;
 }
 
 void DocumentSourceInternalListCollections::serializeToArray(

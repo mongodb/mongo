@@ -128,7 +128,7 @@ public:
         const MultipleCollectionAccessor& collections,
         boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher) override;
 
-    const char* getSourceName() const override;
+    StringData getSourceName() const override;
 
     static const Id& id;
 

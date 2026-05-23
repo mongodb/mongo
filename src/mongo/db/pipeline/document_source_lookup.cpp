@@ -588,8 +588,8 @@ void DocumentSourceLookUp::copyLetVariablesWithNewExpCtx(const std::vector<LetVa
 
 ALLOCATE_DOCUMENT_SOURCE_ID(lookup, DocumentSourceLookUp::id)
 
-const char* DocumentSourceLookUp::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceLookUp::getSourceName() const {
+    return kStageName;
 }
 
 bool DocumentSourceLookUp::foreignShardedLookupAllowed() const {

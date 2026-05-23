@@ -104,8 +104,8 @@ public:
                                     BSONObj cmdObj)
         : DocumentSource(kStageName, pExpCtx), _cmdObj(cmdObj.getOwned()) {}
 
-    const char* getSourceName() const override {
-        return kStageName.data();
+    StringData getSourceName() const override {
+        return kStageName;
     }
 
     static const Id& id;

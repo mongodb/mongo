@@ -123,8 +123,8 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
     return Value(DOC(getSourceName() << outputSpec.freezeToValue()));
 }
 
-const char* DocumentSourceInternalSearchIdLookUp::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceInternalSearchIdLookUp::getSourceName() const {
+    return kStageName;
 }
 
 void DocumentSourceInternalSearchIdLookUp::bindCatalogInfo(

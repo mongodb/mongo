@@ -79,8 +79,8 @@ DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemo
                 "spec"_attr = redact(_spec.toBSON()));
 }
 
-const char* DocumentSourceInternalSearchMongotRemote::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceInternalSearchMongotRemote::getSourceName() const {
+    return kStageName;
 }
 
 Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(

@@ -146,8 +146,8 @@ public:
 
     Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
-    const char* getSourceName() const final {
-        return kStageName.data();
+    StringData getSourceName() const final {
+        return kStageName;
     }
 
     static const Id& id;

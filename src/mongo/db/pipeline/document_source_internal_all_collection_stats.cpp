@@ -156,8 +156,8 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalAllCollectionStats::createFr
     return make_intrusive<DocumentSourceInternalAllCollectionStats>(pExpCtx, std::move(spec));
 }
 
-const char* DocumentSourceInternalAllCollectionStats::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceInternalAllCollectionStats::getSourceName() const {
+    return kStageName;
 }
 
 Value DocumentSourceInternalAllCollectionStats::serialize(const SerializationOptions& opts) const {

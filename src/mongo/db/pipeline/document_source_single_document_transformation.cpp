@@ -62,8 +62,8 @@ DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransfor
     }
 }
 
-const char* DocumentSourceSingleDocumentTransformation::getSourceName() const {
-    return _name.c_str();
+StringData DocumentSourceSingleDocumentTransformation::getSourceName() const {
+    return _name;
 }
 
 StageConstraints DocumentSourceSingleDocumentTransformation::constraints(

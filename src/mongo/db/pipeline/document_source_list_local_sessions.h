@@ -131,8 +131,8 @@ public:
         const PrivilegeVector _privileges;
     };
 
-    const char* getSourceName() const final {
-        return DocumentSourceListLocalSessions::kStageName.data();
+    StringData getSourceName() const final {
+        return DocumentSourceListLocalSessions::kStageName;
     }
 
     static const Id& id;

@@ -143,8 +143,8 @@ public:
 
     ~DocumentSourceUnionWith() override;
 
-    const char* getSourceName() const final {
-        return kStageName.data();
+    StringData getSourceName() const final {
+        return kStageName;
     }
 
     static const Id& id;

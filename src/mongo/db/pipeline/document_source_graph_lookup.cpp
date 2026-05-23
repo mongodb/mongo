@@ -104,8 +104,8 @@ ALLOCATE_AND_REGISTER_STAGE_PARAMS(graphLookup, GraphLookUpStageParams)
 
 ALLOCATE_DOCUMENT_SOURCE_ID(graphLookup, DocumentSourceGraphLookUp::id)
 
-const char* DocumentSourceGraphLookUp::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceGraphLookUp::getSourceName() const {
+    return kStageName;
 }
 
 boost::optional<ShardId> DocumentSourceGraphLookUp::computeMergeShardId() const {

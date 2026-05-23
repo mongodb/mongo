@@ -59,8 +59,8 @@ DocumentSourceMock::DocumentSourceMock(std::deque<GetNextResult> results,
     mockConstraints.setConstraintsForNoInputSources();
 }
 
-const char* DocumentSourceMock::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceMock::getSourceName() const {
+    return kStageName;
 }
 
 boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::createForTest(

@@ -2438,8 +2438,8 @@ public:
         return GetNextResult::makeEOF();
     }
 
-    const char* getSourceName() const override {
-        return kStageName.data();
+    StringData getSourceName() const override {
+        return kStageName;
     }
 
     StageConstraints constraints(PipelineSplitState pipStage) const final {
@@ -2489,8 +2489,8 @@ class TestDocumentSourceNoPrivsWithAuthzChecksOptOut
 public:
     static constexpr StringData kStageName = "$testNoPrivsWithAuthzChecksOptOut"_sd;
 
-    const char* getSourceName() const override {
-        return kStageName.data();
+    StringData getSourceName() const override {
+        return kStageName;
     }
 
     class LiteParsedOptOut : public TestDocumentSourceNoPrivsWithAuthzChecks::LiteParsed {
@@ -2541,8 +2541,8 @@ class TestDocumentSourceWithPrivs : public TestDocumentSourceNoPrivsWithAuthzChe
 public:
     static constexpr StringData kStageName = "$testWithPrivs"_sd;
 
-    const char* getSourceName() const override {
-        return kStageName.data();
+    StringData getSourceName() const override {
+        return kStageName;
     }
 
     class LiteParsedWithPrivs : public TestDocumentSourceWithPrivs::LiteParsed {

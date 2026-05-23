@@ -73,7 +73,7 @@ DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
     tassert(9911901, "", _distanceMultiplier >= 0);
 }
 
-const char* DocumentSourceGeoNearCursor::getSourceName() const {
-    return DocumentSourceGeoNearCursor::kStageName.data();
+StringData DocumentSourceGeoNearCursor::getSourceName() const {
+    return DocumentSourceGeoNearCursor::kStageName;
 }
 }  // namespace mongo

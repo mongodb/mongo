@@ -91,8 +91,8 @@ public:
         return boost::none;
     }
 
-    const char* getSourceName() const override {
-        return DocumentSourceFindAndModifyImageLookup::kStageName.data();
+    StringData getSourceName() const override {
+        return DocumentSourceFindAndModifyImageLookup::kStageName;
     }
 
     static const Id& id;

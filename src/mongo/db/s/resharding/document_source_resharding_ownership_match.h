@@ -86,8 +86,8 @@ public:
         return boost::none;
     }
 
-    const char* getSourceName() const final {
-        return DocumentSourceReshardingOwnershipMatch::kStageName.data();
+    StringData getSourceName() const final {
+        return DocumentSourceReshardingOwnershipMatch::kStageName;
     }
 
     static const Id& id;

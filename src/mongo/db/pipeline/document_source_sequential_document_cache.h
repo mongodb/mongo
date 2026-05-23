@@ -66,8 +66,8 @@ public:
     using SequentialDocumentCachePtr = std::shared_ptr<SequentialDocumentCache>;
     static constexpr StringData kStageName = "$sequentialCache"_sd;
 
-    const char* getSourceName() const final {
-        return DocumentSourceSequentialDocumentCache::kStageName.data();
+    StringData getSourceName() const final {
+        return DocumentSourceSequentialDocumentCache::kStageName;
     }
 
     static const Id& id;

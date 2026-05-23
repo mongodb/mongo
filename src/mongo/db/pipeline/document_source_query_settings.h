@@ -148,8 +148,8 @@ public:
         return constraints;
     }
 
-    const char* getSourceName() const final {
-        return kStageName.data();
+    StringData getSourceName() const final {
+        return kStageName;
     }
 
     Id getId() const override {

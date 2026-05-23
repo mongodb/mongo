@@ -66,7 +66,7 @@ public:
     static constexpr StringData kStageName = "$unwind"_sd;
 
     // virtuals from DocumentSource
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     static const Id& id;
 

@@ -77,7 +77,7 @@ public:
         bool independentOfAnyCollection);
 
     // virtuals from DocumentSource
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     static const Id& id;
 

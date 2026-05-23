@@ -134,8 +134,8 @@ public:
 
     std::list<boost::intrusive_ptr<DocumentSource>> desugar();
 
-    const char* getSourceName() const override {
-        return kStageName.data();
+    StringData getSourceName() const override {
+        return kStageName;
     }
 
     bool isStoredSource() const {

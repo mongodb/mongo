@@ -156,7 +156,7 @@ public:
 
     boost::intrusive_ptr<DocumentSource> optimize();
 
-    const char* getSourceName() const override;
+    StringData getSourceName() const override;
 
     static const Id& id;
 

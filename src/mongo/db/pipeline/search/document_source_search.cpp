@@ -110,8 +110,8 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(search, DocumentSourceSearch,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(search, DocumentSourceSearch::id);
 
-const char* DocumentSourceSearch::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceSearch::getSourceName() const {
+    return kStageName;
 }
 
 Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {

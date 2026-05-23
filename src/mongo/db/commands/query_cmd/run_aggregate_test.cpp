@@ -359,8 +359,8 @@ public:
         return id;
     }
 
-    const char* getSourceName() const override {
-        return kStageName.data();
+    StringData getSourceName() const override {
+        return kStageName;
     }
 
     /**

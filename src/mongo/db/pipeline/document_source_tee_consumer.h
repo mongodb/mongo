@@ -97,7 +97,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    const char* getSourceName() const override;
+    StringData getSourceName() const override;
 
     static const Id& id;
 

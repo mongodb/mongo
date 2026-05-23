@@ -54,7 +54,7 @@ public:
     static constexpr StringData kStageName =
         change_stream_constants::stage_names::kEnsureResumeTokenPresent;
 
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     StageConstraints constraints(PipelineSplitState) const final;
 

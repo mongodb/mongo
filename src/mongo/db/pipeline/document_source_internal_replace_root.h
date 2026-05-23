@@ -47,7 +47,7 @@ public:
                                       boost::intrusive_ptr<Expression> newRoot)
         : DocumentSource(kStageNameInternal, pExpCtx), _newRoot(newRoot) {}
 
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     static const Id& id;
 

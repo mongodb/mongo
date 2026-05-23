@@ -134,8 +134,8 @@ public:
         const PrivilegeVector _privileges;
     };
 
-    const char* getSourceName() const final {
-        return DocumentSourceListSessions::kStageName.data();
+    StringData getSourceName() const final {
+        return DocumentSourceListSessions::kStageName;
     }
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;

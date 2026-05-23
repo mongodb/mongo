@@ -112,7 +112,7 @@ public:
                          InternalSearchMongotRemoteSpec spec)
         : DocumentSource(kStageName, expCtx), _spec(std::move(spec)) {}
 
-    const char* getSourceName() const override;
+    StringData getSourceName() const override;
     StageConstraints constraints(PipelineSplitState pipeState) const override;
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
         const DistributedPlanContext* ctx) final;

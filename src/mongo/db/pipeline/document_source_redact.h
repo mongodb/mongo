@@ -57,7 +57,7 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Redact);
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceRedact final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$redact"_sd;
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize();
 
     static const Id& id;

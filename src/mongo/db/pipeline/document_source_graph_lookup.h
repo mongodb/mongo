@@ -85,7 +85,7 @@ public:
     DocumentSourceGraphLookUp(const DocumentSourceGraphLookUp&,
                               const boost::intrusive_ptr<ExpressionContext>&);
 
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     static const Id& id;
 

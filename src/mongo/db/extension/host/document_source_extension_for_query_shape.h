@@ -56,8 +56,8 @@ public:
             new DocumentSourceExtensionForQueryShape(expCtx, std::move(parseNode)));
     }
 
-    const char* getSourceName() const override {
-        return _stageName.c_str();
+    StringData getSourceName() const override {
+        return _stageName;
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const override {}

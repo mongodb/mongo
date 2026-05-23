@@ -73,8 +73,8 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(unwind, DocumentSourceUnwind,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(unwind, DocumentSourceUnwind::id)
 
-const char* DocumentSourceUnwind::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceUnwind::getSourceName() const {
+    return kStageName;
 }
 
 intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(

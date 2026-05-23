@@ -97,8 +97,8 @@ public:
         return boost::none;
     }
 
-    const char* getSourceName() const override {
-        return DocumentSourceChangeStreamUnwindTransaction::kStageName.data();
+    StringData getSourceName() const override {
+        return DocumentSourceChangeStreamUnwindTransaction::kStageName;
     }
 
     MatchExpression* getMatchExpression() const {

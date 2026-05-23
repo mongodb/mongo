@@ -83,8 +83,8 @@ DocumentSourceChangeStreamCheckResumability::createFromBson(
                                                            parsed.getResumeToken().getData());
 }
 
-const char* DocumentSourceChangeStreamCheckResumability::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceChangeStreamCheckResumability::getSourceName() const {
+    return kStageName;
 }
 
 Value DocumentSourceChangeStreamCheckResumability::doSerialize(

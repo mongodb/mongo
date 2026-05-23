@@ -58,7 +58,7 @@ namespace mongo {
 class DocumentSourceSampleFromRandomCursor final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$sampleFromRandomCursor"_sd;
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 

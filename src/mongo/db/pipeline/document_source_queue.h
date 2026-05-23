@@ -95,7 +95,7 @@ public:
 
     ~DocumentSourceQueue() override = default;
 
-    const char* getSourceName() const override;
+    StringData getSourceName() const override;
 
     static const Id& id;
 

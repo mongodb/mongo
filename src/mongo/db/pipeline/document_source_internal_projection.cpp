@@ -58,8 +58,8 @@ DocumentSourceInternalProjection::DocumentSourceInternalProjection(
       _projection(projection_ast::parseAndAnalyze(
           pExpCtx, _stageSpec.getSpec(), lookUpPolicies(_stageSpec.getPolicies()))) {}
 
-const char* DocumentSourceInternalProjection::getSourceName() const {
-    return kStageNameInternal.data();
+StringData DocumentSourceInternalProjection::getSourceName() const {
+    return kStageNameInternal;
 }
 
 DocumentSourceContainer::iterator DocumentSourceInternalProjection::optimizeAt(

@@ -50,8 +50,8 @@ boost::intrusive_ptr<DocumentSourceTeeConsumer> DocumentSourceTeeConsumer::creat
     return new DocumentSourceTeeConsumer(expCtx, facetId, stageName);
 }
 
-const char* DocumentSourceTeeConsumer::getSourceName() const {
-    return _stageName.c_str();
+StringData DocumentSourceTeeConsumer::getSourceName() const {
+    return _stageName;
 }
 
 Value DocumentSourceTeeConsumer::serialize(const SerializationOptions& opts) const {

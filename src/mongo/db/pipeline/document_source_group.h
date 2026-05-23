@@ -57,7 +57,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceGroup final : public DocumentSou
 public:
     static constexpr StringData kStageName = "$group"_sd;
 
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     static const Id& id;
 

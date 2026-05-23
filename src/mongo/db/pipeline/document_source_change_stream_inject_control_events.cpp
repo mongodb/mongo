@@ -171,8 +171,8 @@ DocumentSourceChangeStreamInjectControlEvents::createFromBson(
         expCtx, ActionsHelper::parseFromBSON(parsed.getActions()));
 }
 
-const char* DocumentSourceChangeStreamInjectControlEvents::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceChangeStreamInjectControlEvents::getSourceName() const {
+    return kStageName;
 }
 
 Value DocumentSourceChangeStreamInjectControlEvents::doSerialize(

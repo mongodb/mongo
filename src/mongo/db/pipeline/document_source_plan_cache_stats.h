@@ -134,8 +134,8 @@ public:
         return boost::none;
     }
 
-    const char* getSourceName() const override {
-        return DocumentSourcePlanCacheStats::kStageName.data();
+    StringData getSourceName() const override {
+        return DocumentSourcePlanCacheStats::kStageName;
     }
 
     static const Id& id;

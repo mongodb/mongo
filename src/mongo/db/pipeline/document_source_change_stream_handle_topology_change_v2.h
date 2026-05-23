@@ -69,8 +69,8 @@ public:
     static boost::intrusive_ptr<DocumentSourceChangeStreamHandleTopologyChangeV2> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    const char* getSourceName() const final {
-        return kStageName.data();
+    StringData getSourceName() const final {
+        return kStageName;
     }
 
     Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;

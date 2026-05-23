@@ -117,8 +117,8 @@ public:
                                        bool fixedBuckets = false,
                                        boost::optional<bool> sbeCompatible = boost::none);
 
-    const char* getSourceName() const override {
-        return kStageNameInternal.data();
+    StringData getSourceName() const override {
+        return kStageNameInternal;
     }
 
     static const Id& id;

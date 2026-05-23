@@ -86,7 +86,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DocumentSourceChangeStreamSpec& spec);
 
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
 

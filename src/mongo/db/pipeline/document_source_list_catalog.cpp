@@ -60,8 +60,8 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(listCatalog,
 
 ALLOCATE_DOCUMENT_SOURCE_ID(listCatalog, DocumentSourceListCatalog::id)
 
-const char* DocumentSourceListCatalog::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceListCatalog::getSourceName() const {
+    return kStageName;
 }
 
 PrivilegeVector DocumentSourceListCatalog::LiteParsed::requiredPrivileges(

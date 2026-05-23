@@ -81,8 +81,8 @@ DocumentSourceQueue::DocumentSourceQueue(DocumentSourceQueue::DeferredQueue resu
       _serializeOverride(std::move(serializeOverride)),
       _constraintsOverride(std::move(constraintsOverride)) {}
 
-const char* DocumentSourceQueue::getSourceName() const {
-    return _stageNameOverride.value_or(kStageName).data();
+StringData DocumentSourceQueue::getSourceName() const {
+    return _stageNameOverride.value_or(kStageName);
 }
 
 Value DocumentSourceQueue::serialize(const SerializationOptions& opts) const {

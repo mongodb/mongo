@@ -69,9 +69,9 @@ class DocumentSourceChangeStreamCheckInvalidate final
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamCheckInvalidate"_sd;
 
-    const char* getSourceName() const final {
+    StringData getSourceName() const final {
         // This is used in error reporting.
-        return DocumentSourceChangeStreamCheckInvalidate::kStageName.data();
+        return DocumentSourceChangeStreamCheckInvalidate::kStageName;
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final {

@@ -81,8 +81,8 @@ public:
                                           std::string distanceField,
                                           double distanceMultiplier);
 
-    const char* getSourceName() const override {
-        return kStageName.data();
+    StringData getSourceName() const override {
+        return kStageName;
     }
 
     static const Id& id;

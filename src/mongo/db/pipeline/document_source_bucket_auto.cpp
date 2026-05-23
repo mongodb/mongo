@@ -85,8 +85,8 @@ boost::intrusive_ptr<Expression> parseGroupByExpression(
 
 }  // namespace
 
-const char* DocumentSourceBucketAuto::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceBucketAuto::getSourceName() const {
+    return kStageName;
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::optimize() {

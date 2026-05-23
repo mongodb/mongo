@@ -310,13 +310,13 @@ bool isMongotStage(DocumentSource* stage) {
 }
 
 // TODO SERVER-116021 Remove this function when the extension can do this through bindViewInfo().
-bool isExtensionVectorSearchStage(std::string stageName) {
+bool isExtensionVectorSearchStage(StringData stageName) {
     return stageName == kExtensionVectorSearchStageName ||
         stageName == DocumentSourceVectorSearch::kStageName;
 }
 
 // TODO SERVER-116021 Remove this function when the extension can do this through bindViewInfo().
-bool isExtensionSearchStage(std::string stageName) {
+bool isExtensionSearchStage(StringData stageName) {
     return stageName == kExtensionSearchStageName ||
         stageName == DocumentSourceSearch::kStageName ||
         stageName == kExtensionSearchMetaStageName ||

@@ -81,8 +81,8 @@ public:
         return boost::none;
     }
 
-    const char* getSourceName() const override {
-        return DocumentSourceReshardingAddResumeId::kStageName.data();
+    StringData getSourceName() const override {
+        return DocumentSourceReshardingAddResumeId::kStageName;
     }
 
     static const Id& id;

@@ -84,8 +84,8 @@ public:
         return new DocumentSourceChangeStreamCheckTopologyChange(expCtx);
     }
 
-    const char* getSourceName() const final {
-        return kStageName.data();
+    StringData getSourceName() const final {
+        return kStageName;
     }
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;

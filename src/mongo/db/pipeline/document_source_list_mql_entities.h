@@ -110,7 +110,7 @@ public:
                                   MqlEntityTypeEnum type);
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     static const Id& id;
 

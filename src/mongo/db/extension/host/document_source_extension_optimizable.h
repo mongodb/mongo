@@ -455,8 +455,8 @@ public:
     // This method is invoked by extensions to register descriptor.
     static void registerStage(AggStageDescriptorHandle descriptor);
 
-    const char* getSourceName() const override {
-        return _stageName.c_str();
+    StringData getSourceName() const override {
+        return _stageName;
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const override {}

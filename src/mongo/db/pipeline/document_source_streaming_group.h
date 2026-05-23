@@ -78,7 +78,7 @@ class DocumentSourceStreamingGroup final : public DocumentSourceGroupBase {
 public:
     static constexpr StringData kStageName = "$_internalStreamingGroup"_sd;
 
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     static const Id& id;
 

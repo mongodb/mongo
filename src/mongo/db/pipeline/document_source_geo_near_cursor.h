@@ -69,7 +69,7 @@ public:
         boost::optional<FieldPath> locationField = boost::none,
         double distanceMultiplier = 1.0);
 
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     static const Id& id;
 

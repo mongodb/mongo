@@ -130,8 +130,8 @@ public:
         return boost::none;
     }
 
-    const char* getSourceName() const override {
-        return kStageName.data();
+    StringData getSourceName() const override {
+        return kStageName;
     }
 
     static const Id& id;

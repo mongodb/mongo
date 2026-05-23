@@ -98,7 +98,7 @@ public:
     };
 
     // virtuals from DocumentSource
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     static const Id& id;

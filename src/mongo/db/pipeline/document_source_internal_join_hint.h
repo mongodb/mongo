@@ -67,8 +67,8 @@ public:
                                    join_ordering::EnumerationStrategy&& strategy)
         : DocumentSource(kStageName, expCtx), _joinStrategy(std::move(strategy)) {}
 
-    const char* getSourceName() const final {
-        return kStageName.data();
+    StringData getSourceName() const final {
+        return kStageName;
     }
 
     static const Id& id;

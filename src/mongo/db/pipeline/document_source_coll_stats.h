@@ -126,7 +126,7 @@ public:
           _collStatsSpec(std::move(spec)),
           _targetAllNodes(_collStatsSpec.getTargetAllNodes().value_or(false)) {}
 
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     static const Id& id;
 

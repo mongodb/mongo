@@ -61,8 +61,8 @@ DocumentSourceChangeStreamEnsureResumeTokenPresent::create(
     return new DocumentSourceChangeStreamEnsureResumeTokenPresent(expCtx, std::move(resumeToken));
 }
 
-const char* DocumentSourceChangeStreamEnsureResumeTokenPresent::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceChangeStreamEnsureResumeTokenPresent::getSourceName() const {
+    return kStageName;
 }
 
 StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints(

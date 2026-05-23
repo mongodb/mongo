@@ -78,8 +78,8 @@ public:
                                 UnionRequirement::kAllowed);
     }
 
-    const char* getSourceName() const override {
-        return kStageName.data();
+    StringData getSourceName() const override {
+        return kStageName;
     }
 
     Id getId() const override {

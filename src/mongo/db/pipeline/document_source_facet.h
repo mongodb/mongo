@@ -169,8 +169,8 @@ public:
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
-    const char* getSourceName() const final {
-        return DocumentSourceFacet::kStageName.data();
+    StringData getSourceName() const final {
+        return DocumentSourceFacet::kStageName;
     }
 
     static const Id& id;

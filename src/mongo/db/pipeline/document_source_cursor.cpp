@@ -49,8 +49,8 @@ ALLOCATE_DOCUMENT_SOURCE_ID(cursor, DocumentSourceCursor::id);
 using boost::intrusive_ptr;
 using std::string;
 
-const char* DocumentSourceCursor::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceCursor::getSourceName() const {
+    return kStageName;
 }
 
 Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {

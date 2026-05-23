@@ -54,7 +54,7 @@ public:
         : DocumentSourceInternalProjection(
               pExpCtx, DocumentSourceInternalProjectionSpec(std::move(projectionSpec), policies)) {}
 
-    const char* getSourceName() const final;
+    StringData getSourceName() const final;
 
     static const Id& id;
 

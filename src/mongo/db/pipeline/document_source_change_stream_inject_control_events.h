@@ -104,7 +104,7 @@ public:
             const DocumentSourceChangeStreamSpec& spec);
     };
 
-    const char* getSourceName() const override;
+    StringData getSourceName() const override;
 
     StageConstraints constraints(PipelineSplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,

@@ -35,8 +35,8 @@ namespace mongo {
 
 ALLOCATE_DOCUMENT_SOURCE_ID(exchange, DocumentSourceExchange::id)
 
-const char* DocumentSourceExchange::getSourceName() const {
-    return kStageName.data();
+StringData DocumentSourceExchange::getSourceName() const {
+    return kStageName;
 }
 
 Value DocumentSourceExchange::serialize(const SerializationOptions& opts) const {
