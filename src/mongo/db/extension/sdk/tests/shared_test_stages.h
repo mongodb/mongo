@@ -560,56 +560,6 @@ protected:
     BSONObj _properties;
 };
 
-/**
- * A LogicalAggStage that overrides getDocsNeededBounds() with a configurable BSON return value.
- * Used to test the DocsNeededBounds visitor.
- */
-class CustomBoundsLogicalAggStage : public TransformLogicalAggStage {
-public:
-    CustomBoundsLogicalAggStage(BSONObj boundsInfo)
-        : TransformLogicalAggStage(), _boundsInfo(boundsInfo.getOwned()) {}
-
-    BSONObj getDocsNeededBounds() const override {
-        return _boundsInfo;
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> clone() const override {
-        return std::make_unique<CustomBoundsLogicalAggStage>(_boundsInfo);
-    }
-
-private:
-    BSONObj _boundsInfo;
-};
-
-/**
- * An AstNode that creates a CustomBoundsLogicalAggStage with configurable bounds.
- * Also accepts custom static properties for non-bounds-related testing.
- */
-class CustomBoundsAstNode : public sdk::AggStageAstNode {
-public:
-    CustomBoundsAstNode(BSONObj properties, BSONObj boundsInfo)
-        : sdk::AggStageAstNode("$customBounds"),
-          _properties(properties.getOwned()),
-          _boundsInfo(boundsInfo.getOwned()) {}
-
-    BSONObj getProperties() const override {
-        return _properties;
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> promote(
-        const ::MongoExtensionCatalogContext& catalogContext) const override {
-        return std::make_unique<CustomBoundsLogicalAggStage>(_boundsInfo);
-    }
-
-    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
-        return std::make_unique<CustomBoundsAstNode>(_properties, _boundsInfo);
-    }
-
-private:
-    BSONObj _properties;
-    BSONObj _boundsInfo;
-};
-
 static constexpr std::string_view kSearchLikeSourceStageName = "$searchLikeSource";
 
 class SearchLikeSourceAggStageAstNode : public sdk::TestAstNode<TransformLogicalAggStage> {

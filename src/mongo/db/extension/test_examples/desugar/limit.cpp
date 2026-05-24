@@ -84,12 +84,6 @@ public:
         return _stageBson;
     }
 
-    mongo::BSONObj getDocsNeededBounds() const override {
-        auto limit = _stageBson.firstElement().parseIntegerElementToNonNegativeLong().getValue();
-        return BSON("effect" << "limit"
-                             << "value" << limit);
-    }
-
     std::unique_ptr<sdk::LogicalAggStage> clone() const override {
         return std::make_unique<LimitLogicalStage>(_name, _stageBson);
     }

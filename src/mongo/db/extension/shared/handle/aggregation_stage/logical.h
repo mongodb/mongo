@@ -30,7 +30,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/extension/public/api.h"
-#include "mongo/db/extension/public/extension_agg_stage_static_properties_gen.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/db/query/explain_options.h"
@@ -131,12 +130,6 @@ public:
      */
     void skipStream(::MongoExtensionStreamType streamType);
 
-    /**
-     * Returns the DocsNeededBounds info for this stage. Returns boost::none if the extension
-     * does not provide bounds info.
-     */
-    boost::optional<MongoExtensionDocsNeededBoundsInfo> getDocsNeededBounds() const;
-
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11420603, "LogicalAggStage 'get_name' is null", vtable.get_name != nullptr);
         tassert(11173703, "LogicalAggStage 'serialize' is null", vtable.serialize != nullptr);
@@ -166,9 +159,6 @@ public:
                 "LogicalAggStage 'get_sort_pattern' is null",
                 vtable.get_sort_pattern != nullptr);
         tassert(12601400, "LogicalAggStage 'skip_stream' is null", vtable.skip_stream != nullptr);
-        tassert(11842300,
-                "LogicalAggStage 'get_docs_needed_bounds' is null",
-                vtable.get_docs_needed_bounds != nullptr);
     }
 };
 

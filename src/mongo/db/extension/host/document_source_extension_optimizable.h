@@ -481,10 +481,6 @@ public:
         return _properties;
     }
 
-    boost::optional<MongoExtensionDocsNeededBoundsInfo> getDocsNeededBounds() const {
-        return _logicalStage->getDocsNeededBounds();
-    }
-
     DepsTracker::State getDependencies(DepsTracker* deps) const override;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic(

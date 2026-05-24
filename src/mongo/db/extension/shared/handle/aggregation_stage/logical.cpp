@@ -182,20 +182,4 @@ BSONObj LogicalAggStageAPI::getSortPattern() const {
     ExtensionByteBufHandle ownedBuf{buf};
     return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
-
-boost::optional<MongoExtensionDocsNeededBoundsInfo> LogicalAggStageAPI::getDocsNeededBounds()
-    const {
-    ::MongoExtensionByteBuf* buf{nullptr};
-    invokeCAndConvertStatusToException(
-        [&]() { return _vtable().get_docs_needed_bounds(get(), &buf); });
-
-    if (!buf) {
-        return boost::none;
-    }
-
-    ExtensionByteBufHandle ownedBuf{buf};
-    auto bson = bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
-    return MongoExtensionDocsNeededBoundsInfo::parse(bson);
-}
-
 }  // namespace mongo::extension
