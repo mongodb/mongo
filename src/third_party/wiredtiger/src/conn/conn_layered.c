@@ -115,7 +115,8 @@ __layered_create_missing_stable_tables_helper(WT_SESSION_IMPL *session)
              * for followers.
              */
             WT_ERR(__wt_disagg_enqueue_metadata_operation(session, stable_uri,
-              layered_uri + strlen("layered:"), WT_SHARED_METADATA_UPDATE, WT_SCHEMA_EPOCH_NONE));
+              layered_uri + strlen("layered:"), WT_SHARED_METADATA_UPDATE, WT_SCHEMA_EPOCH_NONE,
+              true));
             __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
               "Created missing stable table \"%s\" from \"%s\"", stable_uri, layered_uri);
         }
@@ -827,13 +828,13 @@ err:
  */
 int
 __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *stable_uri,
-  const char *table_name, WT_SHARED_METADATA_OP metadata_op, wt_timestamp_t schema_epoch)
+  const char *table_name, WT_SHARED_METADATA_OP metadata_op, wt_timestamp_t schema_epoch,
+  bool deferred)
 {
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
     WT_DISAGG_METADATA_OP *entry;
-    bool ckpt_running;
 
     conn = S2C(session);
     cursor = NULL;
@@ -864,13 +865,15 @@ __wt_disagg_enqueue_metadata_operation(WT_SESSION_IMPL *session, const char *sta
     WT_ERR(__disagg_save_metadata(session, cursor, "", stable_uri, &entry->stable_value));
 
     /*
-     * When WiredTiger is running a checkpoint, prevent drop updates from entering the shared
-     * metadata table for that checkpoint. We defer these metadata operations to the next checkpoint
-     * to keep the checkpoints metadata and table state consistent.
+     * Schema operations (create, drop) start deferred: at the start of each checkpoint, while the
+     * schema lock is held, the deferred flag is cleared on all existing entries so they are applied
+     * at the end of that checkpoint. Entries enqueued after that point, including concurrent schema
+     * ops, will not be processed until the following checkpoint. The one exception is the block
+     * manager callback that records the new checkpointed state of each stable table: those entries
+     * pass deferred=false so that the updated checkpoint metadata is written to the shared metadata
+     * table in the same checkpoint.
      */
-    WT_ACQUIRE_READ_WITH_BARRIER(ckpt_running, conn->txn_global.checkpoint_running);
-    if (ckpt_running && (metadata_op == WT_SHARED_METADATA_REMOVE))
-        entry->deferred = true;
+    entry->deferred = deferred;
 
     /* Cannot fail past this point. */
     __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
@@ -985,8 +988,30 @@ err:
 static int
 __disagg_shared_metadata_op(WT_SESSION_IMPL *session, WT_DISAGG_METADATA_OP *entry)
 {
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(md_key);
     WT_DECL_RET;
+    WT_DISAGG_METADATA_OP *queue_entry;
+
+    conn = S2C(session);
+
+    /*
+     * For UPDATE operations, verify that the table's CREATE will be applied at or before the schema
+     * epoch of the UPDATE, if it has not been applied yet. If a CREATE entry is still in the queue
+     * with a schema epoch ahead of this UPDATE operation's schema epoch (including
+     * WT_SCHEMA_EPOCH_UNPUBLISHED = WT_TS_MAX), the table will not be visible to followers before
+     * the update. Having stable data in an unpublished table is an API contract violation, which
+     * requires that a table must be published before the checkpoint that includes its data.
+     */
+    if (entry->metadata_op == WT_SHARED_METADATA_UPDATE) {
+        WT_ASSERT_SPINLOCK_OWNED(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+        TAILQ_FOREACH (queue_entry, &conn->disaggregated_storage.shared_metadata_qh, q)
+            if (queue_entry->metadata_op == WT_SHARED_METADATA_CREATE &&
+              queue_entry->schema_epoch > entry->schema_epoch &&
+              strcmp(queue_entry->table_name, entry->table_name) == 0)
+                WT_RET_MSG(session, EINVAL, "Stable data checkpointed for unpublished table \"%s\"",
+                  entry->table_name);
+    }
 
     WT_ERR(__wt_scr_alloc(session, 0, &md_key));
     WT_ERR(__wt_buf_fmt(session, md_key, "colgroup:%s", entry->table_name));

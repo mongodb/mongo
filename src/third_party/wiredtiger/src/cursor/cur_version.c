@@ -940,7 +940,7 @@ __curversion_skip_starting_updates(WT_SESSION_IMPL *session, WT_CURSOR_VERSION *
         if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
             continue;
 
-        if (!__txn_visible_id(session, upd->txnid))
+        if (!__wt_txn_visible_id(session, upd->txnid))
             continue;
 
         break;

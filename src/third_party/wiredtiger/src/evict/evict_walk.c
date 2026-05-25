@@ -715,7 +715,8 @@ __evict_skip_dirty_candidate(WT_SESSION_IMPL *session, WT_PAGE *page)
      */
     if (F_ISSET(conn->evict, WT_EVICT_CACHE_DIRTY_HARD | WT_EVICT_CACHE_UPDATES_HARD) &&
       F_ISSET(txn, WT_TXN_HAS_SNAPSHOT)) {
-        if (!__txn_visible_id(session, __wt_atomic_load_uint64_relaxed(&page->modify->update_txn)))
+        if (!__wt_txn_visible_id(
+              session, __wt_atomic_load_uint64_relaxed(&page->modify->update_txn)))
             return (true);
     } else if (__wt_atomic_load_uint64_relaxed(&page->modify->update_txn) >=
       __wt_atomic_load_uint64_v_relaxed(&conn->txn_global.last_running)) {

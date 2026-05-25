@@ -1,0 +1,56 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "linux",
+            "hidden": true,
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "environment": {
+                "MONGODBTOOLCHAIN_BIN": "/opt/mongodbtoolchain/v5/bin"
+            }
+        },
+        {
+            "name": "linux-v4",
+            "hidden": true,
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "environment": {
+                "MONGODBTOOLCHAIN_BIN": "/opt/mongodbtoolchain/v4/bin"
+            }
+        },
+        {
+            "name": "linux-gcc",
+            "displayName": "Linux GCC",
+            "inherits": "linux",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER":   "$env{MONGODBTOOLCHAIN_BIN}/gcc",
+                "CMAKE_CXX_COMPILER": "$env{MONGODBTOOLCHAIN_BIN}/g++"
+            }
+        },
+        {
+            "name": "linux-clang",
+            "displayName": "Linux Clang",
+            "inherits": "linux",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER":   "$env{MONGODBTOOLCHAIN_BIN}/clang",
+                "CMAKE_CXX_COMPILER": "$env{MONGODBTOOLCHAIN_BIN}/clang++"
+            }
+        },
+        {
+            "name": "linux-v4-gcc",
+            "displayName": "Linux GCC (v4 toolchain)",
+            "inherits": "linux-v4",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER":   "$env{MONGODBTOOLCHAIN_BIN}/gcc",
+                "CMAKE_CXX_COMPILER": "$env{MONGODBTOOLCHAIN_BIN}/g++"
+            }
+        }
+    ]
+}

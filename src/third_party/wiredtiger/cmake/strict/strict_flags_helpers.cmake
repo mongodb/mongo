@@ -151,11 +151,10 @@ function(get_clang_base_flags flags)
     # Ignore unrecognized options.
     list(APPEND clang_flags "-Wno-unknown-warning-option")
 
-    if(WT_DARWIN AND NOT CMAKE_CROSSCOMPILING)
-        # If we are not cross-compiling, we can safely disable this diagnostic.
-        # Its incompatible with strict diagnostics when including external
-        # libraries that are not in the default linker path
-        # e.g. linking zlib/snappy/... from /usr/local/.
+    if(WT_DARWIN)
+        # Disable this diagnostic on Darwin. It is incompatible with strict
+        # diagnostics when including external libraries that are not in the
+        # default linker path e.g. linking zlib/snappy/... from /usr/local/.
         list(APPEND clang_flags "-Wno-poison-system-directories")
     endif()
 

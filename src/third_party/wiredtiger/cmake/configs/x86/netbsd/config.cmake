@@ -1,3 +1,0 @@
-set(WT_ARCH "x86" CACHE STRING "")
-set(WT_OS "netbsd" CACHE STRING "")
-set(WT_POSIX ON CACHE BOOL "")

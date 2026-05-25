@@ -689,7 +689,8 @@ connection_runtime_config = [
             if true, for operations with snapshot isolation the cursor temporarily releases any page
             that requires force eviction, then repositions back to the page for further operations.
             A page release encourages eviction of hot or large pages, which is more likely to
-            succeed without a cursor keeping the page pinned.''',
+            succeed without a cursor keeping the page pinned. Note: This setting is not compatible
+            with disaggregated storage.''',
             type='boolean'),
         Config('disagg_address_cookie_upgrade', 'none', r'''
             modify the disaggregated block manager to pretend that it is a newer version to test

@@ -968,6 +968,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, WT_CHECKPOINT_DB
     WT_CONNECTION_IMPL *conn;
     WT_DECL_CONF(WT_SESSION, begin_transaction, txn_conf);
     WT_DECL_RET;
+    WT_DISAGG_METADATA_OP *entry;
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_SHARED *txn_shared;
@@ -1111,6 +1112,12 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, WT_CHECKPOINT_DB
         __wt_atomic_store_uint64_release(&txn_global->checkpoint_disagg_schema_epoch, WT_TS_NONE);
 
     __wt_writeunlock(session, &txn_global->rwlock);
+
+    /* Bring all entries in the disaggregated schema operations queue to this checkpoint. */
+    __wt_spin_lock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+    TAILQ_FOREACH (entry, &conn->disaggregated_storage.shared_metadata_qh, q)
+        entry->deferred = false;
+    __wt_spin_unlock(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
 
     /* Wait for the commit generation to drain before bumping the snapshot. */
     __wt_gen_next_drain(session, WT_GEN_TXN_COMMIT);

@@ -1,2 +1,9 @@
 # Entire team are code-owners for the time being
 * @wiredtiger/storage-engines @svc-auto-approve-bot
+
+# Agent configurations
+/.claude/ @Sean04 @whoisong
+/.agents/ @Sean04 @whoisong
+/CLAUDE.md @Sean04 @whoisong
+/AGENTS.md @Sean04 @whoisong
+/.mcp.json @Sean04 @whoisong

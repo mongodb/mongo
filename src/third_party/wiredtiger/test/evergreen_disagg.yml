@@ -69,7 +69,9 @@ functions:
             COMMON_SAN_OPTIONS="abort_on_error=1:disable_coredump=0"
             if [[ "${CMAKE_BUILD_TYPE|}" =~ ASan ]]; then
               export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
-              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(dirname $(/opt/mongodbtoolchain/v5/bin/clang -print-file-name=libclang_rt.asan.so))"
+              asan_lib=$(clang -print-file-name=libclang_rt.asan.so)
+              [ -f "$asan_lib" ] || { echo "ERROR: libclang_rt.asan.so not found by clang"; exit 1; }
+              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(dirname "$asan_lib")"
               export TESTUTIL_BYPASS_ASAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ MSan ]]; then
               export MSAN_OPTIONS="$COMMON_SAN_OPTIONS:verbosity=3"
@@ -335,7 +337,6 @@ functions:
         # Note that the config flags are resolved prior to changing to cmake_build directory.
         DEFINED_EVERGREEN_CONFIG_FLAGS="${CMAKE_BUILD_TYPE|} \
           ${CMAKE_INSTALL_PREFIX|-DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL} \
-          ${CMAKE_TOOLCHAIN_FILE|-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake} \
           ${ENABLE_LAZYFS|} \
           ${NONSTANDALONE|} \
           ${ENABLE_SHARED|} \
@@ -349,14 +350,11 @@ functions:
           ${CODE_COVERAGE_FLAGS} \
           ${HAVE_DIAGNOSTIC|} \
           ${WORDS_BIGENDIAN|} \
-          ${GNU_C_VERSION|} \
-          ${GNU_CXX_VERSION|} \
-          ${CLANG_C_VERSION|} \
-          ${CLANG_CXX_VERSION|} \
           ${ENABLE_CPPSUITE|} \
           ${SPINLOCK_TYPE|} \
           ${ENABLE_COLORIZE_OUTPUT|-DENABLE_COLORIZE_OUTPUT=0} \
-          ${CC_OPTIMIZE_LEVEL|}"
+          ${CC_OPTIMIZE_LEVEL|} \
+          ${WT_DISAGG_SLOW_TRUNCATE_BUILD|}"
 
         # The RHEL PPC platform does not have ZSTD. Strip it out.
         if [ "${build_variant|}" = "rhel8-ppc" ] && [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS" =~ (\-DHAVE_BUILTIN_EXTENSION_ZSTD=1) ]]; then
@@ -419,6 +417,17 @@ functions:
             /bin/bash test/evergreen/tcmalloc_install_or_build.sh ${build_variant}
           fi
 
+          # Use cmake preset on Linux, defaulting to GCC. Versioned compilers (gcc-9, clang-14, etc.)
+          # clear CMAKE_PRESET to "" to fall through to CC/CXX; non-Linux platforms always use CC/CXX.
+          # The file check guards branches that predate CMakePresets.json (e.g. compile-develop).
+          CMAKE_PRESET_FLAG=""
+          if [[ "$(uname -s)" == "Linux" && -n "${CMAKE_PRESET|linux-gcc}" && -f CMakePresets.json ]]; then
+            CMAKE_PRESET_FLAG="--preset ${CMAKE_PRESET|linux-gcc}"
+          else
+            export CC=${CC|gcc}
+            export CXX=${CXX|g++}
+          fi
+
           # Compiling with CMake.
           echo "Find CMake"
           . test/evergreen/find_cmake.sh
@@ -432,8 +441,8 @@ functions:
           cd cmake_build
 
           echo "Calling CMake with command:"
-          echo $CMAKE $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
-          $CMAKE $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
+          echo $CMAKE $CMAKE_PRESET_FLAG $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
+          $CMAKE $CMAKE_PRESET_FLAG $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
           echo "Completed CMake"
         fi
 
@@ -536,7 +545,11 @@ variables:
     depends_on:
       - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
+      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
+      - func: "compile wiredtiger"
+        vars:
+          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - func: "format test disagg"
         vars:
           format_args: disagg.mode=switch runs.timer=10:15 ops.prepare=1
@@ -547,11 +560,28 @@ variables:
     depends_on:
       - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
+      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
+      - func: "compile wiredtiger"
+        vars:
+          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - func: "format test disagg"
         vars:
           # Validate data with a non-layered table.
           format_args: disagg.mode=switch ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10 ops.prepare=1
+          times: 5
+
+  # Variant of format-stress-test-disagg-switch that exercises the default
+  # fast-truncate code path (uses the standard compile artifact).
+  - &format-stress-test-disagg-switch-fast-truncate
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          # FIXME-WT-17380: Enable prepare for switch mode once failures are resolved.
+          format_args: disagg.mode=switch runs.timer=10:15 ops.prepare=0 ops.verify=1 runs.mirror=1
           times: 5
 
   - &format-stress-test-disagg-multi
@@ -624,7 +654,7 @@ variables:
   - &configure_flags_asan_mongodb_stable_clang_with_builtins
     <<: *configure_flags_with_builtins
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_PRESET: linux-clang
     ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
     ENABLE_TCMALLOC: 0
 
@@ -662,6 +692,9 @@ tasks:
   - <<: *format-stress-test-disagg-switch-data-validation
     name: format-stress-test-disagg-switch-data-validation-3
     tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-switch-fast-truncate
+    name: format-stress-test-disagg-switch-fast-truncate-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
   - <<: *format-stress-test-disagg-multi
     name: format-stress-test-disagg-multi-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
@@ -716,7 +749,6 @@ buildvariants:
   run_on:
   - amazon2023.3-arm64-large
   expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
     ENABLE_TCMALLOC: 0
     additional_env_vars: |

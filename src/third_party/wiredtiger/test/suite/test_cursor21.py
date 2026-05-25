@@ -31,7 +31,7 @@
 
 import wttest
 from wtscenario import make_scenarios
-from wiredtiger import stat
+from wiredtiger import stat, WiredTigerError
 
 class test_cursor21(wttest.WiredTigerTestCase):
     uri = "table:test_cursor21"
@@ -71,6 +71,7 @@ class test_cursor21(wttest.WiredTigerTestCase):
             self.assertEqual(reposition_count, 0)
         return reposition_count
 
+    @wttest.skip_for_hook("disagg", "layered tables don't support cursor reposition")
     def test_cursor21(self):
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         reposition_count = 0
@@ -125,3 +126,15 @@ class test_cursor21(wttest.WiredTigerTestCase):
         reposition_count += self.check_reposition(reposition_count)
         cursor.close()
         self.session.close()
+
+    @wttest.only_for_hook("disagg", "check reposition is disabled for disaggregated storage")
+    def test_cursor21_dsc(self):
+        # Skip the test if reposition is disabled or it's column store (unsupported in disagg).
+        if not self.reposition or self.scenario_name == 'column.reposition':
+            return
+
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(self.uri, format)
+        msg = '/Operation not supported/'
+        self.assertRaisesWithMessage(WiredTigerError,
+            lambda: self.session.open_cursor(self.uri), msg)

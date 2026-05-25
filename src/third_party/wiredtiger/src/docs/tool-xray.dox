@@ -36,7 +36,7 @@ and linker flags to build programs such like \c xray_to_optrack on top of LLVM.
 @code
 $ mkdir build
 $ cd build
-$ cmake -DCMAKE_C_FLAGS=-fxray-instrument -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="10" -DCLANG_CXX_VERSION="10" -G Ninja ../.
+$ CC=clang CXX=clang++ cmake -DCMAKE_C_FLAGS=-fxray-instrument -G Ninja ../.
 $ ninja
 @endcode
 
@@ -110,7 +110,7 @@ in order to build.
 
 @code
 $ cd build
-$ cmake -DENABLE_LLVM=1 -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="10" -DCLANG_CXX_VERSION="10" -G Ninja ../.
+$ CC=clang CXX=clang++ cmake -DENABLE_LLVM=1 -G Ninja ../.
 $ ninja
 @endcode
 

@@ -1,0 +1,1 @@
+set(WT_POSIX ON CACHE BOOL "")

@@ -73,6 +73,11 @@ wts_prepare_discover(WT_CONNECTION *conn)
 
     /* Iterate through all prepared transactions and claim pending prepared transactions. */
     discover_count = 0;
+    /*
+     * Commit/rollback with a timestamp greater than the prepare timestamp. We use the current
+     * timestamp + 10 to ensure it's newer
+     */
+    ts = __wt_atomic_add_uint64_v(&g.timestamp, 10);
     while ((ret = cursor->next(cursor)) == 0) {
         discover_count++;
         testutil_check(cursor->get_key(cursor, &prepared_id));
@@ -88,11 +93,6 @@ wts_prepare_discover(WT_CONNECTION *conn)
         should_commit = (rand_val < 5); /* 50% chance to commit */
 
         if (should_commit) {
-            /*
-             * Commit with a timestamp greater than the prepare timestamp. We use the current
-             * timestamp + 10 to ensure it's newer
-             */
-            ts = __wt_atomic_add_uint64_v(&g.timestamp, 10);
             testutil_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_COMMIT, ts));
             testutil_check(
               session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_DURABLE, ts));
@@ -100,6 +100,8 @@ wts_prepare_discover(WT_CONNECTION *conn)
             testutil_check(session->commit_transaction(session, NULL));
             trace_msg(session, "Claimed and committed prepared id %" PRIu64, prepared_id);
         } else {
+            testutil_check(
+              session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_ROLLBACK, ts));
             /* Roll back the transaction */
             testutil_check(session->rollback_transaction(session, NULL));
             trace_msg(

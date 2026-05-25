@@ -22,7 +22,7 @@ exposes memory bugs.
 @code
 $ mkdir build
 $ cd build
-$ cmake -DENABLE_LLVM=1 -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="8" -DCLANG_CXX_VERSION="8" -DCMAKE_BUILD_TYPE=ASan ../.
+$ CC=clang CXX=clang++ cmake -DENABLE_LLVM=1 -DCMAKE_BUILD_TYPE=ASan ../.
 @endcode
 
 ## Step 2: Build as usual
@@ -154,7 +154,7 @@ with profiling information. It's important that these are added to both the \c C
 @code
 $ mkdir build
 $ cd build
-$ cmake -DENABLE_LLVM=1 -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="8" -DCLANG_CXX_VERSION="8" -DCMAKE_BUILD_TYPE=Coverage ../.
+$ CC=clang CXX=clang++ cmake -DENABLE_LLVM=1 -DCMAKE_BUILD_TYPE=Coverage ../.
 @endcode
 
 ## Step 2: Build and run fuzzer

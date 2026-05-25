@@ -826,7 +826,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
          */
         if (!F_ISSET(upd, WT_UPDATE_SELECT_FOR_DS) && !is_hs_page &&
           (F_ISSET(r, WT_REC_VISIBLE_NO_SNAPSHOT) ? r->rec_start_pinned_id <= txnid :
-                                                    !__txn_visible_id(session, txnid))) {
+                                                    !__wt_txn_visible_id(session, txnid))) {
             /*
              * Rare case: metadata writes at read uncommitted isolation level, eviction may see a
              * committed update followed by uncommitted updates. Give up in that case because we
@@ -1163,7 +1163,7 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
          */
         if (!F_ISSET(upd, WT_UPDATE_SELECT_FOR_DS) &&
           (F_ISSET(r, WT_REC_VISIBLE_NO_SNAPSHOT) ? r->rec_start_pinned_id <= upd->txnid :
-                                                    !__txn_visible_id(session, upd->txnid))) {
+                                                    !__wt_txn_visible_id(session, upd->txnid))) {
             /*
              * Rare case: metadata writes at read uncommitted isolation level, eviction may see a
              * committed update followed by uncommitted updates. Give up in that case because we
@@ -1248,14 +1248,27 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
     }
 
     /*
-     * If there's an on-page value, we only want to write upd_select if the oldest update is
-     * globally visible, otherwise we will lose the on-page update. Check if there's an on-page
-     * update and reset upd_select if the update is not visible.
+     * If there's an on-page value, we only want to write the selected update if the selected update
+     * is globally visible, otherwise we will lose the on-page update. Check if there's an on-page
+     * update and clear the selected update if it is not visible.
      *
-     * If the goal is to prune the entire key, avoid resetting upd_select.
+     * If the goal is to prune the entire key, avoid clearing the selected update.
      */
     if (WT_REC_HAS_ON_DISK(vpack) && !found_last_upd_to_keep && first_pruned_update == NULL) {
         *has_newer_updatesp |= (upd_select->upd != NULL);
+        upd_select->upd = NULL;
+    }
+
+    /*
+     * A committed preserved prepared transaction must not be written to the on-disk image until it
+     * has been drained to the stable btree. Writing it would drop the prepared transaction
+     * identifier from the disk cell, making it impossible to associate the committed update with
+     * the unresolved prepared cell on the stable btree. Keep the update in memory until drain
+     * advances the prune timestamp past its durable timestamp.
+     */
+    if (F_ISSET(btree, WT_BTREE_GARBAGE_COLLECT) && upd_select->upd != NULL &&
+      upd_select->upd->prepared_id != WT_PREPARED_ID_NONE) {
+        *has_newer_updatesp = true;
         upd_select->upd = NULL;
     }
 

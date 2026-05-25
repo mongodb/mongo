@@ -144,11 +144,15 @@
         __wt_session_set_last_error(session, v, WT_NONE, __VA_ARGS__); \
         return (__ret);                                                \
     } while (0)
-#define WT_RET_MSG_CHK(session, v, ...)              \
-    do {                                             \
-        int __ret = (v);                             \
-        if (__ret != 0)                              \
-            WT_RET_MSG(session, __ret, __VA_ARGS__); \
+#define WT_RET_MSG_CHK(session, v, ...)                                        \
+    do {                                                                       \
+        int __ret = (v);                                                       \
+        if (__ret != 0) {                                                      \
+            __wt_error_log_add_helper(#v, __ret, WT_NONE);                     \
+            __wt_err(session, __ret, __VA_ARGS__);                             \
+            __wt_session_set_last_error(session, __ret, WT_NONE, __VA_ARGS__); \
+            return (__ret);                                                    \
+        }                                                                      \
     } while (0)
 #define WT_RET_SUB(session, v, sub_v, ...)                           \
     do {                                                             \

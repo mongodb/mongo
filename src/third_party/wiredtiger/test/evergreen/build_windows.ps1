@@ -75,7 +75,8 @@ cd cmake_build
 if ($configure -eq $true) {
     cmake --version
     # Note that ${args} are all the command line options that are not automatically parsed by the param function.
-    cmake --no-warn-unused-cli -DSWIG_EXECUTABLE="$SWIG_EXECUTABLE" -DCMAKE_TOOLCHAIN_FILE='..\cmake\toolchains\cl.cmake' ${args} -G "Ninja" ..\.
+    # MSVC is provided by vcvars (sourced above); CMake auto-detects cl.exe with the Ninja generator.
+    cmake --no-warn-unused-cli -DSWIG_EXECUTABLE="$SWIG_EXECUTABLE" ${args} -G "Ninja" ..\.
     Die-On-Failure($LastExitCode)
 }
 

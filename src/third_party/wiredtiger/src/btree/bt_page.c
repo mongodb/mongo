@@ -1076,7 +1076,6 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_CELL_UNPACK_KV unpack;
     WT_COL *cip;
     WT_CURSOR_BTREE cbt;
-    WT_DECL_ITEM(key);
     WT_DECL_ITEM(value);
     WT_DECL_RET;
     WT_PAGE *page;
@@ -1133,8 +1132,18 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
         }
     } else {
         WT_ASSERT(session, page->type == WT_PAGE_ROW_LEAF);
-        WT_ERR(__wt_scr_alloc(session, 0, &key));
         bool is_disagg = F_ISSET(btree, WT_BTREE_DISAGGREGATED);
+        /*
+         * We already know each row's slot from WT_ROW_FOREACH, so position the cursor directly
+         * instead of calling __wt_row_search (which would binary search for a slot we already
+         * have).
+         *
+         * When compare=0 and ins=NULL, __wt_row_modify writes to mod_row_update[slot] and never
+         * reaches the insert path where the key parameter is required.
+         */
+        __cursor_pos_clear(&cbt);
+        cbt.ref = ref;
+        cbt.compare = 0;
         WT_ROW_FOREACH (page, rip, i) {
             /*
              * Search for prepare records and records with a stop time point if we want to build
@@ -1145,8 +1154,7 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
               (!is_disagg || !WT_TIME_WINDOW_HAS_STOP(&unpack.tw)))
                 continue;
 
-            /* Get the key/value pair and instantiate the update. */
-            WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
+            /* Get the value and instantiate the update. */
             WT_ERR(__wt_page_cell_data_ref_kv(session, page, &unpack, value));
             WT_ASSERT_ALWAYS(session, __wt_cell_type_raw(unpack.cell) != WT_CELL_VALUE_OVFL_RM,
               "Should never read an overflow removed value for a prepared update");
@@ -1154,9 +1162,8 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
             WT_ERR(__page_inmem_update(session, value, &unpack, &upd, &size));
             total_size += size;
 
-            /* Search the page and apply the modification. */
-            WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
-            WT_ERR(__wt_row_modify(&cbt, key, NULL, &upd, WT_UPDATE_INVALID, true, true));
+            cbt.slot = WT_ROW_SLOT(page, rip);
+            WT_ERR(__wt_row_modify(&cbt, NULL, NULL, &upd, WT_UPDATE_INVALID, true, true));
             upd = NULL;
         }
     }
@@ -1173,7 +1180,6 @@ err:
         __wt_free_update_list(session, &upd);
     }
     WT_TRET(__wt_btcur_close(&cbt, true));
-    __wt_scr_free(session, &key);
     __wt_scr_free(session, &value);
     return (ret);
 }

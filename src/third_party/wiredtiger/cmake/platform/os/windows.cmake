@@ -1,8 +1,6 @@
-set(WT_ARCH "x86" CACHE STRING "")
-set(WT_OS "windows" CACHE STRING "")
 set(WT_POSIX OFF CACHE BOOL "")
 set(SPINLOCK_TYPE "msvc" CACHE STRING "" FORCE)
-# We force a static compilation to generate a ".lib" file. We can then
+# Force a static compilation to generate a ".lib" file. We can then
 # additionally generate a dll file using a *DEF file.
 set(ENABLE_STATIC ON CACHE BOOL "" FORCE)
 set(ENABLE_SHARED OFF CACHE BOOL "" FORCE)

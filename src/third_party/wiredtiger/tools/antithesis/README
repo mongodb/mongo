@@ -3,7 +3,7 @@ and one for a config that will launch docker compose (requested by Antithesis).
 
 1. Install docker on your host
 2. Configure and build with these options (requires cmake_build under the wiredtiger top directory)
-    $ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake -DENABLE_ANTITHESIS=1 -DENABLE_STRICT=0 -G "Ninja" ./..
+    $ CC=clang CXX=clang++ cmake -DENABLE_ANTITHESIS=1 -DENABLE_STRICT=0 -G "Ninja" ./..
     $ ninja
 3. Execute the following command to build the binary docker container (from this directory):
     $ sudo docker build -f test_format.dockerfile -t wt-test-format:latest ../..

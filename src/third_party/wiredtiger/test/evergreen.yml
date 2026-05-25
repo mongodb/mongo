@@ -57,7 +57,9 @@ functions:
             COMMON_SAN_OPTIONS="abort_on_error=1:disable_coredump=0"
             if [[ "${CMAKE_BUILD_TYPE|}" =~ ASan ]]; then
               export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
-              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(dirname $(/opt/mongodbtoolchain/v5/bin/clang -print-file-name=libclang_rt.asan.so))"
+              asan_lib=$(clang -print-file-name=libclang_rt.asan.so)
+              [ -f "$asan_lib" ] || { echo "ERROR: libclang_rt.asan.so not found by clang"; exit 1; }
+              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(dirname "$asan_lib")"
               export TESTUTIL_BYPASS_ASAN=1
             elif [[ "${CMAKE_BUILD_TYPE|}" =~ MSan ]]; then
               export MSAN_OPTIONS="$COMMON_SAN_OPTIONS"
@@ -303,7 +305,6 @@ functions:
         # Note that the config flags are resolved prior to changing to cmake_build directory.
         DEFINED_EVERGREEN_CONFIG_FLAGS="${CMAKE_BUILD_TYPE|} \
           ${CMAKE_INSTALL_PREFIX|-DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL} \
-          ${CMAKE_TOOLCHAIN_FILE|-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake} \
           ${ENABLE_LAZYFS|} \
           ${NONSTANDALONE|} \
           ${ENABLE_SHARED|} \
@@ -317,10 +318,6 @@ functions:
           ${CODE_COVERAGE_FLAGS} \
           ${HAVE_DIAGNOSTIC|} \
           ${WORDS_BIGENDIAN|} \
-          ${GNU_C_VERSION|} \
-          ${GNU_CXX_VERSION|} \
-          ${CLANG_C_VERSION|} \
-          ${CLANG_CXX_VERSION|} \
           ${ENABLE_CPPSUITE|} \
           ${SPINLOCK_TYPE|} \
           ${ENABLE_COLORIZE_OUTPUT|-DENABLE_COLORIZE_OUTPUT=0} \
@@ -388,6 +385,17 @@ functions:
             /bin/bash test/evergreen/tcmalloc_install_or_build.sh ${build_variant}
           fi
 
+          # Use cmake preset on Linux, defaulting to GCC. Versioned compilers (gcc-9, clang-14, etc.)
+          # clear CMAKE_PRESET to "" to fall through to CC/CXX; non-Linux platforms always use CC/CXX.
+          # The file check guards branches that predate CMakePresets.json (e.g. compile-develop).
+          CMAKE_PRESET_FLAG=""
+          if [[ "$(uname -s)" == "Linux" && -n "${CMAKE_PRESET|linux-gcc}" && -f CMakePresets.json ]]; then
+            CMAKE_PRESET_FLAG="--preset ${CMAKE_PRESET|linux-gcc}"
+          else
+            export CC=${CC|gcc}
+            export CXX=${CXX|g++}
+          fi
+
           # Compiling with CMake.
           echo "Find CMake"
           . test/evergreen/find_cmake.sh
@@ -401,8 +409,8 @@ functions:
           cd cmake_build
 
           echo "Calling CMake with command:"
-          echo $CMAKE $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
-          $CMAKE $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
+          echo $CMAKE $CMAKE_PRESET_FLAG $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
+          $CMAKE $CMAKE_PRESET_FLAG $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
           echo "Completed CMake"
         fi
   "python config check":
@@ -1528,17 +1536,16 @@ variables:
   - &configure_flags_asan_mongodb_stable_clang_with_builtins
     <<: *configure_flags_with_builtins
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_PRESET: linux-clang
     ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
     ENABLE_TCMALLOC: 0
 
   # Template for Mac tests
   - &mac_test_template
     expansions: &mac_test_template_expansions
-      # The cmake toolchain file is set to the mongodb toolchain gcc by default.
-      # Remove that configuration here and let MacOS use the default Xcode toolchain instead.
-      # We'll explicitly use the python3 in /usr/bin, we use the same in configuring cmake.
-      CMAKE_TOOLCHAIN_FILE:
+      # macOS uses Xcode's clang (no mongodb toolchain).
+      CC: clang
+      CXX: clang++
       CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
       num_jobs: $(echo $(sysctl -n hw.logicalcpu) / 2 | bc)
       cmake_generator: "Unix Makefiles"
@@ -1824,11 +1831,6 @@ tasks:
     tags: ["pull_request", "pull_request_compilers"]
     depends_on: *s-all-dep
     commands:
-      - command: expansions.update
-        params:
-          updates:
-          - key: CMAKE_TOOLCHAIN_FILE
-            value: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc.cmake
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
@@ -1839,19 +1841,20 @@ tasks:
           CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Debug
       - func: "compile wiredtiger"
         vars:
-          GNU_C_VERSION: -DGNU_C_VERSION=7
+          CC: gcc-7
+          CXX: g++
       - func: "compile wiredtiger"
         vars:
-          GNU_C_VERSION: -DGNU_C_VERSION=8
-          GNU_CXX_VERSION: -DGNU_CXX_VERSION=8
+          CC: gcc-8
+          CXX: g++-8
       - func: "compile wiredtiger"
         vars:
-          GNU_C_VERSION: -DGNU_C_VERSION=9
-          GNU_CXX_VERSION: -DGNU_CXX_VERSION=9
+          CC: gcc-9
+          CXX: g++-9
       - func: "compile wiredtiger"
         vars:
-          GNU_C_VERSION: -DGNU_C_VERSION=11
-          GNU_CXX_VERSION: -DGNU_CXX_VERSION=11
+          CC: gcc-11
+          CXX: g++-11
 
   - name: compile-clang
     tags: ["pull_request", "pull_request_compilers"]
@@ -1860,8 +1863,8 @@ tasks:
       - command: expansions.update
         params:
           updates:
-          - key: CMAKE_TOOLCHAIN_FILE
-            value: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
+          - key: CMAKE_PRESET
+            value: linux-clang
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
@@ -1872,32 +1875,39 @@ tasks:
           CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Debug
       - func: "compile wiredtiger"
         vars:
-          CLANG_C_VERSION: -DCLANG_C_VERSION=7
-          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=7
+          CMAKE_PRESET: ""
+          CC: clang-7
+          CXX: clang++-7
       - func: "compile wiredtiger"
         vars:
-          CLANG_C_VERSION: -DCLANG_C_VERSION=8
-          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=8
+          CMAKE_PRESET: ""
+          CC: clang-8
+          CXX: clang++-8
       - func: "compile wiredtiger"
         vars:
-          CLANG_C_VERSION: -DCLANG_C_VERSION=9
-          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=9
+          CMAKE_PRESET: ""
+          CC: clang-9
+          CXX: clang++-9
       - func: "compile wiredtiger"
         vars:
-          CLANG_C_VERSION: -DCLANG_C_VERSION=10
-          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=10
+          CMAKE_PRESET: ""
+          CC: clang-10
+          CXX: clang++-10
       - func: "compile wiredtiger"
         vars:
-          CLANG_C_VERSION: -DCLANG_C_VERSION=11
-          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=12
+          CMAKE_PRESET: ""
+          CC: clang-11
+          CXX: clang++-12
       - func: "compile wiredtiger"
         vars:
-          CLANG_C_VERSION: -DCLANG_C_VERSION=13
-          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=13
+          CMAKE_PRESET: ""
+          CC: clang-13
+          CXX: clang++-13
       - func: "compile wiredtiger"
         vars:
-          CLANG_C_VERSION: -DCLANG_C_VERSION=14
-          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=14
+          CMAKE_PRESET: ""
+          CC: clang-14
+          CXX: clang++-14
 
   # Compile WiredTiger with uncommon build flags to make sure we compile code that
   # is often pre-processed out.
@@ -4126,7 +4136,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            env CC=/opt/mongodbtoolchain/v5/bin/gcc CXX=/opt/mongodbtoolchain/v5/bin/g++ PATH=/opt/mongodbtoolchain/v5/bin:/opt/java/jdk11/bin:$PATH bash s_release `date +%Y%m%d`
+            env PATH=/opt/mongodbtoolchain/v5/bin:/opt/java/jdk11/bin:$PATH CC=gcc CXX=g++ bash s_release `date +%Y%m%d`
 
   # Note that the project settings use this task name to compile the documentation during PR
   # testing, keep this in mind if you decide to change it.
@@ -5107,11 +5117,6 @@ tasks:
     depends_on: *s-all-dep
     commands:
       - func: "get project"
-      - command: expansions.update
-        params:
-          updates:
-          - key: CMAKE_TOOLCHAIN_FILE
-            value: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc.cmake
       - func: "compile wiredtiger"
         vars:
           CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Coverage
@@ -6947,7 +6952,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
+    CMAKE_PRESET: linux-clang
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
     ENABLE_TCMALLOC: 0
     additional_env_vars: |
@@ -6990,7 +6995,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_PRESET: linux-clang
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=TSan
     ENABLE_TCMALLOC: 0
     additional_env_vars: |
@@ -7030,7 +7035,7 @@ buildvariants:
   - ubuntu2004-test
   expansions:
     # Compile with clang so we test that path for the catch2 unittests.
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_PRESET: linux-clang
     ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
     ENABLE_TCMALLOC: 0
     posix_configure_flags: -DENABLE_PYTHON=0 -DENABLE_LZ4=0 -DENABLE_SNAPPY=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0
@@ -7052,7 +7057,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_PRESET: linux-clang
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=MSan
     # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
     posix_configure_flags: -DENABLE_LZ4=0 -DENABLE_SNAPPY=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0
@@ -7083,7 +7088,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
+    CMAKE_PRESET: linux-clang
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=UBSan
     # Use optimization level -O0 since Clang treats -Og (our default optimization for non-release
     # builds) as -O1, making test binaries more difficult to debug.
@@ -7164,7 +7169,6 @@ buildvariants:
   expansions:
     ENABLE_TCMALLOC: 0
     cmake_generator: "Unix Makefiles"
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc.cmake
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: compile
@@ -7190,8 +7194,7 @@ buildvariants:
   - windows-2022-small
   expansions:
     ENABLE_TCMALLOC: 0
-    # Remove the default configurations for the toolchain, install prefix and number of jobs.
-    CMAKE_TOOLCHAIN_FILE:
+    # Windows uses powershell + vcvars; CMake auto-detects cl.exe.
     CMAKE_INSTALL_PREFIX:
     HAVE_BUILTIN_EXTENSION_KEY_PROVIDER: -DHAVE_BUILTIN_EXTENSION_KEY_PROVIDER=1
     num_jobs:
@@ -7253,7 +7256,7 @@ buildvariants:
   batchtime: 120 # 2 hours
   expansions:
     format_test_setting: ulimit -c unlimited
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_PRESET: linux-clang
     # Use quarter of the vCPUs to avoid OOM kill failure and disk issues on this variant.
     num_jobs: $(echo $(grep -c ^processor /proc/cpuinfo) / 4 | bc)
     ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
@@ -7342,7 +7345,7 @@ buildvariants:
   expansions:
     ENABLE_TCMALLOC: 0
     posix_configure_flags: -DENABLE_ANTITHESIS=1 -DENABLE_STRICT=0
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_PRESET: linux-clang
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: ".antithesis"
@@ -7642,7 +7645,6 @@ buildvariants:
   - amazon2023.3-arm64-small
   expansions:
     ENABLE_TCMALLOC: 1
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v5_gcc.cmake
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
     - name: ".workgen-test"
@@ -7715,7 +7717,7 @@ buildvariants:
   run_on:
   - amazon2023.3-arm64-small
   expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
+    CMAKE_PRESET: linux-clang
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
     ENABLE_TCMALLOC: 0
     additional_env_vars: |
@@ -7757,7 +7759,7 @@ buildvariants:
   run_on:
   - amazon2023.3-arm64-small
   expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_PRESET: linux-clang
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=TSan
     ENABLE_TCMALLOC: 0
     additional_env_vars: |
@@ -7795,7 +7797,7 @@ buildvariants:
   run_on:
   - amazon2023.3-arm64-small
   expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
+    CMAKE_PRESET: linux-clang
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=MSan
     # MemorySanitizer requires that all program code is instrumented, otherwise it may generate false reports.
     posix_configure_flags: -DENABLE_LZ4=0 -DENABLE_SNAPPY=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0
@@ -7829,7 +7831,7 @@ buildvariants:
   run_on:
   - amazon2023.3-arm64-small
   expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
+    CMAKE_PRESET: linux-clang
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=UBSan
     # Use optimization level -O0 since Clang treats -Og (our default optimization for non-release
     # builds) as -O1, making test binaries more difficult to debug.

@@ -32,15 +32,16 @@
 #   Schema operations (create, drop) on a leader do not get included in the next checkpoint
 #   until they are published with a schema epoch.
 
-import time
+import os, time
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
 #   Test WT_SESSION::publish for disaggregated storage.
 @disagg_test_class
-class test_layered104(wttest.WiredTigerTestCase):
+class test_layered104(wttest.WiredTigerTestCase, suite_subprocess):
     conn_base_config = 'statistics=(all),precise_checkpoint=true,'
     conn_config = conn_base_config + 'disaggregated=(role="leader",lose_all_my_data=true)'
     conn_config_follower = conn_base_config + 'disaggregated=(role="follower",lose_all_my_data=true)'
@@ -225,6 +226,111 @@ class test_layered104(wttest.WiredTigerTestCase):
             '/only supported for table: and layered:/')
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1) +
                                 ',oldest_timestamp=' + self.timestamp_str(1))
+
+    def subprocess_checkpoint_fails_without_publish(self):
+        """
+        Helper run in a subprocess by test_checkpoint_fails_without_publish.
+        Triggers a panic by checkpointing data for an unpublished table.
+        """
+        self.set_stable_epoch(5)
+        self.session.create(self.uri, 'key_format=i,value_format=S')
+
+        # Write data so the underlying file becomes dirty and receives a real
+        # (non-fake) block checkpoint, which triggers the shared metadata UPDATE.
+        self.session.begin_transaction()
+        cursor = self.session.open_cursor(self.uri)
+        cursor[1] = 'value'
+        cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
+
+        # Checkpoint without publishing: panics because the shared metadata UPDATE
+        # finds no existing CREATE entry for this unpublished table.
+        self.conn.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        try:
+            self.session.checkpoint()  # Expected to panic.
+        except wiredtiger.WiredTigerError:
+            # Exit immediately to avoid hanging in tearDown when closing a panicked connection.
+            os._exit(1)
+
+    def test_checkpoint_fails_without_publish(self):
+        """
+        Once data has been written to a table that has not been published, taking a
+        checkpoint must panic. The block checkpoint resolve for the underlying table
+        file enqueues a shared metadata UPDATE, which requires an existing CREATE
+        entry. That entry only exists after the CREATE metadata operation is applied,
+        which requires the table to be published with a matching schema epoch.
+
+        Checkpoint panics on this error, so the trigger is run in a subprocess.
+        """
+        subdir = 'SUBPROCESS'
+        [returncode, _] = self.run_subprocess_function(subdir,
+            'test_layered104.test_layered104.subprocess_checkpoint_fails_without_publish',
+            silent=True)
+        self.assertNotEqual(returncode, 0,
+            'Expected subprocess to panic on checkpoint of unpublished table')
+        # Set timestamps so the tearDown shutdown checkpoint can succeed (precise_checkpoint=true
+        # requires a stable timestamp).
+        self.conn.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+
+    def subprocess_checkpoint_fails_with_publish_at_later_epoch(self):
+        """
+        Helper run in a subprocess by test_checkpoint_fails_with_publish_at_later_epoch.
+        Triggers a panic by checkpointing data for a table whose CREATE is deferred because
+        it was published at a higher schema epoch than the current stable epoch.
+        """
+        self.set_stable_epoch(5)
+        self.session.create(self.uri, 'key_format=i,value_format=S')
+
+        # Publish at epoch 10, which is ahead of the stable epoch (5). The CREATE entry
+        # in the metadata queue will be assigned epoch 10 and therefore deferred when the
+        # checkpoint runs at the stable epoch 5.
+        self.publish(self.uri, 10)
+
+        # Write data so the underlying file becomes dirty and receives a real
+        # (non-fake) block checkpoint, which triggers the shared metadata UPDATE.
+        self.session.begin_transaction()
+        cursor = self.session.open_cursor(self.uri)
+        cursor[1] = 'value'
+        cursor.close()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(1))
+
+        # Checkpoint at stable epoch 5: the CREATE (published at epoch 10) is deferred,
+        # but the block checkpoint enqueues an UPDATE at epoch 5. The UPDATE is processed,
+        # detects the deferred CREATE at a higher epoch, and panics.
+        self.conn.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
+        try:
+            self.session.checkpoint()  # Expected to panic.
+        except wiredtiger.WiredTigerError:
+            # Exit immediately to avoid hanging in tearDown when closing a panicked connection.
+            os._exit(1)
+
+    def test_checkpoint_fails_with_publish_at_later_epoch(self):
+        """
+        Once data has been written to a table that was published at a higher schema epoch
+        than the current stable epoch, taking a checkpoint must panic. The CREATE entry is
+        deferred (its epoch exceeds the stable epoch), so no shared metadata entry exists
+        when the block checkpoint tries to apply the UPDATE for stable data.
+
+        Checkpoint panics on this error, so the trigger is run in a subprocess.
+        """
+        subdir = 'SUBPROCESS_LATER_EPOCH'
+        [returncode, _] = self.run_subprocess_function(subdir,
+            'test_layered104.test_layered104.'
+            'subprocess_checkpoint_fails_with_publish_at_later_epoch',
+            silent=True)
+        self.assertNotEqual(returncode, 0,
+            'Expected subprocess to panic on checkpoint of table published at a later epoch')
+        # Set timestamps so the tearDown shutdown checkpoint can succeed (precise_checkpoint=true
+        # requires a stable timestamp).
+        self.conn.set_timestamp(
+            'stable_timestamp=' + self.timestamp_str(1) +
+            ',oldest_timestamp=' + self.timestamp_str(1))
 
     #
     # Statistics tests

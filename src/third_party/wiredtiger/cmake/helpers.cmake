@@ -280,15 +280,8 @@ function(config_func config_name description)
     eval_dependency("${CONFIG_FUNC_DEPENDS}" enabled)
     if(enabled)
         set(CMAKE_REQUIRED_LIBRARIES "${CONFIG_FUNC_LIBS}")
-        if((NOT "${WT_ARCH}" STREQUAL "") AND (NOT "${WT_ARCH}" STREQUAL ""))
-            # 'check_symbol_exists' won't use our current cache when test compiling the function symbol.
-            # To get around this we need to ensure we manually forward WT_ARCH and WT_OS as a minimum. This is particularly
-            # needed if 'check_symbol_exists' will leverage one of our toolchain files.
-            set(CMAKE_REQUIRED_FLAGS "-DWT_ARCH=${WT_ARCH} -DWT_OS=${WT_OS}")
-        endif()
         check_symbol_exists(${CONFIG_FUNC_FUNC} "${CONFIG_FUNC_FILES}" has_symbol_${config_name})
         set(CMAKE_REQUIRED_LIBRARIES)
-        set(CMAKE_REQUIRED_FLAGS)
         set(has_symbol "0")
         if(has_symbol_${config_name})
             set(has_symbol ${has_symbol_${config_name}})
@@ -341,14 +334,7 @@ function(config_include config_name description)
     # Check that the configs dependencies are enabled before setting it to a visible enabled state.
     eval_dependency("${CONFIG_INCLUDE_DEPENDS}" enabled)
     if(enabled)
-        # 'check_include_files' won't use our current cache when test compiling the include header.
-        # To get around this we need to ensure we manually forward WT_ARCH and WT_OS as a minimum. This is particularly
-        # needed if 'check_include_files' will leverage one of our toolchain files.
-        if((NOT "${WT_ARCH}" STREQUAL "") AND (NOT "${WT_ARCH}" STREQUAL ""))
-            set(CMAKE_REQUIRED_FLAGS "-DWT_ARCH=${WT_ARCH} -DWT_OS=${WT_OS}")
-        endif()
         check_include_files(${CONFIG_INCLUDE_FILE} has_include_${config_name})
-        set(CMAKE_REQUIRED_FLAGS)
         set(has_include "0")
         if(has_include_${config_name})
             set(has_include ${has_include_${config_name}})
@@ -405,14 +391,7 @@ function(config_lib config_name description)
     eval_dependency("${CONFIG_LIB_DEPENDS}" enabled)
     if(enabled)
         message(CHECK_START "Looking for library ${CONFIG_LIB_LIB}")
-        # 'check_library_exists' won't use our current cache when test compiling the library.
-        # To get around this we need to ensure we manually forward WT_ARCH and WT_OS as a minimum. This is particularly
-        # needed if 'check_library_exists' will leverage one of our toolchain files.
-        if((NOT "${WT_ARCH}" STREQUAL "") AND (NOT "${WT_ARCH}" STREQUAL ""))
-            set(CMAKE_REQUIRED_FLAGS "-DWT_ARCH=${WT_ARCH} -DWT_OS=${WT_OS}")
-        endif()
         find_library(has_lib_${config_name} ${CONFIG_LIB_LIB})
-        set(CMAKE_REQUIRED_FLAGS)
         set(has_lib "0")
         set(has_include "")
         if(has_lib_${config_name})
@@ -489,7 +468,6 @@ function(config_compile config_name description)
             can_run_${config_name} can_compile_${config_name}
             ${CMAKE_CURRENT_BINARY_DIR}
             ${CONFIG_COMPILE_SOURCE}
-            CMAKE_FLAGS "-DWT_ARCH=${WT_ARCH}" "-DWT_OS=${WT_OS}"
             LINK_LIBRARIES "${CONFIG_COMPILE_LIBS}"
         )
         set(can_run "0")
@@ -569,18 +547,6 @@ function(parse_filelist_source filelist output_var)
             list(FIND plat_host "${file_group}" plat_index)
             if (("${plat_index}" GREATER_EQUAL "0") OR (${file_group} STREQUAL "${arch_host}"))
                 list(APPEND output_files ${file_name})
-                get_filename_component(file_ext ${file_name} EXT)
-                # POWERPC and ZSERIES hosts use the '.sx' extension for their ASM files. We need to
-                # manually tell CMake to ASM compile these files otherwise it will ignore them during
-                # compilation process.
-                if("${file_ext}" STREQUAL ".sx")
-                    if("${CMAKE_C_COMPILER_ID}" MATCHES "[Cc]lang")
-                        # If compiling PPC and ZSERIES assembly with Clang, we need to explicitly pass the language
-                        # type onto the compiler, since the 'sx' extension is unknown.
-                        set_source_files_properties(${file_name} PROPERTIES COMPILE_FLAGS "-x assembler-with-cpp")
-                    endif()
-                    set_source_files_properties(${file_name} PROPERTIES LANGUAGE ASM)
-                endif()
             endif()
         else()
             message(FATAL_ERROR "filelist (${filelist}) has an unexpected format [Invalid Line: \"${file}]\"")

@@ -12,7 +12,7 @@ All the headers contain different implementations of the acquire-release API, wh
 ## How to build
 ```
 mkdir -p build && cd build
-cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake -DCMAKE_BUILD_TYPE=TSan ..
+CC=clang CXX=clang++ cmake -DCMAKE_BUILD_TYPE=TSan ..
 cmake --build . -j 16
 ```
 

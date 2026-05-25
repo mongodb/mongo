@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, re, sys
+import os, re, shutil, sys
 from compatibility_config import BRANCHES, BRANCHES_DIR
 
 # Remember the top-level test directory and the top-level project directory.
@@ -94,7 +94,7 @@ def prepare_branch(branch, config):
         else:
             source = 'https://github.com/wiredtiger/wiredtiger.git'
             print(f'Cloning branch {branch}')
-            system(f'git clone "{source}" "{path}" -b {branch}')
+            system(f'git clone --single-branch --depth 1 -b {branch} "{source}" "{path}"')
 
     # Parse the build config
     standalone = False
@@ -111,11 +111,23 @@ def prepare_branch(branch, config):
     # support older branches, which use autoconf.
     if not os.path.exists(os.path.join(build_path, 'build.ninja')):
         os.mkdir(build_path)
-        cmake_args = '-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake'
-        cmake_args += ' -DENABLE_PYTHON=1'
+        cmake_args = '-DENABLE_PYTHON=1'
         if not standalone:
             cmake_args += ' -DWT_STANDALONE_BUILD=0'
-        system(f'cd "{build_path}" && cmake {cmake_args} -G Ninja ../.')
+
+        # Always use master's CMakePresets.json so preset names are consistent
+        # regardless of the branch's own CMake setup.
+        preset_dst = os.path.join(path, 'CMakePresets.json')
+        shutil.copy(os.path.join(DIST_TOP_DIR, 'CMakePresets.json'), preset_dst)
+
+        # Branches mongodb-7.0 and older require the v4 toolchain (incompatible with GCC 14+).
+        if branch.startswith('mongodb-') and \
+                int(branch.split('-')[1].split('.')[0]) <= 7:
+            preset = 'linux-v4-gcc'
+        else:
+            preset = 'linux-gcc'
+
+        system(f'cd "{build_path}" && cmake --preset {preset} {cmake_args} -G Ninja ../.')
 
     print(f'Building {path}')
     system(f'cd "{build_path}" && ninja')

@@ -898,13 +898,16 @@ __clayered_truncate_follower(WT_TRUNCATE_INFO *trunc_info)
     const int ret_stop = __clayered_position_near_key(ingest_stop, &stop_key, false);
     WT_RET_NOTFOUND_OK(ret_stop);
 
+    WT_LAYERED_TABLE *layered_table = (WT_LAYERED_TABLE *)clayered_start->dhandle;
+
+    WT_RET(__wt_layered_table_truncate_detect_non_ingest_write_conflict(
+      trunc_info->session, layered_table, &start_key, &stop_key));
+
     /*
      * If either positioning returned WT_NOTFOUND, the ingest table has no keys in the range and
      * there is nothing to remove from ingest. Still add the truncate-list entry so stable rows in
      * the range are hidden.
      */
-    WT_LAYERED_TABLE *layered_table = (WT_LAYERED_TABLE *)clayered_start->dhandle;
-
     if (ret_start == 0 && ret_stop == 0)
         WT_RET(__clayered_range_truncate_ingest(
           trunc_info->session, layered_table, ingest_start, ingest_stop));
@@ -2921,11 +2924,14 @@ __wt_clayered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
 
     WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
     if (cval.len != 0)
-        WT_RET_MSG(session, EINVAL, "Layered trees do not support opening by checkpoint");
+        WT_RET_MSG(session, ENOTSUP, "Layered trees do not support opening by checkpoint");
 
     WT_RET(__wt_config_gets_def(session, cfg, "bulk", 0, &cval));
     if (cval.val != 0)
-        WT_RET_MSG(session, EINVAL, "Layered trees do not support bulk loading");
+        WT_RET_MSG(session, ENOTSUP, "Layered trees do not support bulk loading");
+
+    if (FLD_ISSET(S2C(session)->debug.flags, WT_CONN_DEBUG_CURSOR_REPOSITION))
+        WT_RET_MSG(session, ENOTSUP, "Layered trees do not support cursor reposition");
 
     /* Get the layered tree, and hold a reference to it until the cursor is closed. */
     WT_RET(__wt_session_get_dhandle(session, uri, NULL, cfg, 0));
