@@ -631,6 +631,8 @@ conn_stats = [
     ##########################################
     LayeredStat('layered_table_manager_checkpoints_disagg_pick_up_follower', 'number of checkpoints picked up by a follower'),
     LayeredStat('layered_table_manager_tables', 'the number of tables the layered table manager has open'),
+    LayeredStat('layered_truncate_list_gc_entries_removed', 'the number of truncate list entries removed by garbage collection'),
+    LayeredStat('layered_truncate_list_gc_runs', 'the number of times truncate list garbage collection ran with a valid prune timestamp'),
     LayeredStat('layered_truncate_list_search_calls', 'the number of times the truncate list was searched'),
     LayeredStat('layered_truncate_list_search_entries_walked', 'the number of truncate list entries walked during search'),
 

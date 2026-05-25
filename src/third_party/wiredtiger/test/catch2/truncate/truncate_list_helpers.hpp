@@ -61,6 +61,7 @@ public:
     }
 
     WT_TRUNCATE *add_entry(const WT_ITEM &start, const WT_ITEM &stop);
+    void commit_entry(WT_TRUNCATE *entry, wt_timestamp_t durable_ts);
 
 private:
     std::shared_ptr<mock_session> _mock;

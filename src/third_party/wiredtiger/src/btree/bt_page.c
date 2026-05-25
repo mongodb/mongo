@@ -1104,6 +1104,12 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
     __wt_btcur_open(&cbt);
 
     WT_ERR(__wt_scr_alloc(session, 0, &value));
+    /*
+     * Suppress per-update cache increments in the serial functions; we batch them into a single
+     * call below to avoid O(N) atomic operations on page restore.
+     */
+    WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SKIP_CACHE_INCR));
+    F_SET(session, WT_SESSION_SKIP_CACHE_INCR);
     if (page->type == WT_PAGE_COL_VAR) {
         recno = ref->ref_recno;
         WT_COL_FOREACH (page, cip, i) {
@@ -1160,10 +1166,11 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
               "Should never read an overflow removed value for a prepared update");
 
             WT_ERR(__page_inmem_update(session, value, &unpack, &upd, &size));
-            total_size += size;
 
             cbt.slot = WT_ROW_SLOT(page, rip);
+            cbt.ref = ref;
             WT_ERR(__wt_row_modify(&cbt, NULL, NULL, &upd, WT_UPDATE_INVALID, true, true));
+            total_size += size;
             upd = NULL;
         }
     }
@@ -1173,10 +1180,13 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
      * updates to avoid reconciling the page every time.
      */
     __wt_page_modify_clear(session, page);
+    F_CLR(session, WT_SESSION_SKIP_CACHE_INCR);
     __wt_cache_page_inmem_incr(session, page, total_size, false);
 
     if (0) {
 err:
+        F_CLR(session, WT_SESSION_SKIP_CACHE_INCR);
+        __wt_cache_page_inmem_incr(session, page, total_size, false);
         __wt_free_update_list(session, &upd);
     }
     WT_TRET(__wt_btcur_close(&cbt, true));

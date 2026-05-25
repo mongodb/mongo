@@ -72,7 +72,8 @@ truncate_list_fixture::truncate_list_fixture()
 {
     _table.iface.name = "layered:truncate_list_fixture";
     TAILQ_INIT(&_table.truncateqh);
-    REQUIRE(__wt_rwlock_init(_session, &_table.truncate_lock) == 0);
+    CHECK(__wt_rwlock_init(_session, &_table.truncate_lock) == 0);
+    CHECK(truncate_list_size(_table) == 0);
 }
 
 truncate_list_fixture::~truncate_list_fixture()
@@ -108,8 +109,35 @@ truncate_list_fixture::add_entry(const WT_ITEM &start, const WT_ITEM &stop)
     entry->start_key = start;
     entry->stop_key = stop;
 
+    const auto initial_size = truncate_list_size(_table);
+
     TAILQ_INSERT_TAIL(&_table.truncateqh, entry, q);
+
+    const auto expected_size = initial_size + 1;
+    CHECK(truncate_list_size(_table) == expected_size);
     return entry;
+}
+
+void
+truncate_list_fixture::commit_entry(WT_TRUNCATE *entry, const wt_timestamp_t durable_ts)
+{
+    /* WT_TXN has a flexible array member; MSVC forbids stack-allocating such types. */
+    auto *const txn = static_cast<WT_TXN *>(std::calloc(1, sizeof(WT_TXN)));
+
+    txn->time_point.id = entry->txn_id;
+    txn->time_point.commit_timestamp = durable_ts;
+    txn->time_point.durable_timestamp = durable_ts;
+
+    _session->txn = txn;
+
+    WT_TXN_OP op{};
+    op.type = WT_TXN_OP_FOLLOWER_TRUNCATE;
+    op.u.follower_truncate.t = entry;
+
+    __wti_mark_committed_truncate_table_apply(_session, &_table, &op);
+    _session->txn = nullptr;
+
+    std::free(txn);
 }
 
 } // namespace truncate_list_helpers

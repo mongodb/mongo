@@ -808,6 +808,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
             WT_ASSERT(session, prepare_rollback_tombstone == NULL);
+            WT_ASSERT(session, !upd_select->skip_aborted_prepared_value);
             continue;
         }
         /*
@@ -850,6 +851,12 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
              * rollback becomes stable.
              */
             prepare_rollback_tombstone = NULL;
+            /*
+             * Same reason as the aborted-prepared skip earlier: this rolled-back prepared value has
+             * no in-chain fallback, so the on-disk cell must not be dropped on this reconciliation.
+             */
+            if (upd->txnid == WT_TXN_ABORTED && upd->type != WT_UPDATE_TOMBSTONE)
+                upd_select->skip_aborted_prepared_value = true;
 
             continue;
         }

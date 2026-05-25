@@ -102,6 +102,21 @@ __layered_move_updates(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *
     if (from_ts == WT_TS_NONE)
         __layered_assert_stable_btree_state(session, cbt, last_upd);
 
+    /*
+     * If the oldest update being moved is an aborted prepared update and the stable btree has no
+     * existing value for this key, append a globally visible tombstone after the chain. Any newer
+     * updates may themselves be non-stable while the update's rollback timestamp has already become
+     * stable; without a fallback below, reconciliation has nothing to write in place of the aborted
+     * prepared update, leaving an orphaned prepared value on the disk image. The tombstone keeps
+     * the post-rollback state well-defined (the key never existed).
+     */
+    if (cbt->compare != 0 && last_upd->txnid == WT_TXN_ABORTED) {
+        WT_ASSERT(session, last_upd->prepared_id != WT_PREPARED_ID_NONE);
+        WT_UPDATE *tombstone;
+        WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
+        last_upd->next = tombstone;
+    }
+
     /* Apply the modification. */
     WT_ERR(__wt_row_modify(cbt, key, NULL, &upds, WT_UPDATE_INVALID, false, false));
 

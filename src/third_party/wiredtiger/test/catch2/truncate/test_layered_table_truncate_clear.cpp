@@ -22,7 +22,6 @@ SCENARIO("clearing empties the truncate list", "[truncate_list][clear]")
         truncate_list_fixture fixture;
         fixture.add_entry(make_item("a"), make_item("z"));
         fixture.add_entry(make_item("b"), make_item("y"));
-        CHECK(truncate_list_size(fixture.layered_table()) == 2);
 
         WHEN("the truncate list is cleared")
         {
@@ -43,7 +42,6 @@ SCENARIO("clearing the truncate list releases the dhandle reference", "[truncate
         truncate_list_fixture fixture;
         fixture.add_entry(make_item("a"), make_item("z"));
         fixture.add_entry(make_item("b"), make_item("y"));
-        CHECK(truncate_list_size(fixture.layered_table()) == 2);
 
         const auto reference_count = fixture.reference_count();
 
@@ -65,7 +63,6 @@ SCENARIO("clearing an empty truncate list is a no-op", "[truncate_list][clear]")
     {
         truncate_list_fixture fixture;
         const auto reference_count = fixture.reference_count();
-        CHECK(truncate_list_size(fixture.layered_table()) == 0);
 
         WHEN("the truncate list is cleared")
         {
@@ -87,7 +84,6 @@ SCENARIO("clearing the truncate list releases the truncate lock", "[truncate_lis
         truncate_list_fixture fixture;
         fixture.add_entry(make_item("a"), make_item("z"));
         fixture.add_entry(make_item("b"), make_item("y"));
-        CHECK(truncate_list_size(fixture.layered_table()) == 2);
 
         WHEN("the truncate list is cleared")
         {

@@ -10,7 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // Shrink the WiredTiger cache so we can easily fill it up
 let replSet = new ReplSetTest({
     nodes: 1,
-    nodeOptions: {wiredTigerEngineConfigString: "cache_size=256M,cache_stuck_timeout_ms=600000"},
+    nodeOptions: {wiredTigerEngineConfigString: "cache_size=64M,cache_stuck_timeout_ms=600000"},
 });
 
 replSet.startSet();

@@ -354,10 +354,6 @@ function(config_include config_name description)
         set(${config_name} OFF CACHE INTERNAL "" FORCE)
         set(${config_name}_DISABLED ON CACHE INTERNAL "" FORCE)
     endif()
-    # Set an internal cache variable with the CPP include statement. We can use this when building out our config header.
-    if (${${config_name}})
-        set(${config_name}_DECL "#include <${CONFIG_INCLUDE_FILE}>" CACHE INTERNAL "")
-    endif()
 endfunction()
 
 # config_lib(config_name description LIB <library> FUNC <function-symbol> [DEPENDS <deps>] [HEADER <file>])

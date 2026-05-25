@@ -12,6 +12,7 @@
 
 #include "wt_internal.h"
 #include "wrappers/mock_session.h"
+#include "truncate_list_helpers.hpp"
 
 /*
  * test_layered_truncate_visibility.cpp
@@ -124,12 +125,14 @@ public:
     }
 
     int
-    truncate_visible(std::string_view key, WT_TRUNCATE **matched = nullptr)
+    truncate_visible(
+      std::string_view key, WT_ITEM *start_keyp = nullptr, WT_ITEM *stop_keyp = nullptr)
     {
         WT_ITEM item{};
         item.data = key.data();
         item.size = key.size();
-        return (__wt_truncate_delete_visible_check(session, &layered_table, &item, matched));
+        return (__wt_truncate_delete_visible_check(
+          session, &layered_table, &item, start_keyp, stop_keyp));
     }
 };
 
@@ -141,20 +144,23 @@ TEST_CASE_METHOD(
     const uint64_t txn_id = 50;
     const wt_timestamp_t start_ts = WT_TS_NONE;
     const wt_timestamp_t durable_ts = WT_TS_NONE;
+
     const char *start = "0100";
     const char *stop = "0700";
 
     add_truncate(txn_id, start_ts, durable_ts, start, stop);
 
-    WT_TRUNCATE *matched = nullptr;
+    WT_ITEM start_key{};
+    WT_ITEM stop_key{};
     const char *key = "0150";
     set_reader(txn_id, WT_TS_NONE);
-    REQUIRE(truncate_visible(key, &matched) == 0);
-    REQUIRE(matched != nullptr);
 
-    const std::string_view matched_start{
-      static_cast<const char *>(matched->start_key.data), matched->start_key.size};
-    REQUIRE(matched_start == start);
+    REQUIRE(truncate_visible(key, &start_key, &stop_key) == 0);
+    REQUIRE(truncate_list_helpers::as_view(start_key) == start);
+    REQUIRE(truncate_list_helpers::as_view(stop_key) == stop);
+
+    __wt_buf_free(session, &start_key);
+    __wt_buf_free(session, &stop_key);
 }
 
 TEST_CASE_METHOD(layered_truncate_visibility_fixture,
@@ -317,9 +323,15 @@ TEST_CASE_METHOD(layered_truncate_visibility_fixture, "truncate commit stamps th
 
     /* With snap_min=300, txn 250 is visible and its published truncate matches the key. */
     set_reader(txn_id, read_timestamp, WT_ISO_SNAPSHOT, 300, 400);
-    WT_TRUNCATE *matched = nullptr;
-    REQUIRE(truncate_visible(key, &matched) == 0);
-    REQUIRE(matched == committed);
+    WT_ITEM matched_start{};
+    WT_ITEM matched_stop{};
+    REQUIRE(truncate_visible(key, &matched_start, &matched_stop) == 0);
+
+    REQUIRE(truncate_list_helpers::as_view(matched_start) == start);
+    REQUIRE(truncate_list_helpers::as_view(matched_stop) == stop);
+
+    __wt_buf_free(session, &matched_start);
+    __wt_buf_free(session, &matched_stop);
 }
 
 TEST_CASE_METHOD(layered_truncate_visibility_fixture,
@@ -339,8 +351,7 @@ TEST_CASE_METHOD(layered_truncate_visibility_fixture,
     const wt_timestamp_t overlapping_durable_ts = 40;
 
     /* Truncate at txn 10: already committed, over 0150-0300. */
-    WT_TRUNCATE *overlapping = add_truncate(
-      overlapping_txn_id, overlapping_start_ts, overlapping_durable_ts, "0150", "0300");
+    add_truncate(overlapping_txn_id, overlapping_start_ts, overlapping_durable_ts, "0150", "0300");
 
     txn_id = 60;
     wt_timestamp_t read_timestamp = 30;
@@ -373,9 +384,12 @@ TEST_CASE_METHOD(layered_truncate_visibility_fixture,
     set_reader(txn_id, read_timestamp);
     REQUIRE(truncate_visible(target_only_key) == WT_NOTFOUND);
 
-    WT_TRUNCATE *matched = nullptr;
-    REQUIRE(truncate_visible(overlap_key, &matched) == 0);
-    REQUIRE(matched == overlapping);
+    WT_ITEM matched_start{};
+    WT_ITEM matched_stop{};
+    REQUIRE(truncate_visible(overlap_key, &matched_start, &matched_stop) == 0);
+
+    REQUIRE(truncate_list_helpers::as_view(matched_start) == "0150");
+    REQUIRE(truncate_list_helpers::as_view(matched_stop) == "0300");
     REQUIRE(truncate_visible(overlap_only_key) == 0);
 
     txn_id = 300;
@@ -384,9 +398,14 @@ TEST_CASE_METHOD(layered_truncate_visibility_fixture,
     set_reader(txn_id, read_timestamp, WT_ISO_SNAPSHOT, 300, 400);
     REQUIRE(truncate_visible(target_only_key) == 0);
 
-    matched = nullptr;
-    REQUIRE(truncate_visible(overlap_key, &matched) == 0);
-    REQUIRE(matched == committed);
+    REQUIRE(truncate_visible(overlap_key, &matched_start, &matched_stop) == 0);
+
+    REQUIRE(truncate_list_helpers::as_view(matched_start) == "0100");
+    REQUIRE(truncate_list_helpers::as_view(matched_stop) == "0200");
+
+    __wt_buf_free(session, &matched_start);
+    __wt_buf_free(session, &matched_stop);
+
     REQUIRE(truncate_visible(overlap_only_key) == 0);
 }
 
@@ -419,10 +438,16 @@ TEST_CASE_METHOD(layered_truncate_visibility_fixture,
     set_reader(50, WT_TS_NONE);
     REQUIRE(truncate_visible(key) == WT_NOTFOUND);
 
-    WT_TRUNCATE *matched = nullptr;
+    WT_ITEM matched_start{};
+    WT_ITEM matched_stop{};
     key = "0175";
-    REQUIRE(truncate_visible(key, &matched) == 0);
-    REQUIRE(matched == surviving);
+    REQUIRE(truncate_visible(key, &matched_start, &matched_stop) == 0);
+
+    REQUIRE(truncate_list_helpers::as_view(matched_start) == start);
+    REQUIRE(truncate_list_helpers::as_view(matched_stop) == stop);
+
+    __wt_buf_free(session, &matched_start);
+    __wt_buf_free(session, &matched_stop);
 
     key = "0350";
     REQUIRE(truncate_visible(key) == 0);

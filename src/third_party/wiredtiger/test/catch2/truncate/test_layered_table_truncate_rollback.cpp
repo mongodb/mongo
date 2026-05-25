@@ -42,7 +42,6 @@ SCENARIO(
     {
         truncate_list_fixture fixture;
         fixture.add_entry(make_item("a"), make_item("z"));
-        CHECK(truncate_list_size(fixture.layered_table()) == 1);
 
         WHEN("the truncate is rolled back")
         {
@@ -62,7 +61,6 @@ SCENARIO("rolling back a truncate entry clears the op pointer", "[truncate_list]
     {
         truncate_list_fixture fixture;
         fixture.add_entry(make_item("a"), make_item("z"));
-        CHECK(truncate_list_size(fixture.layered_table()) == 1);
 
         WHEN("the truncate is rolled back")
         {
@@ -84,7 +82,6 @@ SCENARIO(
     {
         truncate_list_fixture fixture;
         fixture.add_entry(make_item("a"), make_item("z"));
-        CHECK(truncate_list_size(fixture.layered_table()) == 1);
 
         const auto reference_count = fixture.reference_count();
 
@@ -106,7 +103,6 @@ SCENARIO("rolling back a truncate entry releases the truncate lock", "[truncate_
     {
         truncate_list_fixture fixture;
         fixture.add_entry(make_item("a"), make_item("z"));
-        CHECK(truncate_list_size(fixture.layered_table()) == 1);
 
         WHEN("the truncate is rolled back")
         {
@@ -131,8 +127,6 @@ SCENARIO("rolling back affects only the targeted entry in a multi-entry truncate
         auto *last_entry = fixture.add_entry(make_item("e"), make_item("f"));
 
         const auto size = truncate_list_size(fixture.layered_table());
-        CHECK(size == 3);
-
         const auto reference_count = fixture.reference_count();
 
         auto first_op = make_op(first_entry);

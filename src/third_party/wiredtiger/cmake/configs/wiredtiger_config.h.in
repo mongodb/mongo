@@ -46,7 +46,7 @@
 #cmakedefine HAVE_REF_TRACK 1
 
 /* Define to 1 for unit tests. */
-#cmakedefine HAVE_UNITTEST 0
+#cmakedefine HAVE_UNITTEST 1
 
 /*
  * Define to 1 to when measuring code coverage to make measurements more accurate, by switching code where needed,
@@ -59,16 +59,16 @@
  * the macro versions can be removed and the #ifdef guard using CODE_COVERAGE_MEASUREMENT removed to make the inline
  * functions the only version.
  */
-#cmakedefine CODE_COVERAGE_MEASUREMENT 0
+#cmakedefine CODE_COVERAGE_MEASUREMENT 1
 
 /* define 1 to to switch code that exists in both inline function and macro versions to use the inline versions. */
-#cmakedefine INLINE_FUNCTIONS_INSTEAD_OF_MACROS 0
+#cmakedefine INLINE_FUNCTIONS_INSTEAD_OF_MACROS 1
 
 /*
  * Define to 1 for unit testing assertions.
  * This overrides normal abort logic and should be used *only* when unit testing assertions.
  */
-#cmakedefine HAVE_UNITTEST_ASSERTS 0
+#cmakedefine HAVE_UNITTEST_ASSERTS 1
 
 /* Define to 1 if you have the `fallocate' function. */
 #cmakedefine HAVE_FALLOCATE 1
@@ -125,7 +125,7 @@
 #cmakedefine HAVE_LIBSODIUM 1
 
 /* Automatically set by the build system, turns on or off optional RCpc ARM instructions. */
-#cmakedefine HAVE_RCPC 0
+#cmakedefine HAVE_RCPC 1
 
 /* Define to 1 to disable any crc32 hardware support. */
 #cmakedefine HAVE_NO_CRC32_HARDWARE
