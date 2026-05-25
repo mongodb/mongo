@@ -123,10 +123,17 @@ class TestRunner(Subcommand):
         file_name_uuid = "".join(
             random.choice("0123456789abcdef") if c == "%" else c for c in file_name
         )
+        output_root = os.path.join(parent_dir, file_name_uuid)
 
         # Store the calculated value in the `GOLDEN_TEST_OUTPUT_ROOT_PATTERN` variable so
         # that the C++ code can reference it.
-        os.environ[GOLDEN_TEST_OUTPUT_ROOT_PATTERN_ENV] = os.path.join(parent_dir, file_name_uuid)
+        os.environ[GOLDEN_TEST_OUTPUT_ROOT_PATTERN_ENV] = output_root
+
+        # Create the resolved UUID directory eagerly so that
+        # `buildscripts/golden_test.py latest/diff/accept` can find this run even
+        # when every golden test passes.
+        os.makedirs(os.path.join(output_root, "actual"), exist_ok=True)
+        os.makedirs(os.path.join(output_root, "expected"), exist_ok=True)
 
     def execute(self):
         """Execute the 'run' subcommand."""

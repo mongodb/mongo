@@ -122,6 +122,15 @@ GoldenTestEnvironment::GoldenTestEnvironment() : _goldenDataRoot(".") {
     _actualOutputRoot = outputRoot / "actual";
     _expectedOutputRoot = outputRoot / "expected";
 
+    // Create the resolved UUID directory eagerly when the user has
+    // explicitly configured an outputRootPattern. This lets
+    // `buildscripts/golden_test.py latest/diff/accept` find this run even when
+    // every golden test passes.
+    if (opts.outputRootPattern) {
+        fs::create_directories(_actualOutputRoot);
+        fs::create_directories(_expectedOutputRoot);
+    }
+
     if (opts.diffCmd) {
         _diffCmd = *opts.diffCmd;
     } else {
