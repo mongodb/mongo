@@ -90,7 +90,17 @@ function killopIndexBuildOnSecondaryOnFailpoint(rst, failpointName, shouldSuccee
 
         // After restarting the secondary, expect that the index build completes successfully.
         rst.stop(secondary.nodeId, undefined, {forRestart: true, allowedExitCode: MongoRunner.EXIT_ABORT});
-        rst.start(secondary.nodeId, undefined, true /* restart */);
+        // With an in-memory storage engine the secondary has no persistent state after a crash, so
+        // it must perform a full initial sync rather than crash-recovering from a checkpoint. We
+        // must disable initialSyncWaitForSyncSourceLastStableRecoveryTs because this is a PSA set
+        // and the majority of data-bearing members is 2. While the secondary is in initial sync
+        // (STARTUP2), the primary cannot advance its stable timestamp to beginApplyingTimestamp,
+        // leaving the secondary stuck in the wait loop (deadlock).
+        rst.start(
+            secondary.nodeId,
+            {setParameter: {initialSyncWaitForSyncSourceLastStableRecoveryTs: false}},
+            true /* restart */,
+        );
 
         secondary = rst.getSecondary();
         secondaryDB = secondary.getDB(testDB.getName());
