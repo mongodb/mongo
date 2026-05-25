@@ -34,7 +34,7 @@
 
 #pragma once
 
-#include "mongo/db/query/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 
 namespace mongo::query_knobs {

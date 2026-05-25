@@ -57,7 +57,7 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_knob_configuration.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/tailable_mode_gen.h"

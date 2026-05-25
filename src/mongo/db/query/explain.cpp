@@ -52,7 +52,7 @@
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_knob_configuration.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/util/assert_util.h"

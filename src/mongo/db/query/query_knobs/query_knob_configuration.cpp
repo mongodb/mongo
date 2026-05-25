@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_knob_configuration.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 
 #include "mongo/db/query/query_knob_descriptors_execution.h"
 #include "mongo/db/query/query_knob_descriptors_optimization.h"
-#include "mongo/db/query/query_knob_registry.h"
-#include "mongo/db/query/query_knob_snapshot.h"
+#include "mongo/db/query/query_knobs/query_knob_registry.h"
+#include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 
 namespace mongo {

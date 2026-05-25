@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_knob_configuration.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 
 #include "mongo/db/query/query_fcv_environment_for_test.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"

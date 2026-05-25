@@ -44,7 +44,7 @@ mongo_cc_library(
         "//src/mongo/db:common",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/pipeline:field_path",
-        "//src/mongo/db/query:query_knob_configuration",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration",
         "//src/mongo/db/query/query_settings",
     ],
 )

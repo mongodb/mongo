@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/query_knob_test_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_test_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/assert.h"

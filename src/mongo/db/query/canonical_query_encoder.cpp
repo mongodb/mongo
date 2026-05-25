@@ -65,7 +65,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/query_knob_configuration.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/db/repl/read_concern_args.h"

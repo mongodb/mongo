@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
 
 #include "mongo/util/static_immortal.h"
 

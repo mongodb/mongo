@@ -39,7 +39,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:index_hint",
         # TODO SERVER-127247: Replace this with 'query_knobs' once the knob initialization is explicit.
-        "//src/mongo/db/query:query_knob_configuration",
+        "//src/mongo/db/query/query_knobs:query_knob_configuration",
         "//src/mongo/db/query/query_shape:query_shape_hash",
     ],
 )
@@ -145,7 +145,7 @@ mongo_cc_library(
     hdrs = ["query_knob_overrides.h"],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db/query:query_knob_registry",
+        "//src/mongo/db/query/query_knobs:query_knob_registry",
     ],
 )
 
@@ -166,7 +166,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":query_knob_overrides",
-        "//src/mongo/db/query:query_knob_registry",
+        "//src/mongo/db/query/query_knobs:query_knob_registry",
         "//src/mongo/unittest",
     ],
 )

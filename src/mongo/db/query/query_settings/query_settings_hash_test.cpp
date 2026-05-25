@@ -35,7 +35,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_integration_knobs_gen.h"
-#include "mongo/db/query/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_knob_overrides_test_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"

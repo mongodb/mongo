@@ -30,7 +30,7 @@
 #include "mongo/db/query/query_settings/query_knob_overrides.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/query_knob_registry.h"
+#include "mongo/db/query/query_knobs/query_knob_registry.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

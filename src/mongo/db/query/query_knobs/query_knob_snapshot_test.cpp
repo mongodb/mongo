@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_knob_snapshot.h"
+#include "mongo/db/query/query_knobs/query_knob_snapshot.h"
 
 #include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"

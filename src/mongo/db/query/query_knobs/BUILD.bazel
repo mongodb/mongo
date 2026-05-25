@@ -1,0 +1,111 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "query_knob",
+    srcs = [
+        "query_knob.cpp",
+    ],
+    hdrs = [
+        "query_knob.h",
+        "query_knob_snapshot.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_knob_registry",
+    srcs = [
+        "query_knob_registry.cpp",
+    ],
+    hdrs = [
+        "query_knob_registry.h",
+    ],
+    deps = [
+        ":query_knob",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "query_knob_registry_test_gen",
+    src = "query_knob_registry_test.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_knob_registry_test",
+    srcs = [
+        "query_knob_registry_test.cpp",
+        ":query_knob_registry_test_gen",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":query_knob",
+        ":query_knob_registry",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "query_knob_test_gen",
+    src = "query_knob_test.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_knob_configuration",
+    srcs = [
+        "query_knob_configuration.cpp",
+    ],
+    hdrs = [
+        "query_knob_configuration.h",
+    ],
+    deps = [
+        ":query_knob_registry",
+        "//src/mongo/db/query:query_knobs",
+    ],
+)
+
+mongo_cc_benchmark(
+    name = "query_knob_configuration_bm",
+    srcs = ["query_knob_configuration_bm.cpp"],
+    tags = ["query_bm"],
+    deps = [
+        ":query_knob_configuration",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "query_knob_test",
+    srcs = [
+        "query_knob_snapshot_test.cpp",
+        "query_knob_test.cpp",
+        ":query_knob_test_gen",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":query_knob",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query:query_knobs",
+    ],
+)

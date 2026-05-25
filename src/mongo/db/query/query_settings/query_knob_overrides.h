@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/query/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
 
 #include <span>
 #include <vector>

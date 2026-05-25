@@ -41,7 +41,7 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_knob_configuration.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"

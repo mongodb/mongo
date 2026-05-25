@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/query/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/version/releases.h"

@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_settings/query_knob_overrides_test_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"

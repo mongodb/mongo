@@ -310,97 +310,10 @@ mongo_cc_library(
     ],
     deps = [
         ":on_parameter_change_updaters",
-        ":query_knob",
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/query/query_knobs:query_knob",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter",
-    ],
-)
-
-mongo_cc_library(
-    name = "query_knob_configuration",
-    srcs = [
-        "query_knob_configuration.cpp",
-    ],
-    deps = [
-        ":query_knob_registry",
-        ":query_knobs",
-    ],
-)
-
-mongo_cc_library(
-    name = "query_knob",
-    srcs = [
-        "query_knob.cpp",
-    ],
-    hdrs = [
-        "query_knob.h",
-        "query_knob_snapshot.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/idl:idl_parser",
-    ],
-)
-
-mongo_cc_library(
-    name = "query_knob_registry",
-    srcs = [
-        "query_knob_registry.cpp",
-    ],
-    hdrs = [
-        "query_knob_registry.h",
-    ],
-    deps = [
-        ":query_knob",
-        "//src/mongo:base",
-        "//src/mongo/db:server_base",
-    ],
-)
-
-idl_generator(
-    name = "query_knob_registry_test_gen",
-    src = "query_knob_registry_test.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "query_knob_registry_test",
-    srcs = [
-        "query_knob_registry_test.cpp",
-        ":query_knob_registry_test_gen",
-    ],
-    tags = ["mongo_unittest_third_group"],
-    deps = [
-        ":query_knob",
-        ":query_knob_registry",
-        "//src/mongo:base",
-        "//src/mongo/db:server_base",
-    ],
-)
-
-idl_generator(
-    name = "query_knob_test_gen",
-    src = "query_knob_test.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "query_knob_test",
-    srcs = [
-        "query_knob_snapshot_test.cpp",
-        "query_knob_test.cpp",
-        ":query_knob_test_gen",
-    ],
-    tags = ["mongo_unittest_second_group"],
-    deps = [
-        ":query_knob",
-        ":query_knobs",
-        "//src/mongo/db:server_base",
     ],
 )
 
@@ -797,17 +710,6 @@ mongo_cc_benchmark(
     srcs = ["canonical_query_bm.cpp"],
     tags = ["query_bm"],
     deps = [
-        "//src/mongo/db/query:query_fcv_environment_for_test",
-        "//src/mongo/db/query:query_test_service_context",
-    ],
-)
-
-mongo_cc_benchmark(
-    name = "query_knob_configuration_bm",
-    srcs = ["query_knob_configuration_bm.cpp"],
-    tags = ["query_bm"],
-    deps = [
-        "query_knob_configuration",
         "//src/mongo/db/query:query_fcv_environment_for_test",
         "//src/mongo/db/query:query_test_service_context",
     ],

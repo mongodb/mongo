@@ -65,7 +65,7 @@
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_hint.h"
-#include "mongo/db/query/query_knob_configuration.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"

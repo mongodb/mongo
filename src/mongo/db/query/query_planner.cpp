@@ -85,7 +85,7 @@
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_knob_configuration.h"
+#include "mongo/db/query/query_knobs/query_knob_configuration.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"

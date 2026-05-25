@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_knob_registry.h"
+#include "mongo/db/query/query_knobs/query_knob_registry.h"
 
-#include "mongo/db/query/query_knob.h"
-#include "mongo/db/query/query_knob_registry_test_gen.h"
+#include "mongo/db/query/query_knobs/query_knob.h"
+#include "mongo/db/query/query_knobs/query_knob_registry_test_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
