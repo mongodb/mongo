@@ -224,8 +224,11 @@ Status initializeGlobalShardingState(
                std::move(executorPool),
                networkPtr);
 
-    // The shard registry must be started once the grid is initialized
-    grid->shardRegistry()->startupPeriodicReloader(opCtx);
+    // The shard registry must be started once the grid is initialized. Do not start the periodic
+    // reloader if the server is in config only mode since refreshes will always fail anyways.
+    if (MONGO_likely(!serverGlobalParams.configOnly)) {
+        grid->shardRegistry()->startupPeriodicReloader(opCtx);
+    }
 
     // Start up the cluster time keys manager with a sharded keys client.
     auto keysCollectionClient = initKeysClient(grid->catalogClient());
