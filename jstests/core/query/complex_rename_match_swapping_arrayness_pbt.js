@@ -1,14 +1,14 @@
 /**
- * A property-based test that enables "featureFlagImprovedDepsAnalysis" and asserts correctness
- * of pushing down $match on a complex rename when there is multikeyness metadata that proves
- * there are no arrays on the renamed path. Correctness is asserted by running the generated query
- * with and without optimizations.
+ * A property-based test that asserts correctness of pushing down $match on a complex rename when
+ * there is multikeyness metadata that proves there are no arrays on the renamed path. Correctness
+ * is asserted by running the generated query with and without optimizations.
  *
  * @tags: [
  * query_intensive_pbt,
  * # Runs queries that may return many results, requiring getmores
  * requires_getmore,
- * featureFlagImprovedDepsAnalysis,
+ * # Tests a rewrite that was added in v9.0.
+ * requires_fcv_90,
  * featureFlagPathArrayness,
  * # Time series collections do not support indexing array values in measurement fields.
  * exclude_from_timeseries_crud_passthrough,

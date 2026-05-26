@@ -450,8 +450,8 @@ feature_flags:
         description: "Feature flag to enable pipeline rewrites that require a dependency graph"
         cpp_varname: gFeatureFlagImprovedDepsAnalysis
         fcv_gated: false
-        default: false
-        incremental_rollout_phase: in_development
+        default: true
+        incremental_rollout_phase: released
 
     featureFlagSbeTransformStages:
         description: "Feature flag to enable transform stages in SBE, including $addFields, $replaceRoot, $replaceWith, $project."

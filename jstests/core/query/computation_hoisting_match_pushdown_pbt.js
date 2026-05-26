@@ -8,7 +8,8 @@
  * @tags: [
  *   query_intensive_pbt,
  *   requires_getmore,
- *   featureFlagImprovedDepsAnalysis,
+ *   # Tests a rewrite that was added in v9.0.
+ *   requires_fcv_90,
  *   # Uses a knob (internalQueryTransformHoistPolicy) that does not exist on older binaries.
  *   multiversion_incompatible,
  *   assumes_unsharded_collection,

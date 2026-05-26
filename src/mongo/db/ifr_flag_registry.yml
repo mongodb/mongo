@@ -35,4 +35,5 @@ rollout:
   featureFlagMultiPlanLimiter: {}
   featureFlagUnifiedWriteExecutor: {}
 
-released: {}
+released:
+  featureFlagImprovedDepsAnalysis: {}
