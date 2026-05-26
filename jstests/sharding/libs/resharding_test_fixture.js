@@ -1112,7 +1112,7 @@ export var ReshardingTest = class {
             );
         } else {
             assert.eq(
-                this._currentShardKey,
+                this._translateTimeseriesShardKey(this._currentShardKey),
                 collEntry.key,
                 "shard key pattern changed despite resharding having failed",
             );
