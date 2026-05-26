@@ -147,7 +147,7 @@ Status validateClusteredIndexSpec(OperationContext* opCtx,
     }
 
     const auto arbitraryClusterKeyField = clustered_util::getClusterKeyFieldName(spec);
-    if (arbitraryClusterKeyField.find(".", 0) != std::string::npos) {
+    if (arbitraryClusterKeyField.find('.', 0) != std::string::npos) {
         return Status(
             ErrorCodes::Error(6053701),
             "The clusteredIndex option does not support a cluster key with nested fields");

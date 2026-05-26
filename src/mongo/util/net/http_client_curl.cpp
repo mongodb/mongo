@@ -644,7 +644,7 @@ HostAndPort exactHostAndPortFromUrl(StringData url) {
 
     url = url.substr(slashesIndex + slashes.size());
     if (url.find('/') != std::string::npos) {
-        url = url.substr(0, url.find("/"));
+        url = url.substr(0, url.find('/'));
     }
 
     auto hp = HostAndPort(url);

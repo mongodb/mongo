@@ -77,7 +77,7 @@ std::pair<BSONElement, bool> extractNonArrayElementAtPath(const BSONObj& obj, St
     static const auto kEmptyElt = BSONElement{};
 
     auto&& [elt, tail] = [&]() -> std::pair<BSONElement, StringData> {
-        if (auto dotOffset = path.find("."); dotOffset != std::string::npos) {
+        if (auto dotOffset = path.find('.'); dotOffset != std::string::npos) {
             return {obj.getField(path.substr(0, dotOffset)), path.substr(dotOffset + 1)};
         }
         return {obj.getField(path), ""_sd};

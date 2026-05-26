@@ -513,7 +513,7 @@ std::string Decimal128::toString() const {
 
     StringData dec128String(decimalCharRepresentation);
 
-    int ePos = dec128String.find("E");
+    int ePos = dec128String.find('E');
 
     // Calculate the precision and exponent of the number and output it in a readable manner
     int precision = 0;

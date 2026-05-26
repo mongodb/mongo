@@ -264,7 +264,7 @@ void processSampledDiffs(OperationContext* opCtx,
 
         size_t startIndex = 0;
         while (startIndex < shardKeyFieldName.size()) {
-            const size_t lastDotIndex = shardKeyFieldName.find(".", startIndex);
+            const size_t lastDotIndex = shardKeyFieldName.find('.', startIndex);
             if (lastDotIndex == std::string::npos) {
                 break;
             }

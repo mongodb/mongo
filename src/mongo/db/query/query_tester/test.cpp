@@ -294,7 +294,7 @@ Test Test::parseTest(std::fstream& fs,
             } else {
                 auto sd = StringData{lineFromFile};
                 {
-                    auto endDocument = sd.rfind("}");
+                    auto endDocument = sd.rfind('}');
                     if (endDocument == std::string::npos) {
                         continue;
                     }
@@ -303,7 +303,7 @@ Test Test::parseTest(std::fstream& fs,
                     sd.remove_suffix(sd.size() - endDocument - 1);
                 }
                 {
-                    auto startDocument = sd.find("{");
+                    auto startDocument = sd.find('{');
                     if (startDocument == std::string::npos) {
                         continue;
                     }

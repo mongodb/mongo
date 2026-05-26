@@ -179,7 +179,7 @@ bool matchesGoogleFilter(StringData filt, StringData suite, StringData test) {
             filt.remove_prefix(1);
             continue;
         }
-        size_t pos = filt.find_first_of(":");
+        size_t pos = filt.find_first_of(':');
         StringData elem = filt.substr(0, pos);
         filt = filt.substr(pos);
         if (matchesGooglePattern(elem, fullName))
