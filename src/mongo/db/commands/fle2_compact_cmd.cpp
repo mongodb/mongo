@@ -45,6 +45,7 @@
 #include "mongo/db/commands/fle2_compact_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/fle_compact_cleanup_mutex.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -63,6 +64,7 @@
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/rename_collection.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -90,6 +92,54 @@ MONGO_FAIL_POINT_DEFINE(fleCompactSkipECOCDropUnsharded);
 namespace mongo {
 namespace {
 
+auto acquireAndValidateCollections(OperationContext* opCtx,
+                                   CollectionAcquisitionRequests requests) {
+    CollectionOrViewAcquisitionRequests acquisitionRequests;
+    for (auto& request : requests) {
+        if (request.nssOrUUID.isNamespaceString()) {
+            acquisitionRequests.emplace_back(request.nssOrUUID.nss(),
+                                             request.expectedUUID,
+                                             request.placementConcern,
+                                             request.readConcern,
+                                             request.operationType,
+                                             AcquisitionPrerequisites::ViewMode::kCanBeView,
+                                             request.lockAcquisitionDeadline);
+        } else {
+            acquisitionRequests.emplace_back(std::move(request.nssOrUUID),
+                                             request.placementConcern,
+                                             request.readConcern,
+                                             request.operationType,
+                                             AcquisitionPrerequisites::ViewMode::kCanBeView,
+                                             request.lockAcquisitionDeadline);
+        }
+    }
+
+    auto acquisitions =
+        makeAcquisitionMap(acquireCollectionsOrViews(opCtx, acquisitionRequests, MODE_IS));
+    for (const auto& [nss, acq] : acquisitions) {
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                "Cannot compact structured encryption data on a view",
+                !acq.isView());
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' does not exist",
+                acq.collectionExists());
+    }
+    return acquisitions;
+}
+
+EncryptedStateCollectionsNamespaces validateCompactRequestAndGetNamespaces(
+    OperationContext* opCtx, const CompactStructuredEncryptionData& request) {
+    const auto& edcNss = request.getNamespace();
+    auto collections = acquireAndValidateCollections(
+        opCtx,
+        {CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, edcNss, AcquisitionPrerequisites::OperationType::kRead)});
+    const auto& edcCollection = collections.at(edcNss);
+    validateCompactRequest(request, *edcCollection.getCollectionPtr().get());
+    return uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(
+        *edcCollection.getCollectionPtr().get()));
+}
+
 CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                                                   const CompactStructuredEncryptionData& request) {
     {
@@ -113,31 +163,12 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
 
     LOGV2(6319900, "Compacting the encrypted compaction collection", logAttrs(edcNss));
 
-    AutoGetDb autoDb(opCtx, edcNss.dbName(), MODE_IX);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Database '" << edcNss.dbName().toStringForErrorMsg()
-                          << "' does not exist",
-            autoDb.getDb());
+    auto [namespaces, scopedCompactCleanupMutex] =
+        acquireFLECompactCleanupMutexWithStableNamespaces(
+            opCtx, [&] { return validateCompactRequestAndGetNamespaces(opCtx, request); });
 
-    auto catalog = CollectionCatalog::get(opCtx);
-    Lock::CollectionLock edcLock(opCtx, edcNss, MODE_IS);
-
-    // Check the data collection exists and is not a view
-    auto edc = catalog->lookupCollectionByNamespace(opCtx, edcNss);
-    if (!edc) {
-        uassert(ErrorCodes::CommandNotSupportedOnView,
-                "Cannot compact structured encryption data on a view",
-                !catalog->lookupView(opCtx, edcNss));
-        uasserted(ErrorCodes::NamespaceNotFound,
-                  str::stream() << "Collection '" << edcNss.toStringForErrorMsg()
-                                << "' does not exist");
-    }
-
-    validateCompactRequest(request, *edc);
-
-    auto namespaces =
-        uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc));
-
+    // Register the DDL with the replica set tracker so any local QE state collection DDL remains
+    // visible to metadata synchronization, without taking the replica set DDL locks here.
     ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
         opCtx,
         std::vector<NamespaceString>{namespaces.edcNss,
@@ -146,50 +177,61 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                                      namespaces.ecocRenameNss,
                                      namespaces.ecocLockNss});
 
-    // Acquire exclusive lock on the associated 'ecoc.lock' namespace to serialize calls
-    // to cleanup and compact on the same EDC namespace
-    Lock::CollectionLock compactionLock(opCtx, namespaces.ecocLockNss, MODE_X);
-
-    // Step 1: rename the ECOC collection if it exists
-    catalog = CollectionCatalog::get(opCtx);
-    auto ecoc = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocNss);
-    auto ecocRename = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss);
-
     CompactStats stats({}, {});
     FLECompactESCDeleteSet escDeleteSet;
+    bool createEcoc = false;
+    bool renameEcoc = false;
+    {
+        CollectionAcquisitionRequests acquisitionRequests = {
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, namespaces.ecocNss, AcquisitionPrerequisites::OperationType::kRead),
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, namespaces.ecocRenameNss, AcquisitionPrerequisites::OperationType::kRead)};
+        auto acquisitions =
+            makeAcquisitionMap(acquireCollectionsMaybeLockFree(opCtx, acquisitionRequests));
 
-    if (!ecoc && !ecocRename) {
-        // nothing to compact
-        LOGV2(6548306, "Skipping compaction as there is no ECOC collection to compact");
-        return stats;
-    } else if (ecoc && !ecocRename) {
-        // load the random set of ESC non-anchor entries to be deleted post-compact.
-        // This must be done before renaming the ECOC because if not, we can end up with
-        // ESC entries that have no corresponding ECOC entry in the renamed ECOC.
-        auto memoryLimit =
-            ServerParameterSet::getClusterParameterSet()
-                ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-                ->getValue(boost::none)
-                .getMaxCompactionSize();
+        const auto& ecoc = acquisitions.at(namespaces.ecocNss).getCollectionPtr();
+        const auto& ecocRename = acquisitions.at(namespaces.ecocRenameNss).getCollectionPtr();
 
-        escDeleteSet =
-            readRandomESCNonAnchorIds(opCtx, namespaces.escNss, memoryLimit, &stats.getEsc());
+        // Step 1: rename the ECOC collection if it exists
+        if (!ecoc && !ecocRename) {
+            // nothing to compact
+            LOGV2(6548306, "Skipping compaction as there is no ECOC collection to compact");
+            return stats;
+        } else if (ecoc && !ecocRename) {
+            // load the random set of ESC non-anchor entries to be deleted post-compact.
+            // This must be done before renaming the ECOC because if not, we can end up with
+            // ESC entries that have no corresponding ECOC entry in the renamed ECOC.
+            auto memoryLimit =
+                ServerParameterSet::getClusterParameterSet()
+                    ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
+                    ->getValue(boost::none)
+                    .getMaxCompactionSize();
 
-        LOGV2(7293603,
-              "Renaming the encrypted compaction collection",
-              "ecocNss"_attr = namespaces.ecocNss,
-              "ecocRenameNss"_attr = namespaces.ecocRenameNss);
+            escDeleteSet =
+                readRandomESCNonAnchorIds(opCtx, namespaces.escNss, memoryLimit, &stats.getEsc());
+
+            LOGV2(7293603,
+                  "Renaming the encrypted compaction collection",
+                  "ecocNss"_attr = namespaces.ecocNss,
+                  "ecocRenameNss"_attr = namespaces.ecocRenameNss);
+            renameEcoc = createEcoc = true;
+        } else {
+            LOGV2(7293610,
+                  "Resuming compaction from a stale ECOC collection",
+                  logAttrs(namespaces.ecocRenameNss));
+            if (!ecoc) {
+                createEcoc = true;
+            }
+        }
+    }
+
+    if (renameEcoc) {
         RenameCollectionOptions renameOpts;
         validateAndRunRenameCollection(
             opCtx, namespaces.ecocNss, namespaces.ecocRenameNss, renameOpts);
-        ecoc = nullptr;
-    } else {
-        LOGV2(7293610,
-              "Resuming compaction from a stale ECOC collection",
-              logAttrs(namespaces.ecocRenameNss));
     }
-
-    if (!ecoc) {
+    if (createEcoc) {
         if (MONGO_unlikely(fleCompactHangBeforeECOCCreateUnsharded.shouldFail())) {
             LOGV2(7299601, "Hanging due to fleCompactHangBeforeECOCCreateUnsharded fail point");
             fleCompactHangBeforeECOCCreateUnsharded.pauseWhileSet();
@@ -222,15 +264,23 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     // Step 2: for each encrypted field in compactionTokens, get distinct set of entries 'C'
     // from ECOC, and for each entry in 'C', compact ESC.
     {
-        // acquire IS lock on the ecocRenameNss to prevent it from being dropped during compact
-        AutoGetCollection tempEcocColl(opCtx, namespaces.ecocRenameNss, MODE_IS);
+        // Acquire ecoc.compact and the EDC before stashing transaction resources. Restore will
+        // re-establish these acquisitions after the internal transaction commits and fail if either
+        // collection was dropped or recreated while the resources were stashed.
+        auto collections = acquireAndValidateCollections(
+            opCtx,
+            {CollectionAcquisitionRequest::fromOpCtx(
+                 opCtx, namespaces.ecocRenameNss, AcquisitionPrerequisites::OperationType::kRead),
+             CollectionAcquisitionRequest::fromOpCtx(
+                 opCtx, namespaces.edcNss, AcquisitionPrerequisites::OperationType::kRead)});
 
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Renamed encrypted compaction collection "
-                              << namespaces.ecocRenameNss.toStringForErrorMsg()
-                              << " no longer exists prior to compaction",
-                *tempEcocColl);
+        // Ensure the EDC collection is still valid
+        validateCompactRequest(request,
+                               *collections.at(namespaces.edcNss).getCollectionPtr().get());
 
+        // Stash any resource before starting the internal transaction and restore them after the
+        // transaction commits
+        StashTransactionResourcesForMultiDocumentTransaction stasher(opCtx);
         processFLECompactV2(opCtx,
                             request,
                             &getTransactionWithRetriesForMongoD,
@@ -238,6 +288,9 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                             getFLE2TaskExecutorForMongoD(opCtx),
                             &stats.getEsc(),
                             &stats.getEcoc());
+        stasher.restoreOnCommit();
+        validateCompactRequest(request,
+                               *collections.at(namespaces.edcNss).getCollectionPtr().get());
     }
 
     auto tagsPerDelete =

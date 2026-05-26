@@ -44,6 +44,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
+#include <memory>
 #include <numeric>
 #include <queue>
 #include <vector>

@@ -47,6 +47,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/fle_compact_cleanup_mutex.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -88,6 +89,54 @@
 namespace mongo {
 
 namespace {
+
+auto acquireAndValidateCollections(OperationContext* opCtx,
+                                   CollectionAcquisitionRequests requests) {
+    CollectionOrViewAcquisitionRequests acquisitionRequests;
+    for (auto& request : requests) {
+        if (request.nssOrUUID.isNamespaceString()) {
+            acquisitionRequests.emplace_back(request.nssOrUUID.nss(),
+                                             request.expectedUUID,
+                                             request.placementConcern,
+                                             request.readConcern,
+                                             request.operationType,
+                                             AcquisitionPrerequisites::ViewMode::kCanBeView,
+                                             request.lockAcquisitionDeadline);
+        } else {
+            acquisitionRequests.emplace_back(std::move(request.nssOrUUID),
+                                             request.placementConcern,
+                                             request.readConcern,
+                                             request.operationType,
+                                             AcquisitionPrerequisites::ViewMode::kCanBeView,
+                                             request.lockAcquisitionDeadline);
+        }
+    }
+
+    auto acquisitions =
+        makeAcquisitionMap(acquireCollectionsOrViews(opCtx, acquisitionRequests, MODE_IS));
+    for (const auto& [nss, acq] : acquisitions) {
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                "Cannot cleanup structured encryption data on a view",
+                !acq.isView());
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' does not exist",
+                acq.collectionExists());
+    }
+    return acquisitions;
+}
+
+EncryptedStateCollectionsNamespaces validateCleanupRequestAndGetNamespaces(
+    OperationContext* opCtx, const CleanupStructuredEncryptionData& request) {
+    const auto& edcNss = request.getNamespace();
+    auto collections = acquireAndValidateCollections(
+        opCtx,
+        {CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, edcNss, AcquisitionPrerequisites::OperationType::kRead)});
+    const auto& edcCollection = collections.at(edcNss);
+    validateCleanupRequest(request, *edcCollection.getCollectionPtr().get());
+    return uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(
+        *edcCollection.getCollectionPtr().get()));
+}
 
 void createQEClusteredStateCollection(OperationContext* opCtx, const NamespaceString& nss) {
     // Create QE state collection locally. This local collection creation is safe here because we
@@ -167,35 +216,12 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
 
     const auto& edcNss = request.getNamespace();
 
-    AutoGetDb autoDb(opCtx, edcNss.dbName(), MODE_IX);
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Database '" << edcNss.dbName().toStringForErrorMsg()
-                          << "' does not exist",
-            autoDb.getDb());
-    Lock::CollectionLock edcLock(opCtx, edcNss, MODE_IS);
+    auto [namespaces, scopedCompactCleanupMutex] =
+        acquireFLECompactCleanupMutexWithStableNamespaces(
+            opCtx, [&] { return validateCleanupRequestAndGetNamespaces(opCtx, request); });
 
-    // Validate the request and acquire the relevant namespaces
-    EncryptedStateCollectionsNamespaces namespaces;
-    {
-        auto catalog = CollectionCatalog::get(opCtx);
-
-        // Check the data collection exists and is not a view
-        auto edc = catalog->lookupCollectionByNamespace(opCtx, edcNss);
-        if (!edc) {
-            uassert(ErrorCodes::CommandNotSupportedOnView,
-                    "Cannot cleanup structured encryption data on a view",
-                    !catalog->lookupView(opCtx, edcNss));
-            uasserted(ErrorCodes::NamespaceNotFound,
-                      str::stream()
-                          << "Collection '" << edcNss.toStringForErrorMsg() << "' does not exist");
-        }
-
-        validateCleanupRequest(request, *edc);
-
-        namespaces =
-            uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc));
-    }
-
+    // Register the DDL with the replica set tracker so any local QE state collection DDL remains
+    // visible to metadata synchronization, without taking the replica set DDL locks here.
     ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
         opCtx,
         std::vector<NamespaceString>{namespaces.edcNss,
@@ -204,9 +230,6 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
                                      namespaces.ecocRenameNss,
                                      namespaces.ecocLockNss});
 
-    // Acquire exclusive lock on the associated 'ecoc.lock' namespace to serialize calls
-    // to cleanup and compact on the same EDC namespace.
-    Lock::CollectionLock compactionLock(opCtx, namespaces.ecocLockNss, MODE_X);
 
     LOGV2(7618805, "Cleaning up the encrypted compaction collection", logAttrs(edcNss));
 
@@ -279,14 +302,18 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
         createQEClusteredStateCollection(opCtx, namespaces.ecocNss);
     }
 
+    FLECleanupESCDeleteQueue pq;
     {
-        AutoGetCollection ecocCompact(opCtx, namespaces.ecocRenameNss, MODE_IS);
+        auto collections = acquireAndValidateCollections(
+            opCtx,
+            {CollectionAcquisitionRequest::fromOpCtx(
+                 opCtx, namespaces.ecocRenameNss, AcquisitionPrerequisites::OperationType::kRead),
+             CollectionAcquisitionRequest::fromOpCtx(
+                 opCtx, namespaces.edcNss, AcquisitionPrerequisites::OperationType::kRead)});
 
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Renamed encrypted compaction collection "
-                              << namespaces.ecocRenameNss.toStringForErrorMsg()
-                              << " no longer exists prior to cleanup",
-                *ecocCompact);
+        // Ensure the EDC collection is still valid
+        validateCleanupRequest(request,
+                               *collections.at(namespaces.edcNss).getCollectionPtr().get());
 
         auto pqMemLimit =
             ServerParameterSet::getClusterParameterSet()
@@ -295,21 +322,30 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
                 .getMaxAnchorCompactionSize();
 
         // Clean up entries for each encrypted field in compactionTokens
-        auto pq = processFLECleanup(opCtx,
-                                    request,
-                                    &getTransactionWithRetriesForMongoD,
-                                    namespaces,
-                                    pqMemLimit,
-                                    &stats.getEsc(),
-                                    &stats.getEcoc());
-
-        // Delete the entries in 'C' from the ESC
-        cleanupESCNonAnchors(
-            opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, &stats.getEsc());
-
-        // Delete the entries in the priority queue of ESC anchors from the ESC
-        cleanupESCAnchors(opCtx, namespaces.escNss, pq, tagsPerDelete, &stats.getEsc());
+        // Stash any resource before starting the internal transaction and restore them after the
+        // transaction commits
+        StashTransactionResourcesForMultiDocumentTransaction stasher(opCtx);
+        pq = processFLECleanup(opCtx,
+                               request,
+                               &getTransactionWithRetriesForMongoD,
+                               namespaces,
+                               pqMemLimit,
+                               &stats.getEsc(),
+                               &stats.getEcoc());
+        stasher.restoreOnCommit();
+        validateCleanupRequest(request,
+                               *collections.at(namespaces.edcNss).getCollectionPtr().get());
     }
+
+    // processFLECleanup() has fully consumed 'ecoc.compact' and materialized the ESC cleanup work
+    // into 'escDeleteSet' and 'pq'. The remaining cleanup writes only to the ESC, so it does not
+    // need to keep the read acquisition on 'ecoc.compact'.
+
+    // Delete the entries in 'C' from the ESC
+    cleanupESCNonAnchors(opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, &stats.getEsc());
+
+    // Delete the entries in the priority queue of ESC anchors from the ESC
+    cleanupESCAnchors(opCtx, namespaces.escNss, pq, tagsPerDelete, &stats.getEsc());
 
     // Drop the 'ecoc.compact' collection
     dropQEStateCollection(opCtx, namespaces.ecocRenameNss);

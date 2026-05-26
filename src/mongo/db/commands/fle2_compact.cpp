@@ -60,7 +60,6 @@
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/transaction/transaction_api.h"
@@ -75,7 +74,9 @@
 #include <algorithm>
 #include <array>
 #include <functional>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <tuple>

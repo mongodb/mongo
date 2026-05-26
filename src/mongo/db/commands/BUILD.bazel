@@ -617,6 +617,7 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db:common",
         "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:fle_compact_cleanup_mutex",
         "//src/mongo/db:fle_crud",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:server_base",
