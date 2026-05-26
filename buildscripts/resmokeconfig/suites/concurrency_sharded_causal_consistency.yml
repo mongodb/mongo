@@ -54,6 +54,7 @@ executor:
           runningWithCausalConsistency: true
           runningWithBalancer: false
           implicitlyShardOnCreateCollectionOnly: true
+          shardCollectionProbability: 0.5
   hooks:
     # TODO SERVER-120162: Re-enable once all the false positive have been addressed and the test is stable.
     # - class: CheckIdleCursors

@@ -49,6 +49,9 @@ const runCommandInLoop = function (db, namespace, cmdName, cmdObj, data, expecte
         ErrorCodes.BackgroundOperationInProgressForNamespace,
         ErrorCodes.ReshardCollectionInProgress,
         ErrorCodes.QueryPlanKilled,
+        ErrorCodes.MaxTimeMSExpired,
+        // A rename can starve behind another concurrent DDL operation holding the namespace lock.
+        ErrorCodes.LockBusy,
         // StaleConfig is usually retried by the mongos, but in situations where multiple errors
         // have ocurred on the same batch and MultipleErrorsOcurred is returned, one of the errors
         // could be StaleConfig and the other could be one that mongos does not retry the batch on.
@@ -273,9 +276,12 @@ export const $config = (function () {
             let otherDbShard;
 
             if (numShards > 1) {
+                // currDb may be null if implicit sharding is skipped, leaving the database
+                // unregistered in config.databases (no sharded collection created yet).
                 const currDb = db.getSiblingDB("config")["databases"].findOne({_id: db.getName()});
+                const primaryShard = currDb ? currDb.primary : null;
                 shardNames.some((shard) => {
-                    if (shard != currDb.primary) {
+                    if (shard != primaryShard) {
                         otherDbShard = shard;
                         return false;
                     }

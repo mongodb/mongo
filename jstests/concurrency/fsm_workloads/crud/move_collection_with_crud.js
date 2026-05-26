@@ -14,6 +14,7 @@
  */
 
 import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export const $config = (function () {
     const kTotalWorkingDocuments = 500;
@@ -55,6 +56,8 @@ export const $config = (function () {
         };
         let currentShard = currentShardFn();
         let shards = ShardingTopologyHelpers.getShardNames(mongosConn);
+        // If the collection was never tracked, currentShard is undefined and any shard is a valid
+        // moveCollection destination.
         let destinationShards = shards.filter(function (shard) {
             if (shard !== currentShard) {
                 return shard;
@@ -136,13 +139,24 @@ export const $config = (function () {
     function setup(db, collName, _cluster) {
         const ns = db + "." + collName;
         print(`Started unshardCollection on ${ns}`);
-        assert.commandWorked(db.adminCommand({unshardCollection: ns}));
-        print(`Finished unshardCollection on ${ns}`);
-
-        // Calculate the primary shard
-        let unshardedColl = db.getSiblingDB("config").collections.findOne({_id: ns});
-        let chunk = db.getSiblingDB("config").chunks.findOne({uuid: unshardedColl.uuid});
-        this.primaryShard = chunk.shard;
+        const result = db.adminCommand({unshardCollection: ns});
+        if (result.ok) {
+            print(`Finished unshardCollection on ${ns}`);
+            let unshardedColl = db.getSiblingDB("config").collections.findOne({_id: ns});
+            let chunk = db.getSiblingDB("config").chunks.findOne({uuid: unshardedColl.uuid});
+            this.primaryShard = chunk.shard;
+        } else if (
+            result.code === ErrorCodes.NamespaceNotFound &&
+            FixtureHelpers.maySkipImplicitSharding() &&
+            FixtureHelpers.isUntracked(db.getCollection(collName))
+        ) {
+            // When implicit sharding may be skipped, the collection may not have been sharded, so
+            // the database may not be registered in the cluster catalog.
+            this.primaryShard = undefined;
+            print(`unshardCollection skipped for ${ns}: collection is not tracked in cluster catalog`);
+        } else {
+            assert.commandWorked(result);
+        }
 
         const coll = db.getCollection(collName);
         assert.commandWorked(coll.insert(createDocuments(kTotalWorkingDocuments)));

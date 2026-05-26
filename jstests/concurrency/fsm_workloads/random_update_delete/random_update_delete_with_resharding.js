@@ -19,6 +19,7 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {randomUpdateDelete} from "jstests/concurrency/fsm_workload_modifiers/random_update_delete.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const $baseConfig = {
     threadCount: 5,
@@ -79,14 +80,23 @@ export const $config = extendWorkload($partialConfig, function ($config, $super)
     $config.states.reshardCollection = function reshardCollection(db, collName, connCache) {
         const namespace = `${db}.${collName}`;
         jsTestLog(`Attempting to reshard collection ${namespace}`);
-        const result = assert.commandWorked(
-            db.adminCommand({
-                reshardCollection: namespace,
-                key: this.getShardKey(collName),
-                numInitialChunks: 1,
-                forceRedistribution: true,
-            }),
-        );
+        const result = db.adminCommand({
+            reshardCollection: namespace,
+            key: this.getShardKey(collName),
+            numInitialChunks: 1,
+            forceRedistribution: true,
+        });
+        if (
+            result.code === ErrorCodes.NamespaceNotFound &&
+            FixtureHelpers.maySkipImplicitSharding() &&
+            FixtureHelpers.isUntracked(db.getCollection(collName))
+        ) {
+            // When implicit sharding is skipped, the collection may not have been sharded at
+            // setup time, making reshardCollection legitimately fail with NamespaceNotFound.
+            jsTestLog(`reshardCollection skipped for ${namespace}: collection is not sharded`);
+            return;
+        }
+        assert.commandWorked(result);
         jsTestLog(`Reshard collection result for ${namespace}: ${tojson(result)}`);
     };
 

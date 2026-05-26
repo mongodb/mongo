@@ -89,6 +89,7 @@ executor:
           runningWithBalancer: false
           implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousStepdown]
+          shardCollectionProbability: 0.5
   hooks:
     - class: ContinuousStepdown
       config_stepdown: true

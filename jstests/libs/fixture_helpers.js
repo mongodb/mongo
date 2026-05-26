@@ -108,6 +108,23 @@ export var FixtureHelpers = (function () {
     }
 
     /**
+     * Looks for an entry in the sharding catalog for the given collection to check whether it is
+     * absent.
+     *
+     * TODO (SERVER-86443): remove this utility once all collections are tracked.
+     */
+    function isUntracked(collOrDb, collUUID = undefined) {
+        if (collUUID !== undefined) {
+            return collOrDb.getSiblingDB("config").collections.findOne({uuid: collUUID}) === null;
+        }
+        return !isTracked(collOrDb);
+    }
+
+    function maySkipImplicitSharding() {
+        return typeof TestData.shardCollectionProbability !== "undefined" && TestData.shardCollectionProbability < 1;
+    }
+
+    /**
      * Returns an array with the shardIds that own data for the given collection.
      */
     function getShardsOwningDataForCollection(coll) {
@@ -290,6 +307,8 @@ export var FixtureHelpers = (function () {
         isSharded: isSharded,
         isUnsplittable: isUnsplittable,
         isTracked: isTracked,
+        isUntracked: isUntracked,
+        maySkipImplicitSharding: maySkipImplicitSharding,
         areCollectionsColocated: areCollectionsColocated,
         getShardsOwningDataForCollection: getShardsOwningDataForCollection,
         getTopologyTime: getTopologyTime,

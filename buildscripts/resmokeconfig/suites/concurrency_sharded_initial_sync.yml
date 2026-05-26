@@ -126,6 +126,7 @@ executor:
           killShards: true
           implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousInitialSync]
+          shardCollectionProbability: 0.5
 
   hooks:
     - class: ContinuousInitialSync

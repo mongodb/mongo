@@ -16,6 +16,7 @@ import {
     $config as $baseConfig,
     testCommand,
 } from "jstests/concurrency/fsm_workloads/ddl/rename_collection/collection_uuid.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     const origStates = Object.keys($config.states);
@@ -23,6 +24,12 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         {
             shardingCommands: function shardingCommands(db, collName) {
                 const namespace = db.getName() + "." + collName;
+
+                // When implicit sharding may be skipped, the collection may be unsharded and absent
+                // from the cluster catalog. All commands below require it to be tracked.
+                if (FixtureHelpers.maySkipImplicitSharding() && FixtureHelpers.isUntracked(db, this.collUUID)) {
+                    return;
+                }
 
                 // ShardCollection should fail as the collection is already sharded.
                 let shardCollectionCmd = {

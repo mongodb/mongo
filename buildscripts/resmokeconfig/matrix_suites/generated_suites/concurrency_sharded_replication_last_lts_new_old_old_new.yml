@@ -22,6 +22,7 @@ executor:
           enableOTELTracing: false
           implicitlyShardOnCreateCollectionOnly: true
           runningWithBalancer: false
+          shardCollectionProbability: 0.5
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false
