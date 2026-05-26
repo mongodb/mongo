@@ -116,6 +116,7 @@ function runTransitionTestCases(transitionType, watchMode, collSetupType) {
     // the transition (we use the first event by the previous test case as resume point).
     csCursor = null;
     const resumePoint = observedEvents[0]._id;
+    const resumeId = observedEvents[0].fullDocument._id;
 
     try {
         csCursor = cst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: resumePoint});
@@ -133,7 +134,13 @@ function runTransitionTestCases(transitionType, watchMode, collSetupType) {
 
     // On the other hand, a change stream resumed before a "transition from dedicated config server"
     // is expected to retrieve all the subsequent events.
-    cst.assertNextChangesEqualUnordered({cursor: csCursor, expectedChanges: expectedEvents.slice(1)});
+    //
+    // We exclude the event we resumed from (observedEvents[0]) rather than always slicing
+    // expectedEvents at index 0. In a sharded cluster the change stream delivers events in
+    // cluster-time order, which can differ from insertion order, so the first observed event
+    // may not be expectedEvents[0].
+    const resumedExpected = expectedEvents.filter((e) => e.fullDocument._id !== resumeId);
+    cst.assertNextChangesEqualUnordered({cursor: csCursor, expectedChanges: resumedExpected});
     cst.cleanUp();
 }
 

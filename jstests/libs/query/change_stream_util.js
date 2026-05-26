@@ -592,14 +592,24 @@ export function ChangeStreamTest(_db, options) {
 
         let changes = self.getNextChanges(cursor, expectedNumChanges, skipFirstBatch);
         if (ignoreOrder) {
-            const errMsgFunc = () => `${tojsonMaybeTruncate(changes)} != ${tojsonMaybeTruncate(expectedChanges)}`;
-            assert.eq(changes.length, expectedNumChanges, errMsgFunc);
+            const lengthMismatchErrMsg = () =>
+                "Change stream event count mismatch (order ignored). " +
+                `Expected ${expectedNumChanges} event(s), observed ${changes.length}. ` +
+                `Expected events: ${tojsonMaybeTruncate(expectedChanges)}. ` +
+                `Observed events: ${tojsonMaybeTruncate(changes)}.`;
+            assert.eq(changes.length, expectedNumChanges, lengthMismatchErrMsg);
             for (let i = 0; i < changes.length; i++) {
+                const itemMismatchErrMsg = () =>
+                    "Change stream event mismatch (order ignored). " +
+                    `No expected event matched observed event at index ${i}. ` +
+                    `Observed event: ${tojsonMaybeTruncate(changes[i])}. ` +
+                    `Expected events: ${tojsonMaybeTruncate(expectedChanges)}. ` +
+                    `Observed events: ${tojsonMaybeTruncate(changes)}.`;
                 assert(
                     expectedChanges.some((expectedChange) => {
                         return isChangeStreamEventEq(changes[i], expectedChange, eventModifier);
                     }),
-                    errMsgFunc,
+                    itemMismatchErrMsg,
                 );
             }
         } else {
