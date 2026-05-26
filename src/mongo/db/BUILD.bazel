@@ -2747,7 +2747,6 @@ mongo_cc_library(
         "//src/mongo/db/auth:auth_op_observer",
         "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
         "//src/mongo/db/shard_role/shard_catalog:catalog_impl",
-        "//src/mongo/db/shard_role/shard_catalog:shard_catalog_history_cleanup",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/repl/dbcheck:health_log",
         "//src/mongo/db/repl/dbcheck:health_log_interface",

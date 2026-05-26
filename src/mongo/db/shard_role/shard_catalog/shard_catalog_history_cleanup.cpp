@@ -31,17 +31,116 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/server_parameters_gen.h"
+#include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::shard_catalog_helper {
 
+namespace {
+
+void cleanupCollectionEntry(OperationContext* opCtx, const NamespaceString& nss) {
+    auto acquisition = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+
+    if (!acquisition.exists()) {
+        // Collection got dropped, the drop coordinator will remove all the metadata on this shard.
+        LOGV2_INFO(12620107,
+                   "Skipping collection as it got dropped and there shouldn't be any data present",
+                   "collection"_attr = nss);
+        return;
+    }
+
+    const auto isCriticalSectionActive =
+        CollectionShardingRuntime::acquireShared(opCtx, nss)
+            ->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite)
+            .has_value();
+    if (isCriticalSectionActive) {
+        LOGV2_INFO(
+            12620106, "Skipping collection as critical section is active", "collection"_attr = nss);
+        // Do an early return since the critical section is active, meaning changes are being made
+        // to the collection metadata. Bail out to prevent conflicts.
+        return;
+    }
+
+    PersistentTaskStore<ChunkType> chunkStore{NamespaceString::kConfigShardCatalogChunksNamespace};
+    auto chunkCount =
+        chunkStore.count(opCtx, BSON(ChunkType::collectionUUID() << acquisition.uuid()));
+    if (chunkCount != 0) {
+        LOGV2_INFO(
+            12620104, "Skipping collection as it still holds chunks", "collection"_attr = nss);
+        // Collection still has chunks in the shard.
+        return;
+    }
+
+    auto serializedNs = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
+    PersistentTaskStore<CollectionType> collStore{
+        NamespaceString::kConfigShardCatalogCollectionsNamespace};
+    collStore.remove(opCtx, BSON(CollectionType::kNssFieldName << serializedNs));
+}
+
+std::vector<NamespaceString> getStaleCollectionEntries(OperationContext* opCtx) {
+    std::vector<NamespaceString> collections;
+
+    static constexpr auto kChunksFieldName = "collection_chunks"_sd;
+
+    AggregateCommandRequest aggRequest{NamespaceString::kConfigShardCatalogCollectionsNamespace};
+    // Lookup collections that do not have any chunks on the durable catalog.
+    aggRequest.setPipeline(
+        {BSON("$lookup" << BSON("from" << NamespaceString::kConfigShardCatalogChunksNamespace.coll()
+                                       << "localField" << CollectionType::kUuidFieldName
+                                       << "foreignField" << ChunkType::collectionUUID() << "as"
+                                       << kChunksFieldName << "pipeline"
+                                       << BSON_ARRAY(BSON("$limit" << 1)))),
+         BSON("$match" << BSON(kChunksFieldName << BSONArray())),
+         BSON("$project" << BSON(CollectionType::kNssFieldName << 1))});
+
+    DBDirectClient client(opCtx);
+    auto cursor = uassertStatusOKWithContext(
+        DBClientCursor::fromAggregationRequest(
+            &client, aggRequest, false /* secondaryOk */, true /* useExhaust */),
+        "Failed to establish a cursor for aggregation");
+    while (cursor->more()) {
+        auto nssStringData =
+            cursor->nextSafe().getField(CollectionType::kNssFieldName).valueStringData();
+        auto nss = NamespaceStringUtil::deserialize(
+            boost::none, nssStringData, SerializationContext::stateDefault());
+        const auto isPrimaryDbShard =
+            DatabaseShardingRuntime::acquireShared(opCtx, nss.dbName())->getDbPrimaryShard(opCtx) ==
+            ShardingState::get(opCtx)->shardId();
+        if (isPrimaryDbShard) {
+            // The primary must always contain the collection entry in order to avoid having
+            // tracked/untracked issues.
+            continue;
+        }
+        collections.emplace_back(std::move(nss));
+    }
+    return collections;
+}
+}  // namespace
+
 StorageEngine::TimestampMonitor::TimestampListener kShardCatalogHistoryCleanupTimestampListener(
     [](OperationContext* opCtx, const StorageEngine::TimestampMonitor::Timestamps& timestamp) {
+        if (!gEnableBackgroundCleanupOfShardCatalog.loadRelaxed()) {
+            LOGV2_DEBUG(12620105, 1, "Skipping cleanup of shard catalog");
+            return;
+        }
+
         auto oldest = timestamp.oldest;
         auto* service = opCtx->getServiceContext();
         auto const shardingState = ShardingState::get(service);
@@ -56,15 +155,39 @@ StorageEngine::TimestampMonitor::TimestampListener kShardCatalogHistoryCleanupTi
             return;
         }
 
+        // We fix the FCV region here in order to ensure cleanup only works while FCV is fully 9.0
+        FixedFCVRegion guard{opCtx};
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        if (!(feature_flags::gAuthoritativeShardsDDL.isEnabled(VersionContext::getDecoration(opCtx),
+                                                               fcvSnapshot) &&
+              feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+                  VersionContext::getDecoration(opCtx), fcvSnapshot))) {
+            // The shard is not yet doing authoritative DDLs, as such it can skip the cleanup.
+            return;
+        }
+
         auto shardId = shardingState->shardId();
 
         PersistentTaskStore<ChunkType> chunkStore{
             NamespaceString::kConfigShardCatalogChunksNamespace};
         try {
+            LOGV2_DEBUG(12620103,
+                        1,
+                        "Performing cleanup of stale chunks and collection entries",
+                        "oldestTimestamp"_attr = oldest);
             chunkStore.remove(opCtx,
                               BSON(ChunkType::shard()
                                    << BSON("$ne" << shardId.toString())
                                    << ChunkType::onCurrentShardSince() << BSON("$lt" << oldest)));
+
+            const auto collectionsToRemove = getStaleCollectionEntries(opCtx);
+            for (const auto& collNss : collectionsToRemove) {
+                LOGV2_INFO(
+                    12620101,
+                    "Cleaning up potentially stale collection entry from durable shard catalog",
+                    "collection"_attr = collNss);
+                cleanupCollectionEntry(opCtx, collNss);
+            }
         } catch (const ExceptionFor<ErrorCodes::FailedToSatisfyReadPreference>&) {
             // Primary can be killed in the middle of the removal.
             return;
@@ -85,6 +208,7 @@ StorageEngine::TimestampMonitor::TimestampListener kShardCatalogHistoryCleanupTi
                 return;
             }
             // Otherwise, re-throw the DBException
+            throw;
         }
     });
 }  // namespace mongo::shard_catalog_helper

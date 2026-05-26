@@ -45,6 +45,16 @@ server_parameters:
             lte: 1
         redact: false
 
+    enableBackgroundCleanupOfShardCatalog:
+        description: Enables background cleanup of the authoritative shard catalog
+        set_at:
+            - startup
+            - runtime
+        cpp_varname: gEnableBackgroundCleanupOfShardCatalog
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        redact: false
+
 feature_flags:
     featureFlagPerformDeepCopyOfCollections:
         description: Forces the CollectionCatalog to always do a deep copy of collections

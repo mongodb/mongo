@@ -34,28 +34,40 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/type_chunk.h"
+#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/topology/sharding_state.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future.h"
-#include "mongo/util/future_util.h"
 #include "mongo/util/periodic_runner_factory.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 
-class ShardCatalogHistoryCleanupTest : public ServiceContextMongoDTest {
+namespace {
+static const ShardId kAnotherShardName{"anotherTestShard"};
+static const KeyPattern kKeyPattern{BSON("_id" << 1)};
+}  // namespace
+
+class ShardCatalogHistoryCleanupTest : public ShardServerTestFixture {
 public:
     void setUp() override {
-        ServiceContextMongoDTest::setUp();
+        ShardServerTestFixture::setUp();
         auto* svc = getServiceContext();
 
         auto* storageEngine = svc->getStorageEngine();
 
         storageEngine->startTimestampMonitor(
             {&shard_catalog_helper::kShardCatalogHistoryCleanupTimestampListener});
+
+        // Imagining the test is running on a primary in sharded cluster
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+        auto* replCoord = repl::ReplicationCoordinator::get(getServiceContext());
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
     }
 
     void waitForTimestampMonitorPass() {
@@ -72,112 +84,203 @@ public:
         pf.future.wait();
         timestampMonitor->removeListener(&listener);
     }
+
+    std::pair<CollectionType, std::vector<ChunkType>> makeCollectionAndChunks(
+        const NamespaceString& nss,
+        bool isCurrentlyOwned,
+        bool isOutdatedButActive,
+        bool isFullyOutdated,
+        Timestamp currentTimestamp,
+        Timestamp intermediateTimestamp,
+        Timestamp staleTimestamp) {
+
+        auto collectionUUID = UUID::gen();
+        auto epoch = OID::gen();
+        auto placement = CollectionPlacement(1, 1);
+        CollectionType collEntry{
+            nss, epoch, staleTimestamp, Date_t::now(), collectionUUID, kKeyPattern};
+
+        std::vector<ChunkType> chunks;
+        if (isCurrentlyOwned) {
+            auto currentlyOwnedChunkType =
+                ChunkType(collectionUUID,
+                          ChunkRange(BSON("_id" << MINKEY), BSON("_id" << 100)),
+                          ChunkVersion(CollectionGeneration{epoch, currentTimestamp}, placement),
+                          kMyShardName);
+            currentlyOwnedChunkType.setHistory({ChunkHistory(currentTimestamp, kMyShardName)});
+            currentlyOwnedChunkType.setOnCurrentShardSince(currentTimestamp);
+            chunks.emplace_back(std::move(currentlyOwnedChunkType));
+        }
+        if (isOutdatedButActive) {
+            auto unownedButVisibleChunk =
+                ChunkType(collectionUUID,
+                          ChunkRange(BSON("_id" << 100), BSON("_id" << 200)),
+                          ChunkVersion(CollectionGeneration{epoch, currentTimestamp}, placement),
+                          kAnotherShardName);
+            unownedButVisibleChunk.setHistory(
+                {ChunkHistory(intermediateTimestamp, kAnotherShardName),
+                 ChunkHistory(staleTimestamp, kMyShardName)});
+            unownedButVisibleChunk.setOnCurrentShardSince(intermediateTimestamp);
+            chunks.emplace_back(std::move(unownedButVisibleChunk));
+        }
+        if (isFullyOutdated) {
+            auto staleChunk =
+                ChunkType(collectionUUID,
+                          ChunkRange(BSON("_id" << 200), BSON("_id" << 300)),
+                          ChunkVersion(CollectionGeneration{epoch, currentTimestamp}, placement),
+                          kAnotherShardName);
+            staleChunk.setHistory({ChunkHistory(staleTimestamp - 1, kAnotherShardName),
+                                   ChunkHistory(staleTimestamp - 2, kMyShardName)});
+            staleChunk.setOnCurrentShardSince(staleTimestamp - 1);
+
+            chunks.emplace_back(std::move(staleChunk));
+        }
+
+        return {std::move(collEntry), std::move(chunks)};
+    }
+    void setupCollection(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         bool isCurrentlyOwned,
+                         bool isOutdatedButActive,
+                         bool isFullyOutdated,
+                         Timestamp currentTimestamp,
+                         Timestamp outdatedTimestamp,
+                         Timestamp staleTimestamp) {
+        auto [coll, chunks] = makeCollectionAndChunks(nss,
+                                                      isCurrentlyOwned,
+                                                      isOutdatedButActive,
+                                                      isFullyOutdated,
+                                                      currentTimestamp,
+                                                      outdatedTimestamp,
+                                                      staleTimestamp);
+        createTestCollection(opCtx, nss);
+        auto uuid = *CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
+        coll.setUuid(uuid);
+        for (auto& chunk : chunks) {
+            chunk.setCollectionUUID(uuid);
+        }
+
+        DBDirectClient client{opCtx};
+        client.insert(NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                      coll.asShardCatalogType().toBSON());
+        std::vector<BSONObj> chunkBsons;
+        for (const auto& chunk : chunks) {
+            chunkBsons.emplace_back(chunk.toConfigBSON());
+        }
+        client.insert(NamespaceString::kConfigShardCatalogChunksNamespace, chunkBsons);
+    }
 };
 
 TEST_F(ShardCatalogHistoryCleanupTest, ShardCatalogHistoryCleanupCalledOnTimestampMonitorAdvance) {
-    const ShardId kShardName{"testShard"};
-    const ShardId kAnotherShardName{"anotherTestShard"};
+    RAIIServerParameterControllerForTest ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    RAIIServerParameterControllerForTest crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
 
-    // Imagining the test is running on a primary in sharded cluster
-    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-    auto* replCoord = repl::ReplicationCoordinator::get(getServiceContext());
-    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-
-    ShardingState::get(getServiceContext())
-        ->setRecoveryCompleted({OID::gen(),
-                                ClusterRole::ShardServer,
-                                ConnectionString(HostAndPort("dummy", 1)),
-                                kShardName});
-
-    auto opCtx = cc().makeOperationContext();
-
-    auto shardingState = ShardingState::get(getServiceContext());
-    ASSERT_EQ(shardingState->shardId(), ShardId(kShardName));
-    ASSERT(shardingState->enabled());
+    auto opCtx = operationContext();
 
     auto storageEngine = getServiceContext()->getStorageEngine();
-    auto oldestTimestamp = storageEngine->getOldestTimestamp();
-    auto oldTimestamp = Timestamp(3, 1);
-    storageEngine->setOldestTimestamp(oldTimestamp, false /*force*/);
+    auto staleTimestamp = storageEngine->getOldestTimestamp() + 20;
+    auto oldestTimestamp = staleTimestamp + 10;
+    auto currentTimestamp = oldestTimestamp + 10;
+
+    storageEngine->setOldestTimestamp(oldestTimestamp, false /*force*/);
     waitForTimestampMonitorPass();
-    auto newTimestamp = Timestamp(4, 1);
-    storageEngine->setOldestTimestamp(newTimestamp, false /*force*/);
 
     // Filling kConfigShardCatalogChunksNamespace directly through DBClient to avoid
     // waitForMajorityConcern logic handling
-    auto collectionUUID = UUID::gen();
-    auto epoch = OID::gen();
-    auto placement = CollectionPlacement(1, 1);
+    auto [coll, chunks] = makeCollectionAndChunks(
+        NamespaceStringUtil::deserialize(
+            boost::none, "test.collection", SerializationContext::stateDefault()),
+        true,
+        true,
+        true,
+        currentTimestamp,
+        oldestTimestamp,
+        staleTimestamp);
 
-    auto currentlyOwnedChunkType =
-        ChunkType(collectionUUID,
-                  ChunkRange(BSON("_id" << MINKEY), BSON("_id" << 100)),
-                  ChunkVersion(CollectionGeneration{epoch, oldTimestamp}, placement),
-                  kShardName);
-    currentlyOwnedChunkType.setHistory({ChunkHistory(oldTimestamp, kShardName)});
-    currentlyOwnedChunkType.setOnCurrentShardSince(oldTimestamp);
-    auto outdatedPreviouslyOwnedChunkType =
-        ChunkType(collectionUUID,
-                  ChunkRange(BSON("_id" << 100), BSON("_id" << 200)),
-                  ChunkVersion(CollectionGeneration{epoch, oldTimestamp}, placement),
-                  kAnotherShardName);
-    outdatedPreviouslyOwnedChunkType.setHistory(
-        {ChunkHistory(oldTimestamp, kAnotherShardName), ChunkHistory(oldestTimestamp, kShardName)});
-    outdatedPreviouslyOwnedChunkType.setOnCurrentShardSince(oldTimestamp);
-    auto notOutdatedPreviouslyOwnedChunkType =
-        ChunkType(collectionUUID,
-                  ChunkRange(BSON("_id" << 200), BSON("_id" << 300)),
-                  ChunkVersion(CollectionGeneration{epoch, newTimestamp}, placement),
-                  kAnotherShardName);
-    notOutdatedPreviouslyOwnedChunkType.setHistory(
-        {ChunkHistory(newTimestamp, kAnotherShardName), ChunkHistory(oldestTimestamp, kShardName)});
-    notOutdatedPreviouslyOwnedChunkType.setOnCurrentShardSince(newTimestamp);
-
-    DBDirectClient client(opCtx.get());
-    client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
-                  currentlyOwnedChunkType.toConfigBSON());
-    client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
-                  outdatedPreviouslyOwnedChunkType.toConfigBSON());
-    client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
-                  notOutdatedPreviouslyOwnedChunkType.toConfigBSON());
+    std::vector<BSONObj> chunksBSON;
+    for (const auto& chunk : chunks) {
+        chunksBSON.emplace_back(chunk.toConfigBSON());
+    }
+    DBDirectClient client(opCtx);
+    client.insert(NamespaceString::kConfigShardCatalogChunksNamespace, chunksBSON);
+    client.insert(NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                  coll.asShardCatalogType().toBSON());
 
     waitForTimestampMonitorPass();
-    waitForTimestampMonitorPass();
 
-    std::vector<ChunkType> chunks;
+    size_t numChunks = 0;
     FindCommandRequest findRequest{NamespaceString::kConfigShardCatalogChunksNamespace};
     auto cursor = client.find(std::move(findRequest));
     while (cursor->more()) {
-        BSONObj obj = cursor->nextSafe().getOwned();
-        StatusWith<ChunkType> chunkRes = ChunkType::parseFromConfigBSON(obj, epoch, newTimestamp);
-        ASSERT(chunkRes.getStatus().isOK());
-        chunks.push_back(chunkRes.getValue());
+        BSONObj obj = cursor->nextSafe();
+        StatusWith<ChunkType> chunkRes =
+            ChunkType::parseFromConfigBSON(obj, coll.getEpoch(), coll.getTimestamp());
+        ASSERT_OK(chunkRes.getStatus());
+
+        const auto& chunk = chunkRes.getValue();
+
+        bool isCurrentlyOwned = chunk.getShard() == kMyShardName;
+        bool isStillVisible = chunk.getOnCurrentShardSince() >= staleTimestamp;
+        LOGV2_INFO(12620100,
+                   "Checking chunk",
+                   "chunk"_attr = obj,
+                   "isCurrentlyOwned"_attr = isCurrentlyOwned,
+                   "isStillVisible"_attr = isStillVisible);
+        ASSERT_TRUE(isCurrentlyOwned || isStillVisible);
+        numChunks++;
     }
-
-    ASSERT_EQ(chunks.size(), 2u);
-
-    // Note: Parsing from ChunkType overrode the chunk version, so we have to set it manually
-    std::vector<ChunkType> expectedChunks = {currentlyOwnedChunkType,
-                                             notOutdatedPreviouslyOwnedChunkType};
-    for (auto& chunk : expectedChunks) {
-        chunk.setVersion(ChunkVersion(CollectionGeneration(epoch, newTimestamp), placement));
-    }
-
-    std::sort(
-        expectedChunks.begin(),
-        expectedChunks.end(),
-        [](const ChunkType& lhs, const ChunkType& rhs) { return lhs.getRange() < rhs.getRange(); });
-    std::sort(chunks.begin(), chunks.end(), [](const ChunkType& lhs, const ChunkType& rhs) {
-        return lhs.getRange() < rhs.getRange();
-    });
-
-    ASSERT(std::equal(chunks.begin(),
-                      chunks.end(),
-                      expectedChunks.begin(),
-                      expectedChunks.end(),
-                      [](const ChunkType& lhs, const ChunkType& rhs) {
-                          return lhs.getRange() == rhs.getRange();
-                      }));
+    ASSERT_EQ(2, numChunks);  // currently owned + unowned but visible
 }
 
+TEST_F(ShardCatalogHistoryCleanupTest, DeletesStaleCollectionEntries) {
+    RAIIServerParameterControllerForTest ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    RAIIServerParameterControllerForTest crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+
+    auto storageEngine = getServiceContext()->getStorageEngine();
+    auto oldestTimestamp = storageEngine->getOldestTimestamp() + 20;
+    auto oldTimestamp = oldestTimestamp + 1;
+    storageEngine->setOldestTimestamp(oldTimestamp, false /*force*/);
+    auto newTimestamp = oldTimestamp + 1;
+
+    const auto kStaleNss = NamespaceStringUtil::deserialize(
+        boost::none, "test.stale_collection", SerializationContext::stateDefault());
+    const auto kCurrentNss = NamespaceStringUtil::deserialize(
+        boost::none, "test.valid_collection", SerializationContext::stateDefault());
+    setupCollection(operationContext(),
+                    kStaleNss,
+                    false,
+                    false,
+                    true,
+                    newTimestamp,
+                    oldTimestamp,
+                    oldestTimestamp);
+    setupCollection(operationContext(),
+                    kCurrentNss,
+                    true,
+                    true,
+                    false,
+                    newTimestamp,
+                    oldTimestamp,
+                    oldestTimestamp);
+
+    waitForTimestampMonitorPass();
+
+    DBDirectClient client{operationContext()};
+    ASSERT_EQ(client.count(NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                           BSON(CollectionType::kNssFieldName << kCurrentNss.toString_forTest())),
+              1);
+    ASSERT_EQ(client.count(NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                           BSON(CollectionType::kNssFieldName << kStaleNss.toString_forTest())),
+              0);
+    const auto currentUuid = *CollectionCatalog::get(operationContext())
+                                  ->lookupUUIDByNSS(operationContext(), kCurrentNss);
+    const auto staleUuid =
+        *CollectionCatalog::get(operationContext())->lookupUUIDByNSS(operationContext(), kStaleNss);
+    ASSERT_EQ(client.count(NamespaceString::kConfigShardCatalogChunksNamespace,
+                           BSON(ChunkType::collectionUUID() << staleUuid)),
+              0);
+    ASSERT_EQ(client.count(NamespaceString::kConfigShardCatalogChunksNamespace,
+                           BSON(ChunkType::collectionUUID() << currentUuid)),
+              2);
+}
 }  // namespace mongo
