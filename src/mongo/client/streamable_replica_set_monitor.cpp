@@ -79,7 +79,7 @@ using executor::EgressConnectionCloser;
 using executor::TaskExecutor;
 using CallbackArgs = TaskExecutor::CallbackArgs;
 using CallbackHandle = TaskExecutor::CallbackHandle;
-using HandshakeStage = StreamableReplicaSetMonitorErrorHandler::HandshakeStage;
+using TriggerEvent = StreamableReplicaSetMonitorErrorHandler::TriggerEvent;
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly, TagSet());
 
@@ -475,27 +475,25 @@ void StreamableReplicaSetMonitor::failedHost(const HostAndPort& host, const Stat
 void StreamableReplicaSetMonitor::failedHostPreHandshake(const HostAndPort& host,
                                                          const Status& status,
                                                          BSONObj bson) {
-    _failedHost(host, status, bson, HandshakeStage::kPreHandshake, true);
+    _failedHost(host, status, bson, TriggerEvent::kApplicationPreHandshake);
 }
 
 void StreamableReplicaSetMonitor::failedHostPostHandshake(const HostAndPort& host,
                                                           const Status& status,
                                                           BSONObj bson) {
-    _failedHost(host, status, bson, HandshakeStage::kPostHandshake, true);
+    _failedHost(host, status, bson, TriggerEvent::kApplicationPostHandshake);
 }
 
 void StreamableReplicaSetMonitor::_failedHost(const HostAndPort& host,
                                               const Status& status,
                                               BSONObj bson,
-                                              HandshakeStage stage,
-                                              bool isApplicationOperation) {
+                                              TriggerEvent triggerEvent) {
     if (_isDropped.load())
         return;
 
-    _doErrorActions(
-        host,
-        status.reason(),
-        _errorHandler->computeErrorActions(host, status, stage, isApplicationOperation, bson));
+    _doErrorActions(host,
+                    status.reason(),
+                    _errorHandler->computeErrorActions(host, status, triggerEvent, bson));
 }
 
 void StreamableReplicaSetMonitor::_doErrorActions(
@@ -748,19 +746,18 @@ void StreamableReplicaSetMonitor::onServerHeartbeatSucceededEvent(const HostAndP
 void StreamableReplicaSetMonitor::onServerHeartbeatFailureEvent(Status errorStatus,
                                                                 const HostAndPort& hostAndPort,
                                                                 const BSONObj reply) {
-    _failedHost(
-        HostAndPort(hostAndPort), errorStatus, reply, HandshakeStage::kPostHandshake, false);
+    _failedHost(HostAndPort(hostAndPort), errorStatus, reply, TriggerEvent::kHeartbeatFailure);
 }
 
 void StreamableReplicaSetMonitor::onServerPingFailedEvent(const HostAndPort& hostAndPort,
                                                           const Status& status) {
-    _failedHost(HostAndPort(hostAndPort), status, BSONObj(), HandshakeStage::kPostHandshake, false);
+    _failedHost(HostAndPort(hostAndPort), status, BSONObj(), TriggerEvent::kPingFailure);
 }
 
 void StreamableReplicaSetMonitor::onServerHandshakeFailedEvent(const HostAndPort& address,
                                                                const Status& status,
                                                                const BSONObj reply) {
-    _failedHost(HostAndPort(address), status, reply, HandshakeStage::kPreHandshake, false);
+    _failedHost(HostAndPort(address), status, reply, TriggerEvent::kHandshakeFailure);
 };
 
 void StreamableReplicaSetMonitor::onServerPingSucceededEvent(sdam::HelloRTT durationMS,

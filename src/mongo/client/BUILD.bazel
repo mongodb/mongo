@@ -522,6 +522,7 @@ mongo_cc_unit_test(
         "server_ping_monitor_test.cpp",
         "streamable_replica_set_monitor_discovery_time_processor_test.cpp",
         "streamable_replica_set_monitor_error_handler_test.cpp",
+        "streamable_replica_set_monitor_heartbeat_test.cpp",
     ],
     data = [
         "//src/mongo/client/mongo_uri_tests:test_data",

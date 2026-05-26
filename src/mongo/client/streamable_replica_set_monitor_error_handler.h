@@ -53,17 +53,52 @@ public:
         BSONObj toBSON() const;
     };
 
-    // Indicates whether the initial handshake has completed.
-    enum class HandshakeStage { kPreHandshake, kPostHandshake };
+    // Identifies which monitoring or application event triggered error action computation.
+    enum class TriggerEvent {
+        // An application (non-monitoring) operation failed on a connection before the initial
+        // hello exchange completed.
+        // TODO (SERVER-127303): Remove this error case.
+        kApplicationPreHandshake,
+
+        // An application (non-monitoring) operation failed on an established connection.
+        kApplicationPostHandshake,
+
+        // The background SDAM monitoring heartbeat (periodic hello command) failed on an
+        // established connection.
+        kHeartbeatFailure,
+
+        // A background monitoring ping failed on an established connection.
+        kPingFailure,
+
+        // The hello exchange failed during new connection setup. Fires for any new connection
+        // through the RSM's dedicated NetworkInterface via the
+        // ReplicaSetMonitorManagerNetworkConnectionHook.
+        kHandshakeFailure,
+    };
+
+    bool isApplicationEvent(TriggerEvent triggerEvent) const {
+        return triggerEvent == TriggerEvent::kApplicationPreHandshake ||
+            triggerEvent == TriggerEvent::kApplicationPostHandshake;
+    }
+
+    bool isPreHandshakeEvent(TriggerEvent triggerEvent) const {
+        return triggerEvent == TriggerEvent::kApplicationPreHandshake ||
+            triggerEvent == TriggerEvent::kHandshakeFailure;
+    }
+
+    bool isPostHandshakeEvent(TriggerEvent triggerEvent) const {
+        return triggerEvent == TriggerEvent::kApplicationPostHandshake ||
+            triggerEvent == TriggerEvent::kHeartbeatFailure ||
+            triggerEvent == TriggerEvent::kPingFailure;
+    }
 
     virtual ~StreamableReplicaSetMonitorErrorHandler() = default;
 
-    // Based on the error status, source of the error, and handshake stage determine what
+    // Based on the error status, source of the error, and trigger event determine what
     // ErrorActions we should take.
     virtual ErrorActions computeErrorActions(const HostAndPort& host,
                                              const Status& status,
-                                             HandshakeStage handshakeStage,
-                                             bool isApplicationOperation,
+                                             TriggerEvent triggerEvent,
                                              BSONObj bson) = 0;
 
 protected:
@@ -80,8 +115,7 @@ public:
 
     ErrorActions computeErrorActions(const HostAndPort& host,
                                      const Status& status,
-                                     HandshakeStage handshakeStage,
-                                     bool isApplicationOperation,
+                                     TriggerEvent triggerEvent,
                                      BSONObj bson) override;
 
 private:
@@ -89,12 +123,12 @@ private:
     void _incrementConsecutiveErrorsWithoutHelloOutcome(const HostAndPort& host);
     void _clearConsecutiveErrorsWithoutHelloOutcome(const HostAndPort& host);
 
-    bool _isNodeRecovering(const Status& status) const;
+    bool _isRetriableError(const Status& status) const;
     bool _isNetworkTimeout(const Status& status) const;
     bool _isNodeShuttingDown(const Status& status) const;
     bool _isNetworkError(const Status& status) const;
-    bool _isNotMasterOrNodeRecovering(const Status& status) const;
-    bool _isNotMaster(const Status& status) const;
+    bool _isNotPrimaryError(const Status& status) const;
+    bool _isRemoteError(const BSONObj& bson) const;
 
     const std::string _setName;
     mutable std::mutex _mutex;

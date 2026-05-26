@@ -320,8 +320,7 @@ private:
     void _failedHost(const HostAndPort& host,
                      const Status& status,
                      BSONObj bson,
-                     StreamableReplicaSetMonitorErrorHandler::HandshakeStage stage,
-                     bool isApplicationOperation);
+                     StreamableReplicaSetMonitorErrorHandler::TriggerEvent triggerEvent);
 
     sdam::SdamConfiguration _sdamConfig;
     sdam::TopologyManagerPtr _topologyManager;
