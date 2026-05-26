@@ -229,6 +229,13 @@ value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
         auto [mstrTag, mstrVal] = value::getObjectView(matchVal)->getField("match");
         auto matchString = value::getStringView(mstrTag, mstrVal);
         if (matchString.empty()) {
+            // The regex matched an empty string. If the empty match landed at the end of the
+            // input (e.g. pattern "$" or "a*" against ""), 'startBytePos' is already at
+            // 'inputString.size()' and there is no byte to advance over. Break out so we do not
+            // read past the end of the input.
+            if (startBytePos >= inputString.size()) {
+                break;
+            }
             startBytePos += str::getCodePointLength(inputString[startBytePos]);
             ++codePointPos;
         } else {

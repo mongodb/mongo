@@ -218,4 +218,44 @@ TEST_F(SBERegexTest, ComputesRegexFindAll) {
     runAndAssertFindAllExpression(compiledExpr.get(), arrayView);
 }
 
+TEST_F(SBERegexTest, RegexFindAllEmptyMatchOnEmptyInput) {
+    value::OwnedValueAccessor slotAccessor1;
+    value::OwnedValueAccessor slotAccessor2;
+    auto regexSlot = bindAccessor(&slotAccessor1);
+    auto inputSlot = bindAccessor(&slotAccessor2);
+    auto regexExpr = sbe::makeE<sbe::EFunction>(
+        EFn::kRegexFindAll, sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
+    auto compiledExpr = compileExpression(*regexExpr);
+
+    auto expectedArr = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto arrayView = value::getArrayView(expectedArr.value());
+    addMatchResult(arrayView, /*matchStr*/ "", /*idx*/ 0);
+
+    auto [regexTag, regexVal] = makeNewPcreRegex("a*", "");
+    auto [inputTag, inputVal] = value::makeNewString("");
+    slotAccessor1.reset(regexTag, regexVal);
+    slotAccessor2.reset(inputTag, inputVal);
+    runAndAssertFindAllExpression(compiledExpr.get(), arrayView);
+}
+
+TEST_F(SBERegexTest, RegexFindAllEndAnchorOnNonEmptyInput) {
+    value::OwnedValueAccessor slotAccessor1;
+    value::OwnedValueAccessor slotAccessor2;
+    auto regexSlot = bindAccessor(&slotAccessor1);
+    auto inputSlot = bindAccessor(&slotAccessor2);
+    auto regexExpr = sbe::makeE<sbe::EFunction>(
+        EFn::kRegexFindAll, sbe::makeEs(makeE<EVariable>(regexSlot), makeE<EVariable>(inputSlot)));
+    auto compiledExpr = compileExpression(*regexExpr);
+
+    auto expectedArr = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto arrayView = value::getArrayView(expectedArr.value());
+    addMatchResult(arrayView, /*matchStr*/ "", /*idx*/ 5);
+
+    auto [regexTag, regexVal] = makeNewPcreRegex("$", "");
+    auto [inputTag, inputVal] = value::makeNewString("hello");
+    slotAccessor1.reset(regexTag, regexVal);
+    slotAccessor2.reset(inputTag, inputVal);
+    runAndAssertFindAllExpression(compiledExpr.get(), arrayView);
+}
+
 }  // namespace mongo::sbe
