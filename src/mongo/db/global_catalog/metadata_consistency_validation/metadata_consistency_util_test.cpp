@@ -1963,6 +1963,104 @@ TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_MissingChunksInDurableCa
     ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
 }
 
+TEST_F(MetadataConsistencyShardCatalogTest, UntrackedCollectionWithCollectionEntry) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    OperationContext* opCtx = operationContext();
+    createTestCollection(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
+    ASSERT_EQ(1, localCatalogCollections.size());
+
+    const auto localUuid = localCatalogCollections[0]->uuid();
+    setCSRAuthoritative();
+    insertDurableShardCatalogCollection(generateCollectionType(_nss, localUuid, _keyPattern));
+    const auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        _shardId,
+        {} /* shardingCatalogCollections */,
+        localCatalogSnapshot,
+        localCatalogCollections,
+        false /*checkRangeDeletionIndexes*/,
+        false /*optionalCheckIndexes*/);
+
+    ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest, UntrackedCollectionWithChunkEntry) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    OperationContext* opCtx = operationContext();
+    createTestCollection(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
+    ASSERT_EQ(1, localCatalogCollections.size());
+
+    const auto localUuid = localCatalogCollections[0]->uuid();
+
+    auto chunk = generateChunk(
+        localUuid, _shardId, _keyPattern.globalMin(), _keyPattern.globalMax(), kShard0History);
+    setCSRAuthoritative();
+    insertDurableShardCatalogChunks({chunk});
+
+    const auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        _shardId,
+        {} /* shardingCatalogCollections */,
+        localCatalogSnapshot,
+        localCatalogCollections,
+        false /*checkRangeDeletionIndexes*/,
+        false /*optionalCheckIndexes*/);
+
+    ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest,
+       PrimaryHasNoCollectionEntryForChunklessCollectionGlobalCatalogHas) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    const auto localUuid = setUpLocalCollection();
+    auto globalCatalogColl = generateCollectionType(_nss, localUuid, _keyPattern);
+
+    setCSRAuthoritative();
+    _catalogClient->setChunksToReturn({});
+
+    const auto inconsistencies = checkConsistency(globalCatalogColl);
+
+    ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+}
+
+TEST_F(MetadataConsistencyShardCatalogTest,
+       GlobalCatalogHasNoCollectionEntryForChunklessCollectionPrimaryHas) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
+                                                               true);
+
+    OperationContext* opCtx = operationContext();
+    createTestCollection(opCtx, _nss);
+    const auto [localCatalogSnapshot, localCatalogCollections] = getLocalCatalog(opCtx, _nss);
+    ASSERT_EQ(1, localCatalogCollections.size());
+
+    const auto localUuid = localCatalogCollections[0]->uuid();
+
+    setCSRAuthoritative();
+    insertDurableShardCatalogCollection(generateCollectionType(_nss, localUuid, _keyPattern));
+
+    const auto inconsistencies = metadata_consistency_util::checkCollectionMetadataConsistency(
+        opCtx,
+        _shardId,
+        _shardId,
+        {} /* shardingCatalogCollections */,
+        localCatalogSnapshot,
+        localCatalogCollections,
+        false /*checkRangeDeletionIndexes*/,
+        false /*optionalCheckIndexes*/);
+
+    ASSERT_EQ(1, countInconsistenciesWithReasonField(inconsistencies));
+}
+
 TEST_F(MetadataConsistencyShardCatalogTest, DurablePath_SkippedWhenNonAuthoritative) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagAuthoritativeShardsCRUD",
                                                                true);
