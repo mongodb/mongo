@@ -1072,12 +1072,12 @@ value::TagValueMaybeOwned ByteCode::genericPow(value::TagValueView base,
 
     if (base.tag == value::TypeTags::NumberDecimal ||
         exponent.tag == value::TypeTags::NumberDecimal) {
-        auto baseDecimal = numericCast<Decimal128>(base.tag, base.value);
-        auto exponenetDecimal = numericCast<Decimal128>(exponent.tag, exponent.value);
-        if (baseDecimal == Decimal128("0") && exponenetDecimal < Decimal128("0")) {
+        auto baseDecimal = numericCast<Decimal128>(base);
+        auto exponentDecimal = numericCast<Decimal128>(exponent);
+        if (baseDecimal == Decimal128("0") && exponentDecimal < Decimal128("0")) {
             return {false, value::TypeTags::Nothing, 0};
         }
-        auto result = baseDecimal.power(exponenetDecimal);
+        auto result = baseDecimal.power(exponentDecimal);
         auto [resTag, resValue] = value::makeCopyDecimal(result);
         return {true, resTag, resValue};
     }
@@ -1085,8 +1085,8 @@ value::TagValueMaybeOwned ByteCode::genericPow(value::TagValueView base,
     // If either argument is a double, return a double.
     if (base.tag == value::TypeTags::NumberDouble ||
         exponent.tag == value::TypeTags::NumberDouble) {
-        auto baseDouble = numericCast<double>(base.tag, base.value);
-        auto exponentDouble = numericCast<double>(exponent.tag, exponent.value);
+        auto baseDouble = numericCast<double>(base);
+        auto exponentDouble = numericCast<double>(exponent);
         if (baseDouble == 0 && exponentDouble < 0) {
             return {false, value::TypeTags::Nothing, 0};
         }
@@ -1221,13 +1221,13 @@ value::TagValueMaybeOwned ByteCode::genericAtan2(value::TagValueView operand1,
             case value::TypeTags::NumberInt32:
             case value::TypeTags::NumberInt64:
             case value::TypeTags::NumberDouble: {
-                auto result = std::atan2(numericCast<double>(operand1.tag, operand1.value),
-                                         numericCast<double>(operand2.tag, operand2.value));
+                auto result =
+                    std::atan2(numericCast<double>(operand1), numericCast<double>(operand2));
                 return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(result)};
             }
             case value::TypeTags::NumberDecimal: {
-                auto result = numericCast<Decimal128>(operand1.tag, operand1.value)
-                                  .atan2(numericCast<Decimal128>(operand2.tag, operand2.value));
+                auto result =
+                    numericCast<Decimal128>(operand1).atan2(numericCast<Decimal128>(operand2));
                 auto [resTag, resValue] = value::makeCopyDecimal(result);
                 return {true, resTag, resValue};
             }
@@ -1252,12 +1252,11 @@ value::TagValueMaybeOwned ByteCode::genericDegreesToRadians(value::TagValueView 
             case value::TypeTags::NumberInt32:
             case value::TypeTags::NumberInt64:
             case value::TypeTags::NumberDouble: {
-                auto result = numericCast<double>(operand.tag, operand.value) * kDoublePiOver180;
+                auto result = numericCast<double>(operand) * kDoublePiOver180;
                 return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(result)};
             }
             case value::TypeTags::NumberDecimal: {
-                auto result = numericCast<Decimal128>(operand.tag, operand.value)
-                                  .multiply(Decimal128::kPiOver180);
+                auto result = numericCast<Decimal128>(operand).multiply(Decimal128::kPiOver180);
                 auto [resTag, resValue] = value::makeCopyDecimal(result);
                 return {true, resTag, resValue};
             }
@@ -1274,12 +1273,11 @@ value::TagValueMaybeOwned ByteCode::genericRadiansToDegrees(value::TagValueView 
             case value::TypeTags::NumberInt32:
             case value::TypeTags::NumberInt64:
             case value::TypeTags::NumberDouble: {
-                auto result = numericCast<double>(operand.tag, operand.value) * kDouble180OverPi;
+                auto result = numericCast<double>(operand) * kDouble180OverPi;
                 return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(result)};
             }
             case value::TypeTags::NumberDecimal: {
-                auto result = numericCast<Decimal128>(operand.tag, operand.value)
-                                  .multiply(Decimal128::k180OverPi);
+                auto result = numericCast<Decimal128>(operand).multiply(Decimal128::k180OverPi);
                 auto [resTag, resValue] = value::makeCopyDecimal(result);
                 return {true, resTag, resValue};
             }

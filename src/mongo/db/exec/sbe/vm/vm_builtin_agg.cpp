@@ -1268,7 +1268,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggExpMovingAvg(ArityType arity) {
 
     auto currentResultTagVal = state->getAt(static_cast<size_t>(AggExpMovingAvgElems::kResult));
 
-    auto decimalVal = value::numericCast<Decimal128>(field.tag, field.value);
+    auto decimalVal = value::numericCast<Decimal128>(field);
     auto result = [&]() {
         if (currentResultTagVal.tag == value::TypeTags::Null) {
             // Accumulator result has not been yet initialised. We will now

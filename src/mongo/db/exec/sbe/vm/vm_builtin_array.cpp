@@ -84,9 +84,9 @@ value::TagValueMaybeOwned ByteCode::builtinNewArrayFromRange(ArityType arity) {
     }
 
     // Cast to broader type 'int64_t' to prevent overflow during loop.
-    auto startVal = value::numericCast<int64_t>(startView.tag, startView.value);
-    auto endVal = value::numericCast<int64_t>(endView.tag, endView.value);
-    auto stepVal = value::numericCast<int64_t>(stepView.tag, stepView.value);
+    auto startVal = value::numericCast<int64_t>(startView);
+    auto endVal = value::numericCast<int64_t>(endView);
+    auto stepVal = value::numericCast<int64_t>(stepView);
 
     if (stepVal == 0) {
         return {false, value::TypeTags::Nothing, 0};

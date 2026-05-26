@@ -530,4 +530,25 @@ TEST_F(SbeValueTest, SortSpecCompareInvalid) {
     ASSERT_EQ(cmpTag, value::TypeTags::Nothing);
     ASSERT_EQ(cmpVal, 0);
 }
+TEST(SbeNumericCastTest, TagValueViewOverload) {
+    using namespace value;
+
+    TagValueView v32{TypeTags::NumberInt32, bitcastFrom<int32_t>(7)};
+    ASSERT_EQ(numericCast<int32_t>(v32), 7);
+    ASSERT_EQ(numericCast<int64_t>(v32), int64_t{7});
+    ASSERT_EQ(numericCast<double>(v32), 7.0);
+    ASSERT_EQ(numericCast<Decimal128>(v32), Decimal128(7));
+
+    TagValueView v64{TypeTags::NumberInt64, bitcastFrom<int64_t>(100LL)};
+    ASSERT_EQ(numericCast<int64_t>(v64), 100LL);
+    ASSERT_EQ(numericCast<double>(v64), 100.0);
+
+    TagValueView vd{TypeTags::NumberDouble, bitcastFrom<double>(2.5)};
+    ASSERT_EQ(numericCast<double>(vd), 2.5);
+
+    auto [decTag, decVal] = makeCopyDecimal(Decimal128("3.14"));
+    ValueGuard guard{decTag, decVal};
+    TagValueView vDec{decTag, decVal};
+    ASSERT_EQ(numericCast<Decimal128>(vDec), Decimal128("3.14"));
+}
 }  // namespace mongo::sbe

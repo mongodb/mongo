@@ -49,9 +49,8 @@ value::TagValueMaybeOwned ByteCode::genericNewKeyString(ArityType arity,
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto version = value::numericCast<int64_t>(versionView.tag, versionView.value);
-    auto discriminator =
-        value::numericCast<int64_t>(discriminatorView.tag, discriminatorView.value);
+    auto version = value::numericCast<int64_t>(versionView);
+    auto discriminator = value::numericCast<int64_t>(discriminatorView);
     if ((version < 0 || version > 1) || (discriminator < 0 || discriminator > 2)) {
         return {false, value::TypeTags::Nothing, 0};
     }
@@ -59,7 +58,7 @@ value::TagValueMaybeOwned ByteCode::genericNewKeyString(ArityType arity,
     auto ksVersion = static_cast<key_string::Version>(version);
     auto ksDiscriminator = static_cast<key_string::Discriminator>(discriminator);
 
-    uint32_t orderingBits = value::numericCast<int32_t>(orderingView.tag, orderingView.value);
+    uint32_t orderingBits = value::numericCast<int32_t>(orderingView);
 
     // Maximum number of orderings. An 'Ordering' cannot have more than 32 values at the moment.
     // Limit the usage to 32 bytes here anyway, because if that definition ever changes, the amount

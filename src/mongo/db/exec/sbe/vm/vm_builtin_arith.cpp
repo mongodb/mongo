@@ -291,7 +291,7 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSum(ArityType arity) {
             if (arg.tag == value::TypeTags::Date) {
                 sum = sum.add(Decimal128(value::bitcastTo<int64_t>(arg.value)));
             } else {
-                sum = sum.add(value::numericCast<Decimal128>(arg.tag, arg.value));
+                sum = sum.add(value::numericCast<Decimal128>(arg));
             }
         }
         if (haveDate) {
@@ -305,11 +305,11 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSum(ArityType arity) {
         for (ArityType idx = 0; idx < arity; ++idx) {
             auto arg = viewFromStack(idx);
             if (arg.tag == value::TypeTags::NumberInt32) {
-                sum.addInt(value::numericCast<int32_t>(arg.tag, arg.value));
+                sum.addInt(value::numericCast<int32_t>(arg));
             } else if (arg.tag == value::TypeTags::NumberInt64) {
-                sum.addLong(value::numericCast<int64_t>(arg.tag, arg.value));
+                sum.addLong(value::numericCast<int64_t>(arg));
             } else if (arg.tag == value::TypeTags::NumberDouble) {
-                sum.addDouble(value::numericCast<double>(arg.tag, arg.value));
+                sum.addDouble(value::numericCast<double>(arg));
             } else if (arg.tag == value::TypeTags::Date) {
                 sum.addLong(value::bitcastTo<int64_t>(arg.value));
             }

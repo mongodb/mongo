@@ -107,8 +107,8 @@ value::TagValueMaybeOwned ByteCode::builtinBitTestZero(ArityType arity) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto maskNum = value::numericCast<int64_t>(mask.tag, mask.value);
-    auto inputNum = value::numericCast<int64_t>(input.tag, input.value);
+    auto maskNum = value::numericCast<int64_t>(mask);
+    auto inputNum = value::numericCast<int64_t>(input);
     auto result = (maskNum & inputNum) == 0;
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
 }
@@ -123,8 +123,8 @@ value::TagValueMaybeOwned ByteCode::builtinBitTestMask(ArityType arity) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto maskNum = value::numericCast<int64_t>(mask.tag, mask.value);
-    auto inputNum = value::numericCast<int64_t>(input.tag, input.value);
+    auto maskNum = value::numericCast<int64_t>(mask);
+    auto inputNum = value::numericCast<int64_t>(input);
     auto result = (maskNum & inputNum) == maskNum;
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
 }

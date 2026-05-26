@@ -80,13 +80,13 @@ value::TagValueMaybeOwned builtinDateHelper(DateFn computeDateFn,
     const auto tz = tzString == "" ? timeZoneDB->utcZone() : timeZoneDB->getTimeZone(tzString);
 
     auto date = computeDateFn(tz,
-                              value::numericCast<int64_t>(yearOrWeekYear.tag, yearOrWeekYear.value),
-                              value::numericCast<int64_t>(monthOrWeek.tag, monthOrWeek.value),
-                              value::numericCast<int64_t>(day.tag, day.value),
-                              value::numericCast<int64_t>(hour.tag, hour.value),
-                              value::numericCast<int64_t>(minute.tag, minute.value),
-                              value::numericCast<int64_t>(second.tag, second.value),
-                              value::numericCast<int64_t>(millisecond.tag, millisecond.value));
+                              value::numericCast<int64_t>(yearOrWeekYear),
+                              value::numericCast<int64_t>(monthOrWeek),
+                              value::numericCast<int64_t>(day),
+                              value::numericCast<int64_t>(hour),
+                              value::numericCast<int64_t>(minute),
+                              value::numericCast<int64_t>(second),
+                              value::numericCast<int64_t>(millisecond));
     return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(date.asInt64())};
 }
 

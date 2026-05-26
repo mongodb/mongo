@@ -2465,6 +2465,11 @@ inline T numericCast(TypeTags tag, Value val) noexcept {
     }
 }
 
+template <typename T>
+inline T numericCast(TagValueView v) noexcept {
+    return numericCast<T>(v.tag, v.value);
+}
+
 /**
  * Performs a lossless numeric conversion from a value to a destination type denoted by the target
  * TypeTag. In the case that a conversion is lossy, we return Nothing.
