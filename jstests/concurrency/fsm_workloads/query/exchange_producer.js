@@ -9,7 +9,9 @@
  *   does_not_support_config_fuzzer,
  *   # This will fail if using transactions because the FSM will attempt to call getMore on a cursor
  *   # that's been created outside of the transaction.
- *   does_not_support_transactions
+ *   does_not_support_transactions,
+ *   # TODO SERVER-124190: remove the multiversion incompatible tag.
+ *   multiversion_incompatible,
  * ]
  */
 
