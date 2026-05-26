@@ -270,6 +270,12 @@ public:
         uasserted(mongo::ErrorCodes::NotImplemented,
                   "StubPersistenceProvider::supportsColdCollections() method not implemented");
     }
+
+    bool supportsLegacyReplSetCommands() const override {
+        uasserted(
+            mongo::ErrorCodes::NotImplemented,
+            "StubPersistenceProvider::supportsLegacyReplSetCommands() method not implemented");
+    }
 };
 
 }  // namespace mongo::rss

@@ -71,6 +71,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/update_position_args.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
@@ -238,6 +239,13 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+
+        const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        uassert(ErrorCodes::CommandNotSupported,
+                str::stream() << "replSetGetRBID command is not supported in this storage mode: "
+                              << provider.name(),
+                provider.supportsLegacyReplSetCommands());
+
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         uassertStatusOK(status);
 

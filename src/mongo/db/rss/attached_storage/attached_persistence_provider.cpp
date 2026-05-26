@@ -238,4 +238,8 @@ bool AttachedPersistenceProvider::supportsColdCollections() const {
     return false;
 }
 
+bool AttachedPersistenceProvider::supportsLegacyReplSetCommands() const {
+    return true;
+}
+
 }  // namespace mongo::rss

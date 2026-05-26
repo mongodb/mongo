@@ -238,6 +238,10 @@ public:
      * Attached storage does not support cold collections.
      */
     bool supportsColdCollections() const override;
+
+    /**
+     * Attached storage supports replSetTestEgress and replSetGetRBID commands. */
+    bool supportsLegacyReplSetCommands() const override;
 };
 
 }  // namespace mongo::rss

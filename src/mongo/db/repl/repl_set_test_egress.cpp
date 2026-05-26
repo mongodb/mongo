@@ -37,6 +37,7 @@
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/repl_set_test_egress_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -116,6 +117,14 @@ public:
         using InvocationBase::InvocationBase;
 
         Reply typedRun(OperationContext* opCtx) {
+            const auto& provider =
+                rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+            uassert(
+                ErrorCodes::CommandNotSupported,
+                str::stream() << "replSetTestEgress command is not supported in this storage mode: "
+                              << provider.name(),
+                provider.supportsLegacyReplSetCommands());
+
             const auto& cmd = request();
 
             HostAndPort target;

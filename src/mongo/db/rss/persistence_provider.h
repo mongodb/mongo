@@ -285,6 +285,10 @@ public:
      * If true, the provider supports cold collections.
      */
     virtual bool supportsColdCollections() const = 0;
+
+    /**
+     * If true, the provider supports replSetTestEgress and replSetGetRBID commands. */
+    virtual bool supportsLegacyReplSetCommands() const = 0;
 };
 
 }  // namespace rss
