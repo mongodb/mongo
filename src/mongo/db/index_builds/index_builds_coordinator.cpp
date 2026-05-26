@@ -3954,22 +3954,10 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         indexBuildsSSS.commit.addAndFetch(1);
         storeLastCommittedDuration(*replState);
 
-        // TODO (SERVER-109664): Check build protocol rather than feature flag.
         auto onCommitFn = [&](const std::vector<boost::optional<MultikeyPaths>>& multikeys) {
-            const bool isPdib = [&] {
-                if (replState->protocol == IndexBuildProtocol::kPrimaryDriven) {
-                    return true;
-                }
-                if (replState->protocol != IndexBuildProtocol::kTwoPhase) {
-                    return false;
-                }
-                auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-                return fcvSnapshot.isVersionInitialized() &&
-                    feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
-                        VersionContext::getDecoration(opCtx), fcvSnapshot);
-            }();
-
-            const bool shouldReplicate = isPdib && IndexBuildAction::kOplogCommit != action;
+            const bool shouldReplicate =
+                replState->protocol == IndexBuildProtocol::kPrimaryDriven &&
+                IndexBuildAction::kOplogCommit != action;
             onCommitIndexBuild(opCtx,
                                collection->ns(),
                                replState,
