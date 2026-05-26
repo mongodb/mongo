@@ -100,11 +100,21 @@ void UntrackUnsplittableCollectionCoordinator::_enterCriticalSection(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
     auto service = ShardingRecoveryService::get(opCtx);
+    const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+    const bool clearFilteringMetadata = !isAuthoritative;
+
+    // The critical-section document controls what secondaries do when they observe the release.
+    // With shard-authoritative collection metadata, the commit phase removes the shard catalog
+    // entries and invalidates filtering metadata, so secondaries should not also clear collection
+    // metadata from critical-section cleanup.
     service->acquireRecoverableCriticalSectionBlockWrites(
         opCtx,
         nss(),
         _critSecReason,
-        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter());
+        ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+        false /* clearDbMetadata: untrack only changes collection metadata */,
+        clearFilteringMetadata);
     service->promoteRecoverableCriticalSectionToBlockAlsoReads(
         opCtx,
         nss(),
@@ -120,6 +130,7 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
     tassert(8631102, "There must be a collection stored in the document", _doc.getOptCollType());
+    const auto& coll = _doc.getOptCollType().get();
 
     if (!_firstExecution) {
         AllShardsAndConfigCausalityBarrier barrier{**executor, token};
@@ -132,10 +143,27 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
             opCtx,
             Grid::get(opCtx)->shardRegistry()->getConfigShard(),
             Grid::get(opCtx)->catalogClient(),
-            _doc.getOptCollType().get(),
+            coll,
             defaultMajorityWriteConcernDoNotUse(),
             session,
             **executor);
+    }
+
+    const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+
+    // The global catalog no longer tracks the collection, so shards must forget the corresponding
+    // local shard-catalog entries before the critical section is released.
+    if (isAuthoritative) {
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::commitDropCollectionMetadataToShardCatalog(
+            opCtx,
+            nss(),
+            coll.getUuid(),
+            Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+            session,
+            executor,
+            token);
     }
 
     // Checkpoint the configTime to ensure that, in the case of a stepdown, the new primary will
@@ -152,7 +180,9 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
                        participants.end());
     {
         const auto session = getNewSession(opCtx);
-        const auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
+        // In authoritative mode, the shard-catalog commit above already handled metadata
+        // invalidation, so this participant command only needs to clean up data from local
+        // collections without clearing the collection metadata again.
         sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
             opCtx,
             nss(),
@@ -162,8 +192,9 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
             session,
             true /* fromMigrate */,
             false /* dropSystemCollections */,
-            uuid,
-            true /*requireCollectionEmpty*/);
+            coll.getUuid(),
+            true /*requireCollectionEmpty*/,
+            !isAuthoritative /* forceLegacyRefresh */);
     }
 }
 
@@ -171,23 +202,33 @@ void UntrackUnsplittableCollectionCoordinator::_exitCriticalSection(
     OperationContext* opCtx,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
-    // Force a refresh of the filtering metadata to clean up the data structure held by the
-    // CollectionShardingRuntime (Note also that this code is indirectly used to notify to secondary
-    // nodes to clear their filtering information).
-    FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, nss());
-    FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss());
+    const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
 
-    // Ensures the refresh of the catalog cache will be waited majority at the end of the
-    // command
-    repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+    if (!isAuthoritative) {
+        // Legacy readers rely on the filtering metadata refresh to clear the cached state on the
+        // primary and to replicate the invalidate to secondaries.
+        FilteringMetadataCache::get(opCtx)->forceCollectionPlacementRefresh(opCtx, nss());
+        FilteringMetadataCache::get(opCtx)->waitForCollectionFlush(opCtx, nss());
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+    }
 
-    auto service = ShardingRecoveryService::get(opCtx);
-    service->releaseRecoverableCriticalSection(
+    std::unique_ptr<ShardingRecoveryService::BeforeReleasingCustomAction> actionPtr;
+    if (isAuthoritative) {
+        // The commit phase already removed the durable shard catalog entries and invalidated
+        // in-memory metadata, so releasing the critical section must not perform a second clear
+        // that could race with the authoritative commit semantics.
+        actionPtr = std::make_unique<ShardingRecoveryService::NoCustomAction>();
+    } else {
+        actionPtr = std::make_unique<ShardingRecoveryService::FilteringMetadataClearer>();
+    }
+
+    ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
         opCtx,
         nss(),
         _critSecReason,
         ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
-        ShardingRecoveryService::FilteringMetadataClearer());
+        *actionPtr);
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "untrackCollection.end", nss());
 }

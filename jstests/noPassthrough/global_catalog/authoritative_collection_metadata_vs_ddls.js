@@ -393,6 +393,34 @@ describe("Authoritative collection metadata vs DDLs", function () {
         });
     });
 
+    describe("untrackUnshardedCollection", function () {
+        it("cleans up shard catalog and preserves data for a tracked unsplittable collection", function () {
+            const db = setupDb("untrack");
+            const ns = `${db.getName()}.coll`;
+
+            assert.commandWorked(db.createCollection("coll"));
+            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard1.shardName}));
+            assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: st.shard0.shardName}));
+            assert.commandWorked(db.coll.insert([{x: 1}, {x: 2}]));
+
+            const globalMeta = getGlobalCatalogCollMetadata(ns);
+            assert.neq(null, globalMeta, `${ns}: expected in global catalog before untrack`);
+            const uuid = globalMeta.uuid;
+
+            assert.commandWorked(db.adminCommand({untrackUnshardedCollection: ns}));
+
+            assert.eq(null, getGlobalCatalogCollMetadata(ns), `${ns}: still in global catalog after untrack`);
+            assert.eq(0, getAllGlobalCatalogChunks(uuid).length, `${ns}: chunks still in global catalog after untrack`);
+            assert.eq(2, db.coll.countDocuments({}), `${ns}: user data should remain after untrack`);
+
+            st.awaitReplicationOnShards();
+            forEachNodeOnAllShards((node) => {
+                assertShardCatalogAbsentOnNode(node, ns, uuid);
+                assertInMemoryMetadataNotSharded(node, ns);
+            });
+        });
+    });
+
     describe("dropDatabase", function () {
         it("cleans up shard catalog for all tracked collections in the database", function () {
             const db = setupDb("dropdb");

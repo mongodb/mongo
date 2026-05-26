@@ -5,6 +5,7 @@
  *   requires_fcv_80,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // The test injects a metadata inconsistency.
@@ -15,7 +16,7 @@ const shard0Name = st.shard0.shardName;
 const shard1Name = st.shard1.shardName;
 let lastUUID = null;
 
-const kDbName = "db";
+const kDbName = jsTestName();
 const kCollName = "coll";
 const kNss = kDbName + "." + kCollName;
 
@@ -24,6 +25,15 @@ function verifyShardingCatalogStateAfterUntracking(st, primaryShard, ns, uuid) {
     assert.eq(0, st.s.getCollection("config.collections").countDocuments({_id: ns}));
     // Make sure there is no entry on config.chunks.
     assert.eq(0, st.s.getCollection("config.chunks").countDocuments({uuid: uuid}));
+
+    if (FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsDDL")) {
+        [st.shard0, st.shard1].forEach((shard) => {
+            const configDb = shard.getDB("config");
+            assert.eq(null, configDb.getCollection("shard.catalog.collections").findOne({_id: ns}));
+            assert.eq(0, configDb.getCollection("shard.catalog.chunks").countDocuments({uuid: uuid}));
+        });
+        return;
+    }
 
     // Make sure that the primary shard refreshed its filtering metadata upon completing the
     // command, so that there is no document on the related collections.
@@ -54,7 +64,7 @@ jsTest.log("Untrack a collection on a new primary shard works but non-empty orph
     // Inject an orphaned document for the collection in the primary shard;
     // The upcoming untrackCollection command is expected to leave it untouched (since the
     // collection is not empty).
-    st.rs1.getPrimary().getCollection(kNss).insert({x: 1});
+    assert.commandWorked(st.rs1.getPrimary().getCollection(kNss).insert({x: 1}));
 
     // Untrack the collection; the operation is only expected to succeed when its data are located
     // on the primary shard.
