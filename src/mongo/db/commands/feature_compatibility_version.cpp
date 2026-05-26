@@ -56,6 +56,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
@@ -654,24 +655,27 @@ Timestamp FeatureCompatibilityVersion::setIfCleanStartup(
         CollectionOptions options;
         options.uuid = UUID::gen();
         uassertStatusOK(storageInterface->createCollection(opCtx, nss, options));
-        WriteUnitOfWork wuow(opCtx);
 
-        // Register a callback to update the timestamp on committing the FCV document.
-        if (term != repl::OpTime::kUninitializedTerm) {
-            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                [&timestamp](OperationContext*, boost::optional<Timestamp> commitTime) {
-                    if (commitTime) {
-                        timestamp = *commitTime;
-                    }
-                });
-        }
+        writeConflictRetry(opCtx, "setFCVOnCleanStartup", nss, [&] {
+            WriteUnitOfWork wuow(opCtx);
 
-        // We then insert the featureCompatibilityVersion document into the server configuration
-        // collection. The server parameter will be updated on commit by the op observer.
-        // Leave the timestamp empty to be populated by the OpObserver.
-        uassertStatusOK(storageInterface->insertDocument(
-            opCtx, nss, repl::TimestampedBSONObj{fcvDoc.toBSON(), Timestamp()}, term));
-        wuow.commit();
+            // Register a callback to update the timestamp on committing the FCV document.
+            if (term != repl::OpTime::kUninitializedTerm) {
+                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+                    [&timestamp](OperationContext*, boost::optional<Timestamp> commitTime) {
+                        if (commitTime) {
+                            timestamp = *commitTime;
+                        }
+                    });
+            }
+
+            // We then insert the featureCompatibilityVersion document into the server configuration
+            // collection. The server parameter will be updated on commit by the op observer.
+            // Leave the timestamp empty to be populated by the OpObserver.
+            uassertStatusOK(storageInterface->insertDocument(
+                opCtx, nss, repl::TimestampedBSONObj{fcvDoc.toBSON(), Timestamp()}, term));
+            wuow.commit();
+        });
         return timestamp;
     };
 
