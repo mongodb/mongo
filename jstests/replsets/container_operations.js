@@ -1,5 +1,6 @@
 /**
- * Tests that container insert and delete operations on integer and string keyed containers appear on disk.
+ * Tests that container insert, update, and delete operations on integer and string keyed containers
+ * appear on disk.
  *
  * @tags: [requires_replication, requires_wiredtiger]
  */
@@ -8,7 +9,6 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const SIGTERM = 15;
-const collName = "coll";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -18,16 +18,17 @@ let primary = rst.getPrimary();
 const primaryDB = primary.getDB(jsTestName());
 const dbpath = rst.getDbPath(primary);
 
-if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "ContainerWrites")) {
     rst.stopSet();
     quit();
 }
 
-// Namespace required by container ops. Unused otherwise, we operate on an unrelated container.
-assert.commandWorked(primaryDB.createCollection(collName));
-
 function makeCI(ns, uri, k, v) {
     return {op: "ci", ns, container: uri, o: {k, v}};
+}
+
+function makeCU(ns, uri, k, v) {
+    return {op: "cu", ns, container: uri, o: {k, v, "$v": NumberLong(1)}};
 }
 
 function makeCD(ns, uri, k) {
@@ -53,9 +54,11 @@ function toDict(arr) {
     return out;
 }
 
-const ns = `${primaryDB.getName()}.${collName}`;
+// Reserved NamespaceString used for container ops.
+const ns = "admin.$container";
 const binA = BinData(0, "QQ==");
 const binB = BinData(0, "Qg==");
+const binC = BinData(0, "Qw==");
 
 const cases = [
     {
@@ -79,6 +82,32 @@ const cases = [
             (uri) => makeCD(ns, uri, binA),
         ],
         expected: {
+            "B": "B",
+        },
+    },
+    {
+        uri: "index-intkeys-update",
+        cfg: "key_format=q,value_format=u",
+        ops: [
+            (uri) => makeCI(ns, uri, NumberLong(1), binA),
+            (uri) => makeCI(ns, uri, NumberLong(2), binB),
+            (uri) => makeCU(ns, uri, NumberLong(1), binC),
+        ],
+        expected: {
+            1: "C",
+            2: "B",
+        },
+    },
+    {
+        uri: "index-stringkeys-update",
+        cfg: "key_format=u,value_format=u",
+        ops: [
+            (uri) => makeCI(ns, uri, binA, binA),
+            (uri) => makeCI(ns, uri, binB, binB),
+            (uri) => makeCU(ns, uri, binA, binC),
+        ],
+        expected: {
+            "A": "C",
             "B": "B",
         },
     },

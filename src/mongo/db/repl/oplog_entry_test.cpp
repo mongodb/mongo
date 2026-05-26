@@ -479,6 +479,36 @@ TEST_F(OplogEntryTest, ContainerDeleteParse) {
     ASSERT_EQ(*entry.getContainer(), ident);
 }
 
+TEST_F(OplogEntryTest, ContainerUpdateParse) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+
+    const std::string ident = "test_ident";
+
+    const BSONObj oplogBson = [&] {
+        BSONObjBuilder bob;
+        bob.append("ts", Timestamp(1, 1));
+        bob.append("t", 1LL);
+        bob.append("op", "cu");
+        bob.append("ns", nss.ns_forTest());
+        bob.append("container", ident);
+        bob.append("wall", Date_t());
+
+        BSONObjBuilder oBuilder(bob.subobjStart("o"));
+        oBuilder.appendBinData("k", 3, BinDataGeneral, "abc");
+        oBuilder.appendBinData("v", 4, BinDataGeneral, "defg");
+        oBuilder.append("$v", 1LL);
+        oBuilder.done();
+
+        return bob.obj();
+    }();
+
+    auto entry = unittest::assertGet(DurableOplogEntry::parse(oplogBson));
+    ASSERT_EQ(entry.getOpType(), repl::OpTypeEnum::kContainerUpdate);
+    ASSERT_EQ(entry.getNss(), nss);
+    ASSERT_TRUE(entry.getContainer());
+    ASSERT_EQ(*entry.getContainer(), ident);
+}
+
 TEST_F(OplogEntryTest, ContainerOpMissingContainer) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
 

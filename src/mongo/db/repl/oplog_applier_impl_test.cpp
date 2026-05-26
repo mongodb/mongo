@@ -2331,6 +2331,66 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerOperations) {
 
 // TODO (SERVER-109556): Adjustments to suites coming from this ticket might result in a better
 // candidate for this test's fixture.
+TEST_F(OplogApplierImplTest, ApplyApplyOpsContainerUpdateOperation) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+
+    auto storageEngine = serviceContext->getStorageEngine();
+    auto ident = storageEngine->generateNewInternalIdent();
+    auto ru = storageEngine->newRecoveryUnit();
+    StorageWriteTransaction swt(*ru);
+    auto trs = storageEngine->getEngine()->makeInternalRecordStore(*ru, ident, KeyFormat::String);
+    swt.commit();
+
+    auto k = BSONBinData("K", 1, BinDataGeneral);
+    auto v1 = BSONBinData("V1", 2, BinDataGeneral);
+    auto v2 = BSONBinData("V2", 2, BinDataGeneral);
+
+    const auto entryOpTime = nextOpTime();
+    ASSERT(!entryOpTime.isNull());
+
+    const BSONObj containerInsertOp =
+        BSON("op" << "ci"
+                  << "ns" << nss.ns_forTest() << "container" << ident << "o"
+                  << BSON("k" << k << "v" << v1) << "ts" << entryOpTime.getTimestamp());
+    const BSONObj containerUpdateOp = BSON("op" << "cu"
+                                                << "ns" << nss.ns_forTest() << "container" << ident
+                                                << "o" << BSON("k" << k << "v" << v2 << "$v" << 1LL)
+                                                << "ts" << entryOpTime.getTimestamp());
+
+    BSONArray innerOps = BSON_ARRAY(containerInsertOp << containerUpdateOp);
+
+    /**
+     * o: {
+     *   applyOps: [
+     *     {
+     *       op: "ci",
+     *       ns: "<db>.<coll>",
+     *       container: "<ident>",
+     *       o: {k: <BinData>, v: <BinData>},
+     *       ts: <entryOpTime>
+     *     },
+     *     {
+     *       op: "cu",
+     *       ns: "<db>.<coll>",
+     *       container: "<ident>",
+     *       o: {k: <BinData>, v: <BinData>, $v: 1},
+     *       ts: <entryOpTime>
+     *     }
+     *   ]
+     * }
+     */
+    BSONObj applyOpsCmd = BSON("applyOps" << innerOps);
+    auto entry = makeCommandOplogEntry(entryOpTime, nss, applyOpsCmd, boost::none, boost::none);
+
+    ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
+}
+
+// TODO (SERVER-109556): Adjustments to suites coming from this ticket might result in a better
+// candidate for this test's fixture.
 TEST_F(OplogApplierImplTest, ApplyContainerOperations) {
     // TODO (SERVER-116165): Remove.
     RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
@@ -2354,6 +2414,34 @@ TEST_F(OplogApplierImplTest, ApplyContainerOperations) {
 
     ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
         _opCtx.get(), ApplierOperation{&deleteEntry}, OplogApplication::Mode::kSecondary));
+}
+
+// TODO (SERVER-109556): Adjustments to suites coming from this ticket might result in a better
+// candidate for this test's fixture.
+TEST_F(OplogApplierImplTest, ApplyContainerUpdateOperation) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test.t");
+
+    auto storageEngine = serviceContext->getStorageEngine();
+    auto ident = storageEngine->generateNewInternalIdent();
+    auto ru = storageEngine->newRecoveryUnit();
+    StorageWriteTransaction swt(*ru);
+    auto trs = storageEngine->getEngine()->makeInternalRecordStore(*ru, ident, KeyFormat::String);
+    swt.commit();
+
+    auto k = BSONBinData("K", 1, BinDataGeneral);
+    auto v1 = BSONBinData("V1", 2, BinDataGeneral);
+    auto v2 = BSONBinData("V2", 2, BinDataGeneral);
+    auto insertEntry = makeContainerInsertOplogEntry(nextOpTime(), ident, k, v1);
+    auto updateEntry = makeContainerUpdateOplogEntry(nextOpTime(), ident, k, v2);
+
+    ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), ApplierOperation{&insertEntry}, OplogApplication::Mode::kSecondary));
+
+    ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), ApplierOperation{&updateEntry}, OplogApplication::Mode::kSecondary));
 }
 
 TEST_F(OplogApplierImplTest, ContainerOplogEntryHashesOnKey) {
@@ -2381,6 +2469,37 @@ TEST_F(OplogApplierImplTest, ContainerOplogEntryHashesOnKey) {
     ASSERT_EQUALS(id1, id2);
     ASSERT_NOT_EQUALS(id1, id3);
     ASSERT_NOT_EQUALS(id1, id4);
+}
+
+TEST_F(OplogApplierImplTest, ContainerUpdateOplogEntryHashesOnKey) {
+    auto nss = NamespaceString::createNamespaceString_forTest("test.hash");
+    auto ident1 = serviceContext->getStorageEngine()->generateNewInternalIdent();
+    auto ident2 = serviceContext->getStorageEngine()->generateNewInternalIdent();
+    auto k1 = BSONBinData("K", 1, BinDataGeneral);
+    auto k2 = BSONBinData("K", 2, BinDataGeneral);
+    auto v = BSONBinData("V", 1, BinDataGeneral);
+
+    auto insertEntry = makeContainerInsertOplogEntry(nextOpTime(), ident1, k1, v);
+    auto updateEntry = makeContainerUpdateOplogEntry(nextOpTime(), ident1, k1, v);
+    auto updateDiffKeyEntry = makeContainerUpdateOplogEntry(nextOpTime(), ident1, k2, v);
+    auto updateDiffIdentEntry = makeContainerUpdateOplogEntry(nextOpTime(), ident2, k1, v);
+
+    CachedCollectionProperties collPropertiesCache;
+    uint32_t insertHash =
+        OplogApplierUtils::getOplogEntryHash(_opCtx.get(), &insertEntry, &collPropertiesCache);
+    uint32_t updateHash =
+        OplogApplierUtils::getOplogEntryHash(_opCtx.get(), &updateEntry, &collPropertiesCache);
+    uint32_t updateDiffKeyHash = OplogApplierUtils::getOplogEntryHash(
+        _opCtx.get(), &updateDiffKeyEntry, &collPropertiesCache);
+    uint32_t updateDiffIdentHash = OplogApplierUtils::getOplogEntryHash(
+        _opCtx.get(), &updateDiffIdentEntry, &collPropertiesCache);
+
+    // Update on the same key should hash the same as insert on that key.
+    ASSERT_EQUALS(insertHash, updateHash);
+    // Updates on different keys should hash differently.
+    ASSERT_NOT_EQUALS(updateHash, updateDiffKeyHash);
+    // Updates on the same key but different idents should hash differently.
+    ASSERT_NOT_EQUALS(updateHash, updateDiffIdentHash);
 }
 
 class MultiOplogEntryOplogApplierImplTest : public OplogApplierImplTest {
