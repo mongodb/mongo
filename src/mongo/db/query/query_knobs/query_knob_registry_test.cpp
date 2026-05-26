@@ -30,7 +30,7 @@
 #include "mongo/db/query/query_knobs/query_knob_registry.h"
 
 #include "mongo/db/query/query_knobs/query_knob.h"
-#include "mongo/db/query/query_knobs/query_knob_registry_test_gen.h"
+#include "mongo/db/query/query_knobs/query_knob_test_knobs.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
@@ -41,17 +41,6 @@
 namespace mongo {
 
 using detail::QueryKnobRegistryBuilder;
-
-// QueryKnob<T> descriptors bound to the IDL-generated globals. Self-register
-// into QueryKnobDescriptorSet at static init; QueryKnobRegistryInit then walks
-// the descriptor set and matches each against the ServerParameter declared in
-// query_knob_registry_test.idl.
-namespace test_synth_knobs {
-inline QueryKnob<int> synthIntPqsKnob{"synthIntPqs", &readGlobalValue<gSynthIntPqs>};
-inline QueryKnob<bool> synthBoolPqsKnob{"synthBoolPqs", &readGlobalValue<gSynthBoolPqs>};
-inline QueryKnob<long long> synthLongNonPqsKnob{"synthLongNonPqs",
-                                                &readGlobalValue<gSynthLongNonPqs>};
-}  // namespace test_synth_knobs
 
 namespace {
 
@@ -68,11 +57,11 @@ QueryKnobId findEntryIndex(const QueryKnobBase& target) {
     return QueryKnobId(reg.knobCount());
 }
 
-// The test IDL registers `synthIntPqs` as a ServerParameter, which is convenient
+// The test IDL registers `testIntKnob` as a ServerParameter, which is convenient
 // to pass into Builder.addFromServerParameter() when the specific parameter identity doesn't matter
 // (invariant tests only exercise the builder's validation logic).
 ServerParameter& anyServerParameter() {
-    auto* sp = ServerParameterSet::getNodeParameterSet()->getIfExists("synthIntPqs");
+    auto* sp = ServerParameterSet::getNodeParameterSet()->getIfExists("testIntKnob");
     invariant(sp);
     return *sp;
 }
@@ -83,29 +72,29 @@ ServerParameter& anyServerParameter() {
 
 TEST(QueryKnobRegistryTest, PqsKnobIsFindableByWireName) {
     const auto& reg = QueryKnobRegistry::instance();
-    auto id = reg.getKnobIdForName("synthIntPqsWire"_sd);
+    auto id = reg.getKnobIdForName("testIntKnobWire"_sd);
     ASSERT_TRUE(id.has_value());
     const auto& e = reg.entry(*id);
-    ASSERT_EQ(&e.knob, &test_synth_knobs::synthIntPqsKnob);
+    ASSERT_EQ(&e.knob, &test_knobs::testIntKnob);
     ASSERT_TRUE(e.pqsSettable);
 }
 
 TEST(QueryKnobRegistryTest, NonPqsKnobInvisibleToLookupButCarriesWireName) {
     const auto& reg = QueryKnobRegistry::instance();
-    ASSERT_FALSE(reg.getKnobIdForName("synthLongNonPqsWire"_sd).has_value());
+    ASSERT_FALSE(reg.getKnobIdForName("testLLKnobWire"_sd).has_value());
 
-    auto idx = findEntryIndex(test_synth_knobs::synthLongNonPqsKnob);
+    auto idx = findEntryIndex(test_knobs::testLLKnob);
     ASSERT_LT(idx.value, reg.knobCount());
     const auto& e = reg.entry(idx);
-    ASSERT_EQ(e.wireName, "synthLongNonPqsWire"_sd);
+    ASSERT_EQ(e.wireName, "testLLKnobWire"_sd);
     ASSERT_FALSE(e.pqsSettable);
 }
 
 TEST(QueryKnobRegistryTest, PlainServerParameterNotRegistered) {
     const auto& reg = QueryKnobRegistry::instance();
-    ASSERT_FALSE(reg.getKnobIdForName("synthDoublePlainParam"_sd).has_value());
+    ASSERT_FALSE(reg.getKnobIdForName("testPlainParam"_sd).has_value());
 
-    auto* plain = ServerParameterSet::getNodeParameterSet()->getIfExists("synthDoublePlainParam");
+    auto* plain = ServerParameterSet::getNodeParameterSet()->getIfExists("testPlainParam");
     ASSERT(plain);
     for (size_t i = 0; i < reg.knobCount(); ++i) {
         auto id = QueryKnobId(i);
@@ -115,7 +104,7 @@ TEST(QueryKnobRegistryTest, PlainServerParameterNotRegistered) {
 
 TEST(QueryKnobRegistryTest, MinFcvRoundTrip) {
     const auto& reg = QueryKnobRegistry::instance();
-    auto id = reg.getKnobIdForName("synthIntPqsWire"_sd);
+    auto id = reg.getKnobIdForName("testIntKnobWire"_sd);
     ASSERT_TRUE(id.has_value());
     const auto& e = reg.entry(*id);
     ASSERT_TRUE(e.minFcv.has_value());
@@ -130,22 +119,22 @@ TEST(QueryKnobRegistryTest, DenseIndicesWrittenBackToDescriptors) {
     }
 }
 
-TEST(QueryKnobRegistryTest, CountsReflectPqsSplitOverSynthSubset) {
+TEST(QueryKnobRegistryTest, CountsReflectPqsSplitOverTestSubset) {
     const auto& reg = QueryKnobRegistry::instance();
-    size_t synthTotal = 0;
-    size_t synthPqs = 0;
+    size_t testTotal = 0;
+    size_t testPqs = 0;
     for (size_t i = 0; i < reg.knobCount(); ++i) {
         auto id = QueryKnobId(i);
         const auto& e = reg.entry(id);
-        if (e.wireName.starts_with("synth"_sd)) {
-            ++synthTotal;
+        if (e.wireName.starts_with("test"_sd)) {
+            ++testTotal;
             if (e.pqsSettable) {
-                ++synthPqs;
+                ++testPqs;
             }
         }
     }
-    ASSERT_EQ(synthTotal, 3u);
-    ASSERT_EQ(synthPqs, 2u);
+    ASSERT_EQ(testTotal, 5u);
+    ASSERT_EQ(testPqs, 2u);
 }
 
 // -----------------------------------------------------------------------------
@@ -175,12 +164,12 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  "duplicate wire name.*dup") {
     QueryKnobRegistryBuilder b;
     auto minFcv = multiversion::parseVersionForFeatureFlags("9.0"_sd);
-    b.addFromServerParameter({.knob = test_synth_knobs::synthIntPqsKnob,
+    b.addFromServerParameter({.knob = test_knobs::testIntKnob,
                               .param = anyServerParameter(),
                               .wireName = "dup"_sd,
                               .pqsSettable = true,
                               .minFcv = minFcv});
-    b.addFromServerParameter({.knob = test_synth_knobs::synthBoolPqsKnob,
+    b.addFromServerParameter({.knob = test_knobs::testBoolKnob,
                               .param = anyServerParameter(),
                               .wireName = "dup"_sd,
                               .pqsSettable = true,
@@ -192,7 +181,7 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  EmptyWireNameInvariant,
                  "wire name must not be empty") {
     QueryKnobRegistryBuilder b;
-    b.addFromServerParameter({.knob = test_synth_knobs::synthIntPqsKnob,
+    b.addFromServerParameter({.knob = test_knobs::testIntKnob,
                               .param = anyServerParameter(),
                               .wireName = ""_sd,
                               .pqsSettable = true,
@@ -203,7 +192,7 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  PqsWithoutMinFcvInvariant,
                  "PQS knob.*foo.*requires minFcv") {
     QueryKnobRegistryBuilder b;
-    b.addFromServerParameter({.knob = test_synth_knobs::synthIntPqsKnob,
+    b.addFromServerParameter({.knob = test_knobs::testIntKnob,
                               .param = anyServerParameter(),
                               .wireName = "foo"_sd,
                               .pqsSettable = true,
@@ -212,24 +201,24 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  MissingServerParameterInvariant,
-                 "no ServerParameter for QueryKnob.*synthIntPqs") {
+                 "no ServerParameter for QueryKnob.*testIntKnob") {
     QueryKnobRegistryBuilder b;
-    b.addFromServerParameter(test_synth_knobs::synthIntPqsKnob, nullptr);
+    b.addFromServerParameter(test_knobs::testIntKnob, nullptr);
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  ServerParameterMissingAnnotationInvariant,
                  "missing the query_knob annotation") {
-    auto* plain = ServerParameterSet::getNodeParameterSet()->getIfExists("synthDoublePlainParam");
+    auto* plain = ServerParameterSet::getNodeParameterSet()->getIfExists("testPlainParam");
     QueryKnobRegistryBuilder b;
-    b.addFromServerParameter(test_synth_knobs::synthIntPqsKnob, plain);
+    b.addFromServerParameter(test_knobs::testIntKnob, plain);
 }
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  InvalidFcvMinInvariant,
-                 "fcv.min 'nope'.*synthIntPqs.*not a valid FCV") {
+                 "fcv.min 'nope'.*testIntKnob.*not a valid FCV") {
     QueryKnobRegistryBuilder b;
-    b.addFromServerParameter(test_synth_knobs::synthIntPqsKnob,
+    b.addFromServerParameter(test_knobs::testIntKnob,
                              anyServerParameter(),
                              BSON("wire_name" << "foo"
                                               << "fcv" << BSON("min" << "nope")));
@@ -239,9 +228,9 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
 // parseVersionForFeatureFlags rejects them and the invariant fires.
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  AncientFcvMinInvariant,
-                 "fcv.min '5.0'.*synthIntPqs.*not a valid FCV") {
+                 "fcv.min '5.0'.*testIntKnob.*not a valid FCV") {
     QueryKnobRegistryBuilder b;
-    b.addFromServerParameter(test_synth_knobs::synthIntPqsKnob,
+    b.addFromServerParameter(test_knobs::testIntKnob,
                              anyServerParameter(),
                              BSON("wire_name" << "foo"
                                               << "fcv" << BSON("min" << "5.0")));
@@ -249,21 +238,21 @@ DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
 
 DEATH_TEST_REGEX(QueryKnobRegistryDeathTest,
                  OrphanAnnotationInvariant,
-                 "synthDoublePlainParam.*has a query_knob annotation but no matching QueryKnob") {
+                 "testPlainParam.*has a query_knob annotation but no matching QueryKnob") {
     auto* params = ServerParameterSet::getNodeParameterSet();
-    auto* plain = params->getIfExists("synthDoublePlainParam");
+    auto* plain = params->getIfExists("testPlainParam");
     // Turn `plain` into an orphan: annotated as a query knob but no QueryKnob<T>
     // descriptor has ever been declared against its name.
     plain->setAnnotations(BSON("query_knob" << BSON("wire_name" << "orphanWire")));
 
     QueryKnobRegistryBuilder b;
-    // Register the three known-good synthetic knobs so that only
-    // synthDoublePlainParam is orphaned when the detection runs.
-    b.addFromServerParameter(test_synth_knobs::synthIntPqsKnob, params->getIfExists("synthIntPqs"));
-    b.addFromServerParameter(test_synth_knobs::synthBoolPqsKnob,
-                             params->getIfExists("synthBoolPqs"));
-    b.addFromServerParameter(test_synth_knobs::synthLongNonPqsKnob,
-                             params->getIfExists("synthLongNonPqs"));
+    // Register all known-good test knobs so that only testPlainParam is
+    // orphaned when the detection runs.
+    b.addFromServerParameter(test_knobs::testIntKnob, params->getIfExists("testIntKnob"));
+    b.addFromServerParameter(test_knobs::testDoubleKnob, params->getIfExists("testDoubleKnob"));
+    b.addFromServerParameter(test_knobs::testBoolKnob, params->getIfExists("testBoolKnob"));
+    b.addFromServerParameter(test_knobs::testLLKnob, params->getIfExists("testLLKnob"));
+    b.addFromServerParameter(test_knobs::testEnumKnob, params->getIfExists("testEnumKnob"));
     b.detectOrphanAnnotations(*params);
 }
 

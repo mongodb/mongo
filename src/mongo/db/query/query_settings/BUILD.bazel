@@ -28,18 +28,18 @@ mongo_cc_library(
     srcs = [
         "index_hints_serialization.cpp",
         "query_framework_serialization.cpp",
+        "query_knob_overrides.cpp",
         "query_settings_comment.cpp",
         "query_settings_hash.cpp",
         ":query_settings_gen",
     ],
+    hdrs = ["query_knob_overrides.h"],
     deps = [
-        ":query_knob_overrides",
         ":query_settings_service_dependencies",
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:index_hint",
-        # TODO SERVER-127247: Replace this with 'query_knobs' once the knob initialization is explicit.
-        "//src/mongo/db/query/query_knobs:query_knob_configuration",
+        "//src/mongo/db/query/query_knobs:query_knob",
         "//src/mongo/db/query/query_shape:query_shape_hash",
     ],
 )
@@ -102,6 +102,7 @@ mongo_cc_unit_test(
     srcs = [
         "index_hints_serialization_test.cpp",
         "query_framework_serialization_test.cpp",
+        "query_knob_overrides_test.cpp",
         "query_settings_backfill_test.cpp",
         "query_settings_cluster_parameter_impl_test.cpp",
         "query_settings_hash_test.cpp",
@@ -109,13 +110,14 @@ mongo_cc_unit_test(
         "query_settings_service_test.cpp",
         "query_settings_validation_test.cpp",
         "query_shape_representative_queries_test.cpp",
-        ":query_knob_overrides_test_gen",
     ],
     tags = ["mongo_unittest_seventh_group"],
     deps = [
         ":query_settings",
         "//src/mongo/db/commands/query_cmd:query_settings_cmds",  # Necessary because tests rely on $querySettings pipeline stage.
         "//src/mongo/db/pipeline:expression_context_for_test",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query/query_knobs:query_knob_test_knobs",
         "//src/mongo/db/sharding_environment:sharding_mongos_test_fixture",
         "//src/mongo/executor:mock_async_rpc",
         "//src/mongo/unittest",
@@ -136,37 +138,5 @@ mongo_cc_benchmark(
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/util:processinfo",
-    ],
-)
-
-mongo_cc_library(
-    name = "query_knob_overrides",
-    srcs = ["query_knob_overrides.cpp"],
-    hdrs = ["query_knob_overrides.h"],
-    deps = [
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/query/query_knobs:query_knob_registry",
-    ],
-)
-
-idl_generator(
-    name = "query_knob_overrides_test_gen",
-    src = "query_knob_overrides_test.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "query_knob_overrides_test",
-    srcs = [
-        "query_knob_overrides_test.cpp",
-        ":query_knob_overrides_test_gen",
-    ],
-    tags = ["mongo_unittest_first_group"],
-    deps = [
-        ":query_knob_overrides",
-        "//src/mongo/db/query/query_knobs:query_knob_registry",
-        "//src/mongo/unittest",
     ],
 )

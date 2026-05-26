@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/query_knobs/query_knob_test_gen.h"
-#include "mongo/idl/idl_parser.h"
+#include "mongo/db/query/query_knobs/query_knob_test_knobs.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -40,29 +40,6 @@
 #include <algorithm>
 
 namespace mongo {
-
-void TestEnumKnob::append(OperationContext*,
-                          BSONObjBuilder* b,
-                          StringData name,
-                          const boost::optional<TenantId>&) {
-    *b << name << idl::serialize(_data.get());
-}
-
-Status TestEnumKnob::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data = idl::deserialize<TestKnobModeEnum>(value, IDLParserContext("testEnumKnob"));
-    return Status::OK();
-}
-
-namespace test_knobs {
-
-inline QueryKnob<int> testIntKnob{"testIntKnob", &readGlobalValue<gTestIntKnob>};
-inline QueryKnob<double> testDoubleKnob{"testDoubleKnob", &readGlobalValue<gTestDoubleKnob>};
-inline QueryKnob<bool> testBoolKnob{"testBoolKnob", &readGlobalValue<gTestBoolKnob>};
-inline QueryKnob<long long> testLLKnob{"testLLKnob", &readGlobalValue<gTestLLKnob>};
-inline QueryKnob<TestKnobModeEnum> testEnumKnob{"testEnumKnob", &readGlobalValue<TestEnumKnob>};
-
-}  // namespace test_knobs
-
 namespace {
 
 QueryKnobBase* findByName(StringData name) {
@@ -78,14 +55,6 @@ TEST(QueryKnobTest, SyntheticKnobsSelfRegister) {
     ASSERT_EQ(findByName("testBoolKnob"_sd), &test_knobs::testBoolKnob);
     ASSERT_EQ(findByName("testLLKnob"_sd), &test_knobs::testLLKnob);
     ASSERT_EQ(findByName("testEnumKnob"_sd), &test_knobs::testEnumKnob);
-}
-
-TEST(QueryKnobTest, SentinelIndex) {
-    ASSERT_FALSE(test_knobs::testIntKnob.id.initialized());
-    ASSERT_FALSE(test_knobs::testDoubleKnob.id.initialized());
-    ASSERT_FALSE(test_knobs::testBoolKnob.id.initialized());
-    ASSERT_FALSE(test_knobs::testLLKnob.id.initialized());
-    ASSERT_FALSE(test_knobs::testEnumKnob.id.initialized());
 }
 
 TEST(QueryKnobTest, ReadGlobalInt) {

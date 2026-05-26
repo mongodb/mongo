@@ -47,6 +47,12 @@ server_parameters:
         cpp_varname: gTestIntKnob
         default: 42
         redact: false
+        annotations:
+            query_knob:
+                wire_name: testIntKnobWire
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     testDoubleKnob:
         set_at: [startup, runtime]
@@ -55,6 +61,9 @@ server_parameters:
         cpp_varname: gTestDoubleKnob
         default: 3.14
         redact: false
+        annotations:
+            query_knob:
+                wire_name: testDoubleKnobWire
 
     testBoolKnob:
         set_at: [startup, runtime]
@@ -63,6 +72,12 @@ server_parameters:
         cpp_varname: gTestBoolKnob
         default: true
         redact: false
+        annotations:
+            query_knob:
+                wire_name: testBoolKnobWire
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     testLLKnob:
         set_at: [startup, runtime]
@@ -71,6 +86,9 @@ server_parameters:
         cpp_varname: gTestLLKnob
         default: 100
         redact: false
+        annotations:
+            query_knob:
+                wire_name: testLLKnobWire
 
     testEnumKnob:
         set_at: [startup, runtime]
@@ -80,4 +98,15 @@ server_parameters:
             data: synchronized_value<TestKnobModeEnum>
         default:
             expr: TestKnobModeEnum::kAlpha
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: testEnumKnobWire
+
+    testPlainParam:
+        set_at: [startup, runtime]
+        description: "Plain ServerParameter (no query_knob annotation) for QueryKnobRegistry tests."
+        cpp_vartype: AtomicWord<double>
+        cpp_varname: gTestPlainParam
+        default: 0.0
         redact: false

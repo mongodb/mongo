@@ -31,24 +31,16 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/query_knobs/query_knob.h"
-#include "mongo/db/query/query_settings/query_knob_overrides_test_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 
-#include <string>
-
 namespace mongo::query_settings {
-
-// QueryKnob<T> descriptors bound to the ServerParameters in query_knob_overrides_test.idl.
-// TODO SERVER-125993: Cover enum knob.
-namespace test_knobs {
-inline QueryKnob<int> intKnob{"overridesTestInt", &readGlobalValue<gOverridesTestInt>};
-inline QueryKnob<bool> boolKnob{"overridesTestBool", &readGlobalValue<gOverridesTestBool>};
-}  // namespace test_knobs
-
 namespace {
+
+// Uses the PQS-settable test knobs from query_knob_test.idl: testIntKnob (testIntKnobWire) and
+// testBoolKnob (testBoolKnobWire).
+// TODO SERVER-125993: Cover enum knob.
 
 TEST(QuerySettingsKnobOverridesTest, EmptyBSONYieldsEmptyOverrides) {
     auto overrides = QuerySettingsKnobOverrides::fromBSON(BSONObj{});
@@ -57,7 +49,7 @@ TEST(QuerySettingsKnobOverridesTest, EmptyBSONYieldsEmptyOverrides) {
 }
 
 TEST(QuerySettingsKnobOverridesTest, RoundTripInt) {
-    auto bson = BSON("overridesTestIntWire" << 99);
+    auto bson = BSON("testIntKnobWire" << 99);
     auto overrides = QuerySettingsKnobOverrides::fromBSON(bson);
 
     ASSERT_FALSE(overrides.empty());
@@ -68,7 +60,7 @@ TEST(QuerySettingsKnobOverridesTest, RoundTripInt) {
 }
 
 TEST(QuerySettingsKnobOverridesTest, RoundTripBool) {
-    auto bson = BSON("overridesTestBoolWire" << true);
+    auto bson = BSON("testBoolKnobWire" << true);
     auto overrides = QuerySettingsKnobOverrides::fromBSON(bson);
 
     ASSERT_EQ(overrides.entries().size(), 1u);
@@ -78,7 +70,7 @@ TEST(QuerySettingsKnobOverridesTest, RoundTripBool) {
 }
 
 TEST(QuerySettingsKnobOverridesTest, RoundTripMultipleKnobs) {
-    auto bson = BSON("overridesTestIntWire" << 7 << "overridesTestBoolWire" << false);
+    auto bson = BSON("testIntKnobWire" << 7 << "testBoolKnobWire" << false);
     auto overrides = QuerySettingsKnobOverrides::fromBSON(bson);
 
     ASSERT_EQ(overrides.entries().size(), 2u);
@@ -86,7 +78,7 @@ TEST(QuerySettingsKnobOverridesTest, RoundTripMultipleKnobs) {
 }
 
 TEST(QuerySettingsKnobOverridesTest, NullElementStoresDeleteQueryKnobOverride) {
-    auto bson = BSON("overridesTestIntWire" << BSONNULL);
+    auto bson = BSON("testIntKnobWire" << BSONNULL);
     auto overrides = QuerySettingsKnobOverrides::fromBSON(bson);
 
     ASSERT_EQ(overrides.entries().size(), 1u);
@@ -94,7 +86,7 @@ TEST(QuerySettingsKnobOverridesTest, NullElementStoresDeleteQueryKnobOverride) {
 }
 
 TEST(QuerySettingsKnobOverridesTest, DuplicateKnob) {
-    auto bson = BSON("overridesTestIntWire" << 5 << "overridesTestIntWire" << 10);
+    auto bson = BSON("testIntKnobWire" << 5 << "testIntKnobWire" << 10);
     auto overrides = QuerySettingsKnobOverrides::fromBSON(bson);
 
     ASSERT_EQ(overrides.entries().size(), 2u);
@@ -104,15 +96,14 @@ TEST(QuerySettingsKnobOverridesTest, DuplicateKnob) {
 }
 
 TEST(QuerySettingsKnobOverridesTest, WrongTypeThrows) {
-    ASSERT_THROWS_CODE(
-        QuerySettingsKnobOverrides::fromBSON(BSON("overridesTestIntWire" << "notAnInt")),
-        DBException,
-        12194501);
+    ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << "notAnInt")),
+                       DBException,
+                       12194501);
 }
 
 TEST(QuerySettingsKnobOverridesTest, ValidKnobBeforeInvalidKnobThrows) {
-    auto bson = BSON("overridesTestIntWire" << 5 << "overridesTestBoolWire"
-                                            << "notABool");
+    auto bson = BSON("testIntKnobWire" << 5 << "testBoolKnobWire"
+                                       << "notABool");
     ASSERT_THROWS_CODE(QuerySettingsKnobOverrides::fromBSON(bson), DBException, 12194501);
 }
 
@@ -125,7 +116,7 @@ TEST(QuerySettingsKnobOverridesTest, UnknownKnobThrows) {
 DEATH_TEST_REGEX(QuerySettingsKnobOverridesDeathTest,
                  ToBSONWithDeleteQueryKnobOverrideTasserts,
                  "12194502.*DeleteQueryKnobOverride must not survive past simplification") {
-    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("overridesTestIntWire" << BSONNULL));
+    auto overrides = QuerySettingsKnobOverrides::fromBSON(BSON("testIntKnobWire" << BSONNULL));
     overrides.toBSON();
 }
 
