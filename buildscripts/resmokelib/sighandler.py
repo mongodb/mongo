@@ -30,9 +30,13 @@ def register(logger, suites, start_time):
         log suite summaries.
         """
 
+        # Snapshot subprocesses before setting HANG_ANALYZER_CALLED. Other threads observe
+        # that flag and may tear down fixtures (killing mongod/mongo processes). Capturing
+        # here ensures we see the full process set before any teardown races can occur.
+        pids_to_analyze = _get_pids() if "is_inner_level" not in config.INTERNAL_PARAMS else []
         HANG_ANALYZER_CALLED.set()
         header_msg = "Dumping stacks due to SIGUSR1 signal"
-        _dump_and_log(header_msg)
+        _dump_and_log(header_msg, pids_to_analyze)
 
     def _handle_set_event(event_handle):
         """Event object handler for Windows.
@@ -51,25 +55,24 @@ def register(logger, suites, start_time):
             except win32event.error as err:
                 logger.error("Exception from win32event.WaitForSingleObject with error: %s" % err)
             else:
+                # Snapshot subprocesses before setting HANG_ANALYZER_CALLED for the same
+                # reason as in _handle_sigusr1.
+                pids_to_analyze = (
+                    _get_pids() if "is_inner_level" not in config.INTERNAL_PARAMS else []
+                )
                 HANG_ANALYZER_CALLED.set()
                 header_msg = "Dumping stacks due to signal from win32event.SetEvent"
 
-                _dump_and_log(header_msg)
+                _dump_and_log(header_msg, pids_to_analyze)
 
-    def _dump_and_log(header_msg):
+    def _dump_and_log(header_msg, pids_to_analyze):
         """Dump the stacks of all threads, write report file, and log suite summaries."""
         _dump_stacks(logger, header_msg)
         reportfile.write(suites)
 
         testing.suite.Suite.log_summaries(logger, suites, time.time() - start_time)
 
-        if "is_inner_level" not in config.INTERNAL_PARAMS:
-            # Gather and analyze pids of all subprocesses.
-            # Do nothing for child resmoke process started by another resmoke process
-            # (e.g. backup_restore.js) The child processes of the child resmoke will be
-            # analyzed by the signal handler of the top-level resmoke process.
-            # i.e. the next few lines of code.
-            pids_to_analyze = _get_pids()
+        if pids_to_analyze:
             _analyze_pids(logger, pids_to_analyze)
 
     # On Windows spawn a thread to wait on an event object for signal to dump stacks. For Cygwin

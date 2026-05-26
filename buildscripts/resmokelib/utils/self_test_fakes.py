@@ -11,8 +11,9 @@ def test_analysis(logger: logging.Logger, pids: list[int]) -> None:
     Write the pids out to a file and kill them instead of running analysis.
     This option will only be specified in resmoke selftests.
     """
-    with open(os.path.join(config.DBPATH_PREFIX, "test_analysis.txt"), "w") as analysis_file:
-        analysis_file.write("\n".join([str(pid) for pid in pids]))
+    with open(os.path.join(config.DBPATH_PREFIX, "test_analysis.txt"), "a") as analysis_file:
+        if pids:
+            analysis_file.write("\n".join(str(pid) for pid in pids) + "\n")
         for pid in pids:
             try:
                 proc = psutil.Process(pid)
