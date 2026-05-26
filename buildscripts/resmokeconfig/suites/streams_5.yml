@@ -4,6 +4,7 @@ selector:
   roots:
     - src/mongo/db/modules/*/jstests/streams/change_stream_source_initial_sync_checkpoint_catchup.js
     - src/mongo/db/modules/*/jstests/streams/change_stream_source_initial_sync_1.js
+    - src/mongo/db/modules/*/jstests/streams/change_stream_source_initial_sync_multi_collection.js
 
 executor:
   fixture:
