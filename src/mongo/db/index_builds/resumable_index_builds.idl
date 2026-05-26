@@ -123,8 +123,10 @@ structs:
                 description: "The multikey paths for the index, if supported."
                 type: array<MultikeyPath>
 
-    ResumeIndexInfo:
-        description: "Information needed to resume index builds"
+    IndexBuildMetadata:
+        description:
+            "Basic metadata about the state of an index build that is not specific to any particular
+            index within the build."
         strict: true
         fields:
             _id:
@@ -134,13 +136,21 @@ structs:
                 cpp_name: buildUUID
                 type: uuid
             phase:
-                description: "The phase the index build was in when the node shut down"
+                description: "The current phase that the index build is in."
                 type: IndexBuildPhase
             collectionUUID:
                 description:
                     "A UUID that uniquely identifies which collection the index is being
                     built on"
                 type: uuid
+
+    ResumeIndexInfo:
+        description: "Complete information needed to resume an index build."
+        strict: true
+        inline_chained_structs: true
+        chained_structs:
+            IndexBuildMetadata: metadata
+        fields:
             collectionScanPosition:
                 description: "The last record id inserted into the sorter before shutdown"
                 type: RecordId
