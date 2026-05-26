@@ -220,7 +220,7 @@ function preferShortestIndexWithComparisonsInFilter(indexPruningActive) {
             return [abcIndex, abIndex];
         })();
         assertIndexScan(false, filter, expectedWithoutTieBreaking, explain);
-        assertIndexScan(true, filter, expectedWithTieBreaking, explain);
+        assertIndexScan(true, filter, expectedWithTieBreaking);
     }
 
     for (const index of indexes) {
