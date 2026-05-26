@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/logv2/log.h"
@@ -43,6 +44,9 @@ using namespace mongo::multikey_paths;
 MONGO_FAIL_POINT_DEFINE(pathArraynessYieldInvalidation);
 
 namespace mongo {
+
+auto& pathArraynessQueriesFailedDueToInvalidation =
+    *MetricBuilder<Counter64>{"query.pathArrayness.queriesFailedDueToInvalidation"};
 
 const PathArrayness& PathArrayness::emptyPathArrayness() {
     static const PathArrayness kEmptyPathArrayness;
@@ -220,6 +224,7 @@ boost::optional<FieldPath> PathArrayness::getFirstInvalidatedPath(
 void PathArraynessChecker::uassertIfInvalidated(const PathArrayness& current,
                                                 const NamespaceString& ns) {
     if (auto invalidated = PathArrayness::getFirstInvalidatedPath(nonArrayPaths, current)) {
+        pathArraynessQueriesFailedDueToInvalidation.increment();
         uasserted(
             ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: non-array path became multikey during yield: "

@@ -40,6 +40,7 @@ function setupColl(name) {
 const kKilledMsg = "non-array path became multikey during yield";
 
 function runPhases({runQuery, isWriteCmd}) {
+    const before = db.adminCommand({serverStatus: 1}).metrics.query.pathArrayness.queriesFailedDueToInvalidation;
     const fp = configureFailPoint(db, "pathArraynessYieldInvalidation", {}, {times: 1});
     try {
         // Verify query is killed with the path-arrayness invalidation message.
@@ -55,6 +56,8 @@ function runPhases({runQuery, isWriteCmd}) {
     } finally {
         fp.off();
     }
+    const after = db.adminCommand({serverStatus: 1}).metrics.query.pathArrayness.queriesFailedDueToInvalidation;
+    assert.eq(after, before + 1, "expected invalidation counter to be incremented", {before, after});
 }
 
 {

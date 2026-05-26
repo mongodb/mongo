@@ -71,6 +71,9 @@ function runTest({testCase, setParameters, expect}) {
     const fp = configureFailPoint(testDb, "setYieldAllLocksHang", {namespace: coll.getFullName()});
 
     try {
+        const before = testDb.adminCommand({serverStatus: 1}).metrics.query.pathArrayness
+            .queriesFailedDueToInvalidation;
+
         let awaitShell = startParallelShell(
             funWithArgs(
                 function (dbName, collName, pipeline, aggOptions, expect) {
@@ -110,6 +113,14 @@ function runTest({testCase, setParameters, expect}) {
 
         fp.off();
         awaitShell();
+
+        const after = testDb.adminCommand({serverStatus: 1}).metrics.query.pathArrayness.queriesFailedDueToInvalidation;
+        const expectedDelta = expect === "killed" ? 1 : 0;
+        assert.eq(after - before, expectedDelta, "expected invalidation counter change to be " + expectedDelta, {
+            before,
+            after,
+            expect,
+        });
     } finally {
         fp.off();
     }
