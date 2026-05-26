@@ -44,10 +44,21 @@
 
 namespace mongo::pipeline::dependency_graph {
 
+/**
+ * A dot-separated field path. Every component is interpreted as a field name and never as an
+ * array index.
+ */
 using PathRef = StringData;
 
+/**
+ * Callback used to query whether a path from the input of the pipeline (i.e. the base collection)
+ * may resolve to an array.
+ */
 using CanPathBeArray = std::function<bool(StringData)>;
 
+/**
+ * Always returns true (any path may be an array).
+ */
 bool defaultCanPathBeArray(StringData path);
 
 /**
@@ -97,39 +108,38 @@ public:
     DependencyGraph& operator=(DependencyGraph&&) noexcept;
 
     /**
-     * Return the stage which last modified the path visible from the given DocumentSource. If no
-     * DocumentSource is given, returns the stage which last modified the path in the whole
-     * pipeline. The stage must have either declared, modified or removed the path. If nullptr, the
-     * path is unmodified and assumed to originate from the pipeline input.
+     * Returns the stage which last declared, modified or removed the path as seen at the input of
+     * 'stage'. If 'stage' is nullptr, returns the stage which last touched the path at the end of
+     * the pipeline. Returns nullptr when the path passes through unchanged from the pipeline input
+     * (the base collection or sub-pipeline input). Only used for testing.
      *
-     * For example, the following stages all modify the path 'a'.
+     * For example, the following stages all modify the path 'a':
      * - {$set: {a: 1}}
      * - {$set: {a.b: 1}}
      * - {$project: {a: 0}}
      * - {$group: {_id: ...}}
      */
-    boost::intrusive_ptr<mongo::DocumentSource> getDeclaringStage(DocumentSource* stage,
-                                                                  PathRef path) const;
+    boost::intrusive_ptr<mongo::DocumentSource> getDeclaringStage_forTest(
+        const DocumentSource* stage, PathRef path) const;
 
     /**
-     * Return the stage which last modified the path visible from the given DocumentSource along
-     * with all the intermediate stages that contain subpipelines. The stage must have either
-     * declared, modified or removed the path. If the stage is nullptr, the path is originating from
-     * the pipeline input.
+     * Like getDeclaringStage_forTest, but additionally records the chain of intermediate
+     * sub-pipeline containing stages that the path crosses through.
      *
-     * When the path crosses into a sub-pipeline (e.g. "docs.x" through a $lookup), the result
-     * will have 'fromSubpipeline' set to true and 'srcStages' vector populated with pointers to the
-     * sequence of intermediate stages with subpipelines and the final declaring stage or nullptr
-     * (if it comes from the collection).
+     * When the path crosses into a sub-pipeline (e.g. "docs.x" through a $lookup), the result has
+     * 'fromSubpipeline' set to true and 'srcStages' populated with the chain of intermediate
+     * sub-pipeline containing stages followed by the final declaring stage (or nullptr if the path
+     * comes from the sub-pipeline's input).
      */
-    DeclaringStageResult getDeclaringStageIncludingSubpipelines(DocumentSource* stage,
-                                                                PathRef path) const;
+    DeclaringStageResult getDeclaringStageIncludingSubpipelines_forTest(const DocumentSource* stage,
+                                                                        PathRef path) const;
 
     /**
-     * Returns false if the path visible from the given DocumentSource can be assumed to not contain
-     * arrays. If nullptr, the path is assumed to originate from the pipeline input.
+     * Returns false if the path as seen at the input of 'stage' can be proven to not be an array.
+     * Returns true otherwise. If 'stage' is nullptr, the path is evaluated as it appears at the end
+     * of the pipeline.
      */
-    bool canPathBeArray(DocumentSource* stage, PathRef path) const;
+    bool canPathBeArray(const DocumentSource* stage, PathRef path) const;
 
     /**
      * Returns the constant value of 'path' visible to 'stage' (i.e., as it appears in the input
@@ -141,19 +151,20 @@ public:
      * not statically known, which includes the case where resolving the path would have to
      * traverse an array element.
      */
-    boost::optional<Value> getConstant(DocumentSource* stage, PathRef path) const;
+    boost::optional<Value> getConstant(const DocumentSource* stage, PathRef path) const;
 
     /**
      * Returns the dependency graph for the sub-pipeline of the given stage (e.g. $lookup,
      * $unionWith), or nullptr if the stage has no sub-pipeline.
      */
-    const DependencyGraph* getSubpipelineGraph(DocumentSource* stage) const;
+    const DependencyGraph* getSubpipelineGraph(const DocumentSource* stage) const;
 
     /**
-     * Invalidate and recompute the subgraph starting from the earliest nodes which correspond to
-     * the stage pointed to by 'stageIt'.
+     * Invalidate and recompute the graph from the stage pointed to by 'stageIt' onwards. If
+     * 'stageIt' is not given, recomputes the entire graph from the beginning of the container. Only
+     * used for testing.
      */
-    void recompute(boost::optional<DocumentSourceContainer::const_iterator> stageIt = {});
+    void recompute_forTest(boost::optional<DocumentSourceContainer::const_iterator> stageIt = {});
 
     /**
      * Resizes the graph so that it covers the stages in the range [container.begin(), newEndIt).
@@ -211,7 +222,14 @@ public:
      */
     std::vector<DeadField> getDeadFields() const;
 
+    /**
+     * Renders the graph as a string for debug and golden-test output.
+     */
     std::string toDebugString() const;
+
+    /**
+     * Renders the graph as BSON for debug and golden-test output.
+     */
     BSONObj toBSON() const;
 
 private:
@@ -220,20 +238,23 @@ private:
 };
 
 /**
- * Constructs the DependencyGraph and allows it to be invalidated and recomputed.
+ * Owns and lazily constructs the DependencyGraph for a pipeline and allows it to be invalidated and
+ * recomputed as the pipeline is rewritten.
  */
 class DependencyGraphContext {
 public:
     DependencyGraphContext(ExpressionContext& expCtx, DocumentSourceContainer& container);
 
     /**
-     * Get a dependency graph which is valid up to the given element.
+     * Returns a dependency graph that covers the stages from the beginning of the container up to
+     * and including 'maxStageIt'. If 'maxStageIt' is not given, covers the whole container.
      */
     const DependencyGraph& getGraph(
         boost::optional<DocumentSourceContainer::const_iterator> maxStageIt = {}) const;
 
     /**
-     * Report that the stages starting at 'startIt' may have changed.
+     * Report that the stages starting at 'startIt' may have changed. The graph will be recomputed
+     * for those stages on the next call to getGraph().
      */
     void invalidateFrom(DocumentSourceContainer::const_iterator startIt);
 

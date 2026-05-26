@@ -38,7 +38,7 @@ inline void recomputeAndAssert(DependencyGraph& graph, const Pipeline& pipeline,
     const auto& sources = pipeline.getSources();
     for (auto it = sources.begin(); it != sources.end(); ++it) {
         func();
-        graph.recompute(it);
+        graph.recompute_forTest(it);
     }
     func();
 }

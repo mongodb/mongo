@@ -570,7 +570,7 @@ public:
         grow(endIt);
     }
 
-    boost::intrusive_ptr<mongo::DocumentSource> getDeclaringStage(DocumentSource* ds,
+    boost::intrusive_ptr<mongo::DocumentSource> getDeclaringStage(const DocumentSource* ds,
                                                                   PathRef path) const {
         auto stageId = getPreviousStageId(ds);
         if (!stageId) {
@@ -589,7 +589,7 @@ public:
         return nullptr;
     }
 
-    DeclaringStageResult getDeclaringStageIncludingSubpipelines(DocumentSource* ds,
+    DeclaringStageResult getDeclaringStageIncludingSubpipelines(const DocumentSource* ds,
                                                                 PathRef path) const {
         auto stageId = getPreviousStageId(ds);
         if (!stageId) {
@@ -610,8 +610,8 @@ public:
             if (auto* subGraph = _stages[declaringStageId].subpipelineGraph) {
                 auto suffixPath = skipPathComponents(path, prefix.size() + 1);
                 if (!suffixPath.empty()) {
-                    auto result =
-                        subGraph->getDeclaringStageIncludingSubpipelines(nullptr, suffixPath);
+                    auto result = subGraph->getDeclaringStageIncludingSubpipelines_forTest(
+                        nullptr, suffixPath);
                     result.srcStages.insert(result.srcStages.begin(),
                                             _stages[declaringStageId].documentSource);
                     result.fromSubpipeline = true;
@@ -623,7 +623,7 @@ public:
         return {{getDeclaringStage(ds, path)}};
     }
 
-    bool canPathBeArray(DocumentSource* ds, PathRef path) const {
+    bool canPathBeArray(const DocumentSource* ds, PathRef path) const {
         auto stageId = getPreviousStageId(ds);
         if (!stageId) {
             // Empty pipeline - all paths come from the base collection.
@@ -687,7 +687,7 @@ public:
         MONGO_UNREACHABLE_TASSERT(12266805);
     }
 
-    boost::optional<Value> getConstant(DocumentSource* ds, PathRef path) const {
+    boost::optional<Value> getConstant(const DocumentSource* ds, PathRef path) const {
         auto stageId = getPreviousStageId(ds);
         if (!stageId) {
             return boost::none;
@@ -731,7 +731,7 @@ public:
         MONGO_UNREACHABLE_TASSERT(11939201);
     }
 
-    const DependencyGraph* getSubpipelineGraph(DocumentSource* ds) const {
+    const DependencyGraph* getSubpipelineGraph(const DocumentSource* ds) const {
         auto stageId = getStageId(ds);
         return _stages[stageId].subpipelineGraph;
     }
@@ -1367,7 +1367,7 @@ private:
     /**
      * Gets the stage node that represents the given DocumentSource in the graph.
      */
-    StageId getStageId(DocumentSource* ds) const {
+    StageId getStageId(const DocumentSource* ds) const {
         if (!ds) {
             return _stages.getLastId();
         }
@@ -1382,7 +1382,7 @@ private:
      * Gets the stage node that represents the stage before the given DocumentSource in the graph. A
      * nullptr denotes the position after last stage.
      */
-    StageId getPreviousStageId(DocumentSource* ds) const {
+    StageId getPreviousStageId(const DocumentSource* ds) const {
         auto stageId = getStageId(ds);
         if (ds) {
             if (stageId == StageId{0}) {
@@ -1945,29 +1945,30 @@ DependencyGraph::~DependencyGraph() = default;
 DependencyGraph::DependencyGraph(DependencyGraph&&) noexcept = default;
 DependencyGraph& DependencyGraph::operator=(DependencyGraph&&) noexcept = default;
 
-boost::intrusive_ptr<mongo::DocumentSource> DependencyGraph::getDeclaringStage(DocumentSource* ds,
-                                                                               PathRef path) const {
+boost::intrusive_ptr<mongo::DocumentSource> DependencyGraph::getDeclaringStage_forTest(
+    const DocumentSource* ds, PathRef path) const {
     return _impl->getDeclaringStage(ds, path);
 }
 
-DeclaringStageResult DependencyGraph::getDeclaringStageIncludingSubpipelines(DocumentSource* ds,
-                                                                             PathRef path) const {
+DeclaringStageResult DependencyGraph::getDeclaringStageIncludingSubpipelines_forTest(
+    const DocumentSource* ds, PathRef path) const {
     return _impl->getDeclaringStageIncludingSubpipelines(ds, path);
 }
 
-bool DependencyGraph::canPathBeArray(DocumentSource* ds, PathRef path) const {
+bool DependencyGraph::canPathBeArray(const DocumentSource* ds, PathRef path) const {
     return _impl->canPathBeArray(ds, path);
 }
 
-boost::optional<Value> DependencyGraph::getConstant(DocumentSource* ds, PathRef path) const {
+boost::optional<Value> DependencyGraph::getConstant(const DocumentSource* ds, PathRef path) const {
     return _impl->getConstant(ds, path);
 }
 
-const DependencyGraph* DependencyGraph::getSubpipelineGraph(DocumentSource* ds) const {
+const DependencyGraph* DependencyGraph::getSubpipelineGraph(const DocumentSource* ds) const {
     return _impl->getSubpipelineGraph(ds);
 }
 
-void DependencyGraph::recompute(boost::optional<DocumentSourceContainer::const_iterator> stageIt) {
+void DependencyGraph::recompute_forTest(
+    boost::optional<DocumentSourceContainer::const_iterator> stageIt) {
     _impl->recompute(stageIt);
 }
 

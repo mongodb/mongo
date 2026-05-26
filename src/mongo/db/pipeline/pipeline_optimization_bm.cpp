@@ -234,7 +234,7 @@ BENCHMARK_DEFINE_F(PipelineOptimizationBMFixture, BM_RebuildDependencyGraphFromM
 
     DependencyGraph graph(pipeline->getSources());
     for (auto keepRunning : state) {
-        graph.recompute(middleIt);
+        graph.recompute_forTest(middleIt);
     }
 }
 BENCHMARK_REGISTER_F(PipelineOptimizationBMFixture, BM_RebuildDependencyGraphFromMiddle)
