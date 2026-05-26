@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/service_context.h"
@@ -1148,18 +1149,26 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateWaiting() {
     Seconds secondsSinceLastPoll = duration_cast<Seconds>(now - _lastAllocationToShardsRequestTime);
 
     if (secondsSinceLastPoll < Seconds(_params->minAllocationToShardsPollPeriodSecs)) {
-        // Wait until the next poll time.
-        Date_t nextPollTime = _lastAllocationToShardsRequestTime +
+        // Next planned time to poll again.
+        const Date_t nextPollTime = _lastAllocationToShardsRequestTime +
             Seconds(_params->minAllocationToShardsPollPeriodSecs);
+
+        // For awaitData getMores the caller's deadline lives in 'awaitDataState', not on opCtx.
+        // Cap the wait time to not be larger than the maxAwaitTimeMS.
+        const auto& awaitState = awaitDataState(opCtx);
+        const Date_t waitUntilDate = awaitState.shouldWaitForInserts
+            ? std::min(nextPollTime, awaitState.waitForInsertsDeadline)
+            : nextPollTime;
+
         try {
-            // The following call throws if the operation got interrupted or killed, or if the
-            // OperationContext's own deadline (maxAwaitTimeMS) has been exceeded. Does not throw if
-            // waiting reached 'nextPollTime', but the OperationContext's deadline has not yet
-            // expired.
-            _params->deadlineWaiter->waitUntil(opCtx, nextPollTime);
+            // Returns normally when 'waitUntilDate' is reached. Throws ExceededTimeLimit when
+            // the opCtx deadline expires (only set when the aggregate was issued with explicit
+            // 'maxTimeMS', as mongos does not set it for awaitData getMores) caught below.
+            _params->deadlineWaiter->waitUntil(opCtx, waitUntilDate);
         } catch (const ExceptionFor<ErrorCategory::ExceededTimeLimitError>& ex) {
-            // OperationContext deadline exceeded. Return EOF so the client gets an intermediate
-            // result back.
+            // OperationContext deadline reached. Reachable only on an initial aggregate where the
+            // user passed 'maxTimeMS'. Surface a clean EOF so the aggregate returns the cursor with
+            // an empty firstBatch.
             LOGV2_DEBUG(10657544,
                         3,
                         STAGE_LOG_PREFIX "Deadline time limit exceeded",
@@ -1173,8 +1182,14 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateWaiting() {
             return GetNextResult::makeEOF();
         }
 
-        // No state change here, so we enter the state machine in the next turn with kWaiting
-        // again.
+        // The wait may have ended because the awaitData deadline. Timeout is reached. Return EOF.
+        if (awaitState.shouldWaitForInserts &&
+            awaitState.waitForInsertsDeadline <=
+                opCtx->getServiceContext()->getPreciseClockSource()->now()) {
+            return GetNextResult::makeEOF();
+        }
+
+        // We only waited up to 'nextPollTime'. Stay in kWaiting.
         return boost::none;
     }
 
@@ -1186,9 +1201,13 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateWaiting() {
             uasserted(ErrorCodes::RetryChangeStream,
                       "Could not retrieve placement information for the specified cluster time");
         case AllocationToShardsStatus::kFutureClusterTime:
-            // Cluster time is still in the future. Return EOF to the client because
-            // maxAwaitTimeMS has expired.
-            return GetNextResult::makeEOF();
+            // No awaitData deadline means there's nothing to time-bound a loop against (e.g. the
+            // initial aggregate). Surface an empty batch so the client gets the cursor back and
+            // can issue getMore, which will carry the awaitData deadline.
+            if (!awaitDataState(opCtx).shouldWaitForInserts) {
+                return GetNextResult::makeEOF();
+            }
+            return boost::none;
         case AllocationToShardsStatus::kOk:
             // Transition to kFetchingInitialization state.
             _setState(State::kFetchingInitialization);

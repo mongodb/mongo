@@ -1171,12 +1171,14 @@ export function assertOpenCursors(st, expectedDataShards, expectedConfigCursor, 
             const shardsWithOpenCursors = dataShardCursors.map((cursor) => cursor.shard);
 
             // In config shard mode, the config server is also a data shard (named "config").
-            // Cursors on it are reported as regular data shard cursors via mongos, so we
-            // include "config" in the data shard comparison and skip the separate config
-            // cursor check below.
-            const dataShardsWithOpenCursors = jsTestOptions().configShard
-                ? shardsWithOpenCursors
-                : shardsWithOpenCursors.filter((shard) => shard !== "config");
+            // Cursors on it are reported as regular data shard cursors via mongos. When the
+            // caller expects a config cursor, attribute any "config" entry to it and strip
+            // it out before comparing against 'expectedDataShards'.
+            const isConfigShard = jsTestOptions().configShard;
+            const shouldRemoveConfigShardFromDataShardList = !isConfigShard || expectedConfigCursor;
+            const dataShardsWithOpenCursors = shouldRemoveConfigShardFromDataShardList
+                ? shardsWithOpenCursors.filter((shard) => shard !== "config")
+                : shardsWithOpenCursors;
             assert.sameMembers(
                 expectedDataShards,
                 dataShardsWithOpenCursors,
@@ -1185,11 +1187,18 @@ export function assertOpenCursors(st, expectedDataShards, expectedConfigCursor, 
 
             // With a dedicated config server, check for config cursors directly via
             // localOps since they don't appear in the mongos $currentOp results.
-            if (!jsTestOptions().configShard) {
+            if (!isConfigShard) {
                 const configCursors = listIdleCursors(configAdminDB, filter, {localOps: true});
                 jsTest.log.debug("Open config cursors", {configCursors});
                 const configMatch = expectedConfigCursor ? configCursors.length > 0 : configCursors.length == 0;
                 return configMatch;
+            } else {
+                // In config-shard mode the config server is one of the data shards. When the
+                // caller expects a config cursor, verify "config" was in the data-shard cursor
+                // list reported by mongos before we stripped it out for the sameMembers check.
+                if (expectedConfigCursor && !shardsWithOpenCursors.includes("config")) {
+                    return false;
+                }
             }
             return true;
         },
