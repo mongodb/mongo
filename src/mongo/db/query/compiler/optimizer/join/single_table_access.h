@@ -56,7 +56,6 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     const JoinGraph& model,
-    const SamplingEstimatorMap& samplingEstimators,
-    bool isExplain);
+    const SamplingEstimatorMap& samplingEstimators);
 
 }  // namespace mongo::join_ordering

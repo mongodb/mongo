@@ -1768,7 +1768,7 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
     ce::SamplingEstimator* samplingEstimator,
     const ce::ExactCardinalityEstimator* exactCardinality,
     StatusWith<std::vector<std::unique_ptr<QuerySolution>>> statusWithMultiPlanSolns,
-    bool isExplain) {
+    const CanonicalQuery& query) {
     using namespace cost_based_ranker;
     auto cbrMode = params.planRankerMode;
     EstimateMap estimates;
@@ -1849,7 +1849,7 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
         PlanRankingResult{.solutions = std::move(acceptedSoln),
                           .maybeExplainData = PlanExplainerData{.estimates = std::move(estimates)},
                           .needsWorksMeasuredForPlanCache = successfullyChoseWinner};
-    if (isExplain) {
+    if (query.getExplain()) {
         std::vector<SolutionWithPlanStage> rejectedSolnWithStages;
         rejectedSolnWithStages.reserve(rejectedSoln.size());
         std::transform(std::make_move_iterator(rejectedSoln.begin()),
@@ -1860,6 +1860,12 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
                        });
         planRankingResult.maybeExplainData->rejectedPlansWithStages =
             std::move(rejectedSolnWithStages);
+        if (samplingEstimator) {
+            planRankingResult.maybeExplainData->ceSamplingMetadata.emplace(
+                NamespaceStringUtil::serialize(query.nss(),
+                                               query.getExpCtx()->getSerializationContext()),
+                samplingEstimator->getSamplingMetadata());
+        }
     }
     return std::move(planRankingResult);
 }

@@ -25,7 +25,7 @@ for (let i = 0; i < docsPerColl; i++) {
     assert.commandWorked(collC.insert({c: i, val: 10 - i, groupKey: i}));
 }
 
-const executionStatsIngoredFields = [
+const executionStatsIgnoredFields = [
     "executionTimeMillis",
     "executionTimeMillisEstimate",
     "saveState",
@@ -36,10 +36,17 @@ const executionStatsIngoredFields = [
     "numKeysEstimate",
 ];
 
-const stagesIgnoredFields = ["slots", "optimizationTimeMillis", "planCacheKey", "querySettings", "isCached"];
+const stagesIgnoredFields = [
+    "slots",
+    "optimizationTimeMillis",
+    "planCacheKey",
+    "querySettings",
+    "isCached",
+    "ceSamplingMetadata",
+];
 
 const mongosIgnoredFields = ["works", "needTime", "queryHash", "planCacheShapeHash", "optimizationTimeMillis"].concat(
-    executionStatsIngoredFields,
+    executionStatsIgnoredFields,
     stagesIgnoredFields,
 );
 
@@ -108,7 +115,7 @@ function assertExplainEq(getUnion, getRegular) {
                 documentEqWithIgnoredFields(
                     unionStats.executionStages,
                     regularStats.executionStages,
-                    executionStatsIngoredFields,
+                    executionStatsIgnoredFields,
                 ),
                 buildErrorString(unionStats, regularStats, "executionStages"),
             );
@@ -122,7 +129,7 @@ function assertExplainEq(getUnion, getRegular) {
                 assert(
                     arrayEqWithIgnoredFields(union, regular.stages, [
                         ...stagesIgnoredFields,
-                        ...executionStatsIngoredFields,
+                        ...executionStatsIgnoredFields,
                     ]),
                     buildErrorString(union, regular, "stages with executionStats"),
                 );

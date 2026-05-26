@@ -141,12 +141,17 @@ function dropSamplesCollection() {
     });
 }
 
-function getWinningPlanCE(query) {
+function getWinningPlanMetadata(query) {
     const explain = coll.find(query).explain();
     const plan = getWinningPlanFromExplain(explain);
-    assert(isCollscan(db, plan), `expected a COLLSCAN plan: ${tojson(plan)}`);
-    assert.eq(plan.estimatesMetadata.ceSource, "Sampling", plan);
-    return plan.cardinalityEstimate;
+    assert(isCollscan(db, plan), "expected a COLLSCAN plan", {plan});
+    assert.eq(plan.estimatesMetadata.ceSource, "Sampling", "expected Sampling CE source", {plan});
+    const ceSamplingMetadata = explain.queryPlanner.ceSamplingMetadata;
+    assert(ceSamplingMetadata, "expected ceSamplingMetadata in queryPlanner", {explain});
+    const ns = coll.getFullName();
+    const meta = ceSamplingMetadata[ns];
+    assert(meta, "expected ceSamplingMetadata entry for namespace " + ns, {ceSamplingMetadata});
+    return meta;
 }
 
 const prevCBRConfig = getCBRConfig(db);
@@ -172,42 +177,27 @@ try {
         }),
     );
 
-    // The test detects whether the persistent sample was used via CE as an indirect signal.
-    // Persistent sample docs are all tagged `kPersistentTag`; source collection docs are all
-    // tagged "from_source". Running `find({tag: kPersistentTag})` yields:
-    //   - Hit  (persistent sample loaded): every sampled doc matches → selectivity 1.0
-    //           → CE = collCard = kSourceSize.
-    //   - Miss (on-the-fly sample used):   no source doc carries kPersistentTag → selectivity 0
-    //           → CE = 1. See CardinalityEstimator::clampZeroEstimates().
-    // This approach is fragile: any change to zero-estimate clamping will break these assertions.
-    // TODO SERVER-124332: Replace with a direct check of the sampling source from explain output.
-    const kPersistentTag = "from_persistent";
-    const kHitCE = kSourceSize;
-    const kMissCE = 1;
+    const kSampleDocs = Array.from({length: kSampleSize}, (_, i) => ({_id: i, a: i}));
 
     {
         jsTest.log.info("Testing random sampling technique with a persistent sample hit");
         assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}));
         resetCollections();
 
-        const persistedDocs = [];
-        for (let i = 0; i < kSampleSize; i++) {
-            persistedDocs.push({_id: i, tag: kPersistentTag});
-        }
         insertPersistedSample(
             buildPersistentSampleDoc({
                 collectionUuid: getCollectionUuidString(),
                 method: "random",
                 sampleSize: kSampleSize,
-                docs: persistedDocs,
+                docs: kSampleDocs,
             }),
         );
-        const foundCE = getWinningPlanCE({tag: kPersistentTag});
-        assert.eq(
-            foundCE,
-            kHitCE,
-            `Unexpected CE for random technique when persistent sample is hit: ${foundCE}. Expected ${kHitCE}`,
-        );
+        const meta = getWinningPlanMetadata({a: {$gte: 0}});
+        assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
+        assert.eq(meta.sampleTechnique, "random", "expected random technique", {meta});
+        assert.eq(meta.sampleDocCount, kSampleSize, "expected docCount to match persisted sample size", {meta});
+        assert.eq(meta.sampleRequestedDocCount, kSampleSize, "expected requestedDocCount to match", {meta});
+        assert(!meta.hasOwnProperty("sampleNumChunks"), "random technique should not have numChunks", {meta});
     }
 
     {
@@ -215,12 +205,11 @@ try {
         assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "random"}));
         resetCollections();
 
-        const foundCE = getWinningPlanCE({tag: kPersistentTag});
-        assert.eq(
-            foundCE,
-            kMissCE,
-            `Unexpected CE for random technique when no persistent sample exists: ${foundCE}. Expected ${kMissCE}`,
-        );
+        const meta = getWinningPlanMetadata({a: {$gte: 0}});
+        assert.eq(meta.sampleSource, "onTheFly", "expected on-the-fly sample on miss", {meta});
+        assert.eq(meta.sampleTechnique, "random", "expected random technique", {meta});
+        assert.eq(meta.sampleRequestedDocCount, kSampleSize, "expected requestedDocCount to match", {meta});
+        assert(!meta.hasOwnProperty("sampleNumChunks"), "random technique should not have numChunks", {meta});
     }
 
     {
@@ -228,26 +217,21 @@ try {
         assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "chunk"}));
         resetCollections();
 
-        const persistedDocs = [];
-        for (let i = 0; i < kSampleSize; i++) {
-            persistedDocs.push({_id: i, tag: kPersistentTag});
-        }
         insertPersistedSample(
             buildPersistentSampleDoc({
                 collectionUuid: getCollectionUuidString(),
                 method: "chunk",
                 sampleSize: kSampleSize,
-                docs: persistedDocs,
+                docs: kSampleDocs,
                 numChunks: kNumChunks,
             }),
         );
-
-        const foundCE = getWinningPlanCE({tag: kPersistentTag});
-        assert.eq(
-            foundCE,
-            kHitCE,
-            `Unexpected CE for chunk technique when persistent sample is hit: ${foundCE}. Expected ${kHitCE}`,
-        );
+        const meta = getWinningPlanMetadata({a: {$gte: 0}});
+        assert.eq(meta.sampleSource, "persisted", "expected persisted sample on hit", {meta});
+        assert.eq(meta.sampleTechnique, "chunk", "expected chunk technique", {meta});
+        assert.eq(meta.sampleNumChunks, kNumChunks, "expected numChunks to match", {meta});
+        assert.eq(meta.sampleDocCount, kSampleSize, "expected docCount to match persisted sample size", {meta});
+        assert.eq(meta.sampleRequestedDocCount, kSampleSize, "expected requestedDocCount to match", {meta});
     }
 
     {
@@ -255,12 +239,11 @@ try {
         assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingCEMethod: "chunk"}));
         resetCollections();
 
-        const foundCE = getWinningPlanCE({tag: kPersistentTag});
-        assert.eq(
-            foundCE,
-            kMissCE,
-            `Unexpected CE for chunk technique when no persistent sample exists: ${foundCE}. Expected ${kMissCE}`,
-        );
+        const meta = getWinningPlanMetadata({a: {$gte: 0}});
+        assert.eq(meta.sampleSource, "onTheFly", "expected on-the-fly sample on miss", {meta});
+        assert.eq(meta.sampleTechnique, "chunk", "expected chunk technique", {meta});
+        assert.eq(meta.sampleNumChunks, kNumChunks, "expected numChunks to match", {meta});
+        assert.eq(meta.sampleRequestedDocCount, kSampleSize, "expected requestedDocCount to match", {meta});
     }
 } finally {
     setCBRConfig(db, prevCBRConfig);

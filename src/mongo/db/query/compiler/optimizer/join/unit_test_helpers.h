@@ -232,6 +232,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    ce::SamplingMetadata getSamplingMetadata() const override {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     CardinalityEstimate _collCard;
     stdx::unordered_map<std::vector<FieldPath>, CardinalityEstimate> _fakeEstimates;

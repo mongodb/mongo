@@ -47,6 +47,7 @@ using TopLevelFieldsProjection = StringSet;
 using ProjectionParams = std::variant<NoProjection, TopLevelFieldsProjection>;
 
 using CardinalityEstimate = mongo::cost_based_ranker::CardinalityEstimate;
+using SamplingMetadata = mongo::cost_based_ranker::SamplingMetadata;
 
 class SamplingEstimator {
 public:
@@ -130,6 +131,11 @@ public:
     virtual double getCollCard() const = 0;
 
     virtual size_t getSampleSize() const = 0;
+
+    /**
+     * Returns metadata about the sample used for cardinality estimation.
+     */
+    virtual SamplingMetadata getSamplingMetadata() const = 0;
 };
 
 }  // namespace mongo::ce

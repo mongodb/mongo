@@ -2246,54 +2246,6 @@ TEST_F(SamplingEstimatorTest, ChunkSamplingSkipsPersistentSampleWhenFeatureFlagD
     }
 }
 
-TEST_F(SamplingEstimatorTest, LoadPersistentSampleResetsUniqueDocCountCache) {
-    // _uniqueDocCount is a lazy cache of countUniqueDocuments(_sample), populated on the first
-    // estimateNDV call after a sample is loaded. When tryLoadPersistentSample replaces _sample it
-    // must also clear the cache — otherwise a stale count from a previous sample would be used.
-    // TODO SERVER-112627: Remove once featureFlagPersistentStats is enabled by default.
-    RAIIServerParameterControllerForTest persistentStatsFlag{"featureFlagPersistentStats", true};
-    insertDocuments(kTestNss, {BSON("_id" << 1 << "tag" << "not_persisted")});
-    const UUID uuid = [&] {
-        auto srcColl = acquireCollection(operationContext(), kTestNss);
-        return srcColl.getCollectionPtr()->uuid();
-    }();
-    std::vector<BSONObj> persistedDocs{BSON("_id" << 2 << "tag" << "persisted"),
-                                       BSON("_id" << 3 << "tag" << "persisted"),
-                                       BSON("_id" << 4 << "tag" << "persisted")};
-    createCollAndInsertDocuments(
-        operationContext(),
-        NamespaceStringUtil::deserialize(kTestNss.dbName(), kSamplesCollectionName),
-        {buildPersistentSampleDoc(
-            uuid, SamplingCEMethodEnum::kRandom, persistedDocs.size(), persistedDocs)});
-
-    auto coll = acquireCollection(operationContext(), kTestNss);
-    auto colls = MultipleCollectionAccessor(coll, {}, false);
-    SamplingEstimatorForTesting estimator(operationContext(),
-                                          colls,
-                                          kTestNss,
-                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                          persistedDocs.size(),
-                                          SamplingCEMethodEnum::kRandom,
-                                          numChunks,
-                                          makeCardinalityEstimate(100));
-    estimator.generateSample(ce::NoProjection{});
-    ASSERT_FALSE(estimator.getUniqueDocCountForTesting().has_value());
-    for (const auto& doc : estimator.getSample()) {
-        ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
-    }
-
-    // Simulate the cache being populated by a prior estimateNDV call.
-    estimator.setUniqueDocCountForTesting(99);
-    ASSERT_TRUE(estimator.getUniqueDocCountForTesting().has_value());
-
-    // A second generateSample via the persistent path must clear the cache.
-    estimator.generateSample(ce::NoProjection{});
-    ASSERT_FALSE(estimator.getUniqueDocCountForTesting().has_value());
-    for (const auto& doc : estimator.getSample()) {
-        ASSERT_EQUALS(doc.getStringField("tag"), "persisted");
-    }
-}
-
 TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
     // A doc with the correct _id key exists in system.stats.samples but is malformed (sampleSize
     // field disagrees with the docs array length). tryLoadPersistentSample must log the error and
@@ -2350,6 +2302,30 @@ TEST_F(SamplingEstimatorTest, MalformedPersistentSampleFallsBackToOnTheFly) {
     for (const auto& doc : sample) {
         ASSERT_EQUALS(doc.getStringField("tag"), "not_persisted");
     }
+}
+
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
+             GenerateSampleAssertsOnReuse,
+             "SamplingEstimatorImpl must not be reused") {
+    auto estimator =
+        createSamplingEstimatorForTesting(10 /* collCard */, kSampleSize, ce::NoProjection{});
+    // This is indeed the 2nd call since createSamplingEstimatorForTesting() calls generateSample()
+    // once already.
+    estimator.generateSample(ce::NoProjection{});
+}
+
+DEATH_TEST_F(SamplingEstimatorTestDeathTest,
+             GetSamplingMetadataAssertsOnNonOwnedDoc,
+             "Sample documents must be owned BSONObjs") {
+    auto estimator =
+        createSamplingEstimatorForTesting(10 /* collCard */, kSampleSize, ce::NoProjection{});
+
+    // Create a non-owned BSONObj (raw-pointer view into an existing buffer).
+    auto owned = BSON("a" << 1);
+    BSONObj unowned(owned.objdata());
+
+    estimator.setSampleForTesting({unowned});
+    estimator.getSamplingMetadata();
 }
 
 }  // namespace mongo::ce
