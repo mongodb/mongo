@@ -236,11 +236,12 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
 
                 // Stop migrations during most of the execution of the coordinator to guarantee a
                 // stable placement.
-                {
-                    const auto session = getNewSession(opCtx);
-                    sharding_ddl_util::stopMigrations(
-                        opCtx, nss(), _request.getCollectionUUID(), session);
-                }
+                sharding_ddl_util::stopMigrations(
+                    opCtx,
+                    nss(),
+                    _request.getCollectionUUID(),
+                    [&] { return getNewSession(opCtx); },
+                    _doc.getAuthoritativeMetadataAccessLevel());
 
                 const auto& ns = nss();
                 auto opts = [&] {
@@ -371,11 +372,12 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
                 notifyChangeStreamsOnRefineCollectionShardKeyComplete(
                     opCtx, nss(), _doc.getNewShardKey(), _doc.getOldKey().get(), *_doc.getUuid());
-                {
-                    const auto session = getNewSession(opCtx);
-                    sharding_ddl_util::resumeMigrations(opCtx, nss(), boost::none, session);
-                }
-
+                sharding_ddl_util::resumeMigrations(
+                    opCtx,
+                    nss(),
+                    boost::none,
+                    [&] { return getNewSession(opCtx); },
+                    _doc.getAuthoritativeMetadataAccessLevel());
                 logRefineCollectionShardKey(opCtx, nss(), "end", BSONObj());
             }))
         .then([this, anchor = shared_from_this(), executor] {
@@ -437,8 +439,12 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_cleanupOnAbort(
             }
 
             if (_doc.getPhase() >= Phase::kRemoteIndexValidation) {
-                const auto session = getNewSession(opCtx);
-                sharding_ddl_util::resumeMigrations(opCtx, nss(), boost::none, session);
+                sharding_ddl_util::resumeMigrations(
+                    opCtx,
+                    nss(),
+                    boost::none,
+                    [&] { return getNewSession(opCtx); },
+                    _doc.getAuthoritativeMetadataAccessLevel());
             }
         });
 }

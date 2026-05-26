@@ -270,7 +270,7 @@ public:
     void stopMigrations(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const UUID&,
-                        const OperationSessionInfo&) override {
+                        std::function<OperationSessionInfo()>) override {
         DBDirectClient client(opCtx);
         client.update(NamespaceString::kConfigsvrCollectionsNamespace,
                       BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
@@ -284,7 +284,7 @@ public:
     void resumeMigrations(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const UUID&,
-                          const OperationSessionInfo&) override {
+                          std::function<OperationSessionInfo()>) override {
         DBDirectClient client(opCtx);
         client.update(NamespaceString::kConfigsvrCollectionsNamespace,
                       BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(

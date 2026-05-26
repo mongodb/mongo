@@ -122,13 +122,13 @@ public:
     void stopMigrations(OperationContext*,
                         const NamespaceString&,
                         const UUID&,
-                        const OperationSessionInfo&) override {
+                        std::function<OperationSessionInfo()>) override {
         MONGO_UNREACHABLE;
     }
     void resumeMigrations(OperationContext*,
                           const NamespaceString&,
                           const UUID&,
-                          const OperationSessionInfo&) override {
+                          std::function<OperationSessionInfo()>) override {
         MONGO_UNREACHABLE;
     }
     std::unique_ptr<CausalityBarrier> buildCausalityBarrier(

@@ -493,6 +493,8 @@ void CollectionShardingRuntime::clearFilteringMetadataForDroppedCollection_autho
     OperationContext* opCtx, const UUID& collectionUuid) {
     _clearFilteringMetadata(opCtx, /* collIsDropped */ true);
     _authoritativeState = AuthoritativeState::kAuthoritative;
+    // Since we are dropping the collection, allowChunkOperations should be reset to `true`.
+    _allowChunkOperations = true;
 }
 
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
@@ -816,6 +818,14 @@ CollectionShardingRuntime::AuthoritativeState CollectionShardingRuntime::getAuth
 
 void CollectionShardingRuntime::setNonAuthoritative() {
     _authoritativeState = AuthoritativeState::kNonAuthoritative;
+}
+
+bool CollectionShardingRuntime::allowChunkOperations() const {
+    return _allowChunkOperations;
+}
+
+void CollectionShardingRuntime::setAllowChunkOperations(bool allowChunkOperations) {
+    _allowChunkOperations = allowChunkOperations;
 }
 
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,

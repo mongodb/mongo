@@ -214,7 +214,8 @@ MONGO_MOD_NEEDS_REPLACEMENT void stopMigrations(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const boost::optional<UUID>& expectedCollectionUUID,
-    const boost::optional<OperationSessionInfo>& osi = boost::none);
+    std::function<OperationSessionInfo()> osiGenerator,
+    AuthoritativeMetadataAccessLevelEnum authoritativeState);
 
 /**
  * Resume migrations and balancing rounds for the given nss.
@@ -225,14 +226,19 @@ MONGO_MOD_NEEDS_REPLACEMENT void resumeMigrations(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const boost::optional<UUID>& expectedCollectionUUID,
-    const boost::optional<OperationSessionInfo>& osi = boost::none);
+    std::function<OperationSessionInfo()> osiGenerator,
+    AuthoritativeMetadataAccessLevelEnum authoritativeState);
 
 /**
  * Calls to the config server primary to get the collection document for the given nss.
- * Returns the value of the allowMigrations flag on the collection document.
+ * Returns false if either the allowMigrations or allowChunkOperations is false, true otherwise.
+ * NOTE: This function does not guarantee that migrations have been drained if it returns
+ * false, nor it guarantees consistency between shards in the case of allowChunkOperations
+ * (authoritative behavior). You must call either stopMigrations or resumeMigrations and wait for
+ * them to return without exception to have such guarantees.
  */
-MONGO_MOD_NEEDS_REPLACEMENT bool checkAllowMigrations(OperationContext* opCtx,
-                                                      const NamespaceString& nss);
+MONGO_MOD_NEEDS_REPLACEMENT bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx,
+                                                                    const NamespaceString& nss);
 
 /*
  * Returns the UUID of the collection (if exists) using the catalog. It does not provide any locking
