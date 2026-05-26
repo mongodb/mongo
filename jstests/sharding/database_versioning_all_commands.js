@@ -1188,6 +1188,7 @@ const allTestCases = {
             },
         },
         _shardsvrReshardingDonorFetchFinalCollectionStats: {skip: "TODO"},
+        _shardsvrReshardingRecipientFetchFinalCollectionStats: {skip: "TODO"},
         _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: "TODO"},
         _shardsvrReshardingOperationTime: {skip: "TODO"},
         _shardsvrResolveView: {

@@ -158,6 +158,7 @@ const allCommands = {
     _shardsvrBeginMigrationBlockingOperation: {skip: isAnInternalCommand},
     _shardsvrEndMigrationBlockingOperation: {skip: isAnInternalCommand},
     _shardsvrReshardingDonorFetchFinalCollectionStats: {skip: isAnInternalCommand},
+    _shardsvrReshardingRecipientFetchFinalCollectionStats: {skip: isAnInternalCommand},
     _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: isAnInternalCommand},
     _shardsvrUpgradeDowngradeViewlessTimeseries: {skip: isAnInternalCommand},
     _shardsvrTimeseriesUpgradeDowngradePrepare: {skip: isAnInternalCommand},

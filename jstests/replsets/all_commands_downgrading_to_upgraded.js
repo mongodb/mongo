@@ -143,6 +143,7 @@ const allCommands = {
     _shardsvrDropDatabaseParticipant: {skip: isAnInternalCommand},
     _shardsvrReshardCollection: {skip: isAnInternalCommand},
     _shardsvrReshardingDonorFetchFinalCollectionStats: {skip: isAnInternalCommand},
+    _shardsvrReshardingRecipientFetchFinalCollectionStats: {skip: isAnInternalCommand},
     _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: isAnInternalCommand},
     _shardsvrReshardingOperationTime: {skip: isAnInternalCommand},
     _shardsvrReshardDonorInitialize: {skip: isAnInternalCommand},

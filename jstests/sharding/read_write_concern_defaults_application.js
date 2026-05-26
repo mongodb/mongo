@@ -199,6 +199,7 @@ let testCases = {
     _shardsvrRenameIndexMetadata: {skip: "internal command"},
     _shardsvrReshardCollection: {skip: "internal command"},
     _shardsvrReshardingDonorFetchFinalCollectionStats: {skip: "internal command"},
+    _shardsvrReshardingRecipientFetchFinalCollectionStats: {skip: "internal command"},
     _shardsvrReshardingDonorStartChangeStreamsMonitor: {skip: "internal command"},
     _shardsvrReshardingOperationTime: {skip: "internal command"},
     _shardsvrReshardDonorInitialize: {skip: "internal command"},
