@@ -41,7 +41,7 @@ if [[ "${requester}" == "commit" ]]; then
         echo "Unable to extract MONGO_VERSION from .bazelrc.target_mongo_version" >&2
         exit 1
     fi
-    echo "common --define MONGO_VERSION=${mongo_version}-${GIT_REV: -8}" >>.bazelrc.git
+    echo "common --define MONGO_VERSION=${mongo_version}-${GIT_REV:0:8}" >>.bazelrc.git
 fi
 
 if [[ "${evergreen_remote_exec}" != "on" ]]; then

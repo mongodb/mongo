@@ -11,10 +11,10 @@ if [[ -z "${target_mongo_version}" ]]; then
 fi
 version="r${target_mongo_version}"
 
-# For commit builds, append the last 8 characters of the git revision to the version string.
+# For commit builds, append the first 8 characters of the git revision to the version string.
 if [[ "${requester:-}" == "commit" ]]; then
     GIT_REV=$(git rev-parse HEAD)
-    version="${version}-${GIT_REV: -8}"
+    version="${version}-${GIT_REV:0:8}"
 fi
 
 if [ ${IS_RELEASE} = 'true' ]; then

@@ -25,10 +25,10 @@ if [ "${is_patch}" = "true" ]; then
     MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
 fi
 
-# For commit builds, append the last 8 characters of the git revision to the version string.
+# For commit builds, append the first 8 characters of the git revision to the version string.
 if [[ "${requester}" == "commit" ]]; then
     GIT_REV=$(git rev-parse HEAD)
-    MONGO_VERSION="${MONGO_VERSION}-${GIT_REV: -8}"
+    MONGO_VERSION="${MONGO_VERSION}-${GIT_REV:0:8}"
 fi
 
 # Forcefully override the version for purposes of testing against a different version than the
