@@ -1,23 +1,11 @@
-if(NOT HAVE_LIBZSTD)
-    # We don't need to construct a zstd library target.
-    return()
-endif()
+# zstd: capability detection + imported target.
+#
+# Layer 1 (capability):     HAVE_LIBZSTD
+# Layer 2 (default policy): cmake/configs/base.cmake
+# Layer 3 (user toggle):    ENABLE_ZSTD / HAVE_BUILTIN_EXTENSION_ZSTD
 
-if(TARGET wt::zstd)
-    # Avoid redefining the imported library.
-    return()
-endif()
-
-# Define the imported zstd library target that can be subsequently linked across the build system.
-# We use the double colons (::) as a convention to tell CMake that the target name is associated
-# with an IMPORTED target (which allows CMake to issue a diagnostic message if the library wasn't found).
-add_library(wt::zstd SHARED IMPORTED GLOBAL)
-set_target_properties(wt::zstd PROPERTIES
-    IMPORTED_LOCATION ${HAVE_LIBZSTD}
-    IMPORTED_IMPLIB ${HAVE_LIBZSTD}
-)
-if (HAVE_LIBZSTD_INCLUDES)
-    set_target_properties(wt::zstd PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES ${HAVE_LIBZSTD_INCLUDES}
-    )
-endif()
+# Produces target wt::zstd when the library is available.
+wt_find_library(NAME zstd
+    PACKAGE zstd TARGET zstd::libzstd_shared
+    PKGCONFIG_MODULE libzstd
+    HEADER zstd.h)

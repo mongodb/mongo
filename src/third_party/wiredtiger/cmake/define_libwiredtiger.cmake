@@ -50,15 +50,10 @@ macro(define_wiredtiger_library target type)
         C_STANDARD 11
     )
 
-    # Ensure we link any available library dependencies to our wiredtiger target.
-    if(HAVE_LIBPTHREAD)
-        target_link_libraries(${target} PUBLIC ${HAVE_LIBPTHREAD})
-    endif()
-    if(HAVE_LIBRT)
-        target_link_libraries(${target} PUBLIC ${HAVE_LIBRT})
-    endif()
-    if(HAVE_LIBDL)
-        target_link_libraries(${target} PUBLIC ${HAVE_LIBDL})
+    # System library dependencies.
+    target_link_libraries(${target} PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+    if(WT_LINUX)
+        target_link_libraries(${target} PUBLIC rt)
     endif()
     if(ENABLE_MEMKIND)
         target_link_libraries(${target} PRIVATE wt::memkind)
@@ -88,11 +83,8 @@ macro(define_wiredtiger_library target type)
 
     if(HAVE_BUILTIN_EXTENSION_IAA)
         target_link_libraries(${target} PRIVATE iaacodec)
-        if(HAVE_LIBCXX)
-            target_link_libraries(${target} PRIVATE ${HAVE_LIBCXX})
-        endif()
         if(HAVE_LIBACCEL_CONFIG)
-            target_link_libraries(${target} PRIVATE ${HAVE_LIBACCEL_CONFIG})
+            target_link_libraries(${target} PRIVATE wt::accel_config)
         endif()
     endif()
 

@@ -70,95 +70,54 @@
  */
 #cmakedefine HAVE_UNITTEST_ASSERTS 1
 
-/* Define to 1 if you have the `fallocate' function. */
-#cmakedefine HAVE_FALLOCATE 1
-
-/* Define to 1 if you have the `fdatasync' function. */
-#cmakedefine HAVE_FDATASYNC 1
-
-/* Define to 1 if you have the `clock_gettime' function. */
-#cmakedefine HAVE_CLOCK_GETTIME 1
-
-/* Define to 1 if you have the `gettimeofday' function. */
-#cmakedefine HAVE_GETTIMEOFDAY 1
-
-/* Define to 1 if you have the `dl' library (-ldl). */
-#cmakedefine HAVE_LIBDL 1
-
-/* Define to 1 if you have the `stdc++' library (-lstdc++). */
-#cmakedefine HAVE_LIBCXX 1
-
-/* Define to 1 if you have the `accel-config' library (-laccel-config). */
-#cmakedefine HAVE_LIBACCEL_CONFIG 1
-
-/* Define to 1 if you have the `lz4' library (-llz4). */
-#cmakedefine HAVE_LIBLZ4 1
-
-/* Define to 1 if you have the `memkind' library (-lmemkind). */
-#cmakedefine HAVE_LIBMEMKIND 1
-
-/* Define to 1 if the user has explicitly enable memkind builds. */
+/* Define to 1 if the user has explicitly enabled memkind builds. */
 #cmakedefine ENABLE_MEMKIND 1
-
-/* Define to 1 if you have the `pthread' library (-lpthread). */
-#cmakedefine HAVE_LIBPTHREAD 1
-
-/* Define to 1 if you have the `rt' library (-lrt). */
-#cmakedefine HAVE_LIBRT 1
-
-/* Define to 1 if you have the `snappy' library (-lsnappy). */
-#cmakedefine HAVE_LIBSNAPPY 1
 
 /* Define to 1 if the user has set enable antithesis. */
 #cmakedefine ENABLE_ANTITHESIS 1
-
-/* Define to 1 if you have the `z' library (-lz). */
-#cmakedefine HAVE_LIBZ 1
-
-/* Define to 1 if you have the `zstd' library (-lzstd). */
-#cmakedefine HAVE_LIBZSTD 1
-
-/* Define to 1 if you have the `qpl' library (-lqpl). */
-#cmakedefine HAVE_LIBQPL 1
-
-/* Define to 1 if you have the `sodium' library (-lsodium). */
-#cmakedefine HAVE_LIBSODIUM 1
 
 /* Automatically set by the build system, turns on or off optional RCpc ARM instructions. */
 #cmakedefine HAVE_RCPC 1
 
 /* Define to 1 to disable any crc32 hardware support. */
-#cmakedefine HAVE_NO_CRC32_HARDWARE
+#cmakedefine HAVE_NO_CRC32_HARDWARE 1
 
-/* Define to 1 if you have the `posix_fadvise' function. */
-#cmakedefine HAVE_POSIX_FADVISE 1
+/*
+ * Compile-time platform feature flags.
+ */
 
-/* Define to 1 if you have the `posix_fallocate' function. */
-#cmakedefine HAVE_POSIX_FALLOCATE 1
+/* POSIX.1-2001 functions available on every supported POSIX target. */
+#if defined(__linux__) || defined(__APPLE__) || defined(__NetBSD__)
+#define HAVE_CLOCK_GETTIME 1
+#define HAVE_GETTIMEOFDAY 1
+#define HAVE_POSIX_MADVISE 1
+#define HAVE_POSIX_MEMALIGN 1
+#define HAVE_SETRLIMIT 1
+#endif
 
-/* Define to 1 if you have the `posix_madvise' function. */
-#cmakedefine HAVE_POSIX_MADVISE 1
+/* POSIX functions macOS does not implement. */
+#if defined(__linux__) || defined(__NetBSD__)
+#define HAVE_FDATASYNC 1
+#define HAVE_POSIX_FADVISE 1
+#define HAVE_POSIX_FALLOCATE 1
+#define HAVE_PTHREAD_COND_MONOTONIC 1
+#define HAVE_TIMER_CREATE 1
+#endif
 
-/* Define to 1 if `posix_memalign' works. */
-#cmakedefine HAVE_POSIX_MEMALIGN 1
+/* Linux-specific syscalls and extensions. */
+#if defined(__linux__)
+#define HAVE_FALLOCATE 1
+#define HAVE_SYNC_FILE_RANGE 1
+#endif
 
-/* Define to 1 if pthread condition variables support monotonic clocks. */
-#cmakedefine HAVE_PTHREAD_COND_MONOTONIC 1;
+/* Architecture-specific intrinsic headers. */
+#if defined(__x86_64__) || defined(_M_X64)
+#define HAVE_X86INTRIN_H 1
+#endif
 
-/* Define to 1 if you have the `setrlimit' function. */
-#cmakedefine HAVE_SETRLIMIT 1
-
-/* Define to 1 if you have the `sync_file_range' function. */
-#cmakedefine HAVE_SYNC_FILE_RANGE 1
-
-/* Define to 1 if you have the `timer_create' function. */
-#cmakedefine HAVE_TIMER_CREATE 1
-
-/* Define to 1 if you have the <x86intrin.h> header file. */
-#cmakedefine HAVE_X86INTRIN_H 1
-
-/* Define to 1 if you have the <arm_neon.h> header file. */
-#cmakedefine HAVE_ARM_NEON_INTRIN_H 1
+#if defined(__aarch64__) || defined(_M_ARM64)
+#define HAVE_ARM_NEON_INTRIN_H 1
+#endif
 
 /* Spinlock type from mutex.h. */
 #cmakedefine SPINLOCK_TYPE @SPINLOCK_TYPE_CONFIG_VAR@

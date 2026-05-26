@@ -266,6 +266,9 @@ __curtable_next(WT_CURSOR *cursor)
     ctable = (WT_CURSOR_TABLE *)cursor;
     CURSOR_API_CALL(cursor, session, ret, next, NULL);
     CURSOR_REPOSITION_ENTER(cursor, session);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     APPLY_CG(ctable, next);
 
 err:
@@ -321,6 +324,9 @@ __curtable_prev(WT_CURSOR *cursor)
     ctable = (WT_CURSOR_TABLE *)cursor;
     CURSOR_API_CALL(cursor, session, ret, prev, NULL);
     CURSOR_REPOSITION_ENTER(cursor, session);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     APPLY_CG(ctable, prev);
 
 err:
@@ -377,6 +383,9 @@ __curtable_search(WT_CURSOR *cursor)
     CURSOR_API_CALL(cursor, session, ret, search, NULL);
     API_RETRYABLE(session);
     CURSOR_REPOSITION_ENTER(cursor, session);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     APPLY_CG(ctable, search);
 
 err:
@@ -402,6 +411,8 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
     CURSOR_API_CALL(cursor, session, ret, search_near, NULL);
     API_RETRYABLE(session);
     CURSOR_REPOSITION_ENTER(cursor, session);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
 
     cp = ctable->cg_cursors;
     primary = *cp;
@@ -437,6 +448,9 @@ __curtable_insert(WT_CURSOR *cursor)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     CURSOR_UPDATE_API_CALL(cursor, session, ret, insert, NULL);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     WT_ERR(__curtable_open_indices(ctable));
 
     cp = ctable->cg_cursors;
@@ -515,6 +529,9 @@ __curtable_update(WT_CURSOR *cursor)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     CURSOR_UPDATE_API_CALL(cursor, session, ret, update, NULL);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     WT_ERR(__curtable_open_indices(ctable));
 
     /*
@@ -567,6 +584,9 @@ __curtable_remove(WT_CURSOR *cursor)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     CURSOR_REMOVE_API_CALL(cursor, session, ret, NULL);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     WT_ERR(__curtable_open_indices(ctable));
 
     /* Check if the cursor was positioned. */
@@ -612,6 +632,8 @@ __curtable_reserve(WT_CURSOR *cursor)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     CURSOR_UPDATE_API_CALL(cursor, session, ret, reserve, NULL);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
 
     /*
      * We don't have to open the indices here, but it makes the code similar to other cursor

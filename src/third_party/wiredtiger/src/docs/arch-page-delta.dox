@@ -1,0 +1,154 @@
+/*! @arch_page arch-page-delta Page Deltas
+
+WiredTiger's page delta feature reduces write amplification and I/O by writing
+only the changed entries for a page (a <i>delta</i>) rather than always
+rewriting the full page image during reconciliation. This feature is used
+exclusively with disaggregated (layered) row-store btrees.
+
+@section pd_goals Goals and high-level model
+
+Instead of always writing a full page image on reconciliation, WiredTiger can write:
+- A base page image (full page), and
+- A bounded chain of deltas on top of that base.
+
+On disk the block for a page therefore contains either:
+- Only a full page image, or
+- A full page image plus one or more delta images.
+
+A <i>delta chain</i> is the sequence of deltas that must be applied to the most
+recent full page image (the "base image") to reconstruct the latest page state. Its
+maximum length is bounded by the \c page_delta.max_consecutive_delta configuration
+option.
+
+Page deltas only apply to row-store pages (\c WT_PAGE_ROW_LEAF and
+\c WT_PAGE_ROW_INT). Column-store pages do not participate in this framework.
+Deltas are also never written for non-disaggregated tables the btree must have
+the \c WT_BTREE_DISAGGREGATED flag set (set automatically for layered btrees).
+
+@section pd_config Configuration
+
+Page delta behavior is controlled via the \c page_delta sub-config at
+\c wiredtiger_open or \c reconfigure time:
+
+- \c page_delta.leaf_page_delta (bool): enable leaf page deltas.
+- \c page_delta.internal_page_delta (bool): enable internal page deltas.
+- \c page_delta.delta_pct (int): maximum allowed size of a delta as a percentage
+  of the full page size. Candidates that exceed this threshold fall back to a
+  full page write.
+- \c page_delta.max_consecutive_delta (int): maximum number of deltas in a chain
+  for a single page. When this limit would be exceeded, reconciliation writes a
+  full page image and resets the chain.
+
+These settings are stored at the connection level in \c WT_PAGE_DELTA_CONFIG
+(see \c src/include/connection.h). The flags \c WT_LEAF_PAGE_DELTA and
+\c WT_INTERNAL_PAGE_DELTA are derived from them at startup or reconfig time.
+
+Whether a given btree and page type actually use deltas is controlled by the
+macros \c WT_DELTA_LEAF_ENABLED and \c WT_DELTA_INT_ENABLED, both of which
+additionally require the btree to have the \c WT_BTREE_DISAGGREGATED flag set.
+
+@section pd_generation Generating deltas (reconciliation)
+
+Deltas are generated during reconciliation (\c __wt_reconcile). The two page
+types follow different paths:
+
+- For a leaf page: after the full disk image is built, the delta build function
+  is called if the page has not undergone an in-memory split and the reconciliation
+  produced a single block result.
+- For an internal page: the delta decision and entry packing happen concurrently
+  with building the full page image. Modified children are packed into the delta buffer
+  as the child-walk proceeds. Once the full page image is complete, the write generation
+  field is updated onto the already-populated delta buffer.
+
+After a candidate delta is built, the write path validates whether the delta can
+be written or whether a full page image is required, and takes the decision accordingly:
+
+1. If \c block_meta->delta_count has reached \c max_consecutive_delta, the delta
+   is rejected and a full page image is written instead, resetting the chain.
+2. If the built delta's size exceeds \c delta_pct percent of the full page image, it
+   is also rejected.
+3. Several structural reasons can also prevent a delta from being used: the
+   reconcile produced multiple blocks, the page has no stable LSN yet, the
+   result is not a single page, the leaf delta is empty, or the delta build
+   returned no entries.
+
+When a delta is accepted, it is written by \c __rec_write_delta and
+\c block_meta->delta_count is incremented.
+
+@subsection pd_leaf Leaf page deltas
+
+\c __rec_build_delta_leaf iterates over the saved-updates list (\c supd) for the
+page. For each key whose selected on-page value has changed since the last
+reconciliation (\c __rec_selected_key_changed), it packs a key/value entry into
+the delta buffer via \c __wti_rec_pack_delta_row_leaf. Only keys that actually
+changed are included, making the delta compact for workloads with sparse updates.
+Each packed entry carries full MVCC time-window metadata so reconstruction can
+respect visibility rules identically to a full page image.
+
+@subsection pd_internal Internal page deltas
+
+Internal page deltas are built during the row-store internal reconcile pass in
+\c src/reconcile/rec_row.c. Each child-address change (insert, update, or delete
+of a sub-tree pointer) is packed into \c r->delta.
+
+@section pd_key_files Key files
+
+| File | Role |
+|------|------|
+| \c src/reconcile/rec_write.c | Delta creation decision and writing (\c __rec_build_delta, \c __rec_split_write, \c __rec_write_delta) |
+| \c src/reconcile/rec_row.c | Delta packing per row for internal pages (\c __rec_pack_delta_row_int, \c __rec_build_delta_int) and leaf pages (\c __rec_build_delta_leaf entry helpers) |
+| \c src/reconcile/rec_visibility.c | Update selection and time-window handling used by leaf delta packing |
+| \c src/btree/bt_page.c | Merge helpers on read (\c __wti_page_merge_deltas_with_base_image_leaf, \c __wti_page_merge_deltas_with_base_image_int) |
+| \c src/btree/bt_read.c | Page fault-in and delta reconstruction (\c __page_read_build_full_disk_image) |
+| \c src/include/btmem.h | Chain-tracking structures (\c WT_PAGE_BLOCK_META, \c WT_PAGE_DISAGG_INFO) |
+| \c src/include/connection.h | Connection-level delta config (\c WT_PAGE_DELTA_CONFIG) |
+| \c src/include/btree.h | Enable macros (\c WT_DELTA_LEAF_ENABLED, \c WT_DELTA_INT_ENABLED) |
+| \c src/reconcile/reconcile_private.h | Reconcile-time macros (\c WT_BUILD_DELTA_LEAF, \c WT_BUILD_DELTA_INT, \c WT_REC_RESULT_SINGLE_PAGE) |
+
+@section pd_on_disk On-disk layout and chain tracking
+
+The per-page delta chain state is kept in \c WT_PAGE_BLOCK_META
+(see \c src/include/btmem.h):
+
+- \c delta_count: number of deltas written on top of the current base image
+  (a \c uint8_t, so the theoretical maximum is 255; keep
+  \c max_consecutive_delta well below this in practice).
+- \c base_lsn: LSN of the base full-image block in the page log.
+- \c backlink_lsn: LSN of the previous delta (or base) in the chain.
+- \c cumulative_size: total byte size of the base image plus all deltas.
+
+\c WT_PAGE_BLOCK_META lives inside \c WT_PAGE_DISAGG_INFO, which is attached to
+the in-memory page via \c page->disagg_info.
+
+@section pd_reconstruction Reconstruction on read
+
+When a page is read from storage and has \c delta_count > 0, the read path in
+\c __page_read_build_full_disk_image (see \c src/btree/bt_read.c) merges the
+base image with all delta images into a single complete disk image before
+building the in-memory page. The rest of the read path then proceeds identically
+to the non-delta case.
+
+The merge helpers live in \c src/btree/bt_page.c:
+
+- \c __wti_page_merge_deltas_with_base_image_leaf: merges base leaf image and
+  all leaf deltas in key order. For each key the newest delta entry wins;
+  delta deletes remove the key. The result is a valid leaf page disk image
+  reflecting the latest logical state.
+- \c __wti_page_merge_deltas_with_base_image_int: merges base internal image
+  and all internal deltas. Each child address is either kept from the base or
+  replaced/removed according to the newest delta entry.
+
+@section pd_tuning Tuning
+
+The primary tuning levers are:
+
+- \c page_delta.delta_pct: raise to allow larger deltas, lower to keep them compact.
+- \c page_delta.max_consecutive_delta: raise to extend chains and maximize write
+  savings, lower to bound read reconstruction cost.
+
+The right balance depends on the read/write ratio and how many keys are updated
+per page per checkpoint cycle. Write-heavy workloads with sparse updates benefit
+most. Read-heavy workloads or workloads that touch every key on a page should
+use short chains (\c max_consecutive_delta of 48).
+
+*/

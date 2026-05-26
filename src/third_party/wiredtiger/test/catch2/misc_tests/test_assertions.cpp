@@ -46,7 +46,7 @@ check_assertion_fired(WT_SESSION_IMPL *session)
     if (ret == ASSERT_FIRED) {
         // Clear the assertion flag and message for the next test step.
         session->unittest_assert_hit = false;
-        memset(session->unittest_assert_msg, 0, WT_SESSION_UNITTEST_BUF_LEN);
+        memset(session->unittest_assert_msg, 0, sizeof(session->unittest_assert_msg));
     }
 
     return ret;

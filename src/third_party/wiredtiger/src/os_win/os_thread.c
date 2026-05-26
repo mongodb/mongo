@@ -91,7 +91,7 @@ int
 __wt_thread_str(char *buf, size_t buflen)
 {
     return (__wt_snprintf(buf, buflen, "%" PRIu64 ":%" PRIu64, (uint64_t)GetCurrentProcessId(),
-      (uint64_t)GetCurrentThreadId));
+      (uint64_t)GetCurrentThreadId()));
 }
 
 /*

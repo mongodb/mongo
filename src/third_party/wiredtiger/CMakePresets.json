@@ -2,7 +2,12 @@
     "version": 3,
     "configurePresets": [
         {
+            "name": "default",
+            "displayName": "Default"
+        },
+        {
             "name": "linux",
+            "inherits": "default",
             "hidden": true,
             "condition": {
                 "type": "equals",
@@ -15,6 +20,7 @@
         },
         {
             "name": "linux-v4",
+            "inherits": "default",
             "hidden": true,
             "condition": {
                 "type": "equals",
@@ -51,6 +57,14 @@
                 "CMAKE_C_COMPILER":   "$env{MONGODBTOOLCHAIN_BIN}/gcc",
                 "CMAKE_CXX_COMPILER": "$env{MONGODBTOOLCHAIN_BIN}/g++"
             }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default",
+            "displayName": "Default",
+            "configurePreset": "default",
+            "jobs": 0
         }
     ]
 }

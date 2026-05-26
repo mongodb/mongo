@@ -1,23 +1,11 @@
-if(NOT HAVE_LIBZ)
-    # We don't need to construct a zlib library target.
-    return()
-endif()
+# zlib: capability detection + imported target.
+#
+# Layer 1 (capability):     HAVE_LIBZ
+# Layer 2 (default policy): cmake/configs/base.cmake
+# Layer 3 (user toggle):    ENABLE_ZLIB / HAVE_BUILTIN_EXTENSION_ZLIB
 
-if(TARGET wt::zlib)
-    # Avoid redefining the imported library.
-    return()
-endif()
-
-# Define the imported zlib library target that can be subsequently linked across the build system.
-# We use the double colons (::) as a convention to tell CMake that the target name is associated
-# with an IMPORTED target (which allows CMake to issue a diagnostic message if the library wasn't found).
-add_library(wt::zlib SHARED IMPORTED GLOBAL)
-set_target_properties(wt::zlib PROPERTIES
-    IMPORTED_LOCATION ${HAVE_LIBZ}
-    IMPORTED_IMPLIB ${HAVE_LIBZ}
-)
-if (HAVE_LIBZ_INCLUDES)
-    set_target_properties(wt::zlib PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES ${HAVE_LIBZ_INCLUDES}
-    )
-endif()
+# Produces target wt::zlib when the library is available.
+wt_find_library(NAME z CMAKE_TARGET zlib
+    PACKAGE ZLIB TARGET ZLIB::ZLIB
+    PKGCONFIG_MODULE zlib
+    HEADER zlib.h)

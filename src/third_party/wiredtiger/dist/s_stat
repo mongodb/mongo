@@ -71,6 +71,7 @@ perf_hist_leaf_reconstruct_latency_total_usecs
 perf_hist_opread_latency_total_usecs
 perf_hist_opwrite_latency_total_usecs
 txn_rts_upd_aborted_dryrun
+read_reject_count
 write_reject_count
 UNUSED_STAT_FIELDS
 

@@ -2,6 +2,11 @@ if(NOT ENABLE_PALITE)
     return() # PALite is disabled, skip the rest of this file
 endif()
 
+if(TARGET wt::sqlite3)
+    # Avoid redefining the imported library.
+    return()
+endif()
+
 if(USE_SYSTEM_SQLITE3)
     find_package(SQLite3 ${SQLITE3_REQUIRED_VERSION} REQUIRED)
     add_library(wt::sqlite3 ALIAS SQLite::SQLite3)
@@ -66,8 +71,8 @@ endif()
 
 # Needed for SQLite3 on some platforms
 target_link_libraries(sqlite3_lib PUBLIC
-    $<$<BOOL:${WT_LINUX}>:${HAVE_LIBPTHREAD}>
-    $<$<BOOL:${WT_LINUX}>:${HAVE_LIBDL}>
+    $<$<BOOL:${WT_LINUX}>:Threads::Threads>
+    $<$<BOOL:${WT_LINUX}>:${CMAKE_DL_LIBS}>
     $<$<BOOL:${WT_LINUX}>:m>
 )
 

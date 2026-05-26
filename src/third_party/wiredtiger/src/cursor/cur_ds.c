@@ -174,6 +174,8 @@ __curds_next(WT_CURSOR *cursor)
 
     CURSOR_API_CALL(cursor, session, ret, next, NULL);
 
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     WT_STAT_CONN_DSRC_INCR(session, cursor_next);
 
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
@@ -197,6 +199,7 @@ __curds_prev(WT_CURSOR *cursor)
     source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
     CURSOR_API_CALL(cursor, session, ret, prev, NULL);
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
 
     WT_STAT_CONN_DSRC_INCR(session, cursor_prev);
 
@@ -247,6 +250,8 @@ __curds_search(WT_CURSOR *cursor)
 
     CURSOR_API_CALL(cursor, session, ret, search, NULL);
 
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     WT_STAT_CONN_DSRC_INCR(session, cursor_search);
 
     WT_ERR(__curds_key_set(cursor));
@@ -271,6 +276,8 @@ __curds_search_near(WT_CURSOR *cursor, int *exact)
 
     CURSOR_API_CALL(cursor, session, ret, search_near, NULL);
 
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     WT_STAT_CONN_DSRC_INCR(session, cursor_search_near);
 
     WT_ERR(__curds_key_set(cursor));
@@ -294,6 +301,8 @@ __curds_insert(WT_CURSOR *cursor)
     source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
     CURSOR_UPDATE_API_CALL(cursor, session, ret, insert, NULL);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
 
     WT_STAT_CONN_DSRC_INCR(session, cursor_insert);
     WT_STAT_DSRC_INCRV(session, cursor_insert_bytes, cursor->key.size + cursor->value.size);
@@ -323,6 +332,8 @@ __curds_update(WT_CURSOR *cursor)
 
     CURSOR_UPDATE_API_CALL(cursor, session, ret, update, NULL);
 
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     WT_STAT_CONN_DSRC_INCR(session, cursor_update);
     WT_STAT_CONN_DSRC_INCRV(session, cursor_update_bytes, cursor->value.size);
 
@@ -350,6 +361,8 @@ __curds_remove(WT_CURSOR *cursor)
 
     CURSOR_REMOVE_API_CALL(cursor, session, ret, NULL);
 
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     WT_STAT_CONN_DSRC_INCR(session, cursor_remove);
     WT_STAT_CONN_DSRC_INCRV(session, cursor_remove_bytes, cursor->key.size);
 
@@ -375,6 +388,8 @@ __curds_reserve(WT_CURSOR *cursor)
     source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
     CURSOR_UPDATE_API_CALL(cursor, session, ret, reserve, NULL);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
 
     WT_STAT_CONN_DSRC_INCR(session, cursor_reserve);
 

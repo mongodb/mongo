@@ -78,7 +78,8 @@ typedef struct key_values {
  */
 #define COPY_MESSAGE_CONTENT(dest, src)        \
     do {                                       \
-        char *_dest, *_src, *_trailing;        \
+        const char *_src;                      \
+        char *_dest, *_trailing;               \
                                                \
         _src = strchr(src, ':') + 1;           \
         while (*_src == ' ')                   \
@@ -310,7 +311,8 @@ static int
 handle_wiredtiger_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message)
 {
     CUSTOM_EVENT_HANDLER *custom;
-    char *output, *p;
+    const char *p;
+    char *output;
 
     (void)session;
 

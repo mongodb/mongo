@@ -1323,6 +1323,9 @@ __clayered_next(WT_CURSOR *cursor)
     clayered = (WT_CURSOR_LAYERED *)cursor;
 
     CURSOR_API_CALL(cursor, session, ret, next, clayered->dhandle);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     __cursor_novalue(cursor);
     WT_ERR(__cursor_copy_release(cursor));
 
@@ -1354,6 +1357,9 @@ __clayered_prev(WT_CURSOR *cursor)
     clayered = (WT_CURSOR_LAYERED *)cursor;
 
     CURSOR_API_CALL(cursor, session, ret, prev, clayered->dhandle);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     __cursor_novalue(cursor);
     WT_ERR(__cursor_copy_release(cursor));
 
@@ -1718,7 +1724,7 @@ __clayered_lookup(WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, WT_ITEM
           __clayered_lookup_constituent(clayered->stable_cursor, clayered, value), true);
 
 err:
-    if (ret != 0 && ret != WT_PREPARE_CONFLICT) {
+    if (ret != 0) {
         WT_TRET(__clayered_reset_cursors(clayered, false));
         /* Reset the buffer if the key was deleted on the ingest table. */
         value->data = NULL;
@@ -1747,6 +1753,8 @@ __clayered_search(WT_CURSOR *cursor)
     WT_ERR(__cursor_needkey(cursor));
     __cursor_novalue(cursor);
     WT_ERR(__clayered_enter(clayered, true, true, false));
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
 
     WT_STAT_CONN_DSRC_INCR(session, layered_curs_search);
     WT_ERR(__clayered_lookup(session, clayered, &cursor->value));
@@ -2008,7 +2016,7 @@ done:
     }
 
 err:
-    if (ret != 0 && ret != WT_PREPARE_CONFLICT)
+    if (ret != 0)
         WT_TRET(__clayered_reset_cursors(clayered, false));
 
     return (ret);
@@ -2033,6 +2041,8 @@ __clayered_search_near(WT_CURSOR *cursor, int *exactp)
     WT_ERR(__cursor_needkey(cursor));
     __cursor_novalue(cursor);
     WT_ERR(__clayered_enter(clayered, true, true, false));
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
 
     WT_ERR(__clayered_search_near_int(session, cursor, exactp));
 
@@ -2066,6 +2076,8 @@ __clayered_reserve_constituent(WT_SESSION_IMPL *session, WT_CURSOR *constituent)
 {
     WT_DECL_RET;
     CURSOR_UPDATE_API_CALL_BTREE(constituent, session, ret, reserve);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
 
     /*
      * Pass overwrite=true for followers: a follower's ingest table may not contain the key yet (it
@@ -2270,6 +2282,9 @@ __clayered_insert(WT_CURSOR *cursor)
     clayered = (WT_CURSOR_LAYERED *)cursor;
 
     CURSOR_UPDATE_API_CALL(cursor, session, ret, insert, clayered->dhandle);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     /* Insert doesn't keep the cursor positioned. Always clear the iteration flags. */
     F_CLR(clayered, WT_CLAYERED_ITERATE_NEXT | WT_CLAYERED_ITERATE_PREV);
     WT_ERR(__cursor_copy_release(cursor));
@@ -2328,6 +2343,9 @@ __clayered_update(WT_CURSOR *cursor)
     clayered = (WT_CURSOR_LAYERED *)cursor;
 
     CURSOR_UPDATE_API_CALL(cursor, session, ret, update, clayered->dhandle);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     /*
      * Update keeps the cursor positioned. Retain the iteration flags if we are in the middle of a
      * cursor traversal.
@@ -2400,6 +2418,9 @@ __clayered_remove(WT_CURSOR *cursor)
     __cursor_novalue(cursor);
 
     WT_ERR(__clayered_enter(clayered, false, true, false));
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     /*
      * Copy the key out, since the insert resets non-primary chunk cursors which our lookup may have
      * landed on.
@@ -2441,6 +2462,8 @@ __clayered_reserve(WT_CURSOR *cursor)
     clayered = (WT_CURSOR_LAYERED *)cursor;
 
     CURSOR_UPDATE_API_CALL(cursor, session, ret, reserve, clayered->dhandle);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
 
     /*
      * Since a search will be performed afterward that clears the iteration flags, no point to
@@ -2834,6 +2857,9 @@ __clayered_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
     WT_CURSOR_LAYERED *clayered = (WT_CURSOR_LAYERED *)cursor;
 
     CURSOR_UPDATE_API_CALL(cursor, session, ret, modify, clayered->dhandle);
+
+    CURSOR_API_CHECK_SYSTEM_OVERLOAD(session, ret);
+
     /*
      * Modify keeps the cursor positioned. Retain the iteration flags if we are in the middle of a
      * cursor traversal.

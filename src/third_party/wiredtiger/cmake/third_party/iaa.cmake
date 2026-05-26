@@ -1,22 +1,13 @@
-if(NOT HAVE_LIBQPL)
-    # We don't need to construct a iaa library target.
-    return()
-endif()
+# Intel IAA / QPL + libaccel-config: capability detection + imported targets.
+#
+# Layer 1 (capability):     HAVE_LIBQPL, HAVE_LIBACCEL_CONFIG
+# Layer 2 (default policy): cmake/configs/base.cmake
+# Layer 3 (user toggle):    ENABLE_IAA / HAVE_BUILTIN_EXTENSION_IAA
 
-if(TARGET wt::qpl)
-    # Avoid redefining the imported library.
-    return()
-endif()
+# Produces target wt::qpl when the library is available.
+wt_find_library(NAME qpl
+    HEADER qpl/qpl.h)
 
-# Define the imported iaa library target that can be subsequently linked across the build system.
-# We use the double colons (::) as a convention to tell CMake that the target name is associated
-# with an IMPORTED target (which allows CMake to issue a diagnostic message if the library wasn't found).
-add_library(wt::qpl STATIC IMPORTED GLOBAL)
-set_target_properties(wt::qpl PROPERTIES
-    IMPORTED_LOCATION ${HAVE_LIBQPL}
-)
-if (HAVE_LIBQPL_INCLUDES)
-    set_target_properties(wt::qpl PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES ${HAVE_LIBQPL_INCLUDES}
-    )
-endif()
+# Produces target wt::accel_config when the library is available.
+wt_find_library(NAME accel_config
+    LIBRARY accel-config)

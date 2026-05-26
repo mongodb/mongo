@@ -2000,6 +2000,8 @@ static WT_INLINE bool __wt_conf_get_compiled(WT_CONNECTION_IMPL *conn, const cha
   WT_CONF **confp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_conf_is_compiled(WT_CONNECTION_IMPL *conn, const char *config)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static WT_INLINE bool __wt_conn_load_control_read_overload(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_conn_load_control_write_overload(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static WT_INLINE bool __wt_cursor_has_cached_memory(WT_CURSOR *cursor)
@@ -2580,6 +2582,8 @@ static WT_INLINE void __wt_row_leaf_value_set(WT_ROW *rip, WT_CELL_UNPACK_KV *un
 static WT_INLINE void __wt_scr_free(WT_SESSION_IMPL *session, WT_ITEM **bufp);
 static WT_INLINE void __wt_seconds(WT_SESSION_IMPL *session, uint64_t *secondsp);
 static WT_INLINE void __wt_seconds32(WT_SESSION_IMPL *session, uint32_t *secondsp);
+static WT_INLINE void __wt_single_thread_check_start(WT_SESSION_IMPL *s);
+static WT_INLINE void __wt_single_thread_check_stop(WT_SESSION_IMPL *s);
 static WT_INLINE void __wt_spin_backoff(uint64_t *yield_count, uint64_t *sleep_usecs);
 static WT_INLINE void __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t);
 static WT_INLINE void __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t);

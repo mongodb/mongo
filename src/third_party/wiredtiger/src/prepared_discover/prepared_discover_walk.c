@@ -463,6 +463,8 @@ __wt_prepared_discover_filter_apply_handles(WT_SESSION_IMPL *session)
     const char *checkpoint_name, *uri, *config;
     bool has_prepare;
 
+    checkpoint_name = NULL;
+
     WT_RET(__wt_metadata_cursor(session, &cursor));
 
     while ((ret = cursor->next(cursor)) == 0) {
@@ -489,12 +491,14 @@ __wt_prepared_discover_filter_apply_handles(WT_SESSION_IMPL *session)
              */
             WT_ERR(__wt_buf_fmt(session, stable_uri_buf, "%s/%s", uri, checkpoint_name));
             uri = stable_uri_buf->data;
+            __wt_free(session, checkpoint_name);
         }
         WT_ERR(__prepared_discover_walk_one_tree(session, uri));
     }
     if (ret == WT_NOTFOUND)
         ret = 0;
 err:
+    __wt_free(session, checkpoint_name);
     WT_TRET(__wt_metadata_cursor_release(session, &cursor));
     __wt_scr_free(session, &stable_uri_buf);
     return (ret);
