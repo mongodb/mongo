@@ -117,6 +117,7 @@ void MeasurementMap::_insertNewKey(StringData key, const BSONElement& elem, size
 }
 
 void MeasurementMap::insertOne(const BSONObj& measurement, boost::optional<StringData> metaField) {
+    // First pass to append all elements present in this measurement.
     for (const auto& elem : measurement) {
         StringData key = elem.fieldNameStringData();
         // Skip the meta field values because they aren't stored in a BSONColumn.
@@ -129,11 +130,18 @@ void MeasurementMap::insertOne(const BSONObj& measurement, boost::optional<Strin
             _insertNewKey(key, elem, _measurementCount);
         } else {
             builderIt->second.builder.append(elem);
-            ++builderIt->second.count;
+
+            uassert(12602102,
+                    "Measurements with duplicate field names cannot be stored in timeseries "
+                    "collections",
+                    builderIt->second.count++ <= _measurementCount);
         }
     }
-    // Increment our total measurement count
+
+    // Increment our total measurement count. Needs to be after the first pass above so that
+    // builders for new keys are initialized with the correct count.
     ++_measurementCount;
+
     // Perform a second pass over our builders and perform a skip for the ones that did not get an
     // element appended to them in the first pass above.
     for (auto&& entry : _builders) {
