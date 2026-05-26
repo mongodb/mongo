@@ -454,6 +454,58 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionBlocksRecoveryThenProceeds) {
     ASSERT_EQ(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
 }
 
+TEST_F(AuthoritativeRefreshFixture, ClearFilteringMetadataDuringPostRecoveryWaitTriggersRetry) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
+    auto* opCtx = operationContext();
+
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
+    populateDiskCatalog(opCtx, collType, chunks);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    // Hang the recovery thread inside _waitForConfigTimeOrChunkVersionChange after the version
+    // and majority waiters are registered but before whenAny is scheduled, so that we have a
+    // deterministic window to clear the filtering metadata and cancel the version waiter.
+    auto* fp = globalFailPointRegistry().find("hangBeforeWaitingForConfigTimeOrChunkVersionChange");
+    auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+
+    // Router reports UNTRACKED while the shard's on-disk metadata is tracked: the post-recovery
+    // comparison cannot order the two, so recovery falls into Step 4's wait.
+    stdx::thread recoveryThread([&] {
+        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgInterrupt");
+        auto bgOpCtx = bgClient->makeOperationContext();
+        ASSERT_OK(onShardVersionMismatch(bgOpCtx.get(), kTestNss, ChunkVersion::UNTRACKED()));
+    });
+
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+
+    // Cancel the registered version waiter and clear the CSS metadata. The wait should observe
+    // CallbackCanceled and return kYes so the outer recovery loop performs another disk
+    // recovery iteration.
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    fp->setMode(FailPoint::off);
+
+    recoveryThread.join();
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    auto metadataOpt = csr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadataOpt.has_value());
+    ASSERT_EQ(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
+
+    // The retry path must have run disk recovery a second time: once for the original wait that was
+    // interrupted, and once for the retried iteration that completed.
+    auto stats = getStatistics(opCtx);
+    ASSERT_GTE(stats.getIntField("diskRecoveriesPerformed"), 2)
+        << "Expected the wait interrupt to trigger a second disk recovery";
+}
+
 TEST_F(AuthoritativeRefreshFixture, RecoveryCreatesExactlyOneRecoverer) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
     auto* opCtx = operationContext();

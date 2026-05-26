@@ -447,6 +447,10 @@ void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
         _placementVersionInRecoverOrRefresh->cancellationSource.cancel();
     }
 
+    _shardVersionWaiters.cancelWaiters(Status{ErrorCodes::CallbackCanceled,
+                                              "Filtering metadata got cleared, cancelling callback "
+                                              "to re-evaluate if it's still necessary"});
+
     if (_nss.isNamespaceAlwaysUntracked()) {
         // The namespace is always marked as untracked thus there is no need to clear anything.
         return;

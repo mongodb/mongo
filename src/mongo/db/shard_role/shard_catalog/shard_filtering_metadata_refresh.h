@@ -241,6 +241,7 @@ private:
                                             const NamespaceString& nss,
                                             const ChunkVersion& receivedShardVersion);
 
+    enum class WasWaitInterrupted { kNo, kYes };
     /**
      * Handles the case where router's shard version (receivedShardVersion) and shard's shard
      * version (wantedShardVersion) are not directly comparable (e.g. one tracked, one untracked).
@@ -253,9 +254,9 @@ private:
      * have changed the version have already been applied. On a primary this wait is an instant
      * no-op since it has already applied all oplog entries.
      */
-    void _waitForConfigTimeOrChunkVersionChange(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const ChunkVersion& chunkVersion);
+    WasWaitInterrupted _waitForConfigTimeOrChunkVersionChange(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              const ChunkVersion& chunkVersion);
 
     SharedSemiFuture<void> _recoverRefreshCollectionPlacementVersion(
         ServiceContext* serviceContext,

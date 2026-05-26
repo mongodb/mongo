@@ -90,6 +90,17 @@ public:
         }
     }
 
+    /**
+     * Cancels all pending waiters with a specific error code.
+     */
+    void cancelWaiters(const Status& error) {
+        std::unique_lock lk(_mutex);
+        for (auto& [_, waiterPromise] : _waiters) {
+            waiterPromise.setError(error);
+        }
+        _waiters.clear();
+    }
+
 private:
     std::mutex _mutex;
     boost::optional<Key> _currentKeyValue;
