@@ -96,14 +96,6 @@ void appendToKeyString(const std::vector<BSONElement>& elems,
     }
 }
 
-// Append 'MinKey' to 'keyString'. Multikey path keys use 'MinKey' for non-wildcard fields.
-void appendToMultiKeyString(const std::vector<BSONElement>& elems,
-                            key_string::PooledBuilder* keyString) {
-    for (size_t i = 0; i < elems.size(); i++) {
-        keyString->appendBSONElement(kMinBSONKey.firstElement());
-    }
-}
-
 /**
  * A helper class for generating all the various types of keys for a wildcard index.
  *
@@ -232,22 +224,14 @@ void SingleDocumentKeyEncoder::_addMultiKey(const FieldRef& fullPath) {
     // 'multikeyPaths' may be nullptr if the access method is being used in an operation which does
     // not require multikey path generation.
     if (_multikeyPaths) {
-        key_string::PooledBuilder keyString(_pooledBufferBuilder, _keyStringVersion, _ordering);
-
-        if (!_preElems.empty()) {
-            appendToMultiKeyString(_preElems, &keyString);
-        }
-        for (auto elem : BSON("" << 1 << "" << fullPath.dottedField())) {
-            keyString.appendBSONElement(elem);
-        }
-        if (!_postElems.empty()) {
-            appendToMultiKeyString(_postElems, &keyString);
-        }
-
-        keyString.appendRecordId(record_id_helpers::reservedIdFor(
-            record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, *_rsKeyFormat));
-
-        _multikeyPaths->push_back(keyString.release());
+        _multikeyPaths->push_back(
+            WildcardKeyGenerator::makeMultikeyMetadataKey(fullPath.dottedField(),
+                                                          _preElems.size(),
+                                                          _postElems.size(),
+                                                          _keyStringVersion,
+                                                          _ordering,
+                                                          *_rsKeyFormat,
+                                                          _pooledBufferBuilder));
     }
 }
 
@@ -432,5 +416,30 @@ void WildcardKeyGenerator::generateKeys(SharedBufferFragmentBuilder& pooledBuffe
     if (multikeyPaths)
         multikeyPaths->adopt_sequence(std::move(multikeyPathsSequence));
     keys->adopt_sequence(std::move(keysSequence));
+}
+
+key_string::Value WildcardKeyGenerator::makeMultikeyMetadataKey(
+    StringData fieldPath,
+    size_t prefixFieldCount,
+    size_t suffixFieldCount,
+    key_string::Version version,
+    Ordering ordering,
+    KeyFormat rsKeyFormat,
+    SharedBufferFragmentBuilder& pooledBuilder) {
+    key_string::PooledBuilder keyString(pooledBuilder, version, ordering);
+
+    for (size_t i = 0; i < prefixFieldCount; ++i) {
+        keyString.appendBSONElement(kMinBSONKey.firstElement());
+    }
+    for (auto elem : BSON("" << 1 << "" << fieldPath)) {
+        keyString.appendBSONElement(elem);
+    }
+    for (size_t i = 0; i < suffixFieldCount; ++i) {
+        keyString.appendBSONElement(kMinBSONKey.firstElement());
+    }
+    keyString.appendRecordId(record_id_helpers::reservedIdFor(
+        record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, rsKeyFormat));
+
+    return keyString.release();
 }
 }  // namespace mongo

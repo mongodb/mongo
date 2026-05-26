@@ -133,6 +133,7 @@ public:
 
     void setMultikeyForApplyOps(OperationContext* opCtx,
                                 const CollectionPtr& coll,
+                                const KeyStringSet& multikeyMetadataKeys,
                                 const MultikeyPaths& multikeyPaths) const final {
         MONGO_UNREACHABLE;
     }

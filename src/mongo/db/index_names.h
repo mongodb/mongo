@@ -105,7 +105,7 @@ public:
 /**
  * Contain utilities to work with wildcard fields used for Wildcard indexes.
  */
-struct WildcardNames {
+struct MONGO_MOD_PUBLIC WildcardNames {
     static constexpr StringData WILDCARD_FIELD_NAME = "$**"_sd;
     static constexpr StringData WILDCARD_FIELD_NAME_SUFFIX = ".$**"_sd;
 

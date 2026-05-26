@@ -83,6 +83,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
+#include "mongo/db/repl/set_multikey_metadata_oplog_entry_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/timestamp_block.h"
@@ -111,6 +112,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_catalog/set_multikey_metadata_oplog_helpers.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/damage_vector.h"
@@ -1778,6 +1780,612 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
     assertMultikeyPaths(
         _opCtx, collPtr, indexName, commitEntryTs, true /* shouldBeMultikey */, {{0}});
     assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {{0}});
+}
+
+TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTransaction) {
+    auto service = _opCtx->getServiceContext();
+    auto sessionCatalog = SessionCatalog::get(service);
+    sessionCatalog->reset_forTest();
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx);
+    mongoDSessionCatalog->onStepUp(_opCtx);
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.PrimarySetsWildcardMultikeyInsideMultiDocumentTransaction");
+    create(nss);
+
+    auto indexName = "wildcard";
+    auto indexSpec = BSON("name" << indexName << "ns" << nss.ns_forTest() << "key"
+                                 << BSON("$**" << 1) << "v" << static_cast<int>(kIndexVersion));
+    auto doc = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
+
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns_forTest(), indexSpec));
+
+    const auto currentTime = _clock->getTime();
+    const auto presentTs = currentTime.clusterTime().asTimestamp();
+
+    auto storageEngine = cc().getServiceContext()->getStorageEngine();
+    storageEngine->getSnapshotManager()->setLastApplied(presentTs);
+
+    const auto beforeTxnTime = _clock->tickClusterTime(1);
+    auto beforeTxnTs = beforeTxnTime.asTimestamp();
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    _opCtx->setLogicalSessionId(sessionId);
+    _opCtx->setTxnNumber(1);
+    _opCtx->setInMultiDocumentTransaction();
+
+    auto ocs = mongoDSessionCatalog->checkOutSession(_opCtx);
+    auto txnParticipant = TransactionParticipant::get(_opCtx);
+    ASSERT(txnParticipant);
+
+    txnParticipant.beginOrContinue(_opCtx,
+                                   {*_opCtx->getTxnNumber()},
+                                   false /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kStart);
+    txnParticipant.unstashTransactionResources(_opCtx, "insert");
+    {
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        insertDocument(collAcq.getCollectionPtr(), InsertStatement(doc));
+    }
+
+    txnParticipant.commitUnpreparedTransaction(_opCtx);
+    txnParticipant.stashTransactionResources(_opCtx);
+
+    const auto collAcq = acquireCollForRead(_opCtx, nss);
+    const auto& collPtr = collAcq.getCollectionPtr();
+
+    // Verify the document was committed.
+    assertDocumentAtTimestamp(collPtr, presentTs, BSONObj());
+    assertDocumentAtTimestamp(collPtr, _nullTs, doc);
+
+    // Verify the catalog multikey flag is set at the latest timestamp.
+    assertMultikeyPaths(_opCtx, collPtr, indexName, presentTs, false /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {});
+
+    // Verify the wildcard metadata keys are present at the latest timestamp.
+    // The field "a" is an array, so it should be recorded as a multikey path.
+    auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
+    ASSERT(entry);
+    stdx::unordered_set<std::string> fieldSet = {"a"};
+    {
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(1, paths.size());
+        ASSERT_EQUALS("a", paths.begin()->dottedField());
+    }
+    {
+        // Before the transaction started, no metadata keys should be visible.
+        OneOffRead oor(_opCtx, beforeTxnTs);
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(0, paths.size());
+    }
+
+    // Before the transaction, the catalog multikey flag should not be set.
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+}
+
+TEST_F(StorageTimestampTest,
+       PrimarySetsWildcardMultikeyInsideMultiDocumentTransactionMultiplePaths) {
+    auto service = _opCtx->getServiceContext();
+    auto sessionCatalog = SessionCatalog::get(service);
+    sessionCatalog->reset_forTest();
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx);
+    mongoDSessionCatalog->onStepUp(_opCtx);
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.PrimarySetsWildcardMultikeyInsideMultiDocTxnMultiplePaths");
+    create(nss);
+
+    auto indexName = "wildcard";
+    auto indexSpec = BSON("name" << indexName << "ns" << nss.ns_forTest() << "key"
+                                 << BSON("$**" << 1) << "v" << static_cast<int>(kIndexVersion));
+
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns_forTest(), indexSpec));
+
+    const auto currentTime = _clock->getTime();
+    const auto presentTs = currentTime.clusterTime().asTimestamp();
+
+    auto storageEngine = cc().getServiceContext()->getStorageEngine();
+    storageEngine->getSnapshotManager()->setLastApplied(presentTs);
+
+    const auto beforeTxnTime = _clock->tickClusterTime(1);
+    auto beforeTxnTs = beforeTxnTime.asTimestamp();
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    _opCtx->setLogicalSessionId(sessionId);
+    _opCtx->setTxnNumber(1);
+    _opCtx->setInMultiDocumentTransaction();
+
+    auto ocs = mongoDSessionCatalog->checkOutSession(_opCtx);
+    auto txnParticipant = TransactionParticipant::get(_opCtx);
+    ASSERT(txnParticipant);
+
+    txnParticipant.beginOrContinue(_opCtx,
+                                   {*_opCtx->getTxnNumber()},
+                                   false /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kStart);
+    txnParticipant.unstashTransactionResources(_opCtx, "insert");
+    {
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        // Insert documents that make multiple paths multikey.
+        insertDocument(collAcq.getCollectionPtr(),
+                       InsertStatement(BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2))));
+        insertDocument(collAcq.getCollectionPtr(),
+                       InsertStatement(BSON("_id" << 2 << "b" << BSON_ARRAY(3 << 4))));
+        insertDocument(collAcq.getCollectionPtr(),
+                       InsertStatement(BSON("_id" << 3 << "c" << BSON_ARRAY(5 << 6))));
+    }
+
+    txnParticipant.commitUnpreparedTransaction(_opCtx);
+    txnParticipant.stashTransactionResources(_opCtx);
+
+    // Verify all three multikey paths are present in the wildcard index.
+    const auto collAcq = acquireCollForRead(_opCtx, nss);
+    const auto& collPtr = collAcq.getCollectionPtr();
+    auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
+    ASSERT(entry);
+
+    stdx::unordered_set<std::string> fieldSet = {"a", "b", "c"};
+    {
+        // Before the transaction started, no metadata keys should be visible.
+        OneOffRead oor(_opCtx, beforeTxnTs);
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(0, paths.size());
+    }
+    {
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(3, paths.size());
+        std::set<std::string> pathStrings;
+        for (const auto& p : paths) {
+            pathStrings.insert(std::string(p.dottedField()));
+        }
+        ASSERT(pathStrings.count("a"));
+        ASSERT(pathStrings.count("b"));
+        ASSERT(pathStrings.count("c"));
+    }
+}
+
+TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTransactionPrepared) {
+    auto service = _opCtx->getServiceContext();
+    auto sessionCatalog = SessionCatalog::get(service);
+    sessionCatalog->reset_forTest();
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx);
+    mongoDSessionCatalog->onStepUp(_opCtx);
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.PrimarySetsWildcardMultikeyInsideMultiDocTxnPrepared");
+    create(nss);
+
+    auto indexName = "wildcard";
+    auto indexSpec = BSON("name" << indexName << "ns" << nss.ns_forTest() << "key"
+                                 << BSON("$**" << 1) << "v" << static_cast<int>(kIndexVersion));
+    auto doc = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
+
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns_forTest(), indexSpec));
+
+    const auto currentTime = _clock->getTime();
+    const auto presentTs = currentTime.clusterTime().asTimestamp();
+
+    auto storageEngine = cc().getServiceContext()->getStorageEngine();
+    storageEngine->getSnapshotManager()->setLastApplied(presentTs);
+
+    const auto beforeTxnTime = _clock->tickClusterTime(1);
+    auto beforeTxnTs = beforeTxnTime.asTimestamp();
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    _opCtx->setLogicalSessionId(sessionId);
+    _opCtx->setTxnNumber(1);
+    _opCtx->setInMultiDocumentTransaction();
+
+    auto ocs = mongoDSessionCatalog->checkOutSession(_opCtx);
+    auto txnParticipant = TransactionParticipant::get(_opCtx);
+    ASSERT(txnParticipant);
+
+    txnParticipant.beginOrContinue(_opCtx,
+                                   {*_opCtx->getTxnNumber()},
+                                   false /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kStart);
+    txnParticipant.unstashTransactionResources(_opCtx, "insert");
+    {
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        insertDocument(collAcq.getCollectionPtr(), InsertStatement(doc));
+    }
+
+    // Prepare the transaction.
+    txnParticipant.prepareTransaction(_opCtx, {});
+    txnParticipant.stashTransactionResources(_opCtx);
+
+    // Commit the prepared transaction.
+    const auto commitTime = _clock->getTime();
+    const auto commitClusterTime = commitTime.clusterTime();
+    const auto commitTs = commitClusterTime.addTicks(1).asTimestamp();
+    txnParticipant.unstashTransactionResources(_opCtx, "commitTransaction");
+    {
+        FailPointEnableBlock failPointBlock("skipCommitTxnCheckPrepareMajorityCommitted");
+        txnParticipant.commitPreparedTransaction(_opCtx, commitTs, {});
+    }
+    txnParticipant.stashTransactionResources(_opCtx);
+
+    const auto collAcq = acquireCollForRead(_opCtx, nss);
+    const auto& collPtr = collAcq.getCollectionPtr();
+
+    // Verify the document was committed.
+    assertDocumentAtTimestamp(collPtr, _nullTs, doc);
+
+    // Verify the catalog multikey flag is set at the latest timestamp.
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {});
+    // Before the transaction, multikey should not be set.
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+
+    // Verify the wildcard metadata keys are present at the latest timestamp.
+    auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
+    ASSERT(entry);
+    stdx::unordered_set<std::string> fieldSet = {"a"};
+    {
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(1, paths.size());
+        ASSERT_EQUALS("a", paths.begin()->dottedField());
+    }
+    {
+        // Before the transaction started, no metadata keys should be visible.
+        OneOffRead oor(_opCtx, beforeTxnTs);
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(0, paths.size());
+    }
+}
+
+TEST_F(StorageTimestampTest, PrimarySetsCompoundWildcardMultikeyInsideMultiDocumentTransaction) {
+    auto service = _opCtx->getServiceContext();
+    auto sessionCatalog = SessionCatalog::get(service);
+    sessionCatalog->reset_forTest();
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx);
+    mongoDSessionCatalog->onStepUp(_opCtx);
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.PrimarySetsCompoundWildcardMultikeyInsideMultiDocTxn");
+    create(nss);
+
+    auto indexName = "compound_wildcard";
+    auto indexSpec =
+        BSON("name" << indexName << "ns" << nss.ns_forTest() << "key"
+                    << BSON("x" << 1 << "$**" << 1) << "v" << static_cast<int>(kIndexVersion));
+    auto doc = BSON("_id" << 1 << "x" << 5 << "a" << BSON_ARRAY(1 << 2));
+
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns_forTest(), indexSpec));
+
+    const auto currentTime = _clock->getTime();
+    const auto presentTs = currentTime.clusterTime().asTimestamp();
+
+    auto storageEngine = cc().getServiceContext()->getStorageEngine();
+    storageEngine->getSnapshotManager()->setLastApplied(presentTs);
+
+    const auto beforeTxnTime = _clock->tickClusterTime(1);
+    auto beforeTxnTs = beforeTxnTime.asTimestamp();
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    _opCtx->setLogicalSessionId(sessionId);
+    _opCtx->setTxnNumber(1);
+    _opCtx->setInMultiDocumentTransaction();
+
+    auto ocs = mongoDSessionCatalog->checkOutSession(_opCtx);
+    auto txnParticipant = TransactionParticipant::get(_opCtx);
+    ASSERT(txnParticipant);
+
+    txnParticipant.beginOrContinue(_opCtx,
+                                   {*_opCtx->getTxnNumber()},
+                                   false /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kStart);
+    txnParticipant.unstashTransactionResources(_opCtx, "insert");
+    {
+        auto collAcq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+        insertDocument(collAcq.getCollectionPtr(), InsertStatement(doc));
+    }
+
+    txnParticipant.commitUnpreparedTransaction(_opCtx);
+    txnParticipant.stashTransactionResources(_opCtx);
+
+    const auto collAcq = acquireCollForRead(_opCtx, nss);
+    const auto& collPtr = collAcq.getCollectionPtr();
+
+    assertMultikeyPaths(_opCtx, collPtr, indexName, _nullTs, true /* shouldBeMultikey */, {});
+
+    // Before the transaction, the catalog multikey flag should not be set.
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+
+    auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
+    ASSERT(entry);
+    stdx::unordered_set<std::string> fieldSet = {"a"};
+    {
+        // Before the transaction started, no metadata keys should be visible.
+        OneOffRead oor(_opCtx, beforeTxnTs);
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(0, paths.size());
+    }
+    {
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(1, paths.size());
+        ASSERT_EQUALS("a", paths.begin()->dottedField());
+    }
+}
+
+// Builds a setMultikeyMetadata op:'c' oplog entry that mirrors what
+// OpObserverImpl::onSetMultikeyMetadata writes on the primary.
+namespace {
+repl::OplogEntry makeSetMultikeyMetadataOplogEntry(const NamespaceString& nss,
+                                                   const std::string& indexName,
+                                                   const BSONObj& paths,
+                                                   Timestamp ts,
+                                                   long long term = 1) {
+    SetMultikeyMetadataOplogEntry objectEntry(nss, indexName, paths);
+    return repl::OplogEntry(BSON("ts" << ts << "t" << term << "v" << 2 << "op"
+                                      << "c"
+                                      << "ns" << nss.getCommandNS().ns_forTest() << "wall"
+                                      << Date_t() << "o" << objectEntry.toBSON()));
+}
+}  // namespace
+
+TEST_F(StorageTimestampTest, SecondaryAppliesWildcardMultikeyMetadataFromTransaction) {
+    repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.SecondaryAppliesWildcardMultikeyMetadataFromTransaction");
+    ASSERT_OK(createCollection(_opCtx, nss.dbName(), BSON("create" << nss.coll())));
+
+    auto indexName = "wildcard";
+    auto indexSpec = BSON("name" << indexName << "key" << BSON("$**" << 1) << "v"
+                                 << static_cast<int>(kIndexVersion));
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns_forTest(), indexSpec));
+
+    _coordinatorMock->alwaysAllowWrites(false);
+
+    const auto currentTime = _clock->getTime();
+    const auto presentTs = currentTime.clusterTime().asTimestamp();
+    cc().getServiceContext()->getStorageEngine()->getSnapshotManager()->setLastApplied(presentTs);
+    const auto beforeTxnTs = _clock->tickClusterTime(1).asTimestamp();
+    const auto applyTs = _clock->tickClusterTime(1).asTimestamp();
+
+    auto setMkOp = makeSetMultikeyMetadataOplogEntry(
+        nss, indexName, set_multikey_metadata_oplog_helpers::fieldPathsToBSON({"a"}), applyTs);
+
+    std::vector<repl::OplogEntry> ops = {setMkOp};
+
+    DoNothingOplogApplierObserver observer;
+    auto storageInterface = repl::StorageInterface::get(_opCtx);
+    auto workerPool = repl::makeReplWorkerPool();
+    repl::OplogApplierImpl oplogApplier(
+        nullptr,
+        nullptr,
+        &observer,
+        _coordinatorMock,
+        _consistencyMarkers,
+        storageInterface,
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        workerPool.get());
+    uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
+
+    const auto collAcq = acquireCollForRead(_opCtx, nss);
+    const auto& collPtr = collAcq.getCollectionPtr();
+
+    // Catalog flag set after apply, not before.
+    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, true /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+
+    auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
+    ASSERT(entry);
+    stdx::unordered_set<std::string> fieldSet = {"a"};
+    {
+        // At the apply timestamp, the regenerated metadata keys are visible.
+        OneOffRead oor(_opCtx, applyTs);
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(1, paths.size());
+        ASSERT_EQUALS("a", paths.begin()->dottedField());
+    }
+    {
+        // Before the transaction started, no metadata keys should be visible.
+        OneOffRead oor(_opCtx, beforeTxnTs);
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(0, paths.size());
+    }
+}
+
+TEST_F(StorageTimestampTest, SecondaryAppliesWildcardMultikeyMetadataFromTransactionMultiplePaths) {
+    repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.SecondaryAppliesWildcardMkMetaFromTxnMultiplePaths");
+    ASSERT_OK(createCollection(_opCtx, nss.dbName(), BSON("create" << nss.coll())));
+
+    auto indexName = "wildcard";
+    auto indexSpec = BSON("name" << indexName << "key" << BSON("$**" << 1) << "v"
+                                 << static_cast<int>(kIndexVersion));
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns_forTest(), indexSpec));
+
+    _coordinatorMock->alwaysAllowWrites(false);
+
+    const auto currentTime = _clock->getTime();
+    const auto presentTs = currentTime.clusterTime().asTimestamp();
+    cc().getServiceContext()->getStorageEngine()->getSnapshotManager()->setLastApplied(presentTs);
+    const auto beforeTxnTs = _clock->tickClusterTime(1).asTimestamp();
+    const auto applyTs = _clock->tickClusterTime(1).asTimestamp();
+
+    // A single setMultikeyMetadata entry carries all multikey paths from one insert.
+    auto setMkOp = makeSetMultikeyMetadataOplogEntry(
+        nss,
+        indexName,
+        set_multikey_metadata_oplog_helpers::fieldPathsToBSON({"a", "b", "c"}),
+        applyTs);
+
+    DoNothingOplogApplierObserver observer;
+    auto storageInterface = repl::StorageInterface::get(_opCtx);
+    auto workerPool = repl::makeReplWorkerPool();
+    repl::OplogApplierImpl oplogApplier(
+        nullptr,
+        nullptr,
+        &observer,
+        _coordinatorMock,
+        _consistencyMarkers,
+        storageInterface,
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        workerPool.get());
+    uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, {setMkOp}));
+
+    const auto collAcq = acquireCollForRead(_opCtx, nss);
+    const auto& collPtr = collAcq.getCollectionPtr();
+
+    auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
+    ASSERT(entry);
+    stdx::unordered_set<std::string> fieldSet = {"a", "b", "c"};
+    {
+        // At the apply timestamp, all three regenerated metadata keys are visible.
+        OneOffRead oor(_opCtx, applyTs);
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(3, paths.size());
+        std::set<std::string> pathStrings;
+        for (const auto& p : paths) {
+            pathStrings.insert(std::string(p.dottedField()));
+        }
+        ASSERT(pathStrings.count("a"));
+        ASSERT(pathStrings.count("b"));
+        ASSERT(pathStrings.count("c"));
+    }
+    {
+        // Before the transaction started, no metadata keys should be visible.
+        OneOffRead oor(_opCtx, beforeTxnTs);
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(0, paths.size());
+    }
+}
+
+TEST_F(StorageTimestampTest, SecondaryAppliesCompoundWildcardMultikeyMetadataFromTransaction) {
+    repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.SecondaryAppliesCompoundWildcardMkMetaFromTxn");
+    ASSERT_OK(createCollection(_opCtx, nss.dbName(), BSON("create" << nss.coll())));
+
+    auto indexName = "compound_wildcard";
+    auto indexSpec = BSON("name" << indexName << "key" << BSON("x" << 1 << "$**" << 1) << "v"
+                                 << static_cast<int>(kIndexVersion));
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns_forTest(), indexSpec));
+
+    _coordinatorMock->alwaysAllowWrites(false);
+
+    const auto currentTime = _clock->getTime();
+    const auto presentTs = currentTime.clusterTime().asTimestamp();
+    cc().getServiceContext()->getStorageEngine()->getSnapshotManager()->setLastApplied(presentTs);
+    const auto beforeTxnTs = _clock->tickClusterTime(1).asTimestamp();
+    const auto applyTs = _clock->tickClusterTime(1).asTimestamp();
+
+    auto setMkOp = makeSetMultikeyMetadataOplogEntry(
+        nss, indexName, set_multikey_metadata_oplog_helpers::fieldPathsToBSON({"a"}), applyTs);
+
+    std::vector<repl::OplogEntry> ops = {setMkOp};
+
+    DoNothingOplogApplierObserver observer;
+    auto storageInterface = repl::StorageInterface::get(_opCtx);
+    auto workerPool = repl::makeReplWorkerPool();
+    repl::OplogApplierImpl oplogApplier(
+        nullptr,
+        nullptr,
+        &observer,
+        _coordinatorMock,
+        _consistencyMarkers,
+        storageInterface,
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        workerPool.get());
+    uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
+
+    const auto collAcq = acquireCollForRead(_opCtx, nss);
+    const auto& collPtr = collAcq.getCollectionPtr();
+
+    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, true /* shouldBeMultikey */, {});
+    assertMultikeyPaths(_opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {});
+
+    auto entry = collPtr->getIndexCatalog()->findIndexByName(_opCtx, indexName);
+    ASSERT(entry);
+    stdx::unordered_set<std::string> fieldSet = {"a"};
+    {
+        // At the apply timestamp, the regenerated metadata key is visible.
+        OneOffRead oor(_opCtx, applyTs);
+        MultikeyMetadataAccessStats stats;
+        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        ASSERT_EQUALS(1, paths.size());
+        ASSERT_EQUALS("a", paths.begin()->dottedField());
+    }
+}
+
+TEST_F(StorageTimestampTest, SecondaryAppliesRegularMultikeyMetadataFromTransaction) {
+    repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+        "unittests.SecondaryAppliesRegularMkMetaFromTxn");
+    ASSERT_OK(createCollection(_opCtx, nss.dbName(), BSON("create" << nss.coll())));
+
+    auto indexName = "a_1";
+    auto keyPattern = BSON("a" << 1);
+    auto indexSpec =
+        BSON("name" << indexName << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion));
+    ASSERT_OK(createIndexFromSpec(_opCtx, _clock, nss.ns_forTest(), indexSpec));
+
+    _coordinatorMock->alwaysAllowWrites(false);
+
+    const auto currentTime = _clock->getTime();
+    const auto presentTs = currentTime.clusterTime().asTimestamp();
+    cc().getServiceContext()->getStorageEngine()->getSnapshotManager()->setLastApplied(presentTs);
+    const auto beforeTxnTs = _clock->tickClusterTime(1).asTimestamp();
+    const auto applyTs = _clock->tickClusterTime(1).asTimestamp();
+
+    // Regular index uses multikeyPaths bitset (per-field array of multikey component indexes)
+    // instead of wildcard's field-path list.
+    auto setMkOp = makeSetMultikeyMetadataOplogEntry(
+        nss, indexName, multikey_paths::serialize(keyPattern, {{0}}), applyTs);
+
+    std::vector<repl::OplogEntry> ops = {setMkOp};
+
+    DoNothingOplogApplierObserver observer;
+    auto storageInterface = repl::StorageInterface::get(_opCtx);
+    auto workerPool = repl::makeReplWorkerPool();
+    repl::OplogApplierImpl oplogApplier(
+        nullptr,
+        nullptr,
+        &observer,
+        _coordinatorMock,
+        _consistencyMarkers,
+        storageInterface,
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        workerPool.get());
+    uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
+
+    const auto collAcq = acquireCollForRead(_opCtx, nss);
+    const auto& collPtr = collAcq.getCollectionPtr();
+
+    // Regular index: catalog flag set + multikey path component is recorded.
+    assertMultikeyPaths(_opCtx, collPtr, indexName, applyTs, true /* shouldBeMultikey */, {{0}});
+    assertMultikeyPaths(
+        _opCtx, collPtr, indexName, beforeTxnTs, false /* shouldBeMultikey */, {{}});
 }
 
 TEST_F(StorageTimestampTest, InitializeMinValid) {

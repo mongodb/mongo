@@ -34,6 +34,7 @@
 
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -53,12 +54,15 @@
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -161,30 +165,25 @@ static BSONObj buildIndexBoundsKeyPattern(const BSONObj& wiKeyPattern) {
 }
 
 /**
- * Retrieves from the wildcard index the set of multikey path metadata keys bounded by
- * 'indexBounds'. Returns the set of multikey paths represented by the keys.
+ * Scans wildcard multikey metadata keys from the index using the given recovery unit and
+ * index bounds. Adds discovered multikey paths to 'multikeyPaths' and updates 'stats'.
  */
-static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opCtx,
-                                                           const IndexCatalogEntry* index,
-                                                           const IndexBounds& indexBounds,
-                                                           MultikeyMetadataAccessStats* stats) {
-    const WildcardAccessMethod* wam =
-        static_cast<const WildcardAccessMethod*>(index->accessMethod());
-
-    stats->numSeeks = 0;
-    stats->keysExamined = 0;
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+static void scanWildcardMetadataKeys(OperationContext* opCtx,
+                                     const WildcardAccessMethod* wam,
+                                     RecoveryUnit& ru,
+                                     const IndexBounds& indexBounds,
+                                     const BSONObj& keyPattern,
+                                     std::set<FieldRef>* multikeyPaths,
+                                     MultikeyMetadataAccessStats* stats) {
     auto cursor = wam->newCursor(opCtx, ru);
 
     constexpr int kForward = 1;
-    const auto keyPattern = buildIndexBoundsKeyPattern(index->descriptor()->keyPattern());
     IndexBoundsChecker checker(&indexBounds, keyPattern, kForward);
     IndexSeekPoint seekPoint;
     if (!checker.getStartSeekPoint(&seekPoint)) {
-        return {};
+        return;
     }
 
-    std::set<FieldRef> multikeyPaths{};
     key_string::Builder builder(wam->getSortedDataInterface()->getKeyStringVersion(),
                                 wam->getSortedDataInterface()->getOrdering());
 
@@ -197,7 +196,7 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
 
         switch (checker.checkKey(entry->key, &seekPoint)) {
             case IndexBoundsChecker::VALID:
-                multikeyPaths.emplace(extractMultikeyPathFromIndexKey(*entry));
+                multikeyPaths->emplace(extractMultikeyPathFromIndexKey(*entry));
                 entry = cursor->next(ru);
                 break;
 
@@ -218,6 +217,52 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
             default:
                 MONGO_UNREACHABLE;
         }
+    }
+}
+
+/**
+ * Retrieves from the wildcard index the set of multikey path metadata keys bounded by
+ * 'indexBounds'. Returns the set of multikey paths represented by the keys.
+ */
+static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opCtx,
+                                                           const IndexCatalogEntry* index,
+                                                           const IndexBounds& indexBounds,
+                                                           MultikeyMetadataAccessStats* stats) {
+    const WildcardAccessMethod* wam =
+        checked_cast<const WildcardAccessMethod*>(index->accessMethod());
+
+    stats->numSeeks = 0;
+    stats->keysExamined = 0;
+
+    const auto keyPattern = buildIndexBoundsKeyPattern(index->descriptor()->keyPattern());
+    auto& parentRu = *shard_role_details::getRecoveryUnit(opCtx);
+
+    std::set<FieldRef> multikeyPaths{};
+
+    // Always read from the parent transaction's RU first. This covers the fallback case
+    // where the side transaction was abandoned (because the index was created in the same
+    // transaction and is not visible to the side transaction's snapshot). In that case,
+    // metadata keys were written directly in the parent transaction and are only visible
+    // through the parent's RU — the fresh snapshot below cannot see uncommitted parent writes.
+    scanWildcardMetadataKeys(opCtx, wam, parentRu, indexBounds, keyPattern, &multikeyPaths, stats);
+
+    // In active multi-document transactions, also read from a fresh snapshot to see
+    // side-committed metadata keys — but only if a side transaction actually committed
+    // wildcard metadata keys during this transaction. The parent transaction's WT snapshot
+    // predates the side transaction's commit, so it can't see those keys. The union of both
+    // scans covers both code paths:
+    //   - Normal case (side txn succeeded): fresh RU sees the side-committed keys.
+    //   - Fallback case (side txn abandoned): parent RU sees its own uncommitted writes.
+    // Safe because multikey is monotonic — the union is always correct.
+    if (opCtx->inMultiDocumentTransaction() && parentRu.isActive() &&
+        opCtx->hasSideCommittedWildcardKeys()) {
+        // Cached on opCtx so a query touching multiple wildcard indexes (e.g. $or over two
+        // wildcard indexes) reads them through one consistent snapshot. The cache is reset
+        // by setHasSideCommittedWildcardKeys() so the next read after a new side commit
+        // opens a fresh snapshot that sees the just-committed keys (RYOW).
+        auto& freshRu = opCtx->getOrCreateWildcardMultikeyReadRecoveryUnit();
+        scanWildcardMetadataKeys(
+            opCtx, wam, freshRu, indexBounds, keyPattern, &multikeyPaths, stats);
     }
 
     return multikeyPaths;

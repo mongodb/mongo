@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "/multikey_timestamp_consistency.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

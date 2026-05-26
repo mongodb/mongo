@@ -49,11 +49,14 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_constants.h"
+#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_builds/index_build_oplog_entry.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/index_builds/index_builds_manager.h"
 #include "mongo/db/index_builds/primary_driven/util.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/op_observer/batched_write_context.h"
@@ -68,6 +71,7 @@
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/container_oplog_entry_gen.h"
@@ -117,6 +121,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_catalog/rename_collection.h"
+#include "mongo/db/shard_role/shard_catalog/set_multikey_metadata_oplog_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -125,10 +130,12 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_direct_crud.h"
 #include "mongo/db/storage/storage_options.h"
@@ -1428,7 +1435,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 
           const auto setMkEntry = SetMultikeyMetadataOplogEntry::parse(cmd);
           const auto idxName = setMkEntry.getIdxName();
-          const auto paths = uassertStatusOK(multikey_paths::parse(setMkEntry.getPaths()));
+          const auto pathsObj = setMkEntry.getPaths();
 
           // Ignore setMultikeyMetadata when in initial sync, to avoid having to deal with
           // idempotency. This is acceptable because by design, the resynced node is not expected to
@@ -1463,8 +1470,30 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                           << "Failed to set multikey paths due to missing index: " << idxName,
                       idxEntry);
 
+              // Determine if this is a wildcard index from the catalog, then either regenerate
+              // wildcard metadata KeyStrings or parse regular multikey paths.
+              const bool isWildcard =
+                  idxEntry->descriptor()->getAccessMethodName() == IndexNames::WILDCARD;
+
+              KeyStringSet metadataKeys;
+              MultikeyPaths multikeyPaths;
+              if (isWildcard) {
+                  const auto* sdi =
+                      idxEntry->accessMethod()->asSortedData()->getSortedDataInterface();
+                  metadataKeys =
+                      set_multikey_metadata_oplog_helpers::regenerateMetadataKeysFromFieldPaths(
+                          pathsObj,
+                          sdi->getKeyStringVersion(),
+                          sdi->getOrdering(),
+                          sdi->rsKeyFormat(),
+                          idxEntry->descriptor()->keyPattern());
+              } else {
+                  multikeyPaths = uassertStatusOK(multikey_paths::parse(pathsObj));
+              }
+
               WriteUnitOfWork wuow(opCtx);
-              idxEntry->setMultikeyForApplyOps(opCtx, coll.getCollectionPtr(), paths);
+              idxEntry->setMultikeyForApplyOps(
+                  opCtx, coll.getCollectionPtr(), metadataKeys, multikeyPaths);
               wuow.commit();
           });
           return Status::OK();

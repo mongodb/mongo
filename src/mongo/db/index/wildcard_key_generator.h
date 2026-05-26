@@ -99,6 +99,19 @@ public:
                       KeyStringSet* multikeyPaths,
                       const boost::optional<RecordId>& id = boost::none) const;
 
+    /**
+     * Builds a single wildcard multikey metadata KeyString for 'fieldPath'. Used both during
+     * document-driven key generation on the primary and when regenerating keys from a
+     * `setMultikeyMetadata` oplog entry on the secondary.
+     */
+    static key_string::Value makeMultikeyMetadataKey(StringData fieldPath,
+                                                     size_t prefixFieldCount,
+                                                     size_t suffixFieldCount,
+                                                     key_string::Version version,
+                                                     Ordering ordering,
+                                                     KeyFormat rsKeyFormat,
+                                                     SharedBufferFragmentBuilder& pooledBuilder);
+
 private:
     WildcardProjection _proj;
     const CollatorInterface* _collator;

@@ -138,6 +138,7 @@ public:
 
     virtual void setMultikeyForApplyOps(OperationContext* opCtx,
                                         const CollectionPtr& coll,
+                                        const KeyStringSet& multikeyMetadataKeys,
                                         const MultikeyPaths& multikeyPaths) const = 0;
 
     /**
