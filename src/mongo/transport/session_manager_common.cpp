@@ -434,8 +434,7 @@ bool SessionManagerCommon::waitForNoSessions(Milliseconds timeout) {
 }
 
 std::size_t SessionManagerCommon::numOpenSessions() const {
-    auto sync = _sessions->sync();
-    return sync.size();
+    return _sessions->size();
 }
 
 std::vector<std::pair<SessionId, std::string>> SessionManagerCommon::getOpenSessionIDs() const {

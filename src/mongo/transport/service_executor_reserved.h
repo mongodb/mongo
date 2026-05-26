@@ -98,8 +98,8 @@ private:
     std::deque<Task> _readyTasks;
 
     AtomicWord<unsigned> _numRunningWorkerThreads{0};
-    size_t _numReadyThreads{0};
-    size_t _numStartingThreads{0};
+    Atomic<size_t> _numReadyThreads{0};
+    Atomic<size_t> _numStartingThreads{0};
 
     const std::string _name;
     const size_t _reservedThreads;
