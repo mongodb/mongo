@@ -3,7 +3,8 @@
  *
  * @tags: [
  *  requires_sharding,
- *  requires_fcv_83
+ *  requires_fcv_83,
+ *  resource_intensive,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -160,14 +161,9 @@ function testWriteConcernFailover(st) {
 }
 
 function runTests() {
-    // TODO Do not explicitly set this feature flag after SERVER-109032 is done.
-    const featureFlagReshardingVerification = false;
     const st = new ShardingTest({
         shards: 3,
-        rs: {nodes: 3, setParameter: {featureFlagReshardingVerification}},
-        other: {
-            configOptions: {setParameter: {featureFlagReshardingVerification}},
-        },
+        rs: {nodes: 3},
     });
     testWriteConcernBasic(st);
     testWriteConcernFailover(st);
