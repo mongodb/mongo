@@ -239,6 +239,28 @@ BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_UPDATE_ONE)
     });
 }
 
+BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_FIND_AND_MODIFY)
+(benchmark::State& state) {
+    _populateTestData(getGlobalServiceContext());
+    // Query on an extra "data" predicate to make the query express path ineligible.
+    runBenchmark(state, [updateValue = int64_t{0}]() mutable {
+        // clang-format off
+        return BSON(
+            "findAndModify" << kCollection
+            << "$db" << kDatabase
+            << "query" << BSON("_id" << 1 << "data" << "MongoDB")
+            << "update" << BSON(
+                "$set" << BSON(
+                    "counter" << ++updateValue
+                )
+            )
+            << "new" << true
+            << "upsert" << false
+        );
+        // clang-format on
+    });
+}
+
 BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_INSERT_ONE)
 (benchmark::State& state) {
     // Prepopulate the collection so we are not benchmarking collection creation time.
@@ -275,7 +297,9 @@ BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_FIND_ONE)->Threads(1)->Threads(kCo
 BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_UPDATE_ONE)
     ->Threads(1)
     ->Threads(kCommandBMMaxThreads);
-
+BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_FIND_AND_MODIFY)
+    ->Threads(1)
+    ->Threads(kCommandBMMaxThreads);
 BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_INSERT_ONE)
     ->Threads(1)
     ->Threads(kCommandBMMaxThreads);
