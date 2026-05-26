@@ -3,6 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/server-storage-engine-integration
+  - "oplog*":
+    approvers:
+      - 10gen/server-oplog
   - "backup*":
     approvers:
       - 10gen/server-backup-restore
