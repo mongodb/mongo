@@ -116,10 +116,6 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
     if (behavior == IndexTableResumeBehavior::recreate) {
         // A bulk cursor can only be opened on a fresh table, so we drop the table that was created
         // before shutdown and recreate it.
-        // TODO(SERVER-125007): Remove uassert after we enable resuming from load phase for PDIB.
-        uassert(12500802,
-                "Resuming a primary-driven index build from the load phase is not yet supported",
-                _method == IndexBuildMethodEnum::kHybrid);
         auto collectionOptions = collection->getCollectionOptions();
         auto status = durable_catalog::dropAndRecreateIndexIdentForResume(
             opCtx,
