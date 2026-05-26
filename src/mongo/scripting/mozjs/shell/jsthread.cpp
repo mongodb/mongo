@@ -121,7 +121,7 @@ public:
             uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS::NewArrayObject");
         }
 
-        _sharedData->_args = ObjectWrapper(cx, robj).toBSON();
+        _sharedData->_args = ObjectWrapper(cx, robj).toBSON().getOwned();
 
         _sharedData->_stack = currentJSStackToString(cx);
 
