@@ -5,6 +5,7 @@ Utility to interact with golden data test outputs, produced by golden data test 
 For details on the golden data test framework see: docs/golden_data_test_framework.md.
 """
 
+import fnmatch
 import os
 import pathlib
 import platform
@@ -397,16 +398,52 @@ class GoldenTestApp(object):
         help="Runs tests in all suites they participate in and accepts all the results.",
     )
     @click.argument("tests", required=True, nargs=-1)
+    @click.option(
+        "-e",
+        "--exclude",
+        "exclude_patterns",
+        multiple=True,
+        metavar="PATTERN",
+        help=(
+            "Exclude suites whose names match PATTERN (fnmatch glob). May be given multiple times. "
+            "Any suite matching at least one pattern is dropped. "
+            "Cannot be combined with --include."
+        ),
+    )
+    @click.option(
+        "-i",
+        "--include",
+        "include_patterns",
+        multiple=True,
+        metavar="PATTERN",
+        help=(
+            "Only run suites whose names match PATTERN (fnmatch glob). May be given multiple times. "
+            "A suite is included if it matches at least one pattern. "
+            "Cannot be combined with --exclude."
+        ),
+    )
+    @click.option("-v", "--verbose", is_flag=True, help="Log suite and invocation information.")
+    @click.option(
+        "-n",
+        "--dry-run",
+        is_flag=True,
+        help="Print suites and resmoke invocations that would run without executing them.",
+    )
     @click.pass_obj
-    def command_clean_run_accept(self, tests):
+    def command_clean_run_accept(self, tests, exclude_patterns, include_patterns, verbose, dry_run):
+        if exclude_patterns and include_patterns:
+            raise click.UsageError("--exclude and --include cannot be combined.")
+        if verbose or dry_run:
+            self.verbose = True
+        if dry_run:
+            self.dry_run = True
         self.init_config()
 
         for test_name in tests:
-            self.clean_run_accept_test(test_name)
+            self.clean_run_accept_test(test_name, exclude_patterns, include_patterns)
 
-    def clean_run_accept_test(self, test_name):
+    def clean_run_accept_test(self, test_name, exclude_patterns=(), include_patterns=()):
         """Runs a jstest through all of its passthroughs and accepts the results."""
-
         self.clean()
 
         self.vprint(
@@ -418,7 +455,30 @@ class GoldenTestApp(object):
             .split()
         )
         assert len(suites) > 0, f"Failed to find any suites for test {test_name}"
-        self.vprint(f"Found suites {suites} for test {test_name}")
+        if include_patterns:
+            suites = [s for s in suites if any(fnmatch.fnmatch(s, p) for p in include_patterns)]
+            self.vprint(
+                f"Suites matching include patterns {list(include_patterns)}: {sorted(suites)}"
+            )
+            if not suites:
+                hints = [
+                    f"-i '*{p.removeprefix('*').removesuffix('*')}*'" for p in include_patterns
+                ]
+                msg = f"No suites for test {test_name} matched the include patterns {list(include_patterns)}."
+                if hints:
+                    msg += " Did you mean " + ", ".join(hints) + "?"
+                raise AssertionError(msg)
+        elif exclude_patterns:
+            excluded = {s for s in suites if any(fnmatch.fnmatch(s, p) for p in exclude_patterns)}
+            if excluded:
+                self.vprint(
+                    f"Excluding suites matching {list(exclude_patterns)}: {sorted(excluded)}"
+                )
+            suites = [s for s in suites if s not in excluded]
+            assert (
+                len(suites) > 0
+            ), f"All suites for test {test_name} were excluded by the given patterns"
+        self.vprint(f"Running suites for {test_name}: {suites}")
 
         resmoke_invocations = []
 
@@ -459,12 +519,13 @@ class GoldenTestApp(object):
         for resmoke_invocation in resmoke_invocations:
             self.vprint(f"Will run resmoke.py with arguments: {resmoke_invocation}")
 
-        for resmoke_invocation in resmoke_invocations:
-            try:
-                check_call(["buildscripts/resmoke.py", "run", *resmoke_invocation, test_name])
-            except CalledProcessError:
-                # Golden test failed, accept the new results
-                self.accept(None)
+        if not self.dry_run:
+            for resmoke_invocation in resmoke_invocations:
+                try:
+                    check_call(["buildscripts/resmoke.py", "run", *resmoke_invocation, test_name])
+                except CalledProcessError:
+                    # Golden test failed, accept the new results
+                    self.accept(None)
 
 
 def main():
