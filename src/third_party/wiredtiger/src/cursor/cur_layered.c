@@ -2106,7 +2106,7 @@ __clayered_put(WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, const WT_I
 
     if (!leader) {
         /*
-         * FIXME-WT-16812: Investigate whether this function can be called below the cursor layer.
+         * FIXME-WT-17425: Investigate whether this function can be called below the cursor layer.
          * Doing so would remove the cursor write operation dependency on the truncate list.
          */
         WT_RET(__wt_layered_table_truncate_detect_write_conflict(
@@ -2188,7 +2188,7 @@ __clayered_remove_follower(
         WT_RET(__clayered_reset_cursors(clayered, true));
 
     /*
-     * FIXME-WT-16812: Investigate whether this function can be called below the cursor layer. Doing
+     * FIXME-WT-17425: Investigate whether this function can be called below the cursor layer. Doing
      * so would remove the write cursor operations dependency on the truncate list.
      */
     WT_RET(__wt_layered_table_truncate_detect_write_conflict(

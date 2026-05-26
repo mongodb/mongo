@@ -58,6 +58,20 @@ choco install swig
 choco install python --pre
 ```
 
+##### Docker
+
+Alternatively, the repository ships a Dockerfile in `.devcontainer/Dockerfile`
+with all required and optional build dependencies pre-installed. Build the image
+and mount the repository:
+
+```bash
+docker build -t wiredtiger-dev .devcontainer
+docker run -it -v "$PWD":/workdir wiredtiger-dev
+```
+
+The `.devcontainer/devcontainer.json` also makes this image usable as a
+[Dev Container](https://containers.dev/) in supporting editors (e.g. VS Code).
+
 ### Building the WiredTiger Library
 
 Building the WiredTiger library is relatively straightforward. Navigate to the top level of the WiredTiger repository and run the following commands:

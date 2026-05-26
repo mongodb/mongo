@@ -12,7 +12,6 @@ cscope.out
 cscope.po.out
 build/
 build_*/
-dist/clang-format
 /docs/
 test-compatibility-run/
 COMPATIBILITY_TEST/

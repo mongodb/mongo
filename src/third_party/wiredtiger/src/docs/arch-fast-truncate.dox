@@ -703,7 +703,7 @@ Get an empty page instead and mark it instantiated.}
 Return \c WT_NOTFOUND instead of reading the page if we are skipping deleted pages.}
 
 @row{bt_split.c, Hook, in \c __split_parent_discard_ref,
-Discard the \c page_del field of the }\c WT_REF.
+Discard the \c page_del field of the \c WT_REF.}
 @row{bt_split.c, Hook, in \c __split_parent,
 For VLCS trees\, avoid discarding the leftmost child even if it's deleted.}
 

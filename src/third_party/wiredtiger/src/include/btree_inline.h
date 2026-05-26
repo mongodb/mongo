@@ -2243,6 +2243,21 @@ __wt_btree_can_discard(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_btree_disagg_checkpointed --
+ *     Return true when a disaggregated btree has been visited by the current global checkpoint and
+ *     that checkpoint is still running. While this holds, every modified page in the btree belongs
+ *     to the next checkpoint and cannot be evicted.
+ */
+static WT_INLINE bool
+__wt_btree_disagg_checkpointed(WT_SESSION_IMPL *session, WT_BTREE *btree)
+{
+    return (F_ISSET(btree, WT_BTREE_DISAGGREGATED) &&
+      __wt_atomic_load_uint64_acquire(&btree->checkpoint_gen) ==
+        __wt_gen(session, WT_GEN_CHECKPOINT) &&
+      __wt_atomic_load_bool_v_acquire(&S2C(session)->txn_global.checkpoint_running));
+}
+
+/*
  * __wt_page_can_evict --
  *     Check whether a page can be evicted.
  */
@@ -2252,8 +2267,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     WT_BTREE *btree;
     WT_PAGE *page;
     WT_PAGE_MODIFY *mod;
-    uint64_t checkpoint_gen;
-    bool checkpoint_running, modified;
+    bool modified;
 
     if (inmem_splitp != NULL)
         *inmem_splitp = false;
@@ -2374,16 +2388,10 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * It is safe to evict when checkpoint is not running because we have opened a new checkpoint
      * before we set the checkpoint running flag to false.
      */
-    if (modified && F_ISSET(btree, WT_BTREE_DISAGGREGATED) && !WT_SESSION_BTREE_SYNC(session)) {
-        checkpoint_gen = __wt_atomic_load_uint64_acquire(&btree->checkpoint_gen);
-        if (checkpoint_gen == __wt_gen(session, WT_GEN_CHECKPOINT)) {
-            checkpoint_running =
-              __wt_atomic_load_bool_v_acquire(&S2C(session)->txn_global.checkpoint_running);
-            if (checkpoint_running) {
-                WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_disagg_next_checkpoint);
-                return (false);
-            }
-        }
+    if (modified && !WT_SESSION_BTREE_SYNC(session) &&
+      __wt_btree_disagg_checkpointed(session, btree)) {
+        WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_disagg_next_checkpoint);
+        return (false);
     }
 
     /*

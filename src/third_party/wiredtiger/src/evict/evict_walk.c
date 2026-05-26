@@ -330,7 +330,7 @@ __wti_evict_walk(WT_SESSION_IMPL *session, WTI_EVICT_QUEUE *queue)
     uint32_t evict_walk_period;
     u_int loop_count, max_entries, retries, slot, start_slot;
     u_int total_candidates;
-    bool dhandle_list_locked;
+    bool aggressive, dhandle_list_locked;
 
     WT_TRACK_OP_INIT(session);
 
@@ -430,12 +430,28 @@ retry:
         }
 
         /*
+         * Skip disaggregated btrees that have already been visited by the ongoing checkpoint when
+         * we are looking only for dirty pages and the cache is not under pressure. Every modified
+         * page in such a tree belongs to the next checkpoint and would fail the post-lock recheck,
+         * so walking only inflates the worker failure rate. When looking for clean or update pages,
+         * or when eviction is aggressive, walk anyway: any candidates the workers can lay hands on
+         * are better than starving the cache.
+         */
+        aggressive = __wt_evict_aggressive(session);
+        if (!F_ISSET(evict, WT_EVICT_CACHE_CLEAN | WT_EVICT_CACHE_UPDATES) && !aggressive &&
+          __wt_btree_disagg_checkpointed(session, btree)) {
+            WT_STAT_CONN_INCR(session, eviction_server_skip_disagg_trees_checkpointed);
+            __evict_disagg_btree_skip_count(session, btree);
+            continue;
+        }
+
+        /*
          * Skip files that are configured to stick in cache until we become aggressive.
          *
          * If the file is contributing heavily to our cache usage then ignore the "stickiness" of
          * its pages.
          */
-        if (btree->evict_priority != 0 && !__wt_evict_aggressive(session) &&
+        if (btree->evict_priority != 0 && !aggressive &&
           !__evict_btree_dominating_cache(session, btree)) {
             WT_STAT_CONN_INCR(session, eviction_server_skip_trees_stick_in_cache);
             __evict_disagg_btree_skip_count(session, btree);
@@ -524,7 +540,7 @@ retry:
              * If eviction is not in aggressive mode, sleep a bit to give the checkpoint thread a
              * chance to gather its handles.
              */
-            if (F_ISSET_ATOMIC_32(conn, WT_CONN_CKPT_GATHER) && !__wt_evict_aggressive(session)) {
+            if (F_ISSET_ATOMIC_32(conn, WT_CONN_CKPT_GATHER) && !aggressive) {
                 __wt_sleep(0, 10);
                 WT_STAT_CONN_INCR(session, eviction_walk_sleeps);
             }

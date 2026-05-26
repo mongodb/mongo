@@ -10,8 +10,8 @@
 
 /*
  * Selects which truncate-list entries __truncate_search considers: those visible to the calling
- * transaction (committed truncates we may need to honor) or those not visible (uncommitted
- * truncates that may conflict with our writes).
+ * transaction (committed and within its read timestamp) or those not visible (uncommitted, or
+ * committed at a timestamp beyond its read timestamp) that may conflict with our writes.
  */
 typedef enum { WT_TRUNCATE_SEARCH_VISIBLE, WT_TRUNCATE_SEARCH_NOT_VISIBLE } WT_TRUNCATE_SEARCH_MODE;
 
@@ -259,15 +259,14 @@ __truncate_search(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered_table, con
     TAILQ_FOREACH (entry, &layered_table->truncateqh, q) {
         WT_STAT_CONN_INCR(session, layered_truncate_list_search_entries_walked);
 
-        if (mode == WT_TRUNCATE_SEARCH_VISIBLE) {
-            wt_timestamp_t start_ts, durable_ts;
-            __truncate_read_entry_timestamps(entry, &start_ts, &durable_ts);
-            if (!__wt_txn_visible(session, entry->txn_id, start_ts, durable_ts))
-                continue;
-        } else if (mode == WT_TRUNCATE_SEARCH_NOT_VISIBLE) {
-            if (__wt_txn_visible_id(session, entry->txn_id))
-                continue;
-        }
+        wt_timestamp_t start_ts, durable_ts;
+        __truncate_read_entry_timestamps(entry, &start_ts, &durable_ts);
+
+        const bool visible = __wt_txn_visible(session, entry->txn_id, start_ts, durable_ts);
+        const bool want_visible = (mode == WT_TRUNCATE_SEARCH_VISIBLE);
+
+        if (visible != want_visible)
+            continue;
 
         WT_RET(__key_within_truncate_range(
           session, collator, &entry->start_key, &entry->stop_key, key, is_foundp));
@@ -287,7 +286,7 @@ __truncate_search(WT_SESSION_IMPL *session, WT_LAYERED_TABLE *layered_table, con
  *     Search if the current key we are modifying conflicts with any uncommitted truncates in the
  *     layered table truncate list.
  *
- * FIXME-WT-16812: Investigate whether this function can be called below the cursor layer. Doing so
+ * FIXME-WT-17425: Investigate whether this function can be called below the cursor layer. Doing so
  *     would remove the write cursor operations dependency on the truncate list.
  */
 int
@@ -347,7 +346,10 @@ __wt_layered_table_truncate_detect_non_ingest_write_conflict(WT_SESSION_IMPL *se
     TAILQ_FOREACH (entry, &layered_table->truncateqh, q) {
         WT_STAT_CONN_INCR(session, layered_truncate_list_search_entries_walked);
 
-        if (__wt_txn_visible_id(session, entry->txn_id))
+        wt_timestamp_t start_ts, durable_ts;
+        __truncate_read_entry_timestamps(entry, &start_ts, &durable_ts);
+
+        if (__wt_txn_visible(session, entry->txn_id, start_ts, durable_ts))
             continue;
 
         /* Does the new range start within an existing range? */

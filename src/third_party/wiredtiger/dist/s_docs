@@ -194,17 +194,28 @@ setup_doxygen()
         exit 0
     }
 
-    # Do not build the documentation if doxygen version is not compatible.
+    # Select Doxyfile based on doxygen major.minor version.
     v=$(doxygen --version)
-    case "$v" in
-        1.8.17) doxyfile="Doxyfile";;
-        1.9.1) doxyfile="Doxyfile.9";;
-        1.9.3) doxyfile="Doxyfile.9";;
-        1.11.*) doxyfile="Doxyfile.11";;
-        *)
-            echo "$0 skipped: unsupported version of doxygen: $v, not 1.8.17, 1.9.1, 1.9.3 or 1.11.*"
-            exit 0
-    esac
+    major=$(cut -d. -f1 <<< "$v")
+    minor=$(cut -d. -f2 <<< "$v")
+
+    # Doxygen < 1.8:
+    if [ "$major" -lt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -lt 8 ]; }; then
+        echo "$0 failed: doxygen $v is too old, need 1.8 or later"
+        exit 1
+
+    # Doxygen 1.8:
+    elif [ "$major" -eq 1 ] && [ "$minor" -eq 8 ]; then
+        doxyfile="Doxyfile"
+
+    # Doxygen 1.9 - 1.10:
+    elif [ "$major" -eq 1 ] && [ "$minor" -lt 11 ]; then
+        doxyfile="Doxyfile.9"
+
+    # Doxygen >= 1.11:
+    else
+        doxyfile="Doxyfile.11"
+    fi
 }
 
 build()

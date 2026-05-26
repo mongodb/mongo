@@ -105,15 +105,14 @@ __wt_conn_calc_read_load(WT_SESSION_IMPL *session)
     uint8_t load;
 
     load_control = &S2C(session)->load_control;
-    /*
-     * Avoid division by zero if the cache size has not yet been set in a shared cache.
-     */
-    bytes_max = load_control->read_load_max;
-    bytes_inuse = __wt_cache_bytes_inuse(S2C(session)->cache);
+    if (F_ISSET(load_control, WT_CONN_LOAD_CONTROL)) {
+        bytes_max = load_control->read_load_max;
+        bytes_inuse = __wt_cache_bytes_inuse(S2C(session)->cache);
 
-    load = __conn_calc_load_pct(bytes_inuse, bytes_max);
-    __wt_atomic_store_uint8_relaxed(&load_control->read_load, load);
-    WT_STAT_CONN_SET(session, read_load, load);
+        load = __conn_calc_load_pct(bytes_inuse, bytes_max);
+        __wt_atomic_store_uint8_relaxed(&load_control->read_load, load);
+        WT_STAT_CONN_SET(session, read_load, load);
+    }
     return;
 }
 
@@ -128,15 +127,14 @@ __wt_conn_calc_write_load(WT_SESSION_IMPL *session)
     uint64_t bytes_dirty, bytes_max;
     uint8_t load;
 
-    /*
-     * Avoid division by zero if the cache size has not yet been set in a shared cache.
-     */
     load_control = &S2C(session)->load_control;
-    bytes_max = load_control->write_load_max;
-    bytes_dirty = __wt_cache_dirty_inuse(S2C(session)->cache);
+    if (F_ISSET(load_control, WT_CONN_LOAD_CONTROL)) {
+        bytes_max = load_control->write_load_max;
+        bytes_dirty = __wt_cache_dirty_inuse(S2C(session)->cache);
 
-    load = __conn_calc_load_pct(bytes_dirty, bytes_max);
-    __wt_atomic_store_uint8_relaxed(&load_control->write_load, load);
-    WT_STAT_CONN_SET(session, write_load, load);
+        load = __conn_calc_load_pct(bytes_dirty, bytes_max);
+        __wt_atomic_store_uint8_relaxed(&load_control->write_load, load);
+        WT_STAT_CONN_SET(session, write_load, load);
+    }
     return;
 }
