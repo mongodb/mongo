@@ -125,7 +125,9 @@ bool isQuerySbeCompatible(const CollectionPtr& collection,
 
     // Queries against collections with a particular shape of compound hashed indexes are not
     // supported.
-    if (!feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled() && collection &&
+    const bool deferredExecutorEnabled = cq.getExpCtx()->getIfrContext()->getSavedFlagValue(
+        feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice);
+    if (!deferredExecutorEnabled && collection &&
         collectionHasIndexWithHashedPathPrefixOfNonHashedPath(collection, expCtx)) {
         return false;
     }
@@ -140,7 +142,7 @@ bool isQuerySbeCompatible(const CollectionPtr& collection,
         return false;
     }
 
-    if (solution && !isPlanSbeEligible(solution)) {
+    if (solution && !isPlanSbeCompatible(solution)) {
         return false;
     }
 
@@ -220,8 +222,8 @@ EngineSelectionResult chooseEngine(OperationContext* opCtx,
                                    const QuerySolution* solution,
                                    const std::function<void()>& extendSolutionWithPipelineFn) {
     const bool hasSolution = solution != nullptr;
-    const bool deferredEngineChoice =
-        feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled();
+    const bool deferredEngineChoice = cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+        feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice);
     tassert(11742301,
             "Expected to choose engine based on solution only if "
             "featureFlagGetExecutorDeferredEngineChoice is "

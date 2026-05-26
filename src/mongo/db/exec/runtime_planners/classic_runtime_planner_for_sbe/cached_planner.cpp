@@ -78,7 +78,8 @@ public:
         tassert(11756604,
                 "Expected `extractPlanRankingResult` to only be called with get executor deferred "
                 "feature flag enabled.",
-                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled());
+                cq()->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                    feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice));
         std::vector<std::unique_ptr<QuerySolution>> v;
         v.push_back(std::move(_candidate.solution));
         return PlanRankingResult{
@@ -259,6 +260,9 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
             .planSummary;
     };
 
+    const bool deferredExecutorEnabled =
+        plannerData.cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice);
     if (!candidate.status.isOK()) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache
         // entry, nor cache the result of replanning.
@@ -271,8 +275,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
         std::string replanReason = str::stream() << "cached plan returned: " << candidate.status;
         recoverWhereExpression(plannerData.cq, std::move(candidate));
 
-        if (MONGO_unlikely(
-                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled())) {
+        if (deferredExecutorEnabled) {
             // If we're using the deferred get_executor, we throw an exception which is caught be a
             // higher level replanning try/catch, and will reuse the top-level planning path. If
             // we're using the regular get_executor, this counter is incremented in `replan`.
@@ -313,8 +316,7 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
             << decisionReads << " reads but it took at least " << numReads << " reads";
         recoverWhereExpression(plannerData.cq, std::move(candidate));
 
-        if (MONGO_unlikely(
-                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled())) {
+        if (deferredExecutorEnabled) {
             incrementReplanCounterCb();
             uassertStatusOK(Status(ReplanningRequiredInfo(plan_cache_util::CacheMode::AlwaysCache,
                                                           *plannerData.cachedPlanSolutionHash),

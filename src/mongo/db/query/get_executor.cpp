@@ -1176,7 +1176,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     // paths.
     maybeUpgradeIdHackFlag(*canonicalQuery, collections.getMainCollection());
 
-    if (MONGO_unlikely(feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled())) {
+    if (canonicalQuery->getExpCtx()->getIfrContext()->getSavedFlagValue(
+            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice)) {
         return exec_deferred_engine_choice::getExecutorFindDeferredEngineChoice(
             opCtx,
             collections,

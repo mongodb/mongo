@@ -38,7 +38,7 @@ namespace mongo {
 /**
  * Returns 'false' for query plans that can not be executed in SBE.
  */
-bool isPlanSbeEligible(const QuerySolution* solution);
+bool isPlanSbeCompatible(const QuerySolution* solution);
 
 /**
  * Returns the engine of choice for executing the specified query plan.

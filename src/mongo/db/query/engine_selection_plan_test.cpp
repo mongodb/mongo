@@ -140,7 +140,7 @@ TEST_F(EngineSelectionPlanFixture, DistinctScanEligibility) {
     BSONObj indexFields = fromjson("{a: 1}");
 
     std::unique_ptr<QuerySolution> solution = makeDistinctScanPlan(indexFields);
-    ASSERT_FALSE(isPlanSbeEligible(solution.get()));
+    ASSERT_FALSE(isPlanSbeCompatible(solution.get()));
 }
 
 // Test eligibility of FETCH + IXSCAN plans with hashed indexes.
@@ -149,14 +149,14 @@ TEST_F(EngineSelectionPlanFixture, HashedIndexIxScanEligibility) {
     {
         BSONObj indexFields = fromjson("{a: 1, m: 'hashed', 'm.m1': 1}");
         std::unique_ptr<QuerySolution> solution = makeIndexScanFetchPlan(indexFields);
-        ASSERT_FALSE(isPlanSbeEligible(solution.get()));
+        ASSERT_FALSE(isPlanSbeCompatible(solution.get()));
     }
 
     // Single hashed index.
     {
         BSONObj indexFields = fromjson("{a: 'hashed'}");
         std::unique_ptr<QuerySolution> solution = makeIndexScanFetchPlan(indexFields);
-        ASSERT_TRUE(isPlanSbeEligible(solution.get()));
+        ASSERT_TRUE(isPlanSbeCompatible(solution.get()));
     }
 }
 
@@ -170,7 +170,7 @@ TEST_F(EngineSelectionPlanFixture, AndHashEligibility) {
 
     auto solution = std::make_unique<QuerySolution>();
     solution->setRoot(std::move(andHash));
-    ASSERT_FALSE(isPlanSbeEligible(solution.get()));
+    ASSERT_FALSE(isPlanSbeCompatible(solution.get()));
 }
 
 // Test eligibility of AND_SORTED plans.
@@ -183,7 +183,7 @@ TEST_F(EngineSelectionPlanFixture, AndSortedEligibility) {
 
     auto solution = std::make_unique<QuerySolution>();
     solution->setRoot(std::move(andSorted));
-    ASSERT_FALSE(isPlanSbeEligible(solution.get()));
+    ASSERT_FALSE(isPlanSbeCompatible(solution.get()));
 }
 
 // Test selection of IXSCAN + FETCH plans.

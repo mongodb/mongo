@@ -110,7 +110,8 @@ PlanRankingResult IdHackPlanner::extractPlanRankingResult() {
     tassert(11974301,
             "Expected `extractPlanRankingResult` to only be called with get executor deferred "
             "feature flag enabled.",
-            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled());
+            cq()->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice));
     return PlanRankingResult{.usedIdhack = true,
                              .execState = SavedExecState{ClassicExecState{.workingSet = extractWs(),
                                                                           .root = extractRoot()}},

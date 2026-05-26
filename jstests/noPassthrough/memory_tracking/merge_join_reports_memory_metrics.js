@@ -58,7 +58,7 @@ assert(
 );
 
 // Skip if AND_SORTED did not execute in SBE. When featureFlagGetExecutorDeferredEngineChoice is
-// enabled, isPlanSbeEligible() rejects AND_SORTED plans via AndHashOrSortedRule (SERVER-90818),
+// enabled, isPlanSbeCompatible() rejects AND_SORTED plans via AndHashOrSortedRule (SERVER-90818),
 // causing them to fall back to the classic engine even with trySbeEngine set.
 const execExplain = coll.explain("executionStats").aggregate(pipeline, {allowDiskUse: false});
 if (execExplain.explainVersion !== "2") {

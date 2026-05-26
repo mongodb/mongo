@@ -69,7 +69,8 @@ PlanRankingResult SubPlanner::extractPlanRankingResult() {
     tassert(11974303,
             "Expected `extractPlanRankingResult` to only be called with get executor deferred "
             "feature flag enabled.",
-            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled());
+            cq()->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice));
     auto querySolution = _subPlanStage->extractBestWholeQuerySolution();
 
     return PlanRankingResult{.solutions = makeQsnResult(std::move(querySolution)),

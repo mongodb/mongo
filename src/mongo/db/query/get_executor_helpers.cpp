@@ -92,11 +92,7 @@ void inspectPlannerResult(
     const std::unique_ptr<PlannerInterface>& result,
     const boost::optional<QueryPlannerParams::ReplanningData>& replanningData) {
     // These assertions relate to replanning, so bail if the query did not replan.
-    // Also, these assertions do not apply to the deferred get_executor. The solution hash is
-    // checked after the plan ranking result is created, to update
-    // `replannedPlanIsCachedPlanCounter`.
-    if (!replanningData.has_value() ||
-        feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled()) {
+    if (!replanningData.has_value()) {
         return;
     }
 
@@ -172,6 +168,9 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
     CanonicalQuery* canonicalQuery,
     std::size_t plannerOptions,
     Pipeline* pipeline) {
+    const bool deferredExecutorEnabled =
+        canonicalQuery->getExpCtx()->getIfrContext()->getSavedFlagValue(
+            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice);
     // We create this once on replanning and then make a copy for each QueryPlannerParams to own for
     // subsequent calls.
     boost::optional<QueryPlannerParams::ReplanningData> replanningData = boost::none;
@@ -182,14 +181,17 @@ std::unique_ptr<PlannerInterface> retryMakePlanner(
             // First try the single collection query parameters, as these would have been
             // generated with query settings if present.
             auto result = makePlanner(std::move(plannerParams));
-            inspectPlannerResult(result, replanningData);
+            // The assertions in `inspectPlannerResult` do not apply when the deferred executor is
+            // enabled.
+            if (!deferredExecutorEnabled) {
+                inspectPlannerResult(result, replanningData);
+            }
             return result;
         } catch (const ExceptionFor<ErrorCodes::NoDistinctScansForDistinctEligibleQuery>&) {
             // The planner failed to generate a DISTINCT_SCAN for a distinct-like query. Remove
             // the distinct property and replan using SBE or subplanning as applicable.
             canonicalQuery->resetDistinct();
-            if (canonicalQuery->isSbeCompatible() &&
-                !feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled()) {
+            if (canonicalQuery->isSbeCompatible() && !deferredExecutorEnabled) {
                 // Stages still need to be finalized for SBE since classic was used previously. In
                 // the deferred get_executor, the stages are finalized during lowering.
                 finalizePipelineStages(pipeline, canonicalQuery);

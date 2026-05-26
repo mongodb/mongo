@@ -1355,10 +1355,10 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
 
     // Encode the deferred engine selection feature flag so that cache entries cannot be shared when
     // the flag is changed. This could lead to unpredictable scenarios.
-    const bool deferredGetExecutorEnabled =
-        feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled();
+    const bool deferredGetExecutorEnabled = cq.getExpCtx()->getIfrContext()->getSavedFlagValue(
+        feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice);
     keyBuilder << (deferredGetExecutorEnabled ? "t" : "f");
-    if (MONGO_unlikely(deferredGetExecutorEnabled)) {
+    if (deferredGetExecutorEnabled) {
         encodeDeferredGetExecutorSubplanningData(cq, &keyBuilder);
     } else {
         encodeLegacyGetExecutorSubplanningData(cq, &keyBuilder);

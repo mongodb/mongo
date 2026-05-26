@@ -602,7 +602,7 @@ static_assert(HasPreVisit<AndHashOrSortedRule, AndSortedNode>);
 static_assert(HasPreVisit<AndHashOrSortedRule, AndHashNode>);
 }  // namespace
 
-bool isPlanSbeEligible(const QuerySolution* solution) {
+bool isPlanSbeCompatible(const QuerySolution* solution) {
     return !treeMatchesAny(
         solution->root(), DistinctScanRule(), HashedIndexScanPatternRule(), AndHashOrSortedRule());
 }

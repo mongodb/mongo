@@ -68,7 +68,8 @@ PlanRankingResult MultiPlanner::extractPlanRankingResult() {
     tassert(11974300,
             "Expected `extractPlanRankingResult` to only be called with get executor deferred "
             "feature flag enabled.",
-            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled());
+            cq()->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice));
     auto querySolution = _multiplanStage->extractBestSolution();
 
     if (!_maybeExplainData.has_value()) {

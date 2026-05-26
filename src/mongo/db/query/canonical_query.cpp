@@ -179,8 +179,8 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
         // When the deferred engine choice path is enabled, it is safe to always optimize because
         // the SBE plan cache is not used, so there is no risk of caching an optimized-away
         // variable reference.
-        bool shouldOptimizeProj =
-            feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice.isEnabled() ||
+        bool shouldOptimizeProj = expCtx->getIfrContext()->getSavedFlagValue(
+                                      feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice) ||
             expCtx->getSbeCompatibility() == SbeCompatibility::notCompatible ||
             !_findCommand->getLet();
         if (parsedFind->proj->requiresMatchDetails()) {

@@ -71,6 +71,11 @@ EngineSelectionPlanner::EngineSelectionPlanner(std::unique_ptr<PlannerInterface>
                                                CanonicalQuery* cq,
                                                Pipeline* pipeline,
                                                const MultipleCollectionAccessor& collections) {
+    tassert(11282303,
+            "Only expected an EngineSelectionPlanner to be created when the deferred get_executor "
+            "is enabled.",
+            cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                feature_flags::gFeatureFlagGetExecutorDeferredEngineChoice));
     _result = innerPlanner->extractPlanRankingResult();
 
     // Engine selection is only needed for non-trivial cases. ID hack and cached planners already
