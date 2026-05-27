@@ -575,7 +575,9 @@ def main(outfile: Annotated[str, typer.Option()]):
 
     expansions = read_config_file("../expansions.yml")
     project_name = expansions.get("project", MASTER_PROJECT_NAME)
-    evg_config_path = get_evergreen_config_path(project_name)
+    evg_config_path = expansions.get("evergreen_config_file_path") or get_evergreen_config_path(
+        project_name
+    )
     resmoke_disable_rbe = expansions.get("resmoke_disable_rbe", "") == "true"
 
     print(f"Parsing Evergreen configuration from {evg_config_path}...", file=sys.stderr)

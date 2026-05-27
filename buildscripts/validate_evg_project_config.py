@@ -35,6 +35,10 @@ ALLOWABLE_EVG_VALIDATE_MESSAGE_REGEXES = [
     re.compile(
         r".*task 'select_multiversion_binaries' defined but not used by any variants; consider using or disabling.*"
     ),  # this task is added to variants only alongside multiversion generated tasks
+    re.compile(
+        r".*depends on task 'archive_jstestshell' in build variant 'dsc-amazon2023-(arm64|x86)-compile', but it was not found.*"
+    ),  # archive_jstestshell is produced by the compile_test_and_package_serial_TG task group
+    # and is not visible to the static validator
 ]
 ALLOWABLE_IF_NOT_IN_ALL_PROJECTS_EVG_VALIDATE_MESSAGE_REGEXES = [
     re.compile(r".*task .+ defined but not used by any variants; consider using or disabling.*"),
