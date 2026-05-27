@@ -239,6 +239,47 @@ TEST_F(PipelineAnalyzerTest, EmptyPipelineNoFilterEligible) {
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 }
 
+TEST_F(PipelineAnalyzerTest, NumericLocalFieldIneligibleJoinPredicate) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a.0", foreignField: "b", as: "fromA"}},
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a.0"_sd}, {{"A", {"b"_sd}}});
+    // Structurally eligible ($lookup + $unwind pair exists) ...
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    // ... but the numeric path component in localField makes the join predicate ineligible.
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, NumericForeignFieldIneligibleJoinPredicate) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b.0", as: "fromA"}},
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b.0"_sd}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, NumericMidPathComponentIneligibleJoinPredicate) {
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a.0.b", foreignField: "c", as: "fromA"}},
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a.0.b"_sd}, {{"A", {"c"_sd}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
 TEST_F(PipelineAnalyzerTest, TwoMatchesBothOnAsField) {
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA"}},
@@ -1105,6 +1146,69 @@ TEST_F(PipelineAnalyzerTest, PipelineIneligibleWithNonFieldPathVariable) {
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, NumericLocalFieldExprIneligibleJoinPredicate) {
+    // Numeric component in the let-bound local field path.
+    const auto query = R"([
+    {
+        $lookup: {
+            from: "A",
+            let: {x: "$a.0"},
+            pipeline: [{$match: {$expr: {$eq: ["$b", "$$x"]}}}],
+            as: "fromA"
+        }
+    },
+    {$unwind: "$fromA"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a.0"_sd}, {{"A", {"b"_sd}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, NumericForeignFieldExprIneligibleJoinPredicate) {
+    // Numeric component in the foreign field path inside $expr.
+    const auto query = R"([
+    {
+        $lookup: {
+            from: "A",
+            let: {x: "$a"},
+            pipeline: [{$match: {$expr: {$eq: ["$b.0", "$$x"]}}}],
+            as: "fromA"
+        }
+    },
+    {$unwind: "$fromA"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b.0"_sd}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, NumericMidPathExprIneligibleJoinPredicate) {
+    // Numeric component in the middle of a dotted path in the let binding.
+    const auto query = R"([
+    {
+        $lookup: {
+            from: "A",
+            let: {x: "$a.0.b"},
+            pipeline: [{$match: {$expr: {$eq: ["$c", "$$x"]}}}],
+            as: "fromA"
+        }
+    },
+    {$unwind: "$fromA"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a.0.b"_sd}, {{"A", {"c"_sd}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_NOT_OK(swJoinModel);
 }

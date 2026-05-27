@@ -6,7 +6,7 @@
  * ]
  */
 import {joinOptUsed, plannerStageIsJoinOptNode} from "jstests/libs/query/join_utils.js";
-import {getWinningPlanFromExplain, getAllPlanStages, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 let conn = MongoRunner.runMongod({setParameter: {featureFlagPathArrayness: true}});
 
@@ -39,24 +39,30 @@ assert.commandWorked(coll13.createIndex({dummy: 1, a: 1, b: 1, d: 1}));
 assert.commandWorked(coll2.createIndex({dummy: 1, a: 1, b: 1}));
 assert.commandWorked(coll3.createIndex({dummy: 1, a: 1, b: 1}));
 
-function assertSameResultsWithJoinOptToggled(pipeline, aggOptions, expectedCount) {
+function assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount) {
     assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
-    assert.eq(coll1.aggregate(pipeline, aggOptions).toArray().length, expectedCount);
+    assert.eq(coll.aggregate(pipeline, aggOptions).toArray().length, expectedCount);
     assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
-    assert.eq(coll1.aggregate(pipeline, aggOptions).toArray().length, expectedCount);
+    assert.eq(coll.aggregate(pipeline, aggOptions).toArray().length, expectedCount);
 }
 
 // This helper is for test cases where the entire pipeline is ineligible for join optimization.
-function runTestCaseIneligiblePipeline({pipeline, aggOptions = {}, expectedCount}) {
-    assertSameResultsWithJoinOptToggled(pipeline, aggOptions, expectedCount);
-    const explain = coll1.explain().aggregate(pipeline, aggOptions);
+function runTestCaseIneligiblePipeline({coll = coll1, pipeline, aggOptions = {}, expectedCount}) {
+    assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount);
+    const explain = coll.explain().aggregate(pipeline, aggOptions);
     assert(!joinOptUsed(explain), "Expected join optimizer and actual usage differ: " + tojson(explain));
 }
 
 // This helper is for test cases where the prefix is eligible for join opt but the suffix is not.
-function runTestCaseIneligibleSuffix({pipeline, aggOptions = {}, expectedCount, expectedJoinNodesInPrefix}) {
-    assertSameResultsWithJoinOptToggled(pipeline, aggOptions, expectedCount);
-    const explain = coll1.explain().aggregate(pipeline, aggOptions);
+function runTestCaseIneligibleSuffix({
+    coll = coll1,
+    pipeline,
+    aggOptions = {},
+    expectedCount,
+    expectedJoinNodesInPrefix,
+}) {
+    assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount);
+    const explain = coll.explain().aggregate(pipeline, aggOptions);
 
     // Since the prefix is join eligible we should see the usedJoinOptimization flag in the explain.
     assert(joinOptUsed(explain), "Expected join optimizer and actual usage differ: " + tojson(explain));
@@ -74,9 +80,9 @@ function runTestCaseIneligibleSuffix({pipeline, aggOptions = {}, expectedCount, 
 }
 
 // This helper is for test cases where the entire pipeline is eligible for join optimization.
-function runTestCaseEligiblePipeline({pipeline, aggOptions = {}, expectedCount}) {
-    assertSameResultsWithJoinOptToggled(pipeline, aggOptions, expectedCount);
-    const explain = coll1.explain().aggregate(pipeline, aggOptions);
+function runTestCaseEligiblePipeline({coll = coll1, pipeline, aggOptions = {}, expectedCount}) {
+    assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount);
+    const explain = coll.explain().aggregate(pipeline, aggOptions);
     assert(joinOptUsed(explain), "Expected join optimizer and actual usage differ: " + tojson(explain));
 }
 
@@ -496,5 +502,100 @@ runTestCaseIneligibleSuffix({
     expectedCount: 1,
     expectedJoinNodesInPrefix: 2,
 });
+
+// Numeric path in join predicate falls back gracefully even when the path is indexed.
+// An index on "a.0" is not multikey (numeric components always address a single array element),
+// but the join optimizer must still fall back because numeric paths are ineligible predicates.
+{
+    const collNumeric = conn.getDB(db1)[jsTestName() + "_numeric"];
+    collNumeric.drop();
+    assert.commandWorked(collNumeric.insertOne({a: [1, 2], b: 1}));
+
+    // Index on "a.0": valid and not multikey because "a.0" always returns a single element.
+    assert.commandWorked(collNumeric.createIndex({"a.0": 1}));
+
+    // localField/foreignField syntax: a.0 (numeric) = a.
+    runTestCaseIneligiblePipeline({
+        pipeline: [
+            {$lookup: {from: collNumeric.getName(), localField: "a", foreignField: "a.0", as: "joined"}},
+            {$unwind: "$joined"},
+        ],
+        expectedCount: 1,
+    });
+
+    // $expr syntax.
+    runTestCaseIneligiblePipeline({
+        pipeline: [
+            {
+                $lookup: {
+                    from: collNumeric.getName(),
+                    let: {aa: "$a"},
+                    pipeline: [{$match: {$expr: {$eq: ["$$aa", "$a.0"]}}}],
+                    as: "joined",
+                },
+            },
+            {$unwind: "$joined"},
+        ],
+        expectedCount: 1,
+    });
+
+    // Repeat, but now changing the base coll to be numeric.
+    runTestCaseIneligiblePipeline({
+        coll: collNumeric,
+        pipeline: [
+            {$lookup: {from: coll1.getName(), localField: "a.0", foreignField: "a", as: "joined"}},
+            {$unwind: "$joined"},
+        ],
+        expectedCount: 1,
+    });
+
+    runTestCaseIneligiblePipeline({
+        coll: collNumeric,
+        pipeline: [
+            {
+                $lookup: {
+                    from: coll1.getName(),
+                    let: {aa: "$a.0"},
+                    pipeline: [{$match: {$expr: {$eq: ["$$aa", "$a"]}}}],
+                    as: "joined",
+                },
+            },
+            {$unwind: "$joined"},
+        ],
+        expectedCount: 0,
+    });
+
+    // Validate trailing $match case.
+    runTestCaseIneligiblePipeline({
+        pipeline: [
+            {
+                $lookup: {
+                    from: collNumeric.getName(),
+                    pipeline: [],
+                    as: "joined",
+                },
+            },
+            {$unwind: "$joined"},
+            {$match: {$expr: {$eq: ["$joined.a.0", "$a"]}}},
+        ],
+        expectedCount: 0,
+    });
+
+    runTestCaseIneligiblePipeline({
+        coll: collNumeric,
+        pipeline: [
+            {
+                $lookup: {
+                    from: coll1.getName(),
+                    pipeline: [],
+                    as: "joined",
+                },
+            },
+            {$unwind: "$joined"},
+            {$match: {$expr: {$eq: ["$joined.a", "$a.0"]}}},
+        ],
+        expectedCount: 0,
+    });
+}
 
 MongoRunner.stopMongod(conn);

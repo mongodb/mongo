@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/classic/subplan.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
@@ -260,18 +261,41 @@ Status addExprJoinPredicates(MutableJoinGraph& graph,
     return Status::OK();
 }
 
+bool canJoinPredicateFieldIncludeArrays(
+    const pipeline::dependency_graph::DependencyGraph& baseCollDeps,
+    ExpressionContext* expCtx,
+    const DocumentSource* ds,
+    const NamespaceString& ns,
+    const FieldPath& field) {
+    if (ns == expCtx->getNamespaceString()) {
+        return baseCollDeps.canPathBeArray(ds, field.fullPath());
+    }
+    // TODO SERVER-126992: Use a dependency graph instead of directly accessing foreign path
+    // arrayness.
+    return expCtx->canPathBeArrayForNss(field, ns);
+}
+
 /**
  * Validates that neither field in the join predicate can include arrays.
- * TODO SERVER-123953: Use a dependency graph instead of directly accessing foreign path arrayness.
  */
 bool canJoinPredicateIncludeArrays(const pipeline::dependency_graph::DependencyGraph& baseCollDeps,
                                    ExpressionContext* expCtx,
-                                   DocumentSource* ds,
-                                   const FieldPath& localField,
-                                   const NamespaceString& foreignNs,
-                                   const FieldPath& foreignField) {
-    return baseCollDeps.canPathBeArray(ds, localField.fullPath()) ||
-        expCtx->canPathBeArrayForNss(foreignField, foreignNs);
+                                   const DocumentSource* ds,
+                                   const NamespaceString& leftNs,
+                                   const FieldPath& leftField,
+                                   const NamespaceString& rightNs,
+                                   const FieldPath& rightField) {
+    return canJoinPredicateFieldIncludeArrays(baseCollDeps, expCtx, ds, leftNs, leftField) ||
+        canJoinPredicateFieldIncludeArrays(baseCollDeps, expCtx, ds, rightNs, rightField);
+}
+
+bool hasNumericPathComponent(const FieldPath& fp) {
+    for (size_t i = 0; i < fp.getPathLength(); ++i) {
+        if (FieldRef::isNumericPathComponentLenient(fp.getFieldName(i))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace
@@ -361,6 +385,18 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
     std::vector<ResolvedPath> resolvedPaths;
     PathResolver pathResolver{*baseNodeId, resolvedPaths};
 
+    const auto isJoinPredicateIneligible = [&](const NamespaceString& leftNs,
+                                               const FieldPath& leftField,
+                                               const NamespaceString& rightNs,
+                                               const FieldPath& rightField,
+                                               const DocumentSource* src) {
+        // Ensures join predicate fields don't include numeric path components and can't include
+        // arrays.
+        return hasNumericPathComponent(leftField) || hasNumericPathComponent(rightField) ||
+            canJoinPredicateIncludeArrays(
+                   mainCollDeps, clonedExpCtx.get(), src, leftNs, leftField, rightNs, rightField);
+    };
+
     // Go through the pipeline trying to find the maximal chain of join optimization eligible
     // $lookup+$unwinds pairs and turning them into CanonicalQueries. At the end only ineligible for
     // join optimization stages are left in the suffix.
@@ -379,15 +415,13 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                 break;
             }
 
-            // Ensure that neither local nor foreign field can include arrays (if present).
             if (lookup->hasLocalFieldForeignFieldJoin() &&
-                canJoinPredicateIncludeArrays(mainCollDeps,
-                                              clonedExpCtx.get(),
-                                              lookup,
-                                              *lookup->getLocalField(),
-                                              lookup->getFromNs(),
-                                              *lookup->getForeignField())) {
-                // End prefix here, this join predicate might include arrays.
+                isJoinPredicateIneligible(expCtx->getNamespaceString(),
+                                          *lookup->getLocalField(),
+                                          lookup->getFromNs(),
+                                          *lookup->getForeignField(),
+                                          lookup)) {
+                // End prefix here, this join predicate is invalid.
                 break;
             }
 
@@ -404,15 +438,14 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
             // Similar check as above, but now for predicates extracted from the sub-pipeline.
             if (std::any_of(
                     preds.joinPredicates.begin(), preds.joinPredicates.end(), [&](auto&& jp) {
-                        return canJoinPredicateIncludeArrays(mainCollDeps,
-                                                             clonedExpCtx.get(),
-                                                             lookup,
-                                                             jp.localField(),
-                                                             lookup->getFromNs(),
-                                                             jp.foreignField());
+                        return isJoinPredicateIneligible(expCtx->getNamespaceString(),
+                                                         jp.localField(),
+                                                         lookup->getFromNs(),
+                                                         jp.foreignField(),
+                                                         lookup);
                     })) {
                 // Some field in a join predicate introduced by a $expr $match in a sub-pipeline
-                // might have array values. End prefix here.
+                // might be ineligible. End prefix here.
                 break;
             }
 
@@ -471,21 +504,38 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
             tassert(11116400, "unexpected $match", !prefix->getSources().empty());
 
             auto result = extractExprPredicates(pathResolver, match->getMatchExpression());
+            bool canMatchBeEliminated = result.expressionIsFullyAbsorbed;
             for (const auto& predicate : result.predicates) {
                 auto leftNodeId = pathResolver[predicate.left].nodeId;
                 auto rightNodeId = pathResolver[predicate.right].nodeId;
                 tassert(11116401,
                         "Join predicate fields must be from different nodes",
                         leftNodeId != rightNodeId);
+
+                if (isJoinPredicateIneligible(graph.getNode(leftNodeId).collectionName,
+                                              pathResolver[predicate.left].fieldName,
+                                              graph.getNode(rightNodeId).collectionName,
+                                              pathResolver[predicate.right].fieldName,
+                                              match)) {
+                    // Some field in a join predicate introduced by this trailing $match is
+                    // ineligible. Don't absorb it.
+                    canMatchBeEliminated = false;
+                    continue;
+                }
+
                 graph.addEdge(leftNodeId, rightNodeId, {predicate});
             }
 
-            if (result.expressionIsFullyAbsorbed) {
-                auto next = suffix->popFront();
-                prefix->pushBack(std::move(next));
-            } else {
+            if (!canMatchBeEliminated) {
+                // End prefix here- this $match includes something we can't push into the join
+                // model.
                 break;
             }
+
+            // This $match encodes a valid join-predicate & can be fully absorbed into our
+            // join-graph.
+            prefix->pushBack(suffix->popFront());
+
         } else {
             // Unrecognized stage, give up on building a prefix.
             break;

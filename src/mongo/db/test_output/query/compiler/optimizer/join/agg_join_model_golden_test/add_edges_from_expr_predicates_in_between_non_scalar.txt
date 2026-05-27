@@ -1,0 +1,275 @@
+VARIATION addEdgesFromExpr_predicatesInBetweenNonScalar
+input {
+    "pipeline": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "fromA",
+                "localField": "s1",
+                "foreignField": "s1"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromA"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "B",
+                "as": "fromB",
+                "localField": "s2",
+                "foreignField": "s2"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromB"
+            }
+        },
+        {
+            "$match": {
+                "$expr": {
+                    "$eq": [
+                        "$fromA.a",
+                        "$fromB.a"
+                    ]
+                }
+            }
+        },
+        {
+            "$lookup": {
+                "from": "C",
+                "as": "fromC",
+                "localField": "s3",
+                "foreignField": "s3"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromC"
+            }
+        },
+        {
+            "$match": {
+                "$expr": {
+                    "$eq": [
+                        "$fromB.b",
+                        "$fromC.b"
+                    ]
+                }
+            }
+        },
+        {
+            "$lookup": {
+                "from": "D",
+                "as": "fromD",
+                "localField": "s4",
+                "foreignField": "s4"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromD"
+            }
+        },
+        {
+            "$match": {
+                "$and": [
+                    {
+                        "$expr": {
+                            "$eq": [
+                                "$fromC.c",
+                                "$fromD.c"
+                            ]
+                        }
+                    },
+                    {
+                        "$expr": {
+                            "$eq": [
+                                "$fromD.d",
+                                "$fromA.d"
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}
+output: {
+    "graph": {
+        "nodes": [
+            {
+                "collectionName": "test.pipeline_test",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": ""
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromA"
+            },
+            {
+                "collectionName": "test.B",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": "fromB"
+            }
+        ],
+        "edges": [
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"1"}
+                    }
+                ],
+                "left": {"$numberInt":"0"},
+                "right": {"$numberInt":"1"}
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"2"},
+                        "right": {"$numberInt":"3"}
+                    }
+                ],
+                "left": {"$numberInt":"0"},
+                "right": {"$numberInt":"2"}
+            }
+        ]
+    },
+    "resolvedPaths": [
+        {
+            "nodeId": {"$numberInt":"0"},
+            "fieldName": "s1"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "fieldName": "s1"
+        },
+        {
+            "nodeId": {"$numberInt":"0"},
+            "fieldName": "s2"
+        },
+        {
+            "nodeId": {"$numberInt":"2"},
+            "fieldName": "s2"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "fieldName": "a"
+        },
+        {
+            "nodeId": {"$numberInt":"2"},
+            "fieldName": "a"
+        }
+    ],
+    "prefix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "fromA",
+                "localField": "s1",
+                "foreignField": "s1"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromA"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "B",
+                "as": "fromB",
+                "localField": "s2",
+                "foreignField": "s2"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromB"
+            }
+        }
+    ],
+    "suffix": [
+        {
+            "$match": {
+                "$expr": {
+                    "$eq": [
+                        "$fromA.a",
+                        "$fromB.a"
+                    ]
+                }
+            }
+        },
+        {
+            "$lookup": {
+                "from": "C",
+                "as": "fromC",
+                "localField": "s3",
+                "foreignField": "s3"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromC"
+            }
+        },
+        {
+            "$match": {
+                "$expr": {
+                    "$eq": [
+                        "$fromB.b",
+                        "$fromC.b"
+                    ]
+                }
+            }
+        },
+        {
+            "$lookup": {
+                "from": "D",
+                "as": "fromD",
+                "localField": "s4",
+                "foreignField": "s4"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$fromD"
+            }
+        },
+        {
+            "$match": {
+                "$and": [
+                    {
+                        "$expr": {
+                            "$eq": [
+                                "$fromC.c",
+                                "$fromD.c"
+                            ]
+                        }
+                    },
+                    {
+                        "$expr": {
+                            "$eq": [
+                                "$fromD.d",
+                                "$fromA.d"
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}
+

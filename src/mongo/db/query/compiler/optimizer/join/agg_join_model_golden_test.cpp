@@ -229,11 +229,46 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesAtEnd) {
     auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
     markFieldsAsScalar(*pipeline,
                        {"s1"_sd, "s2"_sd, "s3"_sd, "s4"_sd},
-                       {{"A", {"s1"_sd}}, {"B", {"s2"_sd}}, {"C", {"s3"_sd}}, {"D", {"s4"_sd}}});
+                       {{"A", {"s1"_sd, "a"_sd, "d"_sd}},
+                        {"B", {"s2"_sd, "a"_sd, "b"_sd}},
+                        {"C", {"s3"_sd, "b"_sd, "c"_sd}},
+                        {"D", {"s4"_sd, "c"_sd, "d"_sd}}});
+
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesAtEnd");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
     ASSERT_EQ(joinModel.getValue().graph.numEdges(), 8);
+}
+
+TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesAtEndNonScalar) {
+    // Repeat test above, but don't mark $expr fields as edges- then, we shouldn't add them, since
+    // these fields are non-scalar.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "s1", foreignField: "s1", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "s2", foreignField: "s2", as: "fromB"}},
+            {$unwind: "$fromB"},
+            {$lookup: {from: "C", localField: "s3", foreignField: "s3", as: "fromC"}},
+            {$unwind: "$fromC"},
+            {$lookup: {from: "D", localField: "s4", foreignField: "s4", as: "fromD"}},
+            {$unwind: "$fromD"},
+            {$match: {$and: [
+                {$expr: {$eq: ["$fromA.a", "$fromB.a"]}},
+                {$expr: {$eq: ["$fromB.b", "$fromC.b"]}},
+                {$expr: {$eq: ["$fromC.c", "$fromD.c"]}},
+                {$expr: {$eq: ["$fromD.d", "$fromA.d"]}}
+                ]}
+            }
+        ])";
+    auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(*pipeline,
+                       {"s1"_sd, "s2"_sd, "s3"_sd, "s4"_sd},
+                       {{"A", {"s1"_sd}}, {"B", {"s2"_sd}}, {"C", {"s3"_sd}}, {"D", {"s4"_sd}}});
+    auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesAtEndNonScalar");
+    ASSERT_OK(joinModel);
+    // $match gets pushed up by optimization, then renders remaining suffix ineligible!
+    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
+    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 2);
 }
 
 /**
@@ -259,11 +294,42 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesInBetween) {
     auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
     markFieldsAsScalar(*pipeline,
                        {"s1"_sd, "s2"_sd, "s3"_sd, "s4"_sd},
-                       {{"A", {"s1"_sd}}, {"B", {"s2"_sd}}, {"C", {"s3"_sd}}, {"D", {"s4"_sd}}});
+                       {{"A", {"s1"_sd, "a"_sd, "d"_sd}},
+                        {"B", {"s2"_sd, "a"_sd, "b"_sd}},
+                        {"C", {"s3"_sd, "b"_sd, "c"_sd}},
+                        {"D", {"s4"_sd, "c"_sd, "d"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesInBetween");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
     ASSERT_EQ(joinModel.getValue().graph.numEdges(), 8);
+}
+
+TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesInBetweenNonScalar) {
+    // Same as above, but missing path arrayness.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "s1", foreignField: "s1", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "s2", foreignField: "s2", as: "fromB"}},
+            {$unwind: "$fromB"},
+            {$match: {$expr: {$eq: ["$fromA.a", "$fromB.a"]}}},
+            {$lookup: {from: "C", localField: "s3", foreignField: "s3", as: "fromC"}},
+            {$unwind: "$fromC"},
+            {$match: {$expr: {$eq: ["$fromB.b", "$fromC.b"]}}},
+            {$lookup: {from: "D", localField: "s4", foreignField: "s4", as: "fromD"}},
+            {$unwind: "$fromD"},
+            {$match: {$expr: {$eq: ["$fromC.c", "$fromD.c"]}}},
+            {$match: {$expr: {$eq: ["$fromD.d", "$fromA.d"]}}}
+        ])";
+    auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(*pipeline,
+                       {"s1"_sd, "s2"_sd, "s3"_sd, "s4"_sd},
+                       {{"A", {"s1"_sd}}, {"B", {"s2"_sd}}, {"C", {"s3"_sd}}, {"D", {"s4"_sd}}});
+    auto joinModel =
+        runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesInBetweenNonScalar");
+    ASSERT_OK(joinModel);
+    // $match moves up, disqualifying 2 nodes.
+    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
+    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 2);
 }
 
 /**
@@ -291,13 +357,75 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEnd) {
     auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
     markFieldsAsScalar(*pipeline,
                        {"s1"_sd, "s2"_sd, "s3"_sd, "s4"_sd},
-                       {{"A", {"s1"_sd}}, {"B", {"s2"_sd}}, {"C", {"s3"_sd}}, {"D", {"s4"_sd}}});
+                       {{"A", {"s1"_sd, "a"_sd}},
+                        {"B", {"s2"_sd, "a"_sd, "b"_sd}},
+                        {"C", {"s3"_sd}},
+                        {"D", {"s4"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_earlyEnd");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
     ASSERT_EQ(joinModel.getValue().graph.numEdges(), 3);
 }
 
+TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEndNumeric) {
+    // Same as first, but with a numeric field path instead of a self-edge.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "s1", foreignField: "s1", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "s2", foreignField: "s2", as: "fromB"}},
+            {$unwind: "$fromB"},
+            {$match: {$and: [
+                {$expr: {$eq: ["$fromA.a", "$fromB.a"]}},
+                {$expr: {$eq: ["$fromA.c", "$fromB.c.0"]}}
+            ]}},
+            {$lookup: {from: "C", localField: "s3", foreignField: "s3", as: "fromC"}},
+            {$unwind: "$fromC"},
+            {$lookup: {from: "D", localField: "s4", foreignField: "s4", as: "fromD"}},
+            {$unwind: "$fromD"}
+        ])";
+    auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(
+        *pipeline,
+        {"s1"_sd, "s2"_sd, "s3"_sd, "s4"_sd},
+        {{"A", {"s1"_sd, "a"_sd, "c"_sd}},
+         {"B", {"s2"_sd, "a"_sd, "c.0"_sd}},  // Field 'c.0' is scalar, but not permitted.
+         {"C", {"s3"_sd}},
+         {"D", {"s4"_sd}}});
+    auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_earlyEndNumeric");
+    ASSERT_OK(joinModel);
+    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
+    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 3);
+}
+
+TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEndNonScalar) {
+    // Same as first, but without path arrayness.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "s1", foreignField: "s1", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "s2", foreignField: "s2", as: "fromB"}},
+            {$unwind: "$fromB"},
+            {$match: {$and: [
+                {$expr: {$eq: ["$fromA.a", "$fromB.a"]}},
+                {$expr: {$eq: ["$fromB.b", "$fromA.b"]}}
+                ]}
+            },
+            {$lookup: {from: "C", localField: "s3", foreignField: "s3", as: "fromC"}},
+            {$unwind: "$fromC"},
+            {$lookup: {from: "D", localField: "s4", foreignField: "s4", as: "fromD"}},
+            {$unwind: "$fromD"}
+        ])";
+    auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(*pipeline,
+                       {"s1"_sd, "s2"_sd, "s3"_sd, "s4"_sd},
+                       {{"A", {"s1"_sd, "a"_sd}},  // No arrayness info for field 'b'.
+                        {"B", {"s2"_sd, "a"_sd, "b"_sd}},
+                        {"C", {"s3"_sd}},
+                        {"D", {"s4"_sd}}});
+    auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_earlyEndNonScalar");
+    ASSERT_OK(joinModel);
+    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
+    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 3);
+}
 /**
  * Combined test of $expr and implicit edges.
  * Legend: '==' - local/foreignField edge; '--' - $expr edge.
@@ -326,12 +454,41 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_addImplicitEdge) {
                        {{"A", {"a"_sd, "b"_sd}},
                         {"B", {"b"_sd, "s"_sd}},
                         {"C", {"s"_sd, "c"_sd}},
-                        {"D", {"d"_sd}}});
+                        {"D", {"a"_sd, "d"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_addImplicitEdge");
     ASSERT_OK(joinModel);
     ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
     ASSERT_EQ(joinModel.getValue().graph.numEdges(), 8);
     ASSERT_EQ(numPredicates(joinModel.getValue().graph), 10);
+}
+
+TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_addImplicitEdgeNonScalar) {
+    // Same as above but without arrayness.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "a", as: "fromA"}},
+            {$unwind: "$fromA"},
+            {$lookup: {from: "B", localField: "fromA.b", foreignField: "b", as: "fromB"}},
+            {$unwind: "$fromB"},
+            {$lookup: {from: "C", localField: "fromB.s", foreignField: "s", as: "fromC"}},
+            {$unwind: "$fromC"},
+            {$lookup: {from: "D", localField: "fromC.c", foreignField: "d", as: "fromD"}},
+            {$unwind: "$fromD"},
+            {$match: {$expr: {$eq: ["$fromA.a", "$fromD.a"]}}},
+            {$match: {$expr: {$eq: ["$fromB.b", "$fromC.c"]}}}
+        ])";
+    auto pipeline = makePipeline(query, {"A", "B", "C", "D"});
+    markFieldsAsScalar(*pipeline,
+                       {"a"_sd},
+                       {{"A", {"a"_sd, "b"_sd}},
+                        {"B", {"b"_sd, "s"_sd}},
+                        {"C", {"s"_sd, "c"_sd}},
+                        {"D", {"d"_sd}}});
+    auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_addImplicitEdgeNonScalar");
+    ASSERT_OK(joinModel);
+    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
+    // Can't add potentially multikey edge "A.a" - "D.a".
+    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 7);
+    ASSERT_EQ(numPredicates(joinModel.getValue().graph), 8);
 }
 
 /**
