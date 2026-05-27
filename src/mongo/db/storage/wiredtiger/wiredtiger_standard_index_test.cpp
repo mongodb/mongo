@@ -282,10 +282,14 @@ TEST_F(WiredTigerIdIndexBlindWriteTest, PrimaryAlwaysReturnsDuplicateKey) {
     ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks1, /*dupsAllowed=*/false));
 
     auto ks2 = makeKeyString(sdi.get(), BSON("" << 1), RecordId(2));
-    ASSERT_SDI_INSERT_DUPLICATE_KEY(
-        sdi->insert(opCtx(), recoveryUnit(), ks2, /*dupsAllowed=*/false),
-        BSON("" << 1),
-        RecordId(1));
+    {
+        auto result = sdi->insert(opCtx(), recoveryUnit(), ks2, /*dupsAllowed=*/false);
+        auto duplicate = std::get_if<SortedDataInterface::DuplicateKey>(&result);
+        ASSERT(duplicate);
+        ASSERT_BSONOBJ_EQ(duplicate->key, BSON("" << 1));
+        ASSERT(duplicate->id.has_value());
+        ASSERT_EQ(duplicate->id->getLong(), RecordId(1).getLong());
+    }
     txn.commit();
 }
 
