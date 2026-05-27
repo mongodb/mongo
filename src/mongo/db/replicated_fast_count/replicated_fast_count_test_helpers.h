@@ -39,7 +39,7 @@
 #include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
 
-namespace mongo::replicated_fast_count_test_helpers {
+namespace mongo::replicated_fast_count::test_helpers {
 /**
  * Stub persistence provider for enabling the replicated fast count collection.
  */
@@ -343,9 +343,7 @@ CollectionSizeCount scanForAccurateSizeCount(OperationContext* opCtx, const Name
 absl::flat_hash_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps(
     const repl::OplogEntry& applyOpsEntry, const boost::optional<UUID>& uuidFilter = boost::none);
 
-}  // namespace mongo::replicated_fast_count_test_helpers
 
-namespace mongo::replicated_fast_count::test_helpers {
 /**
  * Simple wrapper to ease creation and testing of replicated fast count and size.
  */

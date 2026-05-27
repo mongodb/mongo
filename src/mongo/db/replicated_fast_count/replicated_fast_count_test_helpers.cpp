@@ -53,7 +53,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo::replicated_fast_count_test_helpers {
+namespace mongo::replicated_fast_count::test_helpers {
 
 namespace {
 bool findPersistedDocInCollection(OperationContext* opCtx, const UUID& uuid, BSONObj& outDoc) {
@@ -605,7 +605,7 @@ void assertOpsMatchSpecs(const std::vector<repl::OplogEntry>& oplogEntries,
     for (size_t i = 0; i < oplogEntries.size(); i++) {
         const auto opSpec = entrySpecs[i];
         const auto opEntry = oplogEntries[i];
-        replicated_fast_count_test_helpers::assertOpMatchesSpec(opEntry, opSpec);
+        assertOpMatchesSpec(opEntry, opSpec);
     }
 }
 
@@ -663,9 +663,7 @@ absl::flat_hash_map<UUID, CollectionSizeCount> extractSizeCountDeltasForApplyOps
     return deltas;
 }
 
-}  // namespace mongo::replicated_fast_count_test_helpers
 
-namespace mongo::replicated_fast_count::test_helpers {
 namespace {
 repl::OplogEntrySizeMetadata makeOperationSizeMetadata(int32_t replicatedSizeDelta) {
     SingleOpSizeMetadata m;

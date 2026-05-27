@@ -66,8 +66,7 @@ class ReplicatedFastCountTestBase : public CatalogTestFixture {
 public:
     ReplicatedFastCountTestBase()
         : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<replicated_fast_count_test_helpers::
-                                   ReplicatedFastCountTestPersistenceProvider>())) {}
+              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
 
 protected:
     virtual FastCountStoreMode getMode() const = 0;
@@ -195,77 +194,76 @@ const std::function<BSONObj(int)> docGeneratorForUpdate = [](int i) {
 TEST_P(ReplicatedFastCountTest, UncommittedChangesResetOnCommit) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
     const int numDocs = 5;
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numDocs,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numDocs,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 }
 
 TEST_P(ReplicatedFastCountTest, UncommittedChangesResetOnRollback) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
     const int numDocs = 5;
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numDocs,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert,
-                                                   /*abortWithoutCommit=*/true);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numDocs,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert,
+                             /*abortWithoutCommit=*/true);
 }
 
 TEST_P(ReplicatedFastCountTest, UpdatesAreCorrectlyAccountedFor) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 10;
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numDocs,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numDocs,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
-    replicated_fast_count_test_helpers::updateDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   /*startIdx=*/0,
-                                                   /*endIdx=*/4,
-                                                   /*startingCount=*/numDocs,
-                                                   /*startingSize=*/numDocs *
-                                                       sampleDocForInsert.objsize(),
-                                                   docGeneratorForUpdate,
-                                                   sampleDocForInsert,
-                                                   sampleDocForUpdate);
+    test_helpers::updateDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             /*startIdx=*/0,
+                             /*endIdx=*/4,
+                             /*startingCount=*/numDocs,
+                             /*startingSize=*/numDocs * sampleDocForInsert.objsize(),
+                             docGeneratorForUpdate,
+                             sampleDocForInsert,
+                             sampleDocForUpdate);
 }
 
 TEST_P(ReplicatedFastCountTest, DeletesAreCorrectlyAccountedFor) {
     RAIIServerParameterControllerForTest featureFlag("featureFlagReplicatedFastCount", true);
 
     const int numDocs = 10;
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numDocs,
-                                                   /*startingSize=*/0,
-                                                   /*startingCount=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numDocs,
+                             /*startingSize=*/0,
+                             /*startingCount=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
-    replicated_fast_count_test_helpers::deleteDocsByIDRange(_opCtx,
-                                                            _fastCountManager,
-                                                            _nss1,
-                                                            3,
-                                                            8,
-                                                            numDocs,
-                                                            numDocs * sampleDocForInsert.objsize(),
-                                                            sampleDocForInsert);
+    test_helpers::deleteDocsByIDRange(_opCtx,
+                                      _fastCountManager,
+                                      _nss1,
+                                      3,
+                                      8,
+                                      numDocs,
+                                      numDocs * sampleDocForInsert.objsize(),
+                                      sampleDocForInsert);
 }
 
 TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalCollection) {
@@ -274,59 +272,57 @@ TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenToInternalCollection) {
     const int numDocsColl1 = 5;
     const int numDocsColl2 = 10;
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numDocsColl1,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numDocsColl1,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss2,
-                                                   numDocsColl2,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss2,
+                             numDocsColl2,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
 
     // Verify that the committed changes have not been written to the internal fast count collection
     // yet.
-    replicated_fast_count_test_helpers::checkFastCountMetadataInInternalStore(
-        _opCtx,
-        _fastCountManager,
-        _uuid1,
-        /*expectPersisted=*/false,
-        /*expectedCount=*/0,
-        /*expectedSize=*/0);
-    replicated_fast_count_test_helpers::checkFastCountMetadataInInternalStore(
-        _opCtx,
-        _fastCountManager,
-        _uuid2,
-        /*expectPersisted=*/false,
-        /*expectedCount=*/0,
-        /*expectedSize=*/0);
+    test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
+                                                        _fastCountManager,
+                                                        _uuid1,
+                                                        /*expectPersisted=*/false,
+                                                        /*expectedCount=*/0,
+                                                        /*expectedSize=*/0);
+    test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
+                                                        _fastCountManager,
+                                                        _uuid2,
+                                                        /*expectPersisted=*/false,
+                                                        /*expectedCount=*/0,
+                                                        /*expectedSize=*/0);
 
     // Manually trigger an iteration to write dirty metadata to the internal collection.
     _fastCountManager->flushSync(_opCtx);
 
-    replicated_fast_count_test_helpers::checkFastCountMetadataInInternalStore(
-        _opCtx,
-        _fastCountManager,
-        _uuid1,
-        /*expectPersisted=*/true,
-        numDocsColl1,
-        numDocsColl1 * sampleDocForInsert.objsize());
-    replicated_fast_count_test_helpers::checkFastCountMetadataInInternalStore(
-        _opCtx,
-        _fastCountManager,
-        _uuid2,
-        /*expectPersisted=*/true,
-        numDocsColl2,
-        numDocsColl2 * sampleDocForInsert.objsize());
+    test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
+                                                        _fastCountManager,
+                                                        _uuid1,
+                                                        /*expectPersisted=*/true,
+                                                        numDocsColl1,
+                                                        numDocsColl1 *
+                                                            sampleDocForInsert.objsize());
+    test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
+                                                        _fastCountManager,
+                                                        _uuid2,
+                                                        /*expectPersisted=*/true,
+                                                        numDocsColl2,
+                                                        numDocsColl2 *
+                                                            sampleDocForInsert.objsize());
 }
 
 TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenAsSingleApplyOpsEntry) {
@@ -335,43 +331,42 @@ TEST_P(ReplicatedFastCountTest, DirtyMetadataWrittenAsSingleApplyOpsEntry) {
     const int numDocsColl1 = 5;
     const int numDocsColl2 = 10;
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numDocsColl1,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numDocsColl1,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss2,
-                                                   numDocsColl2,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss2,
+                             numDocsColl2,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
     _fastCountManager->flushSync(_opCtx);
 
-    auto applyOpsEntries = replicated_fast_count_test_helpers::getApplyOpsForFastCountStore(_opCtx);
+    auto applyOpsEntries = test_helpers::getApplyOpsForFastCountStore(_opCtx);
 
     EXPECT_EQ(applyOpsEntries.size(), 1u);
     auto& applyOpsEntry = applyOpsEntries.front();
 
-    replicated_fast_count_test_helpers::assertFastCountApplyOpsMatches(
-        applyOpsEntry,
-        {
-            {_uuid1,
-             replicated_fast_count_test_helpers::FastCountOpType::kInsert,
-             numDocsColl1,
-             numDocsColl1 * sampleDocForInsert.objsize()},
-            {_uuid2,
-             replicated_fast_count_test_helpers::FastCountOpType::kInsert,
-             numDocsColl2,
-             numDocsColl2 * sampleDocForInsert.objsize()},
-        });
+    test_helpers::assertFastCountApplyOpsMatches(applyOpsEntry,
+                                                 {
+                                                     {_uuid1,
+                                                      test_helpers::FastCountOpType::kInsert,
+                                                      numDocsColl1,
+                                                      numDocsColl1 * sampleDocForInsert.objsize()},
+                                                     {_uuid2,
+                                                      test_helpers::FastCountOpType::kInsert,
+                                                      numDocsColl2,
+                                                      numDocsColl2 * sampleDocForInsert.objsize()},
+                                                 });
 }
 
 TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
@@ -380,23 +375,23 @@ TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
     const int numDocsColl1 = 10;
     const int numDocsColl2 = 20;
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numDocsColl1,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numDocsColl1,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss2,
-                                                   numDocsColl2,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss2,
+                             numDocsColl2,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
     _fastCountManager->flushSync(_opCtx);
 
@@ -411,34 +406,31 @@ TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
     const int endIdxColl2 = 8;
     const int totalUpdatesColl2 = endIdxColl2 - startIdxColl2 + 1;
 
-    replicated_fast_count_test_helpers::updateDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   startIdxColl1,
-                                                   endIdxColl1,
-                                                   /*startingCount=*/numDocsColl1,
-                                                   /*startingSize=*/numDocsColl1 *
-                                                       sampleDocForInsert.objsize(),
-                                                   docGeneratorForUpdate,
-                                                   sampleDocForInsert,
-                                                   sampleDocForUpdate);
+    test_helpers::updateDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             startIdxColl1,
+                             endIdxColl1,
+                             /*startingCount=*/numDocsColl1,
+                             /*startingSize=*/numDocsColl1 * sampleDocForInsert.objsize(),
+                             docGeneratorForUpdate,
+                             sampleDocForInsert,
+                             sampleDocForUpdate);
 
-    replicated_fast_count_test_helpers::updateDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss2,
-                                                   startIdxColl2,
-                                                   endIdxColl2,
-                                                   /*startingCount=*/numDocsColl2,
-                                                   /*startingSize=*/numDocsColl2 *
-                                                       sampleDocForInsert.objsize(),
-                                                   docGeneratorForUpdate,
-                                                   sampleDocForInsert,
-                                                   sampleDocForUpdate);
+    test_helpers::updateDocs(_opCtx,
+                             _fastCountManager,
+                             _nss2,
+                             startIdxColl2,
+                             endIdxColl2,
+                             /*startingCount=*/numDocsColl2,
+                             /*startingSize=*/numDocsColl2 * sampleDocForInsert.objsize(),
+                             docGeneratorForUpdate,
+                             sampleDocForInsert,
+                             sampleDocForUpdate);
 
     _fastCountManager->flushSync(_opCtx);
 
-    auto applyOpsEntry =
-        replicated_fast_count_test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
+    auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
     const int64_t sizeDelta = sampleDocForUpdate.objsize() - sampleDocForInsert.objsize();
     const int64_t newExpectedSizeColl1 =
@@ -446,17 +438,11 @@ TEST_P(ReplicatedFastCountTest, UpdatesWrittenToApplyOpsCorrectly) {
     const int64_t newExpectedSizeColl2 =
         (numDocsColl2 * sampleDocForInsert.objsize()) + (sizeDelta * totalUpdatesColl2);
 
-    replicated_fast_count_test_helpers::assertFastCountApplyOpsMatches(
+    test_helpers::assertFastCountApplyOpsMatches(
         applyOpsEntry,
         {
-            {_uuid1,
-             replicated_fast_count_test_helpers::FastCountOpType::kUpdate,
-             numDocsColl1,
-             newExpectedSizeColl1},
-            {_uuid2,
-             replicated_fast_count_test_helpers::FastCountOpType::kUpdate,
-             numDocsColl2,
-             newExpectedSizeColl2},
+            {_uuid1, test_helpers::FastCountOpType::kUpdate, numDocsColl1, newExpectedSizeColl1},
+            {_uuid2, test_helpers::FastCountOpType::kUpdate, numDocsColl2, newExpectedSizeColl2},
         });
 }
 
@@ -466,62 +452,57 @@ TEST_P(ReplicatedFastCountTest, MixedUpdatesAndInsertInApplyOps) {
     const int numDocsColl1 = 25;
     const int numDocsColl2 = 40;
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numDocsColl1,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numDocsColl1,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
     _fastCountManager->flushSync(_opCtx);
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss2,
-                                                   numDocsColl2,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss2,
+                             numDocsColl2,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
     const int startIdxColl = 2;
     const int endIdxColl = 8;
     const int totalUpdatesColl1 = endIdxColl - startIdxColl + 1;
 
-    replicated_fast_count_test_helpers::updateDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   startIdxColl,
-                                                   endIdxColl,
-                                                   /*startingCount=*/numDocsColl1,
-                                                   /*startingSize=*/numDocsColl1 *
-                                                       sampleDocForInsert.objsize(),
-                                                   docGeneratorForUpdate,
-                                                   sampleDocForInsert,
-                                                   sampleDocForUpdate);
+    test_helpers::updateDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             startIdxColl,
+                             endIdxColl,
+                             /*startingCount=*/numDocsColl1,
+                             /*startingSize=*/numDocsColl1 * sampleDocForInsert.objsize(),
+                             docGeneratorForUpdate,
+                             sampleDocForInsert,
+                             sampleDocForUpdate);
 
     ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss3));
 
     _fastCountManager->flushSync(_opCtx);
 
-    auto applyOpsEntry =
-        replicated_fast_count_test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
+    auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
     const int64_t sizeDelta = sampleDocForUpdate.objsize() - sampleDocForInsert.objsize();
     const int64_t newExpectedSizeColl1 =
         (numDocsColl1 * sampleDocForInsert.objsize()) + (sizeDelta * totalUpdatesColl1);
 
-    replicated_fast_count_test_helpers::assertFastCountApplyOpsMatches(
+    test_helpers::assertFastCountApplyOpsMatches(
         applyOpsEntry,
         {
-            {_uuid1,
-             replicated_fast_count_test_helpers::FastCountOpType::kUpdate,
-             numDocsColl1,
-             newExpectedSizeColl1},
+            {_uuid1, test_helpers::FastCountOpType::kUpdate, numDocsColl1, newExpectedSizeColl1},
             {_uuid2,
-             replicated_fast_count_test_helpers::FastCountOpType::kUpdate,
+             test_helpers::FastCountOpType::kUpdate,
              numDocsColl2,
              numDocsColl2 * sampleDocForInsert.objsize()},
         });
@@ -532,14 +513,14 @@ TEST_P(ReplicatedFastCountTest, DropsWrittenToApplyOpsCorrectly) {
 
     const int numDocs = 5;
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numDocs,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numDocs,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
     _fastCountManager->flushSync(_opCtx);
 
@@ -548,11 +529,10 @@ TEST_P(ReplicatedFastCountTest, DropsWrittenToApplyOpsCorrectly) {
     // We should detect that we dropped the collection _nss1 and delete the fast count entry for it.
     _fastCountManager->flushSync(_opCtx);
 
-    auto applyOpsEntry =
-        replicated_fast_count_test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
+    auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
-    replicated_fast_count_test_helpers::assertFastCountApplyOpsMatches(
-        applyOpsEntry, {{_uuid1, replicated_fast_count_test_helpers::FastCountOpType::kDelete}});
+    test_helpers::assertFastCountApplyOpsMatches(
+        applyOpsEntry, {{_uuid1, test_helpers::FastCountOpType::kDelete}});
 }
 
 TEST_P(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
@@ -560,38 +540,36 @@ TEST_P(ReplicatedFastCountTest, InsertsAndDropToCollectionSameFlush) {
 
     const int numDocs = 5;
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numDocs,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numDocs,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
     _fastCountManager->flushSync(_opCtx);
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numDocs,
-                                                   /*startingCount=*/numDocs,
-                                                   /*startingSize=*/sampleDocForInsert.objsize() *
-                                                       numDocs,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numDocs,
+                             /*startingCount=*/numDocs,
+                             /*startingSize=*/sampleDocForInsert.objsize() * numDocs,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
     ASSERT_OK(storageInterface()->dropCollection(_opCtx, _nss1));
 
     _fastCountManager->flushSync(_opCtx);
 
-    auto applyOpsEntry =
-        replicated_fast_count_test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
+    auto applyOpsEntry = test_helpers::getLatestApplyOpsForFastCountStore(_opCtx);
 
     // We should only see the oplog entry removing the fast count entry for the collection we
     // dropped, and not any entries for the inserts we did before dropping the collection.
-    replicated_fast_count_test_helpers::assertFastCountApplyOpsMatches(
-        applyOpsEntry, {{_uuid1, replicated_fast_count_test_helpers::FastCountOpType::kDelete}});
+    test_helpers::assertFastCountApplyOpsMatches(
+        applyOpsEntry, {{_uuid1, test_helpers::FastCountOpType::kDelete}});
 }
 
 TEST_F(ReplicatedFastCountCollectionOnlyTest, StartupFailsIfFastCountCollectionNotPresent) {
@@ -617,16 +595,16 @@ TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot)
     const int64_t numTotalDocs = numInitialDocs + numExtraDocs;
     const int64_t totalSize = numTotalDocs * sampleDocForInsert.objsize();
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   numInitialDocs,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             numInitialDocs,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
-    replicated_fast_count_test_helpers::checkCommittedFastCountChanges(
+    test_helpers::checkCommittedFastCountChanges(
         _uuid1, _fastCountManager, numInitialDocs, initialSize);
 
     stdx::thread iterThread;
@@ -649,17 +627,16 @@ TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot)
 
         // Insert more documents into the same collection, creating new dirty metadata for that
         // collection.
-        replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                       _fastCountManager,
-                                                       _nss1,
-                                                       numExtraDocs,
-                                                       /*startingCount=*/numInitialDocs,
-                                                       /*startingSize=*/numInitialDocs *
-                                                           sampleDocForInsert.objsize(),
-                                                       docGeneratorForInsert,
-                                                       sampleDocForInsert);
+        test_helpers::insertDocs(_opCtx,
+                                 _fastCountManager,
+                                 _nss1,
+                                 numExtraDocs,
+                                 /*startingCount=*/numInitialDocs,
+                                 /*startingSize=*/numInitialDocs * sampleDocForInsert.objsize(),
+                                 docGeneratorForInsert,
+                                 sampleDocForInsert);
 
-        replicated_fast_count_test_helpers::checkCommittedFastCountChanges(
+        test_helpers::checkCommittedFastCountChanges(
             _uuid1, _fastCountManager, numTotalDocs, totalSize);
 
         // Disable failpoint by letting it go out of scope.
@@ -672,13 +649,12 @@ TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot)
     _fastCountManager->flushSync(_opCtx);
 
     // Verify that all of our writes were persisted to disk.
-    replicated_fast_count_test_helpers::checkFastCountMetadataInInternalStore(
-        _opCtx,
-        _fastCountManager,
-        _uuid1,
-        /*expectPersisted=*/true,
-        numTotalDocs,
-        totalSize);
+    test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
+                                                        _fastCountManager,
+                                                        _uuid1,
+                                                        /*expectPersisted=*/true,
+                                                        numTotalDocs,
+                                                        totalSize);
 }
 
 // TODO SERVER-118457: Parameterize test and test variety of operations with different sizes and
@@ -734,13 +710,13 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsInsertsAreCorrectlyAccountedFor) {
     const int64_t expectedSizeColl1 = numDocsColl1 * sampleDocForInsert.objsize();
     const int64_t expectedSizeColl2 = numDocsColl2 * sampleDocForInsert.objsize();
 
-    replicated_fast_count_test_helpers::checkCommittedFastCountChanges(
+    test_helpers::checkCommittedFastCountChanges(
         _uuid1, _fastCountManager, numDocsColl1, expectedSizeColl1);
-    replicated_fast_count_test_helpers::checkCommittedFastCountChanges(
+    test_helpers::checkCommittedFastCountChanges(
         _uuid2, _fastCountManager, numDocsColl2, expectedSizeColl2);
 
-    replicated_fast_count_test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
-    replicated_fast_count_test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid2, 0, 0);
+    test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
+    test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid2, 0, 0);
 }
 
 TEST_P(ReplicatedFastCountTest, ApplyOpsUpdatesAreCorrectlyAccountedFor) {
@@ -748,14 +724,14 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsUpdatesAreCorrectlyAccountedFor) {
 
     const int numDocs = 5;
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   /*numDocs=*/numDocs,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             /*numDocs=*/numDocs,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
     const int startIdx = 1;
     const int endIdx = 3;
@@ -778,9 +754,9 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsUpdatesAreCorrectlyAccountedFor) {
     const int64_t expectedNewSize = startingSize + (totalUpdates * sizeDelta);
 
 
-    replicated_fast_count_test_helpers::checkCommittedFastCountChanges(
+    test_helpers::checkCommittedFastCountChanges(
         _uuid1, _fastCountManager, numDocs, expectedNewSize);
-    replicated_fast_count_test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
+    test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
 }
 
 TEST_P(ReplicatedFastCountTest, ApplyOpsDeletesAreCorrectlyAccountedFor) {
@@ -788,14 +764,14 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsDeletesAreCorrectlyAccountedFor) {
 
     const int numDocs = 10;
 
-    replicated_fast_count_test_helpers::insertDocs(_opCtx,
-                                                   _fastCountManager,
-                                                   _nss1,
-                                                   /*numDocs=*/numDocs,
-                                                   /*startingCount=*/0,
-                                                   /*startingSize=*/0,
-                                                   docGeneratorForInsert,
-                                                   sampleDocForInsert);
+    test_helpers::insertDocs(_opCtx,
+                             _fastCountManager,
+                             _nss1,
+                             /*numDocs=*/numDocs,
+                             /*startingCount=*/0,
+                             /*startingSize=*/0,
+                             docGeneratorForInsert,
+                             sampleDocForInsert);
 
     const int startIdx = 2;
     const int endIdx = 7;
@@ -817,9 +793,9 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsDeletesAreCorrectlyAccountedFor) {
     const int64_t expectedCount = numDocs - numDeletes;
     const int64_t expectedSize = startingSize - deletedSize;
 
-    replicated_fast_count_test_helpers::checkCommittedFastCountChanges(
+    test_helpers::checkCommittedFastCountChanges(
         _uuid1, _fastCountManager, expectedCount, expectedSize);
-    replicated_fast_count_test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
+    test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
 }
 
 enum class CapType { kCount, kSize };
@@ -925,18 +901,14 @@ TEST_P(ReplicatedFastCountTest, ReplicatedFastCountDoesNotTrackLocalCollections)
         expectedSize += document.objsize();
     }
 
-    replicated_fast_count_test_helpers::checkCommittedFastCountChanges(
-        internalUuid, _fastCountManager, 0, 0);
-    replicated_fast_count_test_helpers::checkUncommittedFastCountChanges(
-        _opCtx, internalUuid, 0, 0);
+    test_helpers::checkCommittedFastCountChanges(internalUuid, _fastCountManager, 0, 0);
+    test_helpers::checkUncommittedFastCountChanges(_opCtx, internalUuid, 0, 0);
 
     wuow.commit();
 
     // Replicated fast count collection has no record of the writes to `internalColl`.
-    replicated_fast_count_test_helpers::checkCommittedFastCountChanges(
-        internalUuid, _fastCountManager, 0, 0);
-    replicated_fast_count_test_helpers::checkUncommittedFastCountChanges(
-        _opCtx, internalUuid, 0, 0);
+    test_helpers::checkCommittedFastCountChanges(internalUuid, _fastCountManager, 0, 0);
+    test_helpers::checkUncommittedFastCountChanges(_opCtx, internalUuid, 0, 0);
 
     // Size and count data for `internalColl` are still tracked through the record store.
     EXPECT_EQ(internalColl.getCollectionPtr()->numRecords(_opCtx), docsToInsertCount);
@@ -966,18 +938,16 @@ TEST_P(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollect
             expectedSize += document.objsize();
         }
 
-        replicated_fast_count_test_helpers::checkCommittedFastCountChanges(
-            internalUuid, _fastCountManager, 0, 0);
-        replicated_fast_count_test_helpers::checkUncommittedFastCountChanges(
+        test_helpers::checkCommittedFastCountChanges(internalUuid, _fastCountManager, 0, 0);
+        test_helpers::checkUncommittedFastCountChanges(
             _opCtx, internalUuid, docsToInsertCount, expectedSize);
 
         wuow.commit();
 
         // Replicated fast count collection has record of the writes to `internalColl`.
-        replicated_fast_count_test_helpers::checkCommittedFastCountChanges(
+        test_helpers::checkCommittedFastCountChanges(
             internalUuid, _fastCountManager, docsToInsertCount, expectedSize);
-        replicated_fast_count_test_helpers::checkUncommittedFastCountChanges(
-            _opCtx, internalUuid, 0, 0);
+        test_helpers::checkUncommittedFastCountChanges(_opCtx, internalUuid, 0, 0);
     }
 }
 
@@ -1029,13 +999,12 @@ TEST_F(SizeMetadataLoggingTest, BasicInsertOplogEntry) {
         wuow.commit();
     }
 
-    const auto insertOplogEntry = replicated_fast_count_test_helpers::getMostRecentOplogEntry(
-        _opCtx, _nss, repl::OpTypeEnum::kInsert);
+    const auto insertOplogEntry =
+        test_helpers::getMostRecentOplogEntry(_opCtx, _nss, repl::OpTypeEnum::kInsert);
     ASSERT_TRUE(insertOplogEntry.has_value());
 
     // Confirm the generated oplog entry includes replicated size count information.
-    replicated_fast_count_test_helpers::assertReplicatedSizeCountMeta(*insertOplogEntry,
-                                                                      expectedSizeDelta);
+    test_helpers::assertReplicatedSizeCountMeta(*insertOplogEntry, expectedSizeDelta);
 }
 
 TEST_F(SizeMetadataLoggingTest, BasicUpdateOplogEntry) {
@@ -1061,13 +1030,12 @@ TEST_F(SizeMetadataLoggingTest, BasicUpdateOplogEntry) {
     const auto docAfterUpdate = Helpers::findOneForTesting(_opCtx, coll, BSON("_id" << 0));
     const auto expectedSizeDelta = docAfterUpdate.objsize() - docInitial.objsize();
 
-    const auto updateOplogEntry = replicated_fast_count_test_helpers::getMostRecentOplogEntry(
-        _opCtx, _nss, repl::OpTypeEnum::kUpdate);
+    const auto updateOplogEntry =
+        test_helpers::getMostRecentOplogEntry(_opCtx, _nss, repl::OpTypeEnum::kUpdate);
     ASSERT_TRUE(updateOplogEntry.has_value());
 
     // Confirm the generated oplog entry includes replicated size count information.
-    replicated_fast_count_test_helpers::assertReplicatedSizeCountMeta(*updateOplogEntry,
-                                                                      expectedSizeDelta);
+    test_helpers::assertReplicatedSizeCountMeta(*updateOplogEntry, expectedSizeDelta);
 }
 
 TEST_F(SizeMetadataLoggingTest, BasicUpdateOplogEntryWithNegativeDelta) {
@@ -1095,11 +1063,10 @@ TEST_F(SizeMetadataLoggingTest, BasicUpdateOplogEntryWithNegativeDelta) {
     const auto docAfterUpdate = Helpers::findOneForTesting(_opCtx, coll, BSON("_id" << 0));
     const auto expectedSizeDelta = docAfterUpdate.objsize() - docInitial.objsize();
 
-    const auto updateOplogEntry = replicated_fast_count_test_helpers::getMostRecentOplogEntry(
-        _opCtx, _nss, repl::OpTypeEnum::kUpdate);
+    const auto updateOplogEntry =
+        test_helpers::getMostRecentOplogEntry(_opCtx, _nss, repl::OpTypeEnum::kUpdate);
     ASSERT_TRUE(updateOplogEntry.has_value());
-    replicated_fast_count_test_helpers::assertReplicatedSizeCountMeta(*updateOplogEntry,
-                                                                      expectedSizeDelta);
+    test_helpers::assertReplicatedSizeCountMeta(*updateOplogEntry, expectedSizeDelta);
 }
 
 TEST_F(SizeMetadataLoggingTest, BasicDeleteOplogEntry) {
@@ -1124,11 +1091,10 @@ TEST_F(SizeMetadataLoggingTest, BasicDeleteOplogEntry) {
         wuow.commit();
     }
     const auto expectedSizeDelta = doc.objsize();
-    const auto deleteOplogEntry = replicated_fast_count_test_helpers::getMostRecentOplogEntry(
-        _opCtx, _nss, repl::OpTypeEnum::kDelete);
+    const auto deleteOplogEntry =
+        test_helpers::getMostRecentOplogEntry(_opCtx, _nss, repl::OpTypeEnum::kDelete);
     ASSERT_TRUE(deleteOplogEntry.has_value());
-    replicated_fast_count_test_helpers::assertReplicatedSizeCountMeta(*deleteOplogEntry,
-                                                                      -expectedSizeDelta);
+    test_helpers::assertReplicatedSizeCountMeta(*deleteOplogEntry, -expectedSizeDelta);
 }
 
 TEST_F(SizeMetadataLoggingTest, BasicGroupCommit) {
@@ -1145,16 +1111,15 @@ TEST_F(SizeMetadataLoggingTest, BasicGroupCommit) {
         ASSERT_OK(Helpers::insert(_opCtx, coll.getCollectionPtr(), doc2));
         wuow.commit();
     }
-    std::vector<replicated_fast_count_test_helpers::OpValidationSpec> expectedOps{
+    std::vector<test_helpers::OpValidationSpec> expectedOps{
         {.uuid = _uuid, .opType = repl::OpTypeEnum::kInsert, .expectedSizeDelta = doc1.objsize()},
         {.uuid = _uuid, .opType = repl::OpTypeEnum::kInsert, .expectedSizeDelta = doc2.objsize()}};
 
-    const auto applyOpsOplogEntry =
-        replicated_fast_count_test_helpers::getLatestApplyOpsForNss(_opCtx, _nss);
+    const auto applyOpsOplogEntry = test_helpers::getLatestApplyOpsForNss(_opCtx, _nss);
     std::vector<repl::OplogEntry> innerEntries;
     repl::ApplyOps::extractOperationsTo(
         applyOpsOplogEntry, applyOpsOplogEntry.getEntry().toBSON(), &innerEntries);
-    replicated_fast_count_test_helpers::assertOpsMatchSpecs(innerEntries, expectedOps);
+    test_helpers::assertOpsMatchSpecs(innerEntries, expectedOps);
 }
 
 using ReplicatedFastCountDeathTest = ReplicatedFastCountTest;

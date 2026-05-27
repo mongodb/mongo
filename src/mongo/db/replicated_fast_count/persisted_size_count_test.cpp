@@ -47,8 +47,7 @@ class PersistedSizeCountTest : public CatalogTestFixture {
 public:
     PersistedSizeCountTest()
         : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<replicated_fast_count_test_helpers::
-                                   ReplicatedFastCountTestPersistenceProvider>())) {}
+              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
 
 protected:
     void setUp() override {

@@ -57,8 +57,7 @@ class ReplicatedFastCountManagerTest : public CatalogTestFixture {
 public:
     ReplicatedFastCountManagerTest()
         : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<replicated_fast_count_test_helpers::
-                                   ReplicatedFastCountTestPersistenceProvider>())) {}
+              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
 
 protected:
     void setUp() override {
@@ -408,8 +407,7 @@ class ReplicatedFastCountManagerColdBootTest : public CatalogTestFixture {
 public:
     ReplicatedFastCountManagerColdBootTest()
         : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<replicated_fast_count_test_helpers::
-                                   ReplicatedFastCountTestPersistenceProvider>())) {}
+              std::make_unique<test_helpers::ReplicatedFastCountTestPersistenceProvider>())) {}
 
 protected:
     void setUp() override {
@@ -494,20 +492,18 @@ TEST_F(ReplicatedFastCountManagerColdBootTest,
         wuow.commit();
     }
 
-    replicated_fast_count_test_helpers::checkFastCountMetadataInInternalStore(
-        _opCtx,
-        _fastCountManager,
-        _coll1.uuid,
-        /*expectPersisted=*/true,
-        expectedCount1,
-        expectedSize1);
-    replicated_fast_count_test_helpers::checkFastCountMetadataInInternalStore(
-        _opCtx,
-        _fastCountManager,
-        _coll2.uuid,
-        /*expectPersisted=*/true,
-        expectedCount2,
-        expectedSize2);
+    test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
+                                                        _fastCountManager,
+                                                        _coll1.uuid,
+                                                        /*expectPersisted=*/true,
+                                                        expectedCount1,
+                                                        expectedSize1);
+    test_helpers::checkFastCountMetadataInInternalStore(_opCtx,
+                                                        _fastCountManager,
+                                                        _coll2.uuid,
+                                                        /*expectPersisted=*/true,
+                                                        expectedCount2,
+                                                        expectedSize2);
 
     const auto* rs1 = getRecordStoreForUuid(_opCtx, _coll1.uuid);
     const auto* rs2 = getRecordStoreForUuid(_opCtx, _coll2.uuid);
@@ -583,8 +579,7 @@ TEST_F(ReplicatedFastCountManagerColdBootTest,
     auto checkFastCountMetadataInContainer =
         [&](const UUID& uuid, int64_t expectedCount, int64_t expectedSize) {
             BSONObj persisted;
-            const bool found = replicated_fast_count_test_helpers::findPersistedDocInContainer(
-                _opCtx, uuid, persisted);
+            const bool found = test_helpers::findPersistedDocInContainer(_opCtx, uuid, persisted);
             ASSERT_TRUE(found);
 
             const int64_t persistedCount = persisted.getField(replicated_fast_count::kMetadataKey)

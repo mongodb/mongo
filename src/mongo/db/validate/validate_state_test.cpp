@@ -56,7 +56,7 @@ class ValidateStateWithoutSizeStorerTest : public CatalogTestFixture {
 public:
     ValidateStateWithoutSizeStorerTest()
         : CatalogTestFixture(Options().setPersistenceProvider(
-              std::make_unique<replicated_fast_count_test_helpers::
+              std::make_unique<replicated_fast_count::test_helpers::
                                    ReplicatedFastCountTestPersistenceProvider>())) {}
 };
 
