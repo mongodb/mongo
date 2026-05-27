@@ -1,4 +1,5 @@
 // Tests to validate the input for sort on '$meta' operator.
+// @tags: [requires_fcv_70]
 (function() {
 "use strict";
 const coll = db.sort_with_meta_operator;
@@ -57,4 +58,19 @@ assert.eq(coll.aggregate([{$sort: {p: {$meta: 'randVal'}, _id: {$meta: 'randVal'
 // Should still sort on the prefix 'p' when the later part is being sorted with 'randVal'.
 assert.eq(coll.aggregate([{$sort: {p: 1, _id: {$meta: 'randVal'}}}]).toArray(),
           [{_id: -1, p: -2}, {_id: -2, p: -1}, {_id: 1, p: 1}, {_id: 2, p: 2}]);
+
+// Verify that a meta sort on a field that shares its name with an indexed field does not crash.
+assert.commandWorked(coll.createIndex({p: 1}));
+assert.eq(
+    coll.find().sort({p: {$meta: "randVal"}}).itcount(),
+    4,
+);
+assert.eq(
+    coll.find({p: {$gte: -2}}).sort({p: {$meta: "randVal"}}).itcount(),
+    4,
+);
+assert.eq(
+    coll.find({p: {$gte: -2}}).sort({p: {$meta: "randVal"}, _id: 1}).itcount(),
+    4,
+);
 })();
