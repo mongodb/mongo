@@ -78,6 +78,20 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "delete_key",
+    srcs = [
+        "delete_key.cpp",
+    ],
+    hdrs = [
+        "delete_key.h",
+    ],
+    deps = [
+        ":key",
+        "//src/mongo/db/query/query_shape:delete_cmd_shape",
+    ],
+)
+
 idl_generator(
     name = "transform_algorithm_gen",
     src = "transform_algorithm.idl",
@@ -98,6 +112,7 @@ mongo_cc_unit_test(
     srcs = [
         "agg_key_test.cpp",
         "count_key_test.cpp",
+        "delete_key_test.cpp",
         "distinct_key_test.cpp",
         "find_key_test.cpp",
         "insert_key_test.cpp",
@@ -110,6 +125,7 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [
+        ":delete_key",
         ":insert_key",
         ":query_stats",
         ":update_key",
