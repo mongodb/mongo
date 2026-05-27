@@ -19,15 +19,18 @@ function runTest(primary, hmacKeyConn = primary) {
     const adminDb = primary.getDB("admin");
     assert.commandWorked(adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
     assert(adminDb.auth("super", "super"));
-    // In a sharded cluster, HMAC keys are stored on the config server, not on the shards, so
-    // awaitHMACKeys must be called on the config server primary. Authenticate there first so the
-    // find on admin.system.keys is authorized.
+    // HMAC keys live on the config server. Authenticate via a fresh connection
+    // rather than hmacKeyConn directly because teardown re-authenticates the cached getPrimary()
+    // connection as __system, which fails if it was already authenticated as a different user.
+    let hmacConn = primary;
     if (hmacKeyConn !== primary) {
-        const hmacAdminDb = hmacKeyConn.getDB("admin");
-        assert.commandWorked(hmacAdminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
-        assert(hmacAdminDb.auth("super", "super"));
+        assert.commandWorked(
+            hmacKeyConn.getDB("admin").runCommand({createUser: "super", pwd: "super", roles: ["__system"]}),
+        );
+        hmacConn = new Mongo(hmacKeyConn.host);
+        assert(hmacConn.getDB("admin").auth("super", "super"));
     }
-    QuerySamplingUtil.awaitHMACKeys(hmacKeyConn);
+    QuerySamplingUtil.awaitHMACKeys(hmacConn);
     const testDb = adminDb.getSiblingDB(dbName);
     const docs = [];
     const numDocs = 1000;

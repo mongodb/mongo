@@ -6,8 +6,9 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
-function runTest(conn) {
+function runTest(conn, hmacKeyConn = conn) {
     const dbName = "testDb";
     const collName0 = "testColl0";
     const collName1 = "testColl1";
@@ -17,6 +18,14 @@ function runTest(conn) {
     const adminDb = conn.getDB("admin");
     assert.commandWorked(adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
     assert(adminDb.auth("super", "super"));
+    let hmacConn = conn;
+    if (hmacKeyConn !== conn) {
+        // Open a fresh connection so we don't permanently authenticate the cached
+        // getPrimary() connection that the test harness reuses during teardown.
+        hmacConn = new Mongo(hmacKeyConn.host);
+        assert(hmacConn.getDB("admin").auth("super", "super"));
+    }
+    QuerySamplingUtil.awaitHMACKeys(hmacConn);
     const testDb = adminDb.getSiblingDB(dbName);
     const docs = [];
     const numDocs = 1000;
@@ -100,7 +109,7 @@ function runTest(conn) {
 {
     const st = new ShardingTest({shards: 1, keyFile: "jstests/libs/key1"});
 
-    runTest(st.s);
+    runTest(st.s, st.configRS.getPrimary());
 
     st.stop();
 }
