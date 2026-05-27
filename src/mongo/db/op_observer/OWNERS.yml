@@ -18,3 +18,6 @@ filters:
   - operation_logger*:
     approvers:
       - 10gen/server-oplog
+  - "should_set_is_timeseries_field_test*":
+    approvers:
+      - 10gen/server-collection-write-path

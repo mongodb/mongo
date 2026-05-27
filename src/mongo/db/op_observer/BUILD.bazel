@@ -277,6 +277,19 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "should_set_is_timeseries_field_test",
+    srcs = [
+        "should_set_is_timeseries_field_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fifth_group",
+    ],
+    deps = [
+        ":op_observer_util",
+    ],
+)
+
 mongo_cc_benchmark(
     name = "op_observer_bm",
     srcs = [

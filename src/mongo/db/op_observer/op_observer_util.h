@@ -64,6 +64,13 @@ bool shouldReplicateLocalCatalogIdentifiers(const rss::PersistenceProvider&);
 bool shouldReplicateRangeTruncates(const rss::PersistenceProvider&, const VersionContext& vCtx);
 
 /**
+ * Return true when the 'isTimeseries' field should be set on oplog entries for events on
+ * time-series collections.
+ * TODO SERVER-127425: Remove this helper function as part of post-9.0 time-series cleanup work.
+ */
+bool shouldSetIsTimeseriesField(const VersionContext& vCtx);
+
+/**
  * Returns true if gFeatureFlagPrimaryDrivenIndexBuilds is enabled.
  */
 bool isPrimaryDrivenIndexBuildEnabled(const VersionContext& vCtx);

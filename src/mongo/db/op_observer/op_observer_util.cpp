@@ -67,6 +67,11 @@ bool shouldReplicateRangeTruncates(const rss::PersistenceProvider& provider,
         feature_flags::gFeatureFlagUseReplicatedTruncatesForDeletions.isEnabled(vCtx, fcvSnapshot);
 }
 
+bool shouldSetIsTimeseriesField(const VersionContext& vCtx) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return gFeatureFlagMarkTimeseriesEventsInOplog.isEnabled(vCtx, fcvSnapshot);
+}
+
 bool isPrimaryDrivenIndexBuildEnabled(const VersionContext& vCtx) {
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     return fcvSnapshot.isVersionInitialized() &&
