@@ -4,11 +4,9 @@ include(cmake/rcpc_test.cmake)
 # ARMv8-A is the 64-bit ARM architecture, turn on the optional CRC.
 # If the compilation check in rcpc_test passes also turn on the RCpc instructions.
 if(HAVE_RCPC)
-    add_cmake_flag(CMAKE_C_FLAGS -march=armv8.2-a+rcpc+crc)
-    add_cmake_flag(CMAKE_CXX_FLAGS -march=armv8.2-a+rcpc+crc)
+    add_compile_options(-march=armv8.2-a+rcpc+crc)
 else()
-    add_cmake_flag(CMAKE_C_FLAGS -march=armv8-a+crc)
-    add_cmake_flag(CMAKE_CXX_FLAGS -march=armv8-a+crc)
+    add_compile_options(-march=armv8-a+crc)
 endif()
 
 # moutline-atomics preserves backwards compatibility with Arm v8.0 systems but also supports
@@ -17,6 +15,6 @@ endif()
 # the flag.
 check_c_compiler_flag("-moutline-atomics" has_moutline_atomics)
 if(has_moutline_atomics)
-    add_cmake_flag(CMAKE_C_FLAGS -moutline-atomics)
+    add_compile_options(-moutline-atomics)
 endif()
 unset(has_moutline_atomics CACHE)

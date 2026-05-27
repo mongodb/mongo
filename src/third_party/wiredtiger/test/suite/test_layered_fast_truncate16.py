@@ -28,13 +28,14 @@
 
 import wttest, wiredtiger
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 
 # test_layered_fast_truncate16.py
 #   Verify that pending follower truncates land on stable when the follower steps up,
 #   across the variety of per-key shapes and edge cases.
 @disagg_test_class
-class test_layered_fast_truncate_stepup(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate_stepup(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
     conn_config = 'disaggregated=(role="leader")'
     uri = 'layered:test_layered_fast_truncate_stepup'
@@ -53,22 +54,10 @@ class test_layered_fast_truncate_stepup(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(ts))
         self.session.checkpoint()
 
-    # Open a separate follower connection, create the table on both sides, leader populates,
-    # follower picks up the checkpoint. After this, follower-side ops run on session_follow.
     def setup_follower(self):
-        self.conn_follow = self.wiredtiger_open(
-            'follower',
-            self.extensionsConfig() + ',create,disaggregated=(role="follower")')
-        self.session_follow = self.conn_follow.open_session('')
         self.session.create(self.uri, 'key_format=i,value_format=S')
-        self.session_follow.create(self.uri, 'key_format=i,value_format=S')
         self.populate_on_leader()
-        self.disagg_advance_checkpoint(self.conn_follow)
-
-    # Step up the follower (which becomes the new leader) and step the original leader down.
-    def step_up(self):
-        self.ignoreStdoutPattern('Picking up the same checkpoint')
-        self.disagg_switch_follower_and_leader(self.conn_follow)
+        self.conn_follow, self.session_follow = self.open_follower()
 
     def write_kv(self, key, value, ts):
         cursor = self.session_follow.open_cursor(self.uri)
@@ -97,26 +86,18 @@ class test_layered_fast_truncate_stepup(wttest.WiredTigerTestCase):
         c_stop.close()
 
     def assert_visible(self, keys, value=None, ts=None):
-        self.session_follow.begin_transaction('read_timestamp=' + self.timestamp_str(ts))
-        cursor = self.session_follow.open_cursor(self.uri)
         for k in keys:
-            cursor.set_key(k)
-            self.assertEqual(cursor.search(), 0, f"key {k} should be visible at ts={ts}")
+            ret, val = self.search_at(self.session_follow, k, ts)
+            self.assertEqual(ret, 0, f"key {k} should be visible at ts={ts}")
             if value is not None:
                 expected = value(k) if callable(value) else value
-                self.assertEqual(cursor.get_value(), expected)
-        cursor.close()
-        self.session_follow.rollback_transaction()
+                self.assertEqual(val, expected)
 
     def assert_deleted(self, keys, ts):
-        self.session_follow.begin_transaction('read_timestamp=' + self.timestamp_str(ts))
-        cursor = self.session_follow.open_cursor(self.uri)
         for k in keys:
-            cursor.set_key(k)
-            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND,
+            ret, _ = self.search_at(self.session_follow, k, ts)
+            self.assertEqual(ret, wiredtiger.WT_NOTFOUND,
                 f"key {k} should be deleted at ts={ts}")
-        cursor.close()
-        self.session_follow.rollback_transaction()
 
     def assert_keys_gone(self, ranges):
         # Sweep the populated key space: keys inside any (lo, hi) inclusive range must be

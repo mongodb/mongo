@@ -32,26 +32,16 @@
 #   Verify that subsequent operations - additional truncates, per-key removes,
 #   and reinsertion - compose correctly with a prior committed truncate.
 
-from contextlib import closing, nullcontext
-from itertools import chain
-from typing import Iterable
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import (
+    LayeredFastTruncateConfigMixin, concat, range_inclusive,
+)
 from wtscenario import make_scenarios
 import wttest
 
 
-def concat(*iterables: Iterable[int]) -> list[int]:
-    """Concatenate any number of iterables into a single list."""
-    return list(chain.from_iterable(iterables))
-
-
-def range_inclusive(start: int, stop: int) -> range:
-    """Return a range covering [start, stop] inclusive."""
-    return range(start, stop + 1)
-
-
 @disagg_test_class
-class test_layered_fast_truncate13(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate13(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
     """
     Interactions with existing truncates.
 
@@ -68,71 +58,12 @@ class test_layered_fast_truncate13(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(disagg_storages, uris)
     conn_config = 'disaggregated=(role="leader"),'
 
-    def session_create_config(self):
-        cfg = "key_format=i,value_format=S"
-        if self.uri.startswith("table"):
-            cfg += ",block_manager=disagg,type=layered"
-        return cfg
-
-    def auto_closing_cursor(self, config: str | None = None) -> closing:
-        """Return a cursor that auto-closes as it goes out of scope."""
-        return closing(self.session.open_cursor(self.uri, None, config))
-
-    def populate(self, keys: Iterable[int]):
-        """Insert each key with a placeholder value in a single transaction."""
-        with self.auto_closing_cursor() as cursor:
-            with self.transaction():
-                for key in keys:
-                    cursor[key] = "v"
-
-    def setup_leader(self, keys: Iterable[int] | None = None):
-        """
-        Create the table on the leader and optionally pre-populate stable. The
-        follower will pick up these keys via the initial checkpoint.
-        """
-        self.session.create(self.uri, self.session_create_config())
-        if keys is not None:
-            self.populate(keys)
-        self.session.checkpoint()
-
-    def setup_follower(self, keys: Iterable[int] | None = None):
-        """Switch to follower role and optionally write keys to ingest."""
-        self.reopen_disagg_conn('disaggregated=(role="follower"),')
-        if keys is not None:
-            self.populate(keys)
-
-    def cursor_for_key(self, key: int | None):
-        """Return a cursor with its key set, or None if key is None."""
-        if key is None:
-            return nullcontext(None)
-        cursor = self.auto_closing_cursor()
-        cursor.thing.set_key(key)
-        return cursor
-
-    def truncate(self, start_key: int | None, stop_key: int | None):
-        """Truncate [start_key, stop_key] inclusive; None means open end."""
-        with (
-            self.cursor_for_key(start_key) as start,
-            self.cursor_for_key(stop_key) as stop,
-        ):
-            uri = self.uri if (start is None and stop is None) else None
-            with self.transaction():
-                self.session.truncate(uri, start, stop, None)
-
-    def remove_key(self, key: int):
+    def remove_key(self, key):
         """Remove a single key in a transaction."""
-        with self.cursor_for_key(key) as cursor:
+        with self.auto_closing_cursor() as cursor:
+            cursor.set_key(self.key(key))
             with self.transaction():
                 cursor.remove()
-
-    def visible_keys(self) -> list[int]:
-        """Return all keys visible via a forward scan, in key order."""
-        result = []
-        with self.auto_closing_cursor() as cursor:
-            with self.transaction(rollback=True):
-                while cursor.next() == 0:
-                    result.append(cursor.get_key())
-        return result
 
     def test_per_key_removes_before_truncate(self):
         # Set up a follower with keys 1-100.
@@ -226,10 +157,12 @@ class test_layered_fast_truncate13(wttest.WiredTigerTestCase):
         # Truncate keys 30-60 and reinsert key 45 within the same transaction.
         with self.transaction():
             with (
-                self.cursor_for_key(30) as start,
-                self.cursor_for_key(60) as stop,
+                self.auto_closing_cursor() as start,
+                self.auto_closing_cursor() as stop,
                 self.auto_closing_cursor() as cursor,
             ):
+                start.set_key(self.key(30))
+                stop.set_key(self.key(60))
                 self.session.truncate(None, start, stop, None)
                 cursor[45] = "v"
 

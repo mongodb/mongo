@@ -4,6 +4,8 @@
 test_autoclose.py
 test_config02.py
 test_config09.py
+test_cursor13.py  # FIXME: WT-15369
+test_cursor21.py  # FIXME: WT-15369
 test_drop03.py
 test_dump.py
 test_dump01.py

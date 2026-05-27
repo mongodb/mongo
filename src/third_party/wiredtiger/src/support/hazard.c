@@ -415,6 +415,8 @@ __wt_hazard_check_assert(WT_SESSION_IMPL *session, void *ref, bool waitfor)
             break;
         __wt_sleep(0, 10 * WT_THOUSAND);
     }
+
+    const char *session_name = __wt_atomic_load_ptr_relaxed(&s->name);
 #ifdef HAVE_DIAGNOSTIC
     /*
      * In diagnostic mode we also track the file and line where the hazard pointer is set. If this
@@ -422,10 +424,11 @@ __wt_hazard_check_assert(WT_SESSION_IMPL *session, void *ref, bool waitfor)
      */
     __wt_errx(session,
       "hazard pointer reference to discarded object: (%p: session %p name %s: %s, line %d)",
-      (void *)hp->ref, (void *)s, s->name == NULL ? "UNKNOWN" : s->name, hp->func, hp->line);
+      (void *)hp->ref, (void *)s, session_name == NULL ? "UNKNOWN" : session_name, hp->func,
+      hp->line);
 #else
     __wt_errx(session, "hazard pointer reference to discarded object: (%p: session %p name %s)",
-      (void *)hp->ref, (void *)s, s->name == NULL ? "UNKNOWN" : s->name);
+      (void *)hp->ref, (void *)s, session_name == NULL ? "UNKNOWN" : session_name);
 #endif
     return (false);
 }

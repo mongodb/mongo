@@ -199,10 +199,13 @@ class test_layered69(test_prepare_preserve_prepare_base):
         session_prepare.rollback_transaction(f'rollback_timestamp={self.timestamp_str(45)}')
         session_prepare.close()
 
-        # Verify checkpoint skips writing a page to disk
+        # Verify checkpoint skips writing a page to disk. When the page was evicted before the
+        # prepare, the prior committed delete tombstone is gone from memory, so the prepare
+        # rollback appends a fresh tail tombstone with no durable flag set; that tombstone gets
+        # re-saved and causes one extra write here.
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
-            stat: False,
+            stat: self.evict,
         }, self.uri)
 
         # Make stable timestamp equal to prepare timestamp - this should allow checkpoint to reconcile prepared update

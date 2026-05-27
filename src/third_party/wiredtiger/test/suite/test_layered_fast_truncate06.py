@@ -34,10 +34,11 @@
 
 import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 
 @disagg_test_class
-class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate06(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
     conn_config = 'disaggregated=(role="leader"),'
     nrows = 100
 
@@ -50,14 +51,6 @@ class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
         'test_layered_fast_truncate06', disagg_only=True)
     scenarios = make_scenarios(disagg_storages, uris)
 
-    def visible_keys(self):
-        c = self.session.open_cursor(self.uri)
-        keys = []
-        while c.next() == 0:
-            keys.append(c.get_key())
-        c.close()
-        return keys
-
     def session_create_config(self):
         cfg = 'key_format=i,value_format=S'
         if self.uri.startswith('table:'):
@@ -65,8 +58,8 @@ class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
         return cfg
 
     def setup_follower(self):
-        # Create the table on the leader, load nrows, checkpoint, then reopen the
-        # connection as a follower picking up that checkpoint.
+        # Create the table on the leader, load nrows with per-row commit timestamps,
+        # checkpoint, then reopen the connection as a follower picking up that checkpoint.
         self.session.create(self.uri, self.session_create_config())
 
         cursor = self.session.open_cursor(self.uri)
@@ -77,32 +70,29 @@ class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
         cursor.close()
         self.session.checkpoint()
 
-        follower_config = ('disaggregated=(role="follower",'
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")')
-        self.reopen_conn(config=follower_config)
+        super().setup_follower()
 
-    def follower_truncate(self, start, stop):
-        c_start = self.session.open_cursor(self.uri)
-        c_start.set_key(start)
-        c_stop = self.session.open_cursor(self.uri)
-        c_stop.set_key(stop)
-        self.session.begin_transaction()
-        self.session.truncate(None, c_start, c_stop, None)
-        self.session.commit_transaction()
-        c_start.close()
-        c_stop.close()
+    def visible_keys_simple(self):
+        # The test verifies a scan outside a transaction; use a simple inline scan
+        # to match the original semantics (no transaction wrapping).
+        c = self.session.open_cursor(self.uri)
+        keys = []
+        while c.next() == 0:
+            keys.append(c.get_key())
+        c.close()
+        return keys
 
     def test_verify_preserves_follower_truncate(self):
         self.setup_follower()
-        self.follower_truncate(30, 60)
+        self.truncate(30, 60)
 
         expected = [i for i in range(1, self.nrows + 1) if i < 30 or i > 60]
 
         # Before verify: a scan does not return the truncated rows.
-        self.assertEqual(self.visible_keys(), expected)
+        self.assertEqual(self.visible_keys_simple(), expected)
 
         # Verify the layered URI. This triggers a close + reopen of the dhandle.
         self.session.verify(self.uri)
 
         # After verify: a scan must still not return the truncated rows.
-        self.assertEqual(self.visible_keys(), expected)
+        self.assertEqual(self.visible_keys_simple(), expected)

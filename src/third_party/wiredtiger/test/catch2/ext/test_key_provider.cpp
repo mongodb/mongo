@@ -326,6 +326,26 @@ TEST_CASE_METHOD(kp_fixture, "Persist key, failure", "[key_provider]")
     free(const_cast<void *>(crypt.keys.data));
 }
 
+TEST_CASE_METHOD(kp_fixture, "set_key_provider version selects push mode", "[key_provider]")
+{
+    WT_CONNECTION *wt_conn = conn.get_wt_connection();
+    WT_CONNECTION_IMPL *conn_impl = conn.get_wt_connection_impl();
+    WT_KEY_PROVIDER stub = {};
+
+    /* version=0 (default): push flag stays clear. */
+    REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=0") == 0);
+    REQUIRE(!F_ISSET(conn_impl, WT_CONN_KEY_PROVIDER_PUSH));
+    conn_impl->key_provider = nullptr; /* Allow reconfiguration. */
+
+    /* version=1: push flag is set. */
+    REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=1") == 0);
+    REQUIRE(F_ISSET(conn_impl, WT_CONN_KEY_PROVIDER_PUSH));
+
+    /* Cleanup so the fixture destructor doesn't see a stale provider. */
+    conn_impl->key_provider = nullptr;
+    F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
+}
+
 TEST_CASE_METHOD(kp_fixture, "Key always expires", "[key_provider]")
 {
     kp_ptr_t kp = kp_init("key_expires=0");

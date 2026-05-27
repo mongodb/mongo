@@ -125,21 +125,23 @@ ENDOFTEXT
 # Parallel execution: if it's the main invocation of the script, collect the file names
 # to process and run them in subprocesses.
 
-# Search for files, skipping some well-known 3rd party directories.
-find [a-z]* -name '*.[ch]' \
+# Search for files in explicit source directories, skipping any absent in this tree.
+dirs=()
+for d in bench dist docs examples ext lang oss src test tools; do
+    [ -d "$d" ] && dirs+=("$d")
+done
+find "${dirs[@]}" \
+    -name '*.[ch]' \
     -o -name '*.cpp' \
     -o -name '*.in' \
     -o -name '*.py' \
     -o -name '*.swig' |
     sed	-e '/Makefile.in/d' \
-    -e '/^build\//d' \
-    -e '/^cmake\//d' \
     -e '/checksum\/power8\//d' \
     -e '/checksum\/zseries\//d' \
     -e '/\/3rdparty\//d' \
     -e '/\/node_modules\//d' \
     -e '/^tools\/wt-mcp\/\.venv\//d' \
-    -e '/^venv\//d' \
     -e '/dist\/__/d' \
     -e 's/^\.\///' |
     do_in_parallel || RET=1

@@ -689,8 +689,7 @@ connection_runtime_config = [
             if true, for operations with snapshot isolation the cursor temporarily releases any page
             that requires force eviction, then repositions back to the page for further operations.
             A page release encourages eviction of hot or large pages, which is more likely to
-            succeed without a cursor keeping the page pinned. Note: This setting is not compatible
-            with disaggregated storage.''',
+            succeed without a cursor keeping the page pinned.''',
             type='boolean'),
         Config('disagg_address_cookie_upgrade', 'none', r'''
             modify the disaggregated block manager to pretend that it is a newer version to test
@@ -2238,7 +2237,13 @@ methods = {
 ),
 'WT_CONNECTION.set_file_system' : Method([]),
 
-'WT_CONNECTION.set_key_provider' : Method([]),
+'WT_CONNECTION.set_key_provider' : Method([
+    Config('version', '0', r'''
+        the key provider API version. Version 0 uses the pull model
+        (WiredTiger calls WT_KEY_PROVIDER::get_key). Version 1 uses
+        the push model''',
+        min=0, max=1),
+]),
 
 'WT_CONNECTION.load_extension' : Method([
     Config('config', '', r'''

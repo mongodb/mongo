@@ -901,6 +901,17 @@ static const uint8_t confchk_WT_CONNECTION_rollback_to_stable_jump[WT_CONFIG_JUM
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2};
 
+static const WT_CONFIG_CHECK confchk_WT_CONNECTION_set_key_provider[] = {
+  {"version", "int", NULL, "min=0,max=1", NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_INT, 70, 0, 1,
+    NULL},
+  {NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 0, 0, 0, NULL}};
+
+static const uint8_t confchk_WT_CONNECTION_set_key_provider_jump[WT_CONFIG_JUMP_TABLE_SIZE] = {0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_set_timestamp[] = {
   {"durable_timestamp", "string", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_STRING, 3,
     INT64_MIN, INT64_MAX, NULL},
@@ -4210,7 +4221,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     confchk_WT_CONNECTION_rollback_to_stable, 2, confchk_WT_CONNECTION_rollback_to_stable_jump, 12,
     WT_CONF_SIZING_NONE, false},
   {"WT_CONNECTION.set_file_system", "", NULL, 0, NULL, 13, WT_CONF_SIZING_NONE, false},
-  {"WT_CONNECTION.set_key_provider", "", NULL, 0, NULL, 14, WT_CONF_SIZING_NONE, false},
+  {"WT_CONNECTION.set_key_provider", "version=0", confchk_WT_CONNECTION_set_key_provider, 1,
+    confchk_WT_CONNECTION_set_key_provider_jump, 14, WT_CONF_SIZING_NONE, false},
   {"WT_CONNECTION.set_timestamp",
     "durable_timestamp=,force=false,oldest_timestamp=,"
     "stable_disaggregated_schema_epoch=,stable_timestamp=",

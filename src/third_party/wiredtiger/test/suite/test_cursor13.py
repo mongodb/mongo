@@ -56,15 +56,7 @@ class test_cursor13_base(wttest.WiredTigerTestCase):
     def caching_stats(self):
         hs_stats_uri = 'statistics:file:WiredTigerHS.wt'
         max_tries = 100
-        # Cursor cache/reopen stats are updated with plain (non-atomic) int64 add/subtract
-        # operations.
-        # A recent increment by another core may not yet be visible to this reader. Re-reading
-        # in a tight Python loop cannot force coherence; the fix is to pause briefly on retry
-        # so store buffers drain and cache lines propagate.
-        retry_sleep = 0.005  # seconds
         for i in range(max_tries):
-            if i > 0:
-                time.sleep(retry_sleep)
             hs_stats_before = self.session.open_cursor(hs_stats_uri, None, None)
             conn_stats = self.session.open_cursor('statistics:', None, None)
             hs_stats_after = self.session.open_cursor(hs_stats_uri, None, None)
@@ -86,14 +78,7 @@ class test_cursor13_base(wttest.WiredTigerTestCase):
                 hs_after[0] += hs_disagg_stat_after[stat.dsrc.cursor_cache][2]
                 hs_after[1] += hs_disagg_stat_after[stat.dsrc.cursor_reopen][2]
 
-                report = [totals[0],
-                          hs_before[0],
-                          hs_disagg_stat_before[stat.dsrc.cursor_cache][2],
-                          hs_stats_before[stat.dsrc.cursor_cache][2]]
-                self.pr(' '.join(map(str, report)))
-
-                hs_disagg_stat_before.close()
-                hs_disagg_stat_after.close()
+                self.pr(str(totals[0]) + " " + str(hs_before[0]) + " " + str(hs_disagg_stat_before[stat.dsrc.cursor_cache][2]) + " " + str(hs_stats_before[stat.dsrc.cursor_cache][2]))
 
             hs_stats_before.close()
             hs_stats_after.close()
@@ -526,7 +511,6 @@ class test_cursor13_big(test_cursor13_big_base):
         self.assertEqual(end_stats[0] - begin_stats[0], self.closecount)
         self.assertEqual(end_stats[1] - begin_stats[1], self.opencount)
 
-@wttest.skip_for_hook("disagg", "layered dhandles are never swept: FIXME-WT-16982")
 class test_cursor13_sweep(test_cursor13_big_base):
     # Set dhandle sweep configuration so that dhandles should be closed within
     # two seconds of all the cursors for the dhandle being closed (cached).

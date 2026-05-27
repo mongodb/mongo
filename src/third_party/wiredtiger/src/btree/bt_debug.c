@@ -1612,10 +1612,6 @@ __debug_update_dump_flags(WT_DBG *ds, WT_UPDATE *upd)
                                    ds->f(ds, ", prepare-restored-from-ds"));
             ++flag_num;
         }
-        if (F_ISSET(upd, WT_UPDATE_PREPARE_ROLLBACK)) {
-            WT_RET(flag_num == 0 ? ds->f(ds, "prepare-rollback") : ds->f(ds, ", prepare-rollback"));
-            ++flag_num;
-        }
         if (F_ISSET(upd, WT_UPDATE_RESTORED_FAST_TRUNCATE)) {
             WT_RET(flag_num == 0 ? ds->f(ds, "fast-truncate") : ds->f(ds, ", fast-truncate"));
             ++flag_num;

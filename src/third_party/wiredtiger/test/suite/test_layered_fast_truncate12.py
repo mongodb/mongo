@@ -32,27 +32,16 @@
 #   Verify that forward scans, backward scans, next_random, search, and
 #   search_near all treat truncated keys as non-existent on a follower.
 
-from contextlib import closing, nullcontext
-from itertools import chain
-from typing import Iterable
 from helper_disagg import disagg_test_class, gen_disagg_storages
-from wiredtiger import WT_NOTFOUND
+from helper_layered_fast_truncate import (
+    LayeredFastTruncateConfigMixin, concat, range_inclusive,
+)
 from wtscenario import make_scenarios
 import wttest
 
 
-def concat(*iterables: Iterable[int]) -> list[int]:
-    """Concatenate any number of iterables into a single list."""
-    return list(chain.from_iterable(iterables))
-
-
-def range_inclusive(start: int, stop: int) -> range:
-    """Return a range covering [start, stop] inclusive."""
-    return range(start, stop + 1)
-
-
 @disagg_test_class
-class test_layered_fast_truncate12(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate12(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
     """
     Cursor iteration and searches over truncated ranges.
 
@@ -69,76 +58,7 @@ class test_layered_fast_truncate12(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(disagg_storages, uris)
     conn_config = 'disaggregated=(role="leader"),'
 
-    def session_create_config(self):
-        cfg = "key_format=i,value_format=S"
-        if self.uri.startswith("table"):
-            cfg += ",block_manager=disagg,type=layered"
-        return cfg
-
-    def auto_closing_cursor(self, config: str | None = None) -> closing:
-        """Return a cursor that auto-closes as it goes out of scope."""
-        return closing(self.session.open_cursor(self.uri, None, config))
-
-    def populate(self, keys: Iterable[int]):
-        """Insert each key with a placeholder value in a single transaction."""
-        with self.auto_closing_cursor() as cursor:
-            with self.transaction():
-                for key in keys:
-                    cursor[key] = "v"
-
-    def setup_leader(self, keys: Iterable[int] | None = None):
-        """
-        Create the table on the leader and optionally pre-populate stable.
-        The follower will pick up these keys via the initial checkpoint.
-        """
-        self.session.create(self.uri, self.session_create_config())
-        if keys is not None:
-            self.populate(keys)
-        self.session.checkpoint()
-
-    def setup_follower(self, keys: Iterable[int] | None = None):
-        """Switch to follower role and optionally write keys to ingest."""
-        self.reopen_disagg_conn('disaggregated=(role="follower"),')
-        if keys is not None:
-            self.populate(keys)
-
-    def cursor_for_key(self, key: int | None):
-        """Return a cursor with its key set, or None if key is None."""
-        if key is None:
-            return nullcontext(None)
-        cursor = self.auto_closing_cursor()
-        cursor.thing.set_key(key)
-        return cursor
-
-    def truncate(self, start_key: int | None, stop_key: int | None):
-        """Truncate [start_key, stop_key] inclusive; None means open end."""
-        with (
-            self.cursor_for_key(start_key) as start,
-            self.cursor_for_key(stop_key) as stop,
-        ):
-            uri = self.uri if (start is None and stop is None) else None
-            with self.transaction():
-                self.session.truncate(uri, start, stop, None)
-
-    def visible_keys(self) -> list[int]:
-        """Return all keys visible via a forward scan, in key order."""
-        result = []
-        with self.auto_closing_cursor() as cursor:
-            with self.transaction(rollback=True):
-                while cursor.next() == 0:
-                    result.append(cursor.get_key())
-        return result
-
-    def backward_visible_keys(self) -> list[int]:
-        """Return all keys visible via a backward scan."""
-        result = []
-        with self.auto_closing_cursor() as cursor:
-            with self.transaction(rollback=True):
-                while cursor.prev() == 0:
-                    result.append(cursor.get_key())
-        return result
-
-    def random_sample_keys(self, n: int) -> list[int]:
+    def random_sample_keys(self, n):
         """Return n keys drawn from a next_random cursor."""
         result = []
         with self.auto_closing_cursor("next_random=true") as cursor:
@@ -147,27 +67,6 @@ class test_layered_fast_truncate12(wttest.WiredTigerTestCase):
                     cursor.next()
                     result.append(cursor.get_key())
         return result
-
-    def search_key(self, key: int) -> int:
-        """Search for key; return 0 on exact match or WT_NOTFOUND."""
-        with self.cursor_for_key(key) as cursor:
-            with self.transaction(rollback=True):
-                return cursor.search()
-
-    def search_near_key(self, key: int) -> tuple[int, int | None]:
-        """
-        Call search_near for a key.
-
-        Returns (exact, found_key). exact follows WT convention: 0 = exact,
-        1 = positioned above, -1 = positioned below, or WT_NOTFOUND if no
-        visible keys exist.
-        """
-        with self.cursor_for_key(key) as cursor:
-            with self.transaction(rollback=True):
-                exact = cursor.search_near()
-                if exact == WT_NOTFOUND:
-                    return exact, None
-                return exact, cursor.get_key()
 
     def test_forward_scan_skips_truncated_range(self):
         # Set up a follower with keys 1-100.
@@ -194,7 +93,7 @@ class test_layered_fast_truncate12(wttest.WiredTigerTestCase):
             reversed(range_inclusive(61, 100)),
             reversed(range_inclusive(1, 29)),
         )
-        self.assertEqual(self.backward_visible_keys(), expected)
+        self.assertEqual(self.visible_keys(forward=False), expected)
 
     def test_next_random_never_lands_in_truncated_range(self):
         # Set up a follower with keys 1-100.
@@ -219,7 +118,7 @@ class test_layered_fast_truncate12(wttest.WiredTigerTestCase):
 
         # Searching for a key inside the truncated range should return
         # WT_NOTFOUND.
-        self.assertEqual(self.search_key(45), WT_NOTFOUND)
+        self.assertFalse(self.key_exists(45))
 
     def test_search_at_inclusive_truncate_boundary(self):
         # Set up a follower with keys 1-100.
@@ -230,12 +129,12 @@ class test_layered_fast_truncate12(wttest.WiredTigerTestCase):
         self.truncate(30, 60)
 
         # The boundary keys should be invisible.
-        self.assertEqual(self.search_key(30), WT_NOTFOUND)
-        self.assertEqual(self.search_key(60), WT_NOTFOUND)
+        self.assertFalse(self.key_exists(30))
+        self.assertFalse(self.key_exists(60))
 
         # The keys just outside the truncated range should still be found.
-        self.assertEqual(self.search_key(29), 0)
-        self.assertEqual(self.search_key(61), 0)
+        self.assertTrue(self.key_exists(29))
+        self.assertTrue(self.key_exists(61))
 
     def test_search_near_inside_truncated_range(self):
         # Set up a follower with keys 1-100.

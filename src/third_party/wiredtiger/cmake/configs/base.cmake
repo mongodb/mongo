@@ -413,34 +413,34 @@ if(ENABLE_DEBUG_INFO AND NOT WT_DEBUG_FLAGS_INITIALIZED)
     set(BUILD_TYPES_WITH_DEBUG_INFO ${BUILD_MODES})
     list(REMOVE_ITEM BUILD_TYPES_WITH_DEBUG_INFO Release)
 
-    set(DEBUG_INFO_FLAGS)
     if(GNU_C_COMPILER OR CLANG_C_COMPILER)
         # Higher debug levels `-g3`/`-ggdb3` emit additional debug information, including
         # macro definitions that allow us to evaluate macros such as `p S2C(session)` inside of gdb.
-        # This needs to be in DWARF version 2 format or later - and should be by default - but
-        # we'll specify version 4 here to be safe.
-        list(APPEND DEBUG_INFO_FLAGS -g3 -gdwarf-4)
+        # DWARF v4 is supplied explicitly to be safe across toolchain defaults.
+        set(debug_info_flags "-g3 -gdwarf-4")
         if(CLANG_C_COMPILER)
-            # Clang requires one additional flag to output macro debug information.
-            list(APPEND DEBUG_INFO_FLAGS -glldb -fdebug-macro)
+            string(APPEND debug_info_flags " -glldb -fdebug-macro")
         else()
-            list(APPEND DEBUG_INFO_FLAGS -ggdb3)
+            string(APPEND debug_info_flags " -ggdb3")
         endif()
-
-        add_cmake_compiler_flags(
-            FLAGS ${DEBUG_INFO_FLAGS}
-            LANGUAGES C CXX
-            BUILD_TYPES ${BUILD_TYPES_WITH_DEBUG_INFO}
-        )
+        foreach(build_type IN LISTS BUILD_TYPES_WITH_DEBUG_INFO)
+            string(TOUPPER "${build_type}" BT)
+            set(CMAKE_C_FLAGS_${BT}
+                "${CMAKE_C_FLAGS_${BT}} ${debug_info_flags}"   CACHE STRING "" FORCE)
+            set(CMAKE_CXX_FLAGS_${BT}
+                "${CMAKE_CXX_FLAGS_${BT}} ${debug_info_flags}" CACHE STRING "" FORCE)
+        endforeach()
     endif()
 
     # MSVC: ensure linker produces PDBs.
     if(MSVC_C_COMPILER)
-        add_cmake_linker_flags(
-            FLAGS "/DEBUG"
-            BINARIES EXE SHARED
-            BUILD_TYPES ${BUILD_TYPES_WITH_DEBUG_INFO}
-        )
+        foreach(build_type IN LISTS BUILD_TYPES_WITH_DEBUG_INFO)
+            string(TOUPPER "${build_type}" BT)
+            set(CMAKE_EXE_LINKER_FLAGS_${BT}
+                "${CMAKE_EXE_LINKER_FLAGS_${BT}} /DEBUG"    CACHE STRING "" FORCE)
+            set(CMAKE_SHARED_LINKER_FLAGS_${BT}
+                "${CMAKE_SHARED_LINKER_FLAGS_${BT}} /DEBUG" CACHE STRING "" FORCE)
+        endforeach()
     endif()
 
     # Mark that we've set the initial debug flags

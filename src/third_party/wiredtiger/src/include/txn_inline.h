@@ -1514,7 +1514,7 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
         *restored_updp = NULL;
     __wt_upd_value_clear(cbt->upd_value);
 
-    for (; upd != NULL; upd = upd->next) {
+    for (; upd != NULL; upd = __wt_atomic_load_ptr_relaxed(&upd->next)) {
         /* Skip reserved place-holders, they're never visible. */
         if (upd->type == WT_UPDATE_RESERVE)
             continue;

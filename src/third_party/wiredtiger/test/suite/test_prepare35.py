@@ -87,7 +87,7 @@ class test_prepare35(test_prepare_preserve_prepare_base):
         session_evict.close()
 
         # Step 4: Rollback the first prepared transaction
-        # This prepends a globally visible tombstone
+        # This appends a globally visible tombstone to the tail of the update chain
         session_prepare.rollback_transaction("rollback_timestamp=" + self.timestamp_str(35))
         session_prepare.close()
 

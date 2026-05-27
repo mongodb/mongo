@@ -32,10 +32,11 @@
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 
 @disagg_test_class
-class test_layered_fast_truncate02(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate02(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
     uri         = 'layered:test_layered_fast_truncate02'
     nrows       = 5000
@@ -47,11 +48,6 @@ class test_layered_fast_truncate02(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,statistics=(all),disaggregated=(role="leader")'
     disagg_storages = gen_disagg_storages('test_layered_fast_truncate02', disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
-
-    def leader_checkpoint(self, ts):
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(ts) +
-                                ',oldest_timestamp=' + self.timestamp_str(1))
-        self.session.checkpoint()
 
     def setup_leader(self):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -74,44 +70,12 @@ class test_layered_fast_truncate02(wttest.WiredTigerTestCase):
         evict_cur.close()
         self.session.rollback_transaction()
 
-    def truncate_and_checkpoint(self, trunc_start, trunc_stop, ts):
-        # Fast-truncate rows [trunc_start, trunc_stop] on the leader and checkpoint.
-        c_start = self.session.open_cursor(self.uri)
-        c_start.set_key(trunc_start)
-        c_stop = self.session.open_cursor(self.uri)
-        c_stop.set_key(trunc_stop)
-        self.session.begin_transaction()
-        self.session.truncate(None, c_start, c_stop, None)
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
-        c_start.close()
-        c_stop.close()
-        self.leader_checkpoint(ts)
-
-    def open_follower(self):
-        conn = self.wiredtiger_open(
-            'follower',
-            self.extensionsConfig() + ',create,cache_size=50MB,statistics=(all),disaggregated=(role="follower")')
-        sess = conn.open_session('')
-        sess.create(self.uri, 'key_format=i,value_format=S')
-        self.disagg_advance_checkpoint(conn, self.conn)
-        return conn, sess
-
-    def search_at(self, sess, key, ts):
-        cur = sess.open_cursor(self.uri)
-        txn_cfg = ('read_timestamp=' + self.timestamp_str(ts))
-        sess.begin_transaction(txn_cfg)
-        cur.set_key(key)
-        ret = cur.search()
-        val = cur.get_value() if ret == 0 else None
-        sess.rollback_transaction()
-        cur.close()
-        return ret, val
-
     def test_visibility(self):
         # At ts=20 (equal to truncation at ts=20): truncated keys return WT_NOTFOUND, boundary and
         # exterior keys return their values. At ts=15 (before truncation): all keys are visible.
         self.setup_leader()
-        self.truncate_and_checkpoint(self.trunc_start, self.trunc_stop, 20)
+        self.truncate(self.trunc_start, self.trunc_stop, commit_timestamp=20)
+        self.leader_checkpoint(20)
         conn, sess = self.open_follower()
 
         # Truncation is visible: deleted keys are gone, surrounding keys survive.
@@ -137,7 +101,8 @@ class test_layered_fast_truncate02(wttest.WiredTigerTestCase):
         # Reading at a timestamp before the truncation must still find all rows, including those
         # later deleted. Verifies mvcc correctness across the follower checkpoint boundary.
         self.setup_leader()
-        self.truncate_and_checkpoint(self.trunc_start, self.trunc_stop, 20)
+        self.truncate(self.trunc_start, self.trunc_stop, commit_timestamp=20)
+        self.leader_checkpoint(20)
         conn, sess = self.open_follower()
 
         for key in [self.trunc_start, self.trunc_mid, self.trunc_stop]:
@@ -161,7 +126,8 @@ class test_layered_fast_truncate02(wttest.WiredTigerTestCase):
         # Forward and backward scans must skip the entire truncated range without visiting any
         # deleted key. search_near on a deleted key must land outside the range.
         self.setup_leader()
-        self.truncate_and_checkpoint(self.trunc_start, self.trunc_stop, 20)
+        self.truncate(self.trunc_start, self.trunc_stop, commit_timestamp=20)
+        self.leader_checkpoint(20)
         conn, sess = self.open_follower()
 
         expected    = self.nrows - (self.trunc_stop - self.trunc_start + 1)

@@ -1155,13 +1155,11 @@ __clayered_iterate_constituents(WT_CURSOR_LAYERED *clayered, uint32_t iter_flag)
      * prepared conflict occurs. Prepared updates are always ignored on the stable cursor, making it
      * safe to check the WT_CURSTD_KEY_INT flag.
      */
-    if (((WT_CURSOR_BTREE *)c_ingest)->ref == NULL && !F_ISSET(c_stable, WT_CURSTD_KEY_INT)) {
-        /*
-         * Move the stable cursor first to ensure it is advanced, even if a prepared conflict occurs
-         * on the ingest cursor.
-         */
-        WT_ERR_NOTFOUND_OK(__clayered_constituent_iter_helper(clayered, c_stable, forward), false);
+    bool fresh_start =
+      (((WT_CURSOR_BTREE *)c_ingest)->ref == NULL && !F_ISSET(c_stable, WT_CURSTD_KEY_INT));
+    if (fresh_start) {
         WT_ERR_NOTFOUND_OK(__clayered_constituent_iter_helper(clayered, c_ingest, forward), false);
+        WT_ERR_NOTFOUND_OK(__clayered_constituent_iter_helper(clayered, c_stable, forward), false);
         goto done;
     }
 
@@ -1226,7 +1224,13 @@ __clayered_iterate_constituents(WT_CURSOR_LAYERED *clayered, uint32_t iter_flag)
 
 done:
 err:
-    if (ret == 0 || ret == WT_PREPARE_CONFLICT) {
+    if (ret == WT_PREPARE_CONFLICT && fresh_start)
+        /*
+         * Prepare conflict on the very first key of a fresh walk: ingest is blocked before stable
+         * has advanced. Reset ingest so the next call restarts cleanly.
+         */
+        WT_TRET(__clayered_reset_cursors(clayered, false));
+    else if (ret == 0 || ret == WT_PREPARE_CONFLICT) {
         if (!F_ISSET(clayered, iter_flag)) {
             F_CLR(clayered, WT_CLAYERED_ITERATE_NEXT | WT_CLAYERED_ITERATE_PREV);
             F_SET(clayered, iter_flag);
@@ -2961,14 +2965,11 @@ __wt_clayered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
 
     WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
     if (cval.len != 0)
-        WT_RET_MSG(session, ENOTSUP, "Layered trees do not support opening by checkpoint");
+        WT_RET_MSG(session, EINVAL, "Layered trees do not support opening by checkpoint");
 
     WT_RET(__wt_config_gets_def(session, cfg, "bulk", 0, &cval));
     if (cval.val != 0)
-        WT_RET_MSG(session, ENOTSUP, "Layered trees do not support bulk loading");
-
-    if (FLD_ISSET(S2C(session)->debug.flags, WT_CONN_DEBUG_CURSOR_REPOSITION))
-        WT_RET_MSG(session, ENOTSUP, "Layered trees do not support cursor reposition");
+        WT_RET_MSG(session, EINVAL, "Layered trees do not support bulk loading");
 
     /* Get the layered tree, and hold a reference to it until the cursor is closed. */
     WT_RET(__wt_session_get_dhandle(session, uri, NULL, cfg, 0));

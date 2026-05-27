@@ -1448,7 +1448,7 @@ __conn_open_session(WT_CONNECTION *wt_conn, WT_EVENT_HANDLER *event_handler, con
 
     session_ret = NULL;
     WT_ERR(__wt_open_session(conn, event_handler, config, true, &session_ret));
-    session_ret->name = "connection-open-session";
+    __wt_atomic_store_ptr_relaxed(&session_ret->name, "connection-open-session");
     *wt_sessionp = &session_ret->iface;
 
 err:
@@ -2907,16 +2907,13 @@ err:
 static int
 __conn_set_key_provider(WT_CONNECTION *wt_conn, WT_KEY_PROVIDER *key_provider, const char *config)
 {
+    WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
     conn = (WT_CONNECTION_IMPL *)wt_conn;
-    CONNECTION_API_CALL_NOCONF(conn, session, set_key_provider);
-
-    /* The configuration string has no use but may be useful at a later time. */
-    if (config != NULL)
-        WT_ERR_MSG(session, EINVAL, "key provider configuration currently not supported.");
+    CONNECTION_API_CALL(conn, session, set_key_provider, config, cfg);
 
     /* You can only enable the key provider system in disaggregated mode. */
     if (__wt_conn_is_disagg(session))
@@ -2927,6 +2924,10 @@ __conn_set_key_provider(WT_CONNECTION *wt_conn, WT_KEY_PROVIDER *key_provider, c
      */
     if (conn->key_provider != NULL)
         WT_ERR_MSG(session, EINVAL, "key provider system must be configured with early_load set");
+
+    WT_ERR(__wt_config_gets(session, cfg, "version", &cval));
+    if (cval.val == 1)
+        F_SET(conn, WT_CONN_KEY_PROVIDER_PUSH);
 
     conn->key_provider = key_provider;
 

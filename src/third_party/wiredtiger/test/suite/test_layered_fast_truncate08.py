@@ -33,68 +33,59 @@
 
 from contextlib import closing
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 import wttest
 
 
 @disagg_test_class
-class test_layered_fast_truncate08(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate08(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
     test_name = __qualname__
 
     disagg_storages = gen_disagg_storages(test_name, disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
     conn_config = 'disaggregated=(role="leader"),'
 
-    def setup_layered_table(self, layered_uri: str):
+    uri = f"layered:{test_name}"
+
+    def session_create_config(self):
+        return "key_format=i,value_format=u"
+
+    def populate(self, keys, value=b"v"):
+        with closing(self.session.open_cursor(self.uri)) as cursor:
+            with self.transaction():
+                for key in keys:
+                    cursor[key] = value
+
+    def setup_layered_table(self):
         # Create the table and produce the initial checkpoint that the follower
         # will attach to.
-        session_config = "key_format=i,value_format=u"
-        self.session.create(layered_uri, session_config)
-        self.session.checkpoint()
+        self.setup_leader()
 
-    def setup_follower(self, layered_uri: str):
-        self.reopen_disagg_conn('disaggregated=(role="follower"),')
-
+    def setup_follower(self, keys=range(100)):
+        super().setup_follower()
         # Add updates on the ingest that can be truncated later.
-        with closing(self.session.open_cursor(layered_uri)) as cursor:
-            with self.transaction():
-                for i in range(100):
-                    cursor[i] = b"v"
+        self.populate(keys)
 
-    def truncate(self, layered_uri: str, start_key: int, stop_key: int):
-        # Truncate between start and stop keys inclusive.
-        with (
-            closing(self.session.open_cursor(layered_uri)) as start_cursor,
-            closing(self.session.open_cursor(layered_uri)) as stop_cursor,
-        ):
-            start_cursor.set_key(start_key)
-            stop_cursor.set_key(stop_key)
-
-            with self.transaction():
-                self.session.truncate(None, start_cursor, stop_cursor, None)
-
-    def get_values(self, uri: str, start_key: int, stop_key: int):
+    def get_values(self, uri, start_key, stop_key):
         # Return values of any keys between start and stop inclusive that exist.
         values = []
-
         with closing(self.session.open_cursor(uri)) as cursor:
             for i in range(start_key, stop_key + 1):
                 cursor.set_key(i)
                 if cursor.search() == 0:
                     values.append(cursor.get_value())
-
         return values
 
     def test_follower_truncate_writes_tombstone_to_ingest(self):
         # Set up a follower with existing ingest updates.
-        layered_uri = f"layered:{self.test_name}"
-        self.setup_layered_table(layered_uri)
-        self.setup_follower(layered_uri)
+        self.setup_layered_table()
+        self.setup_follower()
 
         # Truncate a range of keys.
         start_key = 20
         stop_key = 80
-        self.truncate(layered_uri, start_key, stop_key)
+        self.truncate(start_key, stop_key)
 
         # Examine what the truncate actually wrote to the ingest file.
         ingest_uri = f"file:{self.test_name}.wt_ingest"

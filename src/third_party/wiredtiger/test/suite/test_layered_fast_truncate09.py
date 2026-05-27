@@ -28,12 +28,13 @@
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 
 # test_layered_fast_truncate09.py
 #   Follower truncate-list visibility coverage.
 @disagg_test_class
-class test_layered_fast_truncate09(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate09(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
     conn_config = 'disaggregated=(role="leader"),'
 
@@ -49,7 +50,6 @@ class test_layered_fast_truncate09(wttest.WiredTigerTestCase):
 
     def setUp(self):
         super().setUp()
-
         self.setup_follower()
 
     def session_create_config(self):
@@ -85,7 +85,7 @@ class test_layered_fast_truncate09(wttest.WiredTigerTestCase):
         c_start.close()
         c_stop.close()
 
-    def search_key(self, session, key):
+    def search_in(self, session, key):
         cursor = session.open_cursor(self.uri)
         cursor.set_key(key)
         ret = cursor.search()
@@ -93,7 +93,7 @@ class test_layered_fast_truncate09(wttest.WiredTigerTestCase):
         cursor.close()
         return ret, value
 
-    def search_near_key(self, session, key):
+    def search_near_in(self, session, key):
         cursor = session.open_cursor(self.uri)
         cursor.set_key(key)
         exact = cursor.search_near()
@@ -118,9 +118,9 @@ class test_layered_fast_truncate09(wttest.WiredTigerTestCase):
         with self.transaction(session=self.session, rollback=True):
             self.truncate_range(self.session, 100, 700)
 
-            ret = self.search_key(self.session, 150)[0]
+            ret = self.search_in(self.session, 150)[0]
             self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-            exact, landed = self.search_near_key(self.session, 150)
+            exact, landed = self.search_near_in(self.session, 150)
             self.assertNotEqual(exact, 0)
             if exact < 0:
                 self.assertEqual(landed, 99)
@@ -136,8 +136,8 @@ class test_layered_fast_truncate09(wttest.WiredTigerTestCase):
             session2 = self.conn.open_session()
             try:
                 with self.transaction(session=session2, rollback=True):
-                    self.assertEqual(self.search_key(session2, 150), (0, 'value'))
-                    self.assertEqual(self.search_near_key(session2, 150), (0, 150))
+                    self.assertEqual(self.search_in(session2, 150), (0, 'value'))
+                    self.assertEqual(self.search_near_in(session2, 150), (0, 150))
                     self.assertEqual(self.next_key_after(session2, 149), 150)
             finally:
                 session2.close()
@@ -145,14 +145,14 @@ class test_layered_fast_truncate09(wttest.WiredTigerTestCase):
     def test_rollback_restores_visibility(self):
         with self.transaction(session=self.session, rollback=True):
             self.truncate_range(self.session, 100, 700)
-            ret = self.search_key(self.session, 150)[0]
+            ret = self.search_in(self.session, 150)[0]
             self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
 
         session2 = self.conn.open_session()
         try:
             with self.transaction(session=session2, rollback=True):
-                self.assertEqual(self.search_key(session2, 150), (0, 'value'))
-                self.assertEqual(self.search_near_key(session2, 150), (0, 150))
+                self.assertEqual(self.search_in(session2, 150), (0, 'value'))
+                self.assertEqual(self.search_near_in(session2, 150), (0, 150))
                 self.assertEqual(self.next_key_after(session2, 149), 150)
         finally:
             session2.close()
@@ -163,14 +163,14 @@ class test_layered_fast_truncate09(wttest.WiredTigerTestCase):
         session2 = self.conn.open_session()
         try:
             with self.transaction(session=session2, read_timestamp=20, rollback=True):
-                self.assertEqual(self.search_key(session2, 150), (0, 'value'))
-                self.assertEqual(self.search_near_key(session2, 150), (0, 150))
+                self.assertEqual(self.search_in(session2, 150), (0, 'value'))
+                self.assertEqual(self.search_near_in(session2, 150), (0, 150))
                 self.assertEqual(self.next_key_after(session2, 149), 150)
 
             with self.transaction(session=session2, read_timestamp=30, rollback=True):
-                ret = self.search_key(session2, 150)[0]
+                ret = self.search_in(session2, 150)[0]
                 self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-                exact, landed = self.search_near_key(session2, 150)
+                exact, landed = self.search_near_in(session2, 150)
                 self.assertNotEqual(exact, 0)
                 if exact < 0:
                     self.assertEqual(landed, 99)
@@ -188,16 +188,16 @@ class test_layered_fast_truncate09(wttest.WiredTigerTestCase):
         session2 = self.conn.open_session()
         try:
             with self.transaction(session=session2, read_timestamp=30, rollback=True):
-                ret = self.search_key(session2, 350)[0]
+                ret = self.search_in(session2, 350)[0]
                 self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-                self.assertEqual(self.search_key(session2, 500), (0, 'value'))
+                self.assertEqual(self.search_in(session2, 500), (0, 'value'))
 
             with self.transaction(session=session2, read_timestamp=40, rollback=True):
-                ret = self.search_key(session2, 350)[0]
+                ret = self.search_in(session2, 350)[0]
                 self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-                ret = self.search_key(session2, 500)[0]
+                ret = self.search_in(session2, 500)[0]
                 self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-                exact, landed = self.search_near_key(session2, 150)
+                exact, landed = self.search_near_in(session2, 150)
                 self.assertNotEqual(exact, 0)
                 if exact < 0:
                     self.assertEqual(landed, 99)

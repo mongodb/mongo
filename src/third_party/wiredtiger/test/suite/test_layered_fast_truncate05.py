@@ -28,6 +28,7 @@
 
 import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 
 # test_layered_fast_truncate05.py
@@ -35,7 +36,7 @@ from wtscenario import make_scenarios
 #   standby (follower) node.
 
 @disagg_test_class
-class test_layered_fast_truncate05(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate05(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
     conn_config = 'disaggregated=(role="leader"),'
 
@@ -52,8 +53,7 @@ class test_layered_fast_truncate05(wttest.WiredTigerTestCase):
     # digits so that lexicographic order matches numeric order.
     nitems = 1000
 
-    @staticmethod
-    def key(n):
+    def key(self, n):
         return f'{n:04d}'
 
     def session_create_config(self):
@@ -64,36 +64,8 @@ class test_layered_fast_truncate05(wttest.WiredTigerTestCase):
 
     # Populate the table on the leader, checkpoint, then reopen as follower.
     def setup_follower(self):
-        self.session.create(self.uri, self.session_create_config())
-        cursor = self.session.open_cursor(self.uri)
-        for i in range(self.nitems):
-            self.session.begin_transaction()
-            cursor[self.key(i)] = 'value'
-            self.session.commit_transaction()
-        cursor.close()
-        self.session.checkpoint()
-
-        follower_config = (
-            'disaggregated=(role="follower",'
-            f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")'
-        )
-        self.reopen_conn(config=follower_config)
-
-    # Truncate the range [start, stop] (inclusive). If stop is None, truncate
-    # from start to the end of the table.
-    def truncate_range(self, start, stop):
-        c1 = self.session.open_cursor(self.uri)
-        c1.set_key(self.key(start))
-        c2 = None
-        if stop is not None:
-            c2 = self.session.open_cursor(self.uri)
-            c2.set_key(self.key(stop))
-        self.session.begin_transaction()
-        self.session.truncate(None, c1, c2, None)
-        self.session.commit_transaction()
-        c1.close()
-        if c2 is not None:
-            c2.close()
+        self.setup_leader(keys=range(self.nitems))
+        super().setup_follower()
 
     # Draw `samples` random keys and assert none fall inside [low, high].
     def sample_assert_random(self, low, high, samples=200):
@@ -110,7 +82,7 @@ class test_layered_fast_truncate05(wttest.WiredTigerTestCase):
     def test_random_cursor_skips_truncated_range(self):
         # 200 random samples must all land outside the truncated range.
         self.setup_follower()
-        self.truncate_range(100, 700)
+        self.truncate(100, 700)
         self.sample_assert_random(100, 700)
 
     def test_random_cursor_skips_truncated_range_with_live_ingest(self):
@@ -125,5 +97,5 @@ class test_layered_fast_truncate05(wttest.WiredTigerTestCase):
         self.session.commit_transaction()
         cursor.close()
 
-        self.truncate_range(100, 700)
+        self.truncate(100, 700)
         self.sample_assert_random(100, 700)

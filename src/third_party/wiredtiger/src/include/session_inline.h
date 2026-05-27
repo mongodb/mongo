@@ -32,14 +32,15 @@ __wt_single_thread_check_start(WT_SESSION_IMPL *s)
     if (!WT_SESSION_IS_DEFAULT(s) && s->thread_check.owning_thread != current_tid) {
         ret = __wt_spin_trylock(s, &s->thread_check.lock);
 
+        const char *session_name = __wt_atomic_load_ptr_relaxed(&s->name);
         WT_ASSERT_ALWAYS(s, ret == 0,
           "Session %" PRIu32
           " is accessed concurrently by multiple threads: "
           "current thread %" PRIuMAX ", owning thread %" PRIuMAX
           " (active op: %s, last op: %s, api depth: %u, dhandle: %s)",
-          s->id, current_tid, s->thread_check.owning_thread, s->name != NULL ? s->name : "none",
-          s->lastop != NULL ? s->lastop : "none", s->api_call_counter,
-          s->dhandle != NULL ? s->dhandle->name : "none");
+          s->id, current_tid, s->thread_check.owning_thread,
+          session_name != NULL ? session_name : "none", s->lastop != NULL ? s->lastop : "none",
+          s->api_call_counter, s->dhandle != NULL ? s->dhandle->name : "none");
 
         s->thread_check.owning_thread = current_tid;
     }

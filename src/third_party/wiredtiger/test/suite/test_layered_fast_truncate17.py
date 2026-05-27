@@ -28,6 +28,7 @@
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
@@ -35,7 +36,7 @@ from wiredtiger import stat
 #   Verify that step-up replay uses fast page truncation (WT_REF_DELETED) when
 #   replaying follower truncates.
 @disagg_test_class
-class test_layered_fast_truncate17(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate17(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
     conn_config = 'disaggregated=(role="leader")'
     uri = 'layered:test_layered_ft_replay'
@@ -45,12 +46,6 @@ class test_layered_fast_truncate17(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages('test_layered_ft_replay', disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
 
-    def get_stat(self, conn, stat_key):
-        s = conn.open_session('')
-        val = s.open_cursor('statistics:')[stat_key][2]
-        s.close()
-        return val
-
     def populate_on_leader(self, ts=10):
         cursor = self.session.open_cursor(self.uri)
         for i in range(self.nitems):
@@ -58,23 +53,12 @@ class test_layered_fast_truncate17(wttest.WiredTigerTestCase):
             cursor[i] = 'v'
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
         cursor.close()
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(ts) +
-                                ',oldest_timestamp=' + self.timestamp_str(1))
-        self.session.checkpoint()
+        self.leader_checkpoint(ts)
 
     def setup_follower(self):
-        self.conn_follow = self.wiredtiger_open(
-            'follower',
-            self.extensionsConfig() + ',create,statistics=(all),disaggregated=(role="follower")')
-        self.session_follow = self.conn_follow.open_session('')
         self.session.create(self.uri, self.table_config)
-        self.session_follow.create(self.uri, self.table_config)
         self.populate_on_leader()
-        self.disagg_advance_checkpoint(self.conn_follow)
-
-    def step_up(self):
-        self.ignoreStdoutPattern('Picking up the same checkpoint')
-        self.disagg_switch_follower_and_leader(self.conn_follow)
+        self.conn_follow, self.session_follow = self.open_follower(self.table_config)
 
     def truncate_range(self, start_key, stop_key, ts):
         c_start = self.session_follow.open_cursor(self.uri)

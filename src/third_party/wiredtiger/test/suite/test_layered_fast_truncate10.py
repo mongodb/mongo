@@ -33,26 +33,16 @@
 #   the logical union of the stable and ingest tables, independent of which
 #   table any given key actually lives in.
 
-from contextlib import closing
-from itertools import chain
-from typing import Iterable
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import (
+    LayeredFastTruncateConfigMixin, concat, range_inclusive,
+)
 from wtscenario import make_scenarios
 import wttest
 
 
-def concat(*iterables: Iterable[int]) -> list[int]:
-    """Concatenate any number of iterables into a single list."""
-    return list(chain.from_iterable(iterables))
-
-
-def range_inclusive(start: int, stop: int) -> range:
-    """Return a range covering [start, stop] inclusive."""
-    return range(start, stop + 1)
-
-
 @disagg_test_class
-class test_layered_fast_truncate10(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate10(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
     """
     Data location semantics (stable vs ingest).
 
@@ -69,60 +59,6 @@ class test_layered_fast_truncate10(wttest.WiredTigerTestCase):
     disagg_storages = gen_disagg_storages(disagg_only=True)
     scenarios = make_scenarios(disagg_storages, uris)
     conn_config = 'disaggregated=(role="leader"),'
-
-    def session_create_config(self):
-        cfg = "key_format=i,value_format=S"
-        if self.uri.startswith("table"):
-            cfg += ",block_manager=disagg,type=layered"
-        return cfg
-
-    def auto_closing_cursor(self):
-        """Return a cursor that auto-closes as it goes out of scope."""
-        return closing(self.session.open_cursor(self.uri))
-
-    def populate(self, keys: Iterable[int]):
-        """Insert each key with a placeholder value in a single transaction."""
-        with self.auto_closing_cursor() as cursor:
-            with self.transaction():
-                for key in keys:
-                    cursor[key] = "v"
-
-    def setup_leader(self, keys: Iterable[int] | None = None):
-        """
-        Create the table on the leader and optionally pre-populate stable.
-        The follower will pick up these keys via the initial checkpoint.
-        """
-        self.session.create(self.uri, self.session_create_config())
-        if keys is not None:
-            self.populate(keys)
-        self.session.checkpoint()
-
-    def setup_follower(self, keys: Iterable[int] | None = None):
-        """Switch to follower role and optionally write keys to ingest."""
-        self.reopen_disagg_conn('disaggregated=(role="follower"),')
-        if keys is not None:
-            self.populate(keys)
-
-    def truncate(self, start_key: int, stop_key: int):
-        """Truncate between start and stop keys inclusive."""
-        with (
-            self.auto_closing_cursor() as start_cursor,
-            self.auto_closing_cursor() as stop_cursor,
-        ):
-            start_cursor.set_key(start_key)
-            stop_cursor.set_key(stop_key)
-
-            with self.transaction():
-                self.session.truncate(None, start_cursor, stop_cursor, None)
-
-    def visible_keys(self) -> list[int]:
-        """Return all keys visible via a forward scan, in key order."""
-        result = []
-        with self.auto_closing_cursor() as cursor:
-            with self.transaction(rollback=True):
-                while cursor.next() == 0:
-                    result.append(cursor.get_key())
-        return result
 
     def test_truncate_range_with_both_tables_empty(self):
         # Stable and ingest are both empty.

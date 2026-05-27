@@ -396,18 +396,6 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UP
         if (__wt_atomic_load_uint64_v_relaxed(&upd->txnid) == WT_TXN_ABORTED)
             continue;
 
-        /*
-         * Prepare transaction rollback adds a globally visible tombstone to the update chain to
-         * remove the entire key. Treating these globally visible tombstones as obsolete and
-         * trimming update list can cause problems if the update chain is getting accessed somewhere
-         * else. To avoid this problem, skip these globally visible tombstones from the update
-         * obsolete check.
-         */
-        if (F_ISSET(upd, WT_UPDATE_PREPARE_ROLLBACK)) {
-            first = NULL;
-            continue;
-        }
-
         /* Cannot truncate the updates if we need to remove the updates from the history store. */
         if (F_ISSET(upd, WT_UPDATE_HS_MAX_STOP)) {
             first = NULL;

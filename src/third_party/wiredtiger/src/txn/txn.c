@@ -958,7 +958,7 @@ __txn_prepare_rollback_restore_hs_update(
     }
 
     /* Append the update to the end of the chain. */
-    WT_RELEASE_WRITE_WITH_BARRIER(upd_chain->next, upd);
+    __wt_atomic_store_ptr_relaxed(&upd_chain->next, upd);
 
     __wt_cache_page_inmem_incr(session, page, total_size, false);
 
@@ -1034,30 +1034,35 @@ __txn_search_prepared_op(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_ITEM *key
 
 /*
  * __txn_prepare_rollback_delete_key --
- *     Prepend a global visible tombstone to the head of the update chain to delete the key for
- *     prepare rollback.
+ *     Append a globally visible tombstone to the tail of the update chain to delete the key for
+ *     prepare rollback. Placing the tombstone below the prepared update encodes its role by
+ *     position so reconciliation and pruning see a normal globally visible tombstone without
+ *     needing a distinguishing flag.
  */
 static int
-__txn_prepare_rollback_delete_key(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
+__txn_prepare_rollback_delete_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd_chain)
 {
-    WT_DECL_RET;
     WT_UPDATE *tombstone;
-    size_t not_used;
+    size_t size;
 
-    tombstone = NULL;
+    WT_ASSERT(session, upd_chain != NULL);
 
-    WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, &not_used));
-    F_SET(tombstone, WT_UPDATE_PREPARE_ROLLBACK);
-    WT_WITH_BTREE(session, btree,
-      ret = btree->type == BTREE_ROW ?
-        __wt_row_modify(cbt, &cbt->iface.key, NULL, &tombstone, WT_UPDATE_INVALID, false, false) :
-        __wt_col_modify(cbt, cbt->recno, NULL, &tombstone, WT_UPDATE_INVALID, false, false));
-    WT_ERR(ret);
-    tombstone = NULL;
+    size = 0;
+    WT_RET(__wt_upd_alloc_tombstone(session, &tombstone, &size));
 
-err:
-    __wt_free(session, tombstone);
-    return (ret);
+    /*
+     * Walk to the end of the chain. The caller guarantees that the chain at this point consists
+     * only of updates from the resolving prepared transaction (and aborted reserve entries), so the
+     * tail's next pointer is stable.
+     */
+    while (upd_chain->next != NULL)
+        upd_chain = upd_chain->next;
+
+    __wt_atomic_store_ptr_relaxed(&upd_chain->next, tombstone);
+
+    __wt_cache_page_inmem_incr(session, page, size, false);
+
+    return (0);
 }
 
 /*
@@ -1218,28 +1223,24 @@ __wt_txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_BTREE *btree,
      * If the prepared update is a single tombstone, we don't need to do anything special and we can
      * directly resolve it in memory.
      *
-     * If the prepared update is not a tombstone or we have multiple prepared updates in the same
-     * transaction. There are four base cases:
+     * Otherwise there are three resolve cases:
      *
-     * 1) Prepared updates are on the update chain.
-     *     commit: simply resolve the updates on chain.
-     *     rollback: simply resolve the updates on chain.
+     * 1) Prepared updates are on the update chain (RESOLVE_UPDATE_CHAIN).
+     *     commit: resolve the updates on chain.
+     *     rollback: if the prepared update is the only update and there is no on-disk value,
+     *               append a globally visible tombstone to delete the key.
      *
-     * 2) Prepared updates are written to the data store.
-     *     If there is no older updates written to the history store:
-     *         commit: simply resolve the prepared updates in memory.
-     *         rollback: delete the whole key.
-     *
-     *     If there are older updates written to the history store:
+     * 2) Prepared updates are written to the data store (RESOLVE_PREPARE_ON_DISK).
+     *     If there are older updates in the history store:
      *         commit: restore the newest history store update with a max stop time point to the
-     *                 update chain. Reconciliation should know when to delete it from the history
-     *                 store.
-     *         rollback:restore the newest update in the history store to the update chain.
-     *                  Reconciliation should know when to delete it from the history store.
+     *                 update chain.
+     *         rollback: restore the newest history store update to the update chain.
+     *     If there are no older updates in the history store:
+     *         commit: resolve the prepared updates in memory.
+     *         rollback: append a globally visible tombstone to delete the key.
      *
-     * 4) We are running an in-memory database:
-     *     commit: resolve the prepared updates in memory.
-     *     rollback: if the prepared update is written to the disk image, delete the whole key.
+     * 3) We are running an in-memory database (RESOLVE_IN_MEMORY).
+     *     commit/rollback: resolve the prepared updates in memory only.
      */
 
     /*
@@ -1264,7 +1265,7 @@ __wt_txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_BTREE *btree,
         if (!commit && first_committed_upd == NULL) {
             tw_found = __wt_read_cell_time_window(cbt, &tw);
             if (!tw_found)
-                WT_ERR(__txn_prepare_rollback_delete_key(session, btree, cbt));
+                WT_ERR(__txn_prepare_rollback_delete_key(session, page, head_upd));
             else
                 WT_ASSERT_ALWAYS(
                   session, !WT_TIME_WINDOW_HAS_PREPARE(&tw), "no committed update to fallback to.");
@@ -1303,12 +1304,12 @@ __wt_txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_BTREE *btree,
         else {
             ret = 0;
             /*
-             * Allocate a tombstone and prepend it to the row so when we reconcile the update chain
-             * we don't copy the prepared cell, which is now associated with a rolled back prepare,
-             * and instead write nothing.
+             * Append a globally visible tombstone to the end of the chain. When reconciliation
+             * later drops the rolled-back prepared cell, the tombstone remains as the correct
+             * post-rollback state for the key.
              */
             if (!commit)
-                WT_ERR(__txn_prepare_rollback_delete_key(session, btree, cbt));
+                WT_ERR(__txn_prepare_rollback_delete_key(session, page, head_upd));
         }
         break;
     case RESOLVE_IN_MEMORY:
@@ -2764,13 +2765,15 @@ __wt_verbose_dump_txn_one(
 
     buf_len = 512;
     WT_RET(__wt_scr_alloc(session, buf_len, &buf));
+
+    const char *session_name = __wt_atomic_load_ptr_relaxed(&txn_session->name);
     WT_ERR(__wt_snprintf((char *)buf->data, buf_len,
       "session ID: %" PRIu32 ", txn ID: %" PRIu64 ", pinned ID: %" PRIu64
       ", metadata pinned ID: %" PRIu64 ", name: %s",
       txn_session->id, __wt_atomic_load_uint64_v_relaxed(&txn_shared->id),
       __wt_atomic_load_uint64_v_relaxed(&txn_shared->pinned_id),
       __wt_atomic_load_uint64_v_relaxed(&txn_shared->metadata_pinned),
-      txn_session->name == NULL ? "EMPTY" : txn_session->name));
+      session_name == NULL ? "EMPTY" : session_name));
 
     if (error_code != 0)
         WT_ERR_MSG(session, error_code, "%s, %s", (char *)buf->data,

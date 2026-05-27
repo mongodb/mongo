@@ -80,29 +80,36 @@ function(define_build_mode mode)
     string(REPLACE ";" " " cxx_flags "${DEFINE_BUILD_CXX_COMPILER_FLAGS}")
     string(REPLACE ";" " " linker_flags "${linker_flags}")
     string(TOUPPER ${mode} build_mode)
-    set(CMAKE_C_FLAGS_${build_mode}
-        "${c_flags}" CACHE STRING
-        "Flags used by the C compiler for ${mode} build type or configuration." FORCE)
 
-    set(CMAKE_CXX_FLAGS_${build_mode}
-        "${cxx_flags}" CACHE STRING
-        "Flags used by the C++ compiler for ${mode} build type or configuration." FORCE)
+    # Seed the default flags for this build mode exactly once per build dir.
+    if(NOT WT_BUILD_MODE_${build_mode}_FLAGS_INITIALIZED)
+        set(CMAKE_C_FLAGS_${build_mode}
+            "${c_flags}" CACHE STRING
+            "Flags used by the C compiler for ${mode} build type or configuration." FORCE)
 
-    set(CMAKE_EXE_LINKER_FLAGS_${build_mode}
-        "${linker_flags}" CACHE STRING
-        "Linker flags to be used to create executables for ${mode} build type." FORCE)
+        set(CMAKE_CXX_FLAGS_${build_mode}
+            "${cxx_flags}" CACHE STRING
+            "Flags used by the C++ compiler for ${mode} build type or configuration." FORCE)
 
-    set(CMAKE_SHARED_LINKER_FLAGS_${build_mode}
-        "${linker_flags}" CACHE STRING
-        "Linker flags to be used to create shared libraries for ${mode} build type." FORCE)
+        set(CMAKE_EXE_LINKER_FLAGS_${build_mode}
+            "${linker_flags}" CACHE STRING
+            "Linker flags to be used to create executables for ${mode} build type." FORCE)
 
-    set(CMAKE_MODULE_LINKER_FLAGS_${build_mode}
-        "${linker_flags}" CACHE STRING
-        "Linker flags to be used to create shared modules for ${mode} build type." FORCE)
+        set(CMAKE_SHARED_LINKER_FLAGS_${build_mode}
+            "${linker_flags}" CACHE STRING
+            "Linker flags to be used to create shared libraries for ${mode} build type." FORCE)
+
+        set(CMAKE_MODULE_LINKER_FLAGS_${build_mode}
+            "${linker_flags}" CACHE STRING
+            "Linker flags to be used to create shared modules for ${mode} build type." FORCE)
+
+        set(WT_BUILD_MODE_${build_mode}_FLAGS_INITIALIZED TRUE CACHE INTERNAL
+            "WiredTiger ${mode} build mode flags have been initialized")
+    endif()
 
     mark_as_advanced(
-        CMAKE_CXX_FLAGS_${build_mode}
         CMAKE_C_FLAGS_${build_mode}
+        CMAKE_CXX_FLAGS_${build_mode}
         CMAKE_EXE_LINKER_FLAGS_${build_mode}
         CMAKE_SHARED_LINKER_FLAGS_${build_mode}
         CMAKE_MODULE_LINKER_FLAGS_${build_mode}

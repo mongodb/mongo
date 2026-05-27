@@ -181,7 +181,7 @@ class test_cursor25(wttest.WiredTigerTestCase):
         cursor[1] = 10
         self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
 
-        # Prepared overwrite + rollback. No PREPARE_ROLLBACK tombstone because
+        # Prepared overwrite + rollback. No rollback tombstone appended because
         # first_committed_upd != NULL.
         session2 = self.conn.open_session()
         cursor2 = session2.open_cursor(self.uri, None)
@@ -229,7 +229,7 @@ class test_cursor25(wttest.WiredTigerTestCase):
         cursor[1] = 10
         self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(1))
 
-        # Prepared delete + rollback. No PREPARE_ROLLBACK tombstone because
+        # Prepared delete + rollback. No rollback tombstone appended because
         # first_committed_upd != NULL.
         session2 = self.conn.open_session()
         cursor2 = session2.open_cursor(self.uri, None)

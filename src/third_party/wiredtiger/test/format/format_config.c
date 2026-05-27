@@ -1489,10 +1489,6 @@ config_disagg_storage(void)
     config_off(NULL, "ops.compaction");
     config_off(NULL, "background_compact");
 
-    /* Cursor reposition is not supported for disaggregated storage. */
-    config_off(NULL, "debug.cursor_reposition");
-    config_off(NULL, "stress.evict_reposition");
-
     /*  Tiered storage is not supported with disagg */
     config_single(NULL, "tiered_storage.storage_source=off", true);
 }

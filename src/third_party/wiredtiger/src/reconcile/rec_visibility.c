@@ -349,18 +349,6 @@ __rec_save_delete_hs_upd_and_free_obs_updates(WT_SESSION_IMPL *session, WTI_RECO
             break;
         }
 
-        /*
-         * Prepare transaction rollback adds a globally visible tombstone to the update chain to
-         * remove the entire key. Treating these globally visible tombstones as obsolete and
-         * trimming update list can cause problems if the update chain is getting accessed somewhere
-         * else. To avoid this problem, skip these globally visible tombstones from the update
-         * obsolete check.
-         */
-        if (F_ISSET(delete_upd, WT_UPDATE_PREPARE_ROLLBACK)) {
-            visible_all_upd = NULL;
-            break;
-        }
-
         /* Track the first self-contained value that is globally visible. */
         if (F_ISSET(r, WT_REC_CHECKPOINT) && visible_all_upd == NULL && delete_upd->next != NULL &&
           WT_UPDATE_DATA_VALUE(delete_upd) && __wt_txn_upd_visible_all(session, delete_upd))
@@ -737,14 +725,13 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
   bool *has_newer_updatesp, bool *write_prepare, size_t *upd_memsizep)
 {
     WT_CONNECTION_IMPL *conn;
-    WT_UPDATE *upd, *prepare_rollback_tombstone;
+    WT_UPDATE *upd;
     wt_timestamp_t max_ts;
     uint64_t max_txn, session_txnid, txnid;
     uint8_t prepare_state;
     bool is_hs_page;
 
     conn = S2C(session);
-    prepare_rollback_tombstone = NULL;
     max_ts = WT_TS_NONE;
     max_txn = WT_TXN_NONE;
     is_hs_page = F_ISSET(session->dhandle, WT_DHANDLE_HS);
@@ -773,15 +760,8 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
                 upd->prepare_state == WT_PREPARE_INPROGRESS);
             /* Ignore the prepared update if the rollback timestamp is stable. */
             if (upd->upd_rollback_ts != WT_TS_NONE &&
-              upd->upd_rollback_ts <= r->rec_start_pinned_stable_ts) {
-                /*
-                 * If we have seen a tombstone that rolled back the prepared update, delete the key
-                 * from the disk.
-                 */
-                if (prepare_rollback_tombstone != NULL)
-                    break;
+              upd->upd_rollback_ts <= r->rec_start_pinned_stable_ts)
                 continue;
-            }
 
             txnid = upd->upd_saved_txnid;
         }
@@ -807,7 +787,6 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
           session_txnid != WT_TXN_NONE && txnid == session_txnid) {
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
-            WT_ASSERT(session, prepare_rollback_tombstone == NULL);
             WT_ASSERT(session, !upd_select->skip_aborted_prepared_value);
             continue;
         }
@@ -842,16 +821,6 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
             *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
             *has_newer_updatesp = true;
             /*
-             * If we have already seen a globally visible tombstone from prepared rollback, the
-             * update we are now skipping is the aborted prepared update that the tombstone rolled
-             * back, and its rollback is not yet stable (otherwise we would have broken out of the
-             * loop above). The rollback decision is not durable, so the rollback tombstone is not
-             * safe to write to disk. Drop it from consideration so the fallback after the loop does
-             * not select it for write; we will revisit this key in a later reconcile once the
-             * rollback becomes stable.
-             */
-            prepare_rollback_tombstone = NULL;
-            /*
              * Same reason as the aborted-prepared skip earlier: this rolled-back prepared value has
              * no in-chain fallback, so the on-disk cell must not be dropped on this reconciliation.
              */
@@ -884,8 +853,6 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
                     WT_ASSERT(session, !is_hs_page);
                     *upd_memsizep += WT_UPDATE_MEMSIZE(upd);
                     *has_newer_updatesp = true;
-                    /* We should write nothing to disk. */
-                    prepare_rollback_tombstone = NULL;
 
                     /*
                      * Same reason as the aborted-prepared skip earlier: this rolled-back prepared
@@ -925,8 +892,7 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
                      * commit/rollback. But it is enough to help us catch some issues.
                      */
                     WT_ASSERT_ALWAYS(session,
-                      !F_ISSET(r, WT_REC_EVICT) || prepare_rollback_tombstone != NULL ||
-                        upd->next != NULL ||
+                      !F_ISSET(r, WT_REC_EVICT) || upd->next != NULL ||
                         (WT_REC_HAS_ON_DISK(vpack) && !WT_TIME_WINDOW_HAS_PREPARE(&vpack->tw)),
                       "leaked prepared update.");
                 } else
@@ -999,46 +965,12 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
             }
         }
 
-        if (F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) && F_ISSET(upd, WT_UPDATE_PREPARE_ROLLBACK) &&
-          !F_ISSET(upd, WT_UPDATE_SELECT_FOR_DS))
-            prepare_rollback_tombstone = upd;
         /*
          * Always select the newest visible update if precise checkpoint is not enabled. Otherwise,
          * select the first update that is smaller or equal to the pinned timestamp.
          */
-        else if (upd_select->upd == NULL) {
+        if (upd_select->upd == NULL)
             upd_select->upd = upd;
-            if (prepare_rollback_tombstone != NULL) {
-                /*
-                 * Not checking upd->txnid == WT_TXN_ABORTED here because when doing prepared
-                 * rollback, we first insert the rollback tombstone then mark the prepare aborted,
-                 * so this assert can fire if we race with prepared rollback.
-                 */
-                WT_ASSERT(session,
-                  *write_prepare &&
-                    (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED));
-#ifdef HAVE_DIAGNOSTIC
-                /*
-                 * Walk from the rollback tombstone to the current prepared update; the only updates
-                 * permitted in between are reserve updates. Any other update would mean an unknown
-                 * entry slipped in front of the prepared update we are about to select.
-                 */
-                WT_UPDATE *scan;
-                for (scan = prepare_rollback_tombstone->next; scan != NULL && scan != upd;
-                     scan = scan->next)
-                    WT_ASSERT(
-                      session, scan->type == WT_UPDATE_RESERVE && scan->txnid == WT_TXN_ABORTED);
-                WT_ASSERT(session, scan == upd);
-#endif
-                /* We skipped the prepare rollback tombstone. */
-                WT_ASSERT(session, *has_newer_updatesp);
-                /*
-                 * If we have seen a tombstone that rolled back the prepared update, this must be
-                 * the prepared update. No need to walk further.
-                 */
-                prepare_rollback_tombstone = NULL;
-            }
-        }
 
         /* Track the selected update transaction id and timestamp. */
         if (max_txn < txnid)
@@ -1053,13 +985,6 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
         }
 
         /*
-         * If we see a globally visible tombstone that deletes a key because of prepared rollback,
-         * keep walking to see if we should write the prepared update instead.
-         */
-        if (prepare_rollback_tombstone != NULL)
-            continue;
-
-        /*
          * We only need to walk the whole update chain if we are evicting metadata as it is written
          * with read uncommitted isolation and we may see a committed update followed by uncommitted
          * updates
@@ -1067,10 +992,6 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPACK_KV *
         if (!F_ISSET(r, WT_REC_EVICT) || !WT_IS_METADATA(session->dhandle))
             break;
     }
-
-    /* The prepare rollback is stable. Delete the key by selecting the rollback tombstone. */
-    if (upd_select->upd == NULL && prepare_rollback_tombstone != NULL)
-        upd_select->upd = prepare_rollback_tombstone;
 
     /*
      * Track the most recent transaction in the page. We store this in the tree at the end of

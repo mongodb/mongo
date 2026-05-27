@@ -33,11 +33,12 @@
 
 import wiredtiger, wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 from wiredtiger import stat
 
 @disagg_test_class
-class test_layered_fast_truncate03(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate03(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
     uri         = 'layered:test_layered_fast_truncate03'
     nrows       = 5000
@@ -48,17 +49,6 @@ class test_layered_fast_truncate03(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,statistics=(all),disaggregated=(role="leader")'
     disagg_storages = gen_disagg_storages('test_layered_fast_truncate03', disagg_only=True)
     scenarios = make_scenarios(disagg_storages)
-
-    def get_stat(self, conn, stat_key):
-        s = conn.open_session('')
-        val = s.open_cursor('statistics:')[stat_key][2]
-        s.close()
-        return val
-
-    def leader_checkpoint(self, ts):
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(ts) +
-                                ',oldest_timestamp=' + self.timestamp_str(1))
-        self.session.checkpoint()
 
     def setup_leader(self, extra_cfg=''):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -81,58 +71,16 @@ class test_layered_fast_truncate03(wttest.WiredTigerTestCase):
         evict_cur.close()
         self.session.rollback_transaction()
 
-    def truncate_and_checkpoint(self, trunc_start, trunc_stop, ts):
-        # Fast-truncate rows [trunc_start, trunc_stop] on the leader and checkpoint.
-        c_start = self.session.open_cursor(self.uri)
-        c_start.set_key(trunc_start)
-        c_stop = self.session.open_cursor(self.uri)
-        c_stop.set_key(trunc_stop)
-        self.session.begin_transaction()
-        self.session.truncate(None, c_start, c_stop, None)
-        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
-        c_start.close()
-        c_stop.close()
-        self.leader_checkpoint(ts)
-
-    def open_follower(self):
-        conn = self.wiredtiger_open(
-            'follower',
-            self.extensionsConfig() + ',create,cache_size=50MB,statistics=(all),disaggregated=(role="follower")')
-        sess = conn.open_session('')
-        sess.create(self.uri, 'key_format=i,value_format=S')
-        self.disagg_advance_checkpoint(conn, self.conn)
-        return conn, sess
-
     def advance_follower(self, conn):
         self.leader_checkpoint(20)
         self.disagg_advance_checkpoint(conn, self.conn)
-
-    def evict_range(self, sess, start, stop, step=1):
-        evict_cur = sess.open_cursor(self.uri, None, 'debug=(release_evict)')
-        sess.begin_transaction('read_timestamp=' + self.timestamp_str(10))
-        for i in range(start, stop + 1, step):
-            evict_cur.set_key(i)
-            evict_cur.search()
-            evict_cur.reset()
-        evict_cur.close()
-        sess.rollback_transaction()
-
-    def search_at(self, sess, key, ts):
-        cur = sess.open_cursor(self.uri)
-        txn_cfg = ('read_timestamp=' + self.timestamp_str(ts))
-        sess.begin_transaction(txn_cfg)
-        cur.set_key(key)
-        ret = cur.search()
-        val = cur.get_value() if ret == 0 else None
-        sess.rollback_transaction()
-        cur.close()
-        return ret, val
 
     def test_no_dirty_on_read(self):
         # Reading fast-truncated pages on the follower must never dirty them. Verifies this holds
         # across a full load-evict-reload cycle for both single and bulk page reads.
         self.setup_leader()
-        self.truncate_and_checkpoint(self.trunc_start, self.trunc_stop, 20)
+        self.truncate(self.trunc_start, self.trunc_stop, commit_timestamp=20)
+        self.leader_checkpoint(20)
         conn, sess = self.open_follower()
         sample = list(range(self.trunc_start, self.trunc_stop + 1, 10))
         dirty_before = self.get_stat(conn, stat.conn.cache_pages_dirty)
@@ -168,7 +116,8 @@ class test_layered_fast_truncate03(wttest.WiredTigerTestCase):
         # restore a subset of truncated keys, those keys must be visible while the rest
         # remain deleted.
         self.setup_leader(',leaf_page_max=4096')
-        self.truncate_and_checkpoint(self.trunc_start, self.trunc_stop, 20)
+        self.truncate(self.trunc_start, self.trunc_stop, commit_timestamp=20)
+        self.leader_checkpoint(20)
         conn, sess = self.open_follower()
         sample = list(range(self.trunc_start, self.trunc_stop + 1, 10))
         dirty_before = self.get_stat(conn, stat.conn.cache_pages_dirty)
@@ -226,7 +175,8 @@ class test_layered_fast_truncate03(wttest.WiredTigerTestCase):
         # Closing and reopening the follower connection must not lose the deleted state.
         # The same checkpoint must still show truncated keys as WT_NOTFOUND after a cold start.
         self.setup_leader()
-        self.truncate_and_checkpoint(self.trunc_start, self.trunc_stop, 20)
+        self.truncate(self.trunc_start, self.trunc_stop, commit_timestamp=20)
+        self.leader_checkpoint(20)
 
         truncated_keys     = [self.trunc_start, self.trunc_start + 100, self.trunc_stop]
         non_truncated_keys = [1, self.trunc_start - 1, self.trunc_stop + 1, self.nrows]
@@ -250,7 +200,8 @@ class test_layered_fast_truncate03(wttest.WiredTigerTestCase):
         # Reading a deleted page at a timestamp before the truncation forces it to load from disk.
         # The key must be found, cache_read_deleted must increment, and the page must not be dirtied.
         self.setup_leader()
-        self.truncate_and_checkpoint(self.trunc_start, self.trunc_stop, 20)
+        self.truncate(self.trunc_start, self.trunc_stop, commit_timestamp=20)
+        self.leader_checkpoint(20)
         conn, sess = self.open_follower()
 
         dirty_before = self.get_stat(conn, stat.conn.cache_pages_dirty)

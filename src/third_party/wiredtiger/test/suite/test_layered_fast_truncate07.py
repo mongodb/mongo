@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# test_layered_fast_truncate06.py
+# test_layered_fast_truncate07.py
 #   Follower-initiated truncate stores a bounded range in the truncate list.
 #   Verifies NULL start/stop from the session API are resolved to the table's
 #   first/last visible key, both via the verbose log line and by the row set
@@ -34,19 +34,20 @@
 
 import wttest
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 
 @disagg_test_class
-class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate07(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
 
     conn_config = 'verbose=[layered:3],disaggregated=(role="leader"),'
-    uri = 'layered:test_layered_fast_truncate06'
+    uri = 'layered:test_layered_fast_truncate07'
 
     key_formats = [
         ('string', dict(key_format='S')),
         ('int', dict(key_format='i')),
     ]
-    disagg_storages = gen_disagg_storages('test_layered_fast_truncate06', disagg_only=True)
+    disagg_storages = gen_disagg_storages('test_layered_fast_truncate07', disagg_only=True)
     scenarios = make_scenarios(disagg_storages, key_formats)
 
     nitems = 100
@@ -59,41 +60,16 @@ class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
     def key_str(self, n):
         return f'{n:04d}' if self.key_format == 'S' else str(n)
 
+    def session_create_config(self):
+        return f'key_format={self.key_format},value_format=S'
+
     def setup_follower(self):
-        self.session.create(self.uri, f'key_format={self.key_format},value_format=S')
+        self.session.create(self.uri, self.session_create_config())
         self.insert_range(1, self.nitems)
         self.session.checkpoint()
         follower_config = ('verbose=[layered:3],disaggregated=(role="follower",'
             f'checkpoint_meta="{self.disagg_get_complete_checkpoint_meta()}")')
         self.reopen_conn(config=follower_config)
-
-    def truncate(self, start=None, stop=None):
-        c_start = c_stop = None
-        if start is not None:
-            c_start = self.session.open_cursor(self.uri)
-            c_start.set_key(self.key(start))
-        if stop is not None:
-            c_stop = self.session.open_cursor(self.uri)
-            c_stop.set_key(self.key(stop))
-
-        # Use the table uri if both start and stop cursors are not given.
-        uri = self.uri if (c_start is None and c_stop is None) else None
-        self.session.begin_transaction()
-        self.session.truncate(uri, c_start, c_stop, None)
-        self.session.commit_transaction()
-        if c_start is not None:
-            c_start.close()
-        if c_stop is not None:
-            c_stop.close()
-
-    def visible_keys(self, forward=True):
-        c = self.session.open_cursor(self.uri)
-        step = c.next if forward else c.prev
-        keys = []
-        while step() == 0:
-            keys.append(c.get_key())
-        c.close()
-        return keys
 
     def insert_range(self, lo, hi):
         c = self.session.open_cursor(self.uri)
@@ -102,6 +78,16 @@ class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
             c[self.key(i)] = 'v'
             self.session.commit_transaction()
         c.close()
+
+    def follower_visible_keys(self, forward=True):
+        # Simple inline scan without a transaction wrapper to match the original behavior.
+        c = self.session.open_cursor(self.uri)
+        step = c.next if forward else c.prev
+        keys = []
+        while step() == 0:
+            keys.append(c.get_key())
+        c.close()
+        return keys
 
     # Keys in [1, nitems] minus [start, stop] (inclusive on both ends).
     def expected_keys(self, start, stop):
@@ -117,59 +103,59 @@ class test_layered_fast_truncate06(wttest.WiredTigerTestCase):
 
     def test_bounded_range(self):
         self.setup_follower()
-        self.truncate(start=30, stop=60)
+        self.truncate(start_key=30, stop_key=60)
         self.assert_trunc_log(30, 60)
-        self.assertEqual(self.visible_keys(), self.expected_keys(30, 60))
+        self.assertEqual(self.follower_visible_keys(), self.expected_keys(30, 60))
 
     def test_null_start_resolves_to_first_key(self):
         self.setup_follower()
-        self.truncate(start=None, stop=60)
+        self.truncate(start_key=None, stop_key=60)
         self.assert_trunc_log(1, 60)
-        self.assertEqual(self.visible_keys(), self.expected_keys(1, 60))
+        self.assertEqual(self.follower_visible_keys(), self.expected_keys(1, 60))
 
     def test_null_stop_resolves_to_last_key(self):
         self.setup_follower()
-        self.truncate(start=30, stop=None)
+        self.truncate(start_key=30, stop_key=None)
         self.assert_trunc_log(30, self.nitems)
-        self.assertEqual(self.visible_keys(), self.expected_keys(30, self.nitems))
+        self.assertEqual(self.follower_visible_keys(), self.expected_keys(30, self.nitems))
 
     def test_both_null_is_full_table(self):
         self.setup_follower()
-        self.truncate(start=None, stop=None)
+        self.truncate(start_key=None, stop_key=None)
         self.assert_trunc_log(1, self.nitems)
-        self.assertEqual(self.visible_keys(), [])
+        self.assertEqual(self.follower_visible_keys(), [])
 
     # An open-ended truncate captures "end" at commit time, not dynamically. Keys appended
     # after stop should be visible.
     def test_open_ended_truncate_does_not_hide_later_appends(self):
         self.setup_follower()
-        self.truncate(start=80, stop=None)
+        self.truncate(start_key=80, stop_key=None)
         self.assert_trunc_log(80, self.nitems)
         self.insert_range(200, 210)
         expected = [self.key(i) for i in range(1, 80)] + \
                    [self.key(i) for i in range(200, 211)]
-        self.assertEqual(self.visible_keys(), expected)
+        self.assertEqual(self.follower_visible_keys(), expected)
 
     def test_bounded_and_end_open_ended_overlap(self):
         self.setup_follower()
-        self.truncate(start=20, stop=60)
+        self.truncate(start_key=20, stop_key=60)
         self.assert_trunc_log(20, 60)
-        self.truncate(start=50, stop=None)
+        self.truncate(start_key=50, stop_key=None)
         # key 50-60 was deleted by the first truncate; search_near positions it on the
         # nearest in-bound key, 61.
         self.assert_trunc_log(61, self.nitems)
         expected = [self.key(i) for i in range(1, 20)]
-        self.assertEqual(self.visible_keys(), expected)
-        self.assertEqual(self.visible_keys(forward=False), list(reversed(expected)))
+        self.assertEqual(self.follower_visible_keys(), expected)
+        self.assertEqual(self.follower_visible_keys(forward=False), list(reversed(expected)))
 
     def test_bounded_and_start_open_ended_overlap(self):
         self.setup_follower()
-        self.truncate(start=20, stop=60)
+        self.truncate(start_key=20, stop_key=60)
         self.assert_trunc_log(20, 60)
-        self.truncate(start=0, stop=30)
+        self.truncate(start_key=0, stop_key=30)
         # key 20-30 was deleted by the first truncate; search_near positions it on the
         # nearest live key, 19.
         self.assert_trunc_log(1, 19)
         expected = [self.key(i) for i in range(61, self.nitems + 1)]
-        self.assertEqual(self.visible_keys(), expected)
-        self.assertEqual(self.visible_keys(forward=False), list(reversed(expected)))
+        self.assertEqual(self.follower_visible_keys(), expected)
+        self.assertEqual(self.follower_visible_keys(forward=False), list(reversed(expected)))

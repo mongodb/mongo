@@ -29,15 +29,14 @@
 # test_layered_fast_truncate14.py
 #   Ensure next() skips truncated stable keys after search_near lands on an ingest key.
 
-from contextlib import closing
-from typing import Iterable
 from helper_disagg import disagg_test_class, gen_disagg_storages
+from helper_layered_fast_truncate import LayeredFastTruncateConfigMixin
 from wtscenario import make_scenarios
 import wttest
 
 
 @disagg_test_class
-class test_layered_fast_truncate14(wttest.WiredTigerTestCase):
+class test_layered_fast_truncate14(LayeredFastTruncateConfigMixin, wttest.WiredTigerTestCase):
     """next() skips truncated stable keys after search_near lands on an ingest key."""
 
     uris = [
@@ -49,43 +48,7 @@ class test_layered_fast_truncate14(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(disagg_storages, uris)
     conn_config = 'disaggregated=(role="leader"),'
 
-    def session_create_config(self):
-        cfg = "key_format=i,value_format=S"
-        if self.uri.startswith("table"):
-            cfg += ",block_manager=disagg,type=layered"
-        return cfg
-
-    def auto_closing_cursor(self):
-        return closing(self.session.open_cursor(self.uri))
-
-    def populate(self, keys: Iterable[int]):
-        with self.auto_closing_cursor() as cursor:
-            with self.transaction():
-                for key in keys:
-                    cursor[key] = "v"
-
-    def setup_leader(self, keys: Iterable[int] | None = None):
-        self.session.create(self.uri, self.session_create_config())
-        if keys is not None:
-            self.populate(keys)
-        self.session.checkpoint()
-
-    def setup_follower(self, keys: Iterable[int] | None = None):
-        self.reopen_disagg_conn('disaggregated=(role="follower"),')
-        if keys is not None:
-            self.populate(keys)
-
-    def truncate(self, start_key: int, stop_key: int):
-        with (
-            self.auto_closing_cursor() as start,
-            self.auto_closing_cursor() as stop,
-        ):
-            start.set_key(start_key)
-            stop.set_key(stop_key)
-            with self.transaction():
-                self.session.truncate(None, start, stop, None)
-
-    def keys_after_search_near(self, search_key: int) -> list[int]:
+    def keys_after_search_near(self, search_key):
         """
         Position on search_key via search_near (must be an exact match), then
         return all keys yielded by subsequent next() calls.

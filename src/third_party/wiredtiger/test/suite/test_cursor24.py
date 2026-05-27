@@ -34,7 +34,6 @@ import wiredtiger
 from wtscenario import make_scenarios
 
 WT_TS_MAX = 2**64 - 1
-WT_UPDATE_PREPARE_ROLLBACK = 0x080
 
 class test_cursor24(wttest.WiredTigerTestCase):
     uri = 'file:test_cursor24.wt'
