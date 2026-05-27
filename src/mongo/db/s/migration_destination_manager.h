@@ -131,6 +131,7 @@ public:
      * Checks whether the MigrationDestinationManager is currently handling a migration.
      */
     bool isActive() const;
+    bool isActiveOn(const NamespaceString& nss) const;
 
     /**
      * Reports the state of the migration manager as a BSON document.

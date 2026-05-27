@@ -439,6 +439,11 @@ bool MigrationDestinationManager::isActive() const {
     return _isActive(lk);
 }
 
+bool MigrationDestinationManager::isActiveOn(const NamespaceString& nss) const {
+    std::lock_guard<std::mutex> lk(_mutex);
+    return _isActive(lk) && _nss == nss;
+}
+
 bool MigrationDestinationManager::_isActive(WithLock) const {
     return _sessionId.has_value();
 }
