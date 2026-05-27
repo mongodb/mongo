@@ -11,7 +11,8 @@
 //   requires_scripting,
 //   # Time-series collections are views which don't support map-reduce
 //   exclude_from_timeseries_crud_passthrough,
-//   # TODO SERVER-116053: Add support for mapReduce.
+//   # TODO SERVER-127318 (PR #54257): re-enable on WASM once per-request JS context cost is
+//   # eliminated.
 //   mozjs_wasm_unsupported,
 // ]
 

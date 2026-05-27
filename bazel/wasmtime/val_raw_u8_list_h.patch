@@ -1,0 +1,30 @@
+--- a/include/wasmtime/component/val.h
++++ b/include/wasmtime/component/val.h
+@@ -269,6 +269,14 @@
+ /// \brief Value of #wasmtime_component_valkind_t meaning that
+ /// #wasmtime_component_val_t is a map
+ #define WASMTIME_COMPONENT_MAP 22
++/// \brief Value of #wasmtime_component_valkind_t meaning that
++/// #wasmtime_component_val_t is a raw list<u8> fast-path value.
++///
++/// This is a MongoDB extension to avoid per-byte boxing overhead when passing
++/// large byte arrays (e.g. BSON documents) to WASM component functions.
++/// The value is lowered as a list<u8> into WASM memory via a single
++/// copy_from_slice, avoiding N×32-byte intermediate allocations.
++#define WASMTIME_COMPONENT_RAW_U8_LIST 23
+ 
+ struct wasmtime_component_val;
+ struct wasmtime_component_valrecord_entry;
+@@ -376,6 +384,12 @@
+   /// Field used if #wasmtime_component_val_t::kind is
+   /// #WASMTIME_COMPONENT_RESOURCE
+   wasmtime_component_resource_any_t *resource;
++  /// Field used if #wasmtime_component_val_t::kind is
++  /// #WASMTIME_COMPONENT_RAW_U8_LIST.
++  ///
++  /// This is a MongoDB extension: a raw byte buffer that is lowered into WASM
++  /// memory as a list<u8> via a single bulk copy, avoiding per-element boxing.
++  wasm_byte_vec_t raw_u8_list;
+ } wasmtime_component_valunion_t;
+ 
+ /// \brief Represents possible runtime values which a component function can

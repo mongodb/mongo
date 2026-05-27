@@ -1213,6 +1213,8 @@ mongo_cc_unit_test(
             "expression_javascript_test.cpp",
         ],
         "//bazel/config:js_engine_wasm_supported": [
+            "accumulator_js_test.cpp",
+            "expression_javascript_test.cpp",
         ],
         "//bazel/config:js_engine_none": [
         ],

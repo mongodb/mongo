@@ -119,6 +119,17 @@ wc::Func getMozjsFunc(wc::Instance& instance,
     return *func;
 }
 
+wc::Val makeBytesVal(const uint8_t* data, size_t len) {
+    // Follows the same pattern as makeString: directly set the kind and union
+    // field on the C struct so the Val is initialized without triggering any
+    // destructors on uninitialized memory. wasm_byte_vec_new copies the bytes
+    // and the Val destructor later calls wasm_byte_vec_delete to free them.
+    wasmtime_component_val_t raw;
+    raw.kind = WASMTIME_COMPONENT_RAW_U8_LIST;
+    wasm_byte_vec_new(&raw.of.raw_u8_list, len, reinterpret_cast<const wasm_byte_t*>(data));
+    return wc::Val(std::move(raw));
+}
+
 wc::List makeListU8(const uint8_t* data, size_t len) {
     wasmtime_component_vallist_t raw;
     wasmtime_component_vallist_new_uninit(&raw, len);
@@ -139,11 +150,6 @@ wc::Val makeString(std::string_view s) {
     raw.kind = WASMTIME_COMPONENT_STRING;
     wasm_byte_vec_new(&raw.of.string, s.size(), s.data());
     return wc::Val(std::move(raw));
-}
-
-wc::List makeListU8(const BSONObj& obj) {
-    return makeListU8(reinterpret_cast<const uint8_t*>(obj.objdata()),
-                      static_cast<size_t>(obj.objsize()));
 }
 
 std::vector<uint8_t> extractListU8(const wc::Val& v) {
@@ -207,5 +213,10 @@ bool isOomWitError(const wc::Val& witError) {
         }
     }
     return false;
+}
+
+wc::Val convertBsonToWcVal(const BSONObj& bson) {
+    return makeBytesVal(reinterpret_cast<const uint8_t*>(bson.objdata()),
+                        static_cast<size_t>(bson.objsize()));
 }
 }  // namespace mongo::mozjs::wasm::wasm_helpers

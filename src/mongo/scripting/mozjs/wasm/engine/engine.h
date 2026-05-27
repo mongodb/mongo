@@ -46,6 +46,7 @@
 #include "mongo/scripting/mozjs/common/types/numberdecimal.h"
 #include "mongo/scripting/mozjs/common/types/numberint.h"
 #include "mongo/scripting/mozjs/common/types/numberlong.h"
+#include "mongo/scripting/mozjs/common/types/object.h"
 #include "mongo/scripting/mozjs/common/types/oid.h"
 #include "mongo/scripting/mozjs/common/types/regexp.h"
 #include "mongo/scripting/mozjs/common/types/status.h"
@@ -93,6 +94,7 @@ public:
           _maxKeyProto(_cx),
           _minKeyProto(_cx),
           _nativeFunctionProto(_cx),
+          _objectProto(_cx),
           _numberDecimalProto(_cx),
           _numberIntProto(_cx),
           _numberLongProto(_cx),
@@ -174,6 +176,7 @@ public:
         _numberIntProto.install(global);
         _numberLongProto.install(global);
         _oidProto.install(global);
+        _objectProto.install(global);
         _regExpProto.install(global);
         _timestampProto.install(global);
         _statusProto.install(global);
@@ -191,6 +194,7 @@ private:
     WrapType<MaxKeyInfo> _maxKeyProto;
     WrapType<MinKeyInfo> _minKeyProto;
     WrapType<NativeFunctionInfo> _nativeFunctionProto;
+    WrapType<ObjectInfo> _objectProto;
     WrapType<NumberDecimalInfo> _numberDecimalProto;
     WrapType<NumberIntInfo> _numberIntProto;
     WrapType<NumberLongInfo> _numberLongProto;

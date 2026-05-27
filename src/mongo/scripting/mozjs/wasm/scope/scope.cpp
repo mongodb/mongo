@@ -132,31 +132,35 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
     // TODO(SERVER-122738): readOnlyArgs and readOnlyRecv are silently ignored here. In the MozJS
     // implementation these flags cause SpiderMonkey to freeze the corresponding JS objects so that
     // JavaScript code cannot mutate them during execution.
+
+    // Convert BSON to a wc::Val before starting the deadline so the O(N) host-side work is
+    // not charged against the JS function timeout. See bridge.h for details.
+    const BSONObj& bsonArg =
+        (recv && !recv->isEmpty()) ? *recv : (args ? *args : BSONObj::kEmptyObject);
+    auto bsonVal = wasm::wasm_helpers::convertBsonToWcVal(bsonArg);
+
     if (recv && !recv->isEmpty()) {
         if (_emitCallback) {
             uassert(ErrorCodes::BadValue,
                     "emit() cannot be used in a function that returns a value",
                     ignoreReturn);
             _deadlineMonitor.startDeadline(this, timeoutMs);
-            _bridge->invokeMap(func, *recv);
+            _bridge->invokeMap(func, std::move(bsonVal));
             _deadlineMonitor.stopDeadline(this);
             _drainEmitToCallback();
             return 0;
         }
 
         _deadlineMonitor.startDeadline(this, timeoutMs);
-        bool predicateResult = _bridge->invokePredicate(func, *recv);
+        bool predicateResult = _bridge->invokePredicate(func, std::move(bsonVal));
         _deadlineMonitor.stopDeadline(this);
         if (!ignoreReturn) {
             _lastReturnValue = BSON(kReturnValueField << predicateResult);
         }
         return 0;
     }
-
     _deadlineMonitor.startDeadline(this, timeoutMs);
-    // Consider having invokeFunction return the value directly.
-    // This would eliminate the extra round trip to the engine.
-    auto result = _bridge->invokeFunction(func, args ? *args : BSONObj(), ignoreReturn);
+    auto result = _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn);
     _deadlineMonitor.stopDeadline(this);
     uassertStatusOK(result.getStatus());
     if (!ignoreReturn) {
@@ -386,7 +390,7 @@ void WasmtimeImplScope::_installHelpers() {
         "  };"
         "  return null;"
         "}");
-    uassertStatusOK(_bridge->invokeFunction(h, BSONObj()));
+    uassertStatusOK(_bridge->invokeFunction(h, wasm::wasm_helpers::convertBsonToWcVal(BSONObj())));
 }
 
 void WasmtimeImplScope::_drainEmitToCallback() {

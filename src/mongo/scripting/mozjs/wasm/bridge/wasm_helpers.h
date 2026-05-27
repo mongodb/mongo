@@ -67,10 +67,13 @@ wc::List makeListU8(const uint8_t* data, size_t len);
 
 wc::List makeListU8(std::string_view s);
 
+// Fast path for passing large byte arrays to WASM component functions typed
+// as list<u8>.  Returns a Val carrying a RAW_U8_LIST kind that is bulk-copied
+// into WASM linear memory when lowered, avoiding N×32-byte per-byte boxing.
+[[nodiscard]] wc::Val makeBytesVal(const uint8_t* data, size_t len);
+
 // Create a component Val for WIT `string` type (distinct from list<u8>).
 wc::Val makeString(std::string_view s);
-
-wc::List makeListU8(const BSONObj& obj);
 
 std::vector<uint8_t> extractListU8(const wc::Val& v);
 
@@ -84,5 +87,11 @@ bool isFatalWitError(const wc::Val& witError);
 // with an allocation failure message. Fatal OOM (e-oom) is handled by
 // isFatalWitError instead.
 bool isOomWitError(const wc::Val& witError);
+
+// Converts a BSONObj to a wc::Val (list<u8>) suitable for passing to WASM component functions.
+// The bytes are not copied into WASM linear memory until the function is actually invoked
+// (lowering). Call this before starting the deadline timer so the O(N) work is not charged
+// against the JS function timeout.
+[[nodiscard]] wc::Val convertBsonToWcVal(const BSONObj& bson);
 }  // namespace wasm_helpers
 }  // namespace mongo::mozjs::wasm

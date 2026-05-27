@@ -1,5 +1,5 @@
 {
-  "checksum": "c5167d945fea0a88114d893d2437bad55ac3b4e295eaf0ed5348d3ba97edf335",
+  "checksum": "85caffaf4b251683fd2c989e9c45fdef6ac475abf5774a64edee2b414ad7973f",
   "crates": {
     "addr2line 0.26.1": {
       "name": "addr2line",
@@ -17148,7 +17148,14 @@
       "repository": {
         "Http": {
           "url": "https://static.crates.io/crates/wasmtime/44.0.1/download",
-          "sha256": "372db8bbad8ec962038101f75ab2c3ffcd18797d7d3ae877a58ab9873cd0c4bd"
+          "sha256": "372db8bbad8ec962038101f75ab2c3ffcd18797d7d3ae877a58ab9873cd0c4bd",
+          "patches": [
+            "@@//bazel/wasmtime:val_bytes_fast_path.patch",
+            "@@//bazel/wasmtime:val_bytes_wave_fast_path.patch"
+          ],
+          "patch_args": [
+            "-p1"
+          ]
         }
       },
       "targets": [
@@ -17541,7 +17548,9 @@
           "patches": [
             "@@//bazel/wasmtime:store_h.patch",
             "@@//bazel/wasmtime:store_hh.patch",
-            "@@//bazel/wasmtime:store_rs.patch"
+            "@@//bazel/wasmtime:store_rs.patch",
+            "@@//bazel/wasmtime:val_raw_u8_list_h.patch",
+            "@@//bazel/wasmtime:val_raw_u8_list_rs.patch"
           ]
         }
       },
@@ -20185,7 +20194,13 @@
       "repository": {
         "Http": {
           "url": "https://static.crates.io/crates/wasmtime-wast/44.0.1/download",
-          "sha256": "5db969fb0fbd4c3e4acfa73f768b2530b6cec43180902934599b1668480094c2"
+          "sha256": "5db969fb0fbd4c3e4acfa73f768b2530b6cec43180902934599b1668480094c2",
+          "patches": [
+            "@@//bazel/wasmtime:val_bytes_wast_fast_path.patch"
+          ],
+          "patch_args": [
+            "-p1"
+          ]
         }
       },
       "targets": [

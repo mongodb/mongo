@@ -1,0 +1,63 @@
+--- a/src/runtime/component/values.rs
++++ b/src/runtime/component/values.rs
+@@ -79,6 +79,10 @@
+     Char(char),
+     String(String),
+     List(Vec<Val>),
++    /// MongoDB extension: raw byte buffer lowered as list<u8> via bulk copy.
++    /// This is a write-only optimisation: Bytes is produced by C++ callers and
++    /// lowered into WASM linear memory; it is never lifted from WASM output.
++    Bytes(Vec<u8>),
+     /// A map type represented as a list of key-value pairs.
+     /// Duplicate keys are allowed and follow "last value wins" semantics.
+     Map(Vec<(Val, Val)>),
+@@ -431,6 +433,15 @@
+                 next_mut(dst).write(ValRaw::i64(len as i64));
+                 Ok(())
+             }
++            (InterfaceType::List(_), Val::Bytes(bytes)) => {
++                // MongoDB fast path: bulk-copy the byte buffer into WASM
++                // linear memory rather than boxing each byte individually.
++                let ptr = cx.realloc(0, 0, 1, bytes.len())?;
++                cx.as_slice_mut()[ptr..][..bytes.len()].copy_from_slice(bytes);
++                next_mut(dst).write(ValRaw::i64(ptr as i64));
++                next_mut(dst).write(ValRaw::i64(bytes.len() as i64));
++                Ok(())
++            }
+             (InterfaceType::List(_), _) => unexpected(ty, self),
+             (InterfaceType::Map(ty), Val::Map(pairs)) => {
+                 let map_ty = &cx.types[ty];
+@@ -568,6 +579,16 @@
+                 *cx.get(offset + 4) = u32::try_from(len).unwrap().to_le_bytes();
+                 Ok(())
+             }
++            (InterfaceType::List(_), Val::Bytes(bytes)) => {
++                // MongoDB fast path: bulk-copy the byte buffer into WASM
++                // linear memory rather than boxing each byte individually.
++                let ptr = cx.realloc(0, 0, 1, bytes.len())?;
++                cx.as_slice_mut()[ptr..][..bytes.len()].copy_from_slice(bytes);
++                // FIXME(#4311): needs memory64 handling
++                *cx.get(offset + 0) = u32::try_from(ptr).unwrap().to_le_bytes();
++                *cx.get(offset + 4) = u32::try_from(bytes.len()).unwrap().to_le_bytes();
++                Ok(())
++            }
+             (InterfaceType::List(_), _) => unexpected(ty, self),
+             (InterfaceType::Map(ty_idx), Val::Map(values)) => {
+                 let map_ty = &cx.types[ty_idx];
+@@ -690,6 +711,7 @@
+             Val::Float64(_) => "f64",
+             Val::Char(_) => "char",
+             Val::List(_) => "list",
++            Val::Bytes(_) => "list",
+             Val::Map(_) => "map",
+             Val::String(_) => "string",
+             Val::Record(_) => "record",
+@@ -765,6 +787,8 @@
+             (Self::String(_), _) => false,
+             (Self::List(l), Self::List(r)) => l == r,
+             (Self::List(_), _) => false,
++            (Self::Bytes(l), Self::Bytes(r)) => l == r,
++            (Self::Bytes(_), _) => false,
+             (Self::Map(l), Self::Map(r)) => l == r,
+             (Self::Map(_), _) => false,
+             (Self::Record(l), Self::Record(r)) => l == r,

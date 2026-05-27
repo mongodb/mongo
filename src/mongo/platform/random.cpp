@@ -28,6 +28,7 @@
  */
 
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <fstream>  // IWYU pragma: keep
@@ -48,7 +49,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 
-#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H) || defined(__wasi__)
 #include <unistd.h>
 #endif
 
@@ -57,8 +58,9 @@
 
 #ifdef _WIN32
 #define SECURE_RANDOM_BCRYPT
-#elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || \
-    defined(__EMSCRIPTEN__) || defined(__wasi__)
+#elif defined(__wasi__)
+#define SECURE_RANDOM_GETENTROPY
+#elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__EMSCRIPTEN__)
 #define SECURE_RANDOM_URANDOM
 #elif defined(__OpenBSD__)
 #define SECURE_RANDOM_ARCFOUR
@@ -164,6 +166,30 @@ private:
     }
 };
 #endif  // SECURE_RANDOM_URANDOM
+
+#if defined(SECURE_RANDOM_GETENTROPY)
+class Source {
+public:
+    size_t refill(uint8_t* buf, size_t n) {
+        // WASI maps getentropy() to wasi:random/random. It requires each call to
+        // request at most 256 bytes, so we loop for larger buffers.
+        constexpr size_t kMaxChunk = 256;
+        size_t i = 0;
+        while (i < n) {
+            size_t chunk = std::min(n - i, kMaxChunk);
+            if (getentropy(buf + i, chunk) != 0) {
+                // getentropy() under WASI calls wasi:random/random, which should never
+                // fail. If it does, fassertFailed terminates the process via abort(),
+                // which is the only option since there is no errno or log infrastructure
+                // available in the WASI environment.
+                fassertFailed(11605301);
+            }
+            i += chunk;
+        }
+        return n;
+    }
+};
+#endif  // SECURE_RANDOM_GETENTROPY
 
 #if defined(SECURE_RANDOM_ARCFOUR)
 class Source {

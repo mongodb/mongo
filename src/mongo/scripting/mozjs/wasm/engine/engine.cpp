@@ -72,6 +72,7 @@
 #include "js/Interrupt.h"
 #include "js/Realm.h"
 #include "js/SourceText.h"
+#include "js/Stack.h"
 #include "js/String.h"
 #include "js/Value.h"
 #include "js/ValueArray.h"
@@ -205,6 +206,13 @@ err_code_t MozJSScriptEngine::init(const wasm_mozjs_startup_options_t* opt,
 
     // Stash pointer so native callbacks can reach the engine instance.
     JS_SetContextPrivate(_cx, static_cast<MozJSCommonRuntimeInterface*>(this));
+
+    // Arm SpiderMonkey's "too much recursion" guard (passing 0 would disable it).
+    // In WASI builds the size argument is overridden to JS::WASINativeStackLimit
+    // (address 1024), which sits just above the bottom of WASM linear memory and
+    // fires before a stack overflow trap occurs.
+    static constexpr size_t kNativeStackQuota = 512 * 1024;
+    JS_SetNativeStackQuota(_cx, kNativeStackQuota);
 
     _prototypeInstaller = std::make_unique<MozJSPrototypeInstaller>(_cx);
 

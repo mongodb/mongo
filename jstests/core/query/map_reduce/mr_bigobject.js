@@ -9,7 +9,9 @@
 //   requires_fastcount,
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
-//   # TODO SERVER-116053: Add support for mapReduce.
+//   # TODO SERVER-127318 (PR #54257): re-enable on WASM once per-scope memory overhead is reduced;
+//   # the test allocates ~30 MB through the JS engine per reduce call, which combined with the
+//   # current ~200 MB per-mongod WASM module load OOM-kills the primary on memory-constrained hosts.
 //   mozjs_wasm_unsupported,
 // ]
 const coll = db.mr_bigobject;

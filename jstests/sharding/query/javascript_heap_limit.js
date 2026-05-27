@@ -1,7 +1,6 @@
 /**
  * @tags: [
  *   requires_scripting,
- *   # TODO SERVER-116053: Add support for mapReduce.
  *   # TODO SERVER-116054: Add support for $where.
  *   mozjs_wasm_unsupported,
  * ]

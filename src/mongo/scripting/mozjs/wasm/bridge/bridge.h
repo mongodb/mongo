@@ -87,18 +87,16 @@ public:
     bool isKillPending() const;
 
     uint64_t createFunction(std::string_view source);
-    StatusWith<BSONObj> invokeFunction(uint64_t handle,
-                                       const BSONObj& args,
-                                       bool ignoreReturn = false);
+
+    // Invoke variants that accept a wc::Val arg produced by wasm_helpers::convertBsonToWcVal.
+    StatusWith<BSONObj> invokeFunction(uint64_t handle, wc::Val bsonVal, bool ignoreReturn = false);
+    bool invokePredicate(uint64_t handle, wc::Val bsonVal);
+    void invokeMap(uint64_t handle, wc::Val bsonVal);
 
     void setGlobal(std::string_view name, const BSONObj& value);
     BSONObj getGlobal(std::string_view name, bool implicitNull = false);
 
     void setGlobalValue(std::string_view name, const BSONObj& value);
-
-    bool invokePredicate(uint64_t handle, const BSONObj& value);
-
-    void invokeMap(uint64_t handle, const BSONObj& value);
     BSONObj drainEmitBuffer();
     void setupEmit(boost::optional<int64_t> byteLimit);
 

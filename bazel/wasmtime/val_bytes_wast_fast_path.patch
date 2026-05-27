@@ -1,0 +1,10 @@
+--- a/src/component.rs
++++ b/src/component.rs
+@@ -291,6 +291,7 @@
+         Val::Stream(..) => "stream",
+         Val::ErrorContext(..) => "error-context",
+         Val::Map(..) => "map",
++        Val::Bytes(..) => "list",
+     };
+     bail!("expected `{expected}` got `{actual}`")
+ }

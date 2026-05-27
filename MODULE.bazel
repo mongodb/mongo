@@ -396,6 +396,32 @@ crate.annotation(
         "//bazel/wasmtime:store_rs.patch",
         "//bazel/wasmtime:store_h.patch",
         "//bazel/wasmtime:store_hh.patch",
+        "//bazel/wasmtime:val_raw_u8_list_h.patch",
+        "//bazel/wasmtime:val_raw_u8_list_rs.patch",
+    ],
+)
+
+# The val_bytes_* patches add a Val::Bytes variant to the wasmtime component
+# model, enabling a bulk-copy fast path when passing large BSON byte arrays
+# (e.g. mapReduce documents) from C++ into WASM linear memory. Without this,
+# each byte is boxed individually as a Val::U8, producing O(N) allocations for
+# a single document. The patches must be applied to wasmtime, wasmtime-wast
+# (the test harness), and wasmtime-wave (the value serialisation layer) so
+# that all three agree on the Val enum layout.
+# TODO (SERVER-127394): Contribute these patches upstream to the wasmtime repo
+crate.annotation(
+    crate = "wasmtime",
+    patch_args = ["-p1"],
+    patches = [
+        "//bazel/wasmtime:val_bytes_fast_path.patch",
+        "//bazel/wasmtime:val_bytes_wave_fast_path.patch",
+    ],
+)
+crate.annotation(
+    crate = "wasmtime-wast",
+    patch_args = ["-p1"],
+    patches = [
+        "//bazel/wasmtime:val_bytes_wast_fast_path.patch",
     ],
 )
 

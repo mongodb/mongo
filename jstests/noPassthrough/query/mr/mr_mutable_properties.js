@@ -3,8 +3,6 @@
 // in Map, Reduce and Finalize functions
 // @tags: [
 //   requires_scripting,
-//   # TODO SERVER-116053: Add support for mapReduce.
-//   mozjs_wasm_unsupported,
 // ]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -60,7 +58,6 @@ const finalize = function (key, values) {
     key.fed = {cream: 1};
 
     // push properties onto values array arg
-    printjson(values);
     values.food.push(this.feed);
     values.food.push(key.fed);
 

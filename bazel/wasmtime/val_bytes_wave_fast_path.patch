@@ -1,0 +1,10 @@
+--- a/src/runtime/wave/component.rs
++++ b/src/runtime/wave/component.rs
+@@ -132,6 +132,7 @@
+             Self::Char(_) => WasmTypeKind::Char,
+             Self::String(_) => WasmTypeKind::String,
+             Self::List(_) => WasmTypeKind::List,
++            Self::Bytes(_) => WasmTypeKind::List,
+             Self::Record(_) => WasmTypeKind::Record,
+             Self::Tuple(_) => WasmTypeKind::Tuple,
+             Self::Variant(..) => WasmTypeKind::Variant,

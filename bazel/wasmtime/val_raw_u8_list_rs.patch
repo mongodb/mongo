@@ -1,0 +1,41 @@
+--- a/src/component/val.rs
++++ b/src/component/val.rs
+@@ -1,6 +1,6 @@
+ use crate::{
+-    WasmtimeStoreContextMut, handle_result, wasm_name_t, wasmtime_component_resource_type_t,
+-    wasmtime_error_t,
++    WasmtimeStoreContextMut, handle_result, wasm_byte_vec_t, wasm_name_t,
++    wasmtime_component_resource_type_t, wasmtime_error_t,
+ };
+ use std::mem;
+ use std::mem::{ManuallyDrop, MaybeUninit};
+@@ -274,6 +274,9 @@
+     Flags(wasmtime_component_valflags_t),
+     Resource(Box<wasmtime_component_resource_any_t>),
+     Map(wasmtime_component_valmap_t),
++    /// MongoDB extension: raw byte buffer lowered as list<u8> via bulk copy.
++    /// Discriminant 23 matches WASMTIME_COMPONENT_RAW_U8_LIST in the C header.
++    RawU8List(wasm_byte_vec_t),
+ }
+ 
+ impl Default for wasmtime_component_val_t {
+@@ -317,6 +320,7 @@
+             wasmtime_component_val_t::Flags(x) => Val::Flags(x.into()),
+             wasmtime_component_val_t::Map(x) => Val::Map(x.into()),
+             wasmtime_component_val_t::Resource(x) => Val::Resource(x.resource),
++            wasmtime_component_val_t::RawU8List(raw) => Val::Bytes(raw.as_slice().to_vec()),
+         }
+     }
+ }
+@@ -359,6 +363,11 @@
+             Val::Future(_) => todo!(),
+             Val::Stream(_) => todo!(),
+             Val::ErrorContext(_) => todo!(),
++            Val::Bytes(bytes) => {
++                let mut bytevec = wasm_byte_vec_t::default();
++                bytevec.set_buffer(bytes.clone());
++                wasmtime_component_val_t::RawU8List(bytevec)
++            }
+         }
+     }
+ }

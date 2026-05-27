@@ -11,7 +11,9 @@
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
 //   multiversion_incompatible,
-//   # TODO SERVER-116053: Add support for mapReduce.
+//   # TODO SERVER-127318 (PR #54257): re-enable on WASM once per-request JS context cost is
+//   # eliminated. The ~200 MB per-mongod WASM module load combined with the test's large-document
+//   # workload OOM-kills the primary on memory-constrained hosts.
 //   mozjs_wasm_unsupported,
 // ]
 

@@ -228,13 +228,12 @@ uint64_t MozJSWasmBridge::createFunction(std::string_view source) {
 }
 
 StatusWith<BSONObj> MozJSWasmBridge::invokeFunction(uint64_t handle,
-                                                    const BSONObj& args,
+                                                    wc::Val bsonVal,
                                                     bool ignoreReturn) {
     _assertUsable();
     wc::Val arg0(handle);
-    wc::Val arg1(wasm_helpers::makeListU8(args));
     wc::Val result(wc::WitResult::ok(std::nullopt));
-    if (!_callFunc(*_invokeFunctionFunc, &result, 1, std::move(arg0), std::move(arg1))) {
+    if (!_callFunc(*_invokeFunctionFunc, &result, 1, std::move(arg0), std::move(bsonVal))) {
         return Status{ErrorCodes::Error{11542313},
                       str::stream() << "Failed to call to invoke JS function number " << handle};
     }
@@ -248,7 +247,7 @@ StatusWith<BSONObj> MozJSWasmBridge::invokeFunction(uint64_t handle,
 void MozJSWasmBridge::setGlobal(std::string_view name, const BSONObj& value) {
     _assertUsable();
     wc::Val nameArg = wasm_helpers::makeString(name);
-    wc::Val valueArg(wasm_helpers::makeListU8(value));
+    wc::Val valueArg = wasm_helpers::convertBsonToWcVal(value);
     wc::Val result(wc::WitResult::ok(std::nullopt));
     uassert(11542312,
             str::stream() << "Failed to call to set global JS variable " << std::string(name),
@@ -263,7 +262,7 @@ void MozJSWasmBridge::setGlobalValue(std::string_view name, const BSONObj& value
     _assertUsable();
     invariant(value.nFields() == 1);
     wc::Val nameArg = wasm_helpers::makeString(name);
-    wc::Val valueArg(wasm_helpers::makeListU8(value));
+    wc::Val valueArg = wasm_helpers::convertBsonToWcVal(value);
     wc::Val result(wc::WitResult::ok(std::nullopt));
     uassert(11542316,
             str::stream() << "Failed to call to set global JS value variable " << std::string(name),
@@ -287,26 +286,24 @@ void MozJSWasmBridge::setupEmit(boost::optional<int64_t> byteLimit) {
     _assertWitResult(result, "Wasm Bridge failed to setup-emit");
 }
 
-void MozJSWasmBridge::invokeMap(uint64_t handle, const BSONObj& args) {
+void MozJSWasmBridge::invokeMap(uint64_t handle, wc::Val bsonVal) {
     _assertUsable();
     wc::Val arg0(handle);
-    wc::Val arg1(wasm_helpers::makeListU8(args));
     wc::Val result(wc::WitResult::ok(std::nullopt));
     uassert(11542319,
             str::stream() << "Failed to call to invoke JS function number " << handle,
-            _callFunc(*_invokeMapFunc, &result, 1, std::move(arg0), std::move(arg1)));
+            _callFunc(*_invokeMapFunc, &result, 1, std::move(arg0), std::move(bsonVal)));
     _assertWitResult(result,
                      str::stream() << "Failed to invoke JS function :: function id = " << handle);
 }
 
-bool MozJSWasmBridge::invokePredicate(uint64_t handle, const BSONObj& args) {
+bool MozJSWasmBridge::invokePredicate(uint64_t handle, wc::Val bsonVal) {
     _assertUsable();
     wc::Val arg0(handle);
-    wc::Val arg1(wasm_helpers::makeListU8(args));
     wc::Val result(wc::WitResult::ok(std::nullopt));
     uassert(11542339,
             str::stream() << "Failed to call to invoke JS function number " << handle,
-            _callFunc(*_invokePredicateFunc, &result, 1, std::move(arg0), std::move(arg1)));
+            _callFunc(*_invokePredicateFunc, &result, 1, std::move(arg0), std::move(bsonVal)));
     _assertWitResult(result,
                      str::stream() << "Failed to invoke JS predicate :: function id = " << handle);
     const wc::Val* payload = result.get_result().payload();
