@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -37,6 +38,8 @@
 #include "mongo/db/query/compiler/metadata/path_arrayness_test_helpers.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
+
+#include <limits>
 
 namespace mongo {
 
@@ -750,6 +753,88 @@ TEST(CanPathBeArrayForNss, FieldRefOverloadDelegatesToMainForMainNss) {
     ASSERT_FALSE(expCtx->canPathBeArrayForNss(FieldRef("a.b"), nss));
     // Invalid FieldRef returns conservative true.
     ASSERT_TRUE(expCtx->canPathBeArrayForNss(FieldRef(""), nss));
+}
+
+TEST(PathArraynessEpoch, DefaultEpochIsZero) {
+    PathArrayness pa;
+    ASSERT_EQ(pa.epoch(), 0u);
+}
+
+TEST(PathArraynessEpoch, ExplicitEpoch) {
+    PathArrayness pa(42);
+    ASSERT_EQ(pa.epoch(), 42u);
+}
+
+TEST(PathArraynessEpoch, CopyPreservesEpoch) {
+    PathArrayness original(7);
+    PathArrayness copy(original);
+    ASSERT_EQ(copy.epoch(), 7u);
+}
+
+TEST(PathArraynessEpoch, IncrementEpoch) {
+    PathArrayness pa(5);
+    pa.incrementEpoch();
+    ASSERT_EQ(pa.epoch(), 6u);
+}
+
+TEST(PathArraynessEpoch, IncrementEpochWrapsToZeroOnOverflow) {
+    PathArrayness pa(std::numeric_limits<uint64_t>::max());
+    pa.incrementEpoch();
+    ASSERT_EQ(pa.epoch(), 0u);
+}
+
+TEST(UassertIfInvalidatedPaths, NoPrevEpochCanThrow) {
+    MonotonicallyIncreasingFieldPathSet nonArrayPaths;
+    nonArrayPaths.insert(FieldPath("a.b"));
+
+    PathArrayness current(5);
+    current.addPath(FieldPath("a.b"), MultikeyComponents{1}, true);
+
+    PathArraynessChecker checker{nonArrayPaths, boost::none};
+    ASSERT_THROWS_CODE(checker.uassertIfInvalidatedAndSyncEpoch(
+                           current, NamespaceString::createNamespaceString_forTest("test.coll")),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
+}
+
+TEST(UassertIfInvalidatedPaths, IfPrevEpochMatchesInvalidationIsSkipped) {
+    MonotonicallyIncreasingFieldPathSet nonArrayPaths;
+    nonArrayPaths.insert(FieldPath("a.b"));
+
+    PathArrayness current(7);
+    current.addPath(FieldPath("a.b"), MultikeyComponents{1}, true);
+
+    // Degenerate case, where the epoch matches but the underlying arrayness differs.
+    PathArraynessChecker checker{nonArrayPaths, 7u};
+    checker.uassertIfInvalidatedAndSyncEpoch(
+        current, NamespaceString::createNamespaceString_forTest("test.coll"));
+}
+
+TEST(UassertIfInvalidatedPaths, EpochIsUpdated) {
+    MonotonicallyIncreasingFieldPathSet nonArrayPaths;
+    nonArrayPaths.insert(FieldPath("a.b"));
+
+    PathArrayness current(10);
+    current.addPath(FieldPath("a.b"), MultikeyComponents{}, true);
+
+    PathArraynessChecker checker{nonArrayPaths, 9u};
+    checker.uassertIfInvalidatedAndSyncEpoch(
+        current, NamespaceString::createNamespaceString_forTest("test.coll"));
+    ASSERT_EQ(*checker.prevEpoch, 10u);
+}
+
+TEST(UassertIfInvalidatedPaths, InvalidationRunsWhenEpochIsStale) {
+    MonotonicallyIncreasingFieldPathSet nonArrayPaths;
+    nonArrayPaths.insert(FieldPath("a.b"));
+
+    PathArrayness current(10);
+    current.addPath(FieldPath("a.b"), MultikeyComponents{1}, true);
+
+    PathArraynessChecker checker{nonArrayPaths, 9u};
+    ASSERT_THROWS_CODE(checker.uassertIfInvalidatedAndSyncEpoch(
+                           current, NamespaceString::createNamespaceString_forTest("test.coll")),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
 }
 
 }  // namespace mongo

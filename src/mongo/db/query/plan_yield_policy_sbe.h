@@ -88,7 +88,7 @@ public:
         // PlanYieldPolicySBE need not depend on CollectionQueryInfo directly.
         std::function<std::shared_ptr<const PathArrayness>(const CollectionPtr&)> getPathArrayness;
 
-        void uassertIfInvalidated();
+        void uassertIfInvalidatedAndSyncEpoch();
     };
 
     /**

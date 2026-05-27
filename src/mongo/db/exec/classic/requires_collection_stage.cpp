@@ -83,7 +83,7 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
 
     if (expCtx()->getQueryKnobConfiguration().getEnablePathArrayness()) {
         if (auto current = CollectionQueryInfo::get(coll).getPathArrayness()) {
-            _pathArraynessChecker.uassertIfInvalidated(*current, coll->ns());
+            _pathArraynessChecker.uassertIfInvalidatedAndSyncEpoch(*current, coll->ns());
         }
     }
 

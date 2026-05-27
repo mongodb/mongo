@@ -268,7 +268,8 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
         !expCtx->getNonArrayPathsForNss().empty()) {
         stdx::unordered_map<NamespaceString, PathArraynessChecker> perNss;
         for (auto& [nss, paths] : expCtx->getNonArrayPathsForNss()) {
-            perNss.emplace(nss, PathArraynessChecker{.nonArrayPaths = paths});
+            perNss.emplace(nss,
+                           PathArraynessChecker{.nonArrayPaths = paths, .prevEpoch = boost::none});
         }
         yieldPolicy->setMultipleCollectionPathArraynessChecker(
             {MultipleCollectionAccessor{collections},

@@ -67,7 +67,8 @@ public:
           _catalogEpoch(getCatalogEpoch()),
           _nss(coll.getCollectionPtr()->ns()),
           _pathArraynessChecker{.nonArrayPaths =
-                                    expCtx->nonArrayPathsForNss(coll.getCollectionPtr()->ns())} {}
+                                    expCtx->nonArrayPathsForNss(coll.getCollectionPtr()->ns()),
+                                .prevEpoch = boost::none} {}
 
     ~RequiresCollectionStage() override = default;
 

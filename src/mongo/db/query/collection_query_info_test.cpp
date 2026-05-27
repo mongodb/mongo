@@ -284,6 +284,33 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultipleIndexes) {
         ASSERT_FALSE(pathArrayness.get()->canPathBeArray("b", &expCtx));
     }
 }
+TEST_F(CollectionQueryInfoTest, PathArraynessUpdateForSetMultikeyIncrementsEpoch) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+    std::vector<BSONObj> docs;
+    for (int i = 0; i < 10; ++i) {
+        docs.push_back(BSON("_id" << i << "a" << i));
+    }
+    ce::createCollAndInsertDocuments(operationContext(), _kTestNss, docs);
+    ASSERT_OK(mongo::createIndex(operationContext(), _kTestNss.ns_forTest(), BSON("a" << 1)));
+
+    uint64_t epochBefore;
+    {
+        const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+        epochBefore = CollectionQueryInfo::get(coll.getCollection().getCollectionPtr())
+                          .getPathArrayness()
+                          ->epoch();
+    }
+
+    insertDocuments(_kTestNss, {BSON("_id" << 100 << "a" << BSON_ARRAY(1 << 2))});
+
+    {
+        const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
+        ASSERT_EQ(CollectionQueryInfo::get(coll.getCollection().getCollectionPtr())
+                      .getPathArrayness()
+                      ->epoch(),
+                  epochBefore + 1);
+    }
+}
 }  // namespace
 }  // namespace mongo
 

@@ -87,7 +87,8 @@ void PlanYieldPolicySBE::restoreState(OperationContext* opCtx,
     uassertIfPathArraynessInvalidated();
 }
 
-void PlanYieldPolicySBE::MultipleCollectionPathArraynessChecker::uassertIfInvalidated() {
+void PlanYieldPolicySBE::MultipleCollectionPathArraynessChecker::
+    uassertIfInvalidatedAndSyncEpoch() {
     collections.forEach([&](const CollectionPtr& coll) {
         if (!coll) {
             return;
@@ -98,7 +99,7 @@ void PlanYieldPolicySBE::MultipleCollectionPathArraynessChecker::uassertIfInvali
         }
         auto current = getPathArrayness(coll);
         tassert(12567300, "Expected path arrayness to be set on CollectionQueryInfo", current);
-        it->second.uassertIfInvalidated(*current, coll->ns());
+        it->second.uassertIfInvalidatedAndSyncEpoch(*current, coll->ns());
     });
 }
 
@@ -109,7 +110,7 @@ void PlanYieldPolicySBE::setMultipleCollectionPathArraynessChecker(
 
 void PlanYieldPolicySBE::uassertIfPathArraynessInvalidated() {
     if (_multipleCollectionsPathArraynessChecker) {
-        _multipleCollectionsPathArraynessChecker->uassertIfInvalidated();
+        _multipleCollectionsPathArraynessChecker->uassertIfInvalidatedAndSyncEpoch();
     }
 }
 

@@ -72,8 +72,9 @@ private:
 
 struct PathArraynessChecker {
     const MonotonicallyIncreasingFieldPathSet nonArrayPaths;
+    boost::optional<uint64_t> prevEpoch;
 
-    void uassertIfInvalidated(const PathArrayness& current, const NamespaceString& ns);
+    void uassertIfInvalidatedAndSyncEpoch(const PathArrayness& current, const NamespaceString& ns);
 };
 
 /**
@@ -84,9 +85,17 @@ class PathArrayness {
     class TrieNode;
 
 public:
-    PathArrayness() {}
+    explicit PathArrayness(uint64_t epoch = 0) : _epoch(epoch) {}
 
     ~PathArrayness() = default;
+
+    uint64_t epoch() const {
+        return _epoch;
+    }
+
+    void incrementEpoch() {
+        ++_epoch;
+    }
 
     /**
      * Returns the first path in 'nonArrayPaths' that is now possibly-array in 'current', or
@@ -216,6 +225,8 @@ private:
          */
         bool _canBeArray = true;
     };
+
+    uint64_t _epoch = 0;
 
     /**
      * The root to the trie.

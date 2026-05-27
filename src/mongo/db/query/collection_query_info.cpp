@@ -216,14 +216,16 @@ void CollectionQueryInfo::updatePathArraynessForSetMultikey(
             std::make_shared<PathArrayness>(*_pathArraynessState.pathArrayness.get());
         newPathArrayness->addPathsFromIndexKeyPattern(
             descriptor.keyPattern(), multikeyPaths, false /* isFullRebuild */);
+        newPathArrayness->incrementEpoch();
         // Re-assign PathArrayness pointer.
         _pathArraynessState.pathArrayness = std::move(newPathArrayness);
     }
 }
 
 void CollectionQueryInfo::rebuildPathArrayness(OperationContext* opCtx, const Collection* coll) {
+    auto prevEpoch = _pathArraynessState.pathArrayness->epoch();
     // Create a new pathArrayness that we populate before unseating the shared_ptr.
-    auto newPathArrayness = std::make_shared<PathArrayness>();
+    auto newPathArrayness = std::make_shared<PathArrayness>(prevEpoch + 1);
     auto ii = coll->getIndexCatalog()->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();

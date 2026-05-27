@@ -221,8 +221,13 @@ boost::optional<FieldPath> PathArrayness::getFirstInvalidatedPath(
     return boost::none;
 }
 
-void PathArraynessChecker::uassertIfInvalidated(const PathArrayness& current,
-                                                const NamespaceString& ns) {
+void PathArraynessChecker::uassertIfInvalidatedAndSyncEpoch(const PathArrayness& current,
+                                                            const NamespaceString& ns) {
+    auto currentEpoch = current.epoch();
+    if (prevEpoch.has_value() && *prevEpoch == currentEpoch) {
+        return;
+    }
+    prevEpoch = currentEpoch;
     if (auto invalidated = PathArrayness::getFirstInvalidatedPath(nonArrayPaths, current)) {
         pathArraynessQueriesFailedDueToInvalidation.increment();
         uasserted(
