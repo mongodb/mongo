@@ -146,6 +146,9 @@ BuildInfo getBuildInfo() {
     reply.setBits(static_cast<int>(sizeof(void*)) * CHAR_BIT);
     reply.setDebug(kDebugBuild);
     reply.setMaxBsonObjectSize(BSONObjMaxUserSize);
+#ifdef MONGO_CONFIG_OTEL
+    reply.setOpentelemetry(true);
+#endif
 #ifdef __APPLE__
     reply.setMacOS(generateMacOSInfo());
 #endif

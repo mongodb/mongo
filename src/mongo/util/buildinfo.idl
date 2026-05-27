@@ -122,6 +122,10 @@ structs:
                 description: "List of available storage engines; e.g. ['wt']"
                 type: array<string>
                 optional: true
+            opentelemetry:
+                description: "Whether or not this build was compiled with OpenTelemetry support"
+                type: safeBool
+                optional: true
 
             mongotmock:
                 description: "TRUE when provided by mongotmock"
