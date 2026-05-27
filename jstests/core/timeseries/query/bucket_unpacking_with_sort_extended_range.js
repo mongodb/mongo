@@ -13,16 +13,14 @@
  *     # We need a timeseries collection.
  *     requires_timeseries,
  *     requires_getmore,
+ *     # The test performs explicit chunk split/move operations, which conflict with balancer activity.
+ *     assumes_balancer_off,
  * ]
  */
 import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
-import {
-    isShardedTimeseries,
-    numberOfShardsForTimeseriesCollection,
-    runTimeseriesChunkCommand,
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {isShardedTimeseries, runTimeseriesChunkCommand} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getAllNodeExplains, getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const dbName = jsTestName();
 const testDB = db.getSiblingDB(dbName);
@@ -178,8 +176,7 @@ function checkAgainstReferenceBoundedSortUnexpected(collection, reference, pipel
         const bounded = getAggPlanStages(plan, "$_internalBoundedSort");
         const blocking = getAggPlanStages(plan, "$sort");
         assert.gt(blocking.length, 0, {bounded, blocking, plan});
-        if (!TestData.hasRandomShardsAddedRemoved)
-            assert.lt(bounded.length, numberOfShardsForTimeseriesCollection(coll), {bounded, blocking, plan});
+        assert.lt(bounded.length, getAllNodeExplains(plan).length, {bounded, blocking, plan});
     } else {
         const stages = getAggPlanStages(plan, "$_internalBoundedSort");
         assert.eq([], stages, plan);

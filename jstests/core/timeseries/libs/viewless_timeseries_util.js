@@ -6,7 +6,6 @@
 import {getCommandName} from "jstests/libs/cmd_object_utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isFCVlt, isStableFCVSuite} from "jstests/libs/feature_compatibility_version.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
@@ -268,18 +267,6 @@ export function isShardedTimeseries(coll) {
  */
 export function isTrackedTimeseries(coll) {
     return findTimeseriesConfigCollectionsDocument(coll) !== null;
-}
-
-/**
- * TODO SERVER-101609 once 9.0 becomes last LTS we can remove this function and directly use
- * FixtureHelpers::numberOfShardsForCollection on the given collection.
- */
-export function numberOfShardsForTimeseriesCollection(coll) {
-    const collEntry = findTimeseriesConfigCollectionsDocument(coll);
-    if (collEntry === null) {
-        return 1;
-    }
-    return coll.getDB().getSiblingDB("config").chunks.distinct("shard", {uuid: collEntry.uuid}).length;
 }
 
 /**
