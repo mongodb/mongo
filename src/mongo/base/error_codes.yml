@@ -1258,12 +1258,12 @@ error_codes:
       name: StreamProcessorIcebergRetryableError,
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
-
-  - {
-      code: 505,
-      name: InterruptedDueToLogServerDisconnect,
-      categories: [Interruption],
-    }
+  # Removed in v9.0
+  # - {
+  #     code: 505,
+  #     name: InterruptedDueToLogServerDisconnect,
+  #     categories: [Interruption],
+  #   }
 
   - {code: 506, name: NodeInStepDownPeriod, categories: [RetriableError]}
 
