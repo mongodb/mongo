@@ -60,7 +60,6 @@ public:
      */
     constexpr MetricName(StringData name, Passkey<MetricNameMaker>) : _name(name) {}
     constexpr MetricName(StringData name, Passkey<disagg::MetricNameMaker>) : _name(name) {}
-
     constexpr StringData getName() const {
         return _name;
     }
@@ -78,6 +77,19 @@ class MONGO_MOD_FILE_PRIVATE MetricNameMaker{public : static constexpr MetricNam
     StringData name){return MetricName(name, Passkey<MetricNameMaker>{});
 }  // namespace otel::metrics
 };  // namespace mongo
+
+/**
+ * Helper to create MetricName instances with runtime-constructed names (e.g. names that embed
+ * device names or mount paths discovered at startup). Requires N&O review since dynamic names
+ * cannot be audited at compile time.
+ *
+ * TODO(SERVER-127521): Ensure ServerStatusOptions is boost::none for any runtime metric.
+ */
+class MONGO_MOD_PUBLIC DynamicMetricNameMaker{
+    public : static MetricName make(StringData name){return MetricNameMaker::make(name);
+}
+}
+;
 
 /**
  * Central registry of OpenTelemetry metric names used in the server. When adding a new metric to

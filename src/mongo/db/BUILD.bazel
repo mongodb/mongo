@@ -2810,6 +2810,8 @@ mongo_cc_library(
         "startup_warnings_mongod",
         "//src/mongo/db/storage:backup_cursor_hooks",
         "//src/mongo/db/storage:disk_space_monitor",
+        "//src/mongo/otel/metrics/instrumentation:disk_metrics",
+        "//src/mongo/otel/metrics/instrumentation:system_mount_metrics",
         "//src/mongo/db/storage:oplog_truncation",
         "//src/mongo/db/storage:storage_control",
         "system_index",

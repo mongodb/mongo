@@ -1,0 +1,71 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+    ]),
+)
+
+mongo_cc_library(
+    name = "disk_metrics",
+    srcs_select = [{
+        "@platforms//os:linux": ["disk_metrics_linux.cpp"],
+        "//conditions:default": ["disk_metrics_noop.cpp"],
+    }],
+    deps = [
+        "//src/mongo/db:service_context",
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/otel/metrics:otel_metrics_service",
+            "//src/mongo/util:periodic_runner",
+            "//src/mongo/util:procparser",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "disk_metrics_test",
+    srcs = ["disk_metrics_test.cpp"],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":disk_metrics",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_library(
+    name = "system_mount_metrics",
+    srcs_select = [{
+        "@platforms//os:linux": ["system_mount_metrics_linux.cpp"],
+        "//conditions:default": ["system_mount_metrics_noop.cpp"],
+    }],
+    deps = [
+        "//src/mongo/db:service_context",
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/otel/metrics:otel_metrics_service",
+            "//src/mongo/util:periodic_runner",
+            "//src/mongo/util:procparser",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "system_mount_metrics_test",
+    srcs = ["system_mount_metrics_test.cpp"],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":system_mount_metrics",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
