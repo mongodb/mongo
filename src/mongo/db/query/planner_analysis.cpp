@@ -1368,6 +1368,13 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
 
     if (!solnRoot->fetched()) {
         const bool sortIsCovered = std::all_of(sortObj.begin(), sortObj.end(), [&](BSONElement e) {
+            // Meta expression sort components (e.g. {$meta: "randVal"}) cannot be covered by
+            // index keys for they require metadata generation which only happens after a fetch.
+            // The element value is an object ({$meta: ...}) rather than a numeric direction.
+            if (!e.isNumber()) {
+                return false;
+            }
+
             // Note that hasField() will return 'false' in the case that this field is a
             // string and there is a non-simple collation on the index. This will lead to
             // encoding of the field from the document on fetch, despite having read the

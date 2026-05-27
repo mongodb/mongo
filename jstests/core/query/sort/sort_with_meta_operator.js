@@ -2,7 +2,7 @@
 // Note that sorting with 'searchScore' and 'vectorSearchScore' are separated out to use an
 // end_to_end mongot test.
 // This test was adjusted as we start to allow sorting by "searchScore".
-// @tags: [featureFlagRankFusionFull, requires_fcv_81, requires_getmore]
+// @tags: [featureFlagRankFusionFull, requires_fcv_83, requires_getmore]
 
 const coll = db.sort_with_meta_operator;
 coll.drop();
@@ -85,3 +85,27 @@ assert.eq(coll.aggregate([{$sort: {p: 1, _id: {$meta: "randVal"}}}]).toArray(), 
     {_id: 1, p: 1},
     {_id: 2, p: 2},
 ]);
+
+// Verify that a meta sort on a field that shares its name with an indexed field does not crash.
+assert.commandWorked(coll.createIndex({p: 1}));
+assert.eq(
+    coll
+        .find()
+        .sort({p: {$meta: "randVal"}})
+        .itcount(),
+    4,
+);
+assert.eq(
+    coll
+        .find({p: {$gte: -2}})
+        .sort({p: {$meta: "randVal"}})
+        .itcount(),
+    4,
+);
+assert.eq(
+    coll
+        .find({p: {$gte: -2}})
+        .sort({p: {$meta: "randVal"}, _id: 1})
+        .itcount(),
+    4,
+);
