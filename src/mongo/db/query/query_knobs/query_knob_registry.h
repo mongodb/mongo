@@ -140,4 +140,34 @@ private:
 };
 
 }  // namespace detail
+
+// clang-format off
+// See query_knob.h for the full X-macro framework documentation and usage.
+
+// Internal: defines the global QueryKnob variable for each EXPAND row (kExplicit skips
+// auto-registration; MONGO_DETAIL_INITIALIZE_QUERY_KNOBS handles registration instead).
+#define MONGO_DETAIL_DEFINE_QUERY_KNOB(var, name, global)           \
+    decltype(var) var{name, &readGlobalValue<global>,               \
+                      decltype(var)::RegistrationMode::kExplicit};
+
+// Internal: registers one knob into QueryKnobDescriptorSet; called inside the initializer body.
+#define MONGO_DETAIL_INITIALIZE_QUERY_KNOB(var, name, global) \
+    QueryKnobDescriptorSet::get().add(var);
+
+// Internal: emits a MONGO_INITIALIZER that runs before QueryKnobRegistryInit and registers all
+// knobs in EXPAND into QueryKnobDescriptorSet.
+#define MONGO_DETAIL_INITIALIZE_QUERY_KNOBS(group, EXPAND)                 \
+    namespace {                                                            \
+    MONGO_INITIALIZER_GENERAL(group##_init, (), ("QueryKnobRegistryInit")) \
+        (InitializerContext*) {                                            \
+            EXPAND(MONGO_DETAIL_INITIALIZE_QUERY_KNOB)                     \
+        }                                                                  \
+    } // namespace
+
+// Defines knob globals and registers them via a MONGO_INITIALIZER. Place in the group .cpp inside
+// the knob namespace. GroupName becomes the initializer name (group##_init).
+#define REGISTER_QUERY_KNOBS(group, EXPAND)            \
+    EXPAND(MONGO_DETAIL_DEFINE_QUERY_KNOB)             \
+    MONGO_DETAIL_INITIALIZE_QUERY_KNOBS(group, EXPAND)
+// clang-format on
 }  // namespace mongo

@@ -29,18 +29,15 @@
 
 #include "mongo/db/query/query_knobs/query_knob_test_knobs.h"
 
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/query_knobs/query_knob_registry.h"
 #include "mongo/db/query/query_knobs/query_knob_test_gen.h"
 #include "mongo/idl/idl_parser.h"
 
 namespace mongo {
-
 namespace test_knobs {
-QueryKnob<int> testIntKnob{"testIntKnob", &readGlobalValue<gTestIntKnob>};
-QueryKnob<double> testDoubleKnob{"testDoubleKnob", &readGlobalValue<gTestDoubleKnob>};
-QueryKnob<bool> testBoolKnob{"testBoolKnob", &readGlobalValue<gTestBoolKnob>};
-QueryKnob<long long> testLLKnob{"testLLKnob", &readGlobalValue<gTestLLKnob>};
-QueryKnob<TestKnobModeEnum> testEnumKnob{"testEnumKnob", &readGlobalValue<TestEnumKnob>};
+REGISTER_QUERY_KNOBS(TestKnobs, MONGO_EXPAND_QUERY_KNOBS_TEST)
 }  // namespace test_knobs
 
 void TestEnumKnob::append(OperationContext*,

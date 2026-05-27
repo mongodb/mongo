@@ -40,6 +40,7 @@
 #include <cstdint>
 #include <limits>
 #include <type_traits>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -112,9 +113,11 @@ struct QueryKnobId {
 };
 
 /**
- * Type-erased descriptor for a single query knob. Each typed QueryKnob<T> inherits from this and
- * self-registers into QueryKnobDescriptorSet at static init time. The index field is left as a
- * sentinel (~0) until QueryKnobRegistry assigns dense indices during startup.
+ * Type-erased descriptor for a single query knob. Typed QueryKnob<T> objects inherit from this.
+ * Registration into QueryKnobDescriptorSet happens automatically at static init time unless
+ * RegistrationMode::kExplicit is passed, in which case the caller is responsible for registering
+ * the knob. The index field is left as a sentinel (~0) until QueryKnobRegistry assigns dense
+ * indices during startup.
  *
  * Non-copyable to prevent object slicing when used through the base pointer.
  */
@@ -219,17 +222,36 @@ struct ConverterTraits<bool> {
     }
 };
 
+/**
+ * Helpers for inferring the query knob value type from a global.
+ */
+template <auto& V>
+requires AtomicLoadable<std::remove_cvref_t<decltype(V)>>
+auto queryKnobValueType() -> decltype(V.load());
+
+template <typename SPT>
+requires EnumServerParameter<SPT>
+auto queryKnobValueType() -> std::remove_cvref_t<decltype(std::declval<SPT>()._data.get())>;
+
 }  // namespace detail
 
 /**
- * Typed descriptor. Self-registers into QueryKnobDescriptorSet at static init time.
+ * Typed descriptor. With RegistrationMode::kAuto (the default), self-registers into
+ * QueryKnobDescriptorSet at static init time. With RegistrationMode::kExplicit, construction does
+ * not register the knob; the caller must invoke QueryKnobDescriptorSet::get().add(*this) manually.
  * fromBSON/toBSON auto-wired via ConverterTraits<T>.
  */
 template <typename T>
 class QueryKnob final : public QueryKnobBase {
 public:
-    QueryKnob(StringData name, ReadGlobalFn readFn) : QueryKnobBase(name, readFn) {
-        QueryKnobDescriptorSet::get().add(*this);
+    enum class RegistrationMode : bool { kAuto, kExplicit };
+    QueryKnob(StringData name,
+              ReadGlobalFn readFn,
+              RegistrationMode registrationMode = QueryKnob::RegistrationMode::kAuto)
+        : QueryKnobBase(name, readFn) {
+        if (registrationMode == RegistrationMode::kAuto) {
+            QueryKnobDescriptorSet::get().add(*this);
+        }
     }
 
     QueryKnobValue fromBSON(const BSONElement& elem) override {
@@ -242,3 +264,35 @@ public:
 };
 
 }  // namespace mongo
+
+// clang-format off
+/**
+ * X-macro framework for declaring and registering groups of QueryKnobs.
+ *
+ * Define an EXPAND table with one row per knob:
+ *
+ *   #define MY_EXPAND(KNOB)                                          \
+ *       KNOB(myIntKnob,  "myIntParam",  gMyIntAtomicGlobal)          \
+ *       KNOB(myEnumKnob, "myEnumParam", MyEnumServerParam)
+ *
+ *   var    — C++ identifier for the QueryKnob variable
+ *   name   — server parameter string (must match the ServerParameter IDL name)
+ *   global — atomic global for scalar knobs; ServerParameter type for enum knobs
+ *
+ * In the group header (inside the knob namespace):
+ *   DECLARE_QUERY_KNOBS(GroupName, MY_EXPAND)
+ *
+ * In the group .cpp (inside the knob namespace):
+ *   REGISTER_QUERY_KNOBS(GroupName, MY_EXPAND)  // see query_knob_registry.h
+ *
+ * See query_knob_test_knobs.h/cpp for a worked example.
+ */
+
+// Internal: emits one extern QueryKnob declaration per EXPAND row.
+#define MONGO_DETAIL_DECLARE_QUERY_KNOB(var, name, global) \
+    extern QueryKnob<decltype(detail::queryKnobValueType<global>())> var;
+
+// Declares all knobs in EXPAND. Place in the group header inside the knob namespace.
+#define DECLARE_QUERY_KNOBS(group, EXPAND) \
+    EXPAND(MONGO_DETAIL_DECLARE_QUERY_KNOB)
+// clang-format on

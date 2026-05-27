@@ -32,12 +32,16 @@
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_knobs/query_knob_test_gen.h"
 
+// clang-format off
+#define MONGO_EXPAND_QUERY_KNOBS_TEST(KNOB) \
+    KNOB(testIntKnob, "testIntKnob", gTestIntKnob) \
+    KNOB(testDoubleKnob, "testDoubleKnob", gTestDoubleKnob) \
+    KNOB(testBoolKnob, "testBoolKnob", gTestBoolKnob) \
+    KNOB(testLLKnob, "testLLKnob", gTestLLKnob) \
+    KNOB(testEnumKnob, "testEnumKnob", TestEnumKnob)
+    /**/
+// clang-format on
+
 namespace mongo::test_knobs {
-
-extern QueryKnob<int> testIntKnob;
-extern QueryKnob<double> testDoubleKnob;
-extern QueryKnob<bool> testBoolKnob;
-extern QueryKnob<long long> testLLKnob;
-extern QueryKnob<TestKnobModeEnum> testEnumKnob;
-
+DECLARE_QUERY_KNOBS(TestKnobs, MONGO_EXPAND_QUERY_KNOBS_TEST)
 }  // namespace mongo::test_knobs
