@@ -37,6 +37,7 @@
 #include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/mozjs/wasm/wasmtime_engine.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 namespace mongo::mozjs {
@@ -145,23 +146,31 @@ int WasmtimeImplScope::invoke(ScriptingFunction func,
                     "emit() cannot be used in a function that returns a value",
                     ignoreReturn);
             _deadlineMonitor.startDeadline(this, timeoutMs);
-            _bridge->invokeMap(func, std::move(bsonVal));
-            _deadlineMonitor.stopDeadline(this);
+            {
+                ScopeGuard mapGuard([&] { _deadlineMonitor.stopDeadline(this); });
+                _bridge->invokeMap(func, std::move(bsonVal));
+            }
             _drainEmitToCallback();
             return 0;
         }
 
+        bool predicateResult;
         _deadlineMonitor.startDeadline(this, timeoutMs);
-        bool predicateResult = _bridge->invokePredicate(func, std::move(bsonVal));
-        _deadlineMonitor.stopDeadline(this);
+        {
+            ScopeGuard predGuard([&] { _deadlineMonitor.stopDeadline(this); });
+            predicateResult = _bridge->invokePredicate(func, std::move(bsonVal));
+        }
         if (!ignoreReturn) {
             _lastReturnValue = BSON(kReturnValueField << predicateResult);
         }
         return 0;
     }
+    StatusWith<BSONObj> result{BSONObj{}};
     _deadlineMonitor.startDeadline(this, timeoutMs);
-    auto result = _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn);
-    _deadlineMonitor.stopDeadline(this);
+    {
+        ScopeGuard funcGuard([&] { _deadlineMonitor.stopDeadline(this); });
+        result = _bridge->invokeFunction(func, std::move(bsonVal), ignoreReturn);
+    }
     uassertStatusOK(result.getStatus());
     if (!ignoreReturn) {
         // invokeFunction's direct return goes through getGlobal which flattens JS arrays
@@ -354,7 +363,7 @@ void WasmtimeImplScope::kill() {
         _bridge->kill();
 }
 bool WasmtimeImplScope::isKillPending() const {
-    return _bridge->isKillPending();
+    return _bridge && _bridge->isKillPending();
 }
 
 bool WasmtimeImplScope::hasOutOfMemoryException() {
