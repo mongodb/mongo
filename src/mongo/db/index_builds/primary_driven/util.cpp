@@ -124,6 +124,11 @@ Status start(OperationContext* opCtx,
              const UUID& buildUUID,
              std::vector<IndexBuildInfo> indexes,
              boost::optional<std::string> indexBuildIdent) {
+    // We create temporary interceptors to eagerly create all of the sidetables needed. These
+    // interceptors need to outlive the WUOW so that WUOW rollback can safely access the lazy record
+    // stores.
+    std::deque<IndexBuildInterceptor> interceptors;
+
     auto coll = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(
@@ -134,7 +139,7 @@ Status start(OperationContext* opCtx,
     auto writableColl = writer.getWritableCollection(opCtx);
 
     if (indexBuildIdent) {
-        LazyRecordStore{opCtx, *indexBuildIdent, LazyRecordStore::CreateMode::immediate};
+        LazyRecordStore::createTable(opCtx, *indexBuildIdent);
     }
 
     for (auto&& index : indexes) {
@@ -152,8 +157,8 @@ Status start(OperationContext* opCtx,
             return status;
         }
 
-        IndexBuildInterceptor interceptor{
-            opCtx, index, LazyRecordStore::CreateMode::immediate, descriptor.unique()};
+        interceptors.emplace_back(
+            opCtx, index, LazyRecordStore::CreateMode::immediate, descriptor.unique());
 
         CollectionQueryInfo::get(writableColl).rebuildIndexData(opCtx, writableColl);
 

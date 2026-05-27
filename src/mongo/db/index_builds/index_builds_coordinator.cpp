@@ -2356,8 +2356,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
                 // new one as there's no existing table we need to reuse and we can't be in a
                 // primary-driven index build.
                 auto skippedRecordsIdent = storageEngine->generateNewInternalIdent();
-                auto lazyRecordStore = LazyRecordStore(
-                    opCtx, skippedRecordsIdent, LazyRecordStore::CreateMode::immediate);
+                LazyRecordStore::createTable(opCtx, skippedRecordsIdent);
                 indexBuildInfo.skippedRecordsIdent.emplace(skippedRecordsIdent);
             }
             if (auto ident = indexStateInfo.getDuplicateKeyTrackerTable()) {

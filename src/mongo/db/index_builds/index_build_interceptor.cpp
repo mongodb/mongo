@@ -111,7 +111,7 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
         uassert(11411101,
                 "Primary-driven index builds cannot use deferred table creation",
                 createMode != LazyRecordStore::CreateMode::deferred);
-        _sorterTable = LazyRecordStore(opCtx, *indexBuildInfo.sorterIdent, createMode);
+        _sorterTable.emplace(opCtx, *indexBuildInfo.sorterIdent, createMode);
     }
 }
 

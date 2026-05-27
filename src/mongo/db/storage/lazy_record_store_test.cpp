@@ -29,15 +29,18 @@
 
 #include "mongo/db/storage/lazy_record_store.h"
 
-#include "mongo/bson/timestamp.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
 
 class LazyRecordStoreTest : public StorageEngineTest {};
+using LazyRecordStoreDeathTest = LazyRecordStoreTest;
 
 TEST_F(LazyRecordStoreTest, DeferredDoesNotCreateTableUntilAccess) {
     auto opCtx = makeOperationContext();
@@ -119,6 +122,38 @@ TEST_F(LazyRecordStoreTest, GetTableOrThrowFailsWhenTableDoesNotExist) {
         EXPECT_EQ(ex.code(), 12129700);
         assertionCount.tripwire.subtractAndFetch(1);
     });
+}
+
+TEST_F(LazyRecordStoreTest, GetOrCreateTableInsideWUOW) {
+    auto opCtx = makeOperationContext();
+    auto ident = _storageEngine->generateNewInternalIdent();
+
+    LazyRecordStore lrs(opCtx.get(), ident, LazyRecordStore::CreateMode::deferred);
+
+    // Table should exist inside the pending WUOW, but it should be cleared on rollback
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        lrs.getOrCreateTable(opCtx.get());
+        EXPECT_TRUE(lrs.tableExists());
+    }
+    EXPECT_FALSE(lrs.tableExists());
+
+    // Table should continue to exist after the parent WUOW is committed
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        lrs.getOrCreateTable(opCtx.get());
+        EXPECT_TRUE(lrs.tableExists());
+        wuow.commit();
+    }
+    EXPECT_TRUE(lrs.tableExists());
+}
+
+DEATH_TEST_F(LazyRecordStoreDeathTest, WriteUnitOfWorkOutlivesLazyRecordStore, "invariant") {
+    auto opCtx = makeOperationContext();
+    auto ident = _storageEngine->generateNewInternalIdent();
+    WriteUnitOfWork wuow(opCtx.get());
+    (void)LazyRecordStore(opCtx.get(), ident, LazyRecordStore::CreateMode::immediate);
+    wuow.commit();
 }
 
 }  // namespace

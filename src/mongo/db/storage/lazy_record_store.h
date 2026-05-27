@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/modules.h"
@@ -59,10 +58,21 @@ public:
         openExisting,
     };
 
+    /**
+     * Creates a LazyRecordStore and possibly creates or opens the internal table, depending on the
+     * create mode given.
+     *
+     * If called inside an active WriteUnitOfWork with CreateMode::immediate, the WUOW must be
+     * committed or rolled back before this LazyRecordStore is destroyed.
+     */
     LazyRecordStore(OperationContext* opCtx, StringData ident, CreateMode createMode);
+    ~LazyRecordStore();
 
     /**
      * Creates the internal table if needed and then returns the record store.
+     *
+     * If called inside an active WriteUnitOfWork, the WUOW must be committed or rolled back before
+     * this LazyRecordStore is destroyed.
      */
     RecordStore& getOrCreateTable(OperationContext* opCtx);
 
@@ -86,10 +96,21 @@ public:
      */
     void drop(OperationContext* opCtx, StorageEngine::DropTime dropTime);
 
+    /**
+     * Immediately creates a table which can later be used with CreateMode::openExisting.
+     */
+    static void createTable(OperationContext* opCtx, StringData ident);
+
 private:
+    // Set to true while _tableOrIdent is storing a RecordStore whose creating WUOW has not been
+    // committed yet. Used to fail noisily if the required lifetime rules are not followed.
+    bool _hasPendingCreation = false;
+
     std::variant<std::string, std::unique_ptr<RecordStore>> _tableOrIdent;
 
-    RecordStore& _getOrCreateRecordStore(OperationContext* opCtx);
+    static std::unique_ptr<RecordStore> _createRecordStore(OperationContext* opCtx,
+                                                           StringData ident,
+                                                           LazyRecordStore* lrs);
 };
 
 }  // namespace mongo
