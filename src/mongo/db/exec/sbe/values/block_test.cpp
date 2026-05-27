@@ -1047,6 +1047,114 @@ TEST_F(ValueBlockTest, TestBlockMapFast) {
     ASSERT_EQ(block->mapMonotonicFastPath(testOp5), nullptr);
 }
 
+// Tests for getApproximateSize() on ValueBlock and CellBlock implementations.
+// Each test asserts the result is in [lower, upper] where lower is the raw payload
+// size and upper is a generous multiple that accounts for per-element and struct overhead.
+
+TEST(SbeBlockTest, GetApproximateSize_HeterogeneousBlock_ShallowType) {
+    constexpr int kCount = 100;
+    auto block = std::make_unique<value::HeterogeneousBlock>();
+    for (int i = 0; i < kCount; ++i) {
+        block->push_back(TypeTags::NumberInt64, value::bitcastFrom<int64_t>(i));
+    }
+    int size = block->getApproximateSize();
+    // Lower: kCount * sizeof(int64_t); upper: 3x to allow for tag/value and struct overhead.
+    ASSERT_GTE(size, kCount * static_cast<int>(sizeof(int64_t)));
+    ASSERT_LTE(size, 3 * kCount * static_cast<int>(sizeof(int64_t)));
+}
+
+TEST(SbeBlockTest, GetApproximateSize_HomogeneousBlock_ShallowType) {
+    constexpr int kCount = 100;
+    auto block = std::make_unique<value::Int64Block>();
+    for (int i = 0; i < kCount; ++i) {
+        block->push_back(static_cast<int64_t>(i));
+    }
+    int size = block->getApproximateSize();
+    ASSERT_GTE(size, kCount * static_cast<int>(sizeof(int64_t)));
+    ASSERT_LTE(size, 3 * kCount * static_cast<int>(sizeof(int64_t)));
+}
+
+TEST(SbeBlockTest, GetApproximateSize_HomogeneousBlock_WithNothings) {
+    constexpr int kCount = 128;
+    auto block = std::make_unique<value::Int64Block>();
+    for (int i = 0; i < kCount; ++i) {
+        if (i % 2 == 0) {
+            block->push_back(static_cast<int64_t>(i));
+        } else {
+            block->pushNothing();
+        }
+    }
+    int size = block->getApproximateSize();
+    // Must account for val buffer (kCount/2 present values) + bitset heap storage (2 blocks * 8B).
+    const int bitsetBytes = static_cast<int>(2 * sizeof(value::HomogeneousBlockBitset::block_type));
+    ASSERT_GTE(size, (kCount / 2) * static_cast<int>(sizeof(int64_t)) + bitsetBytes);
+    ASSERT_LTE(size, 3 * kCount * static_cast<int>(sizeof(int64_t)));
+}
+
+TEST(SbeBlockTest, GetApproximateSize_MonoBlock_ShallowType) {
+    // MonoBlock stores a single value regardless of count, so approximate size reflects one value.
+    auto block = std::make_unique<value::MonoBlock>(
+        100, TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    int size = block->getApproximateSize();
+    ASSERT_GTE(size, static_cast<int>(sizeof(int64_t)));
+    ASSERT_LTE(size, 64);
+}
+
+TEST(SbeBlockTest, GetApproximateSize_HeterogeneousBlock_DeepType_BigString) {
+    constexpr int kCount = 100;
+    constexpr int kStrLen = 100;
+    const std::string str(kStrLen, 'x');
+    auto block = std::make_unique<value::HeterogeneousBlock>();
+    for (int i = 0; i < kCount; ++i) {
+        auto [tag, val] = value::makeNewString(str);
+        block->push_back(tag, val);
+    }
+    int size = block->getApproximateSize();
+    ASSERT_GTE(size, kCount * kStrLen);
+    ASSERT_LTE(size, 3 * kCount * kStrLen);
+}
+
+TEST(SbeBlockTest, GetApproximateSize_HeterogeneousBlock_DeepType_Array) {
+    constexpr int kCount = 100;
+    constexpr int kArrayLen = 10;
+    auto block = std::make_unique<value::HeterogeneousBlock>();
+    for (int i = 0; i < kCount; ++i) {
+        auto [arrTag, arrVal] = value::makeNewArray();
+        auto* arr = value::getArrayView(arrVal);
+        for (int j = 0; j < kArrayLen; ++j) {
+            arr->push_back(TypeTags::NumberInt64, value::bitcastFrom<int64_t>(j));
+        }
+        block->push_back(arrTag, arrVal);
+    }
+    int size = block->getApproximateSize();
+    const int rawDataSize = kCount * kArrayLen * static_cast<int>(sizeof(int64_t));
+    ASSERT_GTE(size, rawDataSize);
+    ASSERT_LTE(size, 5 * rawDataSize);
+}
+
+TEST(SbeBlockTest, GetApproximateSize_ScalarMonoCellBlock_ShallowType) {
+    value::ScalarMonoCellBlock cellBlock(1, TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    int size = cellBlock.getApproximateSize();
+    ASSERT_GTE(size, static_cast<int>(sizeof(int64_t)));
+    ASSERT_LTE(size, 512);
+}
+
+TEST(SbeBlockTest, GetApproximateSize_MaterializedCellBlock_DeepType) {
+    constexpr int kCount = 100;
+    constexpr int kStrLen = 100;
+    const std::string str(kStrLen, 'x');
+    auto innerBlock = std::make_unique<value::HeterogeneousBlock>();
+    for (int i = 0; i < kCount; ++i) {
+        auto [tag, val] = value::makeNewString(str);
+        innerBlock->push_back(tag, val);
+    }
+    value::MaterializedCellBlock cellBlock;
+    cellBlock._deblocked = std::move(innerBlock);
+    int size = cellBlock.getApproximateSize();
+    ASSERT_GTE(size, kCount * kStrLen);
+    ASSERT_LTE(size, 3 * kCount * kStrLen);
+}
+
 TEST_F(ValueBlockTest, EmptyBlockMapTest) {
     auto emptyTestBlock = std::make_unique<TestBlock>();
     auto emptyHeterogeneousBlock = std::make_unique<value::HeterogeneousBlock>(

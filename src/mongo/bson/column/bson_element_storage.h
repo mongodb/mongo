@@ -143,6 +143,13 @@ public:
         return _block.get() + _pos;
     }
 
+    /**
+     * Returns the size of all allocated blocks in bytes.
+     */
+    size_t totalBlocksMemory() const {
+        return _capacity + _totalBlocksCapacity;
+    }
+
 private:
     // Starts contiguous mode
     void _beginContiguous();
@@ -152,6 +159,7 @@ private:
 
     // Full memory blocks that are kept alive.
     std::vector<std::unique_ptr<char[]>> _blocks;
+    int _totalBlocksCapacity = 0;
 
     // Current memory block
     std::unique_ptr<char[]> _block;

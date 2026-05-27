@@ -151,6 +151,7 @@ char* BSONElementStorage::allocate(int bytes) {
         // Keep track of current block if it exists.
         if (_block) {
             _blocks.push_back(std::move(_block));
+            _totalBlocksCapacity += _capacity;
         }
 
         // If contiguous mode is enabled we need to copy data from the previous block

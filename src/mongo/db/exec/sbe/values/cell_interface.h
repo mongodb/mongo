@@ -91,6 +91,8 @@ struct CellBlock {
      * is missing). This could also be represented with a vector of all 1s.
      */
     virtual const std::vector<int32_t>& filterPositionInfo() = 0;
+
+    virtual int getApproximateSize() const = 0;
 };
 
 /*
@@ -103,6 +105,15 @@ struct MaterializedCellBlock : public CellBlock {
 
     const std::vector<int32_t>& filterPositionInfo() override {
         return _filterPosInfo;
+    }
+
+    int getApproximateSize() const override {
+        int result = sizeof(*this);
+        result += static_cast<int>(_filterPosInfo.capacity() * sizeof(int32_t));
+        if (_deblocked) {
+            result += _deblocked->getApproximateSize();
+        }
+        return result;
     }
 
     std::unique_ptr<ValueBlock> _deblocked;

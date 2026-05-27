@@ -30,9 +30,9 @@
 #include "mongo/db/exec/sbe/in_list.h"
 #include "mongo/db/exec/sbe/sbe_pattern_value_cmp.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
-#include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/value_size.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 #include <algorithm>

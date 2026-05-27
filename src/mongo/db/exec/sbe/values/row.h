@@ -479,8 +479,6 @@ private:
 typedef RowHasher<MaterializedRow> MaterializedRowHasher;
 typedef RowHasher<FixedSizeRow<1 /*N*/>> FixedSizeSingleRowHasher;
 
-int getApproximateSize(TypeTags tag, Value val);
-
 typedef std::conditional<true, int, int> myint;
 
 }  // namespace mongo::sbe::value
