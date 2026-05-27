@@ -275,11 +275,22 @@ public:
         _ru.onRollback([this](OperationContext*) { --_nextKey; });
         uassertStatusOK(container_write::insert(
             &_opCtx, _ru, _container, _nextKey++, value, container::ExistingKeyPolicy::overwrite));
+        if (size > 0) {
+            this->_checksumCalculator.addUncommittedData(buffer.buf(), size);
+        }
+        if (!_uncommittedChecksum) {
+            _uncommittedChecksum = true;
+            _ru.onCommit([this](OperationContext*, boost::optional<Timestamp>) {
+                this->_checksumCalculator.commit();
+                _uncommittedChecksum = false;
+            });
+            _ru.onRollback([this](OperationContext*) {
+                this->_checksumCalculator.abort();
+                _uncommittedChecksum = false;
+            });
+        }
         wuow.commit();
 
-        if (size > 0) {
-            this->_checksumCalculator.addData(buffer.buf(), size);
-        }
         // The container-based sorter does not compress in the sorter layer, so report the
         // same value for compressed and uncompressed bytes.
         _containerStats.addSpilledDataSize(size);
@@ -319,6 +330,7 @@ private:
     int64_t _nextKey;
     int64_t _rangeStartKey;
     int64_t _lastAddedSize = 0;
+    bool _uncommittedChecksum = false;
 };
 
 template <typename Key, typename Value>
