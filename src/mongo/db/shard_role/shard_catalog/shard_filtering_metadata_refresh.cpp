@@ -47,6 +47,7 @@
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/router_role/routing_cache/read_only_catalog_cache_loader.h"
@@ -117,6 +118,8 @@ MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
 MONGO_FAIL_POINT_DEFINE(hangBeforePlacementVersionCriticalSectionWait);
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForConfigTimeOrChunkVersionChange);
 MONGO_FAIL_POINT_DEFINE(avoidTassertForInconsistentMetadata);
+MONGO_FAIL_POINT_DEFINE(hangBeforeAuthoritativeDbVersionMismatchWait);
+MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshDbVersionThread);
 
 const auto getDecoration = ServiceContext::declareDecoration<FilteringMetadataCache>();
 
@@ -458,13 +461,23 @@ Status FilteringMetadataCache::onDbVersionMismatch(
     const DatabaseName& dbName,
     const DatabaseVersion& clientDbVersion) noexcept {
     while (true) {
+        const auto refresh = FilteringMetadataRefreshTracker::get(opCtx)->acquire(opCtx);
+        const bool isAuthoritative = (refresh.kind == FilteringMetadataRefreshKind::kAuthoritative);
+
         try {
-            auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-            if (feature_flags::gAuthoritativeShardsCRUD.isEnabled(
-                    VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-                _onDbVersionMismatchAuthoritative(opCtx, dbName, clientDbVersion);
+            if (isAuthoritative) {
+                _onDbVersionMismatchAuthoritative(
+                    opCtx, dbName, clientDbVersion, refresh.cancellationToken);
             } else {
-                _onDbVersionMismatch(opCtx, dbName, clientDbVersion);
+                _onDbVersionMismatch(opCtx, dbName, clientDbVersion, refresh.cancellationToken);
+            }
+            if (refresh.cancellationToken.isCanceled()) {
+                LOGV2(12436401,
+                      "Database version mismatch refresh was canceled by an authoritativeness "
+                      "change, retrying",
+                      logAttrs(dbName),
+                      "isAuthoritative"_attr = isAuthoritative);
+                continue;
             }
             return Status::OK();
         } catch (const DBException& ex) {
@@ -487,7 +500,12 @@ Status FilteringMetadataCache::onDbVersionMismatch(
 Status FilteringMetadataCache::forceDatabaseMetadataRefresh_DEPRECATED(
     OperationContext* opCtx, const DatabaseName& dbName) noexcept {
     try {
-        _onDbVersionMismatch(opCtx, dbName, boost::none);
+        const auto refresh = FilteringMetadataRefreshTracker::get(opCtx)->acquire(
+            opCtx, FilteringMetadataRefreshKind::kNonAuthoritative);
+        _onDbVersionMismatch(opCtx, dbName, boost::none, refresh.cancellationToken);
+        uassert(ErrorCodes::DatabaseMetadataRefreshCanceledDueToFCVTransition,
+                "Database metadata refresh was canceled",
+                !refresh.cancellationToken.isCanceled());
         return Status::OK();
     } catch (const DBException& ex) {
         LOGV2(10250102,
@@ -748,6 +766,8 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshDbVersion(
 
             LOGV2_DEBUG(6697203, 2, "Started database metadata refresh", logAttrs(dbName));
 
+            hangInRecoverRefreshDbVersionThread.pauseWhileSet();
+
             return _refreshDbMetadata(opCtx, dbName, cancellationToken);
         })
         .onCompletion([=](Status status) {
@@ -774,7 +794,8 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshDbVersion(
 void FilteringMetadataCache::_onDbVersionMismatch(
     OperationContext* opCtx,
     const DatabaseName& dbName,
-    boost::optional<DatabaseVersion> receivedDbVersion) {
+    boost::optional<DatabaseVersion> receivedDbVersion,
+    const CancellationToken& rootCancellationToken) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
     ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
@@ -798,7 +819,7 @@ void FilteringMetadataCache::_onDbVersionMismatch(
                 "db"_attr = dbName,
                 "receivedDbVersion"_attr = receivedDbVersion);
 
-    while (true) {
+    while (!rootCancellationToken.isCanceled()) {
         if (receivedDbVersion) {
             auto scopedDsr =
                 boost::make_optional(DatabaseShardingRuntime::acquireShared(opCtx, dbName));
@@ -843,7 +864,7 @@ void FilteringMetadataCache::_onDbVersionMismatch(
             // refresh in progress (holding the exclusive lock on the DSS).
             // Therefore, the future to refresh the database metadata can be set.
 
-            CancellationSource cancellationSource;
+            CancellationSource cancellationSource(rootCancellationToken);
             CancellationToken cancellationToken = cancellationSource.token();
             (*scopedDsr)
                 ->setDbMetadataRefreshFuture_DEPRECATED(
@@ -865,7 +886,10 @@ void FilteringMetadataCache::_onDbVersionMismatch(
 }
 
 void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
-    OperationContext* opCtx, const DatabaseName& dbName, const DatabaseVersion& receivedDbVersion) {
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const DatabaseVersion& receivedDbVersion,
+    const CancellationToken& rootCancellationToken) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
     ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
@@ -888,12 +912,24 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
     // Additionally, we need to wait to see the timestamp with majority read concern to avoid split-
     // brain scenarios, where writes with local read concern might bypass the following wait, and we
     // end up seeing an intermediate state.
-    auto readConcern = repl::ReadConcernArgs(LogicalTime{receivedDbVersion.getTimestamp()},
-                                             repl::ReadConcernLevel::kMajorityReadConcern);
-    uassertStatusOK(
-        repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(opCtx, readConcern));
+    hangBeforeAuthoritativeDbVersionMismatchWait.pauseWhileSet();
 
-    while (true) {
+    const auto targetOpTime =
+        repl::OpTime(receivedDbVersion.getTimestamp(), repl::OpTime::kUninitializedTerm);
+
+    try {
+        auto majorityFuture =
+            repl::ReplicationCoordinator::get(opCtx)->registerWaiterForMajorityReadOpTime(
+                opCtx, targetOpTime);
+        future_util::withCancellation(std::move(majorityFuture), rootCancellationToken).get(opCtx);
+    } catch (const ExceptionFor<ErrorCodes::CallbackCanceled>&) {
+        tassert(12436400,
+                "Majority wait canceled but refresh root token is not",
+                rootCancellationToken.isCanceled());
+        return;
+    }
+
+    while (!rootCancellationToken.isCanceled()) {
         auto scopedDsr =
             boost::make_optional(DatabaseShardingRuntime::acquireShared(opCtx, dbName));
 
@@ -1644,6 +1680,53 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatch(
             continue;
         }
         break;
+    }
+}
+
+namespace {
+const auto getFilteringMetadataRefreshTracker =
+    ServiceContext::declareDecoration<FilteringMetadataRefreshTracker>();
+}  // namespace
+
+FilteringMetadataRefreshTracker* FilteringMetadataRefreshTracker::get(OperationContext* opCtx) {
+    return &getFilteringMetadataRefreshTracker(opCtx->getServiceContext());
+}
+
+FilteringMetadataRefreshTracker::Acquisition FilteringMetadataRefreshTracker::acquire(
+    OperationContext* opCtx, boost::optional<FilteringMetadataRefreshKind> forceKind) {
+    std::lock_guard lk(_mutex);
+    // Check the feature flag inside the mutex in order to serialize with calls to
+    // `interruptIncompatibleRefreshes` during FCV transitions.
+    auto kind = forceKind.value_or(feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+                                       VersionContext::getDecoration(opCtx),
+                                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
+                                       ? FilteringMetadataRefreshKind::kAuthoritative
+                                       : FilteringMetadataRefreshKind::kNonAuthoritative);
+    auto& list = kind == FilteringMetadataRefreshKind::kAuthoritative
+        ? _activeAuthoritativeRefreshes
+        : _activeNonAuthoritativeRefreshes;
+    auto cancellationIt = list.emplace(list.end());
+    return Acquisition(this, kind, cancellationIt);
+}
+
+void FilteringMetadataRefreshTracker::_release(
+    FilteringMetadataRefreshKind kind, std::list<CancellationSource>::iterator cancellationIt) {
+    std::lock_guard lk(_mutex);
+    auto& list = kind == FilteringMetadataRefreshKind::kAuthoritative
+        ? _activeAuthoritativeRefreshes
+        : _activeNonAuthoritativeRefreshes;
+    list.erase(cancellationIt);
+}
+
+void FilteringMetadataRefreshTracker::interruptIncompatibleRefreshes(OperationContext* opCtx) {
+    std::lock_guard lk(_mutex);
+    const bool authoritativeEnabled = feature_flags::gAuthoritativeShardsCRUD.isEnabled(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    auto& list =
+        authoritativeEnabled ? _activeNonAuthoritativeRefreshes : _activeAuthoritativeRefreshes;
+    for (auto& source : list) {
+        source.cancel();
     }
 }
 

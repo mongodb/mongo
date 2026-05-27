@@ -45,6 +45,7 @@
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/fail_point.h"
@@ -1195,6 +1196,93 @@ TEST_F(AuthoritativeRefreshFixture, PrimaryChangeDuringRecoveryForcesModeBRetry)
     auto stats = getStatistics(opCtx);
     ASSERT_EQ(stats.getIntField("recoverersCreated"), 3);
     ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
+}
+
+
+class RefreshCancellationFixture : public ShardServerTestFixtureWithCatalogCacheLoaderMock {};
+
+TEST_F(RefreshCancellationFixture, CancelAuthRefreshRetriesAsNonAuthoritative) {
+    auto* opCtx = operationContext();
+
+    // Force the flag on so the bg thread picks the auth path on the first attempt.
+    RAIIServerParameterControllerForTest authoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                            true);
+
+    // Cached version matches received, so both the initial auth path (before we cancel it) and the
+    // non-auth retry can complete from the local cache.
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 0));
+    const auto receivedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 0));
+
+    unittest::LogCaptureGuard logs;
+
+    auto* fp = globalFailPointRegistry().find("hangBeforeAuthoritativeDbVersionMismatchWait");
+    const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+
+    stdx::thread t([&] {
+        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgAuth");
+        auto bgOpCtx = bgClient->makeOperationContext();
+        ASSERT_OK(FilteringMetadataCache::get(bgOpCtx.get())
+                      ->onDbVersionMismatch(bgOpCtx.get(), kTestNss.dbName(), receivedDbVersion));
+    });
+
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+
+    // Flip the flag before cancelling so the outer retry dispatches to the non-auth path.
+    RAIIServerParameterControllerForTest nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                               false);
+
+    FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
+
+    fp->setMode(FailPoint::off);
+    t.join();
+
+    // The retry-after-cancel log must have fired for the canceled auth attempt.
+    ASSERT_EQ(1,
+              logs.countBSONContainingSubset(
+                  BSON("id" << 12436401 << "attr" << BSON("isAuthoritative" << true))));
+}
+
+TEST_F(RefreshCancellationFixture, CancelNonAuthRefreshRetriesAsAuthoritative) {
+    auto* opCtx = operationContext();
+
+    // Force the flag off so the bg thread picks the non-auth path on the first attempt.
+    RAIIServerParameterControllerForTest nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                               false);
+
+    // Set a dbVersion lower than receivedDbVersion, to actually run the non-authoritative refresh.
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(1, 0));
+    const auto receivedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(2, 0));
+
+    unittest::LogCaptureGuard logs;
+
+    auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshDbVersionThread");
+    const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+
+    stdx::thread t([&] {
+        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgNonAuth");
+        auto bgOpCtx = bgClient->makeOperationContext();
+        ASSERT_OK(FilteringMetadataCache::get(bgOpCtx.get())
+                      ->onDbVersionMismatch(bgOpCtx.get(), kTestNss.dbName(), receivedDbVersion));
+    });
+
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+
+    // Bump the cached version so the auth retry's inner loop sees a matching version.
+    setDbPrimaryShardForTest(opCtx, kTestNss, kMyShardName, Timestamp(2, 0));
+
+    // Flip the flag before cancelling so the outer retry dispatches to the auth path.
+    RAIIServerParameterControllerForTest authoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                            true);
+
+    FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
+
+    fp->setMode(FailPoint::off);
+    t.join();
+
+    // The retry-after-cancel log must have fired for the canceled non-auth attempt.
+    ASSERT_EQ(1,
+              logs.countBSONContainingSubset(
+                  BSON("id" << 12436401 << "attr" << BSON("isAuthoritative" << false))));
 }
 
 }  // namespace

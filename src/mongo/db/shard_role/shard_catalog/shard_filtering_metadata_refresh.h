@@ -39,8 +39,12 @@
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
+
+#include <list>
+#include <mutex>
 
 #include <boost/optional/optional.hpp>
 
@@ -207,11 +211,13 @@ private:
 
     void _onDbVersionMismatch(OperationContext* opCtx,
                               const DatabaseName& dbName,
-                              boost::optional<DatabaseVersion> receivedDbVersion);
+                              boost::optional<DatabaseVersion> receivedDbVersion,
+                              const CancellationToken& rootCancellationToken);
 
     void _onDbVersionMismatchAuthoritative(OperationContext* opCtx,
                                            const DatabaseName& dbName,
-                                           const DatabaseVersion& receivedDbVersion);
+                                           const DatabaseVersion& receivedDbVersion,
+                                           const CancellationToken& rootCancellationToken);
 
     /**
      * Creates a CollectionCacheRecoverer and drives a full metadata recovery from disk to
@@ -284,5 +290,69 @@ MONGO_MOD_NEEDS_REPLACEMENT extern FailPoint
     hangInRefreshFilteringMetadataUntilSuccessInterruptible;
 MONGO_MOD_NEEDS_REPLACEMENT extern FailPoint
     hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible;
+
+enum class FilteringMetadataRefreshKind { kNonAuthoritative, kAuthoritative };
+
+/**
+ * The `FilteringMetadataRefreshTracker` is responsible for tracking in-flight filtering metadata
+ * refreshes and offering the possibility to interrupt them.
+ */
+class MONGO_MOD_NEEDS_REPLACEMENT FilteringMetadataRefreshTracker {
+public:
+    static FilteringMetadataRefreshTracker* get(OperationContext* opCtx);
+
+    class Acquisition {
+    public:
+        Acquisition(const Acquisition&) = delete;
+        Acquisition& operator=(const Acquisition&) = delete;
+        Acquisition(Acquisition&&) = delete;
+        Acquisition& operator=(Acquisition&&) = delete;
+
+        ~Acquisition() {
+            _tracker->_release(kind, _cancellationIt);
+        }
+
+        const FilteringMetadataRefreshKind kind;
+        const CancellationToken cancellationToken;
+
+    private:
+        friend class FilteringMetadataRefreshTracker;
+
+        Acquisition(FilteringMetadataRefreshTracker* tracker,
+                    FilteringMetadataRefreshKind kind,
+                    std::list<CancellationSource>::iterator cancellationIt)
+            : kind(kind),
+              cancellationToken(cancellationIt->token()),
+              _tracker(tracker),
+              _cancellationIt(cancellationIt) {}
+
+        FilteringMetadataRefreshTracker* const _tracker;
+        const std::list<CancellationSource>::iterator _cancellationIt;
+    };
+
+    /**
+     * Marks that the current thread is doing a filtering metadata refresh. Unless forced, the
+     * refresh kind is selected automatically based on the Authoritative Shards feature flag.
+     */
+    Acquisition acquire(OperationContext* opCtx,
+                        boost::optional<FilteringMetadataRefreshKind> forceKind = boost::none);
+
+    /**
+     * Cancels in-flight refreshes that are incompatible with the current value of the Authoritative
+     * Shards feature flag (i.e. cancels non-authoritative refreshes when the flag is enabled,
+     * authoritative refreshes when it is disabled).
+     */
+    void interruptIncompatibleRefreshes(OperationContext* opCtx);
+
+private:
+    void _release(FilteringMetadataRefreshKind kind,
+                  std::list<CancellationSource>::iterator cancellationIt);
+
+    std::mutex _mutex;
+    // Cancellation source for each ongoing filtering metadata refresh. We do not use a single
+    // "root" CancellationSource in order to avoid the memory leak described in SERVER-92333.
+    std::list<CancellationSource> _activeAuthoritativeRefreshes;
+    std::list<CancellationSource> _activeNonAuthoritativeRefreshes;
+};
 
 }  // namespace mongo

@@ -47,6 +47,7 @@
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
@@ -138,6 +139,8 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
             throw;
         }
     }
+
+    FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
 
     const auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
     const bool isReplSet = replCoordinator->getSettings().isReplSet();
