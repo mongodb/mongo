@@ -38,6 +38,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <functional>
+#include <limits>
 #include <tuple>
 
 
@@ -530,6 +531,48 @@ TEST_F(SbeValueTest, SortSpecCompareInvalid) {
     ASSERT_EQ(cmpTag, value::TypeTags::Nothing);
     ASSERT_EQ(cmpVal, 0);
 }
+
+TEST_F(SbeValueTest, TagValueViewFactories) {
+    {
+        auto v = value::TagValueView::nothing();
+        ASSERT_EQ(v.tag, value::TypeTags::Nothing);
+        ASSERT_EQ(v.value, 0u);
+    }
+    {
+        auto v = value::TagValueView::null();
+        ASSERT_EQ(v.tag, value::TypeTags::Null);
+        ASSERT_EQ(v.value, 0u);
+    }
+    {
+        auto vt = value::TagValueView::boolean(true);
+        ASSERT_EQ(vt.tag, value::TypeTags::Boolean);
+        ASSERT_EQ(vt.value, value::bitcastFrom<bool>(true));
+
+        auto vf = value::TagValueView::boolean(false);
+        ASSERT_EQ(vf.tag, value::TypeTags::Boolean);
+        ASSERT_EQ(vf.value, value::bitcastFrom<bool>(false));
+    }
+    {
+        auto v = value::TagValueView::numberInt32(42);
+        ASSERT_EQ(v.tag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(v.value, value::bitcastFrom<int32_t>(42));
+
+        auto neg = value::TagValueView::numberInt32(-1);
+        ASSERT_EQ(neg.tag, value::TypeTags::NumberInt32);
+        ASSERT_EQ(neg.value, value::bitcastFrom<int32_t>(-1));
+    }
+    {
+        auto v = value::TagValueView::numberInt64(std::numeric_limits<int64_t>::max());
+        ASSERT_EQ(v.tag, value::TypeTags::NumberInt64);
+        ASSERT_EQ(v.value, value::bitcastFrom<int64_t>(std::numeric_limits<int64_t>::max()));
+    }
+    {
+        auto v = value::TagValueView::numberDouble(3.14);
+        ASSERT_EQ(v.tag, value::TypeTags::NumberDouble);
+        ASSERT_EQ(v.value, value::bitcastFrom<double>(3.14));
+    }
+}
+
 TEST(SbeNumericCastTest, TagValueViewOverload) {
     using namespace value;
 

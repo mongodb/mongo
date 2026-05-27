@@ -557,6 +557,13 @@ struct TagValueView {
     }
 
     TagValueOwned copy() const;
+
+    static TagValueView nothing() noexcept;
+    static TagValueView null() noexcept;
+    static TagValueView boolean(bool b) noexcept;
+    static TagValueView numberInt32(int32_t v) noexcept;
+    static TagValueView numberInt64(int64_t v) noexcept;
+    static TagValueView numberDouble(double v) noexcept;
 };
 
 inline TagValueView rawToView(std::pair<TypeTags, Value> tv) {
@@ -895,6 +902,25 @@ Value bitcastFrom(
     Value val{0};
     memcpy(&val, &in, sizeof(T));
     return val;
+}
+
+inline TagValueView TagValueView::nothing() noexcept {
+    return {TypeTags::Nothing, 0};
+}
+inline TagValueView TagValueView::null() noexcept {
+    return {TypeTags::Null, 0};
+}
+inline TagValueView TagValueView::boolean(bool b) noexcept {
+    return {TypeTags::Boolean, bitcastFrom<bool>(b)};
+}
+inline TagValueView TagValueView::numberInt32(int32_t v) noexcept {
+    return {TypeTags::NumberInt32, bitcastFrom<int32_t>(v)};
+}
+inline TagValueView TagValueView::numberInt64(int64_t v) noexcept {
+    return {TypeTags::NumberInt64, bitcastFrom<int64_t>(v)};
+}
+inline TagValueView TagValueView::numberDouble(double v) noexcept {
+    return {TypeTags::NumberDouble, bitcastFrom<double>(v)};
 }
 
 template <typename T>

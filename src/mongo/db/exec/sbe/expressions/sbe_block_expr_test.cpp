@@ -1220,7 +1220,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
     }
 
     {
-        aggAccessor.reset(value::TagValueView{value::TypeTags::Nothing, 0});
+        aggAccessor.reset(value::TagValueView::nothing());
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMax,
@@ -1284,7 +1284,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
     }
 
     {
-        aggAccessor.reset(value::TagValueView{value::TypeTags::Nothing, 0});
+        aggAccessor.reset(value::TagValueView::nothing());
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMax,
@@ -1323,8 +1323,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
                          value::bitcastFrom<value::ValueBlock*>(bitset.get()));
 
     {
-        aggAccessor.reset(
-            value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-10)});
+        aggAccessor.reset(value::TagValueView::numberInt32(-10));
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMin,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
@@ -1342,8 +1341,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
     }
 
     {
-        aggAccessor.reset(
-            value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(100)});
+        aggAccessor.reset(value::TagValueView::numberInt32(100));
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMax,
@@ -1368,7 +1366,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
     bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
                          value::bitcastFrom<value::ValueBlock*>(allTrueBitset.get()));
     {
-        aggAccessor.reset(value::TagValueView{value::TypeTags::Nothing, 0});
+        aggAccessor.reset(value::TagValueView::nothing());
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMin,
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
@@ -1386,7 +1384,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxSkipExtractTest) {
     }
 
     {
-        aggAccessor.reset(value::TagValueView{value::TypeTags::Nothing, 0});
+        aggAccessor.reset(value::TagValueView::nothing());
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
             EFn::kValueBlockAggMax,

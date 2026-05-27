@@ -326,7 +326,7 @@ void MakeObjStageBase<MakeObjOutputType::Object>::produceObject() {
             }
             // Now we have to make a decision - return Nothing or the original _root.
             if (!_returnOldObject) {
-                _obj.reset(value::TagValueView{value::TypeTags::Nothing, 0});
+                _obj.reset(value::TagValueView::nothing());
             } else {
                 // _root is not an object return it unmodified.
                 _obj.reset(value::TagValueView{tag, val});
@@ -477,7 +477,7 @@ void MakeObjStageBase<MakeObjOutputType::BsonObject>::produceObject() {
             }
             // Now we have to make a decision - return Nothing or the original _root.
             if (!_returnOldObject) {
-                _obj.reset(value::TagValueView{value::TypeTags::Nothing, 0});
+                _obj.reset(value::TagValueView::nothing());
             } else {
                 // _root is not an object return it unmodified.
                 _obj.reset(value::TagValueView{tag, val});

@@ -157,8 +157,7 @@ TEST_F(SBEObjectArrayConversionTest, ObjectToArrayExpression) {
         compiledObjectToArray.get(), value::TypeTags::Array, emptyArrTag, emptyArrVal);
 
     // Test when input is not object Type
-    inputAccessor.reset(
-        value::TagValueView{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42)});
+    inputAccessor.reset(value::TagValueView::numberInt64(42));
     runAndAssertNothing(compiledObjectToArray.get());
 }
 
@@ -211,8 +210,7 @@ TEST_F(SBEObjectArrayConversionTest, ArrayToObjectExpression) {
         compiledArrayToObject.get(), value::TypeTags::Object, emptyObjTag, emptyObjVal);
 
     // Test when input is not array Type
-    inputAccessor.reset(
-        value::TagValueView{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42)});
+    inputAccessor.reset(value::TagValueView::numberInt64(42));
     runAndAssertNothing(compiledArrayToObject.get());
 
     // Test error conditions

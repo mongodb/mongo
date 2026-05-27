@@ -192,13 +192,11 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminal) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 10 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)});
+    inAccessor().reset(value::TagValueView::numberInt32(10));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 90 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(90)});
+    inAccessor().reset(value::TagValueView::numberDouble(90));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator, which we expect it to ignore.
@@ -223,13 +221,11 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminal) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 10 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)});
+    inAccessor().reset(value::TagValueView::numberInt32(10));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 90 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(90)});
+    inAccessor().reset(value::TagValueView::numberDouble(90));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -268,13 +264,11 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminalSpille
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)});
+    inAccessor().reset(value::TagValueView::numberInt32(4));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 40 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(40)});
+    inAccessor().reset(value::TagValueView::numberInt32(40));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -282,13 +276,11 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminalSpille
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 400 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(400)});
+    inAccessor().reset(value::TagValueView::numberDouble(400));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 4,000 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4000)});
+    inAccessor().reset(value::TagValueView::numberInt32(4000));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -305,8 +297,7 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorTerminalSpille
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 400,000 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(400000)});
+    inAccessor().reset(value::TagValueView::numberInt64(400000));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -349,13 +340,11 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartial) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 10 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)});
+    inAccessor().reset(value::TagValueView::numberInt32(10));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 90 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(90)});
+    inAccessor().reset(value::TagValueView::numberDouble(90));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator, which we expect it to ignore.
@@ -387,13 +376,11 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartial) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 10 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)});
+    inAccessor().reset(value::TagValueView::numberInt32(10));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 90 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(90)});
+    inAccessor().reset(value::TagValueView::numberDouble(90));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -444,13 +431,11 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartialSpilled
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)});
+    inAccessor().reset(value::TagValueView::numberInt32(4));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 40 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(40)});
+    inAccessor().reset(value::TagValueView::numberInt32(40));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -458,13 +443,11 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartialSpilled
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 400 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(400)});
+    inAccessor().reset(value::TagValueView::numberDouble(400));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 4,000 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4000)});
+    inAccessor().reset(value::TagValueView::numberInt32(4000));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -481,8 +464,7 @@ TEST_F(HashAggAccumulatorTest, ArithmeticAverageHashAggAccumulatorPartialSpilled
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 400,000 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(400000)});
+    inAccessor().reset(value::TagValueView::numberInt64(400000));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -557,13 +539,11 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulator) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(2)});
+    inAccessor().reset(value::TagValueView::numberDouble(2));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
@@ -577,8 +557,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulator) {
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(1)});
+    inAccessor().reset(value::TagValueView::numberDouble(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 2 to the accumulator.
@@ -592,8 +571,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulator) {
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 4 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)});
+    inAccessor().reset(value::TagValueView::numberInt32(4));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -607,18 +585,15 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulator) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 10 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(10)});
+    inAccessor().reset(value::TagValueView::numberInt32(10));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -697,8 +672,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
@@ -707,8 +681,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(1)});
+    inAccessor().reset(value::TagValueView::numberDouble(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
@@ -721,18 +694,15 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(2)});
+    inAccessor().reset(value::TagValueView::numberDouble(2));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a duplicate 2 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2)});
+    inAccessor().reset(value::TagValueView::numberInt64(2));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -744,8 +714,7 @@ TEST_F(HashAggAccumulatorTest, AddToSetHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(1)});
+    inAccessor().reset(value::TagValueView::numberDouble(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
@@ -967,13 +936,11 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulator) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(2)});
+    inAccessor().reset(value::TagValueView::numberDouble(2));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
@@ -1011,13 +978,11 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulator) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input another 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -1060,8 +1025,7 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
@@ -1079,8 +1043,7 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(4)});
+    inAccessor().reset(value::TagValueView::numberDouble(4));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input an array to the accumulator.
@@ -1100,8 +1063,7 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 6 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(6)});
+    inAccessor().reset(value::TagValueView::numberDouble(6));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
@@ -1250,8 +1212,7 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulator) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
@@ -1285,8 +1246,7 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulator) {
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input another 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -1339,8 +1299,7 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulatorSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 3 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(3)});
+    inAccessor().reset(value::TagValueView::numberDouble(3));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input an array to the accumulator.
@@ -1359,9 +1318,8 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulatorSpilled) {
     moveAccumulatorStateToMockSpillStorage();
     accumulator.initialize(bytecode, accumulatorState());
 
-    // Input 6 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberDouble, value::bitcastFrom<double>(5)});
+    // Input 5 to the accumulator.
+    inAccessor().reset(value::TagValueView::numberDouble(5));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
@@ -1408,8 +1366,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminal) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
@@ -1442,8 +1399,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminal) {
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input another 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -1494,21 +1450,17 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminalLargeValue) {
     accumulator.initialize(bytecode, accumulatorState());
 
     for (int64_t i = 0; i < unusuallyLargeNumberOfDocuments - 2; ++i) {
-        inAccessor().reset(
-            value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+        inAccessor().reset(value::TagValueView::numberInt32(1));
         accumulator.accumulate(bytecode, accumulatorState());
     }
 #else
-    accumulatorState().reset(
-        value::TagValueView{value::TypeTags::NumberInt64,
-                            value::bitcastFrom<int32_t>(unusuallyLargeNumberOfDocuments - 2)});
+    accumulatorState().reset(value::TagValueView::numberInt64(unusuallyLargeNumberOfDocuments - 2));
 #endif
 
     // Add the last two values for real.
     for (int64_t i = unusuallyLargeNumberOfDocuments - 2; i < unusuallyLargeNumberOfDocuments;
          ++i) {
-        inAccessor().reset(
-            value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+        inAccessor().reset(value::TagValueView::numberInt32(1));
         accumulator.accumulate(bytecode, accumulatorState());
     }
 
@@ -1530,13 +1482,11 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminalSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)});
+    inAccessor().reset(value::TagValueView::numberInt32(2));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1544,13 +1494,11 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminalSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 3 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3)});
+    inAccessor().reset(value::TagValueView::numberInt32(3));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)});
+    inAccessor().reset(value::TagValueView::numberInt32(4));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1606,8 +1554,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartial) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input a string to the accumulator.
@@ -1645,8 +1592,7 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartial) {
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input another 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -1698,13 +1644,11 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartialSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 1 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)});
+    inAccessor().reset(value::TagValueView::numberInt32(1));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 2 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)});
+    inAccessor().reset(value::TagValueView::numberInt32(2));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1712,13 +1656,11 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartialSpilled) {
     accumulator.initialize(bytecode, accumulatorState());
 
     // Input 3 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3)});
+    inAccessor().reset(value::TagValueView::numberInt32(3));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Input 4 to the accumulator.
-    inAccessor().reset(
-        value::TagValueView{value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4)});
+    inAccessor().reset(value::TagValueView::numberInt32(4));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.

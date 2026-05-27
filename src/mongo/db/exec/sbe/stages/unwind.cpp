@@ -147,11 +147,10 @@ PlanState UnwindStage::getNext() {
             if (_inArrayAccessor.atEnd()) {
                 _inArray = false;
                 if (_preserveNullAndEmptyArrays) {
-                    _outFieldOutputAccessor->reset(
-                        value::TagValueView{value::TypeTags::Nothing, 0});
+                    _outFieldOutputAccessor->reset(value::TagValueView::nothing());
                     // The array index is set to null if the unwind field is not an array or if the
                     // unwind field is the empty array.
-                    _outIndexOutputAccessor->reset(value::TagValueView{value::TypeTags::Null, 0});
+                    _outIndexOutputAccessor->reset(value::TagValueView::null());
                     return trackPlanState(PlanState::ADVANCED);
                 }
             }
@@ -162,7 +161,7 @@ PlanState UnwindStage::getNext() {
                 _outFieldOutputAccessor->reset(value::TagValueView{tag, val});
                 // The array index is set to null if the unwind field is not an array or if the
                 // unwind field is the empty array.
-                _outIndexOutputAccessor->reset(value::TagValueView{value::TypeTags::Null, 0});
+                _outIndexOutputAccessor->reset(value::TagValueView::null());
                 return trackPlanState(PlanState::ADVANCED);
             }
         }
@@ -172,8 +171,7 @@ PlanState UnwindStage::getNext() {
     auto [tagElem, valElem] = _inArrayAccessor.getViewOfValue();
 
     _outFieldOutputAccessor->reset(value::TagValueView{tagElem, valElem});
-    _outIndexOutputAccessor->reset(
-        value::TagValueView{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(_index)});
+    _outIndexOutputAccessor->reset(value::TagValueView::numberInt64(_index));
 
     _inArrayAccessor.advance();
     ++_index;

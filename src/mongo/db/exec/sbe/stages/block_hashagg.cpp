@@ -454,7 +454,7 @@ void BlockHashAggStage::runAccumulatorsTokenized(const TokenizedKeys& tokenizedK
         executeBlockLevelAccumulatorCode(tokenizedKeys.keys[partition]);
     }
     // Avoid leaving a pointer to inaccessible memory in the accessor.
-    _accumulatorBitsetAccessor.reset(value::TagValueView{value::TypeTags::Nothing, 0});
+    _accumulatorBitsetAccessor.reset(value::TagValueView::nothing());
 }
 
 void BlockHashAggStage::runAccumulatorsElementWise(const value::DeblockedTagVals& extractedBitmap) {
@@ -478,7 +478,7 @@ void BlockHashAggStage::runAccumulatorsElementWise(const value::DeblockedTagVals
     // Call executeRowLevelAccumulatorCode() to run the row accumulators.
     executeRowLevelAccumulatorCode(extractedBitmap, extractedGbs, extractedData);
 
-    _accumulatorBitsetAccessor.reset(value::TagValueView{value::TypeTags::Nothing, 0});
+    _accumulatorBitsetAccessor.reset(value::TagValueView::nothing());
 }
 
 boost::optional<std::vector<size_t>> BlockHashAggStage::tokenizeTokenInfos(
@@ -757,7 +757,7 @@ void BlockHashAggStage::open(bool reOpen) {
         switchToDisk();
     }
 
-    _accumulatorBitsetAccessor.reset(value::TagValueView{value::TypeTags::Nothing, 0});
+    _accumulatorBitsetAccessor.reset(value::TagValueView::nothing());
     _htIt = _ht->end();
 }
 
