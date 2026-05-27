@@ -64,8 +64,8 @@ class MockShard : public Shard {
     MockShard& operator=(const MockShard&) = delete;
 
 public:
-    explicit MockShard(const ShardId& id)
-        : Shard(id,
+    explicit MockShard(const ShardHandle& handle)
+        : Shard(handle,
                 std::make_shared<ShardSharedStateCache::State>(
                     kShardRetryTokenBucketCapacityDefault, kShardRetryTokenReturnRateDefault)) {}
     ~MockShard() override = default;
@@ -167,7 +167,8 @@ protected:
 
         ShardingTestFixture::setUp();
 
-        _mockConfigShard = std::make_shared<MockShard>(ShardId(ShardId::kConfigServerId));
+        _mockConfigShard =
+            std::make_shared<MockShard>(ShardHandle(ShardId::kConfigServerId, UUID::gen()));
         _configShardWrapper = std::make_unique<ConfigShardWrapper>(_mockConfigShard);
     }
 

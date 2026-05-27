@@ -32,7 +32,6 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory.h"
 #include "mongo/db/sharding_environment/client/shard.h"
-#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/modules.h"
 
 #include <functional>
@@ -51,24 +50,24 @@ class MONGO_MOD_PUBLIC ShardFactory {
 
 public:
     using BuilderCallable =
-        std::function<std::unique_ptr<Shard>(const ShardId&, const ConnectionString&)>;
+        std::function<std::unique_ptr<Shard>(const ShardHandle&, const ConnectionString&)>;
     using BuildersMap = std::map<ConnectionString::ConnectionType, BuilderCallable>;
 
     ShardFactory(BuildersMap&&, std::unique_ptr<RemoteCommandTargeterFactory>);
     ~ShardFactory() = default;
 
     /**
-     * Deprecated. Creates a unique_ptr with a new instance of a Shard with the provided shardId
+     * Deprecated. Creates a unique_ptr with a new instance of a Shard with the provided handle
      * and connection string. This method is currently only used for addShard.
      */
-    std::unique_ptr<Shard> createUniqueShard(const ShardId& shardId,
+    std::unique_ptr<Shard> createUniqueShard(const ShardHandle& handle,
                                              const ConnectionString& connStr);
 
     /**
-     * Creates a shared_ptr with a new instance of a Shard with the provided shardId
-     * and connection string.
+     * Creates a shared_ptr with a new instance of a Shard with the provided handle and connection
+     * string.
      */
-    std::shared_ptr<Shard> createShard(const ShardId& shardId, const ConnectionString& connStr);
+    std::shared_ptr<Shard> createShard(const ShardHandle& handle, const ConnectionString& connStr);
 
 private:
     // Map from ConnectionType to a function that can be used to build a Shard object for that

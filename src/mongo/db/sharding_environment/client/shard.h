@@ -38,6 +38,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/retry_strategy.h"
+#include "mongo/db/global_catalog/shard_handle.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -307,8 +308,13 @@ public:
 
     virtual ~Shard() = default;
 
+    // TODO (SERVER-127200): remove and update all callers to rely on getHandle.
     const ShardId& getId() const {
-        return _id;
+        return _handle.name();
+    }
+
+    const ShardHandle& getHandle() const {
+        return _handle;
     }
 
     /**
@@ -517,7 +523,7 @@ public:
     AdaptiveRetryStrategy::RetryBudget& getRetryBudget_forTest() const;
 
 protected:
-    Shard(const ShardId& id, std::shared_ptr<ShardSharedStateCache::State> sharedState);
+    Shard(const ShardHandle& handle, std::shared_ptr<ShardSharedStateCache::State> sharedState);
 
     std::shared_ptr<ShardSharedStateCache::State> getSharedState() const;
 
@@ -583,10 +589,7 @@ private:
         std::function<bool(const std::vector<BSONObj>& batch,
                            const boost::optional<BSONObj>& postBatchResumeToken)> callback) = 0;
 
-    /**
-     * Identifier of the shard as obtained from the configuration data (i.e. shard0000).
-     */
-    const ShardId _id;
+    const ShardHandle _handle;
     std::shared_ptr<ShardSharedStateCache::State> _sharedState;
 
     friend class ConfigShardWrapper;

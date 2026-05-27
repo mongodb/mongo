@@ -32,7 +32,10 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/uuid.h"
 
+#include <functional>
 #include <utility>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -52,6 +55,30 @@ public:
     const boost::optional<UUID>& uuid() const {
         return _uuid;
     }
+
+    bool operator==(const ShardHandle& other) const {
+        // If one shard handle is missing a UUID, it compares as equal to another shard handle with
+        // a UUID to allow for comparisons across FCV upgrade/downgrade.
+        return _name == other._name &&
+            (_uuid == other._uuid || !_uuid.has_value() || !other._uuid.has_value());
+    }
+
+    template <typename H>
+    friend H AbslHashValue(H h, const ShardHandle& handle) {
+        return H::combine(std::move(h), handle._name);
+    }
+
+    /**
+     * Custom hasher so ShardHandles can be used in unordered data structures.
+     * Hashes only _name to stay consistent with operator==, which treats handles with the same
+     * name as equal regardless of whether either is missing a UUID.
+     * Usage: std::unordered_set<ShardHandle, ShardHandle::HashByName> shardHandleSet;
+     */
+    struct HashByName {
+        std::size_t operator()(const ShardHandle& handle) const {
+            return ShardId::Hasher{}(handle._name);
+        }
+    };
 
 private:
     // The Shard ID.

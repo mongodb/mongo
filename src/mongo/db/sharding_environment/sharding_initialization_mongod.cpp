@@ -94,7 +94,6 @@
 #include "mongo/db/sharding_environment/cluster_identity_loader.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/router_uptime_reporter.h"
-#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_local.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_initialization.h"
@@ -347,28 +346,33 @@ void _initializeGlobalShardingState(OperationContext* opCtx,
 
     ShardFactory::BuildersMap buildersMap{
         {ConnectionString::ConnectionType::kReplicaSet,
-         [targeterFactoryPtr, serviceContext](const ShardId& shardId,
+         [targeterFactoryPtr, serviceContext](const ShardHandle& handle,
                                               const ConnectionString& connStr) {
+             // TODO (SERVER-127201) Update the ShardSharedStateCache to operate via ShardUUID
              auto& shardSharedStateCache = ShardSharedStateCache::get(serviceContext);
-             return std::make_unique<ShardRemote>(shardId,
-                                                  connStr,
-                                                  targeterFactoryPtr->create(connStr),
-                                                  shardSharedStateCache.getShardState(shardId));
+             return std::make_unique<ShardRemote>(
+                 handle,
+                 connStr,
+                 targeterFactoryPtr->create(connStr),
+                 shardSharedStateCache.getShardState(handle.name()));
          }},
         {ConnectionString::ConnectionType::kLocal,
-         [serviceContext](const ShardId& shardId, const ConnectionString& connStr) {
+         [serviceContext](const ShardHandle& handle, const ConnectionString& connStr) {
+             // TODO (SERVER-127201) Update the ShardSharedStateCache to operate via ShardUUID
              auto& shardSharedStateCache = ShardSharedStateCache::get(serviceContext);
-             return std::make_unique<ShardLocal>(shardId,
-                                                 shardSharedStateCache.getShardState(shardId));
+             return std::make_unique<ShardLocal>(
+                 handle, shardSharedStateCache.getShardState(handle.name()));
          }},
         {ConnectionString::ConnectionType::kStandalone,
-         [targeterFactoryPtr, serviceContext](const ShardId& shardId,
+         [targeterFactoryPtr, serviceContext](const ShardHandle& handle,
                                               const ConnectionString& connStr) {
+             // TODO (SERVER-127201) Update the ShardSharedStateCache to operate via ShardUUID
              auto& shardSharedStateCache = ShardSharedStateCache::get(serviceContext);
-             return std::make_unique<ShardRemote>(shardId,
-                                                  connStr,
-                                                  targeterFactoryPtr->create(connStr),
-                                                  shardSharedStateCache.getShardState(shardId));
+             return std::make_unique<ShardRemote>(
+                 handle,
+                 connStr,
+                 targeterFactoryPtr->create(connStr),
+                 shardSharedStateCache.getShardState(handle.name()));
          }},
     };
 

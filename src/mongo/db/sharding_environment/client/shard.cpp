@@ -336,8 +336,8 @@ bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
     return !isMongosRetriableError(code) && (code != ErrorCodes::NetworkInterfaceExceededTimeLimit);
 }
 
-Shard::Shard(const ShardId& id, std::shared_ptr<ShardSharedStateCache::State> sharedState)
-    : _id(id), _sharedState{std::move(sharedState)} {}
+Shard::Shard(const ShardHandle& handle, std::shared_ptr<ShardSharedStateCache::State> sharedState)
+    : _handle(handle), _sharedState{std::move(sharedState)} {}
 
 std::shared_ptr<ShardSharedStateCache::State> Shard::getSharedState() const {
     return _sharedState;
@@ -348,7 +348,7 @@ AdaptiveRetryStrategy::RetryBudget& Shard::getRetryBudget_forTest() const {
 }
 
 bool Shard::isConfig() const {
-    return _id == ShardId::kConfigServerId;
+    return _handle.name() == ShardId::kConfigServerId;
 }
 
 bool Shard::localIsRetriableError(const Status& status,

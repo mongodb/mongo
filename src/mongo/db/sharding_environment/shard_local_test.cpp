@@ -75,7 +75,7 @@ protected:
         _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
         auto& shardSharedStateCache = ShardSharedStateCache::get(_opCtx.get());
         _shardLocal = std::make_unique<ShardLocal>(
-            ShardId::kConfigServerId,
+            ShardHandle(ShardId::kConfigServerId, UUID::gen()),
             shardSharedStateCache.getShardState(ShardId::kConfigServerId));
         const repl::ReplSettings replSettings = {};
         repl::ReplicationCoordinator::set(

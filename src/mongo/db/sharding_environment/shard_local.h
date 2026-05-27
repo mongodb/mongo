@@ -42,7 +42,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/rs_local_client.h"
 #include "mongo/db/sharding_environment/client/shard.h"
-#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
@@ -66,7 +65,8 @@ public:
     // local process, so it uses the hardcoded local connection string. Only used in tests.
     static const ConnectionString kLocalConnectionString;
 
-    ShardLocal(const ShardId& id, std::shared_ptr<ShardSharedStateCache::State> sharedState);
+    ShardLocal(const ShardHandle& handle,
+               std::shared_ptr<ShardSharedStateCache::State> sharedState);
 
     ~ShardLocal() override = default;
 

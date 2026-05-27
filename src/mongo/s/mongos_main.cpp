@@ -89,7 +89,6 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongos_server_parameters_gen.h"
 #include "mongo/db/sharding_environment/router_uptime_reporter.h"
-#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_initialization.h"
 #include "mongo/db/sharding_environment/version_mongos.h"
 #include "mongo/db/startup_check_rseq.h"
@@ -582,23 +581,27 @@ Status initializeSharding(
     auto targeterFactory = std::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
 
-    ShardFactory::BuilderCallable setBuilder =
-        [targeterFactoryPtr, opCtx](const ShardId& shardId, const ConnectionString& connStr) {
-            auto& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
-            return std::make_unique<ShardRemote>(shardId,
-                                                 connStr,
-                                                 targeterFactoryPtr->create(connStr),
-                                                 shardSharedStateCache.getShardState(shardId));
-        };
+    ShardFactory::BuilderCallable setBuilder = [targeterFactoryPtr,
+                                                opCtx](const ShardHandle& handle,
+                                                       const ConnectionString& connStr) {
+        // TODO (SERVER-127201) Update the ShardSharedStateCache to operate via ShardUUID
+        auto& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
+        return std::make_unique<ShardRemote>(handle,
+                                             connStr,
+                                             targeterFactoryPtr->create(connStr),
+                                             shardSharedStateCache.getShardState(handle.name()));
+    };
 
-    ShardFactory::BuilderCallable masterBuilder =
-        [targeterFactoryPtr, opCtx](const ShardId& shardId, const ConnectionString& connStr) {
-            auto& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
-            return std::make_unique<ShardRemote>(shardId,
-                                                 connStr,
-                                                 targeterFactoryPtr->create(connStr),
-                                                 shardSharedStateCache.getShardState(shardId));
-        };
+    ShardFactory::BuilderCallable masterBuilder = [targeterFactoryPtr,
+                                                   opCtx](const ShardHandle& handle,
+                                                          const ConnectionString& connStr) {
+        // TODO (SERVER-127201) Update the ShardSharedStateCache to operate via ShardUUID
+        auto& shardSharedStateCache = ShardSharedStateCache::get(opCtx);
+        return std::make_unique<ShardRemote>(handle,
+                                             connStr,
+                                             targeterFactoryPtr->create(connStr),
+                                             shardSharedStateCache.getShardState(handle.name()));
+    };
 
     ShardFactory::BuildersMap buildersMap{
         {ConnectionString::ConnectionType::kReplicaSet, std::move(setBuilder)},

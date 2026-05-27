@@ -90,7 +90,7 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
  * Fetches shard documents from the catalog client without creating Shard instances.
  * Returns a map of shardId -> connectionString and the maximum topologyTime found.
  */
-std::pair<ShardRegistryData::ShardIdToConnectionStringMap, Timestamp> fetchFromCatalogClient(
+std::pair<ShardRegistryData::ShardHandleToConnectionStringMap, Timestamp> fetchFromCatalogClient(
     OperationContext* opCtx) {
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
@@ -112,7 +112,7 @@ std::pair<ShardRegistryData::ShardIdToConnectionStringMap, Timestamp> fetchFromC
                 "shardsNumber"_attr = shards.size(),
                 "lastVisibleOpTime"_attr = reloadOpTime);
 
-    ShardRegistryData::ShardIdToConnectionStringMap shardDocs;
+    ShardRegistryData::ShardHandleToConnectionStringMap shardDocs;
     Timestamp maxTopologyTime{VectorClock::kInitialComponentTime.asTimestamp()};
     for (const auto& shardType : shards) {
         // This validation should ideally go inside the ShardType::validate call. However, doing
@@ -131,7 +131,7 @@ std::pair<ShardRegistryData::ShardIdToConnectionStringMap, Timestamp> fetchFromC
             maxTopologyTime = thisTopologyTime;
         }
 
-        shardDocs.insert_or_assign(ShardId(shardType.getName()), shardHostStatus.getValue());
+        shardDocs.insert_or_assign(shardType.getHandle(), shardHostStatus.getValue());
     }
 
     return {std::move(shardDocs), maxTopologyTime};
@@ -545,23 +545,26 @@ void ShardRegistry::_removeReplicaSet(const std::string& setName) {
 void ShardRegistry::_tearDownRemovedShards(
     OperationContext* opCtx,
     const Cache::ValueHandle& cachedData,
-    const ShardRegistryData::ShardIdToConnectionStringMap& shardDocs) {
+    const ShardRegistryData::ShardHandleToConnectionStringMap& shardDocs) {
     if (!cachedData) {
         return;
     }
 
     for (const auto& cachedShard : cachedData->getAllShards()) {
-        auto cachedId = cachedShard->getId();
-        if (shardDocs.contains(cachedId)) {
+        auto cachedHandle = cachedShard->getHandle();
+        if (shardDocs.contains(cachedHandle)) {
             continue;
         }
 
         auto rsName = cachedShard->getConnString().getSetName();
-        if (cachedId != ShardId::kConfigServerId) {
+        if (cachedHandle.name() != ShardId::kConfigServerId) {
             ReplicaSetMonitor::remove(rsName);
         }
         _removeReplicaSet(rsName);
 
+        // TODO (SERVER-127203): Update shard removal hooks to operate on shardRef once the catalog
+        // cache stores shardRefs.
+        auto cachedId = cachedShard->getId();
         for (auto& callback : _shardRemovalHooks) {
             ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
                 .getAsync([=](const Status&) { callback(cachedId); });
@@ -614,13 +617,15 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& givenConnString,
 }
 
 std::unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& connStr) const {
-    return _shardFactory->createUniqueShard(ShardId("<unnamed>"), connStr);
+    return _shardFactory->createUniqueShard(ShardHandle(ShardId("<unnamed>"), boost::none),
+                                            connStr);
 }
 
 std::shared_ptr<Shard> ShardRegistry::createLocalConfigShard() const {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-    std::shared_ptr<Shard> configShard =
-        _shardFactory->createShard(ShardId::kConfigServerId, ConnectionString::forLocal());
+    // TODO (SERVER-127407): Use config server's uuid when creating the local config shard.
+    std::shared_ptr<Shard> configShard = _shardFactory->createShard(
+        ShardHandle(ShardId::kConfigServerId, boost::none), ConnectionString::forLocal());
     return std::make_shared<ConfigShardWrapper>(configShard);
 }
 
@@ -916,8 +921,9 @@ void ShardRegistry::_scheduleLookupIfRequired() {
 }
 
 void ShardRegistry::_initConfigShard(WithLock wl, const ConnectionString& configCS) {
+    // TODO (SERVER-127407): Use config server's uuid when creating the local config shard.
     _configShardData = ShardRegistryData::createWithConfigShardOnly(
-        _shardFactory->createShard(ShardId::kConfigServerId, configCS));
+        _shardFactory->createShard(ShardHandle(ShardId::kConfigServerId, boost::none), configCS));
     _latestConnStrings[configCS.getSetName()] = configCS;
 }
 
@@ -945,10 +951,10 @@ ShardRegistryData ShardRegistryData::createWithConfigShardOnly(std::shared_ptr<S
 }
 
 ShardRegistryData ShardRegistryData::buildFromShardDocs(
-    const ShardIdToConnectionStringMap& shardDocs, ShardFactory* shardFactory) {
+    const ShardHandleToConnectionStringMap& shardDocs, ShardFactory* shardFactory) {
     ShardRegistryData data;
-    for (const auto& [shardId, connString] : shardDocs) {
-        data._addShard(shardFactory->createShard(shardId, connString));
+    for (const auto& [handle, connString] : shardDocs) {
+        data._addShard(shardFactory->createShard(handle, connString));
     }
     return data;
 }
@@ -994,7 +1000,7 @@ ShardRegistryData ShardRegistryData::createFromExisting(const ShardRegistryData&
         return data;
     }
     invariant(it->second);
-    auto updatedShard = shardFactory->createShard(it->second->getId(), newConnString);
+    auto updatedShard = shardFactory->createShard(it->second->getHandle(), newConnString);
     data._addShard(updatedShard);
 
     return data;
@@ -1074,6 +1080,9 @@ void ShardRegistryData::_addShard(std::shared_ptr<Shard> shard) {
         _connStringLookup.erase(connString.toString());
     }
 
+    if (shard->getHandle().uuid()) {
+        _shardUUIDLookup[*(shard->getHandle().uuid())] = shard;
+    }
     _shardIdLookup[shard->getId()] = shard;
 
     LOGV2_DEBUG(22733,
@@ -1180,7 +1189,7 @@ ShardRegistry::Time ShardRegistry::Time::makeLatestKnown(ServiceContext* svcCtx)
     return Time{_forceReloadIncrementSource.load(), latestKnownTopologyTime};
 }
 
-std::pair<ShardRegistryData::ShardIdToConnectionStringMap, ShardRegistry::Time>
+std::pair<ShardRegistryData::ShardHandleToConnectionStringMap, ShardRegistry::Time>
 ShardRegistry::Time::makeWithLookup(LookupFn&& lookupFn) {
     // It is important that this value is loaded before the lookup to ensure force reload requests
     // are not incorrectly merged.
