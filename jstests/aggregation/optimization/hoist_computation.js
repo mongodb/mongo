@@ -32,6 +32,23 @@ function extractUserStages(explain) {
     return (explain.stages || []).filter((stage) => !stage.$cursor && !stage.$_internalInhibitOptimization);
 }
 
+/// Returns true if `actual` matches `expected`, allowing any leading
+/// $set/$addFields/$project/$match stages in `expected` to be absent because SBE pushdown
+/// can absorb them into the $cursor stage.
+function stagesMatch(actual, expected) {
+    const sbeAbsorbableStages = ["$set", "$addFields", "$project", "$match"];
+    const maybePushedDownToSbe = (stage) => sbeAbsorbableStages.some((s) => s in stage);
+    for (let i = 0; i <= expected.length; i++) {
+        if (i > 0 && !maybePushedDownToSbe(expected[i - 1])) {
+            break;
+        }
+        if (friendlyEqual(actual, expected.slice(i))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /// Produces a lookup stage which stores [{fromLookup: 1}] in the 'as' field and has some optional field references.
 function lookupStage(as, references = []) {
     return {
@@ -77,7 +94,10 @@ function runTest({name, docs, pipeline, optimized, expected, policy}) {
         const optimizedExplain = coll.explain().aggregate(inhibitedOptimized);
         const expectedStages = extractUserStages(optimizedExplain);
 
-        assert.eq(actualStages, expectedStages, "not optimized as expected");
+        assert(stagesMatch(actualStages, expectedStages), "not optimized as expected", {
+            actualStages,
+            expectedStages,
+        });
 
         // Verify the original pipeline produces the same results after optimization.
         const results = coll.aggregate(pipeline).toArray().map(stripId);
@@ -575,10 +595,14 @@ it("maximum paths knob: blocks hoisting above the limit", () => {
             assert.commandWorked(coll.insertMany([{a: 0, b: 0, c: 0}]));
 
             const assertPlan = (input, expected) => {
-                assert.eq(
-                    extractUserStages(coll.explain().aggregate(input)),
-                    extractUserStages(coll.explain().aggregate(inhibitOptimizationPerStage(expected))),
+                const actualStages = extractUserStages(coll.explain().aggregate(input));
+                const expectedStages = extractUserStages(
+                    coll.explain().aggregate(inhibitOptimizationPerStage(expected)),
                 );
+                assert(stagesMatch(actualStages, expectedStages), "not optimized as expected", {
+                    actualStages,
+                    expectedStages,
+                });
             };
 
             assertPlan([lookupStage("x"), {$set: {a: 1, b: 2, c: 3}}], [lookupStage("x"), {$set: {a: 1, b: 2, c: 3}}]);
