@@ -546,7 +546,7 @@ private:
 
     FastTuple<bool, value::TypeTags, value::Value> setField();
 
-    int32_t convertNumericToInt32(value::TypeTags tag, value::Value val);
+    int32_t convertNumericToInt32(value::TagValueView v);
 
     FastTuple<bool, value::TypeTags, value::Value> getArraySize(value::TypeTags tag,
                                                                 value::Value val);
@@ -561,7 +561,7 @@ private:
 
     // This is an implementation of the following algorithm:
     // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
-    void aggStdDevImpl(value::Array* accumulator, value::TypeTags rhsTag, value::Value rhsValue);
+    void aggStdDevImpl(value::Array* accumulator, value::TagValueView rhs);
     void aggMergeStdDevsImpl(value::Array* accumulator,
                              value::TypeTags rhsTag,
                              value::Value rhsValue);
@@ -721,10 +721,8 @@ private:
     value::TagValueMaybeOwned builtinMergeObjects(ArityType arity);
     value::TagValueMaybeOwned builtinAddToSet(ArityType arity);
     value::TagValueMaybeOwned builtinCollAddToSet(ArityType arity);
-    value::TagValueMaybeOwned isMemberImpl(value::TypeTags exprTag,
-                                           value::Value exprVal,
-                                           value::TypeTags arrTag,
-                                           value::Value arrVal,
+    value::TagValueMaybeOwned isMemberImpl(value::TagValueView expr,
+                                           value::TagValueView arr,
                                            CollatorInterface* collator);
     value::TagValueMaybeOwned builtinAddToSetCapped(ArityType arity);
     value::TagValueMaybeOwned builtinCollAddToSetCapped(ArityType arity);

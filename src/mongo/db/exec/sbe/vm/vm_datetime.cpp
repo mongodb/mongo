@@ -60,22 +60,22 @@ TimeZone getTimezone(value::TagValueView timezone, TimeZoneDatabase* timezoneDB)
     }
 }
 
-Date_t getDate(value::TypeTags dateTag, value::Value dateVal) {
-    switch (dateTag) {
+Date_t getDate(value::TagValueView date) {
+    switch (date.tag) {
         case value::TypeTags::Date: {
-            return Date_t::fromMillisSinceEpoch(value::bitcastTo<int64_t>(dateVal));
+            return Date_t::fromMillisSinceEpoch(value::bitcastTo<int64_t>(date.value));
         }
         case value::TypeTags::Timestamp: {
             return Date_t::fromMillisSinceEpoch(
-                Timestamp(value::bitcastTo<uint64_t>(dateVal)).getSecs() * 1000LL);
+                Timestamp(value::bitcastTo<uint64_t>(date.value)).getSecs() * 1000LL);
         }
         case value::TypeTags::ObjectId: {
-            auto objIdBuf = value::getObjectIdView(dateVal);
+            auto objIdBuf = value::getObjectIdView(date.value);
             auto objId = OID::from(objIdBuf);
             return objId.asDateT();
         }
         case value::TypeTags::bsonObjectId: {
-            auto objIdBuf = value::getRawPointerView(dateVal);
+            auto objIdBuf = value::getRawPointerView(date.value);
             auto objId = OID::from(objIdBuf);
             return objId.asDateT();
         }
@@ -228,7 +228,7 @@ value::TagValueMaybeOwned genericDateExpressionAcceptingTimeZone(value::TagValue
                       value::TypeTags::bsonObjectId)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto dateMs = getDate(date.tag, date.value);
+    auto dateMs = getDate(date);
 
     if (tzDB.tag != value::TypeTags::timeZoneDB) {
         return {false, value::TypeTags::Nothing, 0};
@@ -269,7 +269,7 @@ value::TagValueMaybeOwned genericDateExpressionAcceptingTimeZone(value::TagValue
                       value::TypeTags::bsonObjectId)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto dateMs = getDate(date.tag, date.value);
+    auto dateMs = getDate(date);
 
     if (!value::isTimeZone(tz.tag)) {
         return {false, value::TypeTags::Nothing, 0};

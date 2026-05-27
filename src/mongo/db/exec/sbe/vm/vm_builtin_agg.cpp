@@ -91,7 +91,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggStdDev(ArityType arity) {
     if constexpr (merging) {
         aggMergeStdDevsImpl(accumulator, field.tag, field.value);
     } else {
-        aggStdDevImpl(accumulator, field.tag, field.value);
+        aggStdDevImpl(accumulator, field);
     }
 
     // Transfer ownership to return value

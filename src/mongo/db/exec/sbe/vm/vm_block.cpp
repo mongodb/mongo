@@ -1845,7 +1845,7 @@ value::TagValueMaybeOwned ByteCode::blockRoundTrunc(std::string funcName,
         if (!value::isNumber(placeView.tag)) {
             return value::TagValueMaybeOwned(false, value::TypeTags::Nothing, 0);
         }
-        place = convertNumericToInt32(placeView.tag, placeView.value);
+        place = convertNumericToInt32(placeView);
     }
 
     const auto cmpOp = value::makeColumnOp<ColumnOpType::kNoFlags>(

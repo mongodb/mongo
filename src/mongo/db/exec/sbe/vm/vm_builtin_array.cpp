@@ -337,30 +337,28 @@ value::TagValueMaybeOwned ByteCode::builtinConcatArraysCapped(ArityType arity) {
                                  value::bitcastTo<int32_t>(sizeCap.value));
 }
 
-value::TagValueMaybeOwned ByteCode::isMemberImpl(value::TypeTags exprTag,
-                                                 value::Value exprVal,
-                                                 value::TypeTags arrTag,
-                                                 value::Value arrVal,
+value::TagValueMaybeOwned ByteCode::isMemberImpl(value::TagValueView expr,
+                                                 value::TagValueView arr,
                                                  CollatorInterface* collator) {
-    if (!value::isArray(arrTag) && arrTag != value::TypeTags::inList) {
+    if (!value::isArray(arr.tag) && arr.tag != value::TypeTags::inList) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    if (exprTag == value::TypeTags::Nothing) {
+    if (expr.tag == value::TypeTags::Nothing) {
         return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
     }
 
-    if (arrTag == value::TypeTags::inList) {
-        // For InLists, we intentionally ignore the 'collator' parmeter and we use the
+    if (arr.tag == value::TypeTags::inList) {
+        // For InLists, we intentionally ignore the 'collator' parameter and we use the
         // InList's collator instead.
-        InList* inList = value::getInListView(arrVal);
-        const bool found = inList->contains(exprTag, exprVal);
+        InList* inList = value::getInListView(arr.value);
+        const bool found = inList->contains(expr.tag, expr.value);
 
         return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
-    } else if (arrTag == value::TypeTags::ArraySet) {
+    } else if (arr.tag == value::TypeTags::ArraySet) {
         // An empty ArraySet may not have a collation, but we don't need one to definitively
         // determine that the empty set doesn't contain the value we are checking.
-        auto arrSet = value::getArraySetView(arrVal);
+        auto arrSet = value::getArraySetView(arr.value);
         if (arrSet->size() == 0) {
             return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
         }
@@ -376,11 +374,11 @@ value::TagValueMaybeOwned ByteCode::isMemberImpl(value::TypeTags exprTag,
         }
         return {false,
                 value::TypeTags::Boolean,
-                value::bitcastFrom<bool>(values.find({exprTag, exprVal}) != values.end())};
+                value::bitcastFrom<bool>(values.find({expr.tag, expr.value}) != values.end())};
     }
     const bool found =
-        value::arrayAny(arrTag, arrVal, [&](value::TypeTags elemTag, value::Value elemVal) {
-            auto [tag, val] = value::compareValue(exprTag, exprVal, elemTag, elemVal, collator);
+        value::arrayAny(arr.tag, arr.value, [&](value::TypeTags elemTag, value::Value elemVal) {
+            auto [tag, val] = value::compareValue(expr.tag, expr.value, elemTag, elemVal, collator);
             if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(val) == 0) {
                 return true;
             }
@@ -395,7 +393,7 @@ value::TagValueMaybeOwned ByteCode::builtinIsMember(ArityType arity) {
     auto expr = viewFromStack(0);
     auto arr = viewFromStack(1);
 
-    return ByteCode::isMemberImpl(expr.tag, expr.value, arr.tag, arr.value, nullptr);
+    return ByteCode::isMemberImpl(expr, arr, nullptr);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinCollIsMember(ArityType arity) {
@@ -412,7 +410,7 @@ value::TagValueMaybeOwned ByteCode::builtinCollIsMember(ArityType arity) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    return ByteCode::isMemberImpl(expr.tag, expr.value, arr.tag, arr.value, collator);
+    return ByteCode::isMemberImpl(expr, arr, collator);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinExtractSubArray(ArityType arity) {
@@ -691,42 +689,42 @@ namespace {
  * Helper function to extract and validate the 'n' parameter for topN/bottomN.
  * Returns -1 if validation fails.
  */
-inline int64_t extractNParameter(value::TypeTags nTag, value::Value nVal) {
-    if (!value::isNumber(nTag)) {
+inline int64_t extractNParameter(value::TagValueView n) {
+    if (!value::isNumber(n.tag)) {
         return -1;
     }
 
-    int64_t n;
-    switch (nTag) {
+    int64_t result;
+    switch (n.tag) {
         case value::TypeTags::NumberInt64:
-            n = value::bitcastTo<int64_t>(nVal);
+            result = value::bitcastTo<int64_t>(n.value);
             break;
         case value::TypeTags::NumberInt32:
-            n = value::bitcastTo<int32_t>(nVal);
+            result = value::bitcastTo<int32_t>(n.value);
             break;
         case value::TypeTags::NumberDouble: {
-            double dVal = value::bitcastTo<double>(nVal);
-            auto result = mongo::representAs<int64_t>(dVal);
-            if (!result) {
+            double dVal = value::bitcastTo<double>(n.value);
+            auto converted = mongo::representAs<int64_t>(dVal);
+            if (!converted) {
                 return -1;
             }
-            n = *result;
+            result = *converted;
             break;
         }
         case value::TypeTags::NumberDecimal: {
-            auto dVal = value::bitcastTo<Decimal128>(nVal);
-            auto result = mongo::representAs<int64_t>(dVal);
-            if (!result) {
+            auto dVal = value::bitcastTo<Decimal128>(n.value);
+            auto converted = mongo::representAs<int64_t>(dVal);
+            if (!converted) {
                 return -1;
             }
-            n = *result;
+            result = *converted;
             break;
         }
         default:
             return -1;
     }
 
-    return n;
+    return result;
 }
 
 /**
@@ -848,7 +846,7 @@ value::TagValueMaybeOwned ByteCode::topOrBottomNImpl(ArityType arity, TopBottomS
     tassert(1127461, "Unexpected arity value", arity == 3 || arity == 4);
 
     auto nView = viewFromStack(0);
-    int64_t n = extractNParameter(nView.tag, nView.value);
+    int64_t n = extractNParameter(nView);
     if (n < 0) {
         return {false, value::TypeTags::Nothing, 0};
     }

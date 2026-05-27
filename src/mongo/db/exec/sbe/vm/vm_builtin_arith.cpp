@@ -152,19 +152,19 @@ value::TagValueMaybeOwned ByteCode::builtinTanh(ArityType arity) {
  * argument, which is checked to be a whole number between -20 and 100, but could still be a
  * non-int32 type.
  */
-int32_t ByteCode::convertNumericToInt32(const value::TypeTags tag, const value::Value val) {
-    switch (tag) {
+int32_t ByteCode::convertNumericToInt32(const value::TagValueView v) {
+    switch (v.tag) {
         case value::TypeTags::NumberInt32: {
-            return value::bitcastTo<int32_t>(val);
+            return value::bitcastTo<int32_t>(v.value);
         }
         case value::TypeTags::NumberInt64: {
-            return static_cast<int32_t>(value::bitcastTo<int64_t>(val));
+            return static_cast<int32_t>(value::bitcastTo<int64_t>(v.value));
         }
         case value::TypeTags::NumberDouble: {
-            return static_cast<int32_t>(value::bitcastTo<double>(val));
+            return static_cast<int32_t>(value::bitcastTo<double>(v.value));
         }
         case value::TypeTags::NumberDecimal: {
-            Decimal128 dec = value::bitcastTo<Decimal128>(val);
+            Decimal128 dec = value::bitcastTo<Decimal128>(v.value);
             return dec.toInt(Decimal128::kRoundTiesToEven);
         }
         default:
@@ -238,7 +238,7 @@ value::TagValueMaybeOwned ByteCode::scalarRoundTrunc(std::string funcName,
         if (!value::isNumber(placeArg.tag)) {
             return {false, value::TypeTags::Nothing, 0};
         }
-        place = convertNumericToInt32(placeArg.tag, placeArg.value);
+        place = convertNumericToInt32(placeArg);
     }
 
     return genericRoundTrunc(funcName, roundingMode, place, num.tag, num.value);

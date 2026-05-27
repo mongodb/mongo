@@ -51,9 +51,9 @@ bool isValidTimezone(value::TagValueView timezone, const TimeZoneDatabase* timez
 TimeZone getTimezone(value::TagValueView timezone, TimeZoneDatabase* timezoneDB);
 
 /**
- * Returns a Date_t object representing the datetime given by dateTag and dateVal.
+ * Returns a Date_t object representing the datetime given by 'date'.
  */
-Date_t getDate(value::TypeTags dateTag, value::Value dateVal);
+Date_t getDate(value::TagValueView date);
 
 /**
  * Returns 'true' if a value of type encoded by 'typeTag' can be coerced to Date_t by function
