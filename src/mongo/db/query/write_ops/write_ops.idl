@@ -191,6 +191,12 @@ structs:
         is_command_reply: true
         chained_structs:
             WriteCommandReplyBase: writeCommandReplyBase
+        fields:
+            queryStatsMetrics:
+                description: "Metrics for those statements within the command that request them."
+                type: array<QueryStatsMetrics>
+                optional: true
+                stability: internal
 
     # IMPORTANT: If any changes are made to the fields here, please update the corresponding size
     # estimation functions in 'write_ops.cpp'.
@@ -397,6 +403,11 @@ structs:
                 type: uuid
                 optional: true
                 stability: unstable
+            includeQueryStatsMetricsForOpIndex:
+                description: "When present, tells shards to add metrics to response for the op at the given index."
+                type: int
+                optional: true
+                stability: internal
 
     FindAndModifyLastError:
         description: "Contains execution details for the findAndModify command"

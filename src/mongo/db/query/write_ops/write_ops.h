@@ -142,7 +142,8 @@ int getUpdateSizeEstimate(const BSONObj& q,
 int getDeleteSizeEstimate(const BSONObj& q,
                           const boost::optional<mongo::BSONObj>& collation,
                           const mongo::BSONObj& hint,
-                          const boost::optional<UUID>& sampleId);
+                          const boost::optional<UUID>& sampleId,
+                          boost::optional<int32_t> includeQueryStatsMetricsForOpIndex);
 
 /**
  * Set of utilities which estimate the size, in bytes, of an insert/update/delete op with the given

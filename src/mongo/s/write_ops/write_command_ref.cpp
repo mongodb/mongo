@@ -160,8 +160,12 @@ int BatchWriteCommandRefImpl::estimateOpSizeInBytes(int index) const {
                 return estSize;
             },
             [&](const write_ops::DeleteOpEntry& del) {
-                auto estSize = write_ops::getDeleteSizeEstimate(
-                    del.getQ(), del.getCollation(), del.getHint(), del.getSampleId());
+                auto estSize =
+                    write_ops::getDeleteSizeEstimate(del.getQ(),
+                                                     del.getCollation(),
+                                                     del.getHint(),
+                                                     del.getSampleId(),
+                                                     del.getIncludeQueryStatsMetricsForOpIndex());
                 // Verify that estSize is at least the BSON serialization size for debug builds.
                 dassert(estSize >= del.toBSON().objsize());
                 return estSize;

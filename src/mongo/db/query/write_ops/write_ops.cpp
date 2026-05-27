@@ -446,7 +446,8 @@ int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
 int getDeleteSizeEstimate(const BSONObj& q,
                           const boost::optional<mongo::BSONObj>& collation,
                           const mongo::BSONObj& hint,
-                          const boost::optional<UUID>& sampleId) {
+                          const boost::optional<UUID>& sampleId,
+                          boost::optional<int32_t> includeQueryStatsMetricsForOpIndex) {
     using DeleteOpEntry = write_ops::DeleteOpEntry;
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
@@ -470,6 +471,12 @@ int getDeleteSizeEstimate(const BSONObj& q,
     // Add the size of the 'sampleId' field, if present.
     if (sampleId) {
         estSize += DeleteOpEntry::kSampleIdFieldName.size() + kUUIDSize + kPerElementOverhead;
+    }
+
+    // Add the size of the 'includeQueryStatsMetricsForOpIndex' field, if present.
+    if (includeQueryStatsMetricsForOpIndex.has_value()) {
+        estSize += DeleteOpEntry::kIncludeQueryStatsMetricsForOpIndexFieldName.size() + kIntSize +
+            kPerElementOverhead;
     }
 
     return estSize;
@@ -594,7 +601,8 @@ bool verifySizeEstimate(const DeleteCommandRequest& deleteReq,
         size += write_ops::getDeleteSizeEstimate(deleteOp.getQ(),
                                                  deleteOp.getCollation(),
                                                  deleteOp.getHint(),
-                                                 deleteOp.getSampleId()) +
+                                                 deleteOp.getSampleId(),
+                                                 deleteOp.getIncludeQueryStatsMetricsForOpIndex()) +
             kWriteCommandBSONArrayPerElementOverheadBytes;
     }
 
@@ -670,7 +678,9 @@ bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp) {
     return write_ops::getDeleteSizeEstimate(deleteOp.getQ(),
                                             deleteOp.getCollation(),
                                             deleteOp.getHint(),
-                                            deleteOp.getSampleId()) >= deleteOp.toBSON().objsize();
+                                            deleteOp.getSampleId(),
+                                            deleteOp.getIncludeQueryStatsMetricsForOpIndex()) >=
+        deleteOp.toBSON().objsize();
 }
 
 bool isClassicalUpdateReplacement(const BSONObj& update) {
