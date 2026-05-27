@@ -37,6 +37,10 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
@@ -282,5 +286,117 @@ TEST_F(ShardCatalogHistoryCleanupTest, DeletesStaleCollectionEntries) {
     ASSERT_EQ(client.count(NamespaceString::kConfigShardCatalogChunksNamespace,
                            BSON(ChunkType::collectionUUID() << currentUuid)),
               2);
+}
+
+TEST_F(ShardCatalogHistoryCleanupTest, SkipsCleanupWhenCollectionCriticalSectionActive) {
+    RAIIServerParameterControllerForTest ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    RAIIServerParameterControllerForTest crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+
+    auto storageEngine = getServiceContext()->getStorageEngine();
+    auto oldestTimestamp = storageEngine->getOldestTimestamp() + 20;
+    auto oldTimestamp = oldestTimestamp + 1;
+    storageEngine->setOldestTimestamp(oldTimestamp, false /*force*/);
+    auto newTimestamp = oldTimestamp + 1;
+
+    const auto kStaleNss = NamespaceStringUtil::deserialize(
+        boost::none, "test.stale_collection", SerializationContext::stateDefault());
+    setupCollection(operationContext(),
+                    kStaleNss,
+                    false /* isCurrentlyOwned */,
+                    false /* isOutdatedButActive */,
+                    true /* isFullyOutdated */,
+                    newTimestamp,
+                    oldTimestamp,
+                    oldestTimestamp);
+
+    const auto csReason = BSON("reason" << "test");
+
+    {
+        auto acq =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), kStaleNss, AcquisitionPrerequisites::kWrite),
+                              MODE_X);
+        auto csr = CollectionShardingRuntime::acquireExclusive(operationContext(), kStaleNss);
+        csr->enterCriticalSectionCatchUpPhase(operationContext(), csReason);
+        csr->enterCriticalSectionCommitPhase(operationContext(), csReason);
+    }
+
+    waitForTimestampMonitorPass();
+
+    // Within the critical section the cleanup shouldn't run
+    DBDirectClient client{operationContext()};
+    ASSERT_EQ(client.count(NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                           BSON(CollectionType::kNssFieldName << kStaleNss.toString_forTest())),
+              1);
+
+    {
+        auto acq =
+            acquireCollection(operationContext(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  operationContext(), kStaleNss, AcquisitionPrerequisites::kWrite),
+                              MODE_X);
+        auto csr = CollectionShardingRuntime::acquireExclusive(operationContext(), kStaleNss);
+        csr->exitCriticalSection(operationContext(), csReason);
+    }
+
+    waitForTimestampMonitorPass();
+
+    ASSERT_EQ(client.count(NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                           BSON(CollectionType::kNssFieldName << kStaleNss.toString_forTest())),
+              0);
+}
+
+TEST_F(ShardCatalogHistoryCleanupTest, SkipsCleanupWhenDatabaseCriticalSectionActive) {
+    RAIIServerParameterControllerForTest ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    RAIIServerParameterControllerForTest crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+
+    auto storageEngine = getServiceContext()->getStorageEngine();
+    auto oldestTimestamp = storageEngine->getOldestTimestamp() + 20;
+    auto oldTimestamp = oldestTimestamp + 1;
+    storageEngine->setOldestTimestamp(oldTimestamp, false /*force*/);
+    auto newTimestamp = oldTimestamp + 1;
+
+    const auto kStaleNss = NamespaceStringUtil::deserialize(
+        boost::none, "test.stale_collection", SerializationContext::stateDefault());
+    setupCollection(operationContext(),
+                    kStaleNss,
+                    false /* isCurrentlyOwned */,
+                    false /* isOutdatedButActive */,
+                    true /* isFullyOutdated */,
+                    newTimestamp,
+                    oldTimestamp,
+                    oldestTimestamp);
+
+    const auto csReason = BSON("reason" << "test");
+
+    {
+        AutoGetDb autoDb(operationContext(), kStaleNss.dbName(), MODE_X);
+        auto dsr =
+            DatabaseShardingRuntime::acquireExclusive(operationContext(), kStaleNss.dbName());
+        dsr->enterCriticalSectionCatchUpPhase(operationContext(), csReason);
+        dsr->enterCriticalSectionCommitPhase(operationContext(), csReason);
+    }
+
+    waitForTimestampMonitorPass();
+
+    // Within the critical section the cleanup shouldn't run
+    DBDirectClient client{operationContext()};
+    ASSERT_EQ(client.count(NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                           BSON(CollectionType::kNssFieldName << kStaleNss.toString_forTest())),
+              1);
+
+    {
+        AutoGetDb autoDb(operationContext(), kStaleNss.dbName(), MODE_X);
+        auto dsr =
+            DatabaseShardingRuntime::acquireExclusive(operationContext(), kStaleNss.dbName());
+        dsr->exitCriticalSection(operationContext(), csReason);
+    }
+
+    waitForTimestampMonitorPass();
+
+    ASSERT_EQ(client.count(NamespaceString::kConfigShardCatalogCollectionsNamespace,
+                           BSON(CollectionType::kNssFieldName << kStaleNss.toString_forTest())),
+              0);
 }
 }  // namespace mongo
