@@ -254,3 +254,14 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagUniqueShardIdentifiers
         default: false
         fcv_gated: true
+    # TODO (SERVER-126991): Remove this flag once 9.0 becomes last LTS.
+    featureFlagStrictExpireAfterSecondsTypeChecking:
+        description: >-
+            When enabled, checkMetadataConsistency compares 'expireAfterSeconds' across shards
+            using strict BSON type semantics. When disabled, the cross-shard comparison casts
+            numeric values to long first to tolerate legacy values that pre-7.3 nodes persisted
+            using the BSON type of the user-supplied value (int, long, double, or decimal).
+        cpp_varname: feature_flags::gStrictExpireAfterSecondsTypeChecking
+        default: true
+        version: 9.0
+        fcv_gated: true

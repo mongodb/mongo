@@ -1566,8 +1566,24 @@ std::vector<MetadataInconsistencyItem> checkIndexesConsistencyAcrossShards(
          *          index across all shards.
          *      6. Filter out indexes that are consistent across all shards.
          *      7. Project the final result.
+         *
+         * Note: step 4 contains a workaround for a spurious InconsistentIndex that can arise in
+         * mixed-version clusters. Pre-7.3 nodes persisted 'expireAfterSeconds' using the BSON
+         * type of the user-supplied value (e.g. 3600 -> int, 3600.5 -> double), while 7.3+ nodes
+         * always truncate to integer. When FCV is updated to 9.0, all the 'expireAfterSeconds'
+         * values on disk are normalized to integer. However, for previous FCV values, the
+         * inconsistency can still happen. As part of the workaround, we pass
+         * '$$tolerateExpireAfterSecondsTypeMismatch' from the caller: when true, all numeric
+         * 'expireAfterSeconds' values are cast to long before comparison so that semantically-
+         * equivalent values stored with different types compare equal; when false, CMC flags type
+         * mismatches as usual. The caller derives the boolean from
+         * 'featureFlagStrictExpireAfterSecondsTypeChecking' (FCV-gated at 9.0), so by default the
+         * workaround is on below FCV 9.0 and off at FCV >= 9.0.
+         *
+         * TODO (SERVER-126991): Remove the workaround in step 4 once 9.0 becomes last LTS.
          */
-        auto rawPipelineBSON = fromjson(R"({pipeline: [
+        auto rawPipelineBSON = fromjson(
+            R"({pipeline: [
 			{$indexStats: {}},
 			{$group: {
 					_id: null,
@@ -1577,8 +1593,28 @@ std::vector<MetadataInconsistencyItem> checkIndexesConsistencyAcrossShards(
 			{$unwind: '$indexDoc'},
 			{$group: {
 					'_id': '$indexDoc.name',
-					'shards': {$push: '$indexDoc.shard'},
-					'specs': {$push: {$objectToArray: {$ifNull: ['$indexDoc.spec', {}]}}},
+					'shards': {$push: '$indexDoc.shard'},)"
+            // TODO (SERVER-126991): Remove this $map block and replace it with the original
+            //   'specs': {$push: {$objectToArray: {$ifNull: ['$indexDoc.spec', {}]}}},
+            // once 9.0 becomes last LTS. See the function-level note for more info.
+            R"(
+					'specs': {$push: {$map: {
+						input: {$objectToArray: {$ifNull: ['$indexDoc.spec', {}]}},
+						as: 'kv',
+						in: {$cond: {
+							if: {$and: [
+								{$eq: ['$$kv.k', 'expireAfterSeconds']},
+								{$isNumber: '$$kv.v'},
+								'$$tolerateExpireAfterSecondsTypeMismatch'
+							]},
+							then: {k: '$$kv.k',
+								v: {$convert: {
+									input: '$$kv.v', to: 'long',
+									onError: '$$kv.v'}}},
+							else: '$$kv'
+						}}
+					}}},)"
+            R"(
 					'allShards': {$first: '$allShards'}
 			}},
 			{$project: {
@@ -1616,11 +1652,20 @@ std::vector<MetadataInconsistencyItem> checkIndexesConsistencyAcrossShards(
         return parsePipelineFromBSON(rawPipelineBSON.firstElement());
     }();
 
+    // TODO (SERVER-126991): Remove tolerateExpireAfterSecondsTypeMismatch and related handling
+    // once 9.0 becomes last LTS.
+    const bool tolerateExpireAfterSecondsTypeMismatch =
+        !feature_flags::gStrictExpireAfterSecondsTypeChecking.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+
     std::vector<MetadataInconsistencyItem> indexIncons;
     for (const auto& coll : collections) {
         const auto& nss = coll.getNss();
 
         AggregateCommandRequest aggRequest{nss, rawPipelineStages};
+        aggRequest.setLet(BSON("tolerateExpireAfterSecondsTypeMismatch"
+                               << tolerateExpireAfterSecondsTypeMismatch));
 
         std::vector<BSONObj> results = _runExhaustiveAggregation(
             opCtx, nss, aggRequest, "Check sharded indexes consistency across shards"_sd);
