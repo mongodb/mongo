@@ -32,31 +32,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
-#include "mongo/db/replicated_fast_count/size_count_timestamp_store.h"
-#include "mongo/db/storage/record_store.h"
-
-#include <boost/optional/optional.hpp>
 
 namespace mongo::replicated_fast_count {
-
-/**
- * Returns the latest number of records (count) and data size for the collection with `uuid`.
- *
- * readLatest() combines the persisted size and count entry from `sizeCountStore` with deltas
- * aggregated from oplog entries in `cursor` that reference UUID `uuid`. `sizeCountStore` and
- * `timestampStore` are used to determine where to begin traversing `cursor`.
- *
- * `cursor` must be positioned on an oplog collection.
- *
- * If the collection whose size and count is being requested is the oplog, the UUID must be also be
- * passed in as 'oplogUuid'.
- */
-[[nodiscard]] CollectionSizeCount readLatest(OperationContext* opCtx,
-                                             const SizeCountStore& sizeCountStore,
-                                             const SizeCountTimestampStore& timestampStore,
-                                             SeekableRecordCursor& cursor,
-                                             UUID uuid,
-                                             boost::optional<UUID> oplogUuid = boost::none);
 
 /**
  * Returns the persisted number of records (count) and data size for the collection with `uuid`.

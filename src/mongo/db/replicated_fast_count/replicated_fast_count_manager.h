@@ -175,19 +175,6 @@ public:
     CollectionSizeCount find(const UUID& uuid) const;
 
     /**
-     * Returns the number of records (count) and data size for the collection with `uuid` as of the
-     * last committed change.
-     *
-     * This function traverses the oplog to compute latest size/count of the collection with `uuid`.
-     * This traversal ignores oplog visibility rules and thus accumulates oplog entries beyond oplog
-     * holes.
-     *
-     * WARNING: This function is much less performant than `findPersisted()`. Only use
-     * `findLatest()` when precise size/count information is required for correctness.
-     */
-    CollectionSizeCount findLatest(OperationContext* opCtx, UUID uuid) const;
-
-    /**
      * Returns the persisted number of records (count) and data size for the collection with `uuid`.
      */
     CollectionSizeCount findPersisted(OperationContext* opCtx, UUID uuid) const;

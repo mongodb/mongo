@@ -414,38 +414,6 @@ CollectionSizeCount ReplicatedFastCountManager::find(const UUID& uuid) const {
     return {};
 }
 
-CollectionSizeCount ReplicatedFastCountManager::findLatest(OperationContext* opCtx,
-                                                           UUID uuid) const {
-    // Callers sometimes acquire a collection lock before reading findLatest(). When we try to
-    // acquire an additional oplog collection lock here, an assertion can be triggered when multiple
-    // lock acquisitions are disallowed, for example, during capped collection deletes. These
-    // operations should be thread safe, though, since we only acquire IS locks here, but this RAII
-    // wrapper suppresses the assertion for now.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
-        shard_role_details::getLocker(opCtx));
-
-    // The oplog visible timestamp managed by the WiredTigerOplogManager is at most the WiredTiger
-    // all_durable timestamp which never includes oplog holes. However, some callers of findLatest()
-    // expect to see all committed changes, including those beyond one or more oplog holes. We
-    // override the RecoveryUnit's oplog visible timestamp here to allow reading all oplog entries
-    // for the duration of this function.
-    ScopedOplogVisibleTimestamp scopedOplogVisibleTimestamp(
-        shard_role_details::getRecoveryUnit(opCtx), boost::none);
-
-    const AutoGetOplogFastPath oplogRead(
-        opCtx, OplogAccessMode::kRead, Date_t::max(), {.skipRSTLLock = opCtx->isLockFreeReadsOp()});
-    const auto& oplogColl = oplogRead.getCollection();
-    massert(123334, "oplog collection not found", oplogColl);
-
-    auto oplogCursor = oplogColl->getRecordStore()->getCursor(
-        opCtx, *shard_role_details::getRecoveryUnit(opCtx), /*forward=*/true);
-
-    boost::optional<UUID> oplogUuid =
-        (uuid == oplogColl->uuid()) ? boost::make_optional(uuid) : boost::none;
-
-    return readLatest(opCtx, *_sizeCountStore, *_timestampStore, *oplogCursor, uuid, oplogUuid);
-}
-
 CollectionSizeCount ReplicatedFastCountManager::findPersisted(OperationContext* opCtx,
                                                               UUID uuid) const {
     if (MONGO_unlikely(useInMemoryReplicatedSizeCount.shouldFail())) {

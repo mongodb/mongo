@@ -260,10 +260,7 @@ mongo_cc_library(
         "replicated_fast_count_read.cpp",
     ],
     deps = [
-        "replicated_fast_count_delta_utils",
-        "replicated_fast_count_streaming_oplog_delta_accumulator",
         "size_count_store",
-        "size_count_timestamp_store",
     ],
 )
 
@@ -277,10 +274,8 @@ mongo_cc_unit_test(
         "server-collection-write-path",
     ],
     deps = [
-        "replicated_fast_count_delta_utils",
         "replicated_fast_count_read",
         "replicated_fast_count_test_helpers",
-        "size_count_timestamp_store",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],
 )

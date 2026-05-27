@@ -29,42 +29,7 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_read.h"
 
-#include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
-
 namespace mongo::replicated_fast_count {
-
-CollectionSizeCount readLatest(OperationContext* opCtx,
-                               const SizeCountStore& sizeCountStore,
-                               const SizeCountTimestampStore& timestampStore,
-                               SeekableRecordCursor& cursor,
-                               UUID uuid,
-                               boost::optional<UUID> oplogUuid) {
-    Lock::GlobalLock readLock(opCtx, MODE_IS, {.skipRSTLLock = opCtx->isLockFreeReadsOp()});
-    const auto entry =
-        sizeCountStore.read(opCtx, uuid)
-            .value_or(SizeCountStore::Entry{.timestamp = Timestamp::min(), .size = 0, .count = 0});
-    // We default to Timestamp::min() when the timestamp store does not yet contain a timestamp.
-    const Timestamp timestamp = timestampStore.read(opCtx).value_or(Timestamp::min());
-
-    // We compute the maximum of the timestamp in the size count store and the timestamp in the
-    // timestamp store to determine where to begin reading the oplog. The size and count entry is
-    // valid as of the maximum timestamp, so we only need to aggregate deltas after that point in
-    // time.
-    const Timestamp seekAfterTs = std::max(entry.timestamp, timestamp);
-    const auto deltas = aggregateSizeCountDeltasInOplog(
-                            cursor, seekAfterTs, uuid, /*isCheckpoint=*/false, oplogUuid)
-                            .deltas;
-
-    // If there are no oplog entries for this UUID after seekAfterTs, the stored values are already
-    // accurate and no delta adjustment is needed.
-    if (!deltas.contains(uuid)) {
-        return CollectionSizeCount{.size = entry.size, .count = entry.count};
-    }
-
-    return CollectionSizeCount{.size = entry.size + deltas.at(uuid).sizeCount.size,
-                               .count = entry.count + deltas.at(uuid).sizeCount.count};
-}
 
 [[nodiscard]] CollectionSizeCount readPersisted(OperationContext* opCtx,
                                                 const SizeCountStore& sizeCountStore,
