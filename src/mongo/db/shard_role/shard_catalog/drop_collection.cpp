@@ -262,7 +262,8 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const repl::OpTime& dropOpTime,
                                   DropCollectionSystemCollectionMode systemCollectionMode,
-                                  DropReply* reply) {
+                                  DropReply* reply,
+                                  bool markFromMigrate = false) {
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
     boost::optional<UUID> uuid;
     AutoStatsTracker statsTracker(opCtx,
@@ -299,8 +300,8 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(*uuid);
     Status status =
         systemCollectionMode == DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops
-        ? db->dropCollection(opCtx, collectionName, dropOpTime)
-        : db->dropCollectionEvenIfSystem(opCtx, collectionName, dropOpTime);
+        ? db->dropCollection(opCtx, collectionName, dropOpTime, markFromMigrate)
+        : db->dropCollectionEvenIfSystem(opCtx, collectionName, dropOpTime, markFromMigrate);
 
     if (!status.isOK()) {
         return status;
@@ -510,7 +511,8 @@ Status dropCollectionIfUUIDNotMatching(OperationContext* opCtx,
 Status dropCollectionForApplyOps(OperationContext* opCtx,
                                  const NamespaceString& collectionName,
                                  const repl::OpTime& dropOpTime,
-                                 DropCollectionSystemCollectionMode systemCollectionMode) {
+                                 DropCollectionSystemCollectionMode systemCollectionMode,
+                                 bool markFromMigrate) {
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(20332, "CMD: drop", logAttrs(collectionName));
     }
@@ -543,8 +545,13 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
                     opCtx, collectionName, AcquisitionPrerequisites::kWrite)});
             return _dropView(opCtx, db, ddlAcq.at(collectionName).getView(), &unusedReply);
         } else {
-            return _dropCollectionForApplyOps(
-                opCtx, db, collectionName, dropOpTime, systemCollectionMode, &unusedReply);
+            return _dropCollectionForApplyOps(opCtx,
+                                              db,
+                                              collectionName,
+                                              dropOpTime,
+                                              systemCollectionMode,
+                                              &unusedReply,
+                                              markFromMigrate);
         }
     });
 }

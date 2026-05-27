@@ -962,7 +962,8 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                 opCtx,
                 tmpName,
                 {},
-                DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+                DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops,
+                options.markFromMigrate);
         } catch (...) {
             status = exceptionToStatus();
         }
@@ -1012,8 +1013,10 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         return status;
 
     tmpCollectionDropper.dismiss();
+    // The source drop is only reached on the data-bearing shard (non-data-bearing shards get
+    // NamespaceNotFound before this point), so it is always a user-visible DDL event.
     return dropCollectionForApplyOps(
-        opCtx, source, {}, DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+        opCtx, source, {}, DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops, false);
 }
 
 }  // namespace

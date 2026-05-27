@@ -165,14 +165,18 @@ class CollectionTestModel {
         ]);
 
         // ===== COLLECTION_PRESENT_UNTRACKED =====
-        // TODO SERVER-126280: Cross-DB rename is excluded for untracked: coverage is provided by
-        // COLLECTION_PRESENT_UNSPLITTABLE, which exercises the moveCollection → rename path.
         this._setActions(State.COLLECTION_PRESENT_UNTRACKED, [
             [Action.INSERT_DOC, State.COLLECTION_PRESENT_UNTRACKED],
             [Action.DROP_COLLECTION, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             ...(includeDropDatabase ? [[Action.DROP_DATABASE, State.DATABASE_ABSENT]] : []),
             [Action.RENAME_TO_NON_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+            ...(includeCrossDbRename
+                ? [
+                      [Action.RENAME_TO_NON_EXISTENT_DIFFERENT_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+                      [Action.RENAME_TO_EXISTENT_DIFFERENT_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+                  ]
+                : []),
             [Action.SHARD_COLLECTION_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
             [Action.SHARD_COLLECTION_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
             [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_UNTRACKED],

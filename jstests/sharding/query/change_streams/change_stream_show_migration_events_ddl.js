@@ -513,4 +513,65 @@ describe("$changeStream showMigrationEvents", () => {
             runMovePrimaryTest(false /* emitFromMigrate */);
         });
     });
+
+    describe("cross-DB rename after moveCollection", () => {
+        function runCrossDbRenameAfterMoveCollectionTest(emitFromMigrate) {
+            const dbName = freshDbName();
+            const collName = "coll";
+            const mongos = st.s;
+            const db = mongos.getDB(dbName);
+
+            assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+            assert.commandWorked(db.createCollection(collName));
+            assert.commandWorked(
+                mongos.adminCommand({moveCollection: `${dbName}.${collName}`, toShard: st.shard1.shardName}),
+            );
+
+            runWithParamsAllNonConfigNodes(db, {changeStreamsEmitFromMigrate: emitFromMigrate}, () => {
+                const {csTest, cursor} = openRecipientStream(st, dbName);
+
+                const targetDb = `${dbName}_${collName}_target`;
+                assert.commandWorked(
+                    mongos.adminCommand({enableSharding: targetDb, primaryShard: st.shard0.shardName}),
+                );
+                assert.commandWorked(
+                    mongos.adminCommand({
+                        renameCollection: `${dbName}.${collName}`,
+                        to: `${targetDb}.${collName}`,
+                    }),
+                );
+
+                // Drain events until the drop for 'coll' arrives.
+                let dropEvent = null;
+                while (!dropEvent) {
+                    const e = csTest.getOneChange(cursor);
+                    if (e.operationType === "drop" && e.ns.coll === collName) {
+                        dropEvent = e;
+                    }
+                }
+
+                // The notifier shard (data-bearing after moveCollection) always emits a
+                // user-visible drop with no 'fromMigrate' field, regardless of
+                // changeStreamsEmitFromMigrate, because the coordinator explicitly sets
+                // fromMigrate=false on the notifier shard.
+                assert(
+                    !dropEvent.hasOwnProperty("fromMigrate"),
+                    `Invalid fromMigrate on drop event: ${tojson(dropEvent)}`,
+                );
+
+                csTest.cleanUp();
+            });
+
+            db.dropDatabase();
+            mongos.getDB(`${dbName}_${collName}_target`).dropDatabase();
+        }
+
+        it("notifier shard sees user-visible 'drop' (no fromMigrate) after cross-DB rename following moveCollection", () => {
+            runCrossDbRenameAfterMoveCollectionTest(true /* emitFromMigrate */);
+        });
+
+        it("non-primary shard sees 'drop' without fromMigrate field when changeStreamsEmitFromMigrate is false", () => {
+            runCrossDbRenameAfterMoveCollectionTest(false /* emitFromMigrate */);
+        });
+    });
 });

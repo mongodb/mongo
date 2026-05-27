@@ -133,15 +133,6 @@ function createCompositeMatcher(perCollectionEvents) {
     return new MultipleChangeStreamMatcher(subMatchers);
 }
 
-/**
- * Compute expected change stream events from a command sequence for a given watch mode.
- */
-function computeExpectedEvents(commands, watchMode) {
-    return commands
-        .flatMap((cmd) => cmd.getChangeEvents(watchMode))
-        .map((e) => ({event: e, cursorClosed: e.operationType === "invalidate"}));
-}
-
 function buildCommandTrace(commands, source, watchMode = ChangeStreamWatchMode.kCollection) {
     return commands.map((cmd, i) => {
         const shardIds = Array.isArray(cmd.shardSet) ? cmd.shardSet.map((s) => s._id) : [];
@@ -191,7 +182,7 @@ function buildReaderSpecs(commandsByWriter, startTime, batchSize, watchMode) {
     switch (watchMode) {
         case ChangeStreamWatchMode.kCollection:
             return commandsByWriter.map((w) => {
-                const events = computeExpectedEvents(w.commands, watchMode);
+                const events = buildExpectedEvents(w.commands, watchMode);
                 return {
                     label: `coll_${w.dbName}_${w.collName}`,
                     createMatcher: () => createMatcher(events),
@@ -212,7 +203,7 @@ function buildReaderSpecs(commandsByWriter, startTime, batchSize, watchMode) {
                 (writersByDb[w.dbName] ??= []).push(w);
             }
             return Object.entries(writersByDb).map(([dbName, writers]) => {
-                const perCollEvents = writers.map((w) => computeExpectedEvents(w.commands, watchMode));
+                const perCollEvents = writers.map((w) => buildExpectedEvents(w.commands, watchMode));
                 const eventCount = perCollEvents.reduce((s, g) => s + g.length, 0);
                 return {
                     label: `db_${dbName}`,
@@ -230,7 +221,7 @@ function buildReaderSpecs(commandsByWriter, startTime, batchSize, watchMode) {
         }
 
         case ChangeStreamWatchMode.kCluster: {
-            const perCollEvents = commandsByWriter.map((w) => computeExpectedEvents(w.commands, watchMode));
+            const perCollEvents = commandsByWriter.map((w) => buildExpectedEvents(w.commands, watchMode));
             const eventCount = perCollEvents.reduce((s, g) => s + g.length, 0);
             return [
                 {

@@ -87,13 +87,17 @@ MONGO_MOD_PARENT_PRIVATE Status dropCollectionIfUUIDNotMatching(OperationContext
 
 /**
  * Drops the collection "collectionName". When applying a 'drop' oplog entry on a secondary, the
- * 'dropOpTime' will contain the optime of the oplog entry.
+ * 'dropOpTime' will contain the optime of the oplog entry. When 'markFromMigrate' is set, the
+ * related oplog entry will be marked accordingly to reduce its visibility in change streams.
+ * Note: 'markFromMigrate' is only meaningful when 'collectionName' refers to a collection, not a
+ * view.
  */
 MONGO_MOD_NEEDS_REPLACEMENT Status
 dropCollectionForApplyOps(OperationContext* opCtx,
                           const NamespaceString& collectionName,
                           const repl::OpTime& dropOpTime,
-                          DropCollectionSystemCollectionMode systemCollectionMode);
+                          DropCollectionSystemCollectionMode systemCollectionMode,
+                          bool markFromMigrate = false);
 
 /**
  * If we are in a replset, every replicated collection must have an _id index. Issues a warning if
