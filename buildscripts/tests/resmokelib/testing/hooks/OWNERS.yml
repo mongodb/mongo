@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/devprod-test-infrastructure
+  - "test_add_remove_shards.py":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

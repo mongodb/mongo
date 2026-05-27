@@ -163,6 +163,7 @@ class _AddRemoveShardThread(threading.Thread):
     _FAILED_TO_SATISFY_READ_PREFERENCE = 133
     _OPLOG_OPERATION_UNSUPPORTED = 62
     _RANGE_NOT_IN_SINGLE_CHUNK = 11089203
+    _STALLED_DRAINING_THRESHOLD = 10
 
     _CONFIG_DATABASE_NAME = "config"
     _LOGICAL_SESSIONS_COLLECTION_NAME = "system.sessions"
@@ -201,6 +202,8 @@ class _AddRemoveShardThread(threading.Thread):
         self._client = fixture_interface.build_client(self._fixture, self._auth_options)
         self._current_config_mode = self._current_fixture_mode()
         self._shard_name_suffix = 0
+        self._prev_sharded_coll_state = None
+        self._sharded_colls_unchanged_rounds = 0
 
         # Event set when the thread has been stopped using the 'stop()' method.
         self._is_stopped_evt = threading.Event()
@@ -807,6 +810,8 @@ class _AddRemoveShardThread(threading.Thread):
                 )
             )
 
+        self._handle_stalled_sharded_collections(sharded_colls, source)
+
         # If random balancing is on, the balancer will also move unsharded collections (both tracked
         # and untracked). However, random balancing is a test-only setting. In production, users are
         # expected to move unsharded collections manually. So even when random balancing is on,
@@ -819,6 +824,112 @@ class _AddRemoveShardThread(threading.Thread):
         if self._move_sessions_collection:
             self._move_sessions_collection_from_shard(source)
         self._move_all_primaries_from_shard(transition_result["dbsToMove"], source)
+
+    def _is_state_stalled(self, current_state):
+        if not current_state:
+            self._prev_sharded_coll_state = current_state
+            self._sharded_colls_unchanged_rounds = 0
+            return False
+
+        if current_state == self._prev_sharded_coll_state:
+            self._sharded_colls_unchanged_rounds += 1
+        else:
+            self._prev_sharded_coll_state = current_state
+            self._sharded_colls_unchanged_rounds = 0
+            return False
+
+        if self._sharded_colls_unchanged_rounds % self._STALLED_DRAINING_THRESHOLD != 0:
+            return False
+
+        return True
+
+    def _handle_stalled_sharded_collections(self, sharded_colls, source):
+        """Track whether sharded-collection draining is making progress.
+
+        If the set of sharded collections with chunks on `source` has not changed for
+        _STALLED_DRAINING_THRESHOLD consecutive rounds, check each collection for index
+        inconsistencies (SERVER-99357). If any are found, reshard the collection off the
+        shard so that draining can complete.
+        """
+        current_state = frozenset(
+            (coll["_id"], len(coll.get("chunksOnRemovedShard", []))) for coll in sharded_colls
+        )
+
+        if not self._is_state_stalled(current_state):
+            return
+
+        self.logger.info(
+            f"Sharded collection draining on {source} appears stalled for "
+            f"{self._sharded_colls_unchanged_rounds} consecutive rounds. "
+            f"Checking for index inconsistencies."
+        )
+        coll_info = {coll["_id"]: coll.get("key", {}) for coll in sharded_colls}
+        for namespace, shard_key in coll_info.items():
+            self._check_and_reshard_if_index_inconsistent(namespace, shard_key, source)
+
+    def _check_and_reshard_if_index_inconsistent(self, namespace, shard_key, source):
+        """Run checkMetadataConsistency with checkIndexes for `namespace`.
+
+        If InconsistentIndex inconsistencies are found, reshard the collection off `source`
+        to unblock draining.
+        """
+        db_name, coll_name = namespace.split(".", 1)
+        try:
+            result = self._client[db_name].command(
+                {
+                    "checkMetadataConsistency": coll_name,
+                    "checkIndexes": True,
+                    "cursor": {},
+                }
+            )
+        except (pymongo.errors.ConnectionFailure, pymongo.errors.OperationFailure) as err:
+            self.logger.warning(f"checkMetadataConsistency failed for {namespace}: {err}")
+            return
+
+        cursor_data = result.get("cursor", {})
+        inconsistencies = list(cursor_data.get("firstBatch", []))
+        while cursor_id := cursor_data.get("id", 0):
+            try:
+                more = self._client[db_name].command(
+                    {"getMore": cursor_id, "collection": coll_name}
+                )
+            except (pymongo.errors.ConnectionFailure, pymongo.errors.OperationFailure) as err:
+                self.logger.warning(f"getMore failed for {namespace} cursor {cursor_id}: {err}")
+                return
+            cursor_data = more.get("cursor", {})
+            inconsistencies.extend(cursor_data.get("nextBatch", []))
+
+        index_inconsistencies = [i for i in inconsistencies if i.get("type") == "InconsistentIndex"]
+
+        if not index_inconsistencies:
+            self.logger.info(f"No index inconsistencies found for {namespace}")
+            return
+
+        self._reshard_collection_off_shard(namespace, shard_key, source)
+
+    def _reshard_collection_off_shard(self, namespace, shard_key, source):
+        """Reshard `namespace` to work around an index inconsistency blocking chunk migrations.
+
+        We don't use shardDistribution here because it isn't supported for hashed shard keys, and
+        using `forceRedistribution` alone will fix the index inconsistencies.
+        """
+        self.logger.info(
+            f"Resharding {namespace} (key {shard_key}) off {source} to work around index "
+            f"inconsistency blocking chunk migrations."
+        )
+        try:
+            self._client.admin.command(
+                {
+                    "reshardCollection": namespace,
+                    "key": shard_key,
+                    "forceRedistribution": True,
+                }
+            )
+            self.logger.info(f"Successfully resharded {namespace}.")
+        except pymongo.errors.OperationFailure as err:
+            if not self._is_expected_move_collection_error(err, namespace):
+                raise
+            self.logger.info(f"Ignoring expected error when resharding {namespace}: {err}")
 
     def _get_balancer_status_on_shard_not_found(self, prev_round_interrupted, msg):
         try:
@@ -1141,6 +1252,8 @@ class _AddRemoveShardThread(threading.Thread):
         cannot silently loop across test boundaries while stuck on a transient condition such as
         being asked to remove the last shard.
         """
+        self._prev_sharded_coll_state = None
+        self._sharded_colls_unchanged_rounds = 0
         # Pick the API once for this transition attempt so we don't switch mid-retry.
         use_new_api = self._is_fcv_at_least("8.3") and random.random() > 0.5
         start_time = time.monotonic()
