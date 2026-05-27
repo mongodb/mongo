@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/global_catalog/ddl/sharding_coordinator_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/modules.h"
@@ -47,11 +46,8 @@ public:
                                      const NamespaceString& bucketNss) const = 0;
     virtual void allowMigrations(OperationContext* opCtx,
                                  const NamespaceString& nss,
-                                 bool allowMigrations,
-                                 std::function<OperationSessionInfo()> osiGetter,
-                                 AuthoritativeMetadataAccessLevelEnum authoritativeState) = 0;
-    virtual bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx,
-                                                    const NamespaceString& nss) = 0;
+                                 bool allowMigrations) = 0;
+    virtual bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
 private:
 };
@@ -67,11 +63,8 @@ public:
                              const NamespaceString& bucketNss) const override;
     void allowMigrations(OperationContext* opCtx,
                          const NamespaceString& nss,
-                         bool allowMigrations,
-                         std::function<OperationSessionInfo()> osiGetter,
-                         AuthoritativeMetadataAccessLevelEnum authoritativeState) override;
-    bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx,
-                                            const NamespaceString& nss) override;
+                         bool allowMigrations) override;
+    bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) override;
 };
 
 class ShardingCoordinatorExternalStateFactory {

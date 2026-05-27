@@ -78,6 +78,7 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
+#include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
@@ -214,15 +215,17 @@ void deleteCollection(OperationContext* opCtx,
         opCtx, std::move(transactionChain), writeConcern, osi, executor);
 }
 
-void setAllowMigrationsOnConfigServer(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      const boost::optional<UUID>& expectedCollectionUUID,
-                                      const OperationSessionInfo& osi,
-                                      bool allowMigrations) {
+void setAllowMigrations(OperationContext* opCtx,
+                        const NamespaceString& nss,
+                        const boost::optional<UUID>& expectedCollectionUUID,
+                        const boost::optional<OperationSessionInfo>& osi,
+                        bool allowMigrations) {
     ConfigsvrSetAllowMigrations configsvrSetAllowMigrationsCmd(nss, allowMigrations);
     configsvrSetAllowMigrationsCmd.setCollectionUUID(expectedCollectionUUID);
     generic_argument_util::setMajorityWriteConcern(configsvrSetAllowMigrationsCmd);
-    generic_argument_util::setOperationSessionInfo(configsvrSetAllowMigrationsCmd, osi);
+    if (osi) {
+        generic_argument_util::setOperationSessionInfo(configsvrSetAllowMigrationsCmd, *osi);
+    }
 
     const auto swSetAllowMigrationsResult =
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
@@ -246,79 +249,6 @@ void setAllowMigrationsOnConfigServer(OperationContext* opCtx,
     } catch (const ExceptionFor<ErrorCodes::ChunkMetadataInconsistency>&) {
         // Collection metadata has inconsistencies
     }
-}
-
-void setAllowChunkOperations(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             const boost::optional<UUID>& expectedCollectionUUID,
-                             std::function<OperationSessionInfo()> osiGenerator,
-                             bool allowChunkOperations) {
-    {
-        ConfigsvrSetAllowChunkOperations configsvrSetAllowChunkOperationsCmd(nss);
-        configsvrSetAllowChunkOperationsCmd.setDbName(nss.dbName());
-        configsvrSetAllowChunkOperationsCmd.setAllowChunkOperations(allowChunkOperations);
-        configsvrSetAllowChunkOperationsCmd.setCollectionUUID(expectedCollectionUUID);
-        generic_argument_util::setMajorityWriteConcern(configsvrSetAllowChunkOperationsCmd);
-        generic_argument_util::setOperationSessionInfo(configsvrSetAllowChunkOperationsCmd,
-                                                       osiGenerator());
-
-        const auto swSetAllowChunkOperationsResult =
-            Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommand(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                configsvrSetAllowChunkOperationsCmd.toBSON(),
-                Shard::RetryPolicy::kIdempotent);
-
-        // TODO (SERVER-127531) Review these catch clauses.
-        try {
-            uassertStatusOKWithContext(
-                Shard::CommandResponse::getEffectiveStatus(swSetAllowChunkOperationsResult),
-                str::stream() << "Error setting allowChunkOperations to " << allowChunkOperations
-                              << " in the config server for collection "
-                              << nss.toStringForErrorMsg());
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
-            // Collection no longer exists
-            return;
-        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
-            // Collection metadata was concurrently dropped
-            return;
-        } catch (const ExceptionFor<ErrorCodes::ChunkMetadataInconsistency>&) {
-            // Collection metadata has inconsistencies
-            return;
-        }
-    }
-
-    // Use the router loop to target data-bearing shards. Shards containing no chunks of a
-    // collection don't maintain any metadata for that collection, so we should not target them. By
-    // using the shard protocol, we guarantee we are not missing any shard.
-    sharding::router::CollectionRouter router(opCtx, nss);
-    router.routeWithRoutingContext(
-        "setAllowChunkOperations", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-            const auto osi = osiGenerator();
-            ShardsvrSetAllowChunkOperations shardsvrSetAllowChunkOperationsCmd(nss);
-            shardsvrSetAllowChunkOperationsCmd.setDbName(nss.dbName());
-            shardsvrSetAllowChunkOperationsCmd.setAllowChunkOperations(allowChunkOperations);
-            shardsvrSetAllowChunkOperationsCmd.setCollectionUUID(expectedCollectionUUID);
-            generic_argument_util::setMajorityWriteConcern(shardsvrSetAllowChunkOperationsCmd);
-            generic_argument_util::setOperationSessionInfo(shardsvrSetAllowChunkOperationsCmd, osi);
-
-            const auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
-                opCtx,
-                routingCtx,
-                nss,
-                shardsvrSetAllowChunkOperationsCmd.toBSON(),
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                Shard::RetryPolicy::kIdempotent,
-                /*query=*/{},
-                /*collation=*/{},
-                /*letParameters=*/boost::none,
-                /*runtimeConstants=*/boost::none);
-
-            for (const auto& response : shardResponses) {
-                uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
-            }
-        });
 }
 
 }  // namespace
@@ -568,28 +498,18 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithOpt
 void stopMigrations(OperationContext* opCtx,
                     const NamespaceString& nss,
                     const boost::optional<UUID>& expectedCollectionUUID,
-                    std::function<OperationSessionInfo()> osiGenerator,
-                    AuthoritativeMetadataAccessLevelEnum authoritativeState) {
-    if (authoritativeState != AuthoritativeMetadataAccessLevelEnum::kNone) {
-        setAllowChunkOperations(opCtx, nss, expectedCollectionUUID, osiGenerator, false);
-    } else {
-        setAllowMigrationsOnConfigServer(opCtx, nss, expectedCollectionUUID, osiGenerator(), false);
-    }
+                    const boost::optional<OperationSessionInfo>& osi) {
+    setAllowMigrations(opCtx, nss, expectedCollectionUUID, osi, false);
 }
 
 void resumeMigrations(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const boost::optional<UUID>& expectedCollectionUUID,
-                      std::function<OperationSessionInfo()> osiGenerator,
-                      AuthoritativeMetadataAccessLevelEnum authoritativeState) {
-    if (authoritativeState != AuthoritativeMetadataAccessLevelEnum::kNone) {
-        setAllowChunkOperations(opCtx, nss, expectedCollectionUUID, osiGenerator, true);
-    } else {
-        setAllowMigrationsOnConfigServer(opCtx, nss, expectedCollectionUUID, osiGenerator(), true);
-    }
+                      const boost::optional<OperationSessionInfo>& osi) {
+    setAllowMigrations(opCtx, nss, expectedCollectionUUID, osi, true);
 }
 
-bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx, const NamespaceString& nss) {
+bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) {
     auto collDoc =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
                             opCtx,
@@ -607,7 +527,7 @@ bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx, const Namespace
             !collDoc.empty());
 
     auto coll = CollectionType(collDoc[0]);
-    return coll.getAllowMigrations() && coll.getAllowChunkOperations();
+    return coll.getAllowMigrations();
 }
 
 boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,

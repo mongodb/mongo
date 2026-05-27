@@ -2366,56 +2366,6 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
     // will own chunks for this collection.
 }
 
-void ShardingCatalogManager::setAllowChunkOperations(OperationContext* opCtx,
-                                                     const NamespaceString& nss,
-                                                     const boost::optional<UUID>& collectionUUID,
-                                                     bool allowChunkOperations) {
-    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata
-    // collections under the exclusive _kChunkOpLock happen on the same term.
-    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk operations.
-    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
-
-    const auto cm = uassertStatusOK(
-        RoutingInformationCache::get(opCtx)->getCollectionPlacementInfoWithRefresh(opCtx, nss));
-    uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' is not sharded",
-            cm.isSharded());
-
-    uassert(ErrorCodes::InvalidUUID,
-            str::stream() << "Collection uuid " << collectionUUID
-                          << " in the request does not match the current uuid " << cm.getUUID()
-                          << " for ns " << nss.toStringForErrorMsg(),
-            !collectionUUID || collectionUUID == cm.getUUID());
-
-    write_ops::UpdateCommandRequest updateCollOp(NamespaceString::kConfigsvrCollectionsNamespace);
-    updateCollOp.setUpdates([&] {
-        write_ops::UpdateOpEntry entry;
-        const auto update = allowChunkOperations
-            ? BSON("$unset" << BSON(CollectionType::kAllowChunkOperationsFieldName << ""))
-            : BSON("$set" << BSON(CollectionType::kAllowChunkOperationsFieldName << false));
-
-        BSONObj query = BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
-                                 nss, SerializationContext::stateDefault()));
-        if (collectionUUID) {
-            query = query.addFields(BSON(CollectionType::kUuidFieldName << *collectionUUID));
-        }
-        entry.setQ(query);
-        entry.setU(update);
-        entry.setMulti(false);
-        return std::vector<write_ops::UpdateOpEntry>{entry};
-    }());
-
-    DBDirectClient client(opCtx);
-    const auto result = client.update(updateCollOp);
-    write_ops::checkWriteErrors(result);
-
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Expected to match one doc but matched " << result.getN(),
-            result.getN() == 1);
-}
-
 void ShardingCatalogManager::bumpCollectionMinorVersionInTxn(OperationContext* opCtx,
                                                              const NamespaceString& nss,
                                                              TxnNumber txnNumber) const {

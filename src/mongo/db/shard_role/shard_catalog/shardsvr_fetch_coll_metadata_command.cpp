@@ -94,7 +94,7 @@ public:
             // Assert that migrations are disabled.
             uassert(10140200,
                     "_shardsvrFetchCollMetadata can only run when migrations are disabled",
-                    !sharding_ddl_util::checkAllowMigrationsOnConfigServer(opCtx, nss));
+                    !sharding_ddl_util::checkAllowMigrations(opCtx, nss));
 
             // Use an AlternativeClientRegion to perform the shard catalog writes outside the
             // retryable write session. The shard catalog commit contains its own idempotency

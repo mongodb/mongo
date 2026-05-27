@@ -280,19 +280,18 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
 
                 // Freeze migrations on both namespaces. One of them will be the tracked namespace
                 // and the other will be a no-op since it doesn't exist in the sharding catalog.
-                // TODO (SERVER-126811): take AuthoritativeMetadataAccessLevelEnum from _doc.
-                sharding_ddl_util::stopMigrations(
-                    opCtx,
-                    originalNss(),
-                    boost::none,
-                    [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
-                sharding_ddl_util::stopMigrations(
-                    opCtx,
-                    originalNss().makeTimeseriesBucketsNamespace(),
-                    boost::none,
-                    [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
+                {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::stopMigrations(opCtx, originalNss(), boost::none, session);
+                }
+                {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::stopMigrations(
+                        opCtx,
+                        originalNss().makeTimeseriesBucketsNamespace(),
+                        boost::none,
+                        session);
+                }
             }))
         .then(_buildPhaseHandler(
             Phase::kAcquireCriticalSection,
@@ -518,19 +517,18 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
 
                 // Resume migrations on both namespaces. One of them will be the tracked namespace
                 // and the other will be a no-op since it doesn't exist in the sharding catalog.
-                // TODO (SERVER-126811): take AuthoritativeMetadataAccessLevelEnum from _doc.
-                sharding_ddl_util::resumeMigrations(
-                    opCtx,
-                    originalNss(),
-                    boost::none,
-                    [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
-                sharding_ddl_util::resumeMigrations(
-                    opCtx,
-                    originalNss().makeTimeseriesBucketsNamespace(),
-                    boost::none,
-                    [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
+                {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::resumeMigrations(opCtx, originalNss(), boost::none, session);
+                }
+                {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::resumeMigrations(
+                        opCtx,
+                        originalNss().makeTimeseriesBucketsNamespace(),
+                        boost::none,
+                        session);
+                }
             }))
         .then([this, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext();
@@ -627,19 +625,18 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_cleanupOnAbort(
 
                 // Resume migrations on both namespaces. One of them will be the tracked namespace
                 // and the other will be a no-op since it doesn't exist in the sharding catalog.
-                // TODO (SERVER-126811): take AuthoritativeMetadataAccessLevelEnum from _doc.
-                sharding_ddl_util::resumeMigrations(
-                    opCtx,
-                    originalNss(),
-                    boost::none,
-                    [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
-                sharding_ddl_util::resumeMigrations(
-                    opCtx,
-                    originalNss().makeTimeseriesBucketsNamespace(),
-                    boost::none,
-                    [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
+                {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::resumeMigrations(opCtx, originalNss(), boost::none, session);
+                }
+                {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::resumeMigrations(
+                        opCtx,
+                        originalNss().makeTimeseriesBucketsNamespace(),
+                        boost::none,
+                        session);
+                }
             }
         });
 }

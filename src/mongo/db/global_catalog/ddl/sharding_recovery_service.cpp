@@ -37,7 +37,6 @@
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/namespace_string_util.h"
 #include "mongo/db/persistent_task_store.h"
@@ -566,7 +565,6 @@ void ShardingRecoveryService::onReplicationRollback(
         })) {
         _resetInMemoryStates(opCtx);
         _recoverDatabaseShardingState(opCtx);
-        _recoverAllowChunkOperations(opCtx);
         _recoverRecoverableCriticalSections(opCtx);
     }
 
@@ -589,7 +587,6 @@ void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
 
     _resetInMemoryStates(opCtx);
     _recoverDatabaseShardingState(opCtx);
-    _recoverAllowChunkOperations(opCtx);
     _recoverRecoverableCriticalSections(opCtx);
 }
 
@@ -645,20 +642,6 @@ void ShardingRecoveryService::_recoverDatabaseShardingState(OperationContext* op
     });
 
     LOGV2_DEBUG(9813602, 2, "Recovered the DatabaseShardingState from the shard catalog");
-}
-
-void ShardingRecoveryService::_recoverAllowChunkOperations(OperationContext* opCtx) {
-    LOGV2_DEBUG(12120909, 2, "Recovering setAllowChunkOperations from the shard catalog");
-
-    PersistentTaskStore<CollectionType> store(
-        NamespaceString::kConfigShardCatalogCollectionsNamespace);
-    store.forEach(opCtx, BSONObj{}, [&opCtx](const CollectionType& coll) {
-        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, coll.getNss());
-        scopedCsr->setAllowChunkOperations(coll.getAllowChunkOperations());
-        return true;
-    });
-
-    LOGV2_DEBUG(12120910, 2, "Recovered setAllowChunkOperations from the shard catalog");
 }
 
 void ShardingRecoveryService::_resetInMemoryStates(OperationContext* opCtx) {

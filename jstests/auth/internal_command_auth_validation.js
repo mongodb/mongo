@@ -257,11 +257,6 @@ const internalCommandsMap = {
         testname: "_configsvrRunRestore",
         command: {_configsvrRunRestore: 1},
     },
-    _configsvrSetAllowChunkOperations: {
-        testname: "_configsvrSetAllowChunkOperations",
-        command: {_configsvrSetAllowChunkOperations: ns, allowChunkOperations: true},
-        writeConcern: {w: "majority"},
-    },
     _configsvrSetAllowMigrations: {
         testname: "_configsvrSetAllowMigrations",
         command: {
@@ -829,10 +824,6 @@ const internalCommandsMap = {
             toNss: "test.y",
             primaryShardId: "",
         },
-    },
-    _shardsvrSetAllowChunkOperations: {
-        testname: "_shardsvrSetAllowChunkOperations",
-        command: {_shardsvrSetAllowChunkOperations: "db.collection", allowChunkOperations: true},
     },
     _shardsvrSetAllowMigrations: {
         testname: "_shardsvrSetAllowMigrations",

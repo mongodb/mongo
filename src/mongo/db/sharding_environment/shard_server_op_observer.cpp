@@ -754,18 +754,7 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
 
 void ShardServerOpObserver::onSetAllowChunkOperations(OperationContext* opCtx,
                                                       const repl::OplogEntry& op) {
-    tassert(12120912,
-            "setAllowChunkOperations oplog entry is missing the collection UUID",
-            op.getUuid());
-
-    const auto nss =
-        CommandHelpers::parseNsCollectionRequired(op.getNss().dbName(), op.getObject());
-
-    const auto entry = SetAllowChunkOperationsOplogEntry::parse(
-        op.getObject(), IDLParserContext("SetAllowChunkOperationsOplogEntryContext"));
-
-    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-    scopedCsr->setAllowChunkOperations(entry.getAllowChunkOperations());
+    // TODO (SERVER-121209): implement.
 }
 
 }  // namespace mongo

@@ -50,11 +50,8 @@ public:
                              const NamespaceString& bucketNss) const override;
     void allowMigrations(OperationContext* opCtx,
                          const NamespaceString& nss,
-                         bool allowMigrations,
-                         std::function<OperationSessionInfo()> osiGenerator,
-                         AuthoritativeMetadataAccessLevelEnum authoritativeState) override;
-    bool checkAllowMigrationsOnConfigServer(OperationContext* opCtx,
-                                            const NamespaceString& nss) override;
+                         bool allowMigrations) override;
+    bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) override;
 
     MockCommandResponse allowMigrationsResponse;
     MockCommandResponse migrationsAllowedResponse;

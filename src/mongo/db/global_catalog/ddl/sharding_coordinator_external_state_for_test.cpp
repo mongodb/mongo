@@ -50,18 +50,15 @@ bool ShardingCoordinatorExternalStateForTest::isTrackedTimeseries(
     return false;
 }
 
-void ShardingCoordinatorExternalStateForTest::allowMigrations(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    bool allowMigrations,
-    std::function<OperationSessionInfo()> osiGenerator,
-    AuthoritativeMetadataAccessLevelEnum authoritativeState) {
+void ShardingCoordinatorExternalStateForTest::allowMigrations(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              bool allowMigrations) {
     allowMigrationsResponse.getNext();
     migrationsAllowed = allowMigrations;
 }
 
-bool ShardingCoordinatorExternalStateForTest::checkAllowMigrationsOnConfigServer(
-    OperationContext* opCtx, const NamespaceString& nss) {
+bool ShardingCoordinatorExternalStateForTest::checkAllowMigrations(OperationContext* opCtx,
+                                                                   const NamespaceString& nss) {
     migrationsAllowedResponse.getNext();
     return migrationsAllowed;
 }

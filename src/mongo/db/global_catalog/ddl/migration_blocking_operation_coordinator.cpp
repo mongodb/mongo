@@ -138,33 +138,19 @@ void MigrationBlockingOperationCoordinator::_throwIfCleaningUp(WithLock) {
 void MigrationBlockingOperationCoordinator::_recoverIfNecessary(WithLock lk,
                                                                 OperationContext* opCtx,
                                                                 bool isBeginOperation) {
-    if (!_needsRecovery) {
+    if (!_needsRecovery || !_getExternalState()->checkAllowMigrations(opCtx, nss())) {
+        _needsRecovery = false;
         return;
     }
-
-    const bool allowMigrations =
-        _getExternalState()->checkAllowMigrationsOnConfigServer(opCtx, nss());
 
     tassert(10644530,
             "If there is a state document on disk and migrations are not "
             "blocked, then there must be only one operation.",
-            _operations.size() == 1 || !allowMigrations);
+            _operations.size() == 1);
 
-    // If checkAllowMigrationsOnConfigServer returned false, that doesn't guarantee that migrations
-    // are consistently disabled across all shards, nor that migrations have been drained, so call
-    // again allowMigrations(false).
-    // If checkAllowMigrationsOnConfigServer returned true, it doesn't guarantee that migrations are
-    // enabled consistently either, but the coordinator will always call allowMigrations(true)
-    // before finishing, so it's ok to continue.
-    if (isBeginOperation || !allowMigrations) {
+    if (isBeginOperation) {
         try {
-            // TODO (SERVER-127440): take AuthoritativeMetadataAccessLevelEnum from _doc.
-            _getExternalState()->allowMigrations(
-                opCtx,
-                nss(),
-                false,
-                [&] { return getNewSession(opCtx); },
-                AuthoritativeMetadataAccessLevelEnum::kNone);
+            _getExternalState()->allowMigrations(opCtx, nss(), false);
             _needsRecovery = false;
             return;
         } catch (const DBException& e) {
@@ -218,13 +204,7 @@ void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opC
         ScopeGuard removeStateDocumentGuard(
             [&] { ensureFulfilledPromise(lock, _beginCleanupPromise); });
         hangBeforeBlockingMigrations.pauseWhileSet();
-        // TODO (SERVER-127440): take AuthoritativeMetadataAccessLevelEnum from _doc.
-        _getExternalState()->allowMigrations(
-            opCtx,
-            nss(),
-            false,
-            [&] { return getNewSession(opCtx); },
-            AuthoritativeMetadataAccessLevelEnum::kNone);
+        _getExternalState()->allowMigrations(opCtx, nss(), false);
         removeStateDocumentGuard.dismiss();
     }
 
@@ -259,13 +239,7 @@ void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx
 
     if (_operations.empty()) {
         hangBeforeAllowingMigrations.pauseWhileSet();
-        // TODO (SERVER-127440): take AuthoritativeMetadataAccessLevelEnum from _doc.
-        _getExternalState()->allowMigrations(
-            opCtx,
-            nss(),
-            true,
-            [&] { return getNewSession(opCtx); },
-            AuthoritativeMetadataAccessLevelEnum::kNone);
+        _getExternalState()->allowMigrations(opCtx, nss(), true);
 
         hangBeforeFulfillingPromise.pauseWhileSet();
         ensureFulfilledPromise(lock, _beginCleanupPromise);

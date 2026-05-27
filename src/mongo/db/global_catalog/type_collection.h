@@ -96,7 +96,6 @@ public:
     // Make field names accessible.
     static constexpr auto kEpochFieldName = kPre22CompatibleEpochFieldName;
 
-    using GlobalCatalogCollectionTypeBase::kAllowChunkOperationsFieldName;
     using GlobalCatalogCollectionTypeBase::kAllowMigrationsFieldName;
     using GlobalCatalogCollectionTypeBase::kDefaultCollationFieldName;
     using GlobalCatalogCollectionTypeBase::kDefragmentationPhaseFieldName;
@@ -186,10 +185,6 @@ public:
             GlobalCatalogCollectionTypeBase::setAllowMigrations(boost::none);
         else
             GlobalCatalogCollectionTypeBase::setAllowMigrations(false);
-    }
-
-    bool getAllowChunkOperations() const {
-        return GlobalCatalogCollectionTypeBase::getAllowChunkOperations().get_value_or(true);
     }
 
     // TODO SERVER-61033: remove after permitMigrations have been merge with allowMigrations.

@@ -499,11 +499,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     // before persisting its identity on the recovery doc (This condition won't be
                     // reinforced in case of a stepdown)
                     sharding_ddl_util::stopMigrations(
-                        opCtx,
-                        nss,
-                        coll.getUuid(),
-                        [&] { return getNewSession(opCtx); },
-                        _doc.getAuthoritativeMetadataAccessLevel());
+                        opCtx, nss, coll.getUuid(), getNewSession(opCtx));
 
                     auto newStateDoc = _doc;
                     newStateDoc.setCollInfo(coll);

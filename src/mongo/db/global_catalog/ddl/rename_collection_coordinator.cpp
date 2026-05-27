@@ -779,26 +779,17 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 // Block migrations on involved collections.
                 try {
+                    const auto session = getNewSession(opCtx);
                     sharding_ddl_util::stopMigrations(
-                        // TODO (SERVER-127441): take AuthoritativeMetadataAccessLevelEnum from _doc
-                        opCtx,
-                        fromNss,
-                        _doc.getSourceUUID(),
-                        [&] { return getNewSession(opCtx); },
-                        AuthoritativeMetadataAccessLevelEnum::kNone);
+                        opCtx, fromNss, _doc.getSourceUUID(), session);
                 } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                     // stopMigrations is allowed to fail when the source collection is not tracked
                     // by the sharding catalog.
                 }
 
                 try {
-                    // TODO (SERVER-127441): take AuthoritativeMetadataAccessLevelEnum from _doc.
-                    sharding_ddl_util::stopMigrations(
-                        opCtx,
-                        toNss,
-                        _doc.getTargetUUID(),
-                        [&] { return getNewSession(opCtx); },
-                        AuthoritativeMetadataAccessLevelEnum::kNone);
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::stopMigrations(opCtx, toNss, _doc.getTargetUUID(), session);
                 } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                     // stopMigrations is allowed to fail when the target collection doesn't exist or
                     // is not tracked by the sharding catalog.

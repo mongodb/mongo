@@ -323,14 +323,11 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
         // Atomically (still under the CSR lock held above) check whether migrations are allowed and
         // register the MigrationSourceManager on the CSR. This ensures that interruption due to the
-        // change of allowMigrations or allowChunkOperations to false will properly serialize and
-        // not allow any new MSMs to be running after the change.
+        // change of allowMigrations to false will properly serialise and not allow any new MSMs to
+        // be running after the change.
         uassert(ErrorCodes::ConflictingOperationInProgress,
-                fmt::format("Collection is undergoing changes so moveChunk is not allowed. "
-                            "allowMigrations: {}, allowChunkOperations: {}",
-                            metadata.allowMigrations(),
-                            scopedCsr->allowChunkOperations()),
-                metadata.allowMigrations() && scopedCsr->allowChunkOperations());
+                "Collection is undergoing changes so moveChunk is not allowed.",
+                metadata.allowMigrations());
 
         _scopedRegisterer.emplace(this, *scopedCsr);
 

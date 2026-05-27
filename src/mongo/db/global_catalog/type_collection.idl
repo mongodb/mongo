@@ -119,15 +119,6 @@ structs:
 
                     If the flag is not present it defaults to true."
                 optional: true
-            allowChunkOperations:
-                type: bool
-                description:
-                    "Whether this collection allows running chunk operations, including migrations.
-                    It is required by almost all authoritative DDL operations in order to guarantee
-                    mutual exclusion between chunk operations and regular DDL operations.
-
-                    If the flag is not present it defaults to true."
-                optional: true
 
     CommonCollectionTypeBaseIncomparable:
         description:

@@ -11,11 +11,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
-// _shardsvrBeginMigrationBlockingOperation and _shardsvrEndMigrationBlockingOperation internally
-// send commands with an OSI, which conflicts with the implicit session created by the shell
-// (tassert 10090100)
-TestData.disableImplicitSessions = true;
-
 const st = new ShardingTest({shards: {rs0: {nodes: 3}}});
 const replicaSet = new ReplSetTest({nodes: 1});
 replicaSet.startSet();

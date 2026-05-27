@@ -615,7 +615,7 @@ private:
         // warning is emitted.
         for (const auto& collType : collections) {
             if (!collType.getAllowBalance() || !collType.getAllowMigrations() ||
-                !collType.getPermitMigrations() || !collType.getAllowChunkOperations()) {
+                !collType.getPermitMigrations()) {
                 auto matchStage = BSON("$match" << BSON(ChunkType::collectionUUID()
                                                         << collType.getUuid() << ChunkType::shard()
                                                         << BSON("$in" << drainingShardNameArray)));

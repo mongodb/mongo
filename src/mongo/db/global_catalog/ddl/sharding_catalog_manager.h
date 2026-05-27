@@ -412,20 +412,11 @@ public:
     /**
      * In a transaction, sets the 'allowMigrations' to the requested state and bumps the collection
      * version.
-     * TODO (SERVER-98118): Remove this function.
      */
     void setAllowMigrationsAndBumpOneChunk(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const boost::optional<UUID>& collectionUUID,
                                            bool allowMigrations);
-
-    /**
-     * Sets the 'allowChunkOperations' field to the requested state.
-     */
-    void setAllowChunkOperations(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const boost::optional<UUID>& collectionUUID,
-                                 bool allowChunkOperations);
 
     /**
      * Bump the minor version of the newest chunk on each shard

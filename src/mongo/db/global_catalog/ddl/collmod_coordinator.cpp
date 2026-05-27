@@ -377,11 +377,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             sharding_ddl_util::getCollectionUUID(opCtx, _collInfo->nsForTargeting);
                         _doc.setCollUUID(collUUID);
                         sharding_ddl_util::stopMigrations(
-                            opCtx,
-                            _collInfo->nsForTargeting,
-                            collUUID,
-                            [&] { return getNewSession(opCtx); },
-                            _doc.getAuthoritativeMetadataAccessLevel());
+                            opCtx, _collInfo->nsForTargeting, collUUID, getNewSession(opCtx));
                     }
                 })();
         })
@@ -453,9 +449,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 if (_collInfo->isTracked) {
                     try {
                         if (!_firstExecution && _collInfo->isSharded) {
-                            bool allowMigrations =
-                                sharding_ddl_util::checkAllowMigrationsOnConfigServer(
-                                    opCtx, _collInfo->nsForTargeting);
+                            bool allowMigrations = sharding_ddl_util::checkAllowMigrations(
+                                opCtx, _collInfo->nsForTargeting);
                             if (_result.is_initialized() && allowMigrations) {
                                 // The command finished and we have the response. Return it.
                                 return;
@@ -547,20 +542,12 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                         const auto collUUID = _doc.getCollUUID();
                         sharding_ddl_util::resumeMigrations(
-                            opCtx,
-                            _collInfo->nsForTargeting,
-                            collUUID,
-                            [&] { return getNewSession(opCtx); },
-                            _doc.getAuthoritativeMetadataAccessLevel());
+                            opCtx, _collInfo->nsForTargeting, collUUID, getNewSession(opCtx));
                     } catch (DBException& ex) {
                         if (!_isRetriableErrorForDDLCoordinator(ex.toStatus())) {
                             const auto collUUID = _doc.getCollUUID();
                             sharding_ddl_util::resumeMigrations(
-                                opCtx,
-                                _collInfo->nsForTargeting,
-                                collUUID,
-                                [&] { return getNewSession(opCtx); },
-                                _doc.getAuthoritativeMetadataAccessLevel());
+                                opCtx, _collInfo->nsForTargeting, collUUID, getNewSession(opCtx));
                         }
                         throw;
                     }

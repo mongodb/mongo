@@ -207,12 +207,6 @@ private:
      */
     void _recoverDatabaseShardingState(OperationContext* opCtx);
 
-    /**
-     * This method is called when we have to recover the allowChunkOperations flag from disk to
-     * memory (on startup or on rollback).
-     */
-    void _recoverAllowChunkOperations(OperationContext* opCtx);
-
     void onStartup(OperationContext* opCtx) final {}
     void onSetCurrentConfig(OperationContext* opCtx) final {}
     void onShutdown() final {}

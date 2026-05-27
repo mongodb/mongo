@@ -273,12 +273,8 @@ void DropCollectionCoordinator::_freezeMigrations(
 
     if (_doc.getCollInfo()) {
         const auto collUUID = _doc.getCollInfo()->getUuid();
-        sharding_ddl_util::stopMigrations(
-            opCtx,
-            nss(),
-            collUUID,
-            [&] { return getNewSession(opCtx); },
-            _doc.getAuthoritativeMetadataAccessLevel());
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::stopMigrations(opCtx, nss(), collUUID, session);
     }
 }
 

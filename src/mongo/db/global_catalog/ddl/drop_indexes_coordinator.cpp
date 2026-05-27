@@ -139,13 +139,8 @@ ExecutorFuture<void> DropIndexesCoordinator::_cleanupOnAbort(
             auto* opCtx = opCtxHolder.get();
 
             // Ensure migrations are resumed before terminating the coordinator.
-            // TODO (SERVER-127439): take AuthoritativeMetadataAccessLevelEnum from _doc.
-            sharding_ddl_util::resumeMigrations(
-                opCtx,
-                nss(),
-                boost::none /* uuid */,
-                [&] { return getNewSession(opCtx); },
-                AuthoritativeMetadataAccessLevelEnum::kNone);
+            const auto session = getNewSession(opCtx);
+            sharding_ddl_util::resumeMigrations(opCtx, nss(), boost::none /* uuid */, session);
 
             return Status::OK();
         });
@@ -158,13 +153,8 @@ ExecutorFuture<void> mongo::DropIndexesCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kFreezeMigrations,
             [this, anchor = shared_from_this(), executor, token](OperationContext* opCtx) {
-                // TODO (SERVER-127439): take AuthoritativeMetadataAccessLevelEnum from _doc.
-                sharding_ddl_util::stopMigrations(
-                    opCtx,
-                    nss(),
-                    boost::none,
-                    [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
+                const auto session = getNewSession(opCtx);
+                sharding_ddl_util::stopMigrations(opCtx, nss(), boost::none, session);
             }))
         .then(_buildPhaseHandler(
             Phase::kDropIndexes,
@@ -175,13 +165,7 @@ ExecutorFuture<void> mongo::DropIndexesCoordinator::_runImpl(
             Phase::kResumeMigrations,
             [this, anchor = shared_from_this(), executor, token](OperationContext* opCtx) {
                 const auto session = getNewSession(opCtx);
-                // TODO (SERVER-127439): take AuthoritativeMetadataAccessLevelEnum from _doc.
-                sharding_ddl_util::resumeMigrations(
-                    opCtx,
-                    nss(),
-                    boost::none,
-                    [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
+                sharding_ddl_util::resumeMigrations(opCtx, nss(), boost::none, session);
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (_doc.getPhase() < Phase::kFreezeMigrations) {

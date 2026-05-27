@@ -527,19 +527,6 @@ structs:
                 optional: true
                 description: "The expected collection timestamp."
 
-    SetAllowChunkOperationsFields:
-        description: "Fields of _shardsvrSetAllowChunkOperations and _configsvrsvrSetAllowChunkOperations."
-        strict: false
-        fields:
-            allowChunkOperations:
-                type: bool
-                description: "If false, chunk operations (including migrations) should be stopped and disabled."
-                optional: false
-            collectionUUID:
-                type: uuid
-                description: "The uuid of the collection."
-                optional: true
-
 commands:
     _shardsvrCreateCollection:
         command_name: _shardsvrCreateCollection
@@ -1203,27 +1190,3 @@ commands:
                 description: Primary shard identifier, used to determine whether the shard needs to durably persist collection metadata or not.
                 optional: false
         reply_type: OkReply
-
-    _shardsvrSetAllowChunkOperations:
-        command_name: _shardsvrSetAllowChunkOperations
-        cpp_name: ShardsvrSetAllowChunkOperations
-        description: "Internal setAllowChunkOperations command for a shard."
-        strict: false
-        namespace: type
-        type: namespacestring
-        api_version: ""
-        reply_type: OkReply
-        chained_structs:
-            SetAllowChunkOperationsFields: SetAllowChunkOperationsFields
-
-    _configsvrSetAllowChunkOperations:
-        command_name: _configsvrSetAllowChunkOperations
-        cpp_name: ConfigsvrSetAllowChunkOperations
-        description: "Internal setAllowChunkOperations command for the config server."
-        strict: false
-        namespace: type
-        type: namespacestring
-        api_version: ""
-        reply_type: OkReply
-        chained_structs:
-            SetAllowChunkOperationsFields: SetAllowChunkOperationsFields
