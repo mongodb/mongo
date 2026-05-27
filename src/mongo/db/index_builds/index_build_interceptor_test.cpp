@@ -49,12 +49,15 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/lazy_record_store.h"
+#include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 #include <span>
 
@@ -574,6 +577,178 @@ TEST_F(IndexBuilderInterceptorTest, SingleDeleteIsDrainedIntoIndexPrimaryDriven)
             otel::metrics::MetricNames::kIndexBuildSideWritesDrainBytes);
         EXPECT_EQ(drainBytesAfter.count, drainBytesBefore.count + 1);
         EXPECT_GE(drainBytesAfter.sum, drainBytesBefore.sum);
+    }
+}
+
+// Verifies that the writeConflictRetry block wrapping applySingleBatch in
+// SideWritesTracker::drainWritesIntoIndex tolerates a write conflict during the drain.
+TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflict) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    const auto entry = getIndexEntry("a_1");
+
+    // Buffer N >= 2 side writes so applySingleBatch processes a real batch, with kBatchMaxSize
+    // pinned > N so the whole drain is a single batch.
+    constexpr int kNumKeys = 4;
+    RAIIServerParameterControllerForTest batchSize("maxIndexBuildDrainBatchSize", kNumKeys + 1);
+    std::vector<key_string::Value> keyStrings;
+    keyStrings.reserve(kNumKeys);
+    for (int i = 0; i < kNumKeys; ++i) {
+        keyStrings.push_back(makeKeyString(i, RecordId{i + 1}));
+    }
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        for (const auto& keyString : keyStrings) {
+            int64_t numKeys = 0;
+            ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                             _coll->getCollectionPtr(),
+                                             entry,
+                                             {keyString},
+                                             {},
+                                             {},
+                                             IndexBuildInterceptor::Op::kInsert,
+                                             &numKeys));
+            EXPECT_EQ(1, numKeys);
+        }
+        wuow.commit();
+    }
+
+    otel::metrics::OtelMetricsCapturer capturer;
+    int64_t drainedBefore = 0;
+    if (capturer.canReadMetrics()) {
+        drainedBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained);
+    }
+
+    {
+        auto failPoint = enableWriteConflictForWrites(
+            FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        const auto initialTimesEntered = failPoint->initialTimesEntered();
+        // The drain must succeed via writeConflictRetry, even though one WCE fires during
+        // applySingleBatch.
+        ASSERT_OK(
+            interceptor->drainWritesIntoIndex(operationContext(),
+                                              _coll->getCollectionPtr(),
+                                              entry,
+                                              InsertDeleteOptions{.dupsAllowed = true},
+                                              IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+        // Exactly one WCE fired during the drain.
+        EXPECT_EQ(initialTimesEntered + 1,
+                  (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    }
+
+    // The index has exactly kNumKeys keys — no duplicates from a double-applied batch, no losses
+    // from a half-rolled-back batch.
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+    auto indexCursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
+    int numIndexedKeys = 0;
+    for (auto kv = indexCursor->nextKeyString(ru); kv; kv = indexCursor->nextKeyString(ru)) {
+        ++numIndexedKeys;
+    }
+    EXPECT_EQ(kNumKeys, numIndexedKeys);
+
+    // The side-writes table is empty after a successful drain.
+    EXPECT_EQ(0u, getSideWritesTableContents(indexBuildInfo).size());
+
+    // The OTel drained counter advanced by exactly kNumKeys. The counter is incremented only after
+    // applySingleBatch's WUOW commits, so a WCE-rolled-back batch contributes nothing; a
+    // double-applied batch would push this to kNumKeys * 2.
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained),
+            drainedBefore + kNumKeys);
+    }
+}
+
+// Multi-batch variant of the above: with maxIndexBuildDrainBatchSize=2 and N=4 records, the drain
+// loop runs writeConflictRetry across multiple batches.
+TEST_F(IndexBuilderInterceptorTest, DrainWritesIntoIndexSurvivesWriteConflictMultiBatch) {
+    // TODO (SERVER-116165): Remove.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+    RAIIServerParameterControllerForTest batchSize("maxIndexBuildDrainBatchSize", 2);
+
+    auto indexBuildInfo = buildIndexBuildInfo(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
+    auto interceptor =
+        createIndexBuildInterceptor(indexBuildInfo, LazyRecordStore::CreateMode::immediate);
+    const auto entry = getIndexEntry("a_1");
+
+    // N = 2 * batch size, so the drain loop runs at least two non-empty applySingleBatch
+    // invocations.
+    constexpr int kNumKeys = 4;
+    std::vector<key_string::Value> keyStrings;
+    keyStrings.reserve(kNumKeys);
+    for (int i = 0; i < kNumKeys; ++i) {
+        keyStrings.push_back(makeKeyString(i, RecordId{i + 1}));
+    }
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        for (const auto& keyString : keyStrings) {
+            int64_t numKeys = 0;
+            ASSERT_OK(interceptor->sideWrite(operationContext(),
+                                             _coll->getCollectionPtr(),
+                                             entry,
+                                             {keyString},
+                                             {},
+                                             {},
+                                             IndexBuildInterceptor::Op::kInsert,
+                                             &numKeys));
+            EXPECT_EQ(1, numKeys);
+        }
+        wuow.commit();
+    }
+
+    otel::metrics::OtelMetricsCapturer capturer;
+    int64_t drainedBefore = 0;
+    if (capturer.canReadMetrics()) {
+        drainedBefore =
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained);
+    }
+
+    {
+        auto failPoint = enableWriteConflictForWrites(
+            FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        const auto initialTimesEntered = failPoint->initialTimesEntered();
+        // The first qualifying WUOW commit during the drain (the first batch's apply) hits the
+        // WCE. writeConflictRetry must roll it back, re-run the batch, then the loop must proceed
+        // to the second batch cleanly.
+        ASSERT_OK(
+            interceptor->drainWritesIntoIndex(operationContext(),
+                                              _coll->getCollectionPtr(),
+                                              entry,
+                                              InsertDeleteOptions{.dupsAllowed = true},
+                                              IndexBuildInterceptor::TrackDuplicates::kNoTrack,
+                                              IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
+        EXPECT_EQ(initialTimesEntered + 1,
+                  (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+    }
+
+    // Both batches landed exactly once: no records lost from the rolled-back batch and no records
+    // double-applied across the surviving batch.
+    auto& ru = *shard_role_details::getRecoveryUnit(operationContext());
+    auto indexCursor = entry->accessMethod()->asSortedData()->newCursor(operationContext(), ru);
+    int numIndexedKeys = 0;
+    for (auto kv = indexCursor->nextKeyString(ru); kv; kv = indexCursor->nextKeyString(ru)) {
+        ++numIndexedKeys;
+    }
+    EXPECT_EQ(kNumKeys, numIndexedKeys);
+
+    EXPECT_EQ(0u, getSideWritesTableContents(indexBuildInfo).size());
+
+    // The OTel drained counter accumulates across both batches to kNumKeys, not kNumKeys + the
+    // first batch's size (which would indicate the retried first batch was counted twice).
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(
+            capturer.readInt64Counter(otel::metrics::MetricNames::kIndexBuildSideWritesDrained),
+            drainedBefore + kNumKeys);
     }
 }
 
