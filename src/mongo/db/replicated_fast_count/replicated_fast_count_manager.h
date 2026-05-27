@@ -132,14 +132,17 @@ public:
     /**
      * Spawns fastcount thread.
      * Skips running thread when _isUnderTest.
+     *
+     * This function is idempotent when the background thread is already running. See implementation
+     * for more details.
      */
     void startup(OperationContext* opCtx);
 
     /**
      * Signals fastcount thread to stop and flushes final changes synchronously.
      *
-     * WARNING: This function should be called exactly once per startup() call. Calling shutdown()
-     * more than once on the same background thread is an assertion error.
+     * This function is idempotent since we cannot gaurantee that the background thread is joinable
+     * during shutdown(). See implementation for more details.
      */
     void shutdown(OperationContext* opCtx);
 
