@@ -29,7 +29,6 @@
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
 
-#include "mongo/db/commands.h"
 #include "mongo/db/import_collection_oplog_entry_gen.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
@@ -37,12 +36,10 @@
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/replicated_fast_count/durable_size_metadata_gen.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
-#include "mongo/db/replicated_fast_count/replicated_fast_count_metrics.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -246,60 +243,6 @@ boost::optional<CollectionSizeCount> extractSizeCountDeltaForOpImpl(const T& op)
     return CollectionSizeCount{.size = perOpMd->getSz(), .count = computeCountDeltaForOp(opType)};
 }
 
-// Returns true if the oplog entry is a container operation on a replicated fast count ident.
-bool isContainerOpOnFastCountIdent(const repl::OplogEntry& oplogEntry) {
-    auto container = oplogEntry.getContainer();
-    return container && ident::isReplicatedFastCountIdent(*container);
-}
-
-// Returns true if all operations within the provided oplog entry are on the internal fast count
-// collections or containers.
-bool operationsOnFastCountStores(const NamespaceString& nss, const repl::OplogEntry& oplogEntry) {
-    if (isContainerOpOnFastCountIdent(oplogEntry)) {
-        return true;
-    }
-
-    const auto fastCountStoreNss =
-        NamespaceString::makeGlobalConfigCollection(NamespaceString::kReplicatedFastCountStore);
-    const auto fastCountTimestampNss = NamespaceString::makeGlobalConfigCollection(
-        NamespaceString::kReplicatedFastCountStoreTimestamps);
-
-    if (nss == fastCountStoreNss || nss == fastCountTimestampNss) {
-        return true;
-    }
-
-    if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kCreate ||
-        oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kDrop) {
-        // kCreate/kDrop entries use the $cmd namespace (e.g. config.$cmd), not the target
-        // collection's namespace. Use CommandHelpers::parseNsCollectionRequired to extract the
-        // actual target NSS from the first field of the command object (o.create / o.drop).
-        const auto targetNss =
-            CommandHelpers::parseNsCollectionRequired(nss.dbName(), oplogEntry.getObject());
-        if (targetNss == fastCountStoreNss || targetNss == fastCountTimestampNss) {
-            return true;
-        }
-    }
-
-    if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-        std::vector<repl::OplogEntry> innerEntries;
-        repl::ApplyOps::extractOperationsTo(
-            oplogEntry, oplogEntry.getEntry().toBSON(), &innerEntries);
-
-        for (const auto& op : innerEntries) {
-            if (isContainerOpOnFastCountIdent(op)) {
-                continue;
-            }
-            const auto& nss = op.getNss();
-            if (nss != fastCountStoreNss && nss != fastCountTimestampNss) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    return false;
-}
-
 boost::optional<UUID> getUUIDFromOplogEntry(const repl::OplogEntry& oplogEntry) {
     if (oplogEntry.getCommandType() == repl::OplogEntry::CommandType::kImportCollection) {
         const auto catalogEntry =
@@ -343,6 +286,8 @@ int extractSizeCountDeltasForCommitTxn(const repl::OplogEntry& entry,
     }
     return processed;
 }
+
+}  // namespace
 
 // Processes a single oplog entry and accumulates its size/count contribution into
 // 'sizeCountDeltasOut'. Handles applyOps (including nested), truncateRange, commitTransaction, and
@@ -418,127 +363,6 @@ void mergeDeltas(const SizeCountDeltas& src, SizeCountDeltas& dst) {
     }
 }
 
-// Holds the state of a chained applyOps sequence spanning multiple oplog entries.
-struct TxnChainState {
-    SizeCountDeltas deltas;
-    // The opTime of the last entry processed in this chain. The next entry in the chain must have
-    // prevOpTime == lastOpTime.
-    repl::OpTime lastOpTime;
-};
-
-// Caches the size and count deltas for a series of chained applyOps for a single transaction.
-class TxnDeltaBuffer {
-public:
-    // Handles the entry if it belongs to a chained transaction.
-    // Returns the number of inner entries processed, or boost::none if this entry is not a
-    // chained-txn entry and the caller should handle it instead.
-    boost::optional<int> tryConsume(const repl::OplogEntry& entry,
-                                    const boost::optional<UUID>& uuidFilter,
-                                    SizeCountDeltas& globalResult) {
-        if (entry.getCommandType() != repl::OplogEntry::CommandType::kApplyOps) {
-            if (_isTrackingActiveChain()) {
-                // Non-transactional entry: if a chain is active, it was orphaned — the primary
-                // reserved opTimes for the chain but was killed before writing the terminal
-                // applyOps.
-                LOGV2_DEBUG(
-                    12406400,
-                    1,
-                    "Discarding accumulated size and count for partial transaction chain; "
-                    "encountered oplog entry that is not the terminal applyOps for the active "
-                    "chain",
-                    "lastOpTime"_attr = _txnChainState->lastOpTime,
-                    "entry"_attr = redact(entry.toBSONForLogging()),
-                    "entryTxnNumber"_attr = entry.getTxnNumber(),
-                    "entryLsid"_attr = entry.getSessionId());
-                _clearTxnChainState();
-            }
-            return boost::none;
-        }
-
-        if (_hasActiveChainConflict(entry)) {
-            // applyOps from a different chain: discard the active chain's state before
-            // falling through so the entry is processed with a clean slate.
-            LOGV2_DEBUG(12406402,
-                        1,
-                        "Discarding accumulated size and count for partial transaction chain; "
-                        "encountered applyOps from a different chain",
-                        "lastOpTime"_attr = _txnChainState->lastOpTime,
-                        "entryPrevOpTime"_attr = entry.getPrevWriteOpTimeInTransaction(),
-                        "entry"_attr = redact(entry.toBSONForLogging()));
-            _clearTxnChainState();
-        }
-
-        if (entry.shouldPrepare()) {
-            // Wait until the `commitTransaction` oplog entry to include the transaction's aggregate
-            // into the running total.
-            _clearTxnChainState();
-            return 0;
-        }
-
-        if (entry.isPartialTransaction()) {
-            if (!_isTrackingActiveChain()) {
-                _txnChainState = TxnChainState{.lastOpTime = entry.getOpTime()};
-            } else {
-                _txnChainState->lastOpTime = entry.getOpTime();
-            }
-            return processOplogEntry(entry, uuidFilter, _txnChainState->deltas);
-        }
-
-        if (!_isTrackingActiveChain()) {
-            // The entry is an `applyOps`, but not part of a chained `applyOps` for an active
-            // transaction.
-            return boost::none;
-        }
-
-        // Terminal `applyOps` for the open chain.
-        int n = processOplogEntry(entry, uuidFilter, _txnChainState->deltas);
-        mergeDeltas(_txnChainState->deltas, globalResult);
-        _clearTxnChainState();
-        return n;
-    }
-
-private:
-    // Returns true if there is an actively tracked chain but 'entry' does not belong to it.
-    // Chain membership is determined solely by prevOpTime linkage: the entry must carry a
-    // prevOpTime equal to the last tracked opTime.
-    bool _hasActiveChainConflict(const repl::OplogEntry& entry) const {
-        if (!_txnChainState.has_value()) {
-            return false;
-        }
-        auto prevOpTime = entry.getPrevWriteOpTimeInTransaction();
-        return !prevOpTime || *prevOpTime != _txnChainState->lastOpTime;
-    }
-
-    bool _isTrackingActiveChain() const {
-        return _txnChainState.has_value();
-    }
-
-    void _clearTxnChainState() {
-        _txnChainState = boost::none;
-    }
-
-    boost::optional<TxnChainState> _txnChainState;
-};
-
-// Accumulates size count deltas scanned from the oplog, upholding visibility rules so that
-// chained transaction deltas are not visible until the transaction commits.
-class DeltaAccumulator {
-public:
-    int consume(const repl::OplogEntry& oplogEntry,
-                const boost::optional<UUID>& uuidFilter,
-                SizeCountDeltas& globalResult) {
-        if (auto n = _txnBuffer.tryConsume(oplogEntry, uuidFilter, globalResult)) {
-            return *n;
-        }
-        return processOplogEntry(oplogEntry, uuidFilter, globalResult);
-    }
-
-private:
-    TxnDeltaBuffer _txnBuffer;
-};
-
-}  // namespace
-
 boost::optional<CollectionSizeCount> extractSizeCountDeltaForOp(
     const repl::OplogEntry& oplogEntry) {
     return extractSizeCountDeltaForOpImpl(oplogEntry);
@@ -598,57 +422,6 @@ int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
         processed += processOplogEntry(op, uuidFilter, sizeCountDeltasOut);
     }
     return processed;
-}
-
-OplogScanResult aggregateSizeCountDeltasInOplog(SeekableRecordCursor& oplogCursor,
-                                                const Timestamp& seekAfterTS,
-                                                const boost::optional<UUID>& uuidFilter,
-                                                bool isCheckpoint,
-                                                const boost::optional<UUID>& oplogUuid) {
-    OplogScanResult result;
-    DeltaAccumulator deltaAccumulator;
-    RecordId seekRid =
-        massertStatusOK(record_id_helpers::keyForOptime(seekAfterTS, KeyFormat::Long));
-
-    const bool trackOplog = oplogUuid.has_value();
-    for (auto rec = oplogCursor.seek(seekRid, SeekableRecordCursor::BoundInclusion::kExclude); rec;
-         rec = oplogCursor.next()) {
-
-        if (trackOplog) {
-            result.deltas[*oplogUuid].sizeCount.size += static_cast<int64_t>(rec->data.size());
-            result.deltas[*oplogUuid].sizeCount.count += 1;
-        }
-
-        const auto entry = massertStatusOK(repl::OplogEntry::parse(rec->data.toBson()));
-        const auto& nss = entry.getNss();
-        // Do not advance lastTimestamp for writes to the fast count store collections themselves.
-        // Otherwise, we create a feedback loop where we'd advance the timestamp in response to
-        // seeing oplog entries for advancing the timestamp.
-        if (operationsOnFastCountStores(nss, entry)) {
-            if (isCheckpoint) {
-                recordCheckpointOplogEntrySkipped();
-            }
-            continue;
-        }
-        result.lastTimestamp = entry.getTimestamp();
-        int numSizeCountEntries = deltaAccumulator.consume(entry, uuidFilter, result.deltas);
-        if (isCheckpoint) {
-            recordCheckpointOplogEntryProcessed();
-            recordCheckpointSizeCountEntryProcessed(numSizeCountEntries);
-        }
-    }
-
-    // If we did not advance the timestamp (i.e, we did not see any oplog entries for operations
-    // that were not on the fast count collections themselves), we shouldn't persist any deltas. We
-    // update the delta entry for the oplogUuid unconditionally, so if we only saw oplog entries on
-    // fast count collections we should remove the entry here and keep 'deltas' empty.
-    // The size and count of oplog entries operating on fast count collections will be included in
-    // the next checkpoint pass that includes operations on non-fast-count collections.
-    if (isCheckpoint && trackOplog && !result.lastTimestamp) {
-        result.deltas.erase(*oplogUuid);
-    }
-
-    return result;
 }
 
 }  // namespace replicated_fast_count

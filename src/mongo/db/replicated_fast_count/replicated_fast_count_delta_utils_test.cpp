@@ -40,6 +40,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_init.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_manager.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_test_helpers.h"
 #include "mongo/db/replicated_fast_count/size_count_store.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"

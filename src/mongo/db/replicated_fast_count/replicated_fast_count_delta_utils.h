@@ -80,34 +80,19 @@ int extractSizeCountDeltasForApplyOps(const repl::OplogEntry& applyOpsEntry,
                                       SizeCountDeltas& sizeCountDeltasOut);
 
 /**
- * The result of scanning the oplog for size and count deltas.
- *
- * `deltas` contains an entry for each `uuid` which has replicated size count information within the
- * scanned oplog range. May include entries where size count deltas sum to 0.
- *
- * `lastTimestamp` is the timestamp of the final oplog entry visited during the scan that is NOT
- * from an internal fast count store collection, or boost::none if no such entries were scanned
- * (i.e. the seek landed past the end of the oplog).
+ * Processes a single oplog entry and accumulates its size/count contribution into
+ * 'sizeCountDeltasOut'. Handles applyOps (including nested), truncateRange, commitTransaction,
+ * and CRUD operations. Returns the number of size/count entries processed.
  */
-struct OplogScanResult {
-    SizeCountDeltas deltas;
-    boost::optional<Timestamp> lastTimestamp;
-};
+int processOplogEntry(const repl::OplogEntry& entry,
+                      const boost::optional<UUID>& uuidFilter,
+                      SizeCountDeltas& sizeCountDeltasOut);
 
 /**
- * Given a cursor to the oplog, scans the oplog starting after "seekAfterTS" (exclusive bound) and
- * aggregates the size count deltas across UUIDs. Only accumulates size count information for
- * "uuidFilter" when provided. Pass 'isCheckpoint=true' only on the checkpoint scan path to
- * increment checkpoint scan counters; leave false (the default) on read paths.
- *
- * If a non-none 'oplogUuid' is passed in, tracks updates to the oplog size and count.
+ * Merges per-UUID deltas from 'src' into 'dst', handling DDL states (kCreated requires recording
+ * a create; kDropped is not permitted as drops are disallowed in multi-document transactions).
  */
-OplogScanResult aggregateSizeCountDeltasInOplog(
-    SeekableRecordCursor& oplogCursor,
-    const Timestamp& seekAfterTS,
-    const boost::optional<UUID>& uuidFilter = boost::none,
-    bool isCheckpoint = false,
-    const boost::optional<UUID>& oplogUuid = boost::none);
+void mergeDeltas(const SizeCountDeltas& src, SizeCountDeltas& dst);
 
 }  // namespace replicated_fast_count
 

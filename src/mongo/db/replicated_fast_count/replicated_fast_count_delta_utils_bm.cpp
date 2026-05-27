@@ -36,6 +36,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/replicated_fast_count/durable_size_metadata_gen.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_size_count.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"

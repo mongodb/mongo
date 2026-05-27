@@ -30,6 +30,7 @@
 #include "mongo/db/replicated_fast_count/replicated_fast_count_read.h"
 
 #include "mongo/db/replicated_fast_count/replicated_fast_count_delta_utils.h"
+#include "mongo/db/replicated_fast_count/replicated_fast_count_streaming_oplog_delta_accumulator.h"
 
 namespace mongo::replicated_fast_count {
 
