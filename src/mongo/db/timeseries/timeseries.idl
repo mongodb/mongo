@@ -257,6 +257,11 @@ structs:
                 validator: {gte: 1, lte: 31536000}
                 stability: stable
                 query_shape: literal
+            fixedBucketing:
+                description: "Indicates whether this collection uses fixed bucketing boundaries."
+                type: optionalBool
+                stability: unstable
+                query_shape: literal
 
     CollModTimeseries:
         description: "A type representing the adjustable options on timeseries collections"

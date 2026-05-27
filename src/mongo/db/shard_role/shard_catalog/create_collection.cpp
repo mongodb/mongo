@@ -417,6 +417,20 @@ Status _performCollectionCreationChecks(OperationContext* opCtx,
             !createViewlessTimeseriesColl || !options.timeseries.has_value() ||
                 options.validator.isEmpty());
 
+    // The 'fixedBucketing' option requires viewless time-series collections and the
+    // featureFlagFixedBucketingCatalog flag.
+    if (options.timeseries.has_value() && options.timeseries->getFixedBucketing().has_value()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "the 'fixedBucketing' option requires featureFlagFixedBucketingCatalog to be "
+                "enabled",
+                gFeatureFlagFixedBucketingCatalog.isEnabledUseLatestFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx)));
+
+        uassert(ErrorCodes::InvalidOptions,
+                "the 'fixedBucketing' option can only be set on viewless time-series collections",
+                createViewlessTimeseriesColl);
+    }
+
     // TODO SERVER-109289: Investigate whether this is safe on viewless time-series collections.
     uassert(
         ErrorCodes::OperationNotSupportedInTransaction,

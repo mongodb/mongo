@@ -333,6 +333,32 @@ TEST(TimeseriesOptionsTest, AreTimeseriesBucketsFixed) {
     }
 }
 
+TEST(TimeseriesOptionsTest, OptionsAreEqualFixedBucketing) {
+    auto makeOptions = [](boost::optional<bool> fixedBucketing) {
+        TimeseriesOptions options{"time"};
+        if (fixedBucketing.has_value()) {
+            options.setFixedBucketing(*fixedBucketing);
+        }
+        return options;
+    };
+
+    const auto unset = makeOptions(boost::none);
+    const auto enabled = makeOptions(true);
+    const auto disabled = makeOptions(false);
+
+    // Same values compare equal.
+    EXPECT_TRUE(timeseries::optionsAreEqual(unset, unset));
+    EXPECT_TRUE(timeseries::optionsAreEqual(enabled, enabled));
+    EXPECT_TRUE(timeseries::optionsAreEqual(disabled, disabled));
+
+    // Different values compare unequal. In particular `unset` is distinct from `false` — even
+    // though `OptionalBool::operator bool()` would conflate them, optionsAreEqual treats all
+    // three states (unset, false, true) as distinct.
+    EXPECT_FALSE(timeseries::optionsAreEqual(unset, enabled));
+    EXPECT_FALSE(timeseries::optionsAreEqual(unset, disabled));
+    EXPECT_FALSE(timeseries::optionsAreEqual(enabled, disabled));
+}
+
 TEST(TimeseriesOptionsTest, BSONColumnMemEstimationCalculations) {
     // The calculations for BSONColumn memory estimation in bson_validate.cpp rely on the defaults
     // for some server parameters. If these change, we also need to recalculate and potentially

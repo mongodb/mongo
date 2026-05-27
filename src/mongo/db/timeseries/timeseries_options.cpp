@@ -368,6 +368,17 @@ bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& 
         return false;
     }
 
+    // The fixedBucketing option must match. Treat unset, false, and true as three distinct
+    // states: OptionalBool's `operator bool()` collapses unset and false together, so we must
+    // compare `has_value()` separately from the underlying boolean.
+    // TODO(SERVER-126823): revisit when fixedBucketing becomes true by default.
+    if (option1.getFixedBucketing().has_value() != option2.getFixedBucketing().has_value()) {
+        return false;
+    }
+    if (bool(option1.getFixedBucketing()) != bool(option2.getFixedBucketing())) {
+        return false;
+    }
+
     return true;
 }
 

@@ -178,6 +178,7 @@ feature_flags:
         cpp_varname: gFeatureFlagFixedBucketingCatalog
         default: false
         fcv_gated: true
+        check_against_fcv: operation_fcv_only
     featureFlagMongodProxyProtocolSupport:
         description: "Enables non-OCS proxy protocol connections on Mongos and Mongod"
         cpp_varname: gFeatureFlagMongodProxyProtocolSupport
