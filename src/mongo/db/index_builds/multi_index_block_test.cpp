@@ -323,6 +323,75 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
     indexer->abortIndexBuild(operationContext(), collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
 }
 
+// The bulk commit of a unique index wraps IndexBuildInterceptor::recordDuplicateKey in a
+// writeConflictRetry block. Verify that a storage engine write conflict on that write is retried
+// and that the duplicate is persisted exactly once in the constraint-violations ident.
+TEST_F(MultiIndexBlockResumableTest, DuplicateKeyRecordingSurvivesWriteConflict) {
+    auto* opCtx = operationContext();
+    // Batch size >1 keeps both keys in the same in-memory batch, so the recordDuplicateKey insert
+    // is the first time the WCE will hit.
+    RAIIServerParameterControllerForTest insertionBatchSize{
+        "primaryDrivenIndexBuildIndexInsertionBatchSize", 5};
+    auto indexer = getIndexer();
+    indexer->setBuildUUID(UUID::gen());
+    indexer->setIndexBuildMethod(IndexBuildMethodEnum::kPrimaryDriven);
+    indexer->setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
+    // isResumable=false avoids periodic _writeStateToContainer callbacks during the load phase
+    // that could fire on the armed WCE before the duplicate-recording write.
+    indexer->setIsResumable(false);
+
+    AutoGetCollection autoColl(opCtx, getNSS(), MODE_X);
+    CollectionWriter coll(opCtx, autoColl);
+
+    // Two records with identical `a` values: after sorting in the bulk loader they are adjacent
+    // duplicates, which triggers onDuplicateKeyInserted on the second key.
+    {
+        WriteUnitOfWork wuow(opCtx);
+        ASSERT_OK(Helpers::insert(opCtx, *autoColl, BSON("_id" << 0 << "a" << 1)));
+        ASSERT_OK(Helpers::insert(opCtx, *autoColl, BSON("_id" << 1 << "a" << 1)));
+        wuow.commit();
+    }
+
+    auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    IndexBuildInfo indexBuildInfo(BSON("v" << static_cast<int>(IndexConfig::kLatestIndexVersion)
+                                           << "key" << BSON("a" << 1) << "name"
+                                           << "a_1"
+                                           << "unique" << true),
+                                  "index-1",
+                                  *storageEngine);
+    ASSERT_TRUE(indexBuildInfo.constraintViolationsIdent);
+
+    ASSERT_OK(indexer
+                  ->init(opCtx,
+                         coll,
+                         {indexBuildInfo},
+                         MultiIndexBlock::kNoopOnInitFn,
+                         MultiIndexBlock::InitMode::SteadyState,
+                         boost::none)
+                  .getStatus());
+
+    // Arm a WCE to fire exactly once. With two in-memory docs the sorter does not
+    // spill during the scan, and with kReplicate the bulk commit accumulates both keys into one
+    // batch before flushing, so the first write reaching the WCE check is the recordDuplicateKey
+    // insert inside writeConflictRetry("recordingDuplicateKey").
+    {
+        auto failPoint = enableWriteConflictForWrites(
+            FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+        const auto initialTimesEntered = failPoint->initialTimesEntered();
+        ASSERT_OK(indexer->insertAllDocumentsInCollection(opCtx, getNSS()));
+        EXPECT_EQ(initialTimesEntered + 1,
+                  (*failPoint)->waitForTimesEntered(initialTimesEntered + 1))
+            << "Expected exactly one WCE during the duplicate-key recording retry";
+    }
+
+    // Count records directly in the constraint-violations ident: a read-based assertion would
+    // still pass if a buggy retry inserted the duplicate twice.
+    EXPECT_EQ(1u,
+              countRecordsInIdent(opCtx, storageEngine, *indexBuildInfo.constraintViolationsIdent));
+
+    indexer->abortIndexBuild(opCtx, coll, MultiIndexBlock::kNoopOnCleanUpFn);
+}
+
 TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
     auto indexer = getIndexer();
 
