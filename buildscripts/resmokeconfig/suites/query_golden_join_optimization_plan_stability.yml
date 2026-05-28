@@ -22,6 +22,8 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalEnableJoinOptimization: true
+        # Path arrayness is required for join optimization.
+        featureFlagPathArrayness: true
         # Deterministic sampling is required in order to get
         # deterministic query plans in plan stability tests
         internalQuerySamplingBySequentialScan: true

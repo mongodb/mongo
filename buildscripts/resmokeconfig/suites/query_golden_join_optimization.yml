@@ -32,4 +32,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalEnableJoinOptimization: true
+        # Path arrayness is required for join optimization.
+        featureFlagPathArrayness: true
         internalQuerySamplingBySequentialScan: true
