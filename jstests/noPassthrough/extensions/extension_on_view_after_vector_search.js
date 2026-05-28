@@ -2,7 +2,7 @@
  * Verifies that extension stages are properly validated against views even when they follow a
  * legacy $vectorSearch stage after IFR kickback.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [featureFlagExtensionsAPI, featureFlagExtensionStubParsers]
  */
 import {
     checkPlatformCompatibleWithExtensions,
