@@ -48,6 +48,9 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 namespace mongo::index_builds::primary_driven {
 namespace {
@@ -368,6 +371,7 @@ void deleteSorterEntriesOutsideRanges(OperationContext* opCtx,
         const auto batchMaxSize =
             static_cast<size_t>(primaryDrivenIndexBuildSorterInsertionBatchSize.load());
         std::vector<int64_t> keysToDelete;
+        int64_t numDeleted = 0;
 
         auto flushDeletes = [&] {
             writeConflictRetry(
@@ -379,6 +383,7 @@ void deleteSorterEntriesOutsideRanges(OperationContext* opCtx,
                     }
                     wuow.commit();
                 });
+            numDeleted += keysToDelete.size();
             keysToDelete.clear();
         };
 
@@ -415,6 +420,13 @@ void deleteSorterEntriesOutsideRanges(OperationContext* opCtx,
         if (!keysToDelete.empty()) {
             flushDeletes();
         }
+
+        LOGV2(12784900,
+              "Index build: cleaned sorter entries outside persisted ranges",
+              "sorterIdent"_attr = *storageId,
+              "numDeleted"_attr = numDeleted,
+              "firstRangeStart"_attr = firstStart,
+              "lastRangeEnd"_attr = lastEnd);
     }
 }
 
