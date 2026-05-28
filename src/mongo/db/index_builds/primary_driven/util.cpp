@@ -372,6 +372,7 @@ void deleteSorterEntriesOutsideRanges(OperationContext* opCtx,
         auto flushDeletes = [&] {
             writeConflictRetry(
                 opCtx, ru, "deleteSorterEntriesOutsideRanges", NamespaceString::kEmpty, [&] {
+                    Lock::GlobalLock lk(opCtx, MODE_IX);
                     WriteUnitOfWork wuow{opCtx};
                     for (auto key : keysToDelete) {
                         uassertStatusOK(container_write::remove(opCtx, ru, container, key));
