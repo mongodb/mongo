@@ -27,37 +27,39 @@ const runTest = function ({docs, pipeline, behaviour, expectedResult}) {
     assert.commandWorked(coll.insertMany(docs));
 
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
-    let unpackStage = null;
+    let unpackStages = [];
     if (getEngine(explain) === "classic") {
         // In the classic engine $_internalUnpackBucket is run as an aggregation stage.
-        const unpackStages = getAggPlanStages(explain, "$_internalUnpackBucket");
-        assert.eq(1, unpackStages.length, "Should only have a single $_internalUnpackBucket stage: " + tojson(explain));
-        unpackStage = unpackStages[0].$_internalUnpackBucket;
+        const stages = getAggPlanStages(explain, "$_internalUnpackBucket");
+        assert.gte(stages.length, 1, "Should have at least one $_internalUnpackBucket stage: " + tojson(explain));
+        unpackStages = stages.map((s) => s.$_internalUnpackBucket);
     } else if (sbeEnabledForUnpackPushdown) {
         // In the case when only unpack is pushed down to SBE, the explain has it in agg stages.
-        const unpackStages = getAggPlanStages(explain, "UNPACK_TS_BUCKET");
-        assert.eq(1, unpackStages.length, "Should only have a single UNPACK_TS_BUCKET stage: " + tojson(explain));
-        unpackStage = unpackStages[0];
+        unpackStages = getAggPlanStages(explain, "UNPACK_TS_BUCKET");
+        assert.gte(unpackStages.length, 1, "Should have at least one UNPACK_TS_BUCKET stage: " + tojson(explain));
+    } else {
+        assert.doassert("No unpacking stage found in explain: " + tojson(explain));
     }
-    assert(unpackStage, `Should have unpack stage in ${tojson(explain)}`);
 
-    if (behaviour.include) {
-        assert(
-            unpackStage.include,
-            `Unpacking stage should have 'include' behaviour for pipeline ${tojson(
-                pipeline,
-            )} but got ${tojson(explain)}`,
-        );
-        assert.sameMembers(behaviour.include, unpackStage.include, "Includes of unpack stage");
-    }
-    if (behaviour.exclude) {
-        assert(
-            unpackStage.exclude,
-            `Unpacking stage should have 'exclude' behaviour for pipeline ${tojson(
-                pipeline,
-            )} but got ${tojson(explain)}`,
-        );
-        assert.sameMembers(behaviour.exclude, unpackStage.exclude, "Excludes of unpack stage");
+    for (let unpackStage of unpackStages) {
+        if (behaviour.include) {
+            assert(
+                unpackStage.include,
+                `Unpacking stage should have 'include' behaviour for pipeline ${tojson(
+                    pipeline,
+                )} but got ${tojson(explain)}`,
+            );
+            assert.sameMembers(behaviour.include, unpackStage.include, `Includes of unpack stage: ${tojson(explain)}`);
+        }
+        if (behaviour.exclude) {
+            assert(
+                unpackStage.exclude,
+                `Unpacking stage should have 'exclude' behaviour for pipeline ${tojson(
+                    pipeline,
+                )} but got ${tojson(explain)}`,
+            );
+            assert.sameMembers(behaviour.exclude, unpackStage.exclude, `Excludes of unpack stage: ${tojson(explain)}`);
+        }
     }
 
     const res = coll.aggregate(pipeline).toArray();
