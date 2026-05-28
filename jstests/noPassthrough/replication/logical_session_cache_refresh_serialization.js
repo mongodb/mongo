@@ -24,6 +24,24 @@ const primary = rst.getPrimary();
 const adminDB = primary.getDB("admin");
 const sessionsColl = primary.getDB("config").system.sessions;
 
+// Basic sanity check that the sessions collection will be refreshed with a new session without calling
+// refreshLogicalSessionCacheNow, since the logical session refresh interval is short.
+{
+    const session = primary.startSession();
+    const sessionId = session.getSessionId();
+    const sessionDB = session.getDatabase("test");
+    assert.commandWorked(sessionDB.runCommand({insert: "coll", documents: [{_id: 1000}]}));
+
+    jsTestLog.info(
+        `Waiting for session ${tojson(sessionId)} to be added to the cache after logicalSessionRefreshMillis elapses`,
+    );
+    assert.soon(() => {
+        return sessionsColl.find({"_id.id": sessionId.id}).itcount() === 1;
+    }, "Session should be present after logicalSessionRefreshMillis elapses");
+
+    session.endSession();
+}
+
 const sessions = [];
 for (let i = 0; i < numIterations; i++) {
     jsTestLog.info(`Starting session ${i} and using it to add to the cache`);
