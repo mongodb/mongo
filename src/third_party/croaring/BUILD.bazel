@@ -11,6 +11,12 @@ mongo_cc_library(
     hdrs = [
         "dist/roaring.hh",
     ],
+    copts = select({
+        "//bazel/config:compiler_type_clang": [
+            "-Wno-static-in-inline",
+        ],
+        "//conditions:default": [],
+    }),
     includes = [
         "dist",
     ],

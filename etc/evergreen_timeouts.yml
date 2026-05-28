@@ -61,7 +61,15 @@ overrides:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
 
+  debian13:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
   enterprise-debian12-64:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
+  enterprise-debian13-64:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
 

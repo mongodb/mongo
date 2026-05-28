@@ -207,6 +207,7 @@ def get_host_distro_major_version(repository_ctx):
         "Amazon Linux 2023": "amazon_linux_2023",
         "Debian GNU/Linux 10": "debian10",
         "Debian GNU/Linux 12": "debian12",
+        "Debian GNU/Linux 13": "debian13",
         "Red Hat Enterprise Linux 8*": "rhel8",
         "Red Hat Enterprise Linux 9*": "rhel9",
         "Red Hat Enterprise Linux 10*": "rhel10",

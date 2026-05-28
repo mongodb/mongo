@@ -4,7 +4,7 @@ import unittest
 from dataclasses import dataclass
 from unittest import TestCase
 
-from buildscripts.packager import Spec
+from buildscripts.packager import Distro, Spec
 
 
 class TestPackager(TestCase):
@@ -90,6 +90,14 @@ class TestPackager(TestCase):
             with self.subTest(name=case.name):
                 spec = Spec(ver=case.version)
                 self.assertEqual(spec.suffix(), case.want)
+
+    def test_debian13_repo_os_version(self) -> None:
+        """Test Debian 13 repository codename."""
+        self.assertEqual("trixie", Distro("debian").repo_os_version("debian13"))
+
+    def test_debian_build_os_includes_debian13(self) -> None:
+        """Test Debian build OS choices include Debian 13."""
+        self.assertIn("debian13", Distro("debian").build_os("x86_64"))
 
 
 if __name__ == "__main__":

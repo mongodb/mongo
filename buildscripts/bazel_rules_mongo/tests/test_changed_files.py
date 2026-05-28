@@ -69,6 +69,9 @@ class TestChangedFiles(unittest.TestCase):
             shutil.copy(file, new_dest)
 
         cls.repo = Repo(cls.tmp_dir)
+        cls.repo.git.execute(["git", "config", "user.email", "test@example.com"])
+        cls.repo.git.execute(["git", "config", "user.name", "Test User"])
+        cls.repo.git.execute(["git", "config", "commit.gpgsign", "false"])
         # add a testing file to this original commit so we can treat it as a preexisting file that
         # is going to be modified
         write_file(cls.repo, changed_file_name)

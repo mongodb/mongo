@@ -29,6 +29,9 @@ filters:
   - "performance_thresholds.yml":
     approvers:
       - 10gen/performance
+  - "repo_config.yaml":
+    approvers:
+      - 10gen/devprod-build
   - "system_perf.yml":
     approvers:
       - 10gen/performance

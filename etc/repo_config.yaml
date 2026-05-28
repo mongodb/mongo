@@ -250,6 +250,17 @@ repos:
     repos:
       - apt/debian/dists/bookworm/mongodb-org
 
+  - name: debian13
+    type: deb
+    code_name: "trixie"
+    bucket: repo.mongodb.org
+    edition: org
+    component: main
+    architectures:
+      - amd64
+    repos:
+      - apt/debian/dists/trixie/mongodb-org
+
   - name: debian71
     type: deb
     code_name: "wheezy"
@@ -537,6 +548,17 @@ repos:
       - amd64
     repos:
       - apt/debian/dists/bookworm/mongodb-enterprise
+
+  - name: debian13
+    type: deb
+    edition: enterprise
+    code_name: "trixie"
+    bucket: repo.mongodb.com
+    component: main
+    architectures:
+      - amd64
+    repos:
+      - apt/debian/dists/trixie/mongodb-enterprise
 
   - name: debian92
     type: deb

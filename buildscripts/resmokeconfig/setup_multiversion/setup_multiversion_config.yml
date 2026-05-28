@@ -225,6 +225,11 @@ evergreen_buildvariants:
     platform: debian12
     architecture: x86_64
 
+  - name: debian13
+    edition: targeted
+    platform: debian13
+    architecture: x86_64
+
   - name: enterprise-debian11-64
     edition: enterprise
     platform: debian11
@@ -233,6 +238,11 @@ evergreen_buildvariants:
   - name: enterprise-debian12-64
     edition: enterprise
     platform: debian12
+    architecture: x86_64
+
+  - name: enterprise-debian13-64
+    edition: enterprise
+    platform: debian13
     architecture: x86_64
 
   - name: windows

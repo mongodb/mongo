@@ -27,6 +27,7 @@ constraint_setting(name = "distro")
         "amazon_linux_2023",
         "debian10",
         "debian12",
+        "debian13",
         "rhel8",
         "rhel9",
         "rhel10",

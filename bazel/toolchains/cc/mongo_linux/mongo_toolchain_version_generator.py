@@ -31,6 +31,7 @@ PLATFORM_NAME_MAP = {
     "amazon_linux_2_x86_64": "amazon2",
     "debian10_x86_64": "debian10",
     "debian12_x86_64": "debian12",
+    "debian13_x86_64": "debian13",
     "rhel8_aarch64": "rhel82-arm64",
     "rhel8_ppc64le": "rhel81-ppc64le",
     "rhel8_s390x": "rhel80-zseries",

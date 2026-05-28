@@ -2717,6 +2717,7 @@ selects.config_setting_group(
         "//bazel/platforms:amazon_linux_2",
         "//bazel/platforms:debian10",
         "//bazel/platforms:debian12",
+        "//bazel/platforms:debian13",
         "//bazel/platforms:rhel8",
         "//bazel/platforms:rhel9",
         "//bazel/platforms:suse12",

@@ -4,6 +4,7 @@ build_variant_large_distro_exceptions:
   - amazon2023
   - amazon2023-arm64
   - debian12
+  - debian13
   - enterprise-amazon2023
   - atlas-amazon2023
   # TODO(SERVER-85904) - enterprise-amazon2023-lto
@@ -14,6 +15,7 @@ build_variant_large_distro_exceptions:
   - enterprise-amazon2023-arm64-grav4
   # TODO(SERVER-85904) - enterprise-amazon2023-arm64-lto
   - enterprise-debian12-64
+  - enterprise-debian13-64
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
   - enterprise-macos-arm64
