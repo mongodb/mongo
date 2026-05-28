@@ -7,7 +7,6 @@ import "jstests/multiVersion/libs/multi_rs.js";
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
 import {PrefixField, SubstringField, SuffixAndPrefixField, SuffixField} from "jstests/fle2/libs/qe_text_search_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbName = "qe_text_downgrade_test";
 const forcePreview = true;
@@ -42,27 +41,24 @@ function testBinaryDowngrade(queryTypeConfig) {
         }),
     );
 
-    // if featureFlagQEPrefixSuffixSearch is enabled, assert we can't create suffix or prefix
-    // preview types
-    // TODO: SERVER-118594 update this once featureFlagQEPrefixSuffixSearch is default-enabled
-    if (FeatureFlagUtil.isPresentAndEnabled(edb.getMongo(), "QEPrefixSuffixSearch")) {
-        if (!(queryTypeConfig instanceof SubstringField)) {
-            assert.commandFailed(
-                client.getDB().createCollection("basic_text", {
-                    encryptedFields: {
-                        "fields": [
-                            {
-                                path: "first",
-                                bsonType: "string",
-                                queries: queryTypeConfig.createQueryTypeDescriptor(),
-                            },
-                        ],
-                    },
-                }),
-            );
-            rst.stopSet();
-            return;
-        }
+    // featureFlagQEPrefixSuffixSearch is default-enabled, so we can't create suffix or prefix
+    // preview types.
+    if (!(queryTypeConfig instanceof SubstringField)) {
+        assert.commandFailed(
+            client.getDB().createCollection("basic_text", {
+                encryptedFields: {
+                    "fields": [
+                        {
+                            path: "first",
+                            bsonType: "string",
+                            queries: queryTypeConfig.createQueryTypeDescriptor(),
+                        },
+                    ],
+                },
+            }),
+        );
+        rst.stopSet();
+        return;
     }
 
     assert.commandWorked(
