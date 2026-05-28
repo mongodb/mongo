@@ -22,6 +22,9 @@ filters:
   - "read_preference*":
     approvers:
       - 10gen/server-replication-reviewers
+  - "external_client_on_router*":
+    approvers:
+      - 10gen/server-replication-reviewers
   - "server_read_concern*":
     approvers:
       - 10gen/server-rw-concerns

@@ -110,6 +110,7 @@
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/stats/api_version_metrics.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/external_client_on_router.h"
 #include "mongo/db/stats/read_preference_metrics.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/stats/top.h"
@@ -1190,8 +1191,11 @@ void RunCommandImpl::_prologue() {
         // Skip incrementing metrics when the command is not a read operation, as we expect to all
         // commands sent via the driver to inherit the read preference, even if we don't use it.
         if (command->shouldAffectReadOptionCounters()) {
+            // Commands forwarded from a router (mongos) on behalf of an external user should
+            // be counted as "external", even though the mongos connection is an internal client.
+            auto isInternal = _isInternalClient() && !isExternalClientOnRouter(opCtx);
             ReadPreferenceMetrics::get(opCtx)->recordReadPreference(
-                ReadPreferenceSetting::get(opCtx), _isInternalClient(), isPrimary);
+                ReadPreferenceSetting::get(opCtx), isInternal, isPrimary);
         }
     }
 }

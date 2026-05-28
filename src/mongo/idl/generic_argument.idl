@@ -415,6 +415,16 @@ structs:
                 # it when forwarding the request to a shard or config server. See also: rawData.
                 forward_to_shards: false
                 stability: "internal"
+            # Set by the router when the command originates from an external (user) client
+            # connection. This allows mongod to distinguish user operations routed through
+            # mongos from internal system operations (e.g. resharding, balancer) for metrics
+            # purposes such as read preference counters.
+            isExternalClientOnRouter:
+                type: optionalBool
+                # Manually appended by the egress metadata hook, not present in the original
+                # command BSON. See also: rawData, isDirectSystemBucketsAccess.
+                forward_to_shards: false
+                stability: "internal"
             # Contains context fields of the current transaction
             transactionRuntimeContext:
                 type: TransactionRuntimeContext

@@ -44,6 +44,7 @@
 #include "mongo/db/query/util/deferred.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/direct_system_buckets_access.h"
+#include "mongo/db/stats/external_client_on_router.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/user_write_block/replica_set_write_block_bypass.h"
 #include "mongo/db/topology/user_write_block/user_write_block_bypass.h"
@@ -181,6 +182,10 @@ void readRequestMetadata(OperationContext* opCtx,
 
     if (requestArgs.getIsDirectSystemBucketsAccess()) {
         isDirectSystemBucketsAccess(opCtx) = true;
+    }
+
+    if (requestArgs.getIsExternalClientOnRouter()) {
+        isExternalClientOnRouter(opCtx) = true;
     }
 }
 

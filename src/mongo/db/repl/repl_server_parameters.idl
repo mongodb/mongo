@@ -837,3 +837,14 @@ feature_flags:
         default: true
         version: 8.3
         fcv_gated: true
+    featureFlagExternalClientOnRouter:
+        description: >-
+            When enabled, mongos annotates commands forwarded on behalf of external
+            (user) clients with the isExternalClientOnRouter generic argument. This
+            allows mongod to correctly attribute those operations as external in read
+            preference metrics. Gated on FCV to ensure all nodes in the cluster
+            understand the field before it is sent.
+        cpp_varname: feature_flags::gFeatureFlagExternalClientOnRouter
+        default: true
+        version: 9.0
+        fcv_gated: true

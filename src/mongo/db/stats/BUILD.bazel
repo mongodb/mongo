@@ -101,6 +101,19 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "external_client_on_router",
+    srcs = [
+        "external_client_on_router.cpp",
+    ],
+    hdrs = [
+        "external_client_on_router.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
     name = "system_buckets_metrics",
     srcs = [
         "system_buckets_metrics.cpp",

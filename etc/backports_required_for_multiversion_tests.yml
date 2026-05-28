@@ -45,6 +45,8 @@ last-continuous:
       ticket: SERVER-121714
     - test_file: jstests/noPassthrough/ddl/clear_jumbo.js
       ticket: SERVER-125661
+    - test_file: jstests/noPassthrough/read_write_concern/read_preference_metrics_mongos.js
+      ticket: SERVER-116460
     - test_file: jstests/noPassthrough/sharded_cluster_topology/shard_registry_rsm_removal_race.js
       ticket: SERVER-123567
     - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
@@ -446,6 +448,8 @@ last-lts:
       ticket: SERVER-110058
     - test_file: jstests/noPassthrough/query/out_merge/out_timeseries_cleans_up_bucket_collections.js
       ticket: SERVER-93149
+    - test_file: jstests/noPassthrough/read_write_concern/read_preference_metrics_mongos.js
+      ticket: SERVER-116460
     - test_file: jstests/noPassthrough/replication/killOp_against_repl_threads.js
       ticket: SERVER-112273
     - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js

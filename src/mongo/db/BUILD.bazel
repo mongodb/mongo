@@ -2424,6 +2424,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/stats:api_version_metrics",
         "//src/mongo/db/stats:counters",
+        "//src/mongo/db/stats:external_client_on_router",
         "//src/mongo/db/stats:read_preference_metrics",
         "//src/mongo/db/stats:server_read_concern_write_concern_metrics",
         "//src/mongo/db/stats:top",
