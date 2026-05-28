@@ -54,6 +54,8 @@
 
 #include <algorithm>
 #include <exception>
+#include <memory>
+#include <utility>
 
 #include <boost/none.hpp>
 
@@ -89,6 +91,7 @@ namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(failIsSelfCheck);
 MONGO_FAIL_POINT_DEFINE(transientDNSErrorInFastPath);
+MONGO_FAIL_POINT_DEFINE(skipGetaddrinfoCall);
 
 OID instanceId;
 
@@ -106,6 +109,10 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
                                          const int port,
                                          const bool ipv6enabled) {
     addrinfo* addrs = nullptr;
+    // RAII wrapper ensures freeaddrinfo is called exactly once, preventing double-free
+    // when getaddrinfo fails on retry after a transient EAI_AGAIN error.
+    auto addrsGuard = std::unique_ptr<addrinfo, decltype(&freeaddrinfo)>(nullptr, freeaddrinfo);
+
     addrinfo hints = {0};
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_family = (ipv6enabled ? AF_UNSPEC : AF_INET);
@@ -117,7 +124,14 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
     int maxAttempts = 4;
 
     while (true) {
-        err = getaddrinfo(iporhost.c_str(), portNum.c_str(), &hints, &addrs);
+        // When active, skip the real getaddrinfo call to simulate a DNS lookup failure
+        // that does not update addrs, leaving it as a stale/dangling pointer.
+        if (MONGO_unlikely(skipGetaddrinfoCall.shouldFail())) {
+            err = EAI_NONAME;
+        } else {
+            err = getaddrinfo(iporhost.c_str(), portNum.c_str(), &hints, &addrs);
+        }
+        addrsGuard.reset(std::exchange(addrs, nullptr));
 
         // We do not sleep for as long in tests.
         auto waitCoefficient = 1.0;
@@ -133,9 +147,7 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
             break;
         }
 
-        // Free what we have ahead of the next getaddrinfo call.
-        freeaddrinfo(addrs);
-
+        addrsGuard.reset();
         // Wait 1, 2, 4, 8 seconds (and a tenth of that in tests).
         sleepmillis(std::pow(2, attempts++) * 1000 * waitCoefficient);
     }
@@ -149,13 +161,10 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
                       "host"_attr = iporhost,
                       "error"_attr = errorMessage(ec),
                       "timedOut"_attr = (attempts == maxAttempts));
-        freeaddrinfo(addrs);
         return out;
     }
 
-    ON_BLOCK_EXIT([&] { freeaddrinfo(addrs); });
-
-    for (addrinfo* addr = addrs; addr != nullptr; addr = addr->ai_next) {
+    for (addrinfo* addr = addrsGuard.get(); addr != nullptr; addr = addr->ai_next) {
         int family = addr->ai_family;
         char host[NI_MAXHOST];
 
