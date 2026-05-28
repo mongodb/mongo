@@ -139,6 +139,7 @@ if jsEngine:
             'mozjs/jscustomallocator_test.cpp',
         ],
         LIBDEPS=[
+            '$BUILD_DIR/third_party/mozjs/mozjs',
             'bson_template_evaluator',
             'scripting',
         ],

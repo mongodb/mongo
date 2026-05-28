@@ -50,6 +50,8 @@ TEST(ModuleLoaderTest, ImportBaseSpecifierFails) {
                     true /* assertOnError , timeout*/),
         DBException,
         [&](const auto& ex) { ASSERT_STRING_CONTAINS(ex.what(), "Cannot find module"); });
+    scope.reset();
+    setGlobalScriptEngine(nullptr);
 }
 
 #if !defined(_WIN32)
@@ -67,6 +69,8 @@ TEST(ModuleLoaderTest, ImportDirectoryFails) {
                     true /* assertOnError , timeout*/),
         DBException,
         [&](const auto& ex) { ASSERT_STRING_CONTAINS(ex.what(), "Directory import"); });
+    scope.reset();
+    setGlobalScriptEngine(nullptr);
 }
 #endif
 
@@ -86,6 +90,8 @@ TEST(ModuleLoaderTest, ImportInInteractiveFails) {
             ASSERT_STRING_CONTAINS(ex.what(),
                                    "import declarations may only appear at top level of a module");
         });
+    scope.reset();
+    setGlobalScriptEngine(nullptr);
 }
 
 TEST(ModuleLoaderTest, TopLevelAwaitWorks) {
@@ -97,6 +103,8 @@ TEST(ModuleLoaderTest, TopLevelAwaitWorks) {
                                       true /* printResult */,
                                       true /* reportError */,
                                       true /* assertOnError , timeout*/));
+    scope.reset();
+    setGlobalScriptEngine(nullptr);
 }
 
 TEST(ModuleLoaderTest, ParseSearchPathsEmpty) {
