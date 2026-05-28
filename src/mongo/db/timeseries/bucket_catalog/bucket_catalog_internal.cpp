@@ -545,6 +545,7 @@ StatusWith<std::reference_wrapper<Bucket>> loadBucketIntoCatalog(
     auto [insertedIt, newlyInserted] =
         stripe.openBucketsById.try_emplace(bucket->bucketId, std::move(bucket));
     invariant(newlyInserted);
+    stripe.numOpenBucketsByIdCount.addAndFetch(1);
     Bucket* unownedBucket = insertedIt->second.get();
 
     // If we already have an open bucket for this key, we need to close it.
@@ -572,7 +573,12 @@ StatusWith<std::reference_wrapper<Bucket>> loadBucketIntoCatalog(
     if constexpr (kDebugBuild) {
         assertNoOpenUnclearedBucketsForKey(stripe, catalog.bucketStateRegistry, key);
     }
-    stripe.openBucketsByKey[key].emplace(unownedBucket);
+
+    auto [elem, inserted] = stripe.openBucketsByKey.try_emplace(key);
+    elem->second.emplace(unownedBucket);
+    if (inserted)
+        stripe.numOpenBucketsByKeyCount.addAndFetch(1);
+
     stats.incNumBucketsReopened();
 
     stats.incNumActiveBuckets();
@@ -718,6 +724,7 @@ void removeBucketWithoutStats(BucketCatalog& catalog,
         if (bucketIt != openSet.end()) {
             if (openSet.size() == 1) {
                 stripe.openBucketsByKey.erase(openIt);
+                stripe.numOpenBucketsByKeyCount.subtractAndFetch(1);
             } else {
                 // Can't delete the set, only remove 'bucket'.
                 openSet.erase(bucketIt);
@@ -729,6 +736,7 @@ void removeBucketWithoutStats(BucketCatalog& catalog,
     stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
     stripe.openBucketsById.erase(allIt);
+    stripe.numOpenBucketsByIdCount.subtractAndFetch(1);
 }
 
 void archiveBucket(BucketCatalog& catalog,
@@ -933,12 +941,14 @@ void markBucketIdle(Stripe& stripe, WithLock stripeLock, Bucket& bucket) {
     invariant(allCommitted(bucket));
     stripe.idleBuckets.push_front(&bucket);
     bucket.idleListEntry = stripe.idleBuckets.begin();
+    stripe.numIdleBucketsCount.addAndFetch(1);
 }
 
 void markBucketNotIdle(Stripe& stripe, WithLock stripeLock, Bucket& bucket) {
     if (bucket.idleListEntry.has_value()) {
         stripe.idleBuckets.erase(bucket.idleListEntry.value());
         bucket.idleListEntry = boost::none;
+        stripe.numIdleBucketsCount.subtractAndFetch(1);
     }
 }
 
@@ -1103,12 +1113,17 @@ Bucket& allocateBucket(BucketCatalog& catalog,
             "Unable to insert documents due to internal OID generation collision. Increase the "
             "value of server parameter 'timeseriesInsertMaxRetriesOnDuplicates' and try again",
             successfullyCreatedId);
+    stripe.numOpenBucketsByIdCount.addAndFetch(1);
 
     Bucket* bucket = it->second.get();
     if constexpr (kDebugBuild) {
         assertNoOpenUnclearedBucketsForKey(stripe, catalog.bucketStateRegistry, key);
     }
-    stripe.openBucketsByKey[key].emplace(bucket);
+
+    auto [elem, inserted] = stripe.openBucketsByKey.try_emplace(key);
+    elem->second.emplace(bucket);
+    if (inserted)
+        stripe.numOpenBucketsByKeyCount.addAndFetch(1);
 
     stats.incNumActiveBuckets();
     // Make sure we set the control.min time field to match the rounded _id timestamp.
@@ -1252,11 +1267,13 @@ ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
         return {it->second, catalog.globalExecutionStats};
     }
 
-    auto res =
+    auto [res, inserted] =
         catalog.executionStats.emplace(collectionUUID,
                                        tracking::make_shared<ExecutionStats>(getTrackingContext(
                                            catalog.trackingContexts, TrackingScope::kStats)));
-    return {res.first->second, catalog.globalExecutionStats};
+    if (inserted)
+        catalog.numExecutionStatsEntries.addAndFetch(1);
+    return {res->second, catalog.globalExecutionStats};
 }
 
 ExecutionStatsController getExecutionStats(BucketCatalog& catalog, const UUID& collectionUUID) {
@@ -1294,6 +1311,7 @@ std::vector<tracking::shared_ptr<ExecutionStats>> releaseExecutionStatsFromBucke
         if (it != catalog.executionStats.end()) {
             out.push_back(std::move(it->second));
             catalog.executionStats.erase(it);
+            catalog.numExecutionStatsEntries.subtractAndFetch(1);
         }
     }
 

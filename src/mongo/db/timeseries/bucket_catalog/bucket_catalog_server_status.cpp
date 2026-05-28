@@ -37,6 +37,7 @@
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 
+#include <algorithm>
 #include <cstddef>
 
 namespace mongo::timeseries::bucket_catalog {
@@ -61,10 +62,9 @@ class BucketCatalogServerStatus : public ServerStatusSection {
     BucketCounts _getBucketCounts(const BucketCatalog& catalog) const {
         BucketCounts sum;
         for (auto const& stripe : catalog.stripes) {
-            std::lock_guard stripeLock{stripe->mutex};
-            sum += {stripe->openBucketsById.size(),
-                    stripe->openBucketsByKey.size(),
-                    stripe->idleBuckets.size()};
+            sum += {static_cast<std::size_t>(stripe->numOpenBucketsByIdCount.loadRelaxed()),
+                    static_cast<std::size_t>(stripe->numOpenBucketsByKeyCount.loadRelaxed()),
+                    static_cast<std::size_t>(stripe->numIdleBucketsCount.loadRelaxed())};
         }
         return sum;
     }
@@ -78,20 +78,21 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement&) const override {
         const auto& bucketCatalog = GlobalBucketCatalog::get(opCtx->getServiceContext());
-        {
-            std::lock_guard catalogLock{bucketCatalog.mutex};
-            if (bucketCatalog.executionStats.empty()) {
-                return {};
-            }
+        if (bucketCatalog.numExecutionStatsEntries.loadRelaxed() == 0) {
+            return {};
         }
 
         auto counts = _getBucketCounts(bucketCatalog);
         auto numActive = bucketCatalog.globalExecutionStats.numActiveBuckets.loadRelaxed();
+        // Because counts.open and numActive are loaded without locks, counts.open can transiently
+        // exceed numActive. Use signed arithmetic and clamp at 0 to avoid unsigned wraparound.
+        const long long numArchived =
+            std::max<long long>(0, numActive - static_cast<long long>(counts.open));
         BSONObjBuilder builder;
         builder.appendNumber("numBuckets", static_cast<long long>(numActive));
         builder.appendNumber("numOpenBuckets", static_cast<long long>(counts.open));
         builder.appendNumber("numIdleBuckets", static_cast<long long>(counts.idle));
-        builder.appendNumber("numArchivedBuckets", static_cast<long long>(numActive - counts.open));
+        builder.appendNumber("numArchivedBuckets", numArchived);
         builder.appendNumber("memoryUsage", static_cast<long long>(getMemoryUsage(bucketCatalog)));
         getDetailedMemoryUsage(bucketCatalog, builder);
 

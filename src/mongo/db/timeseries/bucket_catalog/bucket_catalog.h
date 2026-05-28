@@ -44,6 +44,7 @@
 #include "mongo/db/timeseries/bucket_catalog/tracking_contexts.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/tracking/btree_map.h"
 #include "mongo/util/tracking/flat_hash_set.h"
@@ -112,6 +113,11 @@ struct Stripe {
     // All access to a stripe should happen while 'mutex' is locked.
     mutable std::mutex mutex;
 
+    // Atomic mirrors of map/list sizes — updated under 'mutex', read lock-free by FTDC.
+    Atomic<int32_t> numOpenBucketsByIdCount{0};
+    Atomic<int32_t> numOpenBucketsByKeyCount{0};
+    Atomic<int32_t> numIdleBucketsCount{0};
+
     // All buckets currently open in the catalog, including buckets which are full or pending
     // closure but not yet committed, indexed by BucketId. Owning pointers.
     tracking::unordered_map<BucketId, tracking::unique_ptr<Bucket>, BucketHasher> openBucketsById;
@@ -178,6 +184,9 @@ public:
     // lock. The object itself is thread-safe (using atomics).
     mutable std::mutex mutex;
     tracking::unordered_map<UUID, tracking::shared_ptr<ExecutionStats>> executionStats;
+
+    // Atomic mirror of executionStats.size() — updated under 'mutex', read lock-free by FTDC.
+    AtomicWord<int32_t> numExecutionStatsEntries{0};
 
     // Global execution stats used to report aggregated metrics in server status.
     ExecutionStats globalExecutionStats;
