@@ -37,6 +37,10 @@ assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField
 // The dataset doesn't matter, as we only care about the choice of the plan to execute the query.
 assert.commandWorked(coll.insert({t: new Date(), m: 1, a: 42, b: 17}));
 
+const foreignColl = db[jsTestName() + "_foreign"];
+assert(foreignColl.drop());
+assert.commandWorked(foreignColl.insert({m: 1, x: 42}));
+
 function runTest({pipeline, shouldUseSbe, aggStages}) {
     jsTestLog("Running pipeline " + tojson(pipeline));
 
@@ -67,7 +71,6 @@ runTest({
 });
 
 // $project by itself is not lowered except in SBE full.
-jsTestLog("ian: SBE full " + sbeFullyEnabled);
 runTest({pipeline: [{$project: {a: 1, b: 1}}], shouldUseSbe: sbeFullyEnabled});
 
 // $addFields, $project lowered only in SBE full.
@@ -222,4 +225,45 @@ runTest({
 
     // Everything should get pushed into SBE except setWindowFields.
     aggStages: sbeFullyEnabled ? [] : ["$_internalSetWindowFields"],
+});
+
+// $lookup-$unwind is not lowered to SBE for time-series collections in default settings.
+// With SBE fully enabled, it may be lowered under certain conditions.
+const lookupUnwind = [
+    {$lookup: {from: foreignColl.getName(), localField: "m", foreignField: "m", as: "joined"}},
+    {$unwind: "$joined"},
+];
+
+// LU alone should never use SBE on TS collections, because the set of fields
+// used for the query is not known.
+runTest({
+    pipeline: lookupUnwind,
+    shouldUseSbe: false,
+    aggStages: ["$lookup"],
+});
+
+// LU with an inclusion projection after indicates the fields the pipeline needs
+// during dependency analysis, enabling SBE (for SBE full).
+runTest({
+    pipeline: [...lookupUnwind, {$project: {joined: 1}}],
+    shouldUseSbe: sbeFullyEnabled,
+    aggStages: sbeFullyEnabled ? [] : ["$lookup", "$project"],
+});
+
+runTest({
+    pipeline: [{$group: {_id: "$m", sum: {$sum: "$a"}}}, ...lookupUnwind],
+    shouldUseSbe: sbeUnpackPushdownEnabled,
+    aggStages: sbeFullyEnabled ? [] : ["$lookup"],
+});
+
+runTest({
+    pipeline: [{$match: {a: {$gt: 0}}}, {$group: {_id: "$m", sum: {$sum: "$a"}}}, ...lookupUnwind],
+    shouldUseSbe: sbeUnpackPushdownEnabled,
+    aggStages: sbeFullyEnabled ? [] : ["$lookup"],
+});
+
+runTest({
+    pipeline: [...lookupUnwind, {$group: {_id: "$joined.x", sum: {$sum: "$a"}}}],
+    shouldUseSbe: sbeFullyEnabled,
+    aggStages: sbeFullyEnabled ? [] : ["$lookup", "$group"],
 });
