@@ -155,4 +155,27 @@ void DeleteCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
     DeleteCmdShapeComponents{parsedDelete, _components.let, opts}.appendTo(bob, opts, expCtx);
 }
 
+QueryShapeHash DeleteCmdShape::sha256Hash(OperationContext*, const SerializationContext&) const {
+    // Allocate a buffer on the stack for serialization of parts of the "delete" command shape.
+    constexpr std::size_t bufferSizeOnStack = 256;
+    StackBufBuilderBase<bufferSizeOnStack> deleteCommandShapeBuffer;
+
+    // Write small or typically empty "delete" command shape parts to the buffer.
+    deleteCommandShapeBuffer.appendStrBytes(write_ops::DeleteCommandRequest::kCommandName);
+    deleteCommandShapeBuffer.appendNum(static_cast<int>(_components.multi));
+
+    tassert(12206000,
+            "nssOrUUID for a delete must be a namespace string",
+            nssOrUUID.isNamespaceString());
+    auto nssDataRange = nssOrUUID.asDataRange();
+    deleteCommandShapeBuffer.appendBuf(nssDataRange.data(), nssDataRange.length());
+
+    deleteCommandShapeBuffer.appendBuf(collation.objdata(), collation.objsize());
+
+    return SHA256Block::computeHash(
+        {ConstDataRange{deleteCommandShapeBuffer.buf(),
+                        static_cast<std::size_t>(deleteCommandShapeBuffer.len())},
+         _components.representativeQ.asDataRange(),
+         _components.let.shapifiedLet.asDataRange()});
+}
 }  // namespace mongo::query_shape

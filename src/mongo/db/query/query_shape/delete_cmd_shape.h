@@ -78,6 +78,9 @@ public:
 
     size_t extraSize() const final;
 
+    QueryShapeHash sha256Hash(OperationContext*,
+                              const SerializationContext& serializationContext) const final;
+
 protected:
     void appendCmdSpecificShapeComponents(BSONObjBuilder&,
                                           OperationContext*,
