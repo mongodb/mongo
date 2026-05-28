@@ -45,5 +45,8 @@ mongo_cc_unit_test(
         ":primary_driven_index_builds",
         "//src/mongo/db/collection_crud:container_write",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
+        "//src/mongo/db/storage:record_store_test_harness",
+        # TODO SERVER-127391: Remove dependency on wiredtiger_record_store_test_harness.
+        "//src/mongo/db/storage/wiredtiger:wiredtiger_record_store_test_harness",
     ],
 )

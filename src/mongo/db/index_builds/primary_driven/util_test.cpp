@@ -47,6 +47,7 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/lazy_record_store.h"
+#include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -749,6 +750,108 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesAcrossBatches) {
     auto remainingKeys = getSorterKeys(opCtx, container);
     EXPECT_EQ(remainingKeys.size(), 5u);
     for (int64_t expected = 1; expected < 6; ++expected) {
+        EXPECT_TRUE(std::find(remainingKeys.begin(), remainingKeys.end(), expected) !=
+                    remainingKeys.end());
+    }
+}
+
+// Fires a deterministic WCE while removing keys < firstStart.
+TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesSurvivesWCEWhenDeletingKeysLessThanFirstStart) {
+    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest batchSize{
+        "primaryDrivenIndexBuildSorterInsertionBatchSize", 5};
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto opCtx = operationContext();
+    std::string sorterIdent = "internal-sorter-wce-pre-test";
+    LazyRecordStore sorterTable(opCtx, sorterIdent, LazyRecordStore::CreateMode::immediate);
+    auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                          sorterTable.getTableOrThrow().getContainer())
+                          .get();
+
+    // We will be deleting keys < 6 and >= 11.
+    insertSorterEntries(opCtx, container, 1, 6);
+    insertSorterEntries(opCtx, container, 6, 11);
+    insertSorterEntries(opCtx, container, 11, 16);
+
+    IndexStateInfo indexInfo;
+    indexInfo.setSpec(BSON("key" << BSON("a" << 1) << "name"
+                                 << "a_1"
+                                 << "v" << IndexConfig::kLatestIndexVersion));
+    indexInfo.setIsMultikey(false);
+    indexInfo.setMultikeyPaths({});
+    indexInfo.setStorageIdentifier(sorterIdent);
+    SorterRange range;
+    range.setStart(6);
+    range.setEnd(11);
+    range.setChecksum(0);
+    indexInfo.setRanges(std::vector<SorterRange>{range});
+
+    auto failPoint = enableWriteConflictForWrites(
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+    const auto initialTimesEntered = failPoint->initialTimesEntered();
+
+    deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
+
+    // Exactly one WCE must have fired when removing keys < 6.
+    EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+
+    auto remainingKeys = getSorterKeys(opCtx, container);
+    EXPECT_EQ(remainingKeys.size(), 5u);
+    for (int64_t expected = 6; expected < 11; ++expected) {
+        EXPECT_TRUE(std::find(remainingKeys.begin(), remainingKeys.end(), expected) !=
+                    remainingKeys.end());
+    }
+}
+
+// Fires a deterministic WCE while removing keys >= LastEnd.
+TEST_F(UtilTest,
+       DeleteSorterEntriesOutsideRangesSurvivesWCEWhenDeletingKeysGreaterThanOrEqualToLastEnd) {
+    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    RAIIServerParameterControllerForTest batchSize{
+        "primaryDrivenIndexBuildSorterInsertionBatchSize", 4};
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto opCtx = operationContext();
+    std::string sorterIdent = "internal-sorter-wce-post-test";
+    LazyRecordStore sorterTable(opCtx, sorterIdent, LazyRecordStore::CreateMode::immediate);
+    auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                          sorterTable.getTableOrThrow().getContainer())
+                          .get();
+
+    // We will be deleting keys >= 11.
+    insertSorterEntries(opCtx, container, 6, 11);
+    insertSorterEntries(opCtx, container, 11, 17);
+
+    IndexStateInfo indexInfo;
+    indexInfo.setSpec(BSON("key" << BSON("a" << 1) << "name"
+                                 << "a_1"
+                                 << "v" << IndexConfig::kLatestIndexVersion));
+    indexInfo.setIsMultikey(false);
+    indexInfo.setMultikeyPaths({});
+    indexInfo.setStorageIdentifier(sorterIdent);
+    SorterRange range;
+    range.setStart(6);
+    range.setEnd(11);
+    range.setChecksum(0);
+    indexInfo.setRanges(std::vector<SorterRange>{range});
+
+    auto failPoint = enableWriteConflictForWrites(
+        FailPoint::ModeOptions{.mode = FailPoint::Mode::nTimes, .val = 1});
+    const auto initialTimesEntered = failPoint->initialTimesEntered();
+
+    deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
+
+    // Exactly one WCE must have fired when removing keys >= 11.
+    EXPECT_EQ(initialTimesEntered + 1, (*failPoint)->waitForTimesEntered(initialTimesEntered + 1));
+
+    auto remainingKeys = getSorterKeys(opCtx, container);
+    EXPECT_EQ(remainingKeys.size(), 5u);
+    for (int64_t expected = 6; expected < 11; ++expected) {
         EXPECT_TRUE(std::find(remainingKeys.begin(), remainingKeys.end(), expected) !=
                     remainingKeys.end());
     }
