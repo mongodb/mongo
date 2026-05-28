@@ -824,7 +824,10 @@ class TestEvergreenYML(unittest.TestCase):
         cls.evg_conf = parse_evergreen_file("etc/evergreen.yml")
         config.CONFIG_DIR = "buildscripts/resmokeconfig"
         cls._orig_module_suite_dirs = config.MODULE_SUITE_DIRS
-        config.MODULE_SUITE_DIRS = ["buildscripts/modules/atlas/suites"]
+        config.MODULE_SUITE_DIRS = [
+            "buildscripts/modules/atlas/suites",
+            "buildscripts/modules/atlas/matrix_suites/generated_suites",
+        ]
         suitesconfig.ExplicitSuiteConfig._named_suites = {}
 
     @classmethod
