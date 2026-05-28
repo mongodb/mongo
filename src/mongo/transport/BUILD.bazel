@@ -21,6 +21,7 @@ mongo_cc_library(
     ],
     deps = [
         ":cidr_range_list_parameter",
+        ":message_filter_hooks",
         "//src/mongo:base",
         "//src/mongo/db:connection_health_metrics_parameter",
         "//src/mongo/db:service_context",
@@ -29,6 +30,25 @@ mongo_cc_library(
         "//src/mongo/util:future_util",
         "//src/mongo/util/net:ssl_manager",
     ],
+)
+
+mongo_cc_library(
+    name = "message_filter_hooks",
+    srcs = [],
+    srcs_select = [{
+        "//bazel/config:build_enterprise_linux_enabled": [],
+        "//conditions:default": [
+            "message_filter_hooks.cpp",
+        ],
+    }],
+    deps = select({
+        "//bazel/config:build_enterprise_linux_enabled": [
+            "//src/mongo/db/modules/enterprise/src/mfp:message_filter_hooks_enterprise",
+        ],
+        "//conditions:default": [
+            "//src/mongo:base",  # needed for third-party includes not handled by auto-header
+        ],
+    }),
 )
 
 mongo_cc_library(
