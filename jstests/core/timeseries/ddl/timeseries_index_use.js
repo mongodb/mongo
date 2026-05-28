@@ -15,7 +15,7 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {getAggPlanStage, getPlanStages, getRejectedPlan, getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getPlanStages, getRejectedPlan, getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
 import {add2dsphereVersionIfNeeded} from "jstests/libs/query/geo_index_version_helpers.js";
 
 const generateTest = (useHint) => {
@@ -69,20 +69,27 @@ const generateTest = (useHint) => {
 
             const explain = query.explain();
             if (useHint) {
-                const ixscan = getAggPlanStage(explain, "IXSCAN");
-                assert.neq(null, ixscan, tojson(explain));
-                assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
-            } else {
-                let ixscan = getAggPlanStage(explain, "IXSCAN");
-                // If ixscan is not present, check rejected plans
-                if (ixscan === null) {
-                    const rejectedPlans = getRejectedPlans(getAggPlanStage(explain, "$cursor")["$cursor"]);
-                    assert.eq(1, rejectedPlans.length);
-                    const ixscans = getPlanStages(getRejectedPlan(rejectedPlans[0]), "IXSCAN");
-                    assert.eq(1, ixscans.length);
-                    ixscan = ixscans[0];
+                const ixscans = getAggPlanStages(explain, "IXSCAN");
+                assert.gt(ixscans.length, 0, tojson(explain));
+                for (const ixscan of ixscans) {
+                    assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
                 }
-                assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
+            } else {
+                let ixscans = getAggPlanStages(explain, "IXSCAN");
+                // If ixscan is not present in any winning plan, check rejected plans on each shard.
+                if (ixscans.length === 0) {
+                    const cursorStages = getAggPlanStages(explain, "$cursor");
+                    assert.gt(cursorStages.length, 0, tojson(explain));
+                    for (const cursorStage of cursorStages) {
+                        for (const rejectedPlan of getRejectedPlans(cursorStage["$cursor"])) {
+                            ixscans = ixscans.concat(getPlanStages(getRejectedPlan(rejectedPlan), "IXSCAN"));
+                        }
+                    }
+                }
+                assert.gt(ixscans.length, 0, tojson(explain));
+                for (const ixscan of ixscans) {
+                    assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
+                }
             }
             assert.commandWorked(coll.dropIndex("testIndexName"));
         };
@@ -111,9 +118,11 @@ const generateTest = (useHint) => {
 
             const options = useHint ? {hint: indexSpec} : {};
             const explain = coll.explain().aggregate(pipeline, options);
-            const ixscan = getAggPlanStage(explain, stageType);
-            assert.neq(null, ixscan, tojson(explain));
-            assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
+            const ixscans = getAggPlanStages(explain, stageType);
+            assert.gt(ixscans.length, 0, tojson(explain));
+            for (const ixscan of ixscans) {
+                assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
+            }
 
             assert.commandWorked(coll.dropIndex("testIndexName"));
         };
