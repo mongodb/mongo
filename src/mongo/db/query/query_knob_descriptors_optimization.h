@@ -28,8 +28,7 @@
  */
 
 /**
- * QueryKnob<T> descriptors for the plain knobs in query_optimization_knobs.idl.
- * Each self-registers into QueryKnobDescriptorSet at static init.
+ * EXPAND table of QueryKnob<T>s mirroring the server parameters in query_optimization_knobs.idl.
  */
 
 #pragma once
@@ -37,119 +36,104 @@
 #include "mongo/db/query/query_knobs/query_knob.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 
+// clang-format off
+#define MONGO_EXPAND_QUERY_KNOBS_OPTIMIZATION(KNOB)                                      \
+    /* Multi-plan ranking */                                                              \
+    KNOB(kPlanEvaluationMaxResults,                                                       \
+         kInternalQueryPlanEvaluationMaxResultsName,                                      \
+         internalQueryPlanEvaluationMaxResults)                                           \
+    KNOB(kPlanEvaluationCollFraction,                                                     \
+         kInternalQueryPlanEvaluationCollFractionName,                                    \
+         internalQueryPlanEvaluationCollFraction)                                         \
+    KNOB(kPlanTotalEvaluationCollFraction,                                                \
+         kInternalQueryPlanTotalEvaluationCollFractionName,                               \
+         internalQueryPlanTotalEvaluationCollFraction)                                    \
+    /* Planning and enumeration */                                                        \
+    KNOB(kPlannerMaxIndexedSolutions,                                                     \
+         kInternalQueryPlannerMaxIndexedSolutionsName,                                    \
+         internalQueryPlannerMaxIndexedSolutions)                                         \
+    KNOB(kMaxScansToExplode,                                                              \
+         kInternalQueryMaxScansToExplodeName,                                             \
+         internalQueryMaxScansToExplode)                                                  \
+    KNOB(kPlannerUseMultiplannerForSingleSolutions,                                       \
+         kInternalQueryPlannerUseMultiplannerForSingleSolutionsName,                      \
+         internalQueryPlannerUseMultiplannerForSingleSolutions)                           \
+    KNOB(kMinAllPlansEnumerationSubsetLevel,                                              \
+         kInternalMinAllPlansEnumerationSubsetLevelName,                                  \
+         internalMinAllPlansEnumerationSubsetLevel)                                       \
+    KNOB(kMaxAllPlansEnumerationSubsetLevel,                                              \
+         kInternalMaxAllPlansEnumerationSubsetLevelName,                                  \
+         internalMaxAllPlansEnumerationSubsetLevel)                                       \
+    /* Join optimization */                                                               \
+    KNOB(kEnableJoinOptimization,                                                         \
+         kInternalEnableJoinOptimizationName,                                             \
+         internalEnableJoinOptimization)                                                  \
+    KNOB(kRandomJoinOrderSeed,                                                            \
+         kInternalRandomJoinOrderSeedName,                                                \
+         internalRandomJoinOrderSeed)                                                     \
+    KNOB(kMaxNodesInJoinGraph,                                                            \
+         kInternalMaxNodesInJoinGraphName,                                                \
+         internalMaxNodesInJoinGraph)                                                     \
+    KNOB(kMaxEdgesInJoinGraph,                                                            \
+         kInternalMaxEdgesInJoinGraphName,                                                \
+         internalMaxEdgesInJoinGraph)                                                     \
+    KNOB(kMaxNumberNodesConsideredForImplicitEdges,                                       \
+         kInternalMaxNumberNodesConsideredForImplicitEdgesName,                           \
+         internalMaxNumberNodesConsideredForImplicitEdges)                                \
+    KNOB(kEnableJoinEnumerationHJOrderPruning,                                            \
+         kInternalEnableJoinEnumerationHJOrderPruningName,                                \
+         internalEnableJoinEnumerationHJOrderPruning)                                     \
+    KNOB(kEnableJoinOptimizationUseIndexUniqueness,                                       \
+         kInternalEnableJoinOptimizationUseIndexUniquenessName,                           \
+         internalEnableJoinOptimizationUseIndexUniqueness)                                \
+    KNOB(kJoinPlanSamplingSize,                                                           \
+         kInternalJoinPlanSamplingSizeName,                                               \
+         internalJoinPlanSamplingSize)                                                    \
+    KNOB(kJoinEnumerateCollScanPlans,                                                     \
+         kInternalJoinEnumerateCollScanPlansName,                                         \
+         internalJoinEnumerateCollScanPlans)                                              \
+    /* Sampling / cardinality estimation */                                               \
+    KNOB(kSamplingMarginOfError,                                                          \
+         kSamplingMarginOfErrorName,                                                      \
+         samplingMarginOfError)                                                           \
+    KNOB(kNumChunksForChunkBasedSampling,                                                 \
+         kInternalQueryNumChunksForChunkBasedSamplingName,                                \
+         internalQueryNumChunksForChunkBasedSampling)                                     \
+    /* Pipeline rewrites */                                                               \
+    KNOB(kEnablePathArrayness,                                                            \
+         kInternalEnablePathArraynessName,                                                \
+         internalEnablePathArrayness)                                                     \
+    KNOB(kEnablePipelineOptimizationAdditionalTestingRules,                               \
+         kInternalEnablePipelineOptimizationAdditionalTestingRulesName,                   \
+         internalEnablePipelineOptimizationAdditionalTestingRules)                        \
+    /* cpp_class enum knobs */                                                            \
+    KNOB(kPlanRankerMode,                                                                 \
+         kInternalQueryCBRCEModeName,                                                     \
+         QueryPlanRankerMode)                                                             \
+    KNOB(kPlanRankingStrategyForAutomaticQueryPlanRankerMode,                             \
+         kAutomaticCEPlanRankingStrategyName,                                             \
+         QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode)                         \
+    KNOB(kSamplingConfidenceInterval,                                                     \
+         kSamplingConfidenceIntervalName,                                                 \
+         SamplingConfidenceInterval)                                                      \
+    KNOB(kSamplingCEMethod,                                                               \
+         kInternalQuerySamplingCEMethodName,                                              \
+         CBRSamplingCEMethod)                                                             \
+    KNOB(kJoinReorderMode,                                                                \
+         kInternalJoinReorderModeName,                                                    \
+         JoinReorderMode)                                                                 \
+    KNOB(kJoinPlanTreeShape,                                                              \
+         kInternalJoinPlanTreeShapeName,                                                  \
+         JoinPlanTreeShape)                                                               \
+    KNOB(kJoinMethod,                                                                     \
+         kInternalJoinMethodName,                                                         \
+         ForcedJoinMethod)                                                                \
+    KNOB(kJoinSamplingCEMethod,                                                           \
+         kInternalJoinOptimizationSamplingCEMethodName,                                   \
+         JoinSamplingCEMethod)                                                            \
+    /* End MONGO_EXPAND_QUERY_KNOBS_OPTIMIZATION */
+// clang-format on
+
 namespace mongo::query_knobs {
-
-// Multi-plan ranking ─────────────────────────────────────────────────────────
-
-inline QueryKnob<int> kPlanEvaluationMaxResults{
-    kInternalQueryPlanEvaluationMaxResultsName,
-    &readGlobalValue<internalQueryPlanEvaluationMaxResults>};
-
-inline QueryKnob<double> kPlanEvaluationCollFraction{
-    kInternalQueryPlanEvaluationCollFractionName,
-    &readGlobalValue<internalQueryPlanEvaluationCollFraction>};
-
-inline QueryKnob<double> kPlanTotalEvaluationCollFraction{
-    kInternalQueryPlanTotalEvaluationCollFractionName,
-    &readGlobalValue<internalQueryPlanTotalEvaluationCollFraction>};
-
-// Planning and enumeration ───────────────────────────────────────────────────
-
-inline QueryKnob<int> kPlannerMaxIndexedSolutions{
-    kInternalQueryPlannerMaxIndexedSolutionsName,
-    &readGlobalValue<internalQueryPlannerMaxIndexedSolutions>};
-
-inline QueryKnob<int> kMaxScansToExplode{kInternalQueryMaxScansToExplodeName,
-                                         &readGlobalValue<internalQueryMaxScansToExplode>};
-
-inline QueryKnob<bool> kPlannerUseMultiplannerForSingleSolutions{
-    kInternalQueryPlannerUseMultiplannerForSingleSolutionsName,
-    &readGlobalValue<internalQueryPlannerUseMultiplannerForSingleSolutions>};
-
-inline QueryKnob<int> kMinAllPlansEnumerationSubsetLevel{
-    kInternalMinAllPlansEnumerationSubsetLevelName,
-    &readGlobalValue<internalMinAllPlansEnumerationSubsetLevel>};
-
-inline QueryKnob<int> kMaxAllPlansEnumerationSubsetLevel{
-    kInternalMaxAllPlansEnumerationSubsetLevelName,
-    &readGlobalValue<internalMaxAllPlansEnumerationSubsetLevel>};
-
-// Join optimization ──────────────────────────────────────────────────────────
-
-inline QueryKnob<bool> kEnableJoinOptimization{kInternalEnableJoinOptimizationName,
-                                               &readGlobalValue<internalEnableJoinOptimization>};
-
-inline QueryKnob<int> kRandomJoinOrderSeed{kInternalRandomJoinOrderSeedName,
-                                           &readGlobalValue<internalRandomJoinOrderSeed>};
-
-inline QueryKnob<int> kMaxNodesInJoinGraph{kInternalMaxNodesInJoinGraphName,
-                                           &readGlobalValue<internalMaxNodesInJoinGraph>};
-
-inline QueryKnob<int> kMaxEdgesInJoinGraph{kInternalMaxEdgesInJoinGraphName,
-                                           &readGlobalValue<internalMaxEdgesInJoinGraph>};
-
-inline QueryKnob<int> kMaxNumberNodesConsideredForImplicitEdges{
-    kInternalMaxNumberNodesConsideredForImplicitEdgesName,
-    &readGlobalValue<internalMaxNumberNodesConsideredForImplicitEdges>};
-
-inline QueryKnob<bool> kEnableJoinEnumerationHJOrderPruning{
-    kInternalEnableJoinEnumerationHJOrderPruningName,
-    &readGlobalValue<internalEnableJoinEnumerationHJOrderPruning>};
-
-inline QueryKnob<bool> kEnableJoinOptimizationUseIndexUniqueness{
-    kInternalEnableJoinOptimizationUseIndexUniquenessName,
-    &readGlobalValue<internalEnableJoinOptimizationUseIndexUniqueness>};
-
-inline QueryKnob<int> kJoinPlanSamplingSize{kInternalJoinPlanSamplingSizeName,
-                                            &readGlobalValue<internalJoinPlanSamplingSize>};
-
-inline QueryKnob<bool> kJoinEnumerateCollScanPlans{
-    kInternalJoinEnumerateCollScanPlansName, &readGlobalValue<internalJoinEnumerateCollScanPlans>};
-
-// Sampling / cardinality estimation ──────────────────────────────────────────
-
-inline QueryKnob<double> kSamplingMarginOfError{kSamplingMarginOfErrorName,
-                                                &readGlobalValue<samplingMarginOfError>};
-
-inline QueryKnob<int> kNumChunksForChunkBasedSampling{
-    kInternalQueryNumChunksForChunkBasedSamplingName,
-    &readGlobalValue<internalQueryNumChunksForChunkBasedSampling>};
-
-// Pipeline rewrites ──────────────────────────────────────────────────────────
-
-inline QueryKnob<bool> kEnablePathArrayness{kInternalEnablePathArraynessName,
-                                            &readGlobalValue<internalEnablePathArrayness>};
-
-inline QueryKnob<bool> kEnablePipelineOptimizationAdditionalTestingRules{
-    kInternalEnablePipelineOptimizationAdditionalTestingRulesName,
-    &readGlobalValue<internalEnablePipelineOptimizationAdditionalTestingRules>};
-
-// cpp_class enum knobs ───────────────────────────────────────────────────────
-
-inline QueryKnob<QueryPlanRankerModeEnum> kPlanRankerMode{kInternalQueryCBRCEModeName,
-                                                          &readGlobalValue<QueryPlanRankerMode>};
-
-inline QueryKnob<QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum>
-    kPlanRankingStrategyForAutomaticQueryPlanRankerMode{
-        kAutomaticCEPlanRankingStrategyName,
-        &readGlobalValue<QueryPlanRankingStrategyForAutomaticQueryPlanRankerMode>};
-
-inline QueryKnob<SamplingConfidenceIntervalEnum> kSamplingConfidenceInterval{
-    kSamplingConfidenceIntervalName, &readGlobalValue<SamplingConfidenceInterval>};
-
-inline QueryKnob<SamplingCEMethodEnum> kSamplingCEMethod{kInternalQuerySamplingCEMethodName,
-                                                         &readGlobalValue<CBRSamplingCEMethod>};
-
-inline QueryKnob<JoinReorderModeEnum> kJoinReorderMode{kInternalJoinReorderModeName,
-                                                       &readGlobalValue<JoinReorderMode>};
-
-inline QueryKnob<JoinPlanTreeShapeEnum> kJoinPlanTreeShape{kInternalJoinPlanTreeShapeName,
-                                                           &readGlobalValue<JoinPlanTreeShape>};
-
-inline QueryKnob<ForcedJoinMethodEnum> kJoinMethod{kInternalJoinMethodName,
-                                                   &readGlobalValue<ForcedJoinMethod>};
-
-inline QueryKnob<SamplingCEMethodEnum> kJoinSamplingCEMethod{
-    kInternalJoinOptimizationSamplingCEMethodName, &readGlobalValue<JoinSamplingCEMethod>};
-
+DECLARE_QUERY_KNOBS(QueryOptimizationKnobs, MONGO_EXPAND_QUERY_KNOBS_OPTIMIZATION)
 }  // namespace mongo::query_knobs

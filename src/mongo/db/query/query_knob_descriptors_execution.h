@@ -28,8 +28,7 @@
  */
 
 /**
- * QueryKnob<T> descriptors for the plain knobs in query_execution_knobs.idl.
- * Each self-registers into QueryKnobDescriptorSet at static init.
+ * EXPAND table of QueryKnob<T>s mirroring the server parameters in query_execution_knobs.idl.
  */
 
 #pragma once
@@ -37,36 +36,35 @@
 #include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 
+// clang-format off
+#define MONGO_EXPAND_QUERY_KNOBS_EXECUTION(KNOB)                                          \
+    KNOB(kSbeDisableGroupPushdown,                                                        \
+         kInternalQuerySlotBasedExecutionDisableGroupPushdownName,                        \
+         internalQuerySlotBasedExecutionDisableGroupPushdown)                             \
+    KNOB(kSbeDisableLookupPushdown,                                                       \
+         kInternalQuerySlotBasedExecutionDisableLookupPushdownName,                       \
+         internalQuerySlotBasedExecutionDisableLookupPushdown)                            \
+    KNOB(kSbeDisableTimeSeriesPushdown,                                                   \
+         kInternalQuerySlotBasedExecutionDisableTimeSeriesPushdownName,                   \
+         internalQuerySlotBasedExecutionDisableTimeSeriesPushdown)                        \
+    KNOB(kMeasureQueryExecutionTimeInNanoseconds,                                         \
+         kInternalMeasureQueryExecutionTimeInNanosecondsName,                             \
+         internalMeasureQueryExecutionTimeInNanoseconds)                                  \
+    KNOB(kSpillingMinAvailableDiskSpaceBytes,                                             \
+         kInternalQuerySpillingMinAvailableDiskSpaceBytesName,                            \
+         internalQuerySpillingMinAvailableDiskSpaceBytes)                                 \
+    KNOB(kMaxGroupAccumulatorsInSbe,                                                      \
+         kInternalMaxGroupAccumulatorsInSbeName,                                          \
+         gInternalMaxGroupAccumulatorsInSbe)                                              \
+    KNOB(kQueryFrameworkControl,                                                          \
+         kInternalQueryFrameworkControlName,                                              \
+         QueryFrameworkControl)                                                           \
+    KNOB(kSbeHashAggIncreasedSpillingMode,                                                \
+         kInternalQuerySlotBasedExecutionHashAggIncreasedSpillingName,                    \
+         SbeHashAggIncreasedSpillingMode)                                                 \
+    /* End MONGO_EXPAND_QUERY_KNOBS_EXECUTION */
+// clang-format on
+
 namespace mongo::query_knobs {
-
-inline QueryKnob<bool> kSbeDisableGroupPushdown{
-    kInternalQuerySlotBasedExecutionDisableGroupPushdownName,
-    &readGlobalValue<internalQuerySlotBasedExecutionDisableGroupPushdown>};
-
-inline QueryKnob<bool> kSbeDisableLookupPushdown{
-    kInternalQuerySlotBasedExecutionDisableLookupPushdownName,
-    &readGlobalValue<internalQuerySlotBasedExecutionDisableLookupPushdown>};
-
-inline QueryKnob<bool> kSbeDisableTimeSeriesPushdown{
-    kInternalQuerySlotBasedExecutionDisableTimeSeriesPushdownName,
-    &readGlobalValue<internalQuerySlotBasedExecutionDisableTimeSeriesPushdown>};
-
-inline QueryKnob<bool> kMeasureQueryExecutionTimeInNanoseconds{
-    kInternalMeasureQueryExecutionTimeInNanosecondsName,
-    &readGlobalValue<internalMeasureQueryExecutionTimeInNanoseconds>};
-
-inline QueryKnob<long long> kSpillingMinAvailableDiskSpaceBytes{
-    kInternalQuerySpillingMinAvailableDiskSpaceBytesName,
-    &readGlobalValue<internalQuerySpillingMinAvailableDiskSpaceBytes>};
-
-inline QueryKnob<long long> kMaxGroupAccumulatorsInSbe{
-    kInternalMaxGroupAccumulatorsInSbeName, &readGlobalValue<gInternalMaxGroupAccumulatorsInSbe>};
-
-inline QueryKnob<QueryFrameworkControlEnum> kQueryFrameworkControl{
-    kInternalQueryFrameworkControlName, &readGlobalValue<QueryFrameworkControl>};
-
-inline QueryKnob<SbeHashAggIncreasedSpillingModeEnum> kSbeHashAggIncreasedSpillingMode{
-    kInternalQuerySlotBasedExecutionHashAggIncreasedSpillingName,
-    &readGlobalValue<SbeHashAggIncreasedSpillingMode>};
-
+DECLARE_QUERY_KNOBS(QueryExecutionKnobs, MONGO_EXPAND_QUERY_KNOBS_EXECUTION)
 }  // namespace mongo::query_knobs

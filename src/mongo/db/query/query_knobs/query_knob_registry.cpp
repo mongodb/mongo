@@ -203,8 +203,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(QueryKnobRegistryInit, ("EndServerParameter
     for (auto* knob : QueryKnobDescriptorSet::get().knobs()) {
         builder.addFromServerParameter(*knob, params->getIfExists(knob->paramName));
     }
-    // TODO SERVER-127247: Re-enable this check once the knob initialization is explicit.
-    // builder.detectOrphanAnnotations(*params);
+    builder.detectOrphanAnnotations(*params);
     QueryKnobRegistry::init(std::move(builder).build());
 }
 

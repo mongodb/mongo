@@ -298,6 +298,8 @@ mongo_cc_library(
         "query_execution_knobs_gen",
         "query_feature_flags_gen",
         "query_integration_knobs_gen",
+        "query_knob_descriptors_execution.cpp",
+        "query_knob_descriptors_optimization.cpp",
         "query_optimization_knobs_gen",
         "sampling_ce_method.cpp",
         "sampling_confidence_interval.cpp",
