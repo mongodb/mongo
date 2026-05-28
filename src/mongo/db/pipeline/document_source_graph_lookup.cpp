@@ -61,6 +61,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 #include <iterator>
@@ -921,10 +922,14 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
     boost::optional<long long> maxDepth;
     boost::optional<BSONObj> additionalFilter;
 
+    StringDataSet seenFields;
     VariablesParseState vps = expCtx->variablesParseState;
 
     for (auto&& argument : elem.Obj()) {
         const auto argName = argument.fieldNameStringData();
+        uassert(12735700,
+                str::stream() << "Duplicate field '" << argName << "' in $graphLookup stage",
+                seenFields.insert(argName).second);
 
         if (argName == "startWith") {
             startWith = Expression::parseOperand(expCtx.get(), argument, vps);
