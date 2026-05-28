@@ -1532,9 +1532,7 @@ TEST_F(MultiIndexBlockTest, ResumedPdibPersistsStateOnFirstDrainWithNoNewRecords
                                                      true};
 
     // Force frequent sorter spills so the first build's scan persists kCollectionScan state.
-    // TODO SERVER-127011: maxIndexBuildMemoryUsageMegabytes doesn't correctly set percentage-based
-    // bytes.
-    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
 
     static_cast<repl::ReplicationCoordinatorMock*>(
@@ -2417,8 +2415,8 @@ TEST_F(MultiIndexBlockTest, WriteStateToContainerOnSpillWhenResumable) {
     RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
                                                      true};
 
-    // Lower the per-build memory limit to 0.5 MB.
-    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    // Lower the per-build memory limit to 1 MB.
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -2438,11 +2436,12 @@ TEST_F(MultiIndexBlockTest, WriteStateToContainerOnSpillWhenResumable) {
     indexer.setContainerWriteBehavior(ContainerWriteBehavior::kReplicate);
     indexer.setIsResumable(true);
 
-    // Insert enough indexable data to exceed the 1 MB memory limit. 20 documents with 64 KB strings
-    // puts us comfortably above the limit.
+    // Insert enough indexable data to trigger multiple spills against the 1 MB limit. 60 documents
+    // with 64 KB strings (~3.84 MB total) guarantees at least 3 spills, exercising both the
+    // initial insert and the subsequent update path in _writeStateToContainer().
     WriteUnitOfWork wuow(operationContext());
     std::string val(64 * 1024, 'a');
-    for (auto i = 0; i < 20; ++i) {
+    for (auto i = 0; i < 60; ++i) {
         ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
     }
     wuow.commit();
@@ -2490,7 +2489,7 @@ TEST_F(MultiIndexBlockTest, OnSpillCallbackSeesLatestRecordIdAndKeyCount) {
     RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
                                                      true};
 
-    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -2511,7 +2510,8 @@ TEST_F(MultiIndexBlockTest, OnSpillCallbackSeesLatestRecordIdAndKeyCount) {
 
     {
         WriteUnitOfWork wuow{operationContext()};
-        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << 1)));
+        std::string val(2 * 1024 * 1024, 'a');
+        ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << 0 << "a" << val)));
         wuow.commit();
     }
 
@@ -2554,7 +2554,7 @@ TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordId) {
     RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
                                                      true};
 
-    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -2623,7 +2623,7 @@ TEST_F(MultiIndexBlockTest, OnSpillRecordsLastSpilledRecordIdForMultipleIndexes)
     RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
                                                      true};
 
-    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -2703,7 +2703,7 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
     RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
                                                      true};
 
-    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -2740,7 +2740,7 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringCollectionScan) {
                            MultiIndexBlock::InitMode::SteadyState,
                            boost::none));
 
-    // 20 documents of 64 KB exceed the 0.5 MB sorter limit and force multiple mid-scan spills.
+    // 20 documents of 64 KB exceed the 1 MB sorter limit and force multiple mid-scan spills.
     {
         WriteUnitOfWork wuow(operationContext());
         std::string val(64 * 1024, 'a');
@@ -2811,7 +2811,7 @@ TEST_F(MultiIndexBlockTest, PdibResumedScanSkipsRecordsAtOrBeforePerIndexLastSpi
     RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
                                                      true};
 
-    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -2990,7 +2990,7 @@ TEST_F(MultiIndexBlockTest, ResumeRestoresLastSpilledRecordId) {
     RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
                                                      true};
 
-    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -3083,7 +3083,7 @@ TEST_F(MultiIndexBlockTest, ResumePdibDuringLoad) {
     RAIIServerParameterControllerForTest resumeStateInterval{
         "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 5};
 
-    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -3326,8 +3326,8 @@ TEST_F(MultiIndexBlockTest, DoNotWriteStateToContainerOnSpillWhenNotResumable) {
     RAIIServerParameterControllerForTest ffResumable{"featureFlagResumablePrimaryDrivenIndexBuilds",
                                                      true};
 
-    // Lower the per-build memory limit to 0.5 MB.
-    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    // Lower the per-build memory limit to 1 MB.
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -3613,7 +3613,7 @@ TEST_F(MultiIndexBlockTest, LastSpilledRecordIdIsNotPersistedDuringLoadPhase) {
     RAIIServerParameterControllerForTest resumeStateInterval{
         "primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys", 10};
 
-    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(0.5);
+    auto prevMemLimitMB = maxIndexBuildMemoryUsageMegabytes.swap(1);
     ON_BLOCK_EXIT([prevMemLimitMB] { maxIndexBuildMemoryUsageMegabytes.store(prevMemLimitMB); });
 
     promoteMockReplCoordToPrimary(getServiceContext());
@@ -3634,7 +3634,7 @@ TEST_F(MultiIndexBlockTest, LastSpilledRecordIdIsNotPersistedDuringLoadPhase) {
     indexer.setIsResumable(true);
 
     WriteUnitOfWork wuow{operationContext()};
-    std::string val(16 * 1024, 'a');
+    std::string val(32 * 1024, 'a');
     for (auto i = 0; i < 50; ++i) {
         ASSERT_OK(Helpers::insert(operationContext(), coll.get(), BSON("_id" << i << "a" << val)));
     }

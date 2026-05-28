@@ -277,7 +277,7 @@ size_t MultiIndexBlock::getTotalIndexBuildMaxMemoryUsageBytes() {
     if (memUsageLimit < 1) {
         ProcessInfo pi;
         double memSizeMB = pi.getMemSizeMB();
-        size_t computedLimitBytes = static_cast<size_t>(memUsageLimit * memSizeMB * 1024 * 1024);
+        computedLimitBytes = static_cast<size_t>(memUsageLimit * memSizeMB * 1024 * 1024);
         if (computedLimitBytes < kMinIndexBuildMemSizeLimitBytes) {
             LOGV2_WARNING(
                 10448902,
