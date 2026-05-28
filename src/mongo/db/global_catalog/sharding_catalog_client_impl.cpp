@@ -797,27 +797,6 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getUnsplittableCollectio
     return collections;
 }
 
-std::vector<NamespaceString>
-ShardingCatalogClientImpl::getUnsplittableCollectionNamespacesForDbOutsideOfShards(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const std::vector<ShardId>& excludedShards,
-    repl::ReadConcernLevel readConcern) {
-    auto aggRequest =
-        makeUnsplittableCollectionsDataShardAggregation(opCtx, dbName, excludedShards);
-    std::vector<BSONObj> collectionEntries =
-        Grid::get(opCtx)->catalogClient()->runCatalogAggregation(
-            opCtx, aggRequest, repl::ReadConcernArgs(readConcern));
-    std::vector<NamespaceString> collectionNames;
-    collectionNames.reserve(collectionEntries.size());
-    for (const auto& coll : collectionEntries) {
-        auto nssField = coll.getField(CollectionType::kNssFieldName);
-        collectionNames.push_back(NamespaceStringUtil::deserialize(
-            boost::none, nssField.String(), SerializationContext::stateDefault()));
-    }
-    return collectionNames;
-}
-
 StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContext* opCtx,
                                                                  StringData key) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,

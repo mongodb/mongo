@@ -121,15 +121,6 @@ std::vector<NamespaceString> ShardingCatalogClientMock::getUnsplittableCollectio
     return {};
 }
 
-std::vector<NamespaceString>
-ShardingCatalogClientMock::getUnsplittableCollectionNamespacesForDbOutsideOfShards(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const std::vector<ShardId>& excludedShards,
-    repl::ReadConcernLevel readConcern) {
-    return {};
-}
-
 StatusWith<std::vector<DatabaseName>> ShardingCatalogClientMock::getDatabasesForShard(
     OperationContext* opCtx, const ShardId& shardName) {
     return {ErrorCodes::InternalError, "Method not implemented"};
