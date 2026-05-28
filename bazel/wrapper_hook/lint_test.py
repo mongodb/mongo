@@ -1,15 +1,49 @@
 """Unit tests for bazel.wrapper_hook.lint."""
 
 import contextlib
+import importlib
+import importlib.abc
 import io
 import os
 import pathlib
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
 
 from bazel.wrapper_hook import lint
+
+
+class BazelCustomFormatterImportTest(unittest.TestCase):
+    def test_import_does_not_require_click(self):
+        class BlockClickFinder(importlib.abc.MetaPathFinder):
+            def find_spec(self, fullname, path, target=None):
+                if fullname == "click" or fullname.startswith("click."):
+                    raise ModuleNotFoundError("No module named 'click'")
+                return None
+
+        module_names = [
+            "buildscripts.bazel_custom_formatter",
+            "buildscripts.simple_report",
+            "click",
+        ]
+        saved_modules = {name: sys.modules.get(name) for name in module_names}
+        for name in module_names:
+            sys.modules.pop(name, None)
+
+        finder = BlockClickFinder()
+        sys.meta_path.insert(0, finder)
+        try:
+            module = importlib.import_module("buildscripts.bazel_custom_formatter")
+            self.assertTrue(hasattr(module, "validate_tcmalloc_cc_test_coverage"))
+            self.assertNotIn("buildscripts.simple_report", sys.modules)
+        finally:
+            sys.meta_path.remove(finder)
+            for name in module_names:
+                sys.modules.pop(name, None)
+                if saved_modules[name] is not None:
+                    sys.modules[name] = saved_modules[name]
 
 
 class RefreshModuleLockfileTest(unittest.TestCase):

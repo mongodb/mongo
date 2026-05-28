@@ -51,3 +51,9 @@ cc_library(
         "@re2",
     ],
 )
+
+cc_library(
+    name = "gtest_main",
+    srcs = ["dist/googletest/src/gtest_main.cc"],
+    deps = [":gtest"],
+)

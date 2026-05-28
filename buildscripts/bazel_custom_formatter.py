@@ -11,7 +11,6 @@ from pathlib import Path
 sys.path.append(".")
 
 from buildscripts.install_bazel import install_bazel, install_buildozer
-from buildscripts.simple_report import make_report, put_report, try_combine_reports
 
 groups_sort_keys = {
     "first": 1,
@@ -23,6 +22,29 @@ groups_sort_keys = {
     "seventh": 7,
     "eighth": 8,
 }
+
+TCMALLOC_UPSTREAM_TEST_SCOPE = "@com_google_tcmalloc//tcmalloc/..."
+TCMALLOC_SHADOW_TEST_SCOPE = "//src/third_party/tcmalloc:*"
+TCMALLOC_UPSTREAM_PACKAGE_PREFIXES = {
+    "@com_google_tcmalloc//tcmalloc": "upstream_tcmalloc_",
+    "@com_google_tcmalloc//tcmalloc/internal": "upstream_tcmalloc_internal_",
+    "@com_google_tcmalloc//tcmalloc/testing": "upstream_tcmalloc_testing_",
+    "@com_google_tcmalloc//tcmalloc/selsan": "upstream_tcmalloc_selsan_",
+}
+TCMALLOC_SHADOW_EXCLUDED_LABELS = {
+    # Vendored tcmalloc/internal/BUILD references testdata shared libraries that
+    # are not present in Mongo's checked-in snapshot, so this test cannot be
+    # built or run here without adding new fixture binaries.
+    "//src/third_party/tcmalloc:upstream_tcmalloc_internal_profile_builder_test",
+}
+
+
+def _put_failure_report(test_name: str, msg: str) -> None:
+    from buildscripts.simple_report import make_report, put_report, try_combine_reports
+
+    report = make_report(test_name, msg, 1)
+    try_combine_reports(report)
+    put_report(report)
 
 
 def find_group(unittest_paths):
@@ -91,6 +113,14 @@ def find_multiple_groups(test, groups):
     return tagged_groups
 
 
+def _translate_tcmalloc_upstream_label(label: str) -> str:
+    package, name = label.split(":", 1)
+    prefix = TCMALLOC_UPSTREAM_PACKAGE_PREFIXES.get(package)
+    if prefix is None:
+        raise ValueError(f"Unexpected upstream tcmalloc test label: {label}")
+    return f"//src/third_party/tcmalloc:{prefix}{name}"
+
+
 def iter_clang_tidy_files(root: str | Path) -> list[Path]:
     """Return a list of repo-relative Paths to '.clang-tidy' files.
     - Uses os.scandir for speed
@@ -152,9 +182,7 @@ def validate_clang_tidy_configs(generate_report, fix):
         msg = f"Incorrect clang tidy config targets: {all_targets} != {tidy_targets}"
         print(msg)
         if generate_report:
-            report = make_report("//:clang_tidy_config_files", msg, 1)
-            try_combine_reports(report)
-            put_report(report)
+            _put_failure_report("//:clang_tidy_config_files", msg)
 
     if fix:
         subprocess.run(
@@ -183,7 +211,8 @@ def validate_bazel_groups(generate_report, fix):
             [
                 bazel_bin,
                 "query",
-                r'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest[,\]]", //src/...))',
+                r'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest[,\]]", //src/...))'
+                r' except kind(extract_debug, attr(tags, "[\[ ]mongo_tcmalloc_unittest[,\]]", //src/...))',
             ]
             + query_opts,
             capture_output=True,
@@ -271,9 +300,86 @@ def validate_bazel_groups(generate_report, fix):
     if failures:
         for failure in failures:
             if generate_report:
-                report = make_report(failure[0], failure[1], 1)
-                try_combine_reports(report)
-                put_report(report)
+                _put_failure_report(failure[0], failure[1])
+
+
+def validate_tcmalloc_cc_test_coverage(
+    generate_report: bool, fix: bool, bazel_bin: str | None = None
+) -> None:
+    del fix
+
+    if bazel_bin is None:
+        bazel_bin = install_bazel(".")
+    query_opts = [
+        "--implicit_deps=False",
+        "--tool_deps=False",
+        "--include_aspects=False",
+        "--bes_backend=",
+        "--bes_results_url=",
+    ]
+
+    try:
+        start = time.time()
+        sys.stdout.write("Query upstream tcmalloc cc_tests... ")
+        sys.stdout.flush()
+        query_proc = subprocess.run(
+            [
+                bazel_bin,
+                "query",
+                rf'kind("cc_test rule", {TCMALLOC_UPSTREAM_TEST_SCOPE})',
+            ]
+            + query_opts,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        expected = []
+        for upstream_label in query_proc.stdout.splitlines():
+            label = _translate_tcmalloc_upstream_label(upstream_label)
+            if label not in TCMALLOC_SHADOW_EXCLUDED_LABELS:
+                expected.append(label)
+        sys.stdout.write("{:0.2f}s\n".format(time.time() - start))
+    except subprocess.CalledProcessError as exc:
+        print("BAZEL ERROR:")
+        print(exc.stdout)
+        print(exc.stderr)
+        sys.exit(exc.returncode)
+
+    try:
+        start = time.time()
+        sys.stdout.write("Query tagged tcmalloc shadow tests... ")
+        sys.stdout.flush()
+        query_proc = subprocess.run(
+            [
+                bazel_bin,
+                "query",
+                rf'kind(extract_debug, attr(tags, "[\[ ]mongo_tcmalloc_unittest[,\]]", {TCMALLOC_SHADOW_TEST_SCOPE}))'
+                rf' union kind(extract_debug, attr(tags, "[\[ ]mongo_tcmalloc_known_failure[,\]]", {TCMALLOC_SHADOW_TEST_SCOPE}))',
+            ]
+            + query_opts,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        actual = set(query_proc.stdout.splitlines())
+        sys.stdout.write("{:0.2f}s\n".format(time.time() - start))
+    except subprocess.CalledProcessError as exc:
+        print("BAZEL ERROR:")
+        print(exc.stdout)
+        print(exc.stderr)
+        sys.exit(exc.returncode)
+
+    missing = [label for label in expected if label not in actual]
+    if not missing:
+        return
+
+    for label in missing:
+        msg = f"{label} is missing a tcmalloc shadow target."
+        print(msg)
+        if generate_report:
+            _put_failure_report(label, msg)
+
+    sys.exit(1)
 
 
 def validate_idl_naming(generate_report: bool, fix: bool) -> None:
@@ -423,9 +529,7 @@ def validate_idl_naming(generate_report: bool, fix: bool) -> None:
         for lbl, msg in failures:
             print(f"IDL naming violation: {lbl}: {msg}")
             if generate_report:
-                report = make_report(lbl, msg, 1)
-                try_combine_reports(report)
-                put_report(report)
+                _put_failure_report(lbl, msg)
 
     # print(time.time() - start)
     if fix and failures:
@@ -618,9 +722,7 @@ def validate_private_headers(generate_report: bool, fix: bool) -> None:
     # 4) CI reports
     if failures and generate_report:
         for tlabel, msg in failures:
-            report = make_report(tlabel, msg, 1)
-            try_combine_reports(report)
-            put_report(report)
+            _put_failure_report(tlabel, msg)
 
     # 5) Failing rules
     # - Always fail if any violation and not fixing (your existing behavior)
@@ -637,6 +739,7 @@ def main():
     args = parser.parse_args()
     validate_clang_tidy_configs(args.generate_report, args.fix)
     validate_bazel_groups(args.generate_report, args.fix)
+    validate_tcmalloc_cc_test_coverage(args.generate_report, args.fix)
     validate_idl_naming(args.generate_report, args.fix)
     validate_private_headers(args.generate_report, args.fix)
 

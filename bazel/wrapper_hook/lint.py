@@ -14,6 +14,8 @@ from typing import Optional
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
+from buildscripts.bazel_custom_formatter import validate_tcmalloc_cc_test_coverage
+
 LARGE_FILE_THRESHOLD = 10 * 1024 * 1024  # 10MiB
 LINT_FAILURE_DETAIL_ENV_VAR = "MONGO_BAZEL_LINT_FAILURE_FILE"
 
@@ -843,8 +845,12 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
     ):
         lint_mod(lr)
 
-    if lint_all or any(file.endswith((".bazel")) for file in files_to_lint):
+    if lint_all or any(
+        file.endswith((".bazel", ".bzl")) or os.path.basename(file) in ("BUILD", "BUILD.bazel")
+        for file in files_to_lint
+    ):
         lr.check_duplicate_lib_names()
+        validate_tcmalloc_cc_test_coverage(generate_report=False, fix=False, bazel_bin=bazel_bin)
 
     if lr.fail:
         raise LinterFail("Linter(s) failed")

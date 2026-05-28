@@ -66,7 +66,12 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
     elif ctx.attr.type == "program":
         program_bin = input_files[0]
 
-        basename = program_bin.basename[:-len(WITH_DEBUG_SUFFIX)]
+        if program_bin.basename.endswith(WITH_DEBUG_SUFFIX):
+            basename = program_bin.basename[:-len(WITH_DEBUG_SUFFIX)]
+        else:
+            # Some wrappers point at native cc_test targets that were not produced by
+            # mongo_cc_test and therefore do not carry the "_with_debug" suffix.
+            basename = program_bin.basename
         if ctx.attr.enabled:
             if debug_ext == MAC_DEBUG_FOLDER_EXTENSION:
                 debug_info = ctx.actions.declare_directory(basename + debug_ext)

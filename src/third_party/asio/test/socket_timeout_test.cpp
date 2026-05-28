@@ -101,7 +101,9 @@ TEST(AsioSocketTimeoutTest, TimeoutDefaultsToZero) {
 TEST(AsioSocketTimeoutTest, TimeoutSetAndGetAreConsistent) {
     timeoutOptionTest([](auto& socket, auto option, const char* name) {
         using Option = decltype(option);
-        const auto duration = std::chrono::milliseconds(42);
+        // Some kernels store SO_SNDTIMEO/SO_RCVTIMEO in tick units, so sub-second
+        // values can be rounded when read back with getsockopt().
+        const auto duration = std::chrono::seconds(1);
         option = Option(duration);
         asio::error_code error;
         socket.set_option(option, error);
@@ -109,7 +111,7 @@ TEST(AsioSocketTimeoutTest, TimeoutSetAndGetAreConsistent) {
         Option after;
         socket.get_option(after, error);
         ASSERT(!error) << "error: " << error.message() << ", name: " << name;
-        ASSERT_EQ(duration, after.value());
+        ASSERT_EQ(duration, after.value()) << name;
     });
 }
 

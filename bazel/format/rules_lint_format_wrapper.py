@@ -12,6 +12,7 @@ from buildscripts.bazel_custom_formatter import (
     validate_clang_tidy_configs,
     validate_idl_naming,
     validate_private_headers,
+    validate_tcmalloc_cc_test_coverage,
 )
 from buildscripts.sort_backport_multiversion import sort_backport_multiversion
 
@@ -248,6 +249,7 @@ def main() -> int:
     if files_to_format_contains_bazel_file(files_to_format):
         validate_clang_tidy_configs(generate_report=True, fix=not args.check)
         validate_bazel_groups(generate_report=True, fix=not args.check)
+        validate_tcmalloc_cc_test_coverage(generate_report=True, fix=not args.check)
         validate_idl_naming(generate_report=True, fix=not args.check)
         validate_private_headers(generate_report=True, fix=not args.check)
 

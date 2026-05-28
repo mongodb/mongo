@@ -9,6 +9,11 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 
 http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 
+mongo_tcmalloc_repository = use_repo_rule(
+    "//src/third_party/tcmalloc:repositories.bzl",
+    "mongo_tcmalloc_repository",
+)
+
 http_archive(
     name = "bazel_clang_tidy",
     integrity = "sha256-PLwbo3dS1ZgeuSiaUctGRIU/O3ScB64+U2mEsN7fgtA=",
@@ -95,6 +100,8 @@ http_file(
 )
 
 bazel_dep(name = "rules_cc", version = "0.2.10")
+bazel_dep(name = "rules_fuzzing", version = "0.6.0")
+bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "platforms", version = "0.0.11")
 single_version_override(
     module_name = "platforms",
@@ -157,6 +164,15 @@ bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googl
 local_path_override(
     module_name = "googletest",
     path = "src/third_party/googletest",
+)
+
+mongo_tcmalloc_repository(name = "com_google_tcmalloc")
+
+bazel_dep(
+    name = "google_benchmark",
+    version = "1.9.4",
+    dev_dependency = True,
+    repo_name = "com_github_google_benchmark",
 )
 
 bazel_dep(name = "grpc", version = "1.74.1", repo_name = "com_github_grpc_grpc")

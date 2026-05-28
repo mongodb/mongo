@@ -1,4 +1,5 @@
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//src/third_party/tcmalloc:upstream_tcmalloc_test_targets.bzl", "define_upstream_tcmalloc_test_targets")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -584,3 +585,5 @@ mongo_cc_library(
         "@com_google_absl//absl/strings:str_format",
     ],
 )
+
+define_upstream_tcmalloc_test_targets()

@@ -25,6 +25,7 @@ py_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//buildscripts:bazel_custom_formatter",
         "//buildscripts:setup_clang_tidy",
     ],
 )
