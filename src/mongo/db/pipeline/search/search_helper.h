@@ -57,6 +57,13 @@ using RemoteExplainVector = std::vector<BSONObj>;
 extern FailPoint searchReturnEofImmediately;
 namespace search_helpers {
 /**
+ * Asserts that a spec does not contain internal search routing fields (e.g. 'mergingPipeline')
+ * when the request comes from an external (non-internal) client. These fields are set exclusively
+ * by the router during sharded search planning and must never be accepted from user requests.
+ */
+void validateInternalSearchFieldsNotSetByUser(const OperationContext* opCtx, const BSONObj& spec);
+
+/**
  * Consult mongot to get planning information for sharded search queries.
  */
 InternalSearchMongotRemoteSpec planShardedSearch(

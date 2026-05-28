@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 
@@ -97,6 +98,8 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
             str::stream() << "$search value must be an object. Found: " << typeName(elem.type()),
             elem.type() == BSONType::Object);
     auto specObj = elem.embeddedObject();
+
+    search_helpers::validateInternalSearchFieldsNotSetByUser(expCtx->opCtx, specObj);
 
     // If kMongotQueryFieldName is present, this is the case that we re-create the DocumentSource
     // from a serialized DocumentSourceSearch that was originally parsed on a router.

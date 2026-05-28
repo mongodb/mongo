@@ -38,9 +38,11 @@
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
 #include "mongo/db/query/search/mongot_options.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -80,6 +82,51 @@ TEST_F(SearchMetaTest, TestParsingOfSearchMeta) {
         DocumentSourceSearchMeta::createFromBson(specObj.firstElement(), getExpCtx()),
         AssertionException,
         ErrorCodes::FailedToParse);
+}
+
+// Each internal routing field must be individually rejected when supplied by an external client.
+TEST_F(SearchMetaTest, ExternalClientCannotSupplyInternalSearchMetaFields) {
+    auto session = transport::MockSession::create(nullptr);
+    auto externalClient = getServiceContext()->getService()->makeClient("externalClient", session);
+    auto externalOpCtx = externalClient->makeOperationContext();
+
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        {"mongotQuery",
+         R"({$searchMeta: {mongotQuery: {index: "default", text: {query: "hello", path: "body"}}}})"},
+        {"mergingPipeline", R"({$searchMeta: {mergingPipeline: [{$merge: {into: "secret"}}]}})"},
+        {"metadataMergeProtocolVersion", R"({$searchMeta: {metadataMergeProtocolVersion: 1}})"},
+        {"requiresSearchSequenceToken", R"({$searchMeta: {requiresSearchSequenceToken: true}})"},
+        {"requiresSearchMetaCursor", R"({$searchMeta: {requiresSearchMetaCursor: true}})"},
+        {"limit", R"({$searchMeta: {limit: 100}})"},
+        {"sortSpec", R"({$searchMeta: {sortSpec: {field: 1}}})"},
+        {"mongotDocsRequested", R"({$searchMeta: {mongotDocsRequested: 50}})"},
+    };
+
+    auto expCtx = make_intrusive<ExpressionContextForTest>(externalOpCtx.get(), getExpCtx()->ns);
+
+    for (const auto& fieldCase : cases) {
+        const auto specBson = fromjson(fieldCase.second);
+        ASSERT_THROWS_CODE(
+            DocumentSourceSearchMeta::createFromBson(specBson.firstElement(), expCtx),
+            AssertionException,
+            5491300);
+    }
+}
+
+// Internal clients (no transport session) must still be able to supply internal routing fields.
+TEST_F(SearchMetaTest, InternalClientCanSupplyInternalSearchMetaFields) {
+    auto expCtx = getExpCtx();
+
+    const auto internalSpec = fromjson(R"({
+        $searchMeta: {
+            mongotQuery: {index: "default", text: {query: "hello", path: "body"}},
+            metadataMergeProtocolVersion: 1,
+            mergingPipeline: []
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceSearchMeta::createFromBson(internalSpec.firstElement(), expCtx));
 }
 
 }  // namespace

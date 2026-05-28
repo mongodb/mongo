@@ -581,6 +581,7 @@ mongo_cc_unit_test(
         "//src/mongo/executor:thread_pool_task_executor_test_fixture",
         "//src/mongo/s:sharding_mongos_test_fixture",
         "//src/mongo/s/query:router_exec_stage",
+        "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/unittest",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util:version_impl",

@@ -33,6 +33,7 @@
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -46,6 +47,7 @@
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/plan_sharded_search_gen.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
@@ -187,7 +189,29 @@ parseMongotResponseCursors(std::vector<executor::TaskExecutorCursor> cursors) {
     }
     return result;
 }
+
+static const std::vector<StringData>& getInternalOnlyFieldNames() {
+    static const std::vector<StringData> fields = {
+        InternalSearchMongotRemoteSpec::kMongotQueryFieldName,
+        InternalSearchMongotRemoteSpec::kMetadataMergeProtocolVersionFieldName,
+        InternalSearchMongotRemoteSpec::kMergingPipelineFieldName,
+        InternalSearchMongotRemoteSpec::kLimitFieldName,
+        InternalSearchMongotRemoteSpec::kRequiresSearchSequenceTokenFieldName,
+        InternalSearchMongotRemoteSpec::kSortSpecFieldName,
+        InternalSearchMongotRemoteSpec::kMongotDocsRequestedFieldName,
+        InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
+    };
+    return fields;
+}
 }  // namespace
+
+void validateInternalSearchFieldsNotSetByUser(const OperationContext* opCtx, const BSONObj& spec) {
+    for (const auto& name : getInternalOnlyFieldNames()) {
+        if (spec.hasField(name)) {
+            assertAllowedInternalIfRequired(opCtx, name, AllowedWithClientType::kInternal);
+        }
+    }
+}
 
 InternalSearchMongotRemoteSpec planShardedSearch(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& searchRequest) {

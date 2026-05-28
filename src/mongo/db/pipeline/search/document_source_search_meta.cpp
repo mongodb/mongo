@@ -136,6 +136,8 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBso
 
     auto specObj = elem.embeddedObject();
 
+    search_helpers::validateInternalSearchFieldsNotSetByUser(expCtx->opCtx, specObj);
+
     // Note that the $searchMeta stage has two parsing options: one for the user visible stage and
     // the second (longer) form which is serialized from mongos to the shards and includes more
     // information such as merging pipeline.

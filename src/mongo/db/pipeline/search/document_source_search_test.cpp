@@ -33,10 +33,12 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/query/search/mongot_options.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -97,6 +99,53 @@ TEST_F(SearchTest, ShouldFailToParseIfSpecIsNotObject) {
     ASSERT_THROWS_CODE(DocumentSourceSearch::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::FailedToParse);
+}
+
+// Each internal routing field must be individually rejected when supplied by an external client.
+TEST_F(SearchTest, ExternalClientCannotSupplyInternalSearchFields) {
+    auto session = transport::MockSession::create(nullptr);
+    auto externalClient = getServiceContext()->getService()->makeClient("externalClient", session);
+    auto externalOpCtx = externalClient->makeOperationContext();
+
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        {"mongotQuery",
+         R"({$search: {mongotQuery: {index: "default", text: {query: "hello", path: "body"}}}})"},
+        {"mergingPipeline",
+         R"({$search: {mergingPipeline: [{$lookup: {from: "secret", as: "leak", pipeline: []}}]}})"},
+        {"metadataMergeProtocolVersion", R"({$search: {metadataMergeProtocolVersion: 1}})"},
+        {"requiresSearchSequenceToken", R"({$search: {requiresSearchSequenceToken: true}})"},
+        {"requiresSearchMetaCursor", R"({$search: {requiresSearchMetaCursor: true}})"},
+        {"limit", R"({$search: {limit: 100}})"},
+        {"sortSpec", R"({$search: {sortSpec: {field: 1}}})"},
+        {"mongotDocsRequested", R"({$search: {mongotDocsRequested: 50}})"},
+    };
+
+    auto expCtx = make_intrusive<ExpressionContextForTest>(externalOpCtx.get(), getExpCtx()->ns);
+
+    for (const auto& fieldCase : cases) {
+        const auto specBson = fromjson(fieldCase.second);
+        ASSERT_THROWS_CODE(DocumentSourceSearch::createFromBson(specBson.firstElement(), expCtx),
+                           AssertionException,
+                           5491300);
+    }
+}
+
+// Internal clients (no transport session) must still be able to supply internal routing fields,
+// since they are set by the router during sharded search planning.
+TEST_F(SearchTest, InternalClientCanSupplyInternalSearchFields) {
+    // The default test client has no transport session and is treated as internal.
+    auto expCtx = getExpCtx();
+
+    const auto internalSpec = fromjson(R"({
+        $search: {
+            mongotQuery: {index: "default", text: {query: "hello", path: "body"}},
+            metadataMergeProtocolVersion: 1,
+            mergingPipeline: []
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceSearch::createFromBson(internalSpec.firstElement(), expCtx));
 }
 
 }  // namespace
