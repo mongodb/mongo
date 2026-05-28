@@ -341,8 +341,10 @@ PlanStageSlots setFieldAndSortKeySlots(PlanStageSlots outputs,
  *     right
  *       ixseek lowKeySlot highKeySlot keyStringSlot snapshotIdSlot recordIdSlot [] @coll @index
  *
- * In case when the 'intervals' are not specified, 'boundsSlot' will be registered in the runtime
- * environment and returned as a third element of the tuple.
+ * In case when the 'intervals' are not specified, 'boundsSlot' will be allocated and returned as a
+ * third element of the tuple. The caller of this function is responsible to make sure that at
+ * runtime the slot contains the key to be searched, either in the runtime environment or as the
+ * output of another stage.
  */
 std::tuple<SbStage, PlanStageSlots, boost::optional<SbSlot>>
 generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
@@ -363,8 +365,7 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
             return SbSlot{
                 state.env->registerSlot(boundsTag, boundsVal, true, state.slotIdGenerator)};
         } else {
-            return SbSlot{state.env->registerSlot(
-                sbe::value::TypeTags::Nothing, 0, true, state.slotIdGenerator)};
+            return SbSlot{state.slotIdGenerator->generate()};
         }
     }();
 
@@ -417,14 +418,13 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
 /**
  * Builds a generic multi-interval index scan for the cases when index bounds cannot be represented
  * as valid low/high keys. A 'GenericIndexScanStage' plan will be generated, and it will use either
- * a constant IndexBounds* or a parameterized IndexBounds* from a runtime environment slot.
- * The parameterized IndexBounds* obtained from environment slot can be rebound to a new value upon
- * plan cache recovery.
+ * a constant IndexBounds* or a parameterized IndexBounds* from a runtime slot.
+ * The caller of this function is responsible to make sure that at runtime this slot contains a
+ * valid IndexBounds, either in the runtime environment (that can be can be rebound to a new value
+ * upon plan cache recovery) or as the output of another stage.
  *
  * Returns a tuple composed of: (1) a 'GenericIndexScanStage' plan stage; (2) a set of output slots;
- * and (3) boost::none or a runtime environment slot id for index bounds. In case when the 'bounds'
- * are not specified, 'indexBounds' will be registered in the runtime environment and returned in
- * the third element of the tuple.
+ * and (3) boost::none or a slot id for the above described index bounds.
  */
 std::tuple<SbStage, PlanStageSlots, boost::optional<SbSlot>> generateGenericMultiIntervalIndexScan(
     StageBuilderState& state,
@@ -444,8 +444,7 @@ std::tuple<SbStage, PlanStageSlots, boost::optional<SbSlot>> generateGenericMult
     SbExpr boundsExpr;
 
     if (hasDynamicIndexBounds) {
-        boundsSlot = SbSlot{state.env->registerSlot(
-            sbe::value::TypeTags::Nothing, 0, true /* owned */, state.slotIdGenerator)};
+        boundsSlot = SbSlot{state.slotIdGenerator->generate()};
         boundsExpr = boundsSlot;
     } else {
         // 'b.makeConstant()' will take the ownership of the 'IndexBounds' pointer.
@@ -613,18 +612,15 @@ generateSingleIntervalIndexScanAndSlotsImpl(StageBuilderState& state,
                                             bool isPointInterval) {
     SbBuilder b(state, nodeId);
 
-    auto slotIdGenerator = state.slotIdGenerator;
     tassert(6584701,
             "Either both lowKey and highKey are specified or none of them are",
             (lowKey && highKey) || (!lowKey && !highKey));
     const bool shouldRegisterLowHighKeyInRuntimeEnv = !lowKey;
 
-    auto lowKeySlot = !lowKey ? boost::make_optional(SbSlot{state.env->registerSlot(
-                                    sbe::value::TypeTags::Nothing, 0, true, slotIdGenerator)})
-                              : boost::none;
-    auto highKeySlot = !highKey ? boost::make_optional(SbSlot{state.env->registerSlot(
-                                      sbe::value::TypeTags::Nothing, 0, true, slotIdGenerator)})
-                                : boost::none;
+    auto lowKeySlot =
+        !lowKey ? boost::make_optional(SbSlot{state.slotIdGenerator->generate()}) : boost::none;
+    auto highKeySlot =
+        !highKey ? boost::make_optional(SbSlot{state.slotIdGenerator->generate()}) : boost::none;
 
     auto lowKeyExpr = !lowKey
         ? SbExpr{*lowKeySlot}
@@ -645,11 +641,10 @@ generateSingleIntervalIndexScanAndSlotsImpl(StageBuilderState& state,
                                                                 nodeId,
                                                                 forward);
 
-    // If low and high keys are provided in the runtime environment, then we need to create
-    // a cfilter stage on top of project in order to be sure that the single interval
-    // exists (the interval may be empty), in which case the index scan plan should simply
-    // return EOF. This does not apply when the interval is a point interval, since the interval
-    // should always exist in that case.
+    // If low and high keys are provided at runtime, then we need to create a cfilter stage on top
+    // of project in order to be sure that the single interval exists (the interval may be empty),
+    // in which case the index scan plan should simply return EOF. This does not apply when the
+    // interval is a point interval, since the interval should always exist in that case.
     if (shouldRegisterLowHighKeyInRuntimeEnv && !isPointInterval) {
         stage = b.makeConstFilter(
             std::move(stage),
@@ -1064,9 +1059,7 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
                 reqs,
                 ixn->nodeId(),
                 intervalsRequired == IntervalsRequired::EqualityInterval /* isPointInterval */);
-        tassert(6484702,
-                "lowKey and highKey runtime environment slots must be present",
-                indexScanBoundsSlots);
+        tassert(6484702, "lowKey and highKey runtime slots must be present", indexScanBoundsSlots);
         parameterizedScanSlots = {ParameterizedIndexScanSlots::SingleIntervalPlan{
             indexScanBoundsSlots->first.getId(), indexScanBoundsSlots->second.getId()}};
     } else {
@@ -1099,8 +1092,7 @@ std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBoundsImpl(
 
         // Generate a branch stage that will either execute an optimized or a generic index scan
         // based on the condition in the slot 'isGenericScanSlot'.
-        auto isGenericScanSlot = SbSlot{state.env->registerSlot(
-            sbe::value::TypeTags::Nothing, 0, true /* owned */, state.slotIdGenerator)};
+        auto isGenericScanSlot = SbSlot{state.slotIdGenerator->generate()};
 
         std::vector<std::pair<SbStage, PlanStageSlots>> stagesAndSlots;
         stagesAndSlots.emplace_back(std::move(genericStage), std::move(genericOutputs));

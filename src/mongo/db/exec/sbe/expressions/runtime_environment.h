@@ -99,6 +99,12 @@ public:
     };
 
     /**
+     * Register the given SlotId 'slotId' as an unnamed slot. The value 'val' is then stored within
+     * the SlotAccessor.
+     */
+    void registerSlot(value::TypeTags tag, value::Value val, bool owned, value::SlotId slotId);
+
+    /**
      * Registers and returns a SlotId for the given slot 'name'. The 'slotIdGenerator' is used
      * to generate a new SlotId for the given slot 'name', which is then registered with this
      * environment by creating a new SlotAccessor. The value 'val' is then stored within the

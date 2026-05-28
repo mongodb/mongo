@@ -954,13 +954,15 @@ buildIndexSeekStage(StageBuilderState& state,
         std::move(scanNljStage), scanNljValueSlot, scanNljRecordIdSlot, std::move(topLevelFields)};
 }
 
-std::tuple<SbStage, SbSlot, SbSlot> buildIndexJoinLookupForeignSideStage(
+SbStage buildIndexJoinLookupForeignSideStage(
     StageBuilderState& state,
     SbSlot localKeysSetSlot,
     const FieldPath& localFieldName,
     const FieldPath& foreignFieldName,
+    SbStage indexStage,
+    const PlanStageSlots& indexSlots,
     const CollectionPtr& foreignColl,
-    const IndexEntry& index,
+    const IndexBoundsEvaluationInfo& indexBoundsEvaluationInfo,
     const PlanNodeId nodeId) {
     SbBuilder b(state, nodeId);
 
@@ -968,20 +970,132 @@ std::tuple<SbStage, SbSlot, SbSlot> buildIndexJoinLookupForeignSideStage(
     auto [localKeysIndexSetSlot, localKeysSetStage] =
         buildKeySetForIndexScan(state, b.makeLimitOneCoScanTree(), localKeysSetSlot, nodeId);
 
-    // Unwind local keys one by one into 'valueForIndexBounds'.
-    auto [valueGeneratorStage, valueForIndexBounds, _] = b.makeUnwind(
+    // Unwind local keys one by one into 'valueForIndexBound'.
+    auto [valueGeneratorStage, valueForIndexBound, _] = b.makeUnwind(
         std::move(localKeysSetStage), localKeysIndexSetSlot, true /*preserveNullAndEmptyArrays*/);
 
-    auto [stage, valueSlot, _1, foreignFieldTopLevelSlots] =
-        buildIndexSeekStage(state,
-                            std::move(valueGeneratorStage),
-                            {valueForIndexBounds},
-                            {foreignFieldName},
-                            foreignColl,
-                            index,
-                            nodeId);
+    auto& index = indexBoundsEvaluationInfo.index;
+    // For hashed indexes, we need to hash the value before computing keystrings iff the
+    // lookup's "foreignField" is the hashed field in this index.
+    if (index.type == INDEX_HASHED) {
+        BSONObjIterator it(index.keyPattern);
+        while (it.more()) {
+            BSONElement elt = it.next();
+            if (elt.valueStringDataSafe() == IndexNames::HASHED &&
+                elt.fieldNameStringData() == foreignFieldName.fullPath()) {
+                // For collated hashed indexes, apply collation before hashing.
+                auto [outStage, outSlots] = b.makeProject(
+                    std::move(valueGeneratorStage),
+                    b.makeFunction(sbe::EFn::kShardHash,
+                                   state.getCollatorSlot()
+                                       ? b.makeFunction(sbe::EFn::kCollComparisonKey,
+                                                        valueForIndexBound,
+                                                        SbSlot{*state.getCollatorSlot()})
+                                       : valueForIndexBound));
+                valueGeneratorStage = std::move(outStage);
+                valueForIndexBound = outSlots[0];
+                break;
+            }
+        }
+    }
 
-    return {std::move(stage), std::move(valueSlot), std::move(foreignFieldTopLevelSlots[0].second)};
+    std::vector<std::string> indexFieldNames;
+    BSONObjIterator it(index.keyPattern);
+    while (it.more()) {
+        BSONElement elt = it.next();
+        indexFieldNames.emplace_back(elt.fieldNameStringData());
+    }
+
+    // Calculate the low key and high key of each individual local field value. They are stored in
+    // 'lowKeySlot' and 'highKeySlot', respectively. These two slots will be made available in
+    // the loop join stage to perform index seek.
+    // TODO: SERVER-114883 support more complex index boundaries by supporting GenericPlan
+    // rather than just a SingleIntervalPlan in indexBoundsEvaluationInfo.
+    auto makeNewKeyStringCall = [&](key_string::Discriminator discriminator) {
+        SbExpr::Vector args = SbExpr::makeSeq(
+            b.makeInt64Constant(static_cast<int64_t>(indexBoundsEvaluationInfo.keyStringVersion)),
+            b.makeInt32Constant(indexBoundsEvaluationInfo.ordering.getBits()));
+        for (size_t i = 0; i < indexBoundsEvaluationInfo.iets.size(); i++) {
+            const auto evalNodePtr =
+                indexBoundsEvaluationInfo.iets[i].cast<interval_evaluation_tree::EvalNode>();
+            const auto constNodePtr =
+                indexBoundsEvaluationInfo.iets[i].cast<interval_evaluation_tree::ConstNode>();
+            if (evalNodePtr && indexFieldNames[i] == foreignFieldName.fullPath()) {
+                args.push_back(valueForIndexBound);
+            } else if (constNodePtr) {
+                tassert(12173004,
+                        "Only single intervals are supported",
+                        constNodePtr->oil.intervals.size() == 1);
+                if (constNodePtr->oil.isPoint()) {
+                    auto [tag, val] =
+                        sbe::bson::convertToOwned(constNodePtr->oil.intervals[0].start)
+                            .releaseToRaw();
+                    args.push_back(b.makeConstant(tag, val));
+                } else {
+                    // Use proper lower/upper boundaries keeping into account the index order.
+                    bool lowerBound = discriminator == key_string::Discriminator::kExclusiveBefore
+                        ? indexBoundsEvaluationInfo.ordering.get(i) > 0
+                        : indexBoundsEvaluationInfo.ordering.get(i) < 0;
+                    auto [tag, val] =
+                        sbe::bson::convertToOwned(lowerBound ? constNodePtr->oil.intervals[0].start
+                                                             : constNodePtr->oil.intervals[0].end)
+                            .releaseToRaw();
+                    args.push_back(b.makeConstant(tag, val));
+                }
+            } else {
+                MONGO_UNREACHABLE_TASSERT(12173003);
+            }
+        }
+        args.push_back(b.makeInt64Constant(static_cast<int64_t>(discriminator)));
+
+        sbe::EFn functionName = sbe::EFn::kKs;
+        if (state.getCollatorSlot()) {
+            functionName = sbe::EFn::kCollKs;
+            args.emplace_back(SbSlot{*state.getCollatorSlot()});
+        }
+
+        return b.makeFunction(functionName, std::move(args));
+    };
+
+    auto singlePlan = std::get_if<ParameterizedIndexScanSlots::SingleIntervalPlan>(
+        &indexBoundsEvaluationInfo.slots.slots);
+    tassert(12173002, "Unsupported index strategy", singlePlan);
+
+    SbSlot lowKeySlot{singlePlan->lowKey};
+    SbSlot highKeySlot{singlePlan->highKey};
+
+    auto [indexBoundKeyStage, _1] = b.makeProject(
+        std::move(valueGeneratorStage),
+        std::make_pair(makeNewKeyStringCall(key_string::Discriminator::kExclusiveBefore),
+                       lowKeySlot),
+        std::make_pair(makeNewKeyStringCall(key_string::Discriminator::kExclusiveAfter),
+                       highKeySlot));
+
+    // Loop join the low key and high key generation with the index seek stage to produce the
+    // foreign record id to seek.
+    auto ixScanNljStage =
+        b.makeLoopJoin(std::move(indexBoundKeyStage),
+                       std::move(indexStage),
+                       SbSlotVector{} /* outerProjects */,
+                       SbExpr::makeSV(lowKeySlot, highKeySlot) /* outerCorrelated */);
+
+    // It is possible for the same record to be returned multiple times when the index is multikey
+    // (contains arrays). Consider an example where local values set is '(1, 2)' and we have a
+    // document with foreign field value '[1, 2]'. The same document will be returned twice:
+    //  - On the first index seek, where we are looking for value '1'
+    //  - On the second index seek, where we are looking for value '2'
+    // To avoid such situation, we are placing 'unique' stage to prevent repeating records from
+    // appearing in the result.
+    if (index.multikey) {
+        auto foreignRecordIdSlot = indexSlots.get(PlanStageSlots::kRecordId);
+        if (foreignColl->isClustered()) {
+            ixScanNljStage = b.makeUnique(std::move(ixScanNljStage), foreignRecordIdSlot);
+        } else {
+            ixScanNljStage = b.makeUniqueRoaring(std::move(ixScanNljStage), foreignRecordIdSlot);
+        }
+    }
+
+    return ixScanNljStage;
 }  // buildIndexJoinLookupForeignSideStage
 
 /*
@@ -991,29 +1105,27 @@ std::tuple<SbStage, SbSlot, SbSlot> buildIndexJoinLookupForeignSideStage(
  * omitted.
  *
  *   filter {isMember (foreignValue, localValueSet)}
- *   nlj
+ *   nlj [lowKey, highKey]
  *   left
- *     nlj [lowKey, highKey]
- *     left
- *       project lowKey = ks (1, 0, valueForIndexBounds, 1),
- *               highKey = ks (1, 0, valueForIndexBounds, 2)
- *       unwind localKeySet localValue
- *       limit 1
- *       coscan
- *     right
- *       ixseek lowKey highKey recordId @"b_1"
- *   right
+ *     project lowKey = ks (1, 0, valueForIndexBounds, 1),
+ *             highKey = ks (1, 0, valueForIndexBounds, 2)
+ *     unwind localValueSet valueForIndexBounds
  *     limit 1
- *     seek s21 foreignDocument recordId [foreignValue = "b"] @"foreign collection"
+ *     coscan
+ *   right
+ *     fetch recordId [foreignValue = "b"] @"foreign collection"
+ *     ixseek lowKey highKey recordId @"b_1"
  */
 std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
     StageBuilderState& state,
     SbStage localStage,
     const PlanStageSlots& slots,
+    SbStage indexStage,
+    const PlanStageSlots& indexSlots,
     const FieldPath& localFieldName,
     const FieldPath& foreignFieldName,
     const CollectionPtr& foreignColl,
-    const IndexEntry& index,
+    const IndexBoundsEvaluationInfo& indexBoundsEvaluationInfo,
     const PlanNodeId nodeId,
     boost::optional<UnwindNode::UnwindSpec> unwindSpec,
     boost::optional<sbe::value::SlotId> indexSlot) {
@@ -1026,10 +1138,19 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
         buildKeySetForLocal(state, std::move(localStage), slots, localFieldName, nodeId);
 
     // Build the inner branch that produces the correlated foreign key slot.
-    auto [scanNljStage, foreignRecordSlot, foreignFieldTopLevelSlot] =
-        buildIndexJoinLookupForeignSideStage(
-            state, localKeysSetSlot, localFieldName, foreignFieldName, foreignColl, index, nodeId);
+    auto scanNljStage = buildIndexJoinLookupForeignSideStage(state,
+                                                             localKeysSetSlot,
+                                                             localFieldName,
+                                                             foreignFieldName,
+                                                             std::move(indexStage),
+                                                             indexSlots,
+                                                             foreignColl,
+                                                             indexBoundsEvaluationInfo,
+                                                             nodeId);
 
+    auto foreignRecordSlot = indexSlots.getResultObj();
+    auto foreignFieldTopLevelSlot =
+        indexSlots.get(std::make_pair(PlanStageSlots::SlotType::kField, foreignFieldName.front()));
     // 'buildForeignMatches()' filters the foreign records, returned by the index scan, to match
     // those in 'localKeysSetSlot'. This is necessary because some values are encoded with the same
     // value in BTree index, such as undefined, null and empty array. In hashed indexes, hash
@@ -1080,20 +1201,16 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
  *     build localKeySet
  * right
  *     if localKey is NOT (String or Array or Object)
- *         nlj
+ *         nlj [lowKey, highKey]
  *         left
- *             nlj [lowKey, highKey]
- *             left
- *                 project lowKey = ks (1, 0, valueForIndexBounds, 1),
- *                         highKey = ks (1, 0, valueForIndexBounds, 2)
- *                 unwind localKeySet localValue
- *                 limit 1
- *                 coscan
- *             right
- *                 ixseek lowKey highKey recordId @"b_1"
- *         right
+ *             project lowKey = ks (1, 0, valueForIndexBounds, 1),
+ *                     highKey = ks (1, 0, valueForIndexBounds, 2)
+ *             unwind localKeySet localValue
  *             limit 1
- *             seek s12 foreignDocument recordId @"foreign collection"
+ *             coscan
+ *         right
+ *             fetch recordId [foreignValue = "b"] @"foreign collection"
+ *             ixseek lowKey highKey recordId @"b_1"
  *     else
  *       scan "foreign collection"
  */
@@ -1101,12 +1218,14 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     StageBuilderState& state,
     SbStage localStage,
     const PlanStageSlots& slots,
+    SbStage indexStage,
+    const PlanStageSlots& indexSlots,
     SbStage nestedLoopFallbackStage,
     const PlanStageSlots& nestedLoopFallbackSlots,
     const FieldPath& localFieldName,
     const CollectionPtr& foreignColl,
     const FieldPath& foreignFieldName,
-    const IndexEntry& index,
+    const IndexBoundsEvaluationInfo& indexBoundsEvaluationInfo,
     const PlanNodeId nodeId,
     boost::optional<UnwindNode::UnwindSpec> unwindSpec,
     boost::optional<sbe::value::SlotId> indexSlot) {
@@ -1119,11 +1238,19 @@ std::pair<SbSlot, SbStage> buildDynamicIndexedLoopJoinLookupStage(
     auto [localKeysSetSlot, localKeysSetStage] =
         buildKeySetForLocal(state, std::move(localStage), slots, localFieldName, nodeId);
 
-    auto [indexLookupBranchStage,
-          indexLookupBranchResultSlot,
-          indexLookupBranchForeignFieldTopLevelSlot] =
-        buildIndexJoinLookupForeignSideStage(
-            state, localKeysSetSlot, localFieldName, foreignFieldName, foreignColl, index, nodeId);
+    auto indexLookupBranchStage = buildIndexJoinLookupForeignSideStage(state,
+                                                                       localKeysSetSlot,
+                                                                       localFieldName,
+                                                                       foreignFieldName,
+                                                                       std::move(indexStage),
+                                                                       indexSlots,
+                                                                       foreignColl,
+                                                                       indexBoundsEvaluationInfo,
+                                                                       nodeId);
+
+    auto indexLookupBranchResultSlot = indexSlots.getResultObj();
+    auto indexLookupBranchForeignFieldTopLevelSlot =
+        indexSlots.get(std::make_pair(PlanStageSlots::SlotType::kField, foreignFieldName.front()));
 
     // Build the typeMatch filter expression
     sbe::FrameId frameId = state.frameId();
@@ -1357,23 +1484,6 @@ std::pair<SbStage, PlanStageSlots> buildLookupResultObject(
     return {std::move(outStage), std::move(outputs)};
 }
 
-IndexEntry extractIndexEntry(const EqLookupNode* eqLookupNode) {
-    tassert(12339700,
-            "IndexEntry can be extracted only from index-based strategies",
-            eqLookupNode->lookupStrategy == EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin ||
-                eqLookupNode->lookupStrategy == EqLookupNode::LookupStrategy::kIndexedLoopJoin);
-    // TODO: SERVER-121730 use SlotBasedStageBuilder::build(eqLookupNode->children[1]) instead
-    // of extracting the IndexEntry and having stage builder replicating more or less the same
-    // logic.
-    auto indexFetch = dynamic_cast<FetchNode*>(eqLookupNode->children[1].get());
-    tassert(11801406,
-            "Second child in EqLookupNode must be an FetchNode when strategy is index-based",
-            indexFetch != nullptr);
-    auto indexScan = dynamic_cast<IndexScanNode*>(indexFetch->children[0].get());
-    tassert(11801407, "Grandchild in EqLookupNode must be an IndexProbeNode", indexScan != nullptr);
-    return indexScan->index;
-}
-
 }  // namespace
 
 /**
@@ -1418,36 +1528,73 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
                 return buildNonExistentForeignCollLookupStage(
                     std::move(localStage), eqLookupNode->nodeId(), _state);
             }
-            case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
-                return buildIndexJoinLookupStage(_state,
-                                                 std::move(localStage),
-                                                 localOutputs,
-                                                 eqLookupNode->joinFieldLocal,
-                                                 eqLookupNode->joinFieldForeign,
-                                                 foreignColl,
-                                                 extractIndexEntry(eqLookupNode),
-                                                 eqLookupNode->nodeId(),
-                                                 eqLookupNode->unwindSpec,
-                                                 indexSlotId);
-            }
-            case mongo::EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin: {
-                auto [foreignStage, foreignSlots] =
-                    build(eqLookupNode->children[2].get(),
-                          reqs.copyForChild().setResultObj().setFields(std::vector<std::string>{
-                              std::string(eqLookupNode->joinFieldForeign.front())}));
+            case EqLookupNode::LookupStrategy::kIndexedLoopJoin:
+            case EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin: {
+                auto indexFetch = dynamic_cast<FetchNode*>(eqLookupNode->children[1].get());
+                tassert(11801406,
+                        "Second child in EqLookupNode must be an FetchNode when strategy is "
+                        "index-based",
+                        indexFetch != nullptr);
+                auto indexScan = dynamic_cast<IndexScanNode*>(indexFetch->children[0].get());
+                tassert(11801407,
+                        "Grandchild in EqLookupNode must be an IndexProbeNode",
+                        indexScan != nullptr);
 
-                return buildDynamicIndexedLoopJoinLookupStage(_state,
-                                                              std::move(localStage),
-                                                              localOutputs,
-                                                              std::move(foreignStage),
-                                                              foreignSlots,
-                                                              eqLookupNode->joinFieldLocal,
-                                                              foreignColl,
-                                                              eqLookupNode->joinFieldForeign,
-                                                              extractIndexEntry(eqLookupNode),
-                                                              eqLookupNode->nodeId(),
-                                                              eqLookupNode->unwindSpec,
-                                                              indexSlotId);
+                // Keep track of the indexBoundsInfo created until now.
+                size_t numIndexBoundsInfo = _state.data->indexBoundsEvaluationInfos.size();
+                // Process the index scan requesting the top level field of the foreign field and
+                // the recordId in case we need to deduplicate matching documents.
+                auto [indexStage, indexSlots] =
+                    build(eqLookupNode->children[1].get(),
+                          reqs.copyForChild().setResultObj().set(kRecordId).setFields(
+                              std::vector<std::string>{
+                                  std::string(eqLookupNode->joinFieldForeign.front())}));
+                tassert(12173000,
+                        "Expected StageBuilder to generate one extra IndexBoundsEvaluationInfo",
+                        _state.data->indexBoundsEvaluationInfos.size() == numIndexBoundsInfo + 1);
+                IndexBoundsEvaluationInfo indexInfo =
+                    std::move(_state.data->indexBoundsEvaluationInfos.back());
+                _state.data->indexBoundsEvaluationInfos.pop_back();
+                tassert(12173001,
+                        "Expected StageBuilder to generate the IndexBoundsEvaluationInfo on the "
+                        "foreign index",
+                        indexInfo.index.identifier == indexScan->index.identifier);
+
+                if (eqLookupNode->lookupStrategy ==
+                    EqLookupNode::LookupStrategy::kIndexedLoopJoin) {
+                    return buildIndexJoinLookupStage(_state,
+                                                     std::move(localStage),
+                                                     localOutputs,
+                                                     std::move(indexStage),
+                                                     indexSlots,
+                                                     eqLookupNode->joinFieldLocal,
+                                                     eqLookupNode->joinFieldForeign,
+                                                     foreignColl,
+                                                     indexInfo,
+                                                     eqLookupNode->nodeId(),
+                                                     eqLookupNode->unwindSpec,
+                                                     indexSlotId);
+                } else {
+                    auto [fallbackStage, fallbackSlots] =
+                        build(eqLookupNode->children[2].get(),
+                              reqs.copyForChild().setResultObj().setFields(std::vector<std::string>{
+                                  std::string(eqLookupNode->joinFieldForeign.front())}));
+
+                    return buildDynamicIndexedLoopJoinLookupStage(_state,
+                                                                  std::move(localStage),
+                                                                  localOutputs,
+                                                                  std::move(indexStage),
+                                                                  indexSlots,
+                                                                  std::move(fallbackStage),
+                                                                  fallbackSlots,
+                                                                  eqLookupNode->joinFieldLocal,
+                                                                  foreignColl,
+                                                                  eqLookupNode->joinFieldForeign,
+                                                                  indexInfo,
+                                                                  eqLookupNode->nodeId(),
+                                                                  eqLookupNode->unwindSpec,
+                                                                  indexSlotId);
+                }
             }
             case EqLookupNode::LookupStrategy::kNestedLoopJoin: {
                 auto [foreignStage, foreignSlots] =

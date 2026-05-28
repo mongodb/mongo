@@ -1883,7 +1883,11 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
     if (query.cqPipeline().empty()) {
         return std::move(solution);
     }
-
+    // Sub-pipelines created over secondary collections need to reference slots via internal
+    // parameters. Use parameter indexes that are above the number of parameters that are injected
+    // externally before a query starts.
+    MatchExpression::InputParamId nextInternalParam = static_cast<MatchExpression::InputParamId>(
+        query.getInputParamIdToMatchExpressionMap().size());
     std::unique_ptr<QuerySolutionNode> solnForAgg = std::make_unique<SentinelNode>();
     const std::vector<boost::intrusive_ptr<DocumentSource>>& innerPipelineStages =
         query.cqPipeline();
@@ -1921,9 +1925,33 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             }
             if (strategy == EqLookupNode::LookupStrategy::kIndexedLoopJoin ||
                 strategy == EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin) {
-                children.emplace_back(std::make_unique<FetchNode>(
-                    std::make_unique<IndexScanNode>(lookupStage->getFromNs(), std::move(*idxEntry)),
-                    lookupStage->getFromNs()));
+                auto ixScan =
+                    std::make_unique<IndexScanNode>(lookupStage->getFromNs(), std::move(*idxEntry));
+                // If there is a risk of multiple matches for the same local document, the
+                // deduplication will occur after all the keys related to the local document will be
+                // tested; any deduplication done right after the index scan would be just wasted
+                // time, so instruct the IndexScanNode to skip them.
+                ixScan->shouldDedup = false;
+                BSONObjIterator it(ixScan->index.keyPattern);
+                // For each field in the key add an entry to the interval evaluation tree using a
+                // new input parameter (when the index field is the foreign field) or a full range
+                // otherwise.
+                while (it.more()) {
+                    BSONElement kpElt = it.next();
+                    if (lookupStage->getForeignField()->fullPath() == kpElt.fieldNameStringData()) {
+                        ixScan->iets.push_back(
+                            interval_evaluation_tree::IET::make<interval_evaluation_tree::EvalNode>(
+                                nextInternalParam++, MatchExpression::EQ));
+                    } else {
+                        OrderedIntervalList oil;
+                        IndexBoundsBuilder::allValuesForField(kpElt, &oil);
+                        ixScan->iets.push_back(
+                            interval_evaluation_tree::IET::make<
+                                interval_evaluation_tree::ConstNode>(std::move(oil)));
+                    }
+                }
+                children.emplace_back(
+                    std::make_unique<FetchNode>(std::move(ixScan), lookupStage->getFromNs()));
             }
             if (strategy == EqLookupNode::LookupStrategy::kHashJoin ||
                 strategy == EqLookupNode::LookupStrategy::kNestedLoopJoin ||
