@@ -1,7 +1,8 @@
 /**
  * Tests that $bit* match expressions ($bitsAllSet, $bitsAllClear, $bitsAnySet, $bitsAnyClear) are
  * executed using the SBE engine when in trySbeEngine or featureFlagSbeFull mode, and use the
- * classic engine otherwise (forceClassicEngine or trySbeRestricted).
+ * classic engine otherwise (forceClassicEngine or trySbeRestricted) - except on the v7.0 branch,
+ * where only featureFlagSbeFull triggers SBE for $bit* expressions.
  */
 load("jstests/libs/analyze_plan.js");  // For getEngine.
 load("jstests/libs/sbe_util.js");      // For checkSbeFullyEnabled.
@@ -14,7 +15,7 @@ coll.drop();
 
 assert.commandWorked(coll.insert({x: 7}));
 
-const expectSbe = checkSbeFullyEnabled(db);
+const expectSbe = FeatureFlagUtil.isPresentAndEnabled(conn, "SbeFull");
 
 for (const op of ["$bitsAllSet", "$bitsAllClear", "$bitsAnySet", "$bitsAnyClear"]) {
     const explain = coll.find({x: {[op]: [0, 1, 2]}}).explain();
