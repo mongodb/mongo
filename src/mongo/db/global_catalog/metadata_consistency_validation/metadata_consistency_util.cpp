@@ -444,19 +444,18 @@ boost::optional<BSONObj> validateChunksDomainCoverage(
  *    all ranges covered in the global catalog must appear in the shard catalog, and
  *    the shard catalog must not store any additional chunks
  *
- * For durable catalog validation, which is enabled only when the catalog is authoritative,
- * we compare all chunks for the collection in the shard catalog against all chunks in the
- * global catalog that are currently or were previously owned by the shard. This ensures
- * that an authoritative shard catalog does not store chunks the shard does not own.
+ * The "all shard chunks ever owned" check accepts any chunk in the shard catalog whose
+ * current owner is this shard or whose history records past ownership by this shard. For
+ * the durable catalog this guards against an authoritative shard catalog retaining chunks
+ * the shard never owned; for the in-memory catalog it tolerates chunks that the shard owned
+ * in the past in non-authoritative scenarios.
  *
- * For in-memory catalog validation, we compare all chunks currently or previously owned
- * by the shard in both the in-memory shard catalog and the global catalog, since in-memory
- * is allowed to store information about unowned chunks in non-authoritative scenarios.
- * For chunk range coverage checks in the in-memory shard catalog, we restrict comparison
- * to chunks currently owned in both catalogs because the global catalog may already contain
- * chunks newly assigned to the shard that have not yet appeared in the shard catalog, or may
- * still contain chunks that have already disappeared from the in-memory shard catalog
- * after migration but have not yet propagated to the global catalog.
+ * The chunk range coverage check is restricted to chunks currently owned by the shard in
+ * both catalogs, regardless of which catalog (durable or in-memory) is being validated.
+ * This avoids false positives during chunk operations: the global catalog may already
+ * reflect chunks newly assigned to the shard that have not yet appeared in the shard
+ * catalog, or may still hold chunks that have already left the shard catalog but whose
+ * removal has not yet propagated to the global catalog.
  */
 void validateShardCatalogEntries(const ShardCatalogCollectionTypeBase& shardCatalogCollection,
                                  const std::vector<ChunkType>& shardCatalogChunks,
@@ -465,8 +464,6 @@ void validateShardCatalogEntries(const ShardCatalogCollectionTypeBase& shardCata
                                  const ShardId& shardId,
                                  StringData sourceName,
                                  std::vector<MetadataInconsistencyItem>& inconsistencies) {
-
-    auto inMemoryValidationCheck = sourceName == kInMemoryShardCatalogSourceScope;
 
     if (shardCatalogCollection.getComparableFields() !=
         globalCatalogCollection.getComparableFields()) {
@@ -492,13 +489,11 @@ void validateShardCatalogEntries(const ShardCatalogCollectionTypeBase& shardCata
 
     // TODO (SERVER-121930): Extend the following checks to strictly validate all chunks' ranges.
 
-    // For in-memory catalog, the domain coverage should be enforced only on currently owned
-    // chunks, allowing for slight de-sync of chunks owned in the past during chunk migrations
+    // The domain coverage should be enforced only on currently owned chunks, allowing for slight
+    // de-sync of chunks owned in the past during chunk operations.
     if (auto mismatchDetail = validateChunksDomainCoverage(
-            inMemoryValidationCheck ? filterCurrentlyOwnedChunks(shardCatalogChunks, shardId)
-                                    : shardCatalogChunks,
-            inMemoryValidationCheck ? filterCurrentlyOwnedChunks(globalCatalogChunks, shardId)
-                                    : globalCatalogChunks)) {
+            filterCurrentlyOwnedChunks(shardCatalogChunks, shardId),
+            filterCurrentlyOwnedChunks(globalCatalogChunks, shardId))) {
         inconsistencies.emplace_back(makeInconsistency(
             MetadataInconsistencyTypeEnum::kInconsistentShardCatalogCollectionMetadata,
             InconsistentShardCatalogCollectionMetadataDetails{
