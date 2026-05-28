@@ -2259,6 +2259,50 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
     }
 }
 
+// Binary layout of FLE2IndexedTextEncryptedValue:
+//   fle_blob_subtype(1) + S_KeyId(16) + bson_type(1) + edge_count(4) + substr_tag_count(4) +
+//   suffix_tag_count(4) + ...
+// The count fields are at these offsets:
+static constexpr size_t kFLE2TextSubstrCountOffset = 22;  // 1 + 16 + 1 + 4
+static constexpr size_t kFLE2TextSuffixCountOffset = 26;  // 1 + 16 + 1 + 4 + 4
+
+// Helper to write a little-endian uint32 into a byte vector at a given offset.
+static void writeU32LE(std::vector<uint8_t>& buf, size_t offset, uint32_t val) {
+    buf[offset + 0] = val & 0xFF;
+    buf[offset + 1] = (val >> 8) & 0xFF;
+    buf[offset + 2] = (val >> 16) & 0xFF;
+    buf[offset + 3] = (val >> 24) & 0xFF;
+}
+
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_ViolatingTagCountHeader) {
+    auto doc = BSON("sample" << "ssssssssss");
+    EDCServerPayloadInfo payload;
+    auto& iupayload = payload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
+    payload.counts = std::vector<uint64_t>(1);
+    std::vector<PrfBlock> tags = EDCServerCollection::generateTagsForTextSearch(payload);
+
+    auto serverPayload =
+        FLE2IndexedTextEncryptedValue::fromUnencrypted(iupayload, tags, payload.counts);
+    auto validBuf = uassertStatusOK(serverPayload.serialize());
+    ASSERT_GTE(validBuf.size(), kFLE2TextSuffixCountOffset + 4);
+
+    // Case 1: simple underflow — edge_count(1) < substr(1) + suffix(0) + 1 = 2.
+    {
+        auto buf = validBuf;
+        writeU32LE(buf, kFLE2TextSubstrCountOffset, 1);
+        ASSERT_THROWS(FLE2IndexedTextEncryptedValue(buf), DBException);
+    }
+
+    // Case 2: overflow bypass — substr(UINT32_MAX) + suffix(1) + 1 wraps to 1 in uint32_t
+    // but equals 4294967297 in uint64_t, still exceeding edge_count(1).
+    {
+        auto buf = validBuf;
+        writeU32LE(buf, kFLE2TextSubstrCountOffset, std::numeric_limits<uint32_t>::max());
+        writeU32LE(buf, kFLE2TextSuffixCountOffset, 1);
+        ASSERT_THROWS(FLE2IndexedTextEncryptedValue(buf), DBException);
+    }
+}
+
 TEST_F(ServiceContextTest, FLE_EDC_DuplicateSafeContent_CompatibleType) {
 
     TestKeyVault keyVault;

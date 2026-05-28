@@ -2963,6 +2963,11 @@ FLE2IndexedTextEncryptedValue::FLE2IndexedTextEncryptedValue(ConstDataRange toPa
                         fmt::underlying(kFLE2IEVTypeText),
                         fmt::underlying(_value->type)),
             _value->type == kFLE2IEVTypeText);
+    uint64_t otherTagCount = (uint64_t)getSubstringTagCount() + (uint64_t)getSuffixTagCount() + 1;
+    uassert(12736500,
+            "FLE2IndexedTextEncryptedValue: edge_count must be at least "
+            "substr_tag_count + suffix_tag_count + 1",
+            (uint64_t)getTagCount() >= otherTagCount);
 }
 
 FLE2IndexedTextEncryptedValue FLE2IndexedTextEncryptedValue::fromUnencrypted(
@@ -3115,9 +3120,10 @@ uint32_t FLE2IndexedTextEncryptedValue::getSuffixTagCount() const {
 }
 
 uint32_t FLE2IndexedTextEncryptedValue::getPrefixTagCount() const {
-    auto otherTagCount = getSubstringTagCount() + getSuffixTagCount() + 1;
-    dassert(getTagCount() >= otherTagCount);
-    return getTagCount() - otherTagCount;
+    uint64_t otherTagCount = (uint64_t)getSubstringTagCount() + (uint64_t)getSuffixTagCount() + 1;
+    fassert(12736501, (uint64_t)getTagCount() >= otherTagCount);
+    // Safe cast: getTagCount() returns a uint32_t so otherTagCount must fit into 32 bits
+    return getTagCount() - static_cast<uint32_t>(otherTagCount);
 }
 
 ConstFLE2TagAndEncryptedMetadataBlock FLE2IndexedTextEncryptedValue::getExactStringMetadataBlock()
