@@ -441,8 +441,17 @@ public:
     void tearDown() override {
         WaitForMajorityService::get(getServiceContext()).shutDown();
 
+        // Interrupt any in-flight donor/recipient state machines started by a test so they exit
+        // their AsyncTry retry loops.
+        _primaryOnlyServiceRegistry->onStepDown();
+
+        // Drain the executor pool (and its mock network) so any pending network responses are
+        // delivered and the state machines' cleanup callbacks can complete.
         shutdownExecutorPool();
 
+        // Final shutdown of the registry: joins the per-service executors and waits for instance
+        // completion. Must run after shutdownExecutorPool() because instance cleanup may queue
+        // work on the executors above.
         _primaryOnlyServiceRegistry->onShutdown();
 
         Grid::get(operationContext())->clearForUnitTests();
