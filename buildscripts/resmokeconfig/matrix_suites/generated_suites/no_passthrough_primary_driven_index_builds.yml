@@ -52,5 +52,5 @@ selector:
     - requires_index_build_resumability
     - primary_driven_index_builds_incompatible_due_to_abort_on_step_up
   roots:
-    - jstests/noPassthrough/**/index_builds/*.js
+    - jstests/noPassthrough/**/index_builds/**/*.js
 test_kind: js_test
