@@ -479,8 +479,8 @@ structs:
             demoMode:
                 type: optionalBool
                 description: >-
-                    "When set to true, overrides reshardingMinimumOperationDurationMillis 
-                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0 
+                    "When set to true, overrides reshardingMinimumOperationDurationMillis
+                    and reshardingDelayBeforeRemainingOperationTimeQueryMillis values to 0
                     for quick demo of reshardCollection operation"
 
     SetAllowMigrationsRequest:
@@ -1154,6 +1154,27 @@ commands:
                 description: Primary shard identifier, used to determine whether the shard needs to durably persist collection metadata or not.
                 optional: false
         reply_type: OkReply
+
+    _shardsvrCommitCreateCollectionChunklessMetadata:
+        command_name: _shardsvrCommitCreateCollectionChunklessMetadata
+        cpp_name: ShardsvrCommitCreateCollectionChunklessMetadata
+        description: "Internal command to create collection chunkless metadata in the shard's catalog."
+        strict: false
+        namespace: type
+        type: namespacestring
+        api_version: ""
+
+    _shardsvrControlShardCatalogCleanupTask:
+        command_name: _shardsvrControlShardCatalogCleanupTask
+        cpp_name: ShardsvrControlShardCatalogCleanupTask
+        description: "Internal command to pause/resume cleanup task in the shard's catalog."
+        strict: true
+        namespace: ignored
+        api_version: ""
+        fields:
+            pause:
+                type: bool
+                description: "If true, pauses the cleanup task, otherwise resumes."
 
     _shardsvrCommitRenameCollectionMetadata:
         command_name: _shardsvrCommitRenameCollectionMetadata

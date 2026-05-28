@@ -816,6 +816,19 @@ const internalCommandsMap = {
             primaryShardId: "",
         },
     },
+    _shardsvrCommitCreateCollectionChunklessMetadata: {
+        testname: "_shardsvrCommitCreateCollectionChunklessMetadata",
+        command: {
+            _shardsvrCommitCreateCollectionChunklessMetadata: "test.x",
+        },
+    },
+    _shardsvrControlShardCatalogCleanupTask: {
+        testname: "_shardsvrControlShardCatalogCleanupTask",
+        command: {
+            _shardsvrControlShardCatalogCleanupTask: 1,
+            pause: true,
+        },
+    },
     _shardsvrCommitRenameCollectionMetadata: {
         testname: "_shardsvrCommitRenameCollectionMetadata",
         command: {

@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops.h"
+#include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -128,8 +129,8 @@ private:
      * Commits the new primary shard for the given database to the config server. The database
      * version is passed to the config server's command as an idempotency key.
      */
-    void commitMetadataToConfig(OperationContext* opCtx,
-                                const DatabaseVersion& preCommitDbVersion) const;
+    void commitDbMetadataToConfig(OperationContext* opCtx,
+                                  const DatabaseVersion& preCommitDbVersion) const;
 
     /**
      * Retrieves the metadata for the database after the commit to the config server.
@@ -148,10 +149,19 @@ private:
      * Commits the database metadata to the new primary shard and removes it from the old primary
      * shard.
      */
-    void commitMetadataToShards(OperationContext* opCtx,
-                                const DatabaseVersion& preCommitDbVersion,
-                                const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                const CancellationToken& token);
+    void commitDbMetadataToShards(OperationContext* opCtx,
+                                  const DatabaseVersion& preCommitDbVersion,
+                                  const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                  const CancellationToken& token);
+
+    /**
+     * Commits the collections metadata to the new primary shard, for all tracked collections from
+     * old primary, that are not registered on the new one.
+     */
+    void commitCollectionsMetadataToShards(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
 
     /**
      * Clears the database metadata in the local catalog cache. Secondary nodes clear the database

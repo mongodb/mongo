@@ -37,12 +37,15 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/shard_catalog_history_cleanup_control.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future.h"
@@ -234,6 +237,79 @@ TEST_F(ShardCatalogHistoryCleanupTest, ShardCatalogHistoryCleanupCalledOnTimesta
         numChunks++;
     }
     ASSERT_EQ(2, numChunks);  // currently owned + unowned but visible
+}
+
+TEST_F(ShardCatalogHistoryCleanupTest, ShardCatalogHistoryCleanupStopsOnPause) {
+    RAIIServerParameterControllerForTest ddlFlag{"featureFlagAuthoritativeShardsDDL", true};
+    RAIIServerParameterControllerForTest crudFlag{"featureFlagAuthoritativeShardsCRUD", true};
+
+    auto opCtx = operationContext();
+
+    auto shardingState = ShardingState::get(getServiceContext());
+    ASSERT_EQ(shardingState->shardId(), kMyShardName);
+    ASSERT(shardingState->enabled());
+
+    auto storageEngine = getServiceContext()->getStorageEngine();
+    auto oldestTimestamp = storageEngine->getOldestTimestamp();
+    auto oldTimestamp = Timestamp(3, 1);
+    storageEngine->setOldestTimestamp(oldTimestamp, false /*force*/);
+    waitForTimestampMonitorPass();
+    auto newTimestamp = Timestamp(4, 1);
+    storageEngine->setOldestTimestamp(newTimestamp, false /*force*/);
+
+    // Filling kConfigShardCatalogChunksNamespace directly through DBClient to avoid
+    // waitForMajorityConcern logic handling
+    auto collectionUUID = UUID::gen();
+    auto epoch = OID::gen();
+    auto placement = CollectionPlacement(1, 1);
+
+    auto outdatedPreviouslyOwnedChunkType =
+        ChunkType(collectionUUID,
+                  ChunkRange(BSON("_id" << MINKEY), BSON("_id" << MAXKEY)),
+                  ChunkVersion(CollectionGeneration{epoch, oldTimestamp}, placement),
+                  kAnotherShardName);
+    outdatedPreviouslyOwnedChunkType.setHistory({ChunkHistory(oldTimestamp, kAnotherShardName),
+                                                 ChunkHistory(oldestTimestamp, kMyShardName)});
+    outdatedPreviouslyOwnedChunkType.setOnCurrentShardSince(oldTimestamp);
+
+    DBDirectClient client(opCtx);
+    client.insert(NamespaceString::kConfigShardCatalogChunksNamespace,
+                  outdatedPreviouslyOwnedChunkType.toConfigBSON());
+
+    // Pausing the cleanup task
+    ShardCatalogHistoryCleanupControl::get(opCtx).pause();
+    waitForTimestampMonitorPass();
+
+    std::vector<ChunkType> chunks;
+    FindCommandRequest findRequest{NamespaceString::kConfigShardCatalogChunksNamespace};
+    auto cursor = client.find(std::move(findRequest));
+    while (cursor->more()) {
+        BSONObj obj = cursor->nextSafe().getOwned();
+        StatusWith<ChunkType> chunkRes = ChunkType::parseFromConfigBSON(obj, epoch, newTimestamp);
+        ASSERT(chunkRes.getStatus().isOK());
+        chunks.push_back(chunkRes.getValue());
+    }
+
+    // Despite the cleanup being triggered, the outdated chunk still persisted
+    ASSERT_EQ(chunks.size(), 1u);
+
+    // Resuming the cleanup task
+    ShardCatalogHistoryCleanupControl::get(opCtx).resume();
+    waitForTimestampMonitorPass();
+
+    chunks.clear();
+
+    FindCommandRequest secondFindRequest{NamespaceString::kConfigShardCatalogChunksNamespace};
+    cursor = client.find(std::move(secondFindRequest));
+    while (cursor->more()) {
+        BSONObj obj = cursor->nextSafe().getOwned();
+        StatusWith<ChunkType> chunkRes = ChunkType::parseFromConfigBSON(obj, epoch, newTimestamp);
+        ASSERT(chunkRes.getStatus().isOK());
+        chunks.push_back(chunkRes.getValue());
+    }
+
+    // After resuming the cleanup, the outdated chunk should be dropped
+    ASSERT(chunks.empty());
 }
 
 TEST_F(ShardCatalogHistoryCleanupTest, DeletesStaleCollectionEntries) {

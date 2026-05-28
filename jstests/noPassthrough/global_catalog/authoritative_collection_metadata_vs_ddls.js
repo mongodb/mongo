@@ -288,6 +288,58 @@ describe("Authoritative collection metadata vs DDLs", function () {
         });
     });
 
+    describe("movePrimary", function () {
+        function assertCollectionExistsWithoutChunksOnNode(node, ns, expectedUuid) {
+            const label = node.host;
+            const meta = getShardCatalogCollMetadata(node, ns);
+            assert.neq(null, meta);
+            assert.eq(expectedUuid.toString(), meta.uuid.toString());
+
+            const shardChunks = getShardCatalogChunks(node, expectedUuid);
+            assert.eq(0, shardChunks.length);
+        }
+
+        it("commits collection metadata on new primary for tracked collection with no chunks there", function () {
+            const db = setupDb("moveprimary_chunkless");
+            const dbName = db.getName();
+            const ns = `${dbName}.coll`;
+
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.coll.insert([{x: 1}]));
+
+            const globalMeta = getGlobalCatalogCollMetadata(ns);
+
+            st.awaitReplicationOnShards();
+            st.rs1.nodes.forEach((node) => assertShardCatalogAbsentOnNode(node, ns, globalMeta.uuid));
+
+            assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+            st.awaitReplicationOnShards();
+
+            st.rs1.nodes.forEach((node) => assertCollectionExistsWithoutChunksOnNode(node, ns, globalMeta.uuid));
+        });
+
+        it("does not commit collection metadata when new primary already owns chunks", function () {
+            const db = setupDb("moveprimary_has_chunks");
+            const dbName = db.getName();
+            const ns = `${dbName}.coll`;
+
+            assert.commandWorked(db.adminCommand({shardCollection: ns, key: {x: 1}}));
+            assert.commandWorked(db.adminCommand({split: ns, middle: {x: 0}}));
+            assert.commandWorked(
+                db.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+            );
+            assert.commandWorked(db.coll.insert([{x: -1}, {x: 1}]));
+
+            const globalMeta = getGlobalCatalogCollMetadata(ns);
+
+            assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+            st.awaitReplicationOnShards();
+
+            const shard1GlobalChunks = getGlobalCatalogChunks(globalMeta.uuid, st.shard1.shardName);
+            assert.gt(shard1GlobalChunks.length, 0);
+        });
+    });
+
     describe("collMod", function () {
         it("updates shard catalog time-series fields and chunk versions", function () {
             const db = setupDb("collmod_ts");

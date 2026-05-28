@@ -1138,6 +1138,8 @@ const allTestCases = {
         _shardsvrCommitCollModCollectionMetadata: {skip: "internal command"},
         _shardsvrCommitDropCollectionMetadata: {skip: "internal command"},
         _shardsvrCommitCreateCollectionMetadata: {skip: "internal command"},
+        _shardsvrCommitCreateCollectionChunklessMetadata: {skip: "internal command"},
+        _shardsvrControlShardCatalogCleanupTask: {skip: "internal command"},
         _shardsvrCommitRenameCollectionMetadata: {skip: "internal command"},
         _shardsvrRenameCollection: {skip: "TODO"},
         _shardsvrRenameCollectionParticipant: {skip: "TODO"},

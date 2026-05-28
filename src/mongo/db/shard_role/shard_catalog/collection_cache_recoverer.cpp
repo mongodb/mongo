@@ -39,6 +39,7 @@
 
 namespace mongo {
 namespace {
+
 CollectionMetadata recoverCollectionFromDisk(OperationContext* opCtx,
                                              repl::OpTime timestampToReadAt,
                                              const NamespaceString& nss) {

@@ -39,8 +39,10 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/server_parameters_gen.h"
+#include "mongo/db/shard_role/shard_catalog/shard_catalog_history_cleanup_control.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -158,6 +160,13 @@ StorageEngine::TimestampMonitor::TimestampListener kShardCatalogHistoryCleanupTi
     [](OperationContext* opCtx, const StorageEngine::TimestampMonitor::Timestamps& timestamp) {
         if (!gEnableBackgroundCleanupOfShardCatalog.loadRelaxed()) {
             LOGV2_DEBUG(12620105, 1, "Skipping cleanup of shard catalog");
+            return;
+        }
+
+        // In certain situations, such as on move primary migration, the cleanup should be
+        // temporarily stopped from outside.
+        auto runGuard = ShardCatalogHistoryCleanupControl::get(opCtx).tryAcquireRun();
+        if (!runGuard) {
             return;
         }
 

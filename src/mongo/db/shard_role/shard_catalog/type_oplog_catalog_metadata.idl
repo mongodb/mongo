@@ -74,6 +74,10 @@ structs:
                 type: bool
                 description: "If true, indicates the invalidation precedes a collection drop"
                 default: false
+            nonAuth:
+                type: bool
+                description: "If true, indicates the invalidation is done in the non authoritative way"
+                default: false
 
     CollectionShardingStateDeltaOplogEntry:
         description: "Oplog entry format for delta changes to apply to the overall CSS"

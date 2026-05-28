@@ -215,7 +215,8 @@ void deleteAllCollectionMetadataLocally(OperationContext* opCtx,
 void invalidateCollectionMetadataOnSecondaries(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const UUID& uuid,
-                                               bool forDroppedCollection) {
+                                               bool forDroppedCollection,
+                                               bool authoritative = true) {
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
@@ -223,6 +224,7 @@ void invalidateCollectionMetadataOnSecondaries(OperationContext* opCtx,
     oplogEntry.setUuid(uuid);
     auto entry = InvalidateCollectionMetadataOplogEntry{std::string(nss.coll())};
     entry.setForDroppedCollection(forDroppedCollection);
+    entry.setNonAuth(!authoritative);
     oplogEntry.setObject(entry.toBSON());
     oplogEntry.setOpTime(OplogSlot());
     oplogEntry.setWallClockTime(opCtx->fastClockSource().now());
@@ -446,6 +448,21 @@ void commitCollectionMetadataLocally(OperationContext* opCtx,
     // Write an oplog 'c' entry to invalidate collection metadata on secondaries.
     invalidateCollectionMetadataOnSecondaries(
         opCtx, nss, coll.getUuid(), false /* forDroppedCollection */);
+}
+
+void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss) {
+    auto coll = fetchCollection(opCtx, nss);
+
+    upsertCollectionEntryLocally(opCtx, nss, coll);
+
+    // Evict any stale UNTRACKED filtering metadata, the collection is now TRACKED, but a racing
+    // operation may have left stale state.
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+
+    // Non-authoritative until all DDL operations are made shard-authoritative.
+    scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+    invalidateCollectionMetadataOnSecondaries(
+        opCtx, nss, coll.getUuid(), false /* forDroppedCollection */, false /* authoritative */);
 }
 
 }  // namespace shard_catalog_commit

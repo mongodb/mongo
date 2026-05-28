@@ -61,12 +61,15 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
 #include "mongo/db/shard_role/shard_catalog/participant_block_gen.h"
+#include "mongo/db/shard_role/shard_catalog/shard_catalog_history_cleanup_control.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -307,23 +310,53 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
         .then(_buildPhaseHandler(
             Phase::kCommit,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                if (!_firstExecution) {
+                    AllShardsAndConfigCausalityBarrier barrier{**executor, token};
+                    performCausalityBarrier(opCtx, barrier);
+                }
+
                 tassert(10644515,
                         "Expected databaseVersion to be set on the coordinator document",
                         _doc.getDatabaseVersion());
                 const auto& preCommitDbVersion = *_doc.getDatabaseVersion();
+                const auto thisShardId = ShardingState::get(opCtx)->shardId();
+                const auto& toShardId = _doc.getToShardId();
 
-                commitMetadataToConfig(opCtx, preCommitDbVersion);
+                // We need to stop the shard catalog cleanup task to ensure
+                // that the new primary's collection metadata doesn't get
+                // cleaned up in the middle of a movePrimary operation if the new
+                // primary doesn't own any chunks.
+                if (_doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::controlShardCatalogCleanupTask(
+                        opCtx, {thisShardId, toShardId}, session, true, executor, token);
+                }
+
+                if (_doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                    commitCollectionsMetadataToShards(opCtx, executor, token);
+                }
+
+                commitDbMetadataToConfig(opCtx, preCommitDbVersion);
 
                 auto dbMetadata = getPostCommitDatabaseMetadata(opCtx);
                 assertChangedMetadataOnConfig(opCtx, dbMetadata, preCommitDbVersion);
 
                 if (_doc.getAuthoritativeMetadataAccessLevel() >=
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
-                    commitMetadataToShards(opCtx, dbMetadata.getVersion(), executor, token);
+                    commitDbMetadataToShards(opCtx, dbMetadata.getVersion(), executor, token);
                 }
 
                 notifyChangeStreamsOnMovePrimary(
                     opCtx, _dbName, ShardingState::get(opCtx)->shardId(), _doc.getToShardId());
+
+                if (_doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::controlShardCatalogCleanupTask(
+                        opCtx, {thisShardId, toShardId}, session, false, executor, token);
+                }
 
                 // Checkpoint the vector clock to ensure causality in the event of a crash or
                 // shutdown.
@@ -401,6 +434,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             performCausalityBarrier(opCtx, barrier);
 
             const auto& failedPhase = _doc.getPhase();
+            const auto thisShardId = ShardingState::get(opCtx)->shardId();
             const auto& toShardId = _doc.getToShardId();
 
             unblockReadsAndWrites(opCtx);
@@ -426,6 +460,23 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
                 } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
                     LOGV2_INFO(7392901,
                                "Failed to remove orphaned data on recipient as it has been removed",
+                               logAttrs(_dbName),
+                               "to"_attr = toShardId);
+                }
+            }
+
+            if (_doc.getAuthoritativeMetadataAccessLevel() >=
+                AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                // TODO (SERVER-127533): Investigate if the remove shards completes before the end
+                // of the command execution
+                try {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::controlShardCatalogCleanupTask(
+                        opCtx, {thisShardId, toShardId}, session, false, executor, token);
+                } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
+                    LOGV2_INFO(7392904,
+                               "Failed to resume the shard catalog cleanup task on recipient as it "
+                               "has been removed",
                                logAttrs(_dbName),
                                "to"_attr = toShardId);
                 }
@@ -643,7 +694,7 @@ void MovePrimaryCoordinator::assertClonedData(
                            clonedCollections.cbegin()));
 }
 
-void MovePrimaryCoordinator::commitMetadataToConfig(
+void MovePrimaryCoordinator::commitDbMetadataToConfig(
     OperationContext* opCtx, const DatabaseVersion& preCommitDbVersion) const {
     const auto commitCommand = [&] {
         ConfigsvrCommitMovePrimary request(_dbName, preCommitDbVersion, _doc.getToShardId());
@@ -699,7 +750,33 @@ void MovePrimaryCoordinator::assertChangedMetadataOnConfig(
             postCommitDbType.getPrimary() != ShardingState::get(opCtx)->shardId());
 }
 
-void MovePrimaryCoordinator::commitMetadataToShards(
+void MovePrimaryCoordinator::commitCollectionsMetadataToShards(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    auto const catalogClient = Grid::get(opCtx)->catalogClient();
+    const auto trackedColls =
+        catalogClient->getCollections(opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+    const auto& toShardId = _doc.getToShardId();
+
+    for (auto& coll : trackedColls) {
+        std::set<ShardId> involvedShards;
+        const auto& cm =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
+                opCtx, coll.getNss()));
+        cm.getAllShardIds(&involvedShards);
+
+        if (involvedShards.contains(toShardId)) {
+            continue;
+        }
+
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::commitCreateCollectionChunklessMetadataToShardCatalog(
+            opCtx, coll.getNss(), {toShardId}, session, executor, token);
+    }
+}
+
+void MovePrimaryCoordinator::commitDbMetadataToShards(
     OperationContext* opCtx,
     const DatabaseVersion& preCommitDbVersion,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -882,7 +959,7 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(
     if (_doc.getAuthoritativeMetadataAccessLevel() > AuthoritativeMetadataAccessLevelEnum::kNone) {
         ShardsvrParticipantBlock request(
             NamespaceString::makeCollectionlessShardsvrParticipantBlockNSS(_dbName));
-        request.setBlockType(mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
+        request.setBlockType(CriticalSectionBlockTypeEnum::kReadsAndWrites);
         request.setReason(_csReason);
         request.setClearDbInfo(false);
 

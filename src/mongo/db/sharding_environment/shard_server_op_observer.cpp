@@ -743,9 +743,13 @@ void ShardServerOpObserver::onInvalidateCollectionMetadata(OperationContext* opC
         recoverer->onOplogEntry(opCtx, op.getTimestamp(), entry);
     } else {
         const auto collectionUuid = *op.getUuid();
-        if (entry.getForDroppedCollection()) {
+        if (entry.getForDroppedCollection() && entry.getNonAuth()) {
+            scopedCsr->clearFilteringMetadataForDroppedCollection_nonAuthoritative(opCtx);
+        } else if (entry.getForDroppedCollection()) {
             scopedCsr->clearFilteringMetadataForDroppedCollection_authoritative(opCtx,
                                                                                 collectionUuid);
+        } else if (entry.getNonAuth()) {
+            scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
         } else {
             scopedCsr->clearFilteringMetadata_authoritative(opCtx, collectionUuid);
         }

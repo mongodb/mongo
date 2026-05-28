@@ -85,5 +85,10 @@ void commitCollectionMetadataLocally(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      bool isDbPrimaryShard = false);
 
+/**
+ * Persists the collection entry, without registering any empty chunks for tracked collection.
+ */
+void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss);
+
 }  // namespace shard_catalog_commit
 }  // namespace mongo
