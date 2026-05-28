@@ -314,7 +314,6 @@ protected:
     std::mutex _sslSocketLock{};
 
     AsioTransportLayer* const _tl;
-    bool _isIngressSession;
 
     /**
      * We have a distinction here. A load balancer port can accept connections that are

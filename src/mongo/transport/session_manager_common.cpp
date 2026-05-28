@@ -322,6 +322,7 @@ SessionManagerCommon::~SessionManagerCommon() = default;
 
 void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     invariant(session);
+    invariant(session->isIngress());
     IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
 
     connectionsProcessedCounter.add(1);

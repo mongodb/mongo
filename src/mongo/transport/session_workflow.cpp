@@ -419,11 +419,17 @@ class SessionWorkflow::Impl {
 public:
     class WorkItem;
 
-    Impl(SessionWorkflow* workflow, ServiceContext::UniqueClient client)
+    Impl(SessionWorkflow* workflow, ServiceContext::UniqueClient uniqueClient)
         : _workflow{workflow},
-          _serviceContext{client->getServiceContext()},
-          _sep{client->getService()->getServiceEntryPoint()},
-          _clientStrand{ClientStrand::make(std::move(client))} {}
+          _serviceContext{uniqueClient->getServiceContext()},
+          _sep{uniqueClient->getService()->getServiceEntryPoint()},
+          _clientStrand{ClientStrand::make(std::move(uniqueClient))} {
+        invariant(session()->isIngress());
+
+        // Can't assume all sessions should be treated as preauth on creation. In particular, if
+        // auth is disabled, then no session should be treated as preauth.
+        session()->setPreauthIngress(isPreAuth(client()));
+    }
 
     Client* client() const {
         return _clientStrand->getClientPointer();
@@ -534,9 +540,6 @@ private:
         // latency.
         _yieldPointReached();
         _iterationFrame->metrics.yieldedBeforeReceive();
-        ON_BLOCK_EXIT(
-            [&, old = session()->getRestrictedMode()] { session()->setRestrictedMode(old); });
-        session()->setRestrictedMode(isPreAuth(client()));
         return _receiveRequest();
     }
 
@@ -825,7 +828,12 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
         StashedRequest::get(_work->opCtx()).set(std::move(*requestForTrafficRecording));
     }
 
-    return _sep->handleRequest(_work->opCtx(), _work->in(), _work->started());
+    return _sep->handleRequest(_work->opCtx(), _work->in(), _work->started())
+        .tapAll([this](auto&&) {
+            // Handling the request may have changed whether the session is authenticated, so update
+            // it here. We can go back to "preauth" after a logout.
+            session()->setPreauthIngress(isPreAuth(client()));
+        });
 }
 
 void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {

@@ -121,12 +121,17 @@ public:
      */
     virtual void end() = 0;
 
-    void setRestrictedMode(bool mode) {
-        _restrictedMode = mode;
+    bool isIngress() const {
+        return _isIngress;
     }
 
-    bool getRestrictedMode() const {
-        return _restrictedMode;
+    bool isPreauthIngress() const {
+        return _isPreauthIngress;
+    }
+    void setPreauthIngress(bool b) {
+        invariant(_isIngress,
+                  "this should only ever be called for ingress sessions, even to set to false");
+        _isPreauthIngress = b;
     }
 
     /**
@@ -276,13 +281,13 @@ public:
     virtual const RestrictionEnvironment& getAuthEnvironment() const = 0;
 
 protected:
-    Session();
-
-    bool _restrictedMode{false};
+    explicit Session(bool isIngress);
 
 private:
     const Id _id;
+    const bool _isIngress;
     bool _inOperation{false};
+    bool _isPreauthIngress{false};  // Only ever true if _isIngress is also true.
     std::shared_ptr<SessionManagerOpCounters> _opCounters;
 };
 

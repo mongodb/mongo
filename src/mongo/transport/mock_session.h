@@ -48,10 +48,11 @@ namespace transport {
 
 class MONGO_MOD_UNFORTUNATELY_OPEN MockSessionBase : public Session {
 public:
-    MockSessionBase() = default;
+    MockSessionBase() : Session(/*ingress=*/true) {}  // Not always true but good enough for now.
 
     explicit MockSessionBase(HostAndPort remote, SockAddr remoteAddr, SockAddr localAddr)
-        : _remote(std::move(remote)),
+        : Session(/*ingress=*/true),
+          _remote(std::move(remote)),
           _remoteAddr(std::move(remoteAddr)),
           _localAddr(std::move(localAddr)),
           _local(HostAndPort(_localAddr.getAddr(), _localAddr.getPort())),

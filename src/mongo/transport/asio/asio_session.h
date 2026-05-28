@@ -75,6 +75,8 @@ protected:
     friend class AsioTransportLayer;
     friend class AsioNetworkingBaton;
 
+    AsioSession(bool isIngress) : Session(isIngress) {}
+
     /** Notifies the Session that it will be used in a synchronous way. */
     virtual void ensureSync() = 0;
 

@@ -176,7 +176,7 @@ CommonAsioSession::CommonAsioSession(
     bool isIngressSession,
     Endpoint endpoint,
     std::shared_ptr<const SSLConnectionContext> transientSSLContext)
-    : _socket(std::move(socket)), _tl(tl), _isIngressSession(isIngressSession) {
+    : AsioSession(isIngressSession), _socket(std::move(socket)), _tl(tl) {
     auto sev = kDebugBuild ? logv2::LogSeverity::Info() : logv2::LogSeverity::Debug(3);
     try {
         auto localEndpoint = getLocalEndpoint(_socket, "AsioSession get local endpoint", sev);
@@ -404,8 +404,8 @@ Future<void> CommonAsioSession::sinkMessageImpl(Message message, const BatonHand
     _asyncOpState.start();
     return write(asio::buffer(message.buf(), message.size()), baton)
         .then([this, message /*keep the buffer alive*/]() {
-            auto connectionType = _isIngressSession ? NetworkCounter::ConnectionType::kIngress
-                                                    : NetworkCounter::ConnectionType::kEgress;
+            auto connectionType = isIngress() ? NetworkCounter::ConnectionType::kIngress
+                                              : NetworkCounter::ConnectionType::kEgress;
             globalNetworkCounter().hitPhysicalOut(connectionType, message.size());
         })
         .onCompletion([this](Status status) {
@@ -580,7 +580,7 @@ auto CommonAsioSession::getSocket() -> GenericSocket& {
 }
 
 ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHandle& reactor) {
-    invariant(_isIngressSession);
+    invariant(isIngress());
     invariant(reactor);
     const Backoff kExponentialBackoff(Milliseconds(gProxyProtocolMaximumWaitBackoffMillis.load()),
                                       Milliseconds::max());
@@ -685,7 +685,7 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
         .then([headerBuffer = std::move(headerBuffer), this, baton]() mutable {
             const auto msgLen = size_t(MSGHEADER::View(headerBuffer.get()).getMessageLength());
 
-            const size_t maxMessageSize = _restrictedMode
+            const size_t maxMessageSize = isPreauthIngress()
                 ? static_cast<size_t>(gPreAuthMaximumMessageSizeBytes.loadRelaxed())
                 : MaxMessageSizeBytes;
             if (msgLen < kHeaderSize || msgLen > maxMessageSize) {
@@ -699,7 +699,7 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
                             "msgLen"_attr = msgLen,
                             "min"_attr = kHeaderSize,
                             "max"_attr = maxMessageSize);
-                if (_restrictedMode) {
+                if (isPreauthIngress()) {
                     totalMessageSizeErrorsPreAuth.increment();
                 } else {
                     totalMessageSizeErrorsPostAuth.increment();
@@ -708,8 +708,8 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
                 return Future<Message>::makeReady(Status(ErrorCodes::ProtocolError, str));
             }
 
-            auto connectionType = _isIngressSession ? NetworkCounter::ConnectionType::kIngress
-                                                    : NetworkCounter::ConnectionType::kEgress;
+            auto connectionType = isIngress() ? NetworkCounter::ConnectionType::kIngress
+                                              : NetworkCounter::ConnectionType::kEgress;
             if (msgLen == kHeaderSize) {
                 // This probably isn't a real case since all (current) messages have bodies.
                 globalNetworkCounter().hitPhysicalIn(connectionType, msgLen);

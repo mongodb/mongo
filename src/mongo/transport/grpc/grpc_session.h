@@ -86,7 +86,7 @@ namespace MONGO_MOD_PARENT_PRIVATE grpc {
  */
 class GRPCSession : public Session {
 public:
-    explicit GRPCSession(TransportLayer* tl, HostAndPort remote);
+    explicit GRPCSession(bool isIngress, TransportLayer* tl, HostAndPort remote);
 
     ~GRPCSession() override = default;
 
