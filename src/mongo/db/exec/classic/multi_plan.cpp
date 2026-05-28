@@ -160,6 +160,12 @@ auto& multiPlannerAllPlansHitMemoryLimitTotal =
  */
 auto& multiPlannerChoseWinningPlan =
     *MetricBuilder<Counter64>{"query.multiPlanner.choseWinningPlan"};
+
+/**
+ * Total number of times the winning plan errored and we switched to the backup plan.
+ */
+auto& multiPlannerSwitchedToBackupPlan =
+    *MetricBuilder<Counter64>{"query.multiPlanner.switchedToBackupPlan"};
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(sleepWhileMultiplanning);
@@ -226,6 +232,7 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
         }
 
         LOGV2_DEBUG(20588, 5, "Best plan errored, switching to backup plan");
+        multiPlannerSwitchedToBackupPlan.increment();
 
         CollectionQueryInfo::get(collectionPtr())
             .getPlanCache()

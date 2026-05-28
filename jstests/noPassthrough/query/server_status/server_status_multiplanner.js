@@ -133,4 +133,71 @@ assert.soon(
     assert.eq(multiPlannerMetrics.choseWinningPlan, 4);
 }
 
+// Test 'switchedToBackupPlan'. The backup plan switch happens when the winning plan (a blocking
+// AND_SORTED intersection wrapped in a SORT) exceeds the memory limit during execution and a
+// non-blocking backup plan is available.
+{
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+
+    const backupColl = db.getCollection("backup_plan_test");
+    backupColl.drop();
+
+    // Insert enough data so the blocking sort exceeds the memory limit during full execution,
+    // but not during the multi-planner trial period (which only processes a fraction of docs).
+    const numDocs = 1000;
+    const docSize = 1024;
+    const bulk = backupColl.initializeUnorderedBulkOp();
+    for (let i = 0; i < numDocs; i++) {
+        bulk.insert({a: 1, b: 1, pad: "x".repeat(docSize)});
+    }
+    assert.commandWorked(bulk.execute());
+
+    assert.commandWorked(backupColl.createIndex({a: 1}));
+    assert.commandWorked(backupColl.createIndex({b: 1}));
+
+    // Force index intersection so the AND_SORTED plan (which includes a blocking sort) wins
+    // multi-planning. A non-blocking single-index plan becomes the backup.
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: true}));
+
+    // The sort memory limit must be large enough for the trial period to succeed (so the
+    // blocking plan wins and a backup is set), but small enough that full execution OOMs.
+    // The trial processes roughly 0.29 * numDocs works. Set the limit to hold ~half the docs.
+    const origSortBytes = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 1}),
+    ).internalQueryMaxBlockingSortMemoryUsageBytes;
+    const sortLimit = (numDocs * docSize) / 2;
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: sortLimit}));
+
+    backupColl.getPlanCache().clear();
+
+    const metricsBefore = db.serverStatus().metrics.query.multiPlanner.switchedToBackupPlan;
+
+    // allowDiskUse:false so the sort throws QueryExceededMemoryLimitNoDiskUseAllowed instead of
+    // spilling, triggering the switch to the backup plan.
+    const cmdResult = db.runCommand({
+        find: backupColl.getName(),
+        filter: {a: 1, b: 1},
+        sort: {b: 1},
+        allowDiskUse: false,
+    });
+    assert.commandWorked(cmdResult);
+    const results = new DBCommandCursor(db, cmdResult).toArray();
+    assert.eq(numDocs, results.length);
+
+    const metricsAfter = db.serverStatus().metrics.query.multiPlanner.switchedToBackupPlan;
+    assert.gt(
+        metricsAfter,
+        metricsBefore,
+        "Expected switchedToBackupPlan to increment; before=" + metricsBefore + " after=" + metricsAfter,
+    );
+
+    // Restore parameters.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: origSortBytes}),
+    );
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: false}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableSortIndexIntersection: false}));
+}
+
 MongoRunner.stopMongod(conn);
