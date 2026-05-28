@@ -116,3 +116,440 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "aggregation_unsplittable_collections_on_random_shard_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_unsplittable_collections_on_random_shard_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "unsplittable_collections",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions_and_add_remove_shard",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_unsplittable_collections_on_random_shard_passthrough_with_config_transitions_and_add_remove_shard.yml",
+    shard_count = 50,
+    tags = [
+        "ci-default",
+        "unsplittable_collections",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "causally_consistent_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/causally_consistent_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "causally_consistent",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "causally_consistent_jscore_passthrough_auth",
+    config = "//buildscripts/resmokeconfig:suites/causally_consistent_jscore_passthrough_auth.yml",
+    shard_count = 20,
+    tags = [
+        "causally_consistent",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_causal_consistency",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_causal_consistency.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "non_live_record",
+        "resources:cpu:2",
+        "sharded",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_causal_consistency_and_balancer",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_causal_consistency_and_balancer.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "non_live_record",
+        "resources:cpu:2",
+        "sharded",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "non_live_record",
+        "resources:cpu:2",
+        "sharded",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_replication_with_balancer_and_config_transitions",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer_and_config_transitions.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "non_live_record",
+        "resources:cpu:2",
+        "sharded",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard",
+    config = "//buildscripts/resmokeconfig:suites/concurrency_sharded_replication_with_balancer_and_config_transitions_and_add_remove_shard.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "concurrency",
+        "kill_terminate",
+        "non_live_record",
+        "resources:cpu:2",
+        "sharded",
+        "stepdowns",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "fcv_upgrade_downgrade_replica_sets_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/fcv_upgrade_downgrade_replica_sets_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "jscore",
+        "requires_replicated_fast_count_recovery",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_transition_to_csrs_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/replica_sets_transition_to_csrs_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "requires_replicated_fast_count_recovery",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_causally_consistent_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/sharded_causally_consistent_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "causally_consistent",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough_priority_ports",
+    config = "//buildscripts/resmokeconfig:suites/sharding_jscore_passthrough_priority_ports.yml",
+    shard_count = 40,
+    tags = [
+        "ci-default",
+        "common",
+        "jscore",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough.yml",
+    shard_count = 4,
+    tags = [
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "fcv_upgrade_downgrade_retryable_writes_replica_sets_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/fcv_upgrade_downgrade_retryable_writes_replica_sets_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "jscore",
+        "replica_sets",
+        "requires_replicated_fast_count_recovery",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "fcv_upgrade_downgrade_sharding_jscore_passthrough_retryable_writes",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/fcv_upgrade_downgrade_sharding_jscore_passthrough_retryable_writes.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "jscore",
+        "sharding",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_reconfig_jscore_passthrough_priority_ports",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_reconfig_jscore_passthrough_priority_ports.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_reconfig_jscore_stepdown_passthrough_priority_ports",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_reconfig_jscore_stepdown_passthrough_priority_ports.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_reconfig_kill_primary_jscore_passthrough_priority_ports",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_reconfig_kill_primary_jscore_passthrough_priority_ports.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_reconfig_kill_stepdown_terminate_jscore_passthrough_priority_ports",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_reconfig_kill_stepdown_terminate_jscore_passthrough_priority_ports.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_reconfig_terminate_primary_jscore_passthrough_priority_ports",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_reconfig_terminate_primary_jscore_passthrough_priority_ports.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_jscore_passthrough_with_balancer_drop_config_cache_collections",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_jscore_passthrough_with_balancer_drop_config_cache_collections.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "common",
+        "jscore",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+# TODO (SERVER-109519): Remove this temporary suite.
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough_legacy_timeseries_no_rawdata",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_legacy_timeseries_no_rawdata.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "jscore",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_jscore_passthrough_with_injected_catalog_metadata",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_jscore_passthrough_with_injected_catalog_metadata.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "common",
+        "jscore",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_kill_stepdown_terminate_jscore_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_kill_stepdown_terminate_jscore_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-release-critical",
+        "common",
+        "jscore",
+        "sharding",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+# TODO (SERVER-109519): Remove this temporary suite.
+resmoke_suite_test(
+    name = "sharding_legacy_timeseries_no_rawdata",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_legacy_timeseries_no_rawdata.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "requires_replicated_fast_count_recovery",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
