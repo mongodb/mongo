@@ -355,6 +355,14 @@ void WiredTigerRecoveryUnit::preallocateSnapshot(const OpenSnapshotOptions& opti
 
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     invariant(_isActive(), toString(_getState()));
+    WiredTigerConnection::BlockShutdown blockShutdown(_connection);
+    if (_connection->isCleanShuttingDown()) {
+        // The WT_CONNECTION is being torn down; the underlying WT_SESSION will be (or has already
+        // been) freed by WT_CONNECTION::close, so calling rollback/commit_transaction here would
+        // be a use-after-free. WT itself rolls back any active transactions during connection
+        // close.
+        return;
+    }
     if (!_readAtTimestamp.isNull()) {
         _lastReadTimestampFromClosedTxn = _readAtTimestamp;
     }
@@ -1101,7 +1109,11 @@ bool WiredTigerRecoveryUnit::isReadSourcePinned() const {
 }
 
 void WiredTigerRecoveryUnit::_setIsolation(Isolation isolation) {
-    if (_session) {
+    if (!_session) {
+        return;
+    }
+    WiredTigerConnection::BlockShutdown blockShutdown(_connection);
+    if (!_connection->isShuttingDown()) {
         _session->reconfigure(getIsolationConfig(isolation));
     }
 }

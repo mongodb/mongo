@@ -1066,6 +1066,13 @@ std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(OperationCo
 }
 
 Status WiredTigerRecordStore::_truncate(OperationContext* opCtx, RecoveryUnit& ru) {
+    WiredTigerConnection::BlockShutdown blockShutdown(&_kvEngine->getConnection());
+    // If a shutdown is in progress, skip truncation as it will race with the shutdown dropping
+    // idents.
+    if (blockShutdown.isShuttingDown()) {
+        return Status(ErrorCodes::ShutdownInProgress,
+                      "Record store truncation failed due to shutdown");
+    }
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     wtTruncate(opCtx, wtRu);
     _changeNumRecordsAndDataSize(wtRu, -numRecords(), -dataSize());

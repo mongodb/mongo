@@ -75,12 +75,23 @@ WiredTigerConnection::~WiredTigerConnection() {
 }
 
 void WiredTigerConnection::shuttingDown(ShutdownReason reason) {
-    // Try to atomically set _shuttingDown flag, but just return if another thread was first.
-    if (_shuttingDown.fetchAndBitOr(kShuttingDownMask) & kShuttingDownMask)
-        return;
+    const auto shutdownMask =
+        kShuttingDownMask | (reason == ShutdownReason::kCleanShutdown ? kCleanShutdownMask : 0);
+
+    // Atomically transition into shutdown and publish the shutdown reason only if this thread
+    // wins the transition, while preserving any existing blocker bits.
+    for (auto current = _shuttingDown.load();;) {
+        if (current & kShuttingDownMask) {
+            return;
+        }
+        const auto newValue = current | shutdownMask;
+        if (_shuttingDown.compareAndSwap(&current, newValue)) {
+            break;
+        }
+    }
 
     // Spin as long as there are threads blocking shutdown.
-    while (_shuttingDown.load() != kShuttingDownMask) {
+    while ((_shuttingDown.load() & ~kCleanShutdownMask) != kShuttingDownMask) {
         sleepmillis(1);
     }
 
@@ -88,11 +99,16 @@ void WiredTigerConnection::shuttingDown(ShutdownReason reason) {
 }
 
 void WiredTigerConnection::restart() {
-    _shuttingDown.fetchAndBitAnd(~kShuttingDownMask);
+    _shuttingDown.fetchAndBitAnd(~(kShuttingDownMask | kCleanShutdownMask));
 }
 
 bool WiredTigerConnection::isShuttingDown() {
     return _shuttingDown.load() & kShuttingDownMask;
+}
+
+bool WiredTigerConnection::isCleanShuttingDown() {
+    constexpr uint32_t both = kShuttingDownMask | kCleanShutdownMask;
+    return (_shuttingDown.load() & both) == both;
 }
 
 void WiredTigerConnection::waitUntilPreparedUnitOfWorkCommitsOrAborts(Interruptible& interruptible,
@@ -199,8 +215,9 @@ WiredTigerManagedSession WiredTigerConnection::getSession(OperationContext& opCt
 WiredTigerManagedSession WiredTigerConnection::getUninterruptibleSession(const char* config,
                                                                          const bool isInternal) {
     // We should never be able to get here after _shuttingDown is set, because no new
-    // operations should be allowed to start.
-    invariant(!(_shuttingDown.load() & kShuttingDownMask));
+    // operations should be allowed to start. This invariant looks specifically for the mask to
+    // match as it also indicates that no outstanding operations are blocking shutdown.
+    invariant(_shuttingDown.load() != kShuttingDownMask);
 
     {
         std::lock_guard<std::mutex> lock(_cacheLock);

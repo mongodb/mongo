@@ -72,16 +72,20 @@ public:
     // RAII type to block and unblock the WiredTigerConnection to shut down.
     class BlockShutdown {
     public:
-        BlockShutdown(WiredTigerConnection* connection) : _conn(connection) {
-            _conn->_shuttingDown.fetchAndAdd(1);
+        BlockShutdown(WiredTigerConnection* connection) : _connection(connection) {
+            _connection->_shuttingDown.fetchAndAdd(1);
         }
 
         ~BlockShutdown() {
-            _conn->_shuttingDown.fetchAndSubtract(1);
+            _connection->_shuttingDown.fetchAndSubtract(1);
+        }
+
+        bool isShuttingDown() const {
+            return _connection->isShuttingDown();
         }
 
     private:
-        WiredTigerConnection* _conn;
+        WiredTigerConnection* _connection{nullptr};
     };
 
     enum class ShutdownReason {
@@ -146,6 +150,13 @@ public:
      * True when in the process of shutting down.
      */
     bool isShuttingDown();
+
+    /**
+     * True only when shutting down for a reason that tears down the underlying WT_CONNECTION
+     * (kCleanShutdown). False when not shutting down or when transiently shutting down for a
+     * rollback to stable, in which case the WT_CONNECTION remains valid.
+     */
+    bool isCleanShuttingDown();
 
     /**
      * Restart a previously shut down cache.
@@ -255,10 +266,13 @@ private:
     CompiledConfigurationsPerConnection _compiledConfigurations;
 
     // Used as follows:
-    //   The low 31 bits are a count of active calls that need to block shutdown.
-    //   The high bit is a flag that is set if and only if we're shutting down.
+    //   The low 30 bits are a count of active calls that need to block shutdown.
+    //   Bit 30 is set iff the in-progress shutdown is a kCleanShutdown (the WT_CONNECTION will be
+    //     torn down). Set together with kShuttingDownMask; cleared by restart().
+    //   Bit 31 is set if and only if we're shutting down.
     AtomicWord<unsigned> _shuttingDown{0};
-    static const uint32_t kShuttingDownMask = 1 << 31;
+    static const uint32_t kShuttingDownMask = 1u << 31;
+    static const uint32_t kCleanShutdownMask = 1u << 30;
 
     std::mutex _cacheLock;
     typedef std::vector<std::unique_ptr<WiredTigerSession>> SessionCache;
