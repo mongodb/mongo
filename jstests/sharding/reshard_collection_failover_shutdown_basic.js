@@ -9,46 +9,23 @@
  *   requires_persistence,
  * ]
  */
-import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
+import {runFailoverShutdownBasic} from "jstests/sharding/libs/resharding_failover_helpers.js";
 
-const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, enableElections: true});
-reshardingTest.setup();
-
-const donorShardNames = reshardingTest.donorShardNames;
-const recipientShardNames = reshardingTest.recipientShardNames;
-const sourceCollection = reshardingTest.createShardedCollection({
-    ns: "reshardingDb.coll",
+runFailoverShutdownBasic({
     shardKeyPattern: {oldKey: 1},
-    chunks: [
+    chunks: (donorShardNames, recipientShardNames) => [
         {min: {oldKey: MinKey}, max: {oldKey: 0}, shard: donorShardNames[0]},
         {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: donorShardNames[1]},
     ],
-});
-
-assert.commandWorked(
-    sourceCollection.insert([
+    newShardKeyPattern: {newKey: 1},
+    newChunks: (donorShardNames, recipientShardNames) => [
+        {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
+        {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
+    ],
+    documents: [
         {_id: "stays on shard0", oldKey: -10, newKey: -10},
         {_id: "moves to shard0", oldKey: 10, newKey: -10},
         {_id: "moves to shard1", oldKey: -10, newKey: 10},
         {_id: "stays on shard1", oldKey: 10, newKey: 10},
-    ]),
-);
-
-reshardingTest.withReshardingInBackground(
-    {
-        newShardKeyPattern: {newKey: 1},
-        newChunks: [
-            {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
-            {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
-        ],
-    },
-    () => {
-        reshardingTest.stepUpNewPrimaryOnShard(donorShardNames[0]);
-
-        reshardingTest.killAndRestartPrimaryOnShard(recipientShardNames[0]);
-
-        reshardingTest.shutdownAndRestartPrimaryOnShard(recipientShardNames[1]);
-    },
-);
-
-reshardingTest.teardown();
+    ],
+});
