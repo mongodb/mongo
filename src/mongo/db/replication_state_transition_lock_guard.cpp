@@ -89,7 +89,9 @@ void ReplicationStateTransitionLockGuard::reacquire() {
 }
 
 void ReplicationStateTransitionLockGuard::_enqueueLock() {
+    // TODO SERVER-106669: Remove this class when we delete the feature flag.
     if (gFeatureFlagIntentRegistration.isEnabled()) {
+        _result = LOCK_OK;
         return;
     }
     // Enqueue a lock request for the RSTL.
@@ -98,6 +100,7 @@ void ReplicationStateTransitionLockGuard::_enqueueLock() {
 
 void ReplicationStateTransitionLockGuard::_unlock() {
     if (gFeatureFlagIntentRegistration.isEnabled()) {
+        _result = LOCK_INVALID;
         return;
     }
     if (_result == LockResult::LOCK_INVALID) {

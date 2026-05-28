@@ -53,6 +53,7 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
@@ -1998,7 +1999,14 @@ TEST_F(StepDownTest, StepDownFailureRestoresDrainState) {
 }
 
 using StepDownTestDeathTest = StepDownTest;
-DEATH_TEST_REGEX_F(StepDownTestDeathTest, StepDownHangsCantGetRSTL, "5675600.*lockRep") {
+DEATH_TEST_REGEX_F(StepDownTestDeathTest, StepDownHangsCantGetRSTL, "5675600.*lockRep|10147500") {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        // With the intent registry RSTL is not used for step-down, so this crash no longer
+        // occurs. Satisfy the death-test harness with a matching fatal log until this test is
+        // removed along with featureFlagIntentRegistration.
+        // TODO SERVER-106669: Delete when featureFlagIntentRegistration is removed.
+        LOGV2_FATAL(10147500, "lockRep: scenario N/A with featureFlagIntentRegistration");
+    }
     startSignalProcessingThread();
 
     const auto repl = getReplCoord();
@@ -2168,6 +2176,11 @@ TEST_F(StepDownTest, NodeReturnsNotWritablePrimaryWhenAskedToStepDownAsANonPrima
 
 TEST_F(StepDownTest,
        NodeReturnsExceededTimeLimitWhenStepDownFailsToObtainTheGlobalLockWithinTheAllottedTime) {
+    // Disable this test because it relies on grabbing the RSTL in MODE_X, which is a no-op when
+    // Intent Registry is active.
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     OpTimeWithTermOne optime1(100, 1);
 
     // Set up this test so that all nodes are caught up. This is necessary to exclude the false

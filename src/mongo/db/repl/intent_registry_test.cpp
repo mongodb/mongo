@@ -755,7 +755,6 @@ TEST_F(IntentRegistryTest, IntegrityRegistryEnableDisable) {
 // Verifies that a Write intent acquired through GlobalLock(MODE_IX) stays live until the
 // enclosing WriteUnitOfWork ends, not merely until the GlobalLock object is destroyed.
 TEST_F(IntentRegistryTest, WriteIntentLifetimeExtendedThroughWriteUnitOfWork) {
-    RAIIServerParameterControllerForTest featureFlag{"featureFlagIntentRegistration", true};
     _intentRegistry.enable();
 
     auto client = getServiceContext()->getService()->makeClient("test-wuow-intent");

@@ -48,6 +48,8 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/intent_guard.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog.h"
@@ -59,6 +61,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -1333,6 +1336,9 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitFails) {
 }
 
 TEST_F(TxnParticipantTest, StepDownDuringPreparedAbortReleasesRSTL) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
@@ -1400,7 +1406,63 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedAbortReleasesRSTL) {
     runFunctionFromDifferentOpCtx(func);
 }
 
+TEST_F(TxnParticipantTest, StepDownDuringPreparedAbortReleasesIntentTokens) {
+    if (!gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    auto& intentRegistry = rss::consensus::IntentRegistry::get(opCtx()->getServiceContext());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+    // The BlockingWrite guard inside unstashTransactionResources is ephemeral — it is
+    // deregistered when the function returns, so no token persists between operations.
+    ASSERT_FALSE(intentRegistry.hasWriteIntentDeclared(opCtx()));
+
+    // Simulate the locking of an insert.
+    {
+        Lock::DBLock dbLock(
+            opCtx(), DatabaseName::createDatabaseName_forTest(boost::none, "test"), MODE_IX);
+        Lock::CollectionLock collLock(
+            opCtx(), NamespaceString::createNamespaceString_forTest("test.foo"), MODE_IX);
+    }
+
+    txnParticipant.stashTransactionResources(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+
+    // Hold a Write intent token on behalf of this session to simulate an in-flight write.
+    // prepareTransaction must call deregisterTokensForSession to clear such tokens so
+    // prepared transactions don't block the stepdown/shutdown intent drain.
+    boost::optional<rss::consensus::IntentGuard> mockGuard;
+    mockGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx());
+    ASSERT_TRUE(intentRegistry.hasWriteIntentDeclared(opCtx()));
+
+    txnParticipant.prepareTransaction(opCtx(), {});
+    // deregisterTokensForSession cleared the token above.
+    ASSERT_FALSE(intentRegistry.hasWriteIntentDeclared(opCtx()));
+    mockGuard.reset();  // safe: token already gone, deregistering a second time is a no-op
+
+    txnParticipant.stashTransactionResources(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
+    ASSERT_FALSE(intentRegistry.hasWriteIntentDeclared(opCtx()));
+
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
+        repl::MemberState::RS_SECONDARY));
+    ASSERT_THROWS_CODE(txnParticipant.abortTransaction(opCtx()),
+                       AssertionException,
+                       ErrorCodes::NotWritablePrimary);
+
+    // The BlockingWrite token created inside abortTransaction is deregistered during
+    // exception unwind — no tokens leak that could block a future state transition drain.
+    ASSERT_FALSE(intentRegistry.hasWriteIntentDeclared(opCtx()));
+}
+
 TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitReleasesRSTL) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
@@ -1468,6 +1530,61 @@ TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitReleasesRSTL) {
         shard_role_details::getLocker(newOpCtx)->unlock(resourceIdReplicationStateTransitionLock);
     };
     runFunctionFromDifferentOpCtx(func);
+}
+
+TEST_F(TxnParticipantTest, StepDownDuringPreparedCommitReleasesIntentTokens) {
+    if (!gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    auto& intentRegistry = rss::consensus::IntentRegistry::get(opCtx()->getServiceContext());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+    // The BlockingWrite guard inside unstashTransactionResources is ephemeral — it is
+    // deregistered when the function returns, so no token persists between operations.
+    ASSERT_FALSE(intentRegistry.hasWriteIntentDeclared(opCtx()));
+
+    // Simulate the locking of an insert.
+    {
+        Lock::DBLock dbLock(
+            opCtx(), DatabaseName::createDatabaseName_forTest(boost::none, "test"), MODE_IX);
+        Lock::CollectionLock collLock(
+            opCtx(), NamespaceString::createNamespaceString_forTest("test.foo"), MODE_IX);
+    }
+
+    txnParticipant.stashTransactionResources(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+
+    // Hold a Write intent token on behalf of this session to simulate an in-flight write.
+    // prepareTransaction must call deregisterTokensForSession to clear such tokens so
+    // prepared transactions don't block the stepdown/shutdown intent drain.
+    boost::optional<rss::consensus::IntentGuard> mockGuard;
+    mockGuard.emplace(rss::consensus::IntentRegistry::Intent::Write, opCtx());
+    ASSERT_TRUE(intentRegistry.hasWriteIntentDeclared(opCtx()));
+
+    const auto prepareResponse = txnParticipant.prepareTransaction(opCtx(), {});
+    const auto& prepareTimestamp = prepareResponse.first;
+    // deregisterTokensForSession cleared the token above.
+    ASSERT_FALSE(intentRegistry.hasWriteIntentDeclared(opCtx()));
+    mockGuard.reset();  // safe: token already gone, deregistering a second time is a no-op
+
+    txnParticipant.stashTransactionResources(opCtx());
+
+    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+    ASSERT_FALSE(intentRegistry.hasWriteIntentDeclared(opCtx()));
+
+    ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
+        repl::MemberState::RS_SECONDARY));
+    ASSERT_THROWS_CODE(
+        txnParticipant.commitPreparedTransaction(opCtx(), prepareTimestamp, boost::none),
+        AssertionException,
+        ErrorCodes::NotWritablePrimary);
+
+    // The BlockingWrite token created inside commitPreparedTransaction is deregistered during
+    // exception unwind — no tokens leak that could block a future state transition drain.
+    ASSERT_FALSE(intentRegistry.hasWriteIntentDeclared(opCtx()));
 }
 
 TEST_F(TxnParticipantTest, ThrowDuringUnpreparedCommitLetsTheAbortAtEntryPointToCleanUp) {

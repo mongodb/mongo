@@ -37,6 +37,7 @@
 #include "mongo/util/decorable.h"
 
 #include <mutex>
+#include <shared_mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -146,8 +147,8 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
 
     // Check these outside of the mutex to avoid a deadlock against the Replication Coordinator
     // mutex.
-    bool isReplSet =
-        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+    bool isReplSet = replCoord && replCoord->getSettings().isReplSet();
 
     std::shared_lock lock(_stateMutex);
 
@@ -175,7 +176,7 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
                     validIntent);
         }
 
-        if (isReplSet && intent == Intent::Write) {
+        if (_primaryEnforcementActive && isReplSet && intent == Intent::Write) {
             // canAcceptWritesFor asserts that we have the RSTL acquired.
             bool isWritablePrimary =
                 repl::ReplicationCoordinator::get(opCtx->getServiceContext())
@@ -339,8 +340,8 @@ bool IntentRegistry::canDeclareIntent(Intent intent, OperationContext* opCtx) {
 
     // Check these outside of the mutex to avoid a deadlock against the Replication Coordinator
     // mutex.
-    bool isReplSet =
-        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
+    auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+    bool isReplSet = replCoord && replCoord->getSettings().isReplSet();
 
     std::shared_lock lock(_stateMutex);
 
@@ -381,6 +382,9 @@ std::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOper
         _activeInterruptionCV.wait(lock, [this] { return !_interruptionCtx; });
         _lastInterruption = interrupt;
         _interruptionCtx = opCtx;
+        if (interrupt == InterruptionType::StepUp) {
+            _primaryEnforcementActive = true;
+        }
     }
 
     //  NOLINTNEXTLINE
@@ -471,9 +475,20 @@ bool IntentRegistry::hasWriteIntentDeclared(const OperationContext* opCtx) {
     return 0 != writeIntentCountOnOpCtx(opCtx).load();
 }
 
+bool IntentRegistry::isPrimaryEnforcementActive() {
+    std::shared_lock lock(_stateMutex);
+    return _primaryEnforcementActive;
+}
+
+void IntentRegistry::activatePrimaryEnforcement() {
+    std::lock_guard lock(_stateMutex);
+    _primaryEnforcementActive = true;
+}
+
 void IntentRegistry::enable() {
     std::lock_guard lock(_stateMutex);
     _enabled = true;
+    _primaryEnforcementActive = true;
     _lastInterruption = InterruptionType::None;
     _interruptionCtx = nullptr;
     _activeInterruptionCV.notify_one();
@@ -482,6 +497,9 @@ void IntentRegistry::enable() {
 void IntentRegistry::disable() {
     std::lock_guard lock(_stateMutex);
     _enabled = false;
+    _primaryEnforcementActive = false;
+    _lastInterruption = InterruptionType::None;
+    _interruptionCtx = nullptr;
 }
 
 bool IntentRegistry::_validIntent(IntentRegistry::Intent intent) const {

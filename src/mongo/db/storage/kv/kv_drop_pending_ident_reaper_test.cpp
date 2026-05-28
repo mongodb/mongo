@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -205,6 +206,7 @@ void KVDropPendingIdentReaperTest::setUp() {
     getServiceContext()->setOpObserver(std::move(opObserver));
     setUsesSchemaEpochs(false);
     setPrimary(true);
+    rss::consensus::IntentRegistry::get(getServiceContext()).activatePrimaryEnforcement();
     _engineMock = std::make_unique<KVEngineMock>();
 }
 void KVDropPendingIdentReaperTest::tearDown() {

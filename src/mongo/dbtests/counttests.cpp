@@ -84,7 +84,7 @@ public:
                                          PlacementConcern(boost::none, ShardVersion::UNTRACKED()),
                                          repl::ReadConcernArgs::get(&_opCtx),
                                          AcquisitionPrerequisites::kWrite),
-            MODE_IS);
+            MODE_IX);
     }
 
     ~Base() {

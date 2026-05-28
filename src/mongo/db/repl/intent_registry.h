@@ -213,6 +213,15 @@ public:
 
     bool hasWriteIntentDeclared(const OperationContext* opCtx);
 
+    bool isPrimaryEnforcementActive();
+
+    /**
+     * Activates the "must be primary" check for write intent registration. Called once during
+     * replica set startup. This flag exists to allow unit tests to not have to be concerned with
+     * properly declaring intents.
+     */
+    void activatePrimaryEnforcement();
+
     /**
      * Marks the IntentRegistry enabled and resets the active and last interruption.
      */
@@ -272,6 +281,9 @@ private:
     void _unregisterWriteCountForOpId(uint64_t opId);
 
     bool _enabled = true;
+    // Controls if we reject write intents based on if a node is primary or not. Starts false so
+    // that unit tests do not need to set up a primary in order to register intents.
+    bool _primaryEnforcementActive = false;
     RWMutex _stateMutex;
     stdx::condition_variable _activeInterruptionCV;
     InterruptionType _lastInterruption = InterruptionType::None;

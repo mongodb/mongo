@@ -42,6 +42,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -257,18 +258,22 @@ TEST_F(DConcurrencyTestFixture, GlobalRead) {
     auto opCtx = makeOperationContext();
     Lock::GlobalRead globalRead(opCtx.get());
     ASSERT(shard_role_details::getLocker(opCtx.get())->isR());
-    ASSERT_EQ(shard_role_details::getLocker(opCtx.get())
-                  ->getLockMode(resourceIdReplicationStateTransitionLock),
-              MODE_IX);
+    if (!gFeatureFlagIntentRegistration.isEnabled()) {
+        ASSERT_EQ(shard_role_details::getLocker(opCtx.get())
+                      ->getLockMode(resourceIdReplicationStateTransitionLock),
+                  MODE_IX);
+    }
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalWrite) {
     auto opCtx = makeOperationContext();
     Lock::GlobalWrite globalWrite(opCtx.get());
     ASSERT(shard_role_details::getLocker(opCtx.get())->isW());
-    ASSERT_EQ(shard_role_details::getLocker(opCtx.get())
-                  ->getLockMode(resourceIdReplicationStateTransitionLock),
-              MODE_IX);
+    if (!gFeatureFlagIntentRegistration.isEnabled()) {
+        ASSERT_EQ(shard_role_details::getLocker(opCtx.get())
+                      ->getLockMode(resourceIdReplicationStateTransitionLock),
+                  MODE_IX);
+    }
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalWriteAndGlobalRead) {
@@ -284,7 +289,9 @@ TEST_F(DConcurrencyTestFixture, GlobalWriteAndGlobalRead) {
     }
 
     ASSERT(lockState->isW());
-    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+    if (!gFeatureFlagIntentRegistration.isEnabled()) {
+        ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
+    }
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockS_Timeout) {
@@ -317,6 +324,9 @@ TEST_F(DConcurrencyTestFixture, GlobalLockX_Timeout) {
 }
 
 TEST_F(DConcurrencyTestFixture, RSTLmodeX_Timeout) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     auto clients = makeKClientsWithLockers(2);
     Lock::ResourceLock rstl(
         clients[0].second.get(), resourceIdReplicationStateTransitionLock, MODE_X);
@@ -722,12 +732,14 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptible) {
     });
 
     ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
-    ASSERT_EQ(shard_role_details::getLocker(opCtx1)->getLockMode(
-                  resourceIdReplicationStateTransitionLock),
-              MODE_IX);
-    ASSERT_EQ(shard_role_details::getLocker(opCtx2)->getLockMode(
-                  resourceIdReplicationStateTransitionLock),
-              MODE_NONE);
+    if (!gFeatureFlagIntentRegistration.isEnabled()) {
+        ASSERT_EQ(shard_role_details::getLocker(opCtx1)->getLockMode(
+                      resourceIdReplicationStateTransitionLock),
+                  MODE_IX);
+        ASSERT_EQ(shard_role_details::getLocker(opCtx2)->getLockMode(
+                      resourceIdReplicationStateTransitionLock),
+                  MODE_NONE);
+    }
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptibleBlockedOnRSTL) {
@@ -791,12 +803,14 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitNotInterruptedWithLeaveUnlockedBeh
     ASSERT(g1.isLocked());
     ASSERT(g2 != boost::none);
     ASSERT(!g2->isLocked());
-    ASSERT_EQ(shard_role_details::getLocker(opCtx1)->getLockMode(
-                  resourceIdReplicationStateTransitionLock),
-              MODE_IX);
-    ASSERT_EQ(shard_role_details::getLocker(opCtx2)->getLockMode(
-                  resourceIdReplicationStateTransitionLock),
-              MODE_NONE);
+    if (!gFeatureFlagIntentRegistration.isEnabled()) {
+        ASSERT_EQ(shard_role_details::getLocker(opCtx1)->getLockMode(
+                      resourceIdReplicationStateTransitionLock),
+                  MODE_IX);
+        ASSERT_EQ(shard_role_details::getLocker(opCtx2)->getLockMode(
+                      resourceIdReplicationStateTransitionLock),
+                  MODE_NONE);
+    }
 
     // Should not throw an exception.
     result.get();
@@ -804,6 +818,9 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitNotInterruptedWithLeaveUnlockedBeh
 
 TEST_F(DConcurrencyTestFixture,
        GlobalLockWaitNotInterruptedWithLeaveUnlockedBehaviorBlockedOnRSTL) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     auto clients = makeKClientsWithLockers(2);
     auto opCtx1 = clients[0].second.get();
     auto opCtx2 = clients[1].second.get();
@@ -861,16 +878,20 @@ TEST_F(DConcurrencyTestFixture, SetMaxLockTimeoutMillisAndDoNotUsingWithInterrup
 
     ASSERT(g1.isLocked());
     ASSERT(!g2.isLocked());
-
-    ASSERT_EQ(shard_role_details::getLocker(opCtx1)->getLockMode(
-                  resourceIdReplicationStateTransitionLock),
-              MODE_IX);
-    ASSERT_EQ(shard_role_details::getLocker(opCtx2)->getLockMode(
-                  resourceIdReplicationStateTransitionLock),
-              MODE_NONE);
+    if (!gFeatureFlagIntentRegistration.isEnabled()) {
+        ASSERT_EQ(shard_role_details::getLocker(opCtx1)->getLockMode(
+                      resourceIdReplicationStateTransitionLock),
+                  MODE_IX);
+        ASSERT_EQ(shard_role_details::getLocker(opCtx2)->getLockMode(
+                      resourceIdReplicationStateTransitionLock),
+                  MODE_NONE);
+    }
 }
 
 TEST_F(DConcurrencyTestFixture, SetMaxLockTimeoutMillisAndNotUsingInterruptBehaviorBlockedOnRSTL) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     auto clients = makeKClientsWithLockers(2);
     auto opCtx1 = clients[0].second.get();
     auto opCtx2 = clients[1].second.get();
@@ -911,17 +932,21 @@ TEST_F(DConcurrencyTestFixture, SetMaxLockTimeoutMillisAndThrowUsingInterruptBeh
         ErrorCodes::LockTimeout);
 
     ASSERT(g1.isLocked());
-
-    ASSERT_EQ(shard_role_details::getLocker(opCtx1)->getLockMode(
-                  resourceIdReplicationStateTransitionLock),
-              MODE_IX);
-    ASSERT_EQ(shard_role_details::getLocker(opCtx2)->getLockMode(
-                  resourceIdReplicationStateTransitionLock),
-              MODE_NONE);
+    if (!gFeatureFlagIntentRegistration.isEnabled()) {
+        ASSERT_EQ(shard_role_details::getLocker(opCtx1)->getLockMode(
+                      resourceIdReplicationStateTransitionLock),
+                  MODE_IX);
+        ASSERT_EQ(shard_role_details::getLocker(opCtx2)->getLockMode(
+                      resourceIdReplicationStateTransitionLock),
+                  MODE_NONE);
+    }
 }
 
 TEST_F(DConcurrencyTestFixture,
        SetMaxLockTimeoutMillisAndThrowUsingInterruptBehaviorBlockedOnRSTL) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     auto clients = makeKClientsWithLockers(2);
     auto opCtx1 = clients[0].second.get();
     auto opCtx2 = clients[1].second.get();
@@ -947,6 +972,9 @@ TEST_F(DConcurrencyTestFixture,
 }
 
 TEST_F(DConcurrencyTestFixture, FailedGlobalLockShouldUnlockRSTLOnlyOnce) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     auto clients = makeKClientsWithLockers(2);
     auto opCtx1 = clients[0].second.get();
     auto opCtx2 = clients[1].second.get();
@@ -1039,6 +1067,9 @@ TEST_F(DConcurrencyTestFixture, DBLockWaitIsNotInterruptibleWithLockGuard) {
 }
 
 TEST_F(DConcurrencyTestFixture, LockCompleteInterruptedWhenUncontested) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     auto clientOpctxPairs = makeKClientsWithLockers(2);
     auto opCtx1 = clientOpctxPairs[0].second.get();
     auto opCtx2 = clientOpctxPairs[1].second.get();
@@ -2025,6 +2056,9 @@ TEST_F(DConcurrencyTestFixture, CollectionLockTimeout) {
 }
 
 TEST_F(DConcurrencyTestFixture, CompatibleFirstWithSXIS) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     // Currently, we are allowed to acquire IX and X lock modes for RSTL. To overcome it,
     // this fail point will allow the test to acquire RSTL in any lock modes.
     FailPointEnableBlock enableTestOnlyFlag("enableTestOnlyFlagforRSTL");
@@ -2051,8 +2085,10 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithSXIS) {
     ASSERT(!lockX.isLocked());
 }
 
-
 TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSIXIS) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     // Currently, we are allowed to acquire IX and X lock modes for RSTL. To overcome it,
     // this fail point will allow the test to acquire RSTL in any lock modes.
     FailPointEnableBlock enableTestOnlyFlag("enableTestOnlyFlagforRSTL");
@@ -2077,7 +2113,6 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSIXIS) {
         opctx4, MODE_IS, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT(!lockIS.isLocked());
 
-
     // Now release the MODE_X and ensure that MODE_S will switch policy to compatibleFirst
     lockX.reset();
     lockS->waitForLockUntil(Date_t::now());
@@ -2093,6 +2128,9 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSIXIS) {
 }
 
 TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSXIXIS) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     // Currently, we are allowed to acquire IX and X lock modes for RSTL. To overcome it,
     // this fail point will allow the test to acquire RSTL in any lock modes.
     FailPointEnableBlock enableTestOnlyFlag("enableTestOnlyFlagforRSTL");
@@ -2125,7 +2163,6 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSXIXIS) {
     repl::ReplicationStateTransitionLockGuard lockIS(
         opctx5, MODE_IS, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
     ASSERT(!lockIS.isLocked());
-
 
     // Now release the granted MODE_X and ensure that MODE_S will switch policy to compatibleFirst,
     // not locking the MODE_X or MODE_IX, but instead granting the final MODE_IS.
@@ -2356,6 +2393,9 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockDoesNotAbandonSnapshotWhenInWriteU
 }
 
 TEST_F(DConcurrencyTestFixture, RSTLLockGuardTimeout) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     auto clients = makeKClientsWithLockers(2);
     auto firstOpCtx = clients[0].second.get();
     auto secondOpCtx = clients[1].second.get();
@@ -2386,6 +2426,9 @@ TEST_F(DConcurrencyTestFixture, RSTLLockGuardTimeout) {
 }
 
 TEST_F(DConcurrencyTestFixture, RSTLLockGuardEnqueueAndWait) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     auto clients = makeKClientsWithLockers(2);
     auto firstOpCtx = clients[0].second.get();
     auto secondOpCtx = clients[1].second.get();
@@ -2398,7 +2441,6 @@ TEST_F(DConcurrencyTestFixture, RSTLLockGuardEnqueueAndWait) {
                   ->getLockMode(resourceIdReplicationStateTransitionLock),
               MODE_X);
 
-
     // The second opCtx enqueues the lock request but cannot acquire it.
     repl::ReplicationStateTransitionLockGuard secondRSTL(
         secondOpCtx, MODE_X, repl::ReplicationStateTransitionLockGuard::EnqueueOnly());
@@ -2410,7 +2452,6 @@ TEST_F(DConcurrencyTestFixture, RSTLLockGuardEnqueueAndWait) {
                   ->getLockMode(resourceIdReplicationStateTransitionLock),
               MODE_NONE);
 
-
     secondRSTL.waitForLockUntil(Date_t::now());
     ASSERT_TRUE(secondRSTL.isLocked());
     ASSERT_EQ(shard_role_details::getLocker(secondOpCtx)
@@ -2419,6 +2460,9 @@ TEST_F(DConcurrencyTestFixture, RSTLLockGuardEnqueueAndWait) {
 }
 
 TEST_F(DConcurrencyTestFixture, RSTLLockGuardResilientToExceptionThrownBeforeWaitForRSTLComplete) {
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        return;
+    }
     auto clients = makeKClientsWithLockers(2);
     auto firstOpCtx = clients[0].second.get();
     auto secondOpCtx = clients[1].second.get();

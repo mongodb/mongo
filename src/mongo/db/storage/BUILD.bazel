@@ -645,6 +645,7 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db:startup_recovery",
         "//src/mongo/db/index_builds:resumable_index_builds_idl",
+        "//src/mongo/db/repl:intent_registry",
         "//src/mongo/db/rss:persistence_provider_impl",
         "//src/mongo/db/rss:service_lifecycle_impl",
         "//src/mongo/db/shard_role",

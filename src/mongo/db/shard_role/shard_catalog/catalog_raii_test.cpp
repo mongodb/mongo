@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
@@ -261,7 +262,9 @@ TEST_F(CatalogRAIITestFixture, AutoGetDbSecondaryNamespacesSingleDb) {
     boost::optional<AutoGetDb> autoGetDb;
     autoGetDb.emplace(opCtx1, nss.dbName(), MODE_IS, Date_t::max());
 
-    ASSERT(shard_role_details::getLocker(opCtx1)->isRSTLLocked());
+    if (!gFeatureFlagIntentRegistration.isEnabled()) {
+        ASSERT(shard_role_details::getLocker(opCtx1)->isRSTLLocked());
+    }
     ASSERT(shard_role_details::getLocker(opCtx1)->isReadLocked());  // Global lock check
     ASSERT(shard_role_details::getLocker(opCtx1)->isDbLockedForMode(nss.dbName(), MODE_IS));
     ASSERT(

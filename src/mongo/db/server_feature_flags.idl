@@ -209,7 +209,7 @@ feature_flags:
     featureFlagIntentRegistration:
         description: "Enables intent registration in place of RSTL acquisitions"
         cpp_varname: gFeatureFlagIntentRegistration
-        default: false
+        default: true
         fcv_gated: false
     featureFlagRecordDelinquentMetrics:
         description: "Enables delinquent metrics recording"

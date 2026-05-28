@@ -148,10 +148,9 @@ void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& n
 std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx,
                                                       std::size_t count,
                                                       std::size_t opTimeOffset) {
-    if (gFeatureFlagIntentRegistration.isEnabled() &&
-        !rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-             .hasWriteIntentDeclared(opCtx) &&
-        !repl::alwaysAllowNonLocalWrites(opCtx)) {
+    auto& intentRegistry = rss::consensus::IntentRegistry::get(opCtx->getServiceContext());
+    if (gFeatureFlagIntentRegistration.isEnabled() && intentRegistry.isPrimaryEnforcementActive() &&
+        !intentRegistry.hasWriteIntentDeclared(opCtx) && !repl::alwaysAllowNonLocalWrites(opCtx)) {
         LOGV2_FATAL(12436504,
                     "Attempted to reserve optime without a declared write intent",
                     "opCtx"_attr = opCtx->getOpID());

@@ -1073,6 +1073,7 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
     }
 
     invariant(_settings.isReplSet());
+    _intentRegistry.activatePrimaryEnforcement();
     fassertNoTrace(5923500, !ReplSettings::shouldRecoverFromOplogAsStandalone());
 
     // Do not modify local replication metadata if we are starting in magic restore mode.

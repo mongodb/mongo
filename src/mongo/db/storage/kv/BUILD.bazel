@@ -27,6 +27,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/shard_role/lock_manager",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
     ],

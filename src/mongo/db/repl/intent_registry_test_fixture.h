@@ -47,6 +47,8 @@ class IntentRegistryTest : public ServiceContextMongoDTest {
 public:
     IntentRegistryTest();
 
+    void tearDown() override;
+
 protected:
     IntentRegistry& _intentRegistry;
     bool containsToken(IntentRegistry::IntentToken token) const;

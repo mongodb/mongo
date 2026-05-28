@@ -619,6 +619,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     // This node has already stepped down due to reconfig. So, signal anyone who is waiting on the
     // step down event.
     if (!_topCoord->isSteppingDownUnconditionally()) {
+        rstg.reset();
         _replExecutor->signalEvent(finishedEvent);
         return;
     }
@@ -652,6 +653,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
     const Date_t endTimeUpdateMemberState = _replExecutor->now();
+    rstg.reset();
     _replExecutor->signalEvent(finishedEvent);
     const Date_t endStepDownTime = _replExecutor->now();
     LOGV2(962664,
