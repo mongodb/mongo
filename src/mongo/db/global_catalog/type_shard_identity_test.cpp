@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -76,7 +75,14 @@ TEST(ShardIdentityType, ParseMissingUuid) {
 
     auto result = ShardIdentityType::fromShardIdentityDocument(doc);
     ASSERT_OK(result.getStatus());
-    ASSERT_FALSE(result.getValue().getUuid().has_value());
+
+    auto shardIdentity = result.getValue();
+    ASSERT_EQ("test/a:123", shardIdentity.getConfigsvrConnectionString().toString());
+    ASSERT_EQ("s1", shardIdentity.getShardName());
+    ASSERT_FALSE(shardIdentity.getUuid().has_value());
+    ASSERT_EQ(clusterId, shardIdentity.getClusterId());
+
+    ASSERT_BSONOBJ_EQ(doc, shardIdentity.toShardIdentityDocument());
 }
 
 TEST(ShardIdentityType, ParseMissingId) {

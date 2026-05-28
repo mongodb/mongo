@@ -55,6 +55,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/uuid.h"
 
 #include <climits>
 
@@ -188,9 +189,12 @@ std::string createShardName(OperationContext* opCtx,
                             std::shared_ptr<executor::TaskExecutor> executor);
 
 /**
- * Creates a ShardIdentity
+ * Creates a ShardIdentity. When shardUuid is provided it is stored in the identity document so
+ * that the receiving shard can persist its unique UUID alongside its human-readable name.
  */
-ShardIdentityType createShardIdentity(OperationContext* opCtx, const ShardId& shardName);
+ShardIdentityType createShardIdentity(OperationContext* opCtx,
+                                      const ShardId& shardName,
+                                      boost::optional<UUID> shardUuid = boost::none);
 
 /**
  * Issues a command on the remote host to insert a shard identity document

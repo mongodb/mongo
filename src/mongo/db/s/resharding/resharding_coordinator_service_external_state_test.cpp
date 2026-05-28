@@ -57,13 +57,13 @@ public:
         ConfigServerTestFixture::setUp();
 
         ShardType shard0;
-        shard0.setName(shardId0.toString());
+        shard0.setHandle(ShardHandle{ShardId(shardId0.toString()), boost::none});
         shard0.setHost(shardId0.toString() + ":1234");
         ShardType shard1;
-        shard1.setName(shardId1.toString());
+        shard1.setHandle(ShardHandle{ShardId(shardId1.toString()), boost::none});
         shard1.setHost(shardId1.toString() + ":1234");
         ShardType shard2;
-        shard2.setName(shardId2.toString());
+        shard2.setHandle(ShardHandle{ShardId(shardId2.toString()), boost::none});
         shard2.setHost(shardId2.toString() + ":1234");
         std::vector<ShardType> shards{shard0, shard1, shard2};
 

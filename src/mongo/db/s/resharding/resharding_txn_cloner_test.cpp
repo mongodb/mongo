@@ -211,7 +211,7 @@ class ReshardingTxnClonerTest : service_context_test::WithSetupTransportLayer,
                     const ConnectionString cs = ConnectionString::forReplicaSet(
                         shardId.toString(), {makeHostAndPort(shardId)});
                     ShardType sType;
-                    sType.setName(cs.getSetName());
+                    sType.setHandle(ShardHandle{ShardId(cs.getSetName()), boost::none});
                     sType.setHost(cs.toString());
                     shardTypes.push_back(std::move(sType));
                 };

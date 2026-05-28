@@ -246,7 +246,7 @@ public:
                 std::vector<ShardType> shards;
                 for (const auto& shardId : _shardIds) {
                     ShardType shard;
-                    shard.setName(shardId);
+                    shard.setHandle(ShardHandle{ShardId(shardId), boost::none});
                     shard.setHost(shardId + ":12345");
                     shards.push_back(std::move(shard));
                 }

@@ -688,12 +688,17 @@ void removeAllClusterParametersFromReplicaSet(
 
 namespace topology_change_helpers {
 
-ShardIdentityType createShardIdentity(OperationContext* opCtx, const ShardId& shardName) {
+ShardIdentityType createShardIdentity(OperationContext* opCtx,
+                                      const ShardId& shardName,
+                                      boost::optional<UUID> shardUuid) {
     ShardIdentityType shardIdentity;
     shardIdentity.setShardName(shardName.toString());
     shardIdentity.setClusterId(ClusterIdentityLoader::get(opCtx)->getClusterId());
     shardIdentity.setConfigsvrConnectionString(
         repl::ReplicationCoordinator::get(opCtx)->getConfigConnectionString());
+    if (shardUuid) {
+        shardIdentity.setUuid(*shardUuid);
+    }
 
     return shardIdentity;
 }

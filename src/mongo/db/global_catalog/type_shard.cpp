@@ -221,14 +221,6 @@ const std::string& ShardType::getName() const {
     return _handle->name().toString();
 }
 
-void ShardType::setName(const std::string& name) {
-    if (_handle) {
-        _handle.emplace(name, _handle->uuid());
-    } else {
-        _handle.emplace(name, boost::none);
-    }
-}
-
 const boost::optional<UUID>& ShardType::getUuid() const {
     invariant(_handle);
     return _handle->uuid();

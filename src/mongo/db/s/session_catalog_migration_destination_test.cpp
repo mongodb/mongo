@@ -470,7 +470,7 @@ private:
                 BSONObj filter) override {
 
                 ShardType donorShard;
-                donorShard.setName(kDonorConnStr.getSetName());
+                donorShard.setHandle(ShardHandle(ShardId(kDonorConnStr.getSetName()), boost::none));
                 donorShard.setHost(kDonorConnStr.toString());
 
                 return repl::OpTimeWith<std::vector<ShardType>>({donorShard});

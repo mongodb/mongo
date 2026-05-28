@@ -270,19 +270,19 @@ public:
         // Set up the shard registry to contain the fake shards
         setupShards({[] {
                          ShardType shardType;
-                         shardType.setName(kShardName1);
+                         shardType.setHandle(ShardHandle{ShardId(kShardName1), boost::none});
                          shardType.setHost(kTestShardHost1.toString());
                          return shardType;
                      }(),
                      [] {
                          ShardType shardType;
-                         shardType.setName(kShardName2);
+                         shardType.setHandle(ShardHandle{ShardId(kShardName2), boost::none});
                          shardType.setHost(kTestShardHost2.toString());
                          return shardType;
                      }(),
                      [] {
                          ShardType shardType;
-                         shardType.setName(kShardName3);
+                         shardType.setHandle(ShardHandle{ShardId(kShardName3), boost::none});
                          shardType.setHost(kTestShardHost3.toString());
                          return shardType;
                      }()});
@@ -3734,13 +3734,13 @@ public:
         // Set up the shard registry to contain the fake shards
         setupShards({[] {
                          ShardType shardType;
-                         shardType.setName(kShardName1);
+                         shardType.setHandle(ShardHandle{ShardId(kShardName1), boost::none});
                          shardType.setHost(kTestShardHost1.toString());
                          return shardType;
                      }(),
                      [] {
                          ShardType shardType;
-                         shardType.setName(kShardName2);
+                         shardType.setHandle(ShardHandle{ShardId(kShardName2), boost::none});
                          shardType.setHost(kTestShardHost2.toString());
                          return shardType;
                      }()});
@@ -3852,13 +3852,13 @@ public:
         // Set up the shard registry to contain the fake shards
         setupShards({[] {
                          ShardType shardType;
-                         shardType.setName(kShardName1);
+                         shardType.setHandle(ShardHandle{ShardId(kShardName1), boost::none});
                          shardType.setHost(kTestShardHost1.toString());
                          return shardType;
                      }(),
                      [] {
                          ShardType shardType;
-                         shardType.setName(kShardName2);
+                         shardType.setHandle(ShardHandle{ShardId(kShardName2), boost::none});
                          shardType.setHost(kTestShardHost2.toString());
                          return shardType;
                      }()});
@@ -4003,13 +4003,13 @@ public:
         // Set up the shard registry to contain the fake shards
         setupShards({[] {
                          ShardType shardType;
-                         shardType.setName(kShardName1);
+                         shardType.setHandle(ShardHandle{ShardId(kShardName1), boost::none});
                          shardType.setHost(kTestShardHost1.toString());
                          return shardType;
                      }(),
                      [] {
                          ShardType shardType;
-                         shardType.setName(kShardName2);
+                         shardType.setHandle(ShardHandle{ShardId(kShardName2), boost::none});
                          shardType.setHost(kTestShardHost2.toString());
                          return shardType;
                      }()});

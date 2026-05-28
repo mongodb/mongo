@@ -131,7 +131,7 @@ std::vector<ShardType> CoreCatalogCacheTestFixture::setupNShards(int numShards) 
         HostAndPort host(str::stream() << "Host" << i << ":12345");
 
         ShardType shard;
-        shard.setName(name.toString());
+        shard.setHandle(ShardHandle{ShardId(name.toString()), boost::none});
         shard.setHost(host.toString());
         shards.emplace_back(std::move(shard));
 

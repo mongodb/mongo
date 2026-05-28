@@ -75,6 +75,12 @@ structs:
                 type: string
                 description: "The chosen name for the new shard"
                 optional: true
+            shardUuid:
+                description:
+                    "A unique reference for the new shard. Populated in kCheckShardPreconditions when
+                    featureFlagUniqueShardIdentifiers is enabled. The field is optional for backward compatibility."
+                type: uuid
+                optional: true
             originalUserWriteBlockingLevel:
                 type: int
                 description: >

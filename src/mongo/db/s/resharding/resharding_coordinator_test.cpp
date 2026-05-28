@@ -140,11 +140,11 @@ protected:
         ConfigServerTestFixture::setUp();
 
         ShardType shard0;
-        shard0.setName("shard0000");
+        shard0.setHandle(ShardHandle{ShardId("shard0000"), boost::none});
         shard0.setHost("shard0000:1234");
         shard0.setTags({kZone1});
         ShardType shard1;
-        shard1.setName("shard0001");
+        shard1.setHandle(ShardHandle{ShardId("shard0001"), boost::none});
         shard1.setHost("shard0001:1234");
         shard1.setTags({kZone2});
         setupShards({shard0, shard1});

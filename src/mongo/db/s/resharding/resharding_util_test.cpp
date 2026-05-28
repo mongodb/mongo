@@ -90,10 +90,10 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
         ShardType shard1;
-        shard1.setName("a");
+        shard1.setHandle(ShardHandle{ShardId("a"), boost::none});
         shard1.setHost("a:1234");
         ShardType shard2;
-        shard2.setName("b");
+        shard2.setHandle(ShardHandle{ShardId("b"), boost::none});
         shard2.setHost("b:1234");
         setupShards({shard1, shard2});
     }

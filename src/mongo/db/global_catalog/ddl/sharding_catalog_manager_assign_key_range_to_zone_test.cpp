@@ -80,7 +80,7 @@ public:
         ConfigServerTestFixture::setUp();
 
         ShardType shard;
-        shard.setName("a");
+        shard.setHandle(ShardHandle{ShardId("a"), boost::none});
         shard.setHost("a:1234");
         shard.setTags({zoneName()});
 
@@ -691,7 +691,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeEquivalentToExistingOneShouldB
 TEST_F(AssignKeyRangeWithOneRangeFixture,
        NewRangeEquivalentToExistingOneWithDifferentZoneShouldFail) {
     ShardType shard;
-    shard.setName("b");
+    shard.setHandle(ShardHandle{ShardId("b"), boost::none});
     shard.setHost("b:1234");
     shard.setTags({"y"});
 

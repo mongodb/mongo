@@ -186,15 +186,15 @@ protected:
 TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
 
     ShardType shard1;
-    shard1.setName("shard1");
+    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setName("shard2");
+    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
     shard2.setHost("host2:12345");
 
     ShardType shard3;
-    shard3.setName("shard3");
+    shard3.setHandle(ShardHandle{ShardId("shard3"), boost::none});
     shard3.setHost("host3:12345");
 
     setupShards(std::vector<ShardType>{shard1, shard2, shard3});
@@ -213,7 +213,7 @@ TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
 TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
 
     ShardType shard1;
-    shard1.setName("shard1");
+    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
     shard1.setHost("host1:12345");
 
     setupShards(std::vector<ShardType>{shard1});
@@ -226,11 +226,11 @@ TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
 
 TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     ShardType shard1;
-    shard1.setName("shard1");
+    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setName("shard2");
+    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
     shard2.setHost("host2:12345");
 
     setupShards(std::vector<ShardType>{shard1, shard2});
@@ -244,11 +244,11 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
 TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
 
     ShardType shard1;
-    shard1.setName("shard1");
+    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setName("shard2");
+    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
     shard2.setHost("host2:12345");
 
     auto epoch = OID::gen();
@@ -294,11 +294,11 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
 TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
 
     ShardType shard1;
-    shard1.setName("shard1");
+    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setName("shard2");
+    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
     shard2.setHost("host2:12345");
 
     setupShards(std::vector<ShardType>{shard1, shard2});
@@ -323,11 +323,11 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
 TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
     ShardType shard1;
-    shard1.setName("shard1");
+    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setName("shard2");
+    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
     shard2.setHost("host2:12345");
 
     auto epoch = OID::gen();
@@ -396,11 +396,11 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
 TEST_F(RemoveShardTest, RemoveShardCommitWithPreconditionsNotMet) {
     ShardType shard1;
-    shard1.setName("shard1");
+    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setName("shard2");
+    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
     shard2.setHost("host2:12345");
 
     setupShards(std::vector<ShardType>{shard1, shard2});
@@ -426,11 +426,11 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemainingMaxBSONSize) {
                                              BSON("maxUserSize" << 20480));
 
     ShardType shard1;
-    shard1.setName("shard1");
+    shard1.setHandle(ShardHandle{ShardId("shard1"), boost::none});
     shard1.setHost("host1:12345");
 
     ShardType shard2;
-    shard2.setName("shard2");
+    shard2.setHandle(ShardHandle{ShardId("shard2"), boost::none});
     shard2.setHost("host2:12345");
 
     auto epoch = OID::gen();

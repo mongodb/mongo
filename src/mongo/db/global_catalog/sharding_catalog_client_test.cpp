@@ -305,17 +305,17 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     ShardType s1;
-    s1.setName("shard0000");
+    s1.setHandle(ShardHandle{ShardId("shard0000"), boost::none});
     s1.setHost("ShardHost");
     s1.setDraining(false);
     s1.setTags({"tag1", "tag2", "tag3"});
 
     ShardType s2;
-    s2.setName("shard0001");
+    s2.setHandle(ShardHandle{ShardId("shard0001"), boost::none});
     s2.setHost("ShardHost");
 
     ShardType s3;
-    s3.setName("shard0002");
+    s3.setHandle(ShardHandle{ShardId("shard0002"), boost::none});
     s3.setHost("ShardHost");
 
     const vector<ShardType> expectedShardsList = {s1, s2, s3};
@@ -363,7 +363,7 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsWithInvalidShard) {
     onFindCommand([](const RemoteCommandRequest& request) {
         // Valid ShardType
         ShardType s1;
-        s1.setName("shard0001");
+        s1.setHandle(ShardHandle{ShardId("shard0001"), boost::none});
         s1.setHost("ShardHost");
 
         return vector<BSONObj>{

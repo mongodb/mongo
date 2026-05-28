@@ -134,10 +134,10 @@ public:
         // The correct approach for this fixture is: insert shard docs, reload the registry
         // synchronously, then configure mock targeters on the resulting shard objects.
         ShardType shard0Doc;
-        shard0Doc.setName(kShard0.toString());
+        shard0Doc.setHandle(ShardHandle{ShardId(kShard0.toString()), boost::none});
         shard0Doc.setHost(kShard0Host.toString());
         ShardType shard1Doc;
-        shard1Doc.setName(kShard1.toString());
+        shard1Doc.setHandle(ShardHandle{ShardId(kShard1.toString()), boost::none});
         shard1Doc.setHost(kShard1Host.toString());
         setupShards({shard0Doc, shard1Doc});
         shardRegistry()->reload(operationContext());

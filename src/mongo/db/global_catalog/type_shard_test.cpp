@@ -165,4 +165,37 @@ TEST(ShardType, ConstructorWithoutUUID) {
     ASSERT(shard.validate().isOK());
 }
 
+TEST(ShardType, ToBSONIncludesUUID) {
+    UUID uuid = UUID::gen();
+    BSONObjBuilder builder;
+    builder.append(ShardType::name(), "shard0000");
+    builder.append(ShardType::host(), "localhost:27017");
+    uuid.appendToBuilder(&builder, ShardType::uuid.name());
+    StatusWith<ShardType> shardRes = ShardType::fromBSON(builder.obj());
+    ASSERT(shardRes.isOK());
+    const ShardType& shard = shardRes.getValue();
+
+    BSONObj serialized = shard.toBSON();
+    ASSERT(serialized.hasField(ShardType::uuid.name()));
+    ASSERT_EQ(serialized[ShardType::uuid.name()].binDataType(), BinDataType::newUUID);
+    ASSERT_EQ(uassertStatusOK(UUID::parse(serialized[ShardType::uuid.name()])), uuid);
+}
+
+TEST(ShardType, ToBSONRoundTripWithoutUUID) {
+    BSONObj original = BSON(ShardType::name("shard0001") << ShardType::host("localhost:27017"));
+    StatusWith<ShardType> shardRes = ShardType::fromBSON(original);
+    ASSERT(shardRes.isOK());
+    const ShardType& shard = shardRes.getValue();
+
+    ASSERT_FALSE(shard.getUuid().has_value());
+
+    BSONObj serialized = shard.toBSON();
+    ASSERT_FALSE(serialized.hasField(ShardType::uuid.name()));
+
+    StatusWith<ShardType> roundTripped = ShardType::fromBSON(serialized);
+    ASSERT(roundTripped.isOK());
+    ASSERT_EQ(roundTripped.getValue().getName(), shard.getName());
+    ASSERT_FALSE(roundTripped.getValue().getUuid().has_value());
+}
+
 }  // unnamed namespace

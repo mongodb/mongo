@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <functional>
@@ -43,7 +44,7 @@ namespace mongo {
  * Data type that bundles a shard's ShardId with its UUID (if available),
  * supporting lookup operations through the ShardRegistry API.
  */
-class ShardHandle {
+class MONGO_MOD_PUBLIC ShardHandle {
 public:
     ShardHandle(ShardId name, boost::optional<UUID> uuid)
         : _name(std::move(name)), _uuid(std::move(uuid)) {}

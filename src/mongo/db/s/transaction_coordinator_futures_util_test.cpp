@@ -333,7 +333,7 @@ protected:
                     const ConnectionString cs = ConnectionString::forReplicaSet(
                         shardId.toString(), {HostAndPort(str::stream() << shardId << ":123")});
                     ShardType sType;
-                    sType.setName(cs.getSetName());
+                    sType.setHandle(ShardHandle{ShardId(cs.getSetName()), boost::none});
                     sType.setHost(cs.toString());
                     shardTypes.push_back(std::move(sType));
                 };

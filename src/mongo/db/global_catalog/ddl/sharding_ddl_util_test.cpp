@@ -97,7 +97,7 @@ private:
             ->initializeIfNeeded(operationContext(), /* term */ 1);
 
         // Initialize a shard
-        shard0.setName("shard0");
+        shard0.setHandle(ShardHandle{ShardId("shard0"), boost::none});
         shard0.setHost("shard0:12");
         setupShards({shard0});
     }

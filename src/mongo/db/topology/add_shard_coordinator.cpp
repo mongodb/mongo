@@ -53,6 +53,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/uuid.h"
 
 #include <fmt/format.h>
 
@@ -127,6 +128,28 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                                                              _executorWithoutGossip);
 
                 _doc.setChosenName(shardName);
+
+                // Assign a UUID for the new shard when the feature flag is enabled.
+                if (!_doc.getShardUuid().has_value() &&
+                    feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabled(
+                        VersionContext::getDecoration(opCtx),
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    if (_doc.getIsConfigShard()) {
+                        // For config-shard transitions, reuse the UUID already stored in the
+                        // config server's shard identity document.
+                        auto shardIdentityDoc =
+                            ShardingInitializationMongoD::getShardIdentityDoc(opCtx);
+                        tassert(10964202,
+                                "Config server is missing shard identity document",
+                                shardIdentityDoc);
+                        tassert(10964203,
+                                "Config server's shard identity is missing UUID",
+                                shardIdentityDoc->getUuid().has_value());
+                        _doc.setShardUuid(*shardIdentityDoc->getUuid());
+                    } else {
+                        _doc.setShardUuid(UUID::gen());
+                    }
+                }
 
                 // Check if the replicaset has any residue sharding related data
                 if (!_doc.getIsConfigShard()) {
@@ -264,7 +287,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
 
                 ShardType shard;
-                shard.setName(std::string{*_doc.getChosenName()});
+                shard.setHandle(
+                    ShardHandle(ShardId(std::string{*_doc.getChosenName()}), _doc.getShardUuid()));
                 shard.setHost(targeter.connectionString().toString());
 
                 auto newTopologyTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
@@ -448,8 +472,8 @@ void AddShardCoordinator::_installShardIdentity(OperationContext* opCtx,
             apiParameters = APIParameters::fromBSON(params.value());
         }
 
-        const auto shardIdentity =
-            topology_change_helpers::createShardIdentity(opCtx, std::string{*_doc.getChosenName()});
+        const auto shardIdentity = topology_change_helpers::createShardIdentity(
+            opCtx, std::string{*_doc.getChosenName()}, _doc.getShardUuid());
 
         topology_change_helpers::installShardIdentity(
             opCtx, shardIdentity, targeter, apiParameters, _osiGenerator(), _executorWithoutGossip);
