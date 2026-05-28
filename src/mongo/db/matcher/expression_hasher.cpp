@@ -263,16 +263,16 @@ public:
     }
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
         hashCombineCommonProperties(expr);
-        combine(expr->startIndex(), *expr->getExpression());
+        combine(expr->startIndex());
     }
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {
         hashCombineCommonProperties(expr);
-        combine(expr->getNamePlaceholder(), *expr->getOtherwise());
+        combine(expr->getNamePlaceholder());
         for (const auto& prop : expr->getProperties()) {
             combine(prop);
         }
         for (const auto& pat : expr->getPatternProperties()) {
-            combine(pat.first.rawRegex, *pat.second.get());
+            combine(pat.first.rawRegex);
         }
     }
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
@@ -299,7 +299,7 @@ public:
     }
     void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
         hashCombineCommonProperties(expr);
-        combine(expr->arrayIndex(), *expr->getExpression());
+        combine(expr->arrayIndex());
     }
     void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {
         hashCombineCommonProperties(expr);
@@ -327,7 +327,6 @@ public:
     }
     void visit(const InternalSchemaObjectMatchExpression* expr) final {
         hashCombineCommonProperties(expr);
-        combine(MatchExpressionHasher{}(expr->getChild(0)));
     }
     void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {
         hashCombineCommonProperties(expr);
@@ -478,11 +477,6 @@ H hash(H h, const MatchExpression::HashParam&, const Collation& collation) {
 template <typename H>
 H hash(H h, const MatchExpression::HashParam&, const Decimal128& dec) {
     return H::combine(std::move(h), dec.getValue().low64, dec.getValue().high64);
-}
-
-template <typename H>
-H hash(H h, const MatchExpression::HashParam&, const ExpressionWithPlaceholder& dec) {
-    return H::combine(std::move(h), MatchExpressionHasher{}(dec.getFilter()), dec.getPlaceholder());
 }
 
 template <typename H>
