@@ -4,14 +4,24 @@
  * All metrics are reported via the OTel server status integration.
  *
  * @tags: [
- *   featureFlagReplicatedFastCount,
  *   requires_replication,
  * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {afterEach, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
+
+function quitIfReplicatedFastCountNotEnabled(rst, db) {
+    if (
+        PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "shouldUseReplicatedFastCount", false, rst.nodes) &&
+        !FeatureFlagUtil.isEnabled(db, "ReplicatedFastCount")
+    ) {
+        quit();
+    }
+}
 
 // Maximum amount of time that can elapse in an assert.soon() in this test before timeout. The
 // default value is 10 minutes, but server status updates should never take that long.
@@ -47,6 +57,7 @@ describe("fast count server status metric", function () {
         this.rst.initiate();
         const primary = this.rst.getPrimary();
         this.db = primary.getDB("test");
+        quitIfReplicatedFastCountNotEnabled(this.rst, this.db);
     });
 
     it("flush time", function () {
@@ -139,6 +150,7 @@ describe("is running", function () {
         this.rst = new ReplSetTest({nodes: 1});
         this.rst.startSet();
         this.db = this.rst.nodes[0].getDB("test");
+        quitIfReplicatedFastCountNotEnabled(this.rst, this.db);
     });
 
     it("before step up", function () {

@@ -3,7 +3,6 @@
  * and count deltas were persisted.
  *
  * @tags: [
- *   featureFlagReplicatedFastCount,
  *   requires_replication,
  *   requires_persistence,
  * ]
@@ -11,6 +10,8 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -19,6 +20,13 @@ rst.initiate();
 const primary = rst.getPrimary();
 const db = primary.getDB(jsTestName());
 const coll = db.getCollection(jsTestName());
+
+if (
+    PersistenceProviderUtil.allNodesHavePropertyWithValue(db, "shouldUseReplicatedFastCount", false) &&
+    !FeatureFlagUtil.isEnabled(db, "ReplicatedFastCount")
+) {
+    quit();
+}
 
 const kNumBaselineDocs = 10;
 const sampleDocSize = Object.bsonsize({_id: new ObjectId(), x: 1});
