@@ -3044,11 +3044,7 @@ class WasmStructMemoryView : public MDefinitionVisitorDefaultNoop {
   bool mergeIntoSuccessorState(MBasicBlock* curr, MBasicBlock* succ,
                                BlockState** pSuccState);
 
-#ifdef DEBUG
   void assertSuccess();
-#else
-  void assertSuccess() {}
-#endif
 
   bool oom() const { return oom_; }
 
@@ -3065,15 +3061,13 @@ void WasmStructMemoryView::setEntryBlockState(BlockState* state) {
   state_ = state;
 }
 
-#ifdef DEBUG
 void WasmStructMemoryView::assertSuccess() {
   // Make sure that the undefined value used as a placeholder is not used.
-  MOZ_ASSERT(!undefinedVal_->hasUses());
+  MOZ_RELEASE_ASSERT(!undefinedVal_->hasUses());
 
   // Make sure that the MWasmNewStruct instruction is not used anymore.
-  MOZ_ASSERT(!struct_->hasUses());
+  MOZ_RELEASE_ASSERT(!struct_->hasUses());
 }
-#endif
 
 MBasicBlock* WasmStructMemoryView::startingBlock() { return startBlock_; }
 
@@ -3323,7 +3317,7 @@ static bool IsWasmStructEscaped(MDefinition* ins, MInstruction* newStruct) {
       }
       case MDefinition::Opcode::WasmStoreFieldRef: {
         // Escaped if it's stored into another struct.
-        if (def->toWasmStoreFieldRef()->value() == newStruct) {
+        if (def->toWasmStoreFieldRef()->value() == ins) {
           JitSpewDef(JitSpew_Escape, "is escaped by\n", def);
           return true;
         }

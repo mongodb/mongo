@@ -1820,14 +1820,15 @@ enum GetCapabilitiesExecutorSlots {
  * https://tc39.es/ecma262/#sec-promise-executor
  */
 [[nodiscard]] PromiseObject* js::CreatePromiseObjectWithoutResolutionFunctions(
-    JSContext* cx) {
+    JSContext* cx, int32_t extraFlags) {
   // Steps 3-7.
   PromiseObject* promise = CreatePromiseObjectInternal(cx);
   if (!promise) {
     return nullptr;
   }
 
-  AddPromiseFlags(*promise, PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS);
+  AddPromiseFlags(*promise,
+                  PROMISE_FLAG_DEFAULT_RESOLVING_FUNCTIONS | extraFlags);
 
   // Step 11. Return promise.
   return promise;
@@ -5625,12 +5626,12 @@ static bool OriginalPromiseThenBuiltin(JSContext* cx, HandleValue promiseVal,
  */
 [[nodiscard]] PromiseObject* js::CreatePromiseObjectForAsync(JSContext* cx) {
   // Step 1. Let promiseCapability be ! NewPromiseCapability(%Promise%).
-  PromiseObject* promise = CreatePromiseObjectWithoutResolutionFunctions(cx);
+  PromiseObject* promise =
+      CreatePromiseObjectWithoutResolutionFunctions(cx, PROMISE_FLAG_ASYNC);
   if (!promise) {
     return nullptr;
   }
 
-  AddPromiseFlags(*promise, PROMISE_FLAG_ASYNC);
   return promise;
 }
 
@@ -5641,12 +5642,12 @@ bool js::IsPromiseForAsyncFunctionOrGenerator(JSObject* promise) {
 
 [[nodiscard]] PromiseObject* js::CreatePromiseObjectForAsyncGenerator(
     JSContext* cx) {
-  PromiseObject* promise = CreatePromiseObjectWithoutResolutionFunctions(cx);
+  PromiseObject* promise =
+      CreatePromiseObjectWithoutResolutionFunctions(cx, PROMISE_FLAG_ASYNC);
   if (!promise) {
     return nullptr;
   }
 
-  AddPromiseFlags(*promise, PROMISE_FLAG_ASYNC);
   return promise;
 }
 
@@ -5692,6 +5693,15 @@ bool js::IsPromiseForAsyncFunctionOrGenerator(JSObject* promise) {
  */
 [[nodiscard]] bool js::AsyncFunctionReturned(
     JSContext* cx, Handle<PromiseObject*> resultPromise, HandleValue value) {
+  if (resultPromise->state() != JS::PromiseState::Pending) {
+    if (!WarnNumberASCII(cx, JSMSG_UNHANDLABLE_PROMISE_RESOLUTION_WARNING)) {
+      if (cx->isExceptionPending()) {
+        cx->clearPendingException();
+      }
+    }
+    return true;
+  }
+
   // Step 4.e. Else if result.[[Type]] is return, then
   // Step 4.e.i. Perform
   //             ! Call(promiseCapability.[[Resolve]], undefined,

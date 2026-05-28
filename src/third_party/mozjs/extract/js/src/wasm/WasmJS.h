@@ -233,6 +233,7 @@ class WasmInstanceObject : public NativeObject {
 
   wasm::Instance& instance() const;
   JSObject& exportsObj() const;
+  WasmFunctionScope* getExistingFunctionScope(uint32_t funcIndex) const;
 
   [[nodiscard]] static bool getExportedFunction(
       JSContext* cx, Handle<WasmInstanceObject*> instanceObj,

@@ -129,6 +129,12 @@ inline void SetObjectISupports(JSObject* obj, void* nsISupportsValue) {
   SetReservedSlot(obj, 0, PrivateValue(nsISupportsValue));
 }
 
+/**
+ * Returns true if the native object has own named properties, i.e. user-added
+ * properties (expandos). Must not be called on proxy objects.
+ */
+extern JS_PUBLIC_API bool NativeObjectHasOwnProperties(const JSObject* obj);
+
 }  // namespace JS
 
 // JSObject* is an aligned pointer, but this information isn't available in the

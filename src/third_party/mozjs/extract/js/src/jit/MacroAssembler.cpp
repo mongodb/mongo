@@ -5765,6 +5765,7 @@ static ReturnCallTrampolineData MakeReturnCallTrampoline(MacroAssembler& masm) {
   masm.loadPtr(
       Address(masm.getStackPointer(), WasmCallerInstanceOffsetBeforeCall),
       InstanceReg);
+  masm.loadWasmPinnedRegsFromInstance(mozilla::Nothing());
   masm.switchToWasmInstanceRealm(ABINonArgReturnReg0, ABINonArgReturnReg1);
   masm.moveToStackPtr(FramePointer);
 #ifdef JS_CODEGEN_ARM64

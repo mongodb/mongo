@@ -43,7 +43,7 @@ class IonCompilationId {
 
 namespace jit {
 
-using RecoverOffset = uint32_t;
+using RecoverOffset = uint64_t;
 using SnapshotOffset = uint32_t;
 
 // The maximum size of any buffer associated with an assembler or code object.
@@ -54,8 +54,8 @@ static const uint32_t MAX_BUFFER_SIZE = (1 << 30) - 1;
 // Maximum number of scripted arg slots.
 static const uint32_t SNAPSHOT_MAX_NARGS = 127;
 
-static const SnapshotOffset INVALID_RECOVER_OFFSET = uint32_t(-1);
-static const SnapshotOffset INVALID_SNAPSHOT_OFFSET = uint32_t(-1);
+static const RecoverOffset INVALID_RECOVER_OFFSET = RecoverOffset(-1);
+static const SnapshotOffset INVALID_SNAPSHOT_OFFSET = SnapshotOffset(-1);
 
 /*
  * [SMDOC] Avoiding repeated bailouts / invalidations

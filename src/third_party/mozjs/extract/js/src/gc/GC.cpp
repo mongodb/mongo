@@ -2194,8 +2194,11 @@ void GCRuntime::decommitEmptyChunks(const bool& cancel, AutoLockGC& lock) {
       break;
     }
 
-    // Check whether something used the chunk while lock was released.
-    if (!CanDecommitWholeChunk(chunk)) {
+    // Check whether something used the chunk while the lock was released. The
+    // chunk may have been taken from the empty chunks pool (e.g. adopted as
+    // the current chunk, or repurposed as a nursery/buffer chunk), so we must
+    // verify it is still a member of the pool before removing it.
+    if (!emptyChunks(lock).contains(chunk) || !CanDecommitWholeChunk(chunk)) {
       continue;
     }
 

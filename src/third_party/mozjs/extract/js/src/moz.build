@@ -258,6 +258,7 @@ EXPORTS.js.experimental += [
 # a clean design.  Use this only if you absolutely must, and feel free to
 # propose clean APIs to replace what's here!
 EXPORTS.js.friend += [
+    "../public/friend/CycleCollector.h",
     "../public/friend/DOMProxy.h",
     "../public/friend/DumpFunctions.h",
     "../public/friend/ErrorMessages.h",
