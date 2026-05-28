@@ -14,6 +14,7 @@ mongo_cc_library(
     srcs = [
         "query_knob.cpp",
         "query_knob_registry.cpp",
+        "query_knob_snapshot.cpp",
     ],
     hdrs = [
         "query_knob.h",

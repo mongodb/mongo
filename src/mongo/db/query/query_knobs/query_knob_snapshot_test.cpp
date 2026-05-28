@@ -34,6 +34,15 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/fail_point.h"
+
+#include <chrono>
+#include <cstddef>
+#include <future>
+#include <tuple>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {
@@ -223,6 +232,144 @@ DEATH_TEST_REGEX(QueryKnobSnapshotDeathTest,
                  "12611000.*invalid call to QueryKnobSnapshot::build\\(\\) with unset query knob "
                  "values") {
     std::ignore = QueryKnobSnapshotBuilder(1).build();
+}
+
+// Builds a snapshot of 'n' slots, all set to 0.
+QueryKnobSnapshot makeSnapshot(size_t n) {
+    QueryKnobSnapshotBuilder b{n};
+    for (QueryKnobId::value_t i = 0; i < n; ++i) {
+        b.set(QueryKnobId{i}, QueryKnobValue{0}, KnobSource::kDefault);
+    }
+    return std::move(b).build();
+}
+
+TEST(QueryKnobSnapshotCacheTest, GetSnapshotReturnsInitialValue) {
+    QueryKnobSnapshotCache cache{makeSnapshot(1)};
+    ASSERT_EQ(cache.getSnapshot().get<int>(QueryKnobId{0}), 0);
+}
+
+TEST(QueryKnobSnapshotCacheTest, UpdateDoesNotMutateSnapshotAlreadyHeld) {
+    QueryKnobSnapshotCache cache{makeSnapshot(1)};
+    auto before = cache.getSnapshot();
+    cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{99}, KnobSource::kSetParameter);
+    ASSERT_EQ(before.get<int>(QueryKnobId{0}), 0);
+    ASSERT_EQ(before.getSource(QueryKnobId{0}), KnobSource::kDefault);
+}
+
+TEST(QueryKnobSnapshotCacheTest, SequentialUpdatesCompose) {
+    QueryKnobSnapshotCache cache{makeSnapshot(2)};
+
+    cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{42}, KnobSource::kSetParameter);
+    {
+        auto snap = cache.getSnapshot();
+        ASSERT_EQ(snap.get<int>(QueryKnobId{0}), 42);
+        ASSERT_EQ(snap.getSource(QueryKnobId{0}), KnobSource::kSetParameter);
+        ASSERT_EQ(snap.get<int>(QueryKnobId{1}), 0);
+        ASSERT_EQ(snap.getSource(QueryKnobId{1}), KnobSource::kDefault);
+    }
+
+    // A second update on the same slot must transition both the value and the source, while
+    // leaving the untouched slot alone.
+    cache.updateKnobValue(QueryKnobId{1}, QueryKnobValue{7}, KnobSource::kQuerySettings);
+    {
+        auto snap = cache.getSnapshot();
+        ASSERT_EQ(snap.get<int>(QueryKnobId{0}), 42);
+        ASSERT_EQ(snap.getSource(QueryKnobId{0}), KnobSource::kSetParameter);
+        ASSERT_EQ(snap.get<int>(QueryKnobId{1}), 7);
+        ASSERT_EQ(snap.getSource(QueryKnobId{1}), KnobSource::kQuerySettings);
+    }
+}
+
+// Writer A pinned inside the intent-locked critical section must block writer B at the intent
+// lock. After A is released, B reads A's installed snapshot as its base, so both updates are
+// preserved (no lost update).
+TEST(QueryKnobSnapshotCacheTest, WritersAreSerializedByIntentLock) {
+    QueryKnobSnapshotCache cache{makeSnapshot(2)};
+
+    boost::optional<FailPointEnableBlock> fp;
+    fp.emplace("hangInQueryKnobSnapshotCacheUpdate");
+    const auto initial = fp->initialTimesEntered();
+
+    auto aFut = std::async(std::launch::async, [&] {
+        cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{1}, KnobSource::kSetParameter);
+    });
+    (*fp)->waitForTimesEntered(initial + 1);
+
+    auto bFut = std::async(std::launch::async, [&] {
+        cache.updateKnobValue(QueryKnobId{1}, QueryKnobValue{2}, KnobSource::kSetParameter);
+    });
+
+    // While A is parked holding the intent lock, B must be blocked at the lock acquisition.
+    ASSERT_EQ(bFut.wait_for(std::chrono::milliseconds(50)), std::future_status::timeout);
+
+    fp.reset();
+    aFut.get();
+    bFut.get();
+
+    auto snap = cache.getSnapshot();
+    ASSERT_EQ(snap.get<int>(QueryKnobId{0}), 1);
+    ASSERT_EQ(snap.get<int>(QueryKnobId{1}), 2);
+}
+
+TEST(QueryKnobSnapshotCacheTest, HeldReadLockBlocksWriterInstall) {
+    QueryKnobSnapshotCache cache{makeSnapshot(1)};
+
+    boost::optional<FailPointEnableBlock> fp;
+    fp.emplace("hangInQueryKnobSnapshotCacheRead");
+    const auto initial = fp->initialTimesEntered();
+
+    auto readerFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
+    (*fp)->waitForTimesEntered(initial + 1);
+
+    auto writerFut = std::async(std::launch::async, [&] {
+        cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{1}, KnobSource::kSetParameter);
+    });
+    ASSERT_EQ(writerFut.wait_for(std::chrono::milliseconds(50)), std::future_status::timeout);
+
+    fp.reset();
+    readerFut.get();
+    writerFut.get();
+    ASSERT_EQ(cache.getSnapshot().get<int>(QueryKnobId{0}), 1);
+}
+
+TEST(QueryKnobSnapshotCacheTest, WriterBuildPhaseDoesNotBlockReaders) {
+    QueryKnobSnapshotCache cache{makeSnapshot(1)};
+    cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{1}, KnobSource::kSetParameter);
+
+    boost::optional<FailPointEnableBlock> fp;
+    fp.emplace("hangInQueryKnobSnapshotCacheUpdate");
+    const auto initial = fp->initialTimesEntered();
+
+    auto writerFut = std::async(std::launch::async, [&] {
+        cache.updateKnobValue(QueryKnobId{0}, QueryKnobValue{2}, KnobSource::kSetParameter);
+    });
+    (*fp)->waitForTimesEntered(initial + 1);
+
+    // Writer is parked after building, before taking the write lock. A concurrent reader
+    // must see the pre-write value without blocking.
+    ASSERT_EQ(cache.getSnapshot().get<int>(QueryKnobId{0}), 1);
+
+    fp.reset();
+    writerFut.get();
+    ASSERT_EQ(cache.getSnapshot().get<int>(QueryKnobId{0}), 2);
+}
+
+TEST(QueryKnobSnapshotCacheTest, ConcurrentReadersDontBlockEachOther) {
+    QueryKnobSnapshotCache cache{makeSnapshot(1)};
+
+    boost::optional<FailPointEnableBlock> fp;
+    fp.emplace("hangInQueryKnobSnapshotCacheRead");
+    const auto initial = fp->initialTimesEntered();
+
+    auto readerAFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
+    (*fp)->waitForTimesEntered(initial + 1);
+
+    auto readerBFut = std::async(std::launch::async, [&] { std::ignore = cache.getSnapshot(); });
+    (*fp)->waitForTimesEntered(initial + 2);
+
+    fp.reset();
+    readerAFut.get();
+    readerBFut.get();
 }
 
 }  // namespace
