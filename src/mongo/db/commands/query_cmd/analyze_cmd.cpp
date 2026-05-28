@@ -48,21 +48,29 @@
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/analyze_command_gen.h"
+#include "mongo/db/query/compiler/ce/sampling/persistent_sample_loader.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
 #include "mongo/db/query/compiler/stats/stats_catalog.h"
 #include "mongo/db/query/compiler/stats/stats_for_histograms_gen.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_role.h"
+#include "mongo/db/version_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
+#include <cmath>
 #include <cstddef>
 #include <memory>
 #include <set>
@@ -134,6 +142,125 @@ StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
                             << BSONObj() << "allowDiskUse" << false);
 }
 
+void runSampleMode(OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   boost::optional<int> sampleSizeOpt,
+                   boost::optional<SamplingCEMethodEnum> samplingMethodOpt,
+                   boost::optional<int> numChunksOpt) {
+    uassert(
+        ErrorCodes::CommandNotSupported,
+        "The analyze command with sampling mode requires featureFlagPersistentStats to be enabled",
+        feature_flags::gFeatureFlagPersistentStats.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
+    uassert(12433001,
+            str::stream() << "Must provide samplingMethod when using mode 'sample'",
+            samplingMethodOpt);
+
+    SamplingCEMethodEnum samplingMethod = samplingMethodOpt.value();
+
+    boost::optional<UUID> collUUID;
+    BSONArrayBuilder docsArr;
+    size_t sampleSize;
+
+    {
+        // Acquire the collection to read metadata and run the sampling estimator. The acquisition
+        // must remain live for the duration of sampling.
+        auto coll = acquireCollectionMaybeLockFree(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
+
+        uassert(12433000,
+                str::stream() << "Couldn't find collection " << nss.toStringForErrorMsg(),
+                coll.exists());
+        const auto& collectionPtr = coll.getCollectionPtr();
+
+        // TODO SERVER-127022: Remove this once samplingCE supports timeseries collections
+        uassert(ErrorCodes::CommandNotSupported,
+                "Analyze command is not supported on timeseries collections",
+                !collectionPtr->isTimeseriesCollection() ||
+                    !collectionPtr->isNewTimeseriesWithoutView());
+
+        collUUID = collectionPtr->uuid();
+        long long numRecords = collectionPtr->numRecords(opCtx);
+
+        if (sampleSizeOpt) {
+            sampleSize = *sampleSizeOpt;
+        } else {
+            QueryKnobConfiguration qkc(query_settings::QuerySettings{});
+            sampleSize = ce::SamplingEstimatorImpl::calculateSampleSize(
+                qkc.getConfidenceInterval(), qkc.getSamplingMarginOfError());
+        }
+
+        if (samplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt) {
+            numChunksOpt = internalQueryNumChunksForChunkBasedSampling.load();
+        }
+
+        tassert(12433003,
+                "numChunks must be set for chunk-based sampling",
+                !(samplingMethod == SamplingCEMethodEnum::kChunk && !numChunksOpt));
+
+        MultipleCollectionAccessor collections(coll);
+
+        // Use kOnTheFlySample to force collection of a new sample rather than attempting to read an
+        // existing one.
+        // TODO SERVER-127210: Investigate if this is the right yield policy to ensure we sample
+        // from a consistent snapshot.
+        ce::SamplingEstimatorImpl estimator(opCtx,
+                                            collections,
+                                            nss,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                            sampleSize,
+                                            samplingMethod,
+                                            numChunksOpt,
+                                            numRecords,
+                                            SamplingSourceEnum::kOnTheFlySample);
+        estimator.generateSample(ce::NoProjection{});
+
+        // Append a copy of each document to the array to persist in the sample doc.
+        const auto& sample = estimator.getSample();
+        for (const auto& doc : sample) {
+            docsArr.append(doc);
+        }
+    }
+
+    tassert(12433002, "collUUID must be initialized by end of sampling block", collUUID);
+
+    std::string docId =
+        ce::buildPersistentSampleId(*collUUID, samplingMethod, sampleSize, numChunksOpt);
+
+    // Build the sample document using IDL field name constants to guarantee the stored document
+    // matches the schema expected by PersistentSampleLoader.
+    BSONObjBuilder sampleDocBuilder;
+    sampleDocBuilder.append(ce::PersistentSampleDoc::k_idFieldName, docId);
+    sampleDocBuilder.append(ce::PersistentSampleDoc::kCollectionUuidFieldName,
+                            collUUID->toString());
+    sampleDocBuilder.append(ce::PersistentSampleDoc::kSchemaVersionFieldName, 1);
+    sampleDocBuilder.appendDate(ce::PersistentSampleDoc::kCreatedAtFieldName, Date_t::now());
+    sampleDocBuilder.append(ce::PersistentSampleDoc::kSampleSizeFieldName,
+                            static_cast<long long>(sampleSize));
+    sampleDocBuilder.append(ce::PersistentSampleDoc::kSamplingMethodFieldName,
+                            idlSerialize(samplingMethod));
+    if (samplingMethod == SamplingCEMethodEnum::kChunk) {
+        sampleDocBuilder.append(ce::PersistentSampleDoc::kNumChunksFieldName, *numChunksOpt);
+    }
+    sampleDocBuilder.append(ce::PersistentSampleDoc::kDocsFieldName, docsArr.arr());
+    BSONObj sampleDoc = sampleDocBuilder.obj();
+
+    DBDirectClient client(opCtx);
+
+    // Upsert into system.stats.samples.
+    BSONObj updateResult;
+    client.runCommand(nss.dbName(),
+                      BSON("update" << NamespaceString::kStatsSamplesCollectionName << "updates"
+                                    << BSON_ARRAY(BSON("q" << BSON("_id" << docId) << "u"
+                                                           << sampleDoc << "upsert" << true))),
+                      updateResult);
+
+    uassertStatusOK(getStatusFromCommandResult(updateResult));
+}
+
 class CmdAnalyze final : public TypedCommand<CmdAnalyze> {
 public:
     using Request = AnalyzeCommandRequest;
@@ -166,11 +293,24 @@ public:
             const auto& cmd = request();
             const NamespaceString& nss = ns();
 
+            // TODO SERVER-127476: Make sample mode the default
+            auto mode = cmd.getMode();
+            if (mode && *mode == AnalyzeModeEnum::kSample) {
+                runSampleMode(
+                    opCtx, nss, cmd.getSampleSize(), cmd.getSamplingMethod(), cmd.getNumChunks());
+                return;
+            }
+
+            auto key = cmd.getKey();
+            if (mode && *mode == AnalyzeModeEnum::kHistograms) {
+                uassert(9820001, "Histograms mode requires a key to be specified", key);
+            }
+
             // Sample rate and sample size can't both be present
             auto sampleRate = cmd.getSampleRate();
             auto sampleSize = cmd.getSampleSize();
             uassert(6799705,
-                    "Only one of sample rate and sample size may be present",
+                    "Only one of sampleRate and sampleSize may be present",
                     !sampleRate || !sampleSize);
 
             // Validate collection
@@ -223,7 +363,6 @@ public:
             }
 
             // Validate key
-            auto key = cmd.getKey();
             if (key) {
                 const FieldRef keyFieldRef(*key);
 
@@ -270,8 +409,10 @@ public:
                 uassertStatusOK(statsCatalog.invalidatePath(nss, std::string{*key}));
 
             } else if (sampleSize || sampleRate) {
-                uassert(
-                    6799706, "It is illegal to pass sampleRate or sampleSize without a key", key);
+                uassert(6799706,
+                        "It is illegal to pass sampleRate or sampleSize without a key in "
+                        "histograms mode",
+                        key);
             }
         }
 

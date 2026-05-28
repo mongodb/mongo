@@ -405,6 +405,7 @@ idl_generator(
     name = "analyze_command_gen",
     src = "analyze_command.idl",
     deps = [
+        ":query_optimization_knobs_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/auth:access_checks_gen",
         "//src/mongo/db/auth:action_type_gen",

@@ -130,6 +130,10 @@ bool NamespaceString::isLegalClientSystemNS() const {
         return true;
     }
 
+    if (isStatsSamplesCollection()) {
+        return true;
+    }
+
     return false;
 }
 

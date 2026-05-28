@@ -343,3 +343,15 @@ mongo_cc_library(
         "//src/mongo/db/query/client_cursor",
     ],
 )
+
+mongo_cc_unit_test(
+    name = "analyze_cmd_test",
+    srcs = [
+        "analyze_cmd_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/idl:idl_parser",
+    ],
+)

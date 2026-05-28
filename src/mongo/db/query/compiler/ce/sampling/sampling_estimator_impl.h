@@ -99,6 +99,21 @@ public:
         CardinalityEstimate collectionCard,
         SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
 
+    /*
+     * Convenience constructor that accepts a raw record count instead of a CardinalityEstimate,
+     * for callers outside the cost_based_ranker module that cannot construct CardinalityType.
+     */
+    SamplingEstimatorImpl(
+        OperationContext* opCtx,
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
+        size_t sampleSize,
+        SamplingCEMethodEnum samplingStyle,
+        boost::optional<int> numChunks,
+        long long numRecords,
+        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
+
     ~SamplingEstimatorImpl() override;
 
     /**
@@ -196,6 +211,13 @@ public:
      */
     inline size_t getSampleSize() const final {
         return _sampleSize;
+    }
+
+    /**
+     * Returns the collected sample documents.
+     */
+    const std::vector<BSONObj>& getSample() const {
+        return _sample;
     }
 
     /*

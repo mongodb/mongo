@@ -34,6 +34,15 @@ imports:
     - "mongo/db/auth/access_checks.idl"
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/basic_types.idl"
+    - "mongo/db/query/query_optimization_knobs.idl"
+
+enums:
+    AnalyzeMode:
+        description: "Mode controlling what the analyze command generates."
+        type: string
+        values:
+            kSample: "sample"
+            kHistograms: "histograms"
 
 commands:
     analyze:
@@ -71,6 +80,19 @@ commands:
                 optional: true
             numberBuckets:
                 description: "The number of buckets used for creating the histogram."
+                type: safeInt
+                validator: {gt: 0}
+                optional: true
+            mode:
+                description: "Whether to collect a persistent sample or build histograms."
+                type: AnalyzeMode
+                optional: true
+            samplingMethod:
+                description: "The sampling method to use when mode is 'sample'."
+                type: SamplingCEMethod
+                optional: true
+            numChunks:
+                description: "The number of chunks to use when samplingMethod is 'chunk'."
                 type: safeInt
                 validator: {gt: 0}
                 optional: true

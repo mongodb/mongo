@@ -80,6 +80,9 @@ public:
     // Prefix for the collection storing collection statistics.
     static constexpr StringData kStatisticsCollectionPrefix = "system.statistics."_sd;
 
+    // Name for the collection storing persistent document samples.
+    static constexpr StringData kStatsSamplesCollectionName = "system.stats.samples"_sd;
+
     // Name for the profile collection
     static constexpr StringData kSystemDotProfileCollectionName = "system.profile"_sd;
 
@@ -451,6 +454,9 @@ public:
     }
     bool isServerConfigurationCollection() const {
         return isAdminDB() && (coll() == "system.version");
+    }
+    bool isStatsSamplesCollection() const {
+        return coll() == kStatsSamplesCollectionName;
     }
     bool isPrivilegeCollection() const {
         if (!isAdminDB()) {

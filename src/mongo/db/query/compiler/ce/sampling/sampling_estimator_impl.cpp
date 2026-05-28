@@ -977,6 +977,28 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
                             collectionCard,
                             samplingSource) {}
 
+SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
+                                             const MultipleCollectionAccessor& collections,
+                                             const NamespaceString& nss,
+                                             PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                             size_t sampleSize,
+                                             SamplingCEMethodEnum samplingStyle,
+                                             boost::optional<int> numChunks,
+                                             long long numRecords,
+                                             SamplingSourceEnum samplingSource)
+    : SamplingEstimatorImpl(opCtx,
+                            collections,
+                            nss,
+                            yieldPolicy,
+                            sampleSize,
+                            samplingStyle,
+                            numChunks,
+                            CardinalityEstimate{CardinalityType{static_cast<double>(numRecords)},
+                                                EstimationSource::Metadata},
+                            samplingSource) {}
+
+SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
+
 Status SamplingEstimatorImpl::tryLoadPersistentSample(SamplingCEMethodEnum method,
                                                       size_t sampleSize) {
     if (!feature_flags::gFeatureFlagPersistentStats.isEnabled(
@@ -1034,8 +1056,6 @@ SamplingMetadata SamplingEstimatorImpl::getSamplingMetadata() const {
     meta.createdAt = _sampleCreatedAt;
     return meta;
 }
-
-SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 
 CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
     const std::vector<FieldPathAndEqSemantics>& fields,
