@@ -376,14 +376,6 @@ TEST_F(ShardCatalogHistoryCleanupTest, SkipsCleanupWhenCollectionCriticalSection
 
     const auto kStaleNss = NamespaceStringUtil::deserialize(
         boost::none, "test.stale_collection", SerializationContext::stateDefault());
-    setupCollection(operationContext(),
-                    kStaleNss,
-                    false /* isCurrentlyOwned */,
-                    false /* isOutdatedButActive */,
-                    true /* isFullyOutdated */,
-                    newTimestamp,
-                    oldTimestamp,
-                    oldestTimestamp);
 
     const auto csReason = BSON("reason" << "test");
 
@@ -397,6 +389,16 @@ TEST_F(ShardCatalogHistoryCleanupTest, SkipsCleanupWhenCollectionCriticalSection
         csr->enterCriticalSectionCatchUpPhase(operationContext(), csReason);
         csr->enterCriticalSectionCommitPhase(operationContext(), csReason);
     }
+
+    setupCollection(operationContext(),
+                    kStaleNss,
+                    false /* isCurrentlyOwned */,
+                    false /* isOutdatedButActive */,
+                    true /* isFullyOutdated */,
+                    newTimestamp,
+                    oldTimestamp,
+                    oldestTimestamp);
+
 
     waitForTimestampMonitorPass();
 
@@ -435,14 +437,6 @@ TEST_F(ShardCatalogHistoryCleanupTest, SkipsCleanupWhenDatabaseCriticalSectionAc
 
     const auto kStaleNss = NamespaceStringUtil::deserialize(
         boost::none, "test.stale_collection", SerializationContext::stateDefault());
-    setupCollection(operationContext(),
-                    kStaleNss,
-                    false /* isCurrentlyOwned */,
-                    false /* isOutdatedButActive */,
-                    true /* isFullyOutdated */,
-                    newTimestamp,
-                    oldTimestamp,
-                    oldestTimestamp);
 
     const auto csReason = BSON("reason" << "test");
 
@@ -453,6 +447,15 @@ TEST_F(ShardCatalogHistoryCleanupTest, SkipsCleanupWhenDatabaseCriticalSectionAc
         dsr->enterCriticalSectionCatchUpPhase(operationContext(), csReason);
         dsr->enterCriticalSectionCommitPhase(operationContext(), csReason);
     }
+
+    setupCollection(operationContext(),
+                    kStaleNss,
+                    false /* isCurrentlyOwned */,
+                    false /* isOutdatedButActive */,
+                    true /* isFullyOutdated */,
+                    newTimestamp,
+                    oldTimestamp,
+                    oldestTimestamp);
 
     waitForTimestampMonitorPass();
 

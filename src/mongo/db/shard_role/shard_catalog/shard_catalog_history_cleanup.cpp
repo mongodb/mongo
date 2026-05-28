@@ -216,27 +216,16 @@ StorageEngine::TimestampMonitor::TimestampListener kShardCatalogHistoryCleanupTi
                       "collection"_attr = collNss);
                 cleanupCollectionEntry(opCtx, collNss);
             }
-        } catch (const ExceptionFor<ErrorCodes::FailedToSatisfyReadPreference>&) {
-            // Primary can be killed in the middle of the removal.
-            return;
-        } catch (const ExceptionFor<ErrorCodes::WriteConcernTimeout>&) {
-            // Best-effort cleanup; retry on next pass.
-            return;
-        } catch (const ExceptionFor<ErrorCodes::InternalError>& ex) {
-            // Ignore failAllRemoves failpoint
-            if (ex.reason().find("failAllRemoves") != std::string::npos) {
-                return;
-            }
-            // Otherwise, re-throw the internal error
-            throw;
         } catch (const DBException& exception) {
             auto status = exception.toStatus();
-            // Stepdown / primary change mid-removal; next oldest-timestamp pass will retry.
-            if (ErrorCodes::isNotPrimaryError(status.code())) {
-                return;
-            }
-            // Otherwise, re-throw the DBException
-            throw;
+            // We log and ignore the error as it will have no impact on the current state of the
+            // shard catalog. It also prevents unnecessary noisy nodes (i.e. crashing) for an error
+            // that is quite possibly temporary.
+            LOGV2_WARNING(
+                12775300,
+                "Ignoring exception for shard catalog cleanup, this should be a temporary issue",
+                "ex"_attr = status);
+            return;
         }
     });
 }  // namespace mongo::shard_catalog_helper
