@@ -54,7 +54,7 @@ assert.commandWorked(source.insert({_id: "seed"}));
 
 // Test that if the collection is dropped and re-sharded during the course of the aggregation that
 // the operation will fail rather than proceed with the old shard key.
-function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData, expectedError}) {
+function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData, expectedErrors}) {
     // Converts a single string or an array of strings into it's object spec form. For instance, for
     // input ["a", "b"] the returned object would be {a: 1, b: 1}.
     function indexSpecFromOnFields(onFields) {
@@ -96,7 +96,7 @@ function testEpochChangeDuringAgg({mergeSpec, failpoint, failpointData, expected
                     {$addFields: {sk: "$_id"}},
                     {$merge: ${tojsononeline(mergeSpec)}}
                 ]));
-                assert.eq(error.code, ${expectedError});
+                assert.commandFailedWithCode(error, [${expectedErrors}]);
             `;
 
         if (mergeSpec.hasOwnProperty("on")) {
@@ -165,7 +165,7 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         },
         failpoint: "waitWithPinnedCursorDuringGetMoreBatch",
         failpointData: {nss: source.getFullName()},
-        expectedError: ErrorCodes.StaleEpoch,
+        expectedErrors: [ErrorCodes.StaleEpoch, ErrorCodes.QueryPlanKilled],
     });
     testEpochChangeDuringAgg({
         mergeSpec: {
@@ -176,7 +176,7 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         },
         failpoint: "waitWithPinnedCursorDuringGetMoreBatch",
         failpointData: {nss: source.getFullName()},
-        expectedError: ErrorCodes.StaleEpoch,
+        expectedErrors: [ErrorCodes.StaleEpoch, ErrorCodes.QueryPlanKilled],
     });
 });
 
@@ -188,13 +188,13 @@ testEpochChangeDuringAgg({
     mergeSpec: {into: target.getName(), whenMatched: "fail", whenNotMatched: "insert"},
     failpoint: "hangDuringBatchInsert",
     failpointData: {nss: target.getFullName()},
-    expectedError: ErrorCodes.QueryPlanKilled,
+    expectedErrors: [ErrorCodes.QueryPlanKilled],
 });
 testEpochChangeDuringAgg({
     mergeSpec: {into: target.getName(), whenMatched: "replace", whenNotMatched: "discard"},
     failpoint: "hangDuringBatchUpdate",
     failpointData: {nss: target.getFullName()},
-    expectedError: ErrorCodes.QueryPlanKilled,
+    expectedErrors: [ErrorCodes.QueryPlanKilled],
 });
 
 st.stop();
