@@ -1285,7 +1285,6 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
             nKeys = 0;
         }
     };
-    ON_BLOCK_EXIT([&] { commitBatch(); });
 
     while (it && it->more()) {
         opCtx->checkForInterrupt();
@@ -1381,6 +1380,9 @@ Status BulkBuilderImpl::commit(OperationContext* opCtx,
             pm.get(lk)->hit();
         }
     }
+
+    // Final flush of any remaining batched keys.
+    commitBatch();
 
     {
         std::unique_lock<Client> lk(*opCtx->getClient());
