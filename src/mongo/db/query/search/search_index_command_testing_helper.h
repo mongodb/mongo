@@ -209,11 +209,11 @@ inline void blockUntilIndexQueryable(OperationContext* opCtx,
     // TODO SERVER-101359 dynamically set maxTimeout depending on if we're running on evergreen or
     // locally.
     auto maxTimeout = Milliseconds(10 * 60 * 1000);
-    auto runElapsed = Milliseconds(0);
     auto executor = Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor();
 
     for (auto& host : allClusterHosts) {
         auto runStart = clock.now();
+        auto runElapsed = Milliseconds(0);
         do {
             executor::RemoteCommandRequest request(host,
                                                    dbName,
@@ -254,9 +254,18 @@ inline void blockUntilIndexQueryable(OperationContext* opCtx,
 
             if (!response.isOK()) {
                 if (!Shard::shouldErrorBePropagated(response.status.code())) {
-                    uasserted(ErrorCodes::OperationFailed,
-                              str::stream() << "failed to run command " << listSearchIndexesCmdObj
-                                            << causedBy(response.status));
+                    // Covers NetworkInterfaceExceededTimeLimit and mongos-retriable network
+                    // errors. On slow sanitizer builds (e.g. aubsan), shards can take longer
+                    // than kRemoteCommandTimeout to respond. Retry rather than throw so
+                    // transient slowness doesn't cause a spurious BF.
+                    LOGV2_DEBUG(9638407,
+                                1,
+                                "blockUntilIndexQueryable: retriable error, retrying",
+                                "host"_attr = host,
+                                "error"_attr = response.status);
+                    opCtx->sleepFor(kRetryPeriodMs);
+                    runElapsed = clock.now() - runStart;
+                    continue;
                 }
                 uassertStatusOK(response.status);
             }
@@ -294,10 +303,10 @@ inline void blockUntilIndexQueryable(OperationContext* opCtx,
 
             runElapsed = clock.now() - runStart;
         } while (runElapsed < maxTimeout);
-    }
 
-    if (runElapsed > maxTimeout) {
-        uasserted(9638406, "Index is not replicated and queryable within the max timeout");
+        if (runElapsed > maxTimeout) {
+            uasserted(9638406, "Index is not replicated and queryable within the max timeout");
+        }
     }
 }
 
