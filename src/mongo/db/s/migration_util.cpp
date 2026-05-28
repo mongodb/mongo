@@ -356,6 +356,10 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
 }
 
 void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx, long long term) {
+    // TODO (SERVER-127230): When the donor-side migration recovery is owned by MoveRangeCoordinator
+    // and its persisted state in config.system.sharding_ddl_coordinators, note that the legacy
+    // recovery driven from config.migrationCoordinators below races with the coordinator's own
+    // recovery and should be skipped
     LOGV2_DEBUG(4798510, 2, "Starting migration coordinator step-up recovery", "term"_attr = term);
 
     const auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();

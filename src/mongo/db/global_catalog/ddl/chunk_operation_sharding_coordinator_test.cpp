@@ -35,6 +35,7 @@
 #include "mongo/db/global_catalog/ddl/split_chunk_coordinator.h"
 #include "mongo/db/global_catalog/ddl/test_chunk_operation_sharding_coordinator_document_gen.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
+#include "mongo/db/s/move_range_coordinator.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 
@@ -159,6 +160,28 @@ protected:
         metadata.setForwardableOpMetadata(forwardableOpMetadata);
         doc.setShardingCoordinatorMetadata(std::move(metadata));
         doc.setShardsvrSplitChunkRequest(req);
+        return doc;
+    }
+
+    MoveRangeCoordinatorDocument makeMoveRangeCoordinatorDoc(BSONObj min,
+                                                             BSONObj max,
+                                                             ShardId fromShard,
+                                                             ShardId toShard) {
+        MoveRangeCoordinatorDocument doc;
+        ShardsvrMoveRangeRequest req;
+        req.setToShard(toShard);
+        req.setMin(min);
+        req.setMax(max);
+        req.setFromShard(fromShard);
+        req.setCollectionTimestamp(Timestamp(1, 1));
+        req.setMaxChunkSizeBytes(64 * 1024 * 1024);
+        ShardingCoordinatorMetadata metadata{
+            {NamespaceString::createNamespaceString_forTest("test.move"),
+             CoordinatorTypeEnum::kMoveRange}};
+        ForwardableOperationMetadata forwardableOpMetadata(_opCtx);
+        metadata.setForwardableOpMetadata(forwardableOpMetadata);
+        doc.setShardingCoordinatorMetadata(std::move(metadata));
+        doc.setShardsvrMoveRangeRequest(req);
         return doc;
     }
 
@@ -377,6 +400,117 @@ TEST_F(ChunkOperationShardingCoordinatorTest, SplitChunkAppendCommandInfoInclude
     ASSERT_BSONOBJ_EQ(cmdInfo.getObjectField("max"), BSON("x" << 100));
     ASSERT_EQ(cmdInfo.getStringField("from"), "shard0000");
     ASSERT_EQ(cmdInfo.getField("splitKeys").Array().size(), 2u);
+
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, MoveRangeCheckIfOptionsConflictSameParams) {
+    auto coordinatorDoc = makeMoveRangeCoordinatorDoc(
+        BSON("a" << 0), BSON("a" << 100), ShardId{"shard0000"}, ShardId{"shard0001"});
+
+    auto coordinator = std::make_shared<MoveRangeCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Same parameters — should not throw.
+    ASSERT_DOES_NOT_THROW(coordinator->checkIfOptionsConflict(coordinatorDoc.toBSON()));
+
+    // Satisfy destructor invariants by resolving internal promises.
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, MoveRangeCheckIfOptionsConflictDifferentBounds) {
+    auto coordinatorDoc = makeMoveRangeCoordinatorDoc(
+        BSON("a" << 0), BSON("a" << 100), ShardId{"shard0000"}, ShardId{"shard0001"});
+
+    auto coordinator = std::make_shared<MoveRangeCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Different bounds — should throw.
+    auto otherDoc = makeMoveRangeCoordinatorDoc(
+        BSON("a" << 50), BSON("a" << 150), ShardId{"shard0000"}, ShardId{"shard0001"});
+
+    ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, MoveRangeCheckIfOptionsConflictDifferentToShard) {
+    auto coordinatorDoc = makeMoveRangeCoordinatorDoc(
+        BSON("a" << 0), BSON("a" << 100), ShardId{"shard0000"}, ShardId{"shard0001"});
+
+    auto coordinator = std::make_shared<MoveRangeCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Different recipient shard — should throw.
+    auto otherDoc = makeMoveRangeCoordinatorDoc(
+        BSON("a" << 0), BSON("a" << 100), ShardId{"shard0000"}, ShardId{"shard0002"});
+
+    ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, MoveRangeCheckIfOptionsConflictDifferentFromShard) {
+    auto coordinatorDoc = makeMoveRangeCoordinatorDoc(
+        BSON("a" << 0), BSON("a" << 100), ShardId{"shard0000"}, ShardId{"shard0001"});
+
+    auto coordinator = std::make_shared<MoveRangeCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Different donor shard — should throw.
+    auto otherDoc = makeMoveRangeCoordinatorDoc(
+        BSON("a" << 0), BSON("a" << 100), ShardId{"shard0003"}, ShardId{"shard0001"});
+
+    ASSERT_THROWS_CODE(coordinator->checkIfOptionsConflict(otherDoc.toBSON()),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest, MoveRangeAppendCommandInfoIncludesRequestFields) {
+    auto coordinatorDoc = makeMoveRangeCoordinatorDoc(
+        BSON("a" << 0), BSON("a" << 100), ShardId{"shard0000"}, ShardId{"shard0001"});
+
+    auto coordinator = std::make_shared<MoveRangeCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    BSONObjBuilder cmdInfoBuilder;
+    coordinator->appendCommandInfo(&cmdInfoBuilder);
+    auto cmdInfo = cmdInfoBuilder.obj();
+    ASSERT_BSONOBJ_EQ(cmdInfo.getObjectField("min"), BSON("a" << 0));
+    ASSERT_BSONOBJ_EQ(cmdInfo.getObjectField("max"), BSON("a" << 100));
+    ASSERT_EQ(cmdInfo.getStringField("toShard"), "shard0001");
+    ASSERT_EQ(cmdInfo.getStringField("fromShard"), "shard0000");
+
+    static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
+        ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});
+}
+
+TEST_F(ChunkOperationShardingCoordinatorTest,
+       MoveRangeCheckIfOptionsConflictIgnoresWriteConcernDifference) {
+    auto coordinatorDoc = makeMoveRangeCoordinatorDoc(
+        BSON("a" << 0), BSON("a" << 100), ShardId{"shard0000"}, ShardId{"shard0001"});
+
+    auto coordinator = std::make_shared<MoveRangeCoordinator>(
+        static_cast<ShardingCoordinatorService*>(_service), coordinatorDoc.toBSON());
+
+    // Same logical request, different writeConcern — should NOT throw, since WC is intentionally
+    // not part of ShardsvrMoveRangeRequest (and therefore not part of the conflict-compare).
+    auto otherDoc = coordinatorDoc;
+    otherDoc.setWriteConcern(WriteConcernOptions{
+        "majority", WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoTimeout});
+
+    ASSERT_DOES_NOT_THROW(coordinator->checkIfOptionsConflict(otherDoc.toBSON()));
 
     static_cast<repl::PrimaryOnlyService::Instance*>(coordinator.get())
         ->interrupt({ErrorCodes::Interrupted, "Test cleanup"});

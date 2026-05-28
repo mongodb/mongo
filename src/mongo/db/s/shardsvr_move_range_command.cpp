@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/client/read_preference.h"
@@ -36,8 +37,10 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -46,15 +49,19 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/s/move_range_coordinator.h"
+#include "mongo/db/s/move_range_coordinator_document_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -80,6 +87,173 @@
 
 namespace mongo {
 namespace {
+
+/**
+ * Attempts to execute the migration through the sharding coordinator service. Returns true if the
+ * migration completed via the coordinator; returns false if the caller should fall back to the
+ * legacy path.
+ *
+ * The FixedFCVRegion is scoped to span both the feature-flag check and `getOrCreateInstance`, so
+ * the FCV snapshot stays pinned for the entire coordinator construction (no window between
+ * deciding to use the coordinator path and persisting the coordinator document). It is released
+ * before waiting on the coordinator's completion future, since holding the FCV pin across the
+ * blocking `get(opCtx)` would block FCV transitions for the entire duration of the migration.
+ */
+bool tryRunMoveRangeCoordinator(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const ShardsvrMoveRange& req) {
+    std::shared_ptr<MoveRangeCoordinator> coordinator;
+    {
+        FixedFCVRegion fcvRegion{opCtx};
+
+        if (sharding_ddl_util::getGrantedAuthoritativeMetadataAccessLevel(
+                VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot()) ==
+            AuthoritativeMetadataAccessLevelEnum::kNone) {
+            return false;
+        }
+
+        auto coordinatorDoc = MoveRangeCoordinatorDocument();
+        coordinatorDoc.setShardsvrMoveRangeRequest(req.getShardsvrMoveRangeRequest());
+        coordinatorDoc.setShardingCoordinatorMetadata({{nss, CoordinatorTypeEnum::kMoveRange}});
+        // Preserve the caller's write concern across the coordinator boundary so that it can be
+        // forwarded into MigrationChunkClonerSource when secondaryThrottle is enabled. WC is not
+        // part of ShardsvrMoveRangeRequest (and therefore not part of checkIfOptionsConflict),
+        // matching the legacy ScopedDonateChunk join behavior, which compares request args with
+        // generic arguments (including writeConcern) stripped.
+        coordinatorDoc.setWriteConcern(opCtx->getWriteConcern());
+
+        auto service = ShardingCoordinatorService::getService(opCtx);
+        coordinator = checked_pointer_cast<MoveRangeCoordinator>(
+            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), fcvRegion));
+    }
+
+    coordinator->getCompletionFuture().get(opCtx);
+    return true;
+}
+
+/**
+ * Legacy MSM-driving body.
+ */
+void _runLegacyImpl(OperationContext* opCtx,
+                    ShardsvrMoveRange&& request,
+                    WriteConcernOptions&& writeConcern) {
+    if (request.getFromShard() == request.getToShard()) {
+        return;
+    }
+
+    // Resolve the donor and recipient shards and their connection string
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+    const auto donorConnStr =
+        uassertStatusOK(shardRegistry->getShard(opCtx, request.getFromShard()))->getConnString();
+    const auto recipientHost = uassertStatusOK([&] {
+        auto recipientShard = uassertStatusOK(shardRegistry->getShard(opCtx, request.getToShard()));
+
+        return recipientShard->getTargeter()->findHost(
+            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {});
+    }());
+
+    long long totalDocsCloned = ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load();
+    long long totalBytesCloned = ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load();
+    long long totalCloneTime = ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load();
+
+    auto&& migrationSourceManager = MigrationSourceManager::createMigrationSourceManager(
+        opCtx, std::move(request), std::move(writeConcern), donorConnStr, recipientHost);
+
+    migrationSourceManager.startClone();
+    migrationSourceManager.awaitToCatchUp();
+    migrationSourceManager.enterCriticalSection();
+    migrationSourceManager.commitChunkOnRecipient();
+    migrationSourceManager.commitChunkMetadataOnConfig();
+
+    long long docsCloned =
+        ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load() - totalDocsCloned;
+    long long bytesCloned =
+        ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load() - totalBytesCloned;
+    long long cloneTime =
+        ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load() - totalCloneTime;
+    auto migrationId = migrationSourceManager.getMigrationId();
+
+    LOGV2(7627801,
+          "Migration finished",
+          "migrationId"_attr = migrationId ? migrationId->toString() : "",
+          "totalTimeMillis"_attr = migrationSourceManager.getOpTimeMillis(),
+          "docsCloned"_attr = docsCloned,
+          "bytesCloned"_attr = bytesCloned,
+          "cloneTime"_attr = cloneTime);
+}
+
+/**
+ * Legacy path entry point. Mirrors the pre-coordinator typedRun body: register a
+ * ScopedDonateChunk, run the migration on the fixed executor (execute mode) or block on
+ * waitForCompletion (join mode), and propagate the result via _runLegacyImpl.
+ */
+void runLegacyMoveRange(OperationContext* opCtx, ShardsvrMoveRange req) {
+    auto scopedMigration = uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerDonateChunk(
+        opCtx, req.getCommandParameter(), req.getShardsvrMoveRangeRequest()));
+
+    // Check if there is an existing migration running and if so, join it
+    if (scopedMigration.mustExecute()) {
+        auto moveChunkComplete =
+            ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
+                .then([req = std::move(req),
+                       writeConcern = opCtx->getWriteConcern(),
+                       scopedMigration = std::move(scopedMigration),
+                       serviceContext = opCtx->getServiceContext()]() mutable {
+                    // This local variable is created to enforce that the scopedMigration is
+                    // destroyed before setting the shared state as ready.
+                    // Note that captured objects of the lambda are destroyed by the
+                    // executor thread after setting the shared state as ready.
+                    auto scopedMigrationLocal(std::move(scopedMigration));
+                    ThreadClient tc("MoveChunk", serviceContext->getService());
+                    auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
+                    auto executorOpCtx = uniqueOpCtx.get();
+                    Status status = {ErrorCodes::InternalError, "Uninitialized value"};
+                    try {
+                        executorOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+                        {
+                            // Ensure that opCtx will get interrupted in the event of a
+                            // stepdown. This is to ensure that the MigrationSourceManager
+                            // checks that there are no pending migrationCoordinators
+                            // documents (under the ActiveMigrationRegistry lock) on the
+                            // same term during which the migrationCoordinators document
+                            // will be persisted.
+                            Lock::GlobalLock lk(executorOpCtx, MODE_IX);
+                            uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                                    "Not primary while attempting to start chunk migration "
+                                    "donation",
+                                    repl::ReplicationCoordinator::get(executorOpCtx)
+                                        ->getMemberState()
+                                        .primary());
+                        }
+                        // Note: This internal authorization is tied to the lifetime of the
+                        // client.
+                        AuthorizationSession::get(executorOpCtx->getClient())
+                            ->grantInternalAuthorization();
+                        _runLegacyImpl(executorOpCtx, std::move(req), std::move(writeConcern));
+                        status = Status::OK();
+                    } catch (const DBException& e) {
+                        status = e.toStatus();
+                        LOGV2_WARNING(23777,
+                                      "Error while doing moveChunk",
+                                      logAttrs(req.getCommandParameter()),
+                                      "error"_attr = redact(status),
+                                      "errorCode"_attr = status.codeString());
+
+                        if (status.code() == ErrorCodes::LockTimeout) {
+                            ShardingStatistics::get(executorOpCtx)
+                                .countDonorMoveChunkLockTimeout.addAndFetch(1);
+                        }
+                    }
+
+                    scopedMigrationLocal.signalComplete(status);
+                    uassertStatusOK(status);
+                });
+        moveChunkComplete.get(opCtx);
+    } else {
+        uassertStatusOK(scopedMigration.waitForCompletion(opCtx));
+    }
+}
 
 class ShardsvrMoveRangeCommand final : public TypedCommand<ShardsvrMoveRangeCommand> {
 public:
@@ -113,74 +287,15 @@ public:
 
             // Make sure we're as up-to-date as possible with shard information. This catches the
             // case where we might have changed a shard's host by removing/adding a shard with the
-            // same name.
+            // same name. Done before invoking the coordinator so the recipient-host lookup inside
+            // _runImpl sees the freshest registry state.
             Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
             sharding_ddl_util::assertDataMovementAllowed();
 
-            auto scopedMigration = uassertStatusOK(
-                ActiveMigrationsRegistry::get(opCtx).registerDonateChunk(opCtx, request()));
-
-            // Check if there is an existing migration running and if so, join it
-            if (scopedMigration.mustExecute()) {
-                auto moveChunkComplete =
-                    ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
-                        .then([req = request(),
-                               writeConcern = opCtx->getWriteConcern(),
-                               scopedMigration = std::move(scopedMigration),
-                               serviceContext = opCtx->getServiceContext()]() mutable {
-                            // This local variable is created to enforce that the scopedMigration is
-                            // destroyed before setting the shared state as ready.
-                            // Note that captured objects of the lambda are destroyed by the
-                            // executor thread after setting the shared state as ready.
-                            auto scopedMigrationLocal(std::move(scopedMigration));
-                            ThreadClient tc("MoveChunk", serviceContext->getService());
-                            auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
-                            auto executorOpCtx = uniqueOpCtx.get();
-                            Status status = {ErrorCodes::InternalError, "Uninitialized value"};
-                            try {
-                                executorOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-                                {
-                                    // Ensure that opCtx will get interrupted in the event of a
-                                    // stepdown. This is to ensure that the MigrationSourceManager
-                                    // checks that there are no pending migrationCoordinators
-                                    // documents (under the ActiveMigrationRegistry lock) on the
-                                    // same term during which the migrationCoordinators document
-                                    // will be persisted.
-                                    Lock::GlobalLock lk(executorOpCtx, MODE_IX);
-                                    uassert(ErrorCodes::InterruptedDueToReplStateChange,
-                                            "Not primary while attempting to start chunk migration "
-                                            "donation",
-                                            repl::ReplicationCoordinator::get(executorOpCtx)
-                                                ->getMemberState()
-                                                .primary());
-                                }
-                                // Note: This internal authorization is tied to the lifetime of the
-                                // client.
-                                AuthorizationSession::get(executorOpCtx->getClient())
-                                    ->grantInternalAuthorization();
-                                _runImpl(executorOpCtx, std::move(req), std::move(writeConcern));
-                                status = Status::OK();
-                            } catch (const DBException& e) {
-                                status = e.toStatus();
-                                LOGV2_WARNING(23777,
-                                              "Error while doing moveChunk",
-                                              logAttrs(req.getCommandParameter()),
-                                              "error"_attr = redact(status),
-                                              "errorCode"_attr = status.codeString());
-
-                                if (status.code() == ErrorCodes::LockTimeout) {
-                                    ShardingStatistics::get(executorOpCtx)
-                                        .countDonorMoveChunkLockTimeout.addAndFetch(1);
-                                }
-                            }
-
-                            scopedMigrationLocal.signalComplete(status);
-                            uassertStatusOK(status);
-                        });
-                moveChunkComplete.get(opCtx);
-            } else {
-                uassertStatusOK(scopedMigration.waitForCompletion(opCtx));
+            const auto& nss = ns();
+            if (!tryRunMoveRangeCoordinator(opCtx, nss, request())) {
+                runLegacyMoveRange(opCtx, request());
             }
 
             if (request().getWaitForDelete()) {
@@ -218,61 +333,6 @@ public:
                         ->isAuthorizedForActionsOnResource(
                             ResourcePattern::forClusterResource(request().getDbName().tenantId()),
                             ActionType::internal));
-        }
-
-        static void _runImpl(OperationContext* opCtx,
-                             ShardsvrMoveRange&& request,
-                             WriteConcernOptions&& writeConcern) {
-            if (request.getFromShard() == request.getToShard()) {
-                return;
-            }
-
-            // Resolve the donor and recipient shards and their connection string
-            auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-            const auto donorConnStr =
-                uassertStatusOK(shardRegistry->getShard(opCtx, request.getFromShard()))
-                    ->getConnString();
-            const auto recipientHost = uassertStatusOK([&] {
-                auto recipientShard =
-                    uassertStatusOK(shardRegistry->getShard(opCtx, request.getToShard()));
-
-                return recipientShard->getTargeter()->findHost(
-                    opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {});
-            }());
-
-            long long totalDocsCloned =
-                ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load();
-            long long totalBytesCloned =
-                ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load();
-            long long totalCloneTime =
-                ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load();
-
-            auto&& migrationSourceManager = MigrationSourceManager::createMigrationSourceManager(
-                opCtx, std::move(request), std::move(writeConcern), donorConnStr, recipientHost);
-
-            migrationSourceManager.startClone();
-            migrationSourceManager.awaitToCatchUp();
-            migrationSourceManager.enterCriticalSection();
-            migrationSourceManager.commitChunkOnRecipient();
-            migrationSourceManager.commitChunkMetadataOnConfig();
-
-            long long docsCloned =
-                ShardingStatistics::get(opCtx).countDocsClonedOnDonor.load() - totalDocsCloned;
-            long long bytesCloned =
-                ShardingStatistics::get(opCtx).countBytesClonedOnDonor.load() - totalBytesCloned;
-            long long cloneTime =
-                ShardingStatistics::get(opCtx).totalDonorChunkCloneTimeMillis.load() -
-                totalCloneTime;
-            auto migrationId = migrationSourceManager.getMigrationId();
-
-            LOGV2(7627801,
-                  "Migration finished",
-                  "migrationId"_attr = migrationId ? migrationId->toString() : "",
-                  "totalTimeMillis"_attr = migrationSourceManager.getOpTimeMillis(),
-                  "docsCloned"_attr = docsCloned,
-                  "bytesCloned"_attr = bytesCloned,
-                  "cloneTime"_attr = cloneTime);
         }
     };
 };

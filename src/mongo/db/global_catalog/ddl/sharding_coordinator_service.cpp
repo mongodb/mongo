@@ -63,6 +63,7 @@
 #include "mongo/db/global_catalog/ddl/untrack_unsplittable_collection_coordinator.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
+#include "mongo/db/s/move_range_coordinator.h"
 #include "mongo/db/s/resharding/reshard_collection_coordinator.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
@@ -138,6 +139,7 @@ constexpr std::pair<CoordinatorTypeEnum,
         {CoordinatorTypeEnum::kMergeChunks, typedInstance<MergeChunksCoordinator>},
         {CoordinatorTypeEnum::kMergeAllChunks, typedInstance<MergeAllChunksCoordinator>},
         {CoordinatorTypeEnum::kSplitChunk, typedInstance<SplitChunkCoordinator>},
+        {CoordinatorTypeEnum::kMoveRange, typedInstance<MoveRangeCoordinator>},
         {CoordinatorTypeEnum::kTestCoordinator, noInstance},
     };
 

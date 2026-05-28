@@ -80,6 +80,32 @@ structs:
                 description: "If set, wait for the chunk migration to finish before returning"
                 default: false
 
+    ShardsvrMoveRangeRequest:
+        description: >-
+            Parameters of the _shardsvrMoveRange command.
+        strict: false
+        chained_structs:
+            MoveRangeRequestBase: MoveRangeRequestBase
+        fields:
+            collectionTimestamp:
+                type: timestamp
+                description: "Timestamp of the collection"
+            fromShard:
+                type: shard_id
+                description: "ID of the donor shard"
+                validator:
+                    callback: "ShardId::validate"
+            maxChunkSizeBytes:
+                type: safeInt64
+                description: "Max size of data to move"
+            forceJumbo:
+                type: ForceJumbo
+                description: "Specifies the policy to use for jumbo chunks"
+                default: kDoNotForce
+            secondaryThrottle:
+                type: optionalBool
+                description: "Secondary throttle policy to adopt during the migration"
+
 commands:
     clusterMoveRange:
         command_name: moveRange
@@ -129,23 +155,4 @@ commands:
         api_version: ""
         strict: false
         chained_structs:
-            MoveRangeRequestBase: MoveRangeRequestBase
-        fields:
-            collectionTimestamp:
-                type: timestamp
-                description: "Timestamp of the collection"
-            fromShard:
-                type: shard_id
-                description: "ID of the donor shard"
-                validator:
-                    callback: "ShardId::validate"
-            maxChunkSizeBytes:
-                type: safeInt64
-                description: "Max size of data to move"
-            forceJumbo:
-                type: ForceJumbo
-                description: "Specifies the policy to use for jumbo chunks"
-                default: kDoNotForce
-            secondaryThrottle:
-                type: optionalBool
-                description: "Secondary throttle policy to adopt during the migration"
+            ShardsvrMoveRangeRequest: ShardsvrMoveRangeRequest

@@ -180,7 +180,12 @@ export function waitForMoveChunkStep(shardConnection, stepNumber) {
             let op = in_progress.next();
             inProgressStr += tojson(op);
 
-            if (op.desc && op.desc === "MoveChunk") {
+            // The donor's migration thread surfaces in $currentOp with `desc === "MoveChunk"` on
+            // the legacy path (the executor lambda creates a `ThreadClient("MoveChunk", ...)`) or
+            // with a `ShardingCoordinator-<N>` desc on the coordinator path (MoveRangeCoordinator
+            // runs on a ShardingCoordinatorService pool thread).
+            // TODO SERVER-127253 Remove op.desc === "MoveChunk" once the legacy path is removed.
+            if (op.desc && (op.desc === "MoveChunk" || op.desc.startsWith("ShardingCoordinator-"))) {
                 // Note: moveChunk in join mode will not have the "step" message. So keep on
                 // looking if searchString is not found.
                 if (op.msg && op.msg.startsWith(searchString)) {
@@ -308,29 +313,6 @@ export function runCommandDuringTransferMods(
     // Turn off the fail point and wait for moveChunk to complete.
     unpauseMoveChunkAtStep(fromShard, moveChunkStepNames.startedMoveChunk);
     joinMoveChunk();
-}
-
-export function killRunningMoveChunk(admin) {
-    let inProgressOps = admin.aggregate([{$currentOp: {"allUsers": true}}]);
-    let abortedMigration = false;
-    let inProgressStr = "";
-    let opIdsToKill = {};
-    while (inProgressOps.hasNext()) {
-        let op = inProgressOps.next();
-        inProgressStr += tojson(op);
-
-        // For 4.4 binaries and later.
-        if (op.desc && op.desc === "MoveChunk") {
-            opIdsToKill["MoveChunk"] = op.opid;
-        }
-    }
-
-    if (opIdsToKill.MoveChunk) {
-        admin.killOp(opIdsToKill.MoveChunk);
-        abortedMigration = true;
-    }
-
-    assert.eq(true, abortedMigration, "Failed to abort migration, current running ops: " + inProgressStr);
 }
 
 export function migrationsAreAllowed(db, collName) {

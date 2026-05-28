@@ -96,3 +96,6 @@ filters:
   - "index_catalog_helpers.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "*chunk*":
+    approvers:
+      - 10gen/server-cluster-scalability

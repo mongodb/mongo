@@ -36,7 +36,6 @@
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
@@ -163,7 +162,8 @@ public:
      */
     StatusWith<ScopedDonateChunk> registerDonateChunk(
         OperationContext* opCtx,
-        const ShardsvrMoveRange& args,
+        const NamespaceString& nss,
+        const ShardsvrMoveRangeRequest& request,
         boost::optional<BypassRecoveryWait> bypass = boost::none);
 
     /**
@@ -218,16 +218,21 @@ private:
 
     // Describes the state of a currently active moveChunk operation
     struct ActiveMoveChunkState {
-        ActiveMoveChunkState(ShardsvrMoveRange inArgs)
-            : args(std::move(inArgs)), notification(std::make_shared<Notification<Status>>()) {}
+        ActiveMoveChunkState(NamespaceString inNss, ShardsvrMoveRangeRequest inRequest)
+            : nss(std::move(inNss)),
+              request(std::move(inRequest)),
+              notification(std::make_shared<Notification<Status>>()) {}
 
         /**
          * Constructs an error status to return in the case of conflicting operations.
          */
         Status constructErrorStatus() const;
 
-        // Exact arguments of the currently active operation
-        ShardsvrMoveRange args;
+        // Namespace of the currently active operation
+        NamespaceString nss;
+
+        // Move-range request fields of the currently active operation.
+        ShardsvrMoveRangeRequest request;
 
         // Notification event that will be signaled when the currently active operation completes
         std::shared_ptr<Notification<Status>> notification;
