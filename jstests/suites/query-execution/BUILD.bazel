@@ -55,3 +55,1084 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "aggregation_facet_unwind_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_facet_unwind_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "aggregation",
+        "ci-default",
+        "unwind",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_high_yielding",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_high_yielding.yml",
+    shard_count = 8,
+    tags = [
+        "aggregation",
+        "ci-default",
+        "common",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_one_shard_sharded_collections",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_one_shard_sharded_collections.yml",
+    shard_count = 8,
+    tags = [
+        "aggregation",
+        "ci-default",
+        "no_async",
+        "sharded",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_secondary_reads",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_secondary_reads.yml",
+    shard_count = 8,
+    tags = [
+        "aggregation",
+        "ci-default",
+        "secondary_reads",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_sharded_collections_causally_consistent_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/aggregation_sharded_collections_causally_consistent_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "aggregation",
+        "ci-default",
+        "secondary_reads",
+        "sharded",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams",
+    config = "//buildscripts/resmokeconfig:suites/change_streams.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_mongos_sessions_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_mongos_sessions_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],  # TODO: SERVER-114563 for re-enabling this. Right now very slow for TSAN builds.
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_mongos_sessions_passthrough_v2",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_mongos_sessions_passthrough_v2.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",  # TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
+    ],
+    target_compatible_with = select({
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],  # TODO: SERVER-114563 for re-enabling this. Right now very slow for TSAN builds.
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_multi_stmt_txn_mongos_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_mongos_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_multi_stmt_txn_mongos_passthrough_v2",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_mongos_passthrough_v2.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",  # TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_multi_stmt_txn_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_multi_stmt_txn_passthrough_v2",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_passthrough_v2.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_multi_stmt_txn_sharded_collections_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_sharded_collections_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_multi_stmt_txn_sharded_collections_passthrough_v2",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_multi_stmt_txn_sharded_collections_passthrough_v2.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",  # TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_per_shard_cursor_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_per_shard_cursor_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_per_shard_cursor_passthrough_v2",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_per_shard_cursor_passthrough_v2.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_pre_images_removal_fcv_upgrade_downgrade",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_pre_images_removal_fcv_upgrade_downgrade.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_whole_cluster_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_whole_cluster_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_whole_cluster_passthrough_v2",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_whole_cluster_passthrough_v2.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",  # TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_whole_db_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_whole_db_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_whole_db_passthrough_v2",
+    config = "//buildscripts/resmokeconfig:suites/change_streams_whole_db_passthrough_v2.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",  # TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "clustered_collection_passthrough",
+    config = "//buildscripts/resmokeconfig:suites/clustered_collection_passthrough.yml",
+    shard_count = 20,
+    tags = [
+        "ci-default",
+        "clustered_collections",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_change_streams_v2",
+    config = "//buildscripts/resmokeconfig:suites/sharding_change_streams_v2.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",  # TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_change_streams_v2_ignore_removed_shards",
+    config = "//buildscripts/resmokeconfig:suites/sharding_change_streams_v2_ignore_removed_shards.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",  # TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_mongos_pqs_hints",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_mongos_pqs_hints.yml",
+    shard_count = 8,
+    tags = ["ci-default"],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_pqs_hints",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_pqs_hints.yml",
+    shard_count = 8,
+    tags = ["ci-default"],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "aggregation_sharded_collections_pqs_hints",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/aggregation_sharded_collections_pqs_hints.yml",
+    shard_count = 8,
+    tags = ["ci-default"],
+    target_compatible_with = select({
+        "//bazel/config:asan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:ubsan_enabled": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_secondary_reads_sharded_collections",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_secondary_reads_sharded_collections.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "secondary_reads",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_secondary_reads_sharded_collections_v2",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_secondary_reads_sharded_collections_v2.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",  # TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
+        "secondary_reads",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_batch_size_1_embedded_watch_cluster",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_batch_size_1_embedded_watch_cluster.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_batch_size_1_embedded_watch_collection",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_batch_size_1_embedded_watch_collection.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_batch_size_1_embedded_watch_db",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_batch_size_1_embedded_watch_db.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_batch_size_1_watch_cluster",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_batch_size_1_watch_cluster.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_batch_size_1_watch_db",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_batch_size_1_watch_db.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_cluster",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_cluster.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_collection",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_collection.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_db",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_batch_size_1_embedded_watch_db.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_bg_mutator_batch_size_1_watch_cluster",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_batch_size_1_watch_cluster.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_bg_mutator_batch_size_1_watch_db",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_batch_size_1_watch_db.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_bg_mutator_embedded_watch_cluster",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_embedded_watch_cluster.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_bg_mutator_embedded_watch_collection",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_embedded_watch_collection.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_bg_mutator_embedded_watch_db",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_embedded_watch_db.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_bg_mutator_watch_cluster",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_watch_cluster.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_bg_mutator_watch_db",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_bg_mutator_watch_db.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_embedded_watch_cluster",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_embedded_watch_cluster.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_embedded_watch_collection",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_embedded_watch_collection.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_embedded_watch_db",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_embedded_watch_db.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_irs_watch_cluster",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_irs_watch_cluster.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "multiversion_incompatible",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_irs_watch_db",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_irs_watch_db.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "multiversion_incompatible",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_pairwise_irs_watch_cluster",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_pairwise_irs_watch_cluster.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "multiversion_incompatible",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_pairwise_irs_watch_collection",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_pairwise_irs_watch_collection.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "multiversion_incompatible",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_pairwise_irs_watch_db",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_pairwise_irs_watch_db.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "multiversion_incompatible",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_watch_cluster",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_watch_cluster.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_sharding_fsm_watch_db",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_sharding_fsm_watch_db.yml",
+    shard_count = 4,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",
+        "resources:cpu:2",
+        "sharding",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_whole_cluster_secondary_reads_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_secondary_reads_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "secondary_reads",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_whole_cluster_secondary_reads_sharded_collections",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_secondary_reads_sharded_collections.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "secondary_reads",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_whole_cluster_secondary_reads_sharded_collections_v2",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_secondary_reads_sharded_collections_v2.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",  # TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
+        "secondary_reads",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_whole_cluster_sharded_collections_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_cluster_sharded_collections_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_whole_db_secondary_reads_sharded_collections",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_db_secondary_reads_sharded_collections.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "secondary_reads",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_whole_db_secondary_reads_sharded_collections_v2",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_db_secondary_reads_sharded_collections_v2.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+        "requires_all_feature_flags",  # TODO: SERVER-52253 Enable feature flag for Improved change stream handling of cluster topology changes.
+        "secondary_reads",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "change_streams_whole_db_sharded_collections_passthrough",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/change_streams_whole_db_sharded_collections_passthrough.yml",
+    shard_count = 8,
+    tags = [
+        "change_streams",
+        "ci-default",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "replica_sets_jscore_pqs_index_filters",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/replica_sets_jscore_pqs_index_filters.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "requires_all_feature_flags",
+        "sbe_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharded_collections_pqs_index_filters",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharded_collections_pqs_index_filters.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "requires_all_feature_flags",
+        "sbe_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sharding_pqs_index_filters",
+    config = "//buildscripts/resmokeconfig:matrix_suites/generated_suites/sharding_pqs_index_filters.yml",
+    shard_count = 8,
+    tags = [
+        "ci-default",
+        "requires_all_feature_flags",
+        "sbe_only",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
