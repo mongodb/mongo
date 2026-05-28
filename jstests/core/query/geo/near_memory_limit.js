@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   assumes_stable_shard_list,
+ *   assumes_stable_collection_uuid,
  *   assumes_unsharded_collection,
  *   does_not_support_transactions,
  *   not_allowed_with_signed_security_token,
