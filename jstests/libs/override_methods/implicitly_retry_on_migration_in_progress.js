@@ -124,7 +124,7 @@ function _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, fun
     let attempt = 0;
     let interval;
     if (MigrationRetryConfig.retryJitterMS) {
-        interval = 500 + Math.floor(Math.random() * MigrationRetryConfig.retryJitterMS);
+        interval = 1000 + Math.floor(Math.random() * MigrationRetryConfig.retryJitterMS);
     }
 
     assert.soon(
