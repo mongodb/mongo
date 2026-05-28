@@ -1067,7 +1067,7 @@ public:
         tassert(12502304, "PathArrayness entry must not be null", it->second);
         bool result = it->second->canPathBeArray(path, this);
         if (!result) {
-            _nonArrayPathsForNss[nss].insert(path);
+            _params.nonArrayPathsForNss[nss].insert(path);
         }
         return result;
     }
@@ -1084,12 +1084,12 @@ public:
     const MonotonicallyIncreasingFieldPathSet& nonArrayPathsForNss(
         const NamespaceString& nss) const {
         static const MonotonicallyIncreasingFieldPathSet kEmpty;
-        auto it = _nonArrayPathsForNss.find(nss);
-        return it != _nonArrayPathsForNss.end() ? it->second : kEmpty;
+        auto it = _params.nonArrayPathsForNss.find(nss);
+        return it != _params.nonArrayPathsForNss.end() ? it->second : kEmpty;
     }
 
     const NonArrayPathsForNss& getNonArrayPathsForNss() const {
-        return _nonArrayPathsForNss;
+        return _params.nonArrayPathsForNss;
     }
 
 protected:
@@ -1242,11 +1242,10 @@ protected:
         // acquisition is not possible, e.g. when running on mongos.
         stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
             pathArraynessForNss;
+        NonArrayPathsForNss nonArrayPathsForNss;
     };
 
     ExpressionContextParams _params;
-
-    NonArrayPathsForNss _nonArrayPathsForNss;
 
     /**
      * Construct an expression context using ExpressionContextParams. Consider using

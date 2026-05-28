@@ -401,6 +401,12 @@ ExpressionContextBuilder& ExpressionContextBuilder::pathArraynessFrom(
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::nonArrayPathsForNssFrom(
+    const ExpressionContext& other) {
+    params.nonArrayPathsForNss = other._params.nonArrayPathsForNss;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     OperationContext* operationContext,
     const FindCommandRequest& request,
@@ -624,7 +630,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
     // TODO: SERVER-111384: When removing feature flag, we can collapse the builder into one
     // chained call.
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
-        builder.pathArraynessFrom(*other);
+        builder.pathArraynessFrom(*other).nonArrayPathsForNssFrom(*other);
     }
 
     auto expCtx = builder.build();

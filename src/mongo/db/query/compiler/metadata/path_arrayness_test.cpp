@@ -837,4 +837,74 @@ TEST(UassertIfInvalidatedPaths, InvalidationRunsWhenEpochIsStale) {
                        ErrorCodes::QueryPlanKilled);
 }
 
+TEST(NonArrayPathsForNssFrom, CopiesNonArrayPathsToNewContext) {
+    QueryTestServiceContext testServiceCtx;
+    auto opCtx = testServiceCtx.makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+
+    auto pa = std::make_shared<PathArrayness>();
+    pa->addPath(FieldPath("a"), MultikeyComponents{}, true);
+    pa->addPath(FieldPath("b"), MultikeyComponents{}, true);
+
+    stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>> map;
+    map.emplace(nss, std::shared_ptr<const PathArrayness>(std::move(pa)));
+
+    auto src = ExpressionContextBuilder{}
+                   .opCtx(opCtx.get())
+                   .ns(nss)
+                   .pathArraynessForNss(std::move(map))
+                   .build();
+    ASSERT_FALSE(src->canPathBeArrayForNss(FieldPath("a"), nss));
+
+    auto derived =
+        ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(nss).nonArrayPathsForNssFrom(*src).build();
+
+    const auto& srcPaths = src->nonArrayPathsForNss(nss);
+    const auto& derivedPaths = derived->nonArrayPathsForNss(nss);
+
+    int srcCount = 0, derivedCount = 0;
+    for (const auto& p : srcPaths) {
+        ++srcCount;
+        ASSERT_EQ(p, FieldPath("a"));
+    }
+    for (const auto& p : derivedPaths) {
+        ++derivedCount;
+        ASSERT_EQ(p, FieldPath("a"));
+    }
+    ASSERT_EQ(srcCount, 1);
+    ASSERT_EQ(derivedCount, 1);
+}
+
+TEST(MakeCopyFromExpressionContext, CopiesNonArrayPathsForNss) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagPathArrayness", true);
+    QueryTestServiceContext testServiceCtx;
+    auto opCtx = testServiceCtx.makeOperationContext();
+    auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+
+    auto pa = std::make_shared<PathArrayness>();
+    pa->addPath(FieldPath("a"), MultikeyComponents{}, true);
+    pa->addPath(FieldPath("b"), MultikeyComponents{}, true);
+
+    stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>> map;
+    map.emplace(nss, std::shared_ptr<const PathArrayness>(std::move(pa)));
+
+    auto src = ExpressionContextBuilder{}
+                   .opCtx(opCtx.get())
+                   .ns(nss)
+                   .pathArraynessForNss(std::move(map))
+                   .build();
+
+    ASSERT_FALSE(src->canPathBeArrayForNss(FieldPath("a"), nss));
+
+    auto copy = makeCopyFromExpressionContext(src, nss);
+
+    const auto& copyPaths = copy->nonArrayPathsForNss(nss);
+    int count = 0;
+    for (const auto& p : copyPaths) {
+        ++count;
+        ASSERT_EQ(p, FieldPath("a"));
+    }
+    ASSERT_EQ(count, 1);
+}
+
 }  // namespace mongo

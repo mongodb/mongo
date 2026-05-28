@@ -109,6 +109,7 @@ public:
         stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
             pathArraynessForNss);
     ExpressionContextBuilder& pathArraynessFrom(const ExpressionContext& other);
+    ExpressionContextBuilder& nonArrayPathsForNssFrom(const ExpressionContext& other);
 
     /**
      * Add kSessionTransactionsTableNamespace, and kRsOplogNamespace
