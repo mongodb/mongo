@@ -32,7 +32,10 @@
 
 rollout:
   featureFlagCostBasedRanker: {}
+  featureFlagExtractFieldPathsSbeStage: {}
   featureFlagMultiPlanLimiter: {}
+  featureFlagSbeAccumulators: {}
+  featureFlagSbeUpgradeBinaryTrees: {}
   featureFlagUnifiedWriteExecutor: {}
 
 released:

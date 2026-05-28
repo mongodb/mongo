@@ -35,6 +35,8 @@ last-continuous:
       ticket: SERVER-121132
     - test_file: jstests/core/index/not_index_tagging.js
       ticket: SERVER-125555
+    - test_file: jstests/core/query/group_sbe_accumulator_limit.js
+      ticket: SERVER-118700
     - test_file: jstests/core/query/sparse_index_supports_ne_null.js
       ticket: SERVER-125555
     - test_file: jstests/core/repro/dbcase2.js
@@ -272,6 +274,8 @@ last-lts:
       ticket: SERVER-95670
     - test_file: jstests/core/query/find_with_resume_after_param.js
       ticket: SERVER-92431
+    - test_file: jstests/core/query/group_sbe_accumulator_limit.js
+      ticket: SERVER-118700
     - test_file: jstests/core/query/index_deduplication.js
       ticket: SERVER-92147
     - test_file: jstests/core/query/internal_apply_oplog_update.js

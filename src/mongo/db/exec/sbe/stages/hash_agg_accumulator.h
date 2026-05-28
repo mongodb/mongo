@@ -540,7 +540,7 @@ protected:
                              value::MaterializedSingleRowAccessor& accumulatorState) const final;
 
     std::string getDebugName() const final {
-        return "_internalArithmeticAverage";
+        return "_internalCount";
     }
 };
 

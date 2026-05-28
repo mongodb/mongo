@@ -40,9 +40,9 @@ feature_flags:
     featureFlagSbeAccumulators:
         description: "Feature flag to enable single-purpose SBE $group accumulators."
         cpp_varname: gFeatureFlagSbeAccumulators
-        default: false
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: rollout
 
     featureFlagSbeFull:
         description:
@@ -233,8 +233,9 @@ feature_flags:
     featureFlagSbeUpgradeBinaryTrees:
         description: "Feature flag to enable N-ary ABT nodes"
         cpp_varname: gFeatureFlagSbeUpgradeBinaryTrees
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: rollout
 
     featureFlagUUIDExpression:
         description: "Feature flag to enable $createUUID expression"
@@ -347,8 +348,8 @@ feature_flags:
         description: "Feature flag to enable extract_field_paths SBE stage."
         cpp_varname: gFeatureFlagExtractFieldPathsSbeStage
         fcv_gated: false
-        default: false
-        incremental_rollout_phase: in_development
+        default: true
+        incremental_rollout_phase: rollout
 
     featureFlagPathArrayness:
         description: "Feature flag to enable tracking of path arrayness."

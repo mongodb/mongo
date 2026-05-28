@@ -18,13 +18,9 @@
  *   # decisions.
  *   exclude_from_timeseries_crud_passthrough,
  *
- *   # The accumulator limit being tested here is feature-flag gated.
- *   featureFlagSbeAccumulators,
- *
  *   # Nodes in the initial sync state may ignore getParameter commands, causing the test to hang.
  *   incompatible_with_initial_sync,
  *
- *   requires_fcv_83,
  *   writes_timeseries_collection,
  * ]
  */
