@@ -1266,8 +1266,8 @@ error_codes:
   #   }
 
   - {code: 506, name: NodeInStepDownPeriod, categories: [RetriableError]}
-
   - {code: 507, name: ReplicaSetWritesBlocked}
+  - {code: 508, name: SearchIndexManagementHostUnreachable}
 
   # ^^^^
   # Add new codes, sequentially numbered, above.

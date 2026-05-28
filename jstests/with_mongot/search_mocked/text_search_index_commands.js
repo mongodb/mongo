@@ -153,7 +153,7 @@ let unavailableHostAndPort;
                 "createSearchIndexes": shardedCollName,
                 "indexes": [{"definition": {"mappings": {"dynamic": true}}}],
             }),
-            ErrorCodes.CommandFailed,
+            ErrorCodes.SearchIndexManagementHostUnreachable,
         );
 
         // The code to reach the remote search index management server is shared across search index
@@ -161,7 +161,7 @@ let unavailableHostAndPort;
         // aggregation stage.
         assert.commandFailedWithCode(
             testDB.runCommand({aggregate: shardedCollName, pipeline: [{$listSearchIndexes: {}}], cursor: {}}),
-            ErrorCodes.CommandFailed,
+            ErrorCodes.SearchIndexManagementHostUnreachable,
         );
     };
 
