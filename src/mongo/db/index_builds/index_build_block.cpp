@@ -128,11 +128,11 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
     }
 
     _indexBuildInterceptor =
-        std::make_unique<IndexBuildInterceptor>(opCtx,
+        std::make_shared<IndexBuildInterceptor>(opCtx,
                                                 indexBuildInfo,
                                                 LazyRecordStore::CreateMode::openExisting,
                                                 writableEntry->descriptor()->unique());
-    writableEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
+    writableEntry->setIndexBuildInterceptor(_indexBuildInterceptor);
 
     _completeInit(opCtx, collection);
 
@@ -185,9 +185,9 @@ Status IndexBuildBlock::init(OperationContext* opCtx,
         auto indexCatalog = collection->getIndexCatalog();
         auto indexCatalogEntry = indexCatalog->getWritableEntryByName(
             opCtx, getIndexName(), IndexCatalog::InclusionPolicy::kUnfinished);
-        _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(
+        _indexBuildInterceptor = std::make_shared<IndexBuildInterceptor>(
             opCtx, *_indexBuildInfo, mode, indexCatalogEntry->descriptor()->unique());
-        indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
+        indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor);
     }
 
     _completeInit(opCtx, collection);
@@ -212,9 +212,6 @@ void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
                           ErrorCodes::IndexBuildAborted);
 
     if (auto indexCatalogEntry = getWritableEntry(opCtx, collection)) {
-        if (_indexBuildInterceptor) {
-            indexCatalogEntry->setIndexBuildInterceptor(nullptr);
-        }
         invariant(
             collection->getIndexCatalog()->dropIndexEntry(opCtx, collection, indexCatalogEntry));
     } else {

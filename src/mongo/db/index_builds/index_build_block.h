@@ -170,6 +170,10 @@ private:
     boost::optional<IndexBuildInfo> _indexBuildInfo;
     std::string _indexNamespace;
 
-    std::unique_ptr<IndexBuildInterceptor> _indexBuildInterceptor;
+    // TODO (SERVER-127702): This is shared_ptr only to satisfy weak_ptr's control block
+    // requirement in IndexCatalogEntryImpl. IndexBuildBlock is the sole owner. Revert to
+    // unique_ptr once we find a better way to represent the relationship between IndexBuildBlock
+    // and IndexBuildInterceptor.
+    std::shared_ptr<IndexBuildInterceptor> _indexBuildInterceptor;
 };
 }  // namespace MONGO_MOD_PUBLIC mongo

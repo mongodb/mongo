@@ -13,7 +13,7 @@
  *    eventually completes on the new primary.
  *
  * @tags: [
- *   # Primary driven index builds are aborted when a new primary steps up.
+ *   # TODO (SERVER-127417): Remove once abortAllTwoPhaseIndexBuildsForStepUp skips kPrimaryDriven.
  *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   uses_prepare_transaction,
  *   uses_transactions,

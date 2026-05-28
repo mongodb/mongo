@@ -75,11 +75,9 @@ public:
 
     virtual void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) = 0;
 
-    virtual bool sideWritesAllowed() const = 0;
+    virtual std::shared_ptr<IndexBuildInterceptor> indexBuildInterceptor() const = 0;
 
-    virtual IndexBuildInterceptor* indexBuildInterceptor() const = 0;
-
-    virtual void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) = 0;
+    virtual void setIndexBuildInterceptor(std::shared_ptr<IndexBuildInterceptor> interceptor) = 0;
 
     virtual const Ordering& ordering() const = 0;
 

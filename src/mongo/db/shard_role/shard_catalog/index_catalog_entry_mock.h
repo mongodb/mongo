@@ -79,15 +79,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool sideWritesAllowed() const final {
+    std::shared_ptr<IndexBuildInterceptor> indexBuildInterceptor() const final {
         MONGO_UNREACHABLE;
     }
 
-    IndexBuildInterceptor* indexBuildInterceptor() const final {
-        MONGO_UNREACHABLE;
-    }
-
-    void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) final {
+    void setIndexBuildInterceptor(std::shared_ptr<IndexBuildInterceptor> interceptor) final {
         MONGO_UNREACHABLE;
     }
 

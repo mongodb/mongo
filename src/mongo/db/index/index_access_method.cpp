@@ -344,7 +344,7 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
     UpdateTicket updateTicket;
     prepareUpdate(opCtx, coll, entry, oldDoc, newDoc, loc, options, &updateTicket);
 
-    if (entry->sideWritesAllowed() || !entry->isReady()) {
+    if (entry->indexBuildInterceptor() || !entry->isReady()) {
         bool logIfError = false;
         _unindexKeysOrWriteToSideTable(opCtx,
                                        coll,
@@ -715,7 +715,7 @@ void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
     if (!indexFilter || exec::matcher::matchesBSON(indexFilter, from)) {
         // Override key constraints when generating keys for removal. This only applies to keys
         // that do not apply to a partial filter expression.
-        const auto getKeysMode = entry->sideWritesAllowed()
+        const auto getKeysMode = entry->indexBuildInterceptor()
             ? InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsUnfiltered
             : options.getKeysMode;
 
@@ -764,7 +764,7 @@ Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
                                              const UpdateTicket& ticket,
                                              int64_t* numInserted,
                                              int64_t* numDeleted) {
-    invariant(!entry->sideWritesAllowed());
+    invariant(!entry->indexBuildInterceptor());
     invariant(ticket.newKeys.size() ==
               ticket.oldKeys.size() + ticket.added.size() - ticket.removed.size());
     invariant(numInserted);
@@ -1612,7 +1612,7 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     int64_t* keysInsertedOut) {
     Status status = Status::OK();
 
-    if (entry->sideWritesAllowed()) {
+    if (auto interceptor = entry->indexBuildInterceptor()) {
         // The side table interface accepts only records that meet the criteria for this partial
         // index.
         // See SERVER-28975 and SERVER-39705 for details.
@@ -1623,14 +1623,14 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
         }
 
         int64_t inserted = 0;
-        status = entry->indexBuildInterceptor()->sideWrite(opCtx,
-                                                           coll,
-                                                           entry,
-                                                           keys,
-                                                           multikeyMetadataKeys,
-                                                           multikeyPaths,
-                                                           IndexBuildInterceptor::Op::kInsert,
-                                                           &inserted);
+        status = interceptor->sideWrite(opCtx,
+                                        coll,
+                                        entry,
+                                        keys,
+                                        multikeyMetadataKeys,
+                                        multikeyPaths,
+                                        IndexBuildInterceptor::Op::kInsert,
+                                        &inserted);
         if (keysInsertedOut) {
             *keysInsertedOut += inserted;
         }
@@ -1665,7 +1665,7 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     int64_t* const keysDeletedOut,
     InsertDeleteOptions options,  // copy!
     CheckRecordId checkRecordId) {
-    if (entry->sideWritesAllowed()) {
+    if (auto interceptor = entry->indexBuildInterceptor()) {
         // The side table interface accepts only records that meet the criteria for this partial
         // index.
         // See SERVER-28975 and SERVER-39705 for details.
@@ -1678,7 +1678,7 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
         int64_t removed = 0;
         fassert(
             31155,
-            entry->indexBuildInterceptor()->sideWrite(
+            interceptor->sideWrite(
                 opCtx, coll, entry, keys, {}, {}, IndexBuildInterceptor::Op::kDelete, &removed));
         if (keysDeletedOut) {
             *keysDeletedOut += removed;

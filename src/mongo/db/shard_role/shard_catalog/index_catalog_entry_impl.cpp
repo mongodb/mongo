@@ -172,10 +172,6 @@ void IndexCatalogEntryImpl::setAccessMethod(std::unique_ptr<IndexAccessMethod> a
         this, _shared->_accessMethod.get(), &_shared->_indexedPaths);
 }
 
-bool IndexCatalogEntryImpl::sideWritesAllowed() const {
-    return _indexBuildInterceptor != nullptr;
-}
-
 bool IndexCatalogEntryImpl::isFrozen() const {
     invariant(!_isFrozen || !_isReady);
     return _isFrozen;
@@ -620,15 +616,11 @@ public:
         MONGO_UNIMPLEMENTED_TASSERT(10083545);
     }
 
-    bool sideWritesAllowed() const final {
-        return _original->sideWritesAllowed();
-    }
-
-    IndexBuildInterceptor* indexBuildInterceptor() const final {
+    std::shared_ptr<IndexBuildInterceptor> indexBuildInterceptor() const final {
         return _original->indexBuildInterceptor();
     }
 
-    void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) final {
+    void setIndexBuildInterceptor(std::shared_ptr<IndexBuildInterceptor> interceptor) final {
         MONGO_UNIMPLEMENTED_TASSERT(10083546);
     }
 
@@ -751,15 +743,11 @@ public:
         MONGO_UNIMPLEMENTED_TASSERT(10083552);
     }
 
-    bool sideWritesAllowed() const final {
-        return _original->sideWritesAllowed();
-    }
-
-    IndexBuildInterceptor* indexBuildInterceptor() const final {
+    std::shared_ptr<IndexBuildInterceptor> indexBuildInterceptor() const final {
         return _original->indexBuildInterceptor();
     }
 
-    void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) final {
+    void setIndexBuildInterceptor(std::shared_ptr<IndexBuildInterceptor> interceptor) final {
         MONGO_UNIMPLEMENTED_TASSERT(10083553);
     }
 

@@ -90,13 +90,11 @@ public:
 
     void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) final;
 
-    bool sideWritesAllowed() const final;
-
-    IndexBuildInterceptor* indexBuildInterceptor() const final {
-        return _indexBuildInterceptor;
+    std::shared_ptr<IndexBuildInterceptor> indexBuildInterceptor() const final {
+        return _indexBuildInterceptor.lock();
     }
 
-    void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) final {
+    void setIndexBuildInterceptor(std::shared_ptr<IndexBuildInterceptor> interceptor) final {
         _indexBuildInterceptor = interceptor;
     }
 
@@ -244,7 +242,7 @@ private:
         UpdateIndexData _indexedPaths;
     };
 
-    IndexBuildInterceptor* _indexBuildInterceptor = nullptr;  // not owned here
+    std::weak_ptr<IndexBuildInterceptor> _indexBuildInterceptor;
 
     boost::intrusive_ptr<SharedState> _shared;
 
