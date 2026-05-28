@@ -126,7 +126,7 @@ try {
 
     runTestWithUnorderedComparison({
         db,
-        description: "Join optimization should not be used with let/pipeline syntax and additional filter",
+        description: "Join optimization should be used with let/pipeline syntax and additional filter",
         coll: baseColl,
         pipeline: [
             {
@@ -145,14 +145,12 @@ try {
             {a: 1, b: 1, d: 1, foreignColl1: {a: 1, c: "bar", d: 2}},
             {a: 1, b: 2, d: 2, foreignColl1: {a: 1, c: "bar", d: 2}},
         ],
-        expectedUsedJoinOptimization: false,
+        expectedUsedJoinOptimization: true,
     });
 
-    // TODO (SERVER-125579): Once pipeline: [] with absorbed filter is supported, this test should
-    // expect expectedUsedJoinOptimization: true.
     runTestWithUnorderedComparison({
         db,
-        description: "Join optimization should not be used with pipeline: [] syntax and additional filter",
+        description: "Join optimization should be used with pipeline: [] syntax and additional filter",
         coll: baseColl,
         pipeline: [
             {
@@ -171,12 +169,12 @@ try {
             {_id: 0, a: 1, b: 1, d: 1, foreignColl1: {_id: 1, a: 1, c: "bar", d: 2}},
             {_id: 1, a: 1, b: 2, d: 2, foreignColl1: {_id: 1, a: 1, c: "bar", d: 2}},
         ],
-        expectedUsedJoinOptimization: false,
+        expectedUsedJoinOptimization: true,
     });
 
     runTestWithUnorderedComparison({
         db,
-        description: "Join optimization should not be used with field syntax and pipeline syntax and additional filter",
+        description: "Join optimization should be used with field syntax and pipeline syntax and additional filter",
         coll: baseColl,
         pipeline: [
             {
@@ -194,6 +192,104 @@ try {
             {$project: {_id: 0, "foreignColl1._id": 0}},
         ],
         expectedResults: [{a: 1, b: 2, d: 2, foreignColl1: {a: 1, c: "bar", d: 2}}],
+        expectedUsedJoinOptimization: true,
+    });
+
+    runTestWithUnorderedComparison({
+        db,
+        description:
+            "Join optimization should be used with sub-pipeline containing both $expr join + single-table predicate plus absorbed filter",
+        coll: baseColl,
+        pipeline: [
+            {
+                $lookup: {
+                    from: foreignColl1.getName(),
+                    let: {a: "$a"},
+                    pipeline: [{$match: {$and: [{$expr: {$eq: ["$a", "$$a"]}}, {d: 1}]}}],
+                    as: "foreignColl1",
+                },
+            },
+            {$unwind: "$foreignColl1"},
+            {$match: {"foreignColl1.c": {$eq: "foo"}}},
+        ],
+        expectedResults: [
+            {_id: 0, a: 1, b: 1, d: 1, foreignColl1: {_id: 0, a: 1, c: "foo", d: 1}},
+            {_id: 1, a: 1, b: 2, d: 2, foreignColl1: {_id: 0, a: 1, c: "foo", d: 1}},
+        ],
+        expectedUsedJoinOptimization: true,
+    });
+
+    runTestWithUnorderedComparison({
+        db,
+        description: "Join optimization should be used with multi-predicate sub-pipeline $match and absorbed filter",
+        coll: baseColl,
+        pipeline: [
+            {
+                $lookup: {
+                    from: foreignColl1.getName(),
+                    localField: "a",
+                    foreignField: "a",
+                    pipeline: [{$match: {a: 1, d: 1}}],
+                    as: "foreignColl1",
+                },
+            },
+            {$unwind: "$foreignColl1"},
+            {$match: {"foreignColl1.c": {$eq: "foo"}}},
+        ],
+        expectedResults: [
+            {_id: 0, a: 1, b: 1, d: 1, foreignColl1: {_id: 0, a: 1, c: "foo", d: 1}},
+            {_id: 1, a: 1, b: 2, d: 2, foreignColl1: {_id: 0, a: 1, c: "foo", d: 1}},
+        ],
+        expectedUsedJoinOptimization: true,
+    });
+
+    runTestWithUnorderedComparison({
+        db,
+        description:
+            "Join optimization should be used with pipeline $lookup and two consecutive trailing $match stages",
+        coll: baseColl,
+        pipeline: [
+            {
+                $lookup: {
+                    from: foreignColl1.getName(),
+                    localField: "a",
+                    foreignField: "a",
+                    pipeline: [{$match: {d: 1}}],
+                    as: "foreignColl1",
+                },
+            },
+            {$unwind: "$foreignColl1"},
+            {$match: {"foreignColl1.c": {$eq: "foo"}}},
+            {$match: {"foreignColl1.a": {$eq: 1}}},
+        ],
+        expectedResults: [
+            {_id: 0, a: 1, b: 1, d: 1, foreignColl1: {_id: 0, a: 1, c: "foo", d: 1}},
+            {_id: 1, a: 1, b: 2, d: 2, foreignColl1: {_id: 0, a: 1, c: "foo", d: 1}},
+        ],
+        expectedUsedJoinOptimization: true,
+    });
+
+    runTestWithUnorderedComparison({
+        db,
+        description:
+            "Non-equijoin $expr in sub-pipeline with absorbed filter should fall back to non-optimized execution",
+        coll: baseColl,
+        pipeline: [
+            {
+                $lookup: {
+                    from: foreignColl1.getName(),
+                    let: {a: "$a"},
+                    pipeline: [{$match: {$expr: {$gt: ["$a", "$$a"]}}}],
+                    as: "foreignColl1",
+                },
+            },
+            {$unwind: "$foreignColl1"},
+            {$match: {"foreignColl1.c": {$eq: "baz"}}},
+        ],
+        expectedResults: [
+            {_id: 0, a: 1, b: 1, d: 1, foreignColl1: {_id: 2, a: 2, c: "baz", d: 1}},
+            {_id: 1, a: 1, b: 2, d: 2, foreignColl1: {_id: 2, a: 2, c: "baz", d: 1}},
+        ],
         expectedUsedJoinOptimization: false,
     });
 

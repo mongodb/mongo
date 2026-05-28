@@ -438,4 +438,48 @@ joinTestWrapper(db, () => {
         {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
         {$unwind: "$x"},
     ]);
+
+    section("Pipeline $lookup with pipeline:[] and absorbed $match on as field");
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [],
+            },
+        },
+        {$unwind: "$x"},
+        {$match: {"x.c": {$eq: "blah"}}},
+    ]);
+
+    section("Pipeline $lookup with pipeline:[$match] and absorbed $match on as field");
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {d: {$lt: 3}}}],
+            },
+        },
+        {$unwind: "$x"},
+        {$match: {"x.c": {$eq: "blah"}}},
+    ]);
+
+    section("Pipeline $lookup with correlated sub-pipeline and absorbed $match on as field");
+    runBasicJoinTest([
+        {
+            $lookup: {
+                from: foreignColl1.getName(),
+                as: "x",
+                let: {a: "$a"},
+                pipeline: [{$match: {$expr: {$eq: ["$a", "$$a"]}}}],
+            },
+        },
+        {$unwind: "$x"},
+        {$match: {"x.c": {$eq: "blah"}}},
+    ]);
 }); // joinTestWrapper();

@@ -318,6 +318,17 @@ public:
         return hasPipeline() ? BSONObj() : _additionalFilter.value_or(BSONObj());
     }
 
+    /**
+     * Returns the absorbed filter regardless of hasPipeline() - unlike getAdditionalFilter(),
+     * which returns {} when hasPipeline() is true to avoid the execution layer double-applying
+     * the filter via resolvedPipeline. Safe only for callers that consume the filter
+     * independently of resolvedPipeline (e.g. the join optimizer, which builds its own
+     * foreign CanonicalQuery).
+     */
+    BSONObj getAbsorbedFilter() const {
+        return _additionalFilter.value_or(BSONObj());
+    }
+
     bool hasAdditionalFilter() const {
         return _additionalFilter.has_value();
     }

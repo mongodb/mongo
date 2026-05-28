@@ -34,6 +34,8 @@
 #include "mongo/db/exec/classic/subplan.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_internal_join_hint.h"
@@ -115,18 +117,30 @@ StatusWith<Predicates> extractPredicatesFromLookup(DocumentSourceLookUp& stage) 
         }
         joinPredicates = std::move(splitRes->joinPredicates);
         singleTablePredicates = std::move(splitRes->singleTablePredicates);
-    } else if (stage.hasAdditionalFilter()) {
-        // isLookupEligible() already rejects pipeline-form $lookups with an absorbed filter.
-        // TODO (SERVER-125579): Extend to pipeline-form $lookups via a non-gated accessor and
-        // remove the tassert.
-        auto swExpr = MatchExpressionParser::parse(stage.getAdditionalFilter(),
+    }
+
+    // Absorbed filter, reachable via getAbsorbedFilter() for both pipeline-form and non-pipeline
+    // $lookups. For pipeline-form $lookups the introspection pipeline above may have produced a
+    // singleTablePredicates from the user's sub-pipeline $match; combine the two with $and.
+    if (stage.hasAdditionalFilter()) {
+        auto swExpr = MatchExpressionParser::parse(stage.getAbsorbedFilter(),
                                                    stage.getSubpipelineExpCtx(),
                                                    ExtensionsCallbackNoop(),
                                                    Pipeline::kAllowedMatcherFeatures);
         if (!swExpr.isOK()) {
             return swExpr.getStatus();
         }
-        singleTablePredicates = std::move(swExpr.getValue());
+        if (singleTablePredicates) {
+            // We construct the AND by first adding the sub-pipeline $match (singleTablePredicates),
+            // followed by the absorbed filter's $match. Note that downstream CanonicalQuery
+            // construction stable-sorts the children of $and by MatchExpression type (with field
+            // path as a secondary tiebreak within the same type), so the order here may not be
+            // maintained.
+            singleTablePredicates =
+                makeAnd(std::move(singleTablePredicates), std::move(swExpr.getValue()));
+        } else {
+            singleTablePredicates = std::move(swExpr.getValue());
+        }
     }
     // If neither branch is hit, then this a non-pipeline or empty subpipeline (pipeline: []) lookup
     // with no absorbed filters. In this case, 'joinPredicates' and 'singleTablePredicates' stay
@@ -169,7 +183,6 @@ bool isUnwindEligible(const DocumentSourceUnwind& unwind) {
 }
 
 bool isLookupEligible(const DocumentSourceLookUp& lookup) {
-
     if (lookup.getExpCtx()->getSubPipelineDepth() != 0) {
         // We've descended into a subpipelined, fallback.
         return false;
@@ -180,25 +193,20 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
     }
 
     // $lookup specified with localField/foreignField only (no pipeline spec). An absorbed filter,
-    // if any, is reachable via getAdditionalFilter() and handled in extractPredicatesFromLookup().
+    // if any, is reachable via getAbsorbedFilter() and handled in extractPredicatesFromLookup().
     if (!lookup.hasPipeline()) {
         return true;
     }
 
-    // $lookup with pipeline (pipeline:[] or pipeline:[$match, ...]). getAdditionalFilter() returns
-    // {} when hasPipeline() is true, so an absorbed filter on this form is dropped. Thus, we
-    // reject this case.
-    // TODO (SERVER-125579): Support absorbed filter alongside pipeline-form $lookup.
-    if (lookup.hasAdditionalFilter()) {
-        return false;
-    }
-
-    // pipeline:[] with no absorbed filter is eligible — no sub-pipeline to inspect.
+    // pipeline:[] passes this check — the absorbed filter, if any, is read via
+    // getAbsorbedFilter() in extractPredicatesFromLookup(). Disconnected graphs (no join
+    // predicate from any source) are rejected later by constructJoinModel.
     if (lookup.getResolvedIntrospectionPipeline().empty()) {
         return true;
     }
 
-    // Otherwise the sub-pipeline must contain a single $match stage.
+    // Otherwise the sub-pipeline must contain a single $match stage. The absorbed filter (if any)
+    // is combined with that $match in extractPredicatesFromLookup().
     return lookup.getResolvedIntrospectionPipeline().size() == 1 &&
         dynamic_cast<DocumentSourceMatch*>(lookup.getResolvedIntrospectionPipeline().peekFront());
 }

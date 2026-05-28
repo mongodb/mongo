@@ -207,6 +207,8 @@ TEST_F(PipelineAnalyzerTest, AbsorbedFilterNonPipelineLookup) {
 }
 
 TEST_F(PipelineAnalyzerTest, AbsorbedFilterEmptyPipeline) {
+    // pipeline:[] with a trailing $match that gets absorbed. The introspection pipeline is empty,
+    // so the foreign CQ filter comes entirely from the absorbed match.
     const auto query = R"([
             {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
                        pipeline: [] }
@@ -218,9 +220,18 @@ TEST_F(PipelineAnalyzerTest, AbsorbedFilterEmptyPipeline) {
     auto pipeline = makePipeline(query, {"A"});
     markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
 
-    // TODO (SERVER-125579): pipeline: [] with an absorbed filter should be eligible once we can
-    // properly capture the filter in the join graph.
-    ASSERT_FALSE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ d: { $eq: 11 } }", cq->getPrimaryMatchExpression()->toString());
 }
 
 TEST_F(PipelineAnalyzerTest, EmptyPipelineNoFilterEligible) {
@@ -237,6 +248,29 @@ TEST_F(PipelineAnalyzerTest, EmptyPipelineNoFilterEligible) {
     markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
 
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+}
+
+TEST_F(PipelineAnalyzerTest, EmptyPipelineNoJoinPredicateRejected) {
+    // $lookup with pipeline:[] and NO localField/foreignField has no source of a join
+    // predicate. isLookupEligible() lets this shape through since it is dealing with the general
+    // shape. But constructJoinModel would add the foreign node WITHOUT any connecting edge: no
+    // localField/foreignField pair, no $expr in the empty sub-pipeline, no downstream
+    // cross-collection $match. The resulting graph would be disconnected, which constructJoinModel
+    // rejects with InternalErrorNotSupported because cross-products are not currently supported by
+    // the join optimizer.
+    const auto query = R"([
+            {$lookup: {from: "A", as: "fromA", pipeline: [] } },
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+
+    // The pipeline passes the surface-level eligibility check (some $lookup is eligible).
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    // But constructJoinModel rejects the would-be-disconnected graph.
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_EQ(swJoinModel.getStatus(), ErrorCodes::InternalErrorNotSupported);
 }
 
 TEST_F(PipelineAnalyzerTest, NumericLocalFieldIneligibleJoinPredicate) {
@@ -278,6 +312,383 @@ TEST_F(PipelineAnalyzerTest, NumericMidPathComponentIneligibleJoinPredicate) {
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_NOT_OK(swJoinModel);
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineMatchPlusAbsorbedFilter) {
+    // pipeline:[$match] with a trailing $match that gets absorbed. The foreign CQ's filter is the
+    // conjunction of the sub-pipeline match and the absorbed match.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [{$match: {d: 11}}] }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.e": 5}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ $and: [ { d: { $eq: 11 } }, { e: { $eq: 5 } } ] }",
+              cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineMultiPredicateMatchOrderingNoAbsorbedFilter) {
+    // Pipeline-form $lookup with multiple STPs inside the sub-pipeline $match and NO trailing
+    // absorbed $match. The STPs are authored in the order "z" then "a"; the final foreign CQ
+    // must contain both predicates correctly in the normalized CQ order, i.e. lexicographically
+    // ordered field names.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [{$match: {z: 99, a: 1}}] }
+            },
+            {$unwind: "$fromA"}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    // Final CQ children are sorted by MatchExpression type first; for same-type predicates
+    // (here both $eq) the field path is the secondary tiebreak, so "a" comes before "z"
+    // regardless of the BSON authoring order ("z" first, "a" second) in the sub-pipeline.
+    ASSERT_EQ("{ $and: [ { a: { $eq: 1 } }, { z: { $eq: 99 } } ] }",
+              cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineMatchPlusAbsorbedFilterPreservesPipelineOrder) {
+    // Verifies the order of children in the conjunction STP from combining the sub-pipeline
+    // $match and the absorbed filter $match. Children are sorted by MatchExpression type,
+    // with field path as a secondary tiebreak within the same type — both predicates here
+    // are $eq, so the path-based secondary sort puts "a" before "z".
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [{$match: {z: 99}}] }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.a": 1}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    // The CQ-construction sort places "a" (absorbed, later in pipeline) before "z"
+    // (sub-pipeline, earlier in pipeline). The AndMatchExpression handed to CQ construction
+    // was built in pipeline order (z then a); the type-then-path sort applied during CQ
+    // normalization rearranges them, so the observed ordering is a property of the CQ layer,
+    // not the AND-assembly in extractPredicatesFromLookup.
+    ASSERT_EQ("{ $and: [ { a: { $eq: 1 } }, { z: { $eq: 99 } } ] }",
+              cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineCorrelatedMatchPlusAbsorbedFilter) {
+    // pipeline:[$expr-correlated $match] with a trailing $match that gets absorbed. The
+    // correlated predicate becomes a join edge; the absorbed match becomes a single-table filter
+    // on the foreign CQ.
+    const auto query = R"([
+            {$lookup: {from: "A",
+                       let: {a: "$a"},
+                       pipeline: [{$match: {$expr: {$eq: ["$b", "$$a"]}}}],
+                       as: "fromA" }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.e": 5}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ e: { $eq: 5 } }", cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineMatchPlusAbsorbedFilterMixedBaseAndAsField) {
+    // pipeline:[$match] with a trailing $match that has predicates on BOTH the as-field and a
+    // base-collection field. The pipeline optimizer splits the trailing match: base part is
+    // pushed before the lookup as a prefix $match (handled in the base CQ), as-field part is
+    // absorbed into the lookup. The foreign CQ ends up with the conjunction of the sub-pipeline
+    // match and the absorbed as-field part.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [{$match: {d: 11}}] }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.e": 5, "z": 7}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{ z: { $eq: 7 } }", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ $and: [ { d: { $eq: 11 } }, { e: { $eq: 5 } } ] }",
+              cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineMixedCorrelatedAndUncorrelatedPlusAbsorbedFilter) {
+    // Sub-pipeline $match has both a correlated $expr (becomes the join edge) AND a non-correlated
+    // single-table predicate. The trailing $match is absorbed and combined with the single-table
+    // part of the sub-pipeline split.
+    const auto query = R"([
+            {$lookup: {from: "A",
+                       let: {a: "$a"},
+                       pipeline: [{$match: {$and: [{$expr: {$eq: ["$b", "$$a"]}}, {d: 11}]}}],
+                       as: "fromA" }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.e": 5}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ $and: [ { d: { $eq: 11 } }, { e: { $eq: 5 } } ] }",
+              cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineMultiPredicateMatchPlusAbsorbedFilter) {
+    // Sub-pipeline $match has multiple single-table predicates. The trailing $match is absorbed
+    // and combined with the multi-predicate sub-pipeline result.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [{$match: {d: 11, x: 7}}] }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.e": 5}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    // The CanonicalQuery construction flattens nested $and and sorts children by
+    // MatchExpression type, with field path as a secondary tiebreak within the same type.
+    // All three children here are $eq, so the path-based secondary sort applies (d, e, x).
+    ASSERT_EQ("{ $and: [ { d: { $eq: 11 } }, { e: { $eq: 5 } }, { x: { $eq: 7 } } ] }",
+              cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineNonEqStpPlusNonEqAbsorbedFilter) {
+    // Sub-pipeline $match has a non-$eq predicate ($gt); trailing $match also has a non-$eq
+    // predicate ($lt). Verifies that non-$eq comparison operators are preserved on both sides
+    // when combined into the foreign CQ.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [{$match: {d: {$gt: 10}}}] }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.e": {$lt: 100}}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    // CQ-level sortMatchExpressionTree orders children by MatchExpression type first, not by
+    // field name: $lt sorts before $gt regardless of path. So the trailing-absorbed-$lt comes
+    // first, the sub-pipeline-$gt second.
+    ASSERT_EQ("{ $and: [ { e: { $lt: 100 } }, { d: { $gt: 10 } } ] }",
+              cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineNestedOrPlusAbsorbedFilter) {
+    // Sub-pipeline $match has a complex shape: a non-rooted $or nested under an implicit
+    // top-level $and. (A rooted $or would trigger the SERVER-121502 fallback and disqualify
+    // the lookup; nesting it inside an $and avoids that path.) Combined with a plain absorbed
+    // $match, the foreign CQ should preserve the $or structure alongside the other predicates.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [{$match: {d: 5, $or: [{x: 1}, {x: 2}]}}] }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.e": 7}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    // The MatchExpression optimizer collapses $or of equality predicates on the same field
+    // into a single $in.
+    ASSERT_EQ("{ $and: [ { d: { $eq: 5 } }, { e: { $eq: 7 } }, { x: { $in: [ 1, 2 ] } } ] }",
+              cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineNonCorrelatedExprStpPlusAbsorbedFilter) {
+    // Sub-pipeline $match contains a non-correlated $expr (references "$d" on the foreign
+    // collection, not a $$letVar). This is a single-table predicate, not a join predicate,
+    // because there's no correlation with the outer collection. The trailing plain $match is
+    // absorbed and combined with the $expr STP in the foreign CQ.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [{$match: {$expr: {$gt: ["$d", 10]}}}] }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.e": 5}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ(
+        "{ $and: [ { e: { $eq: 5 } }, "
+        "{ $expr: { $gt: [ \"$d\", { $const: 10 } ] } }, "
+        "{ d: { $_internalExprGt: 10 } } ] }",
+        cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, TwoMatchesBothOnAsFieldPipelineForm) {
+    // Two consecutive trailing $match stages on the as-field of a pipeline-form $lookup. The
+    // pipeline optimizer merges the two trailing matches before absorption; the merged result is
+    // combined with the sub-pipeline match in the foreign CQ.
+    const auto query = R"([
+            {$lookup: {from: "A", localField: "a", foreignField: "b", as: "fromA",
+                       pipeline: [{$match: {d: 11}}] }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.e": 5}},
+            {$match: {"fromA.f": 7}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+
+    const auto& joinModel = swJoinModel.getValue();
+    ASSERT_EQ(joinModel.graph.numNodes(), 2);
+    const auto* baseCq = joinModel.graph.accessPathAt((NodeId)0);
+    ASSERT_EQ("{}", baseCq->getPrimaryMatchExpression()->toString());
+    const auto* cq = joinModel.graph.accessPathAt((NodeId)1);
+    ASSERT_EQ(cq->nss().coll(), "A");
+    ASSERT_EQ("{ $and: [ { d: { $eq: 11 } }, { e: { $eq: 5 } }, { f: { $eq: 7 } } ] }",
+              cq->getPrimaryMatchExpression()->toString());
+}
+
+TEST_F(PipelineAnalyzerTest, SubPipelineNonEquijoinExprPlusAbsorbedFilter) {
+    // Sub-pipeline $match contains a non-equijoin correlated $expr predicate (e.g., $gt). This
+    // is not supported by the splitter, which returns nullopt. extractPredicatesFromLookup
+    // surfaces this as a QueryFeatureNotAllowed error. The classic engine handles such queries
+    // via the non-optimized path.
+    const auto query = R"([
+            {$lookup: {from: "A",
+                       let: {a: "$a"},
+                       pipeline: [{$match: {$expr: {$gt: ["$b", "$$a"]}}}],
+                       as: "fromA" }
+            },
+            {$unwind: "$fromA"},
+            {$match: {"fromA.e": 5}}
+        ])";
+
+    auto pipeline = makePipeline(query, {"A"});
+    markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_NOT_OK(swJoinModel);
+    ASSERT_EQ(swJoinModel.getStatus().code(), ErrorCodes::QueryFeatureNotAllowed);
 }
 
 TEST_F(PipelineAnalyzerTest, TwoMatchesBothOnAsField) {
