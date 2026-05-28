@@ -31,6 +31,7 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host_connector/adapter/query_shape_opts_adapter.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 
 namespace mongo::extension::host {
 
@@ -85,3 +86,13 @@ DocumentSource::Id DocumentSourceExtensionForQueryShape::getId() const {
 }
 
 }  // namespace mongo::extension::host
+
+namespace mongo {
+void visitExtensionStage(DocsNeededBoundsContext* ctx,
+                         const extension::host::DocumentSourceExtensionForQueryShape& source) {
+    // extractDocsNeededBounds() runs after desugaring; a pre-desugar stage should never reach here.
+    tasserted(11628000,
+              "DocsNeededBounds visitor should not encounter a pre-desugar "
+              "DocumentSourceExtensionForQueryShape");
+}
+}  // namespace mongo

@@ -127,6 +127,15 @@ public:
     }
 
     /**
+     * Returns DocsNeededBounds info for this stage as a BSON-serialized
+     * MongoExtensionDocsNeededBoundsInfo. Override to declare how this stage affects pipeline
+     * bounds. Return empty BSONObj (the default) to use Unknown bounds.
+     */
+    virtual BSONObj getDocsNeededBounds() const {
+        return BSONObj();
+    }
+
+    /**
      * Evaluates the precondition of the rule identified by name. Extensions override this.
      */
     virtual bool evaluateRulePrecondition(
@@ -367,6 +376,20 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _extGetDocsNeededBounds(
+        const ::MongoExtensionLogicalAggStage* extLogicalStage,
+        ::MongoExtensionByteBuf** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            *output = nullptr;
+            const auto& impl =
+                static_cast<const ExtensionLogicalAggStageAdapter*>(extLogicalStage)->getImpl();
+            auto bounds = impl.getDocsNeededBounds();
+            if (!bounds.isEmpty()) {
+                *output = new ByteBuf(bounds);
+            }
+        });
+    }
+
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_extDestroy,
         .get_name = &_extGetName,
@@ -383,7 +406,8 @@ private:
         .get_filter = &_extGetFilter,
         .apply_pipeline_suffix_dependencies = &_extApplyPipelineSuffixDependencies,
         .get_sort_pattern = &_extGetSortPattern,
-        .skip_stream = &_extSkipStream};
+        .skip_stream = &_extSkipStream,
+        .get_docs_needed_bounds = &_extGetDocsNeededBounds};
     std::unique_ptr<LogicalAggStage> _stage;
 };
 

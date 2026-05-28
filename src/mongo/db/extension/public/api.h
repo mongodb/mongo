@@ -883,6 +883,16 @@ typedef struct MongoExtensionLogicalAggStageVTable {
     MongoExtensionStatus* (*skip_stream)(MongoExtensionLogicalAggStage* logicalStage,
                                          MongoExtensionStreamType streamType);
 
+    /**
+     * Returns the DocsNeededBounds effect for this stage. The output buffer contains a BSON-
+     * serialized MongoExtensionDocsNeededBoundsInfo struct. If the output buffer is left as
+     * nullptr, the host treats this stage as having Unknown bounds (both min and max are
+     * reset to Unknown).
+     *
+     * Ownership of the output buffer is transferred to the caller.
+     */
+    MongoExtensionStatus* (*get_docs_needed_bounds)(
+        const MongoExtensionLogicalAggStage* logicalStage, MongoExtensionByteBuf** output);
 } MongoExtensionLogicalAggStageVTable;
 
 /**

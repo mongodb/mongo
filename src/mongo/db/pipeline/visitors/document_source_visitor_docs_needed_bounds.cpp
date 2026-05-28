@@ -365,20 +365,6 @@ void visit(DocsNeededBoundsContext* ctx, const DocumentSourceSequentialDocumentC
     // the first in the pipeline, where it populates the result stream.
 }
 
-void visitExtensionStage(DocsNeededBoundsContext* ctx,
-                         const extension::host::DocumentSourceExtensionOptimizable& source) {
-    // TODO SERVER-118423: Allow extension stages to report their own bounds.
-    ctx->applyUnknownStage();
-}
-
-void visitExtensionStage(DocsNeededBoundsContext* ctx,
-                         const extension::host::DocumentSourceExtensionForQueryShape& source) {
-    // extractDocsNeededBounds() runs after desugaring; a pre-desugar stage should never reach here.
-    tasserted(11628000,
-              "DocsNeededBounds visitor should not encounter a pre-desugar "
-              "DocumentSourceExtensionForQueryShape");
-}
-
 const ServiceContext::ConstructorActionRegisterer docsNeededBoundsRegisterer{
     "DocsNeededBoundsRegisterer", [](ServiceContext* service) {
         registerMongodVisitor<DocsNeededBoundsContext>(service);

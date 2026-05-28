@@ -31,6 +31,7 @@ global:
     cpp_namespace: "mongo::extension"
     cpp_includes:
         - "mongo/db/extension/public/api.h"
+        - "mongo/db/extension/shared/extension_agg_stage_static_properties_validator.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -79,6 +80,19 @@ enums:
             kPlanCacheRead: "planCacheRead"
             kCollStats: "collStats"
             kIndexStats: "indexStats"
+    MongoExtensionDocsNeededBoundsEffect:
+        description: >-
+            How this stage affects the DocsNeededBounds of the pipeline. Used by the pipeline
+            visitor to infer how many documents upstream stages need to produce.
+        type: string
+        values:
+            kUnknown: "unknown"
+            kBlocking: "blocking"
+            kPossibleDecrease: "possibleDecrease"
+            kPossibleIncrease: "possibleIncrease"
+            kNoEffect: "noEffect"
+            kLimit: "limit"
+            kSkip: "skip"
 
 structs:
     MongoExtensionPrivilegeActionEntry:
@@ -156,3 +170,20 @@ structs:
                     Whether this stage is a selection stage. A selection stage does not modify or transform documents.
                 type: bool
                 default: false
+    MongoExtensionDocsNeededBoundsInfo:
+        description: >-
+            Return type for the LogicalAggStage get_docs_needed_bounds callback.
+            Describes how a stage affects pipeline DocsNeededBounds.
+        strict: true
+        cpp_validator_func: "validateDocsNeededBoundsInfo"
+        fields:
+            effect:
+                description: How the stage affects DocsNeededBounds.
+                type: MongoExtensionDocsNeededBoundsEffect
+            value:
+                description: >-
+                    Concrete numeric value for the effect. Required when effect is "limit" or
+                    "skip". Must be a positive integer.
+                type: safeInt64
+                optional: true
+                validator: {gt: 0}
