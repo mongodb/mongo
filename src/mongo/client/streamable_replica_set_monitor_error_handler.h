@@ -57,7 +57,6 @@ public:
     enum class TriggerEvent {
         // An application (non-monitoring) operation failed on a connection before the initial
         // hello exchange completed.
-        // TODO (SERVER-127303): Remove this error case.
         kApplicationPreHandshake,
 
         // An application (non-monitoring) operation failed on an established connection.
