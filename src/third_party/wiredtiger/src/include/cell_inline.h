@@ -394,13 +394,13 @@ __wt_cell_pack_leaf_kv(WT_SESSION_IMPL *session, bool empty_value, const void *k
     /* Recompute write pointer after possible realloc */
     WT_ASSERT(session, new_image->mem != NULL);
 
-    s->p_ptr = (uint8_t *)new_image->mem + new_image->size;
-    __wt_cell_kv_copy(session, s->p_ptr, &key);
-    s->p_ptr += key.len;
+    s->cell_ptr = (uint8_t *)new_image->mem + new_image->size;
+    __wt_cell_kv_copy(session, s->cell_ptr, &key);
+    s->cell_ptr += key.len;
     s->entries++;
     if (!empty_value) {
-        __wt_cell_kv_copy(session, s->p_ptr, &val);
-        s->p_ptr += val.len;
+        __wt_cell_kv_copy(session, s->cell_ptr, &val);
+        s->cell_ptr += val.len;
         s->entries++;
     }
     new_image->size += packed_size;
@@ -436,17 +436,15 @@ __wt_cell_build_addr_kv(WT_SESSION_IMPL *session, WT_CELL_KV *val_kv, uint8_t ce
  * __cell_build_int_key_from_kv --
  *     Build an internal key cell and populate a WTI_REC_KV structure.
  */
-static WT_INLINE int
-__cell_build_int_key_from_kv(
-  WT_SESSION_IMPL *session, WT_CELL_KV *key, const void *data, size_t size)
+static WT_INLINE void
+__cell_build_int_key_from_kv(WT_CELL_KV *key, const void *data, size_t size)
 {
-    WT_RET(__wt_buf_set(session, &key->buf, data, size));
+    key->buf.data = data;
+    key->buf.size = size;
 
     /* Build cell header and compute lengths */
     key->cell_len = __wt_cell_pack_int_key(&key->cell, key->buf.size);
     key->len = key->cell_len + key->buf.size;
-
-    return (0);
 }
 
 /*
@@ -486,31 +484,38 @@ __wt_cell_pack_internal_key_addr(WT_SESSION_IMPL *session, WT_ITEM *new_image,
   bool is_delta, uint8_t **pp)
 {
     WT_CELL_KV key_kv, val_kv;
+    WT_DECL_RET;
     WT_PAGE_DELETED *page_del = NULL;
+    WT_TIME_AGGREGATE *ta;
+    const void *key_data, *val_data;
     size_t packed_size;
+    size_t key_size, val_size;
+    uint8_t cell_type, *p;
 
     WT_CLEAR(key_kv);
     WT_CLEAR(val_kv);
 
-    /* Build packed key */
-    if (is_delta)
-        WT_RET(__cell_build_int_key_from_kv(session, &key_kv, delta->key.data, delta->key.size));
-    else
-        WT_RET(__cell_build_int_key_from_kv(session, &key_kv, base_key->data, base_key->size));
-
-    /* Build packed value */
     if (is_delta) {
-        page_del = (delta->value.type == WT_CELL_ADDR_DEL) ? &delta->value.page_del : NULL;
-
-        __wt_cell_build_addr_kv(session, &val_kv, delta->value.type, page_del, &delta->value.ta,
-          delta->value.data, delta->value.size);
-
+        key_data = delta->key.data;
+        key_size = delta->key.size;
+        cell_type = delta->value.type;
+        page_del = (cell_type == WT_CELL_ADDR_DEL) ? &delta->value.page_del : NULL;
+        ta = &delta->value.ta;
+        val_data = delta->value.data;
+        val_size = delta->value.size;
     } else {
-        page_del = (base_val->type == WT_CELL_ADDR_DEL) ? &base_val->page_del : NULL;
-
-        __wt_cell_build_addr_kv(session, &val_kv, base_val->type, page_del, &base_val->ta,
-          base_val->data, base_val->size);
+        key_data = base_key->data;
+        key_size = base_key->size;
+        cell_type = base_val->type;
+        page_del = (cell_type == WT_CELL_ADDR_DEL) ? &base_val->page_del : NULL;
+        ta = &base_val->ta;
+        val_data = base_val->data;
+        val_size = base_val->size;
     }
+
+    /* Build packed key/value. */
+    __cell_build_int_key_from_kv(&key_kv, key_data, key_size);
+    __wt_cell_build_addr_kv(session, &val_kv, cell_type, page_del, ta, val_data, val_size);
 
     /*
      * Ensure enough space, then recompute write pointer from new_image (not the caller's saved
@@ -518,12 +523,12 @@ __wt_cell_pack_internal_key_addr(WT_SESSION_IMPL *session, WT_ITEM *new_image,
      */
     packed_size = key_kv.len + val_kv.len;
     if (new_image->size + packed_size > new_image->memsize)
-        WT_RET(__wt_buf_grow(session, new_image, new_image->size + packed_size));
+        WT_ERR(__wt_buf_grow(session, new_image, new_image->size + packed_size));
 
     /* Recompute write pointer after possible realloc */
     WT_ASSERT(session, new_image->mem != NULL);
 
-    uint8_t *p = (uint8_t *)new_image->mem + new_image->size;
+    p = (uint8_t *)new_image->mem + new_image->size;
     __wt_cell_kv_copy(session, p, &key_kv);
     p += key_kv.len;
     __wt_cell_kv_copy(session, p, &val_kv);
@@ -532,9 +537,10 @@ __wt_cell_pack_internal_key_addr(WT_SESSION_IMPL *session, WT_ITEM *new_image,
     *pp = p;
     new_image->size += packed_size;
 
+err:
     __wt_buf_free(session, &key_kv.buf);
     __wt_buf_free(session, &val_kv.buf);
-    return (0);
+    return (ret);
 }
 
 /*
@@ -1909,28 +1915,52 @@ __wt_page_cell_data_ref_kv(
     return (__cell_data_ref(session, page, (WT_CELL_UNPACK_COMMON *)unpack, store));
 }
 
-/*
- * WT_CELL_FOREACH --
- *	Walk the cells on a page.
- */
-#define WT_CELL_FOREACH_DELTA_INT(session, page_dsk, dsk, unpack)                               \
-    do {                                                                                        \
-        uint32_t __i;                                                                           \
-        uint8_t *__cell;                                                                        \
-        for (__cell = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), __i = (dsk)->u.entries; __i > 0; \
-             __i -= 2) {                                                                        \
-            WT_CELL_UNPACK_DELTA_INT *t_unpack = &unpack;                                       \
-            __wt_cell_unpack_kv(session, page_dsk, (WT_CELL *)__cell, &t_unpack->key);          \
-            __cell += t_unpack->key.__len;                                                      \
-            __wt_cell_unpack_addr(session, page_dsk, (WT_CELL *)__cell, &t_unpack->value);      \
-            __cell += t_unpack->value.__len;
-
 #define WT_CELL_DELTA_LEAF_UNPACK(session, dsk, unpack, cell)                     \
     do {                                                                          \
         __wt_cell_unpack_kv(session, dsk, (WT_CELL *)cell, &(unpack)->delta_key); \
         cell += (unpack)->delta_key.__len;                                        \
         __wt_cell_unpack_delta_leaf_value(session, dsk, (WT_CELL *)cell, unpack); \
         cell += (unpack)->delta_value.__len;                                      \
+    } while (0)
+
+/*
+ * WT_CELL_DELTA_INT_UNPACK --
+ *	Unpack one key+value entry from the head of an internal delta stream, advancing the read
+ *	position past both cells and marking the entry as decoded.
+ *
+ * Called only when the stream has not yet decoded its current head entry. After this macro, the
+ * read position points at the next entry in the stream, while the decoded fields hold the
+ * current entry. The caller resets the decoded flag and decrements the remaining count by 2
+ * when an entry is consumed or discarded, triggering a fresh decode on the next call.
+ *
+ * The base page header is passed to the unpack helpers so they can resolve timestamps stored
+ * relative to the base page.
+ */
+#define WT_CELL_DELTA_INT_UNPACK(session, base_dsk, s)                                      \
+    do {                                                                                    \
+        __wt_cell_unpack_kv(session, base_dsk, (WT_CELL *)(s)->cell, &(s)->unpack.key);     \
+        (s)->cell += (s)->unpack.key.__len;                                                 \
+        __wt_cell_unpack_addr(session, base_dsk, (WT_CELL *)(s)->cell, &(s)->unpack.value); \
+        (s)->cell += (s)->unpack.value.__len;                                               \
+        (s)->unpacked = true;                                                               \
+    } while (0)
+
+/*
+ * WT_CELL_BASE_INT_UNPACK --
+ *	Unpack one key+value pair from the base internal page, advancing the read position past both
+ *	cells and marking the entry as decoded.
+ *
+ * Follows the same advance-on-decode, reset-on-consume contract as the delta stream variant.
+ * Internal page keys are never prefix-compressed, so the decoded key always contains the full
+ * key and no decompression step is needed before comparison.
+ */
+#define WT_CELL_BASE_INT_UNPACK(session, s)                                               \
+    do {                                                                                  \
+        __wt_cell_unpack_addr(session, (s)->dsk, (WT_CELL *)(s)->cell, &(s)->unpack_key); \
+        (s)->cell += (s)->unpack_key.__len;                                               \
+        __wt_cell_unpack_addr(session, (s)->dsk, (WT_CELL *)(s)->cell, &(s)->unpack_val); \
+        (s)->cell += (s)->unpack_val.__len;                                               \
+        (s)->unpacked = true;                                                             \
     } while (0)
 
 #define WT_CELL_FOREACH_DELTA_LEAF(session, dsk, unpack)                                        \

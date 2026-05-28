@@ -250,6 +250,6 @@
     "python3 ../test/suite/run.py test_live_restore01",
     "python3 ../test/suite/run.py test_key_provider_disagg01.py",
     "python3 ../test/suite/run.py test_key_provider_disagg02.py",
-    "python3 ../test/suite/run.py --hook disagg --skip-tests-in-file ../test/suite/hook_disagg.fail base"
+    "python3 ../test/suite/run.py --hook disagg --skip-tests-in-file ../test/suite/fail_lists/hook_disagg.fail base"
   ]
 }

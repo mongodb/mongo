@@ -428,6 +428,6 @@ struct __wti_disk_leaf_merge_state {
     bool key_pfx_compress;
     bool all_empty_value;
     bool any_empty_value;
-    uint8_t *p_ptr;
+    uint8_t *cell_ptr;
     uint32_t entries;
 };

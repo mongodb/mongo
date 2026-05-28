@@ -47,6 +47,8 @@ import test_util
 test_util.setup_paths()
 wt_builddir = test_util.find_build_dir()
 suitedir = sys.path[0]
+sys.path.insert(1, os.path.join(suitedir, 'helpers'))
+sys.path.insert(1, os.path.join(suitedir, 'hooks'))
 
 # unittest will be imported later, near to when it is needed.
 unittest = None
