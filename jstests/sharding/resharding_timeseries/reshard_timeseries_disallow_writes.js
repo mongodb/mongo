@@ -72,7 +72,7 @@ reshardingTest.withReshardingInBackground(
                 updates: [{q: {"metaTest.x": -1}, u: {$set: {"metaTest.x": -15}}, multi: true}],
                 maxTimeMS: 3000,
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code), tojson(res));
 
             res = getTimeseriesCollForRawOps(db, coll).runCommand({
                 update: getTimeseriesCollForRawOps(db, coll).getName(),
@@ -80,7 +80,7 @@ reshardingTest.withReshardingInBackground(
                 maxTimeMS: 3000,
                 ...getRawOperationSpec(db),
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code), tojson(res));
 
             jsTestLog("Attempting delete");
             res = coll.runCommand({
@@ -88,7 +88,7 @@ reshardingTest.withReshardingInBackground(
                 deletes: [{q: {"metaTest.x": -1}, limit: 1}],
                 maxTimeMS: 3000,
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code), tojson(res));
 
             res = getTimeseriesCollForRawOps(db, coll).runCommand({
                 delete: getTimeseriesCollForRawOps(db, coll).getName(),
@@ -96,7 +96,7 @@ reshardingTest.withReshardingInBackground(
                 maxTimeMS: 3000,
                 ...getRawOperationSpec(db),
             });
-            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors[0].code));
+            assert(ErrorCodes.isExceededTimeLimitError(res.writeErrors?.[0]?.code ?? res.code), tojson(res));
 
             jsTestLog("Attempting createIndex");
             res = coll.runCommand({
