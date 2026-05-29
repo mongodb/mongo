@@ -233,6 +233,13 @@ config_setting(
 )
 
 config_setting(
+    name = "rhel10",
+    constraint_values = [
+        "//bazel/platforms:rhel10",
+    ],
+)
+
+config_setting(
     name = "windows_x86_64",
     constraint_values = [
         "@platforms//os:windows",
@@ -2324,6 +2331,7 @@ selects.config_setting_group(
         "//bazel/platforms:debian12",
         "//bazel/platforms:rhel8",
         "//bazel/platforms:rhel9",
+        "//bazel/platforms:rhel10",
         "//bazel/platforms:suse12",
         "//bazel/platforms:suse15",
     ],

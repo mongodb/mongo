@@ -86,6 +86,22 @@ class TestInferPlatform(unittest.TestCase):
         pltf = infer_platform(None, None)
         self.assertEqual(pltf, "rhel80")
 
+        mock_id.return_value = "rhel"
+        mock_major.return_value = "10"
+        mock_minor.return_value = "0"
+        pltf = infer_platform("base", "4.2")
+        self.assertEqual(pltf, "rhel10")
+        pltf = infer_platform("enterprise", "4.2")
+        self.assertEqual(pltf, "rhel10")
+        pltf = infer_platform("base", "4.0")
+        self.assertEqual(pltf, "rhel10")
+        pltf = infer_platform(None, "4.2")
+        self.assertEqual(pltf, "rhel10")
+        pltf = infer_platform("base", None)
+        self.assertEqual(pltf, "rhel10")
+        pltf = infer_platform(None, None)
+        self.assertEqual(pltf, "rhel10")
+
     @patch("distro.id")
     @patch("platform.system")
     def test_infer_platform_others(self, mock_system, mock_id):

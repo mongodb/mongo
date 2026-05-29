@@ -138,6 +138,9 @@ mongo_cc_library(
             "-Wno-unused-but-set-variable",
         ],
         "//conditions:default": ["//conditions:incompatible"],
+    }) + select({
+        "//bazel/config:rhel10": ["-DOPENSSL_NO_ENGINE"],
+        "//conditions:default": [],
     }),
     includes = [
         "dist/src",

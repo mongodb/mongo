@@ -286,6 +286,12 @@ OS_DOCKER_LOOKUP = {
         frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
         "python3",
     ),
+    "rhel10": (
+        "almalinux:10",
+        "yum",
+        frozenset(["python3", "wget", "pkgconfig", "systemd", "procps", "file"]),
+        "python3",
+    ),
     "sunos5": None,
     "suse11": None,
     "suse12": None,
@@ -634,11 +640,23 @@ def get_tools_package(arch_name: str, os_name: str) -> Optional[str]:
     # Tools packages are only published to the latest RHEL version supported on master, but
     # the tools binaries are cross compatible with other RHEL versions
     # (see https://jira.mongodb.org/browse/SERVER-92939)
+    def rhel_major_version(name: str) -> Optional[str]:
+        match = re.match(r"^rhel(\d+)", name)
+        if not match:
+            return None
+
+        digits = match.group(1)
+        if len(digits) >= 2 and digits[0] == "1":
+            return digits[:2]
+        return digits[0]
+
     def major_version_matches(download_name: str) -> bool:
+        os_rhel_major = rhel_major_version(os_name)
+        download_rhel_major = rhel_major_version(download_name)
         if (
-            os_name.startswith("rhel")
-            and download_name.startswith("rhel")
-            and os_name[4] == download_name[4]
+            os_rhel_major
+            and download_rhel_major
+            and os_rhel_major == download_rhel_major
         ):
             return True
         return download_name == os_name

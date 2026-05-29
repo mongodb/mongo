@@ -140,6 +140,26 @@ evergreen_buildvariants:
     platform: rhel8
     architecture: arm64
 
+  - name: rhel10
+    edition: targeted
+    platform: rhel10
+    architecture: x86_64
+
+  - name: enterprise-rhel-10-64-bit
+    edition: enterprise
+    platform: rhel10
+    architecture: x86_64
+
+  - name: rhel10-arm64
+    edition: targeted
+    platform: rhel10
+    architecture: arm64
+
+  - name: enterprise-rhel-10-arm64
+    edition: enterprise
+    platform: rhel10
+    architecture: arm64
+
   - name: enterprise-rhel-71-ppc64le
     edition: enterprise
     platform: rhel71

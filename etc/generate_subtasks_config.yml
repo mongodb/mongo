@@ -28,6 +28,8 @@ build_variant_large_distro_exceptions:
   - enterprise-rhel-9-ppc64le
   - enterprise-rhel-93-64-bit
   - enterprise-rhel-93-arm64
+  - enterprise-rhel-10-64-bit
+  - enterprise-rhel-10-arm64
   - enterprise-rhel-9-s390x
   - enterprise-suse15-64
   - enterprise-ubuntu1804-arm64
@@ -55,6 +57,8 @@ build_variant_large_distro_exceptions:
   - rhel-8-arm64
   - rhel93
   - rhel93-arm64
+  - rhel10
+  - rhel10-arm64
   - suse15
   - ubi8
   - ubuntu1604-container

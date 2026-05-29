@@ -94,6 +94,8 @@ class ToolchainDistroName(Tuple[str, ...], enum.Enum):
         "rhel88",
         "ubi8",
     )
+    RHEL9 = ("rhel9", "rhel90", "rhel93", "ubi9")
+    RHEL10 = ("rhel10", "ubi10")
     SUSE12 = ("suse12", "suse12-sp5")
     SUSE15 = ("suse15", "suse15-sp0", "suse15-sp2")
     UBUNTU1404 = ("ubuntu1404",)

@@ -114,9 +114,116 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//bazel:bzlmod.bzl%bazel_features_deps": {
+      "general": {
+        "bzlTransitiveDigest": "EL5SaHGhzVxbhp8O3Zb4RW/MILuo+HHpYj3Ufvj5yqM=",
+        "usagesDigest": "c91kQ0HotoA1cfwWU4KaqCoQU7lT6pGi6XPGIiMGkb0=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "bazel_features_version": {
+            "bzlFile": "@@bazel_features~//private:version_repo.bzl",
+            "ruleClassName": "version_repo",
+            "attributes": {}
+          },
+          "bazel_features_globals": {
+            "bzlFile": "@@bazel_features~//private:globals_repo.bzl",
+            "ruleClassName": "globals_repo",
+            "attributes": {
+              "globals": {
+                "cc_proto_aspect": [
+                  "7.0.0-pre.20230405.2",
+                  "8.0.0"
+                ],
+                "CcSharedLibraryInfo": [
+                  "6.0.0-pre.20220630.1",
+                  "9.0.0-pre.20250921.2"
+                ],
+                "CcSharedLibraryHintInfo": [
+                  "7.0.0-pre.20230316.2",
+                  ""
+                ],
+                "JavaInfo": [
+                  "",
+                  "8.0.0"
+                ],
+                "JavaPluginInfo": [
+                  "",
+                  "8.0.0"
+                ],
+                "macro": [
+                  "8.0.0",
+                  ""
+                ],
+                "PackageSpecificationInfo": [
+                  "6.4.0",
+                  ""
+                ],
+                "ProtoInfo": [
+                  "",
+                  "8.0.0"
+                ],
+                "PyCcLinkParamsProvider": [
+                  "",
+                  "8.0.0"
+                ],
+                "PyInfo": [
+                  "",
+                  "8.0.0"
+                ],
+                "PyRuntimeInfo": [
+                  "",
+                  "8.0.0"
+                ],
+                "RunEnvironmentInfo": [
+                  "5.3.0",
+                  ""
+                ],
+                "subrule": [
+                  "7.0.0",
+                  ""
+                ],
+                "DefaultInfo": [
+                  "0.0.1",
+                  ""
+                ],
+                "__TestingOnly_NeverAvailable": [
+                  "1000000000.0.0",
+                  ""
+                ]
+              }
+            }
+          },
+          "bazel_skylib": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "ruleClassName": "http_archive",
+            "attributes": {
+              "sha256": "9f38886a40548c6e96c106b752f242130ee11aaa068a56ba7e56f4511f33e4f2",
+              "urls": [
+                "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.6.1/bazel-skylib-1.6.1.tar.gz",
+                "https://github.com/bazelbuild/bazel-skylib/releases/download/1.6.1/bazel-skylib-1.6.1.tar.gz"
+              ]
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "",
+            "bazel_features",
+            "bazel_features~"
+          ],
+          [
+            "bazel_features~",
+            "bazel_tools",
+            "bazel_tools"
+          ]
+        ]
+      }
+    },
     "//bazel:bzlmod.bzl%setup_mongo_python_toolchains": {
       "general": {
-        "bzlTransitiveDigest": "baWIcGvxfENkhkIgmm5mVeBYLqxYAFah+mEDZBqXK4w=",
+        "bzlTransitiveDigest": "UmlUUnXebwvibgiDeW7fGlAbPGq8AepRdfUNyiToj5U=",
         "usagesDigest": "bUxjq9n+hj2YwYT/lcSP4lHyQ2GVy5JpFgSmddUqUZg=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
