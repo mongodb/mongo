@@ -1004,6 +1004,14 @@ export function getClusterTime(db) {
 }
 
 /**
+ * Returns the configsvr's currently-known configTime (the applied opTime ts on the configsvr
+ * primary).
+ */
+export function getConfigTime(st) {
+    return st.configRS.getPrimary().adminCommand({replSetGetStatus: 1}).optimes.appliedOpTime.ts;
+}
+
+/**
  * Returns the next cluster time by incrementing the 'inc' field of the provided 'clusterTime'.
  */
 export function getNextClusterTime(clusterTime) {

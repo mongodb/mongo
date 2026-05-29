@@ -14,7 +14,7 @@
 // AsyncResultsMerger to return sorted results even if some shards have not yet produced any
 // data.
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {getClusterTime} from "jstests/libs/query/change_stream_util.js";
+import {getConfigTime} from "jstests/libs/query/change_stream_util.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -39,10 +39,10 @@ assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), mid
 // Move the [0, MaxKey] chunk to st.shard1.shardName.
 assert.commandWorked(mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
-// Save current cluster time. We use this for opening the change streams in this test,
+// Save current config time. We use this for opening the change streams in this test,
 // because we want to avoid v2 change stream readers running into "future cluster time"
 // responses from the placement history when opening the change stream at a "too new" PIT.
-const startAtOperationTime = getClusterTime(mongosDB);
+const startAtOperationTime = getConfigTime(st);
 
 // Start the profiler on each shard so that we can examine the getMores' maxTimeMS.
 for (let profileDB of [shard0DB, shard1DB]) {
