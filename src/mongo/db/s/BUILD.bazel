@@ -452,6 +452,7 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:resharding_oplog_fetcher.cpp",
         "//src/mongo/db/s/resharding:resharding_oplog_session_application.cpp",
         "//src/mongo/db/s/resharding:resharding_ownership_match_stage.cpp",
+        "//src/mongo/db/s/resharding:resharding_recipient_post_cloning_delta_collector.cpp",
         "//src/mongo/db/s/resharding:resharding_recipient_service_external_state.cpp",
         "//src/mongo/db/s/resharding:resharding_txn_cloner.cpp",
         "//src/mongo/db/s/resharding:resharding_txn_cloner_progress_gen",
@@ -1162,6 +1163,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_coordinator_service_util_test.cpp",
         "//src/mongo/db/s/resharding:resharding_coordinator_test.cpp",
         "//src/mongo/db/s/resharding:resharding_donor_post_cloning_delta_collector_test.cpp",
+        "//src/mongo/db/s/resharding:resharding_recipient_post_cloning_delta_collector_test.cpp",
         "//src/mongo/db/s/resharding:resharding_util_test.cpp",
     ],
     tags = [

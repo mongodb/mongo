@@ -3,6 +3,3 @@ filters:
   - "*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "coordinator_document.idl":
-    approvers:
-      - 10gen/server-catalog-and-routing-ddl

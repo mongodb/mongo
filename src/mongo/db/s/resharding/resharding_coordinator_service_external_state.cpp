@@ -557,6 +557,16 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsD
     return docsDelta;
 }
 
+std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsDeltaFromRecipients(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    CancellationToken token,
+    const UUID& reshardingUUID,
+    const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds) {
+    MONGO_UNREACHABLE;
+}
+
 void ReshardingCoordinatorExternalStateImpl::verifyClonedCollection(
     OperationContext* opCtx,
     const std::shared_ptr<executor::TaskExecutor>& executor,

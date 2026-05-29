@@ -129,6 +129,19 @@ public:
         const std::vector<ShardId>& shardIds) = 0;
 
     /**
+     * Returns a map from each recipient shard id to the change in the number of documents in the
+     * temporary resharding collection since the cloning phase started, as reported by the
+     * recipient's change stream monitor.
+     */
+    virtual std::map<ShardId, int64_t> getDocumentsDeltaFromRecipients(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::TaskExecutor>& executor,
+        CancellationToken token,
+        const UUID& reshardingUUID,
+        const NamespaceString& nss,
+        const std::vector<ShardId>& shardIds) = 0;
+
+    /**
      * To be called before transitioning to the "applying" state to verify the temporary collection
      * after cloning by asserting that:
      * - The total number of documents to copy is equal to the total number of documents copied.
@@ -221,6 +234,14 @@ public:
         const std::map<ShardId, ShardVersion>& shardVersions) override;
 
     std::map<ShardId, int64_t> getDocumentsDeltaFromDonors(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::TaskExecutor>& executor,
+        CancellationToken token,
+        const UUID& reshardingUUID,
+        const NamespaceString& nss,
+        const std::vector<ShardId>& shardIds) override;
+
+    std::map<ShardId, int64_t> getDocumentsDeltaFromRecipients(
         OperationContext* opCtx,
         const std::shared_ptr<executor::TaskExecutor>& executor,
         CancellationToken token,

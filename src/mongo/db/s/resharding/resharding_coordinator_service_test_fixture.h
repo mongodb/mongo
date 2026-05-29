@@ -250,6 +250,16 @@ public:
         return docsDelta;
     }
 
+    std::map<ShardId, int64_t> getDocumentsDeltaFromRecipients(
+        OperationContext*,
+        const std::shared_ptr<executor::TaskExecutor>&,
+        CancellationToken,
+        const UUID&,
+        const NamespaceString&,
+        const std::vector<ShardId>&) override {
+        MONGO_UNREACHABLE;
+    }
+
     void verifyClonedCollection(OperationContext*,
                                 const std::shared_ptr<executor::TaskExecutor>&,
                                 CancellationToken,

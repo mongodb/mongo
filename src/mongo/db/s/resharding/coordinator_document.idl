@@ -78,6 +78,10 @@ structs:
             # We intentionally have the mutable state nested in a subobject to make it easy to
             # overwrite with a single $set.
             mutableState: RecipientShardContext
+            documentsFinal:
+                type: long
+                description: "The number of documents on this donor in the 'strict-consistency' state"
+                optional: true
 
     ReshardingCoordinatorMetrics:
         description: "Contains metrics about the resharding operation on the coordinator."

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/resharding/resharding_donor_post_cloning_delta_collector.h"
+#include "mongo/db/s/resharding/resharding_recipient_post_cloning_delta_collector.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/hierarchical_cancelable_operation_context_factory.h"
@@ -49,25 +49,24 @@ using resharding_delta_collector_test_util::FailOnceThenSucceedMockExternalState
 using resharding_delta_collector_test_util::SuccessMockExternalState;
 using resharding_delta_collector_test_util::UnrecoverableMockExternalState;
 
-
-class ReshardingDonorPostCloningDeltaCollectorTest
+class ReshardingRecipientPostCloningDeltaCollectorTest
     : public resharding_delta_collector_test_util::PostCloningDeltaCollectorTestBase {
 public:
     /**
      * Builds a ReshardingCoordinatorDocument in the given state.
-     * If documentsFinalAlreadySet is true, sets documentsFinal on the first donor, simulating a
+     * If documentsFinalAlreadySet is true, sets documentsFinal on each recipient, simulating a
      * resume after the fetch already completed.
      */
     ReshardingCoordinatorDocument makeDoc(CoordinatorStateEnum state,
-                                          const std::vector<ShardId>& donorShardIds,
+                                          const std::vector<ShardId>& recipientShardIds,
                                           bool documentsFinalAlreadySet = false) {
-        std::vector<DonorShardEntry> donorShards;
-        for (const auto& shardId : donorShardIds) {
-            DonorShardEntry entry(shardId, {});
+        std::vector<RecipientShardEntry> recipientShards;
+        for (const auto& shardId : recipientShardIds) {
+            RecipientShardEntry entry(shardId, {});
             if (documentsFinalAlreadySet) {
                 entry.setDocumentsFinal(100);
             }
-            donorShards.emplace_back(std::move(entry));
+            recipientShards.emplace_back(std::move(entry));
         }
 
         ReshardingCoordinatorDocument doc;
@@ -77,15 +76,15 @@ public:
                                          NamespaceString::createNamespaceString_forTest("db.tmp"),
                                          BSON("x" << 1)});
         doc.setState(state);
-        doc.setDonorShards(std::move(donorShards));
+        doc.setRecipientShards(std::move(recipientShards));
         return doc;
     }
 
-    std::shared_ptr<ReshardingDonorPostCloningDeltaCollector> makeCollector(
+    std::shared_ptr<ReshardingRecipientPostCloningDeltaCollector> makeCollector(
         ReshardingCoordinatorDocument doc,
         std::shared_ptr<ReshardingCoordinatorExternalState> externalState,
         CancellationToken abortToken) {
-        return std::make_shared<ReshardingDonorPostCloningDeltaCollector>(
+        return std::make_shared<ReshardingRecipientPostCloningDeltaCollector>(
             std::move(doc),
             std::move(externalState),
             abortToken,
@@ -94,7 +93,7 @@ public:
     }
 };
 
-TEST_F(ReshardingDonorPostCloningDeltaCollectorTest, SkipsFetchWhenNotInBlockingWritesState) {
+TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest, SkipsFetchWhenNotInBlockingWritesState) {
     CancellationSource abortSource;
     auto externalState = std::make_shared<SuccessMockExternalState>(
         std::map<ShardId, int64_t>{{ShardId("shard0"), 5}});
@@ -107,7 +106,7 @@ TEST_F(ReshardingDonorPostCloningDeltaCollectorTest, SkipsFetchWhenNotInBlocking
     ASSERT_TRUE(result.empty());
 }
 
-TEST_F(ReshardingDonorPostCloningDeltaCollectorTest, SkipsFetchWhenDocumentsFinalAlreadySet) {
+TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest, SkipsFetchWhenDocumentsFinalAlreadySet) {
     CancellationSource abortSource;
     auto externalState = std::make_shared<SuccessMockExternalState>(
         std::map<ShardId, int64_t>{{ShardId("shard0"), 5}});
@@ -123,7 +122,7 @@ TEST_F(ReshardingDonorPostCloningDeltaCollectorTest, SkipsFetchWhenDocumentsFina
     ASSERT_TRUE(result.empty());
 }
 
-TEST_F(ReshardingDonorPostCloningDeltaCollectorTest, FetchesDeltaSuccessfully) {
+TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest, FetchesDeltaSuccessfully) {
     const ShardId shard0("shard0");
     const ShardId shard1("shard1");
     CancellationSource abortSource;
@@ -141,7 +140,7 @@ TEST_F(ReshardingDonorPostCloningDeltaCollectorTest, FetchesDeltaSuccessfully) {
     ASSERT_EQ(result.at(shard1), -7);
 }
 
-TEST_F(ReshardingDonorPostCloningDeltaCollectorTest,
+TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest,
        RetryableNetworkErrorTriggersRetryAndSucceeds) {
     const ShardId shard0("shard0");
     CancellationSource abortSource;
@@ -159,7 +158,7 @@ TEST_F(ReshardingDonorPostCloningDeltaCollectorTest,
     ASSERT_EQ(result.at(shard0), 10);
 }
 
-TEST_F(ReshardingDonorPostCloningDeltaCollectorTest, UnrecoverableErrorPropagatesWithoutRetry) {
+TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest, UnrecoverableErrorPropagatesWithoutRetry) {
     CancellationSource abortSource;
     auto externalState = std::make_shared<UnrecoverableMockExternalState>();
     auto doc = makeDoc(CoordinatorStateEnum::kBlockingWrites, {ShardId("shard0")});
@@ -173,7 +172,7 @@ TEST_F(ReshardingDonorPostCloningDeltaCollectorTest, UnrecoverableErrorPropagate
     ASSERT_EQ(externalState->callCount(), 1);
 }
 
-TEST_F(ReshardingDonorPostCloningDeltaCollectorTest,
+TEST_F(ReshardingRecipientPostCloningDeltaCollectorTest,
        AbortTokenCancelsBlockedFetchAndCompletesWithError) {
     CancellationSource abortSource;
     auto blockingState = std::make_shared<BlockingMockExternalState>();
@@ -182,7 +181,7 @@ TEST_F(ReshardingDonorPostCloningDeltaCollectorTest,
 
     auto future = collector->launch(scopedExecutor(), makeSpanForCollector());
 
-    // Wait until getDocumentsDeltaFromDonors is actually blocking before cancelling.
+    // Wait until getDocumentsDeltaFromRecipients is actually blocking before cancelling.
     blockingState->waitUntilEntered();
 
     abortSource.cancel();
