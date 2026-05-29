@@ -300,6 +300,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         if (!PrimaryDrivenResumableIndexBuildTest._featureFlagsEnabled(rst.getPrimary().getDB(dbName))) {
             jsTest.log.info(
                 "PrimaryDrivenResumableIndexBuildTest: skipping because " +
+                    "featureFlagContainerWrites or " +
                     "featureFlagPrimaryDrivenIndexBuilds or " +
                     "featureFlagResumablePrimaryDrivenIndexBuilds is disabled",
             );
@@ -401,6 +402,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         if (!PrimaryDrivenResumableIndexBuildTest._featureFlagsEnabled(rst.getPrimary().getDB(dbName))) {
             jsTest.log.info(
                 "PrimaryDrivenResumableIndexBuildTest: skipping runMultiPhase because " +
+                    "featureFlagContainerWrites or " +
                     "featureFlagPrimaryDrivenIndexBuilds or " +
                     "featureFlagResumablePrimaryDrivenIndexBuilds is disabled",
             );
@@ -562,11 +564,12 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
 
     /**
      * @param {DB} db
-     * @returns {boolean} True iff both `featureFlagPrimaryDrivenIndexBuilds` and
+     * @returns {boolean} True iff `featureFlagContainerWrites`, `featureFlagPrimaryDrivenIndexBuilds` and
      *     `featureFlagResumablePrimaryDrivenIndexBuilds` are enabled.
      */
     static _featureFlagsEnabled(db) {
         return (
+            FeatureFlagUtil.isPresentAndEnabled(db, "ContainerWrites") &&
             FeatureFlagUtil.isPresentAndEnabled(db, "PrimaryDrivenIndexBuilds") &&
             FeatureFlagUtil.isPresentAndEnabled(db, "ResumablePrimaryDrivenIndexBuilds")
         );
