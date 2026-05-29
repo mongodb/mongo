@@ -169,6 +169,7 @@
 #include "mongo/db/shard_role/ddl/direct_connection_ddl_hook.h"
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
+#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/resource_yielders.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_helper.h"
@@ -377,38 +378,43 @@ void logStartup(OperationContext* opCtx) {
     BSONObj o = toLog.obj();
 
     Lock::GlobalWrite lk(opCtx);
-    AutoGetDb autoDb(opCtx, NamespaceString::kStartupLogNamespace.dbName(), mongo::MODE_X);
-    auto db = autoDb.ensureDbExists(opCtx);
-    // kStartupLogNamespace is always local and doesn't require a placement version check.
-    auto collection =
-        acquireCollection(opCtx,
-                          CollectionAcquisitionRequest{NamespaceString::kStartupLogNamespace,
-                                                       PlacementConcern::kPretendUnsharded,
-                                                       repl::ReadConcernArgs::get(opCtx),
-                                                       AcquisitionPrerequisites::kWrite},
-                          MODE_X);
-    WriteUnitOfWork wunit(opCtx);
-    if (!collection.exists()) {
-        BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
-        repl::UnreplicatedWritesBlock uwb(opCtx);
-        CollectionOptions collectionOptions = uassertStatusOK(
-            CollectionOptions::parse(options, CollectionOptions::ParseKind::parseForCommand));
-        auto newColl =
-            db->createCollection(opCtx, NamespaceString::kStartupLogNamespace, collectionOptions);
-        invariant(newColl);
-        // Re-acquire after creation
-        collection =
+    writeConflictRetry(opCtx, "logStartup", NamespaceString::kStartupLogNamespace, [&] {
+        AutoGetDb autoDb(opCtx, NamespaceString::kStartupLogNamespace.dbName(), mongo::MODE_X);
+        auto db = autoDb.ensureDbExists(opCtx);
+        // kStartupLogNamespace is always local and doesn't require a placement version check.
+        auto collection =
             acquireCollection(opCtx,
                               CollectionAcquisitionRequest{NamespaceString::kStartupLogNamespace,
                                                            PlacementConcern::kPretendUnsharded,
                                                            repl::ReadConcernArgs::get(opCtx),
                                                            AcquisitionPrerequisites::kWrite},
                               MODE_X);
-    }
+        WriteUnitOfWork wunit(opCtx);
+        if (!collection.exists()) {
+            BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+            CollectionOptions collectionOptions = uassertStatusOK(
+                CollectionOptions::parse(options, CollectionOptions::ParseKind::parseForCommand));
+            auto newColl = db->createCollection(
+                opCtx, NamespaceString::kStartupLogNamespace, collectionOptions);
+            invariant(newColl);
+            // Re-acquire after creation
+            collection = acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest{NamespaceString::kStartupLogNamespace,
+                                             PlacementConcern::kPretendUnsharded,
+                                             repl::ReadConcernArgs::get(opCtx),
+                                             AcquisitionPrerequisites::kWrite},
+                MODE_X);
+        }
 
-    uassertStatusOK(collection_internal::insertDocument(
-        opCtx, collection.getCollectionPtr(), InsertStatement(o), nullptr /* OpDebug */, false));
-    wunit.commit();
+        uassertStatusOK(collection_internal::insertDocument(opCtx,
+                                                            collection.getCollectionPtr(),
+                                                            InsertStatement(o),
+                                                            nullptr /* OpDebug */,
+                                                            false));
+        wunit.commit();
+    });
 }
 
 void initializeCommandHooks(ServiceContext* serviceContext) {
