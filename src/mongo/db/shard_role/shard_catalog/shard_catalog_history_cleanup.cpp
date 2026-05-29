@@ -69,6 +69,18 @@ void cleanupCollectionEntry(OperationContext* opCtx, const NamespaceString& nss)
         return;
     }
 
+    const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
+    const auto isCriticalSectionActive =
+        scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite).has_value();
+    if (isCriticalSectionActive) {
+        LOGV2(12620106,
+              "Skipping shard catalog cleanup as critical section is active",
+              "collection"_attr = nss);
+        // Do an early return since the critical section is active, meaning changes are being
+        // made to the collection metadata. Bail out to prevent conflicts.
+        return;
+    }
+
     const auto scopedDsr = DatabaseShardingRuntime::acquireShared(opCtx, nss.dbName());
     const auto isDatabaseCriticalSectionActive =
         scopedDsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite).has_value();
@@ -87,18 +99,6 @@ void cleanupCollectionEntry(OperationContext* opCtx, const NamespaceString& nss)
         LOGV2(12764903,
               "Skipping shard catalog cleanup as this shard is the dbPrimary",
               "collection"_attr = nss);
-        return;
-    }
-
-    const auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
-    const auto isCriticalSectionActive =
-        scopedCsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite).has_value();
-    if (isCriticalSectionActive) {
-        LOGV2(12620106,
-              "Skipping shard catalog cleanup as critical section is active",
-              "collection"_attr = nss);
-        // Do an early return since the critical section is active, meaning changes are being
-        // made to the collection metadata. Bail out to prevent conflicts.
         return;
     }
 
