@@ -51,7 +51,6 @@ directly include `<gmock/gmock.h>`. There are matchers for common mongo types su
 
 ## Upcoming Features
 
-- IDE Integration
 - Color output (Evergreen support, filter out color when terminal not detected)
 - Output filtering/formatting
 - New APIs to help with unit testing developer experience
@@ -99,10 +98,44 @@ DEATH_TEST_F(FixtureNameDeathTest, TestName) {
 }
 ```
 
+## VSCode Integration
+
+The linux default VSCode workspace (`.vscode_defaults/linux-virtual-workstation.code-workspace`)
+includes support for discovering, running, and debugging unit tests via the [TestMate C++][testmate]
+extension.
+
+### Prerequisites
+
+- The workspace file must be opened directly in VS Code: **File → Open Workspace from File** →
+  select `.vscode_defaults/linux-virtual-workstation.code-workspace`.
+- The TestMate C++ extension (`matepek.vscode-catch2-test-adapter`) must be installed (it is listed
+  in the workspace's recommended extensions list).
+
+### Discovering tests
+
+TestMate watches `bazel-bin/src/mongo/**/*test*_with_debug` for test binaries. Tests are not
+discovered until binaries are built:
+
+```bash
+bazel build --config=dbg +bson_test # bazel-bin/src/mongo/bson/bson_test
+```
+
+Once built, the Test Explorer panel will populate with the tests grouped by binary, test suite, and
+test name.
+
+### Debugging a single test
+
+1. In the source file, set a breakpoint by clicking to the left of the line you want to pause at. A
+   red circle should appear.
+2. Click the **Debug** button next to the test in the Test Explorer.
+3. The **Run and Debug** panel should open, where you can view **Call Stack**, **Variables**, and
+   **Watch**.
+
 [death_test_naming]:
   https://github.com/google/googletest/blob/main/docs/advanced.md#death-test-naming
 [death_test_h]: ../src/mongo/unittest/death_test.h
 [google_test_docs]: https://github.com/google/googletest/blob/main/docs/primer.md
 [value_parameterized_tests]:
   https://github.com/google/googletest/blob/main/docs/advanced.md#value-parameterized-tests
+[testmate]: https://marketplace.visualstudio.com/items?itemName=matepek.vscode-catch2-test-adapter
 [typed_tests]: https://github.com/google/googletest/blob/main/docs/advanced.md#typed-tests

@@ -96,8 +96,9 @@ public:
 
 private:
     /**
-     * Parses, validates, and applies unit test options.
-     * Returns an exit code if the program should immediately end.
+     * Parses, validates, and applies unit test options. Must run before
+     * testing::InitGoogleTest so that `--filter`, `--suites`, and `--fileNameFilter`
+     * work correctly. Returns an exit code if the program should exit immediately.
      */
     boost::optional<ExitCode> _parseAndAcceptOptions();
 
