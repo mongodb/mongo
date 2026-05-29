@@ -1264,8 +1264,6 @@ FilteringMetadataCache::_waitForConfigTimeOrChunkVersionChange(OperationContext*
             ->registerWaiterForChunkVersion(opCtx, ShardVersionFactory::make(chunkVersion));
 
     const auto fixedExecutor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    // The order here is important for unit tests as the majorityFuture is immediately fulfilled but
-    // whenAny goes in order of the arguments to setup.
     auto waitForEither = [&] {
         return whenAny(versionFuture.thenRunOn(fixedExecutor),
                        majorityFuture.thenRunOn(fixedExecutor))
