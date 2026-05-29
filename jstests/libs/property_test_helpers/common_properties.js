@@ -362,7 +362,10 @@ export function createQueriesWithKnobsSetAreSameAsControlCollScanProperty(contro
                 const query = queries[i];
                 const controlResults = resultMap[i];
                 const experimentResults = experimentColl.aggregate(query.pipeline, query.options).toArray();
-                if (!testHelpers.comp(controlResults, experimentResults)) {
+                // Use the normalizing comparator. A knob-controlled rewrite may legitimately affect
+                // result order, and the default `comp` is not robust to numerics that compare equal
+                // but have different binary representations (e.g. +0 and -0) in different orders.
+                if (!testHelpers.compNormalized(controlResults, experimentResults)) {
                     return {
                         passed: false,
                         message:

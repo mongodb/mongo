@@ -149,6 +149,8 @@ function runProperty(propertyFn, namespaces, workload, sortArrays) {
         comp: _resultSetsEqualUnordered,
         // Comparator that sorts arrays within documents before comparing results.
         compSortArrays: _resultSetsEqualUnorderedWithUnorderedArrays,
+        // Comparator that also normalizes numeric values and sorts arrays.
+        compNormalized: _resultSetsEqualNormalized,
         numQueryShapes: queries.length,
         leafParametersPerFamily,
     };
