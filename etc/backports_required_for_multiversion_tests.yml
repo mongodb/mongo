@@ -690,8 +690,12 @@ last-lts:
       ticket: SERVER-93149
     - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries.js
       ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_building_index_failover.js
+      ticket: SERVER-126218
     - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_disallow_writes.js
       ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_failover_during_abort.js
+      ticket: SERVER-126218
     - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_force_redistribution.js
       ticket: SERVER-111411
     - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_nonempty_stash.js
