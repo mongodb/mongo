@@ -6,6 +6,7 @@ base_suite: concurrency_replication
 overrides:
   - "primary_driven_index_builds.enable_primary_driven_index_builds_feature_flag_mongod"
   - "primary_driven_index_builds.all_concurrency_index_builds_tests_selector"
+  - "primary_driven_index_builds.enable_spurious_write_conflicts_hook_concurrency_replication"
 
 excludes:
   - "primary_driven_index_builds.exclude_primary_driven_index_builds_incompatible_tag"

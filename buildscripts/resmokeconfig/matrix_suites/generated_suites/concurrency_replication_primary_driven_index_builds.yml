@@ -31,6 +31,12 @@ executor:
         roleGraphInvalidationIsFatal: 1
     num_nodes: 3
   hooks:
+    - class: EnableSpuriousWriteConflicts
+      shell_options:
+        global_vars:
+          TestData:
+            WTWriteConflictExceptionChance: 0.001
+            WTWriteConflictExceptionForReadsChance: 0
     - class: RunDBCheckInBackground
     - class: CheckReplDBHashInBackground
     - class: ValidateCollectionsInBackground

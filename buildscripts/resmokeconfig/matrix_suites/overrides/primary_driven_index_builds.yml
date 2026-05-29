@@ -65,6 +65,53 @@
       # Tests marked with this tag are excluded because primary-driven index builds use batched
       # writes which config.image_collection does not support.
       - primary_driven_index_builds_incompatible_with_retryable_writes
+- name: enable_spurious_write_conflicts_hook
+  value:
+    executor:
+      hooks:
+        - class: EnableSpuriousWriteConflicts
+          shell_options:
+            global_vars:
+              TestData:
+                WTWriteConflictExceptionChance: 0.001
+                WTWriteConflictExceptionForReadsChance: 0
+# concurrency_replication's base hooks list is replaced (not appended) when using `overrides`,
+# so we re-declare it here with EnableSpuriousWriteConflicts at the front. Enable must come first
+# so its after_test (which turns the failpoint off) runs before the validation/cleanup hooks'
+# after_test, otherwise validation writes hit the failpoint.
+- name: enable_spurious_write_conflicts_hook_concurrency_replication
+  value:
+    executor:
+      hooks:
+        - class: EnableSpuriousWriteConflicts
+          shell_options:
+            global_vars:
+              TestData:
+                WTWriteConflictExceptionChance: 0.001
+                WTWriteConflictExceptionForReadsChance: 0
+        - class: RunDBCheckInBackground
+        - class: CheckReplDBHashInBackground
+        - class: ValidateCollectionsInBackground
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+        - class: CleanupConcurrencyWorkloads
+# For suites without a persistent fixture (replica_sets, no_passthrough), the hook can't connect
+# to find servers. Instead we inject the failpoints via TestData.setParameters so servers.js
+# automatically passes them as --setParameter to every mongod the test starts.
+- name: enable_spurious_write_conflicts_startup_parameters
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParameters:
+                "failpoint.WTWriteConflictException":
+                  mode:
+                    activationProbability: 0.001
+                "failpoint.WTWriteConflictExceptionForReads":
+                  mode:
+                    activationProbability: 0
 - name: all_no_passthrough_index_builds_tests_selector
   value:
     selector:

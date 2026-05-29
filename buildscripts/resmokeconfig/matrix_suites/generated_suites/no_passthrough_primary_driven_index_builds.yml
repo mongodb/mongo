@@ -29,6 +29,12 @@ executor:
       global_vars:
         TestData:
           setParameters:
+            failpoint.WTWriteConflictException:
+              mode:
+                activationProbability: 0.001
+            failpoint.WTWriteConflictExceptionForReads:
+              mode:
+                activationProbability: 0
             featureFlagContainerWrites: true
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: true

@@ -6,6 +6,7 @@ base_suite: replica_sets
 overrides:
   - "primary_driven_index_builds.enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongod"
   - "primary_driven_index_builds.all_replica_sets_index_builds_tests_selector"
+  - "primary_driven_index_builds.enable_spurious_write_conflicts_startup_parameters"
 
 excludes:
   - "primary_driven_index_builds.exclude_primary_driven_index_builds_incompatible_tag"
