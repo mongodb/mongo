@@ -16,7 +16,9 @@
  *     # Refusing to run a test that issues an aggregation command with explain because it may
  *     # return incomplete results if interrupted by a stepdown.
  *     does_not_support_stepdowns,
- *     requires_fcv_71
+ *     requires_fcv_71,
+ *     # The test assumes that the collection will remain on a single shard.
+ *     assumes_balancer_off,
  * ]
  */
 
@@ -71,20 +73,24 @@ const assertPlanStagesInPipeline = ({
         // We check index at i in the PlanStage against the i'th index in expectedStages
         // Should rewrite [{$_unpack}, {$limit: x}] pipeline as [{$limit:
         // x}, {$_unpack}, {$limit: x}]
-        assert(expectedStages.length == planStage.length);
+        assert.eq(
+            expectedStages.length,
+            planStage.length,
+            `Expected pipeline: ${tojson(expectedStages)}, found pipeline: ${tojson(planStage)}, full explain: ${tojson(aggRes)}`,
+        );
         for (var i = 0; i < expectedStages.length; i++) {
             assert(planStage[i].hasOwnProperty(expectedStages[i]), tojson(aggRes));
         }
 
         if (expectedResults.length != 0) {
             const result = c.aggregate(pipeline).toArray();
-            assert(expectedResults.length == result.length);
+            assert.eq(expectedResults.length, result.length, tojson(result));
             for (var i = 0; i < expectedResults.length; i++) {
                 assert.docEq(result[i], expectedResults[i], tojson(result));
             }
         } else if (expectedResultLength) {
             const result = c.aggregate(pipeline).toArray();
-            assert(expectedResultLength == result.length);
+            assert.eq(expectedResultLength, result.length, tojson(result));
         }
     }
 };
