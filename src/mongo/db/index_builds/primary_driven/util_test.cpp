@@ -651,14 +651,14 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesOutOfRangeKeys) {
     }
 }
 
-TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesNoOpWhenNoRanges) {
+TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesAllWhenRangesUnset) {
     RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
     static_cast<repl::ReplicationCoordinatorMock*>(
         repl::ReplicationCoordinator::get(getServiceContext()))
         ->alwaysAllowWrites(true);
 
     auto opCtx = operationContext();
-    std::string sorterIdent = "internal-sorter-noop-test";
+    std::string sorterIdent = "internal-sorter-unset-ranges-test";
     LazyRecordStore sorterTable(opCtx, sorterIdent, LazyRecordStore::CreateMode::immediate);
     auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
                           sorterTable.getTableOrThrow().getContainer())
@@ -673,11 +673,43 @@ TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesNoOpWhenNoRanges) {
     indexInfo.setIsMultikey(false);
     indexInfo.setMultikeyPaths({});
     indexInfo.setStorageIdentifier(sorterIdent);
+    // Ranges are left unset, so all entries are orphaned.
 
     deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
 
     auto remainingKeys = getSorterKeys(opCtx, container);
-    EXPECT_EQ(remainingKeys.size(), 5u);
+    EXPECT_TRUE(remainingKeys.empty());
+}
+
+TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesDeletesAllWhenRangesEmpty) {
+    RAIIServerParameterControllerForTest containerWritesEnabled{"featureFlagContainerWrites", true};
+    static_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(getServiceContext()))
+        ->alwaysAllowWrites(true);
+
+    auto opCtx = operationContext();
+    std::string sorterIdent = "internal-sorter-empty-ranges-test";
+    LazyRecordStore sorterTable(opCtx, sorterIdent, LazyRecordStore::CreateMode::immediate);
+    auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
+                          sorterTable.getTableOrThrow().getContainer())
+                          .get();
+
+    insertSorterEntries(opCtx, container, 1, 6);
+
+    IndexStateInfo indexInfo;
+    indexInfo.setSpec(BSON("key" << BSON("a" << 1) << "name"
+                                 << "a_1"
+                                 << "v" << IndexConfig::kLatestIndexVersion));
+    indexInfo.setIsMultikey(false);
+    indexInfo.setMultikeyPaths({});
+    indexInfo.setStorageIdentifier(sorterIdent);
+    // Ranges are present but empty, so all entries are orphaned.
+    indexInfo.setRanges(std::vector<SorterRange>{});
+
+    deleteSorterEntriesOutsideRanges(opCtx, {indexInfo});
+
+    auto remainingKeys = getSorterKeys(opCtx, container);
+    EXPECT_TRUE(remainingKeys.empty());
 }
 
 TEST_F(UtilTest, DeleteSorterEntriesOutsideRangesNoOpWhenAllWithinRange) {

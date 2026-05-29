@@ -355,13 +355,9 @@ void deleteSorterEntriesOutsideRanges(OperationContext* opCtx,
 
     for (const auto& indexStateInfo : resumeInfoIndexes) {
         auto storageId = indexStateInfo.getStorageIdentifier();
-        const auto& ranges = indexStateInfo.getRanges();
-        if (!storageId || !ranges || ranges->empty()) {
+        if (!storageId) {
             continue;
         }
-
-        int64_t firstStart = ranges->front().getStart();
-        int64_t lastEnd = ranges->back().getEnd();
 
         LazyRecordStore sorterTable(opCtx, *storageId, LazyRecordStore::CreateMode::openExisting);
         auto& container = std::get<std::reference_wrapper<IntegerKeyedContainer>>(
@@ -396,25 +392,40 @@ void deleteSorterEntriesOutsideRanges(OperationContext* opCtx,
 
         auto cursor = container.getCursor(ru);
 
-        // Delete keys before firstStart. Write conflicts may reset the cursor to the beginning
-        // which is safe since we only delete keys < firstStart.
-        for (auto entry = cursor->next(); entry && entry->first < firstStart;
-             entry = cursor->next()) {
-            collectKey(entry->first);
-        }
+        auto& ranges = indexStateInfo.getRanges();
+        boost::optional<int64_t> firstStart;
+        boost::optional<int64_t> lastEnd;
 
-        // Delete keys at and after lastEnd. lastEnd is kept as a seek anchor and deleted last. A
-        // key < lastEnd after flush indicates a write conflict reset the cursor so we re-seek
-        // lastEnd.
-        if (cursor->find(lastEnd)) {
-            while (auto entry = cursor->next()) {
-                if (entry->first < lastEnd) {
-                    cursor->find(lastEnd);
-                    continue;
-                }
+        if (!ranges || ranges->empty()) {
+            // Delete every entry. Write conflicts may reset the cursor to the beginning which is
+            // safe since we are deleting all keys and committed deletes never reappear.
+            for (auto entry = cursor->next(); entry; entry = cursor->next()) {
                 collectKey(entry->first);
             }
-            collectKey(lastEnd);
+        } else {
+            firstStart = ranges->front().getStart();
+            lastEnd = ranges->back().getEnd();
+
+            // Delete keys before firstStart. Write conflicts may reset the cursor to the beginning
+            // which is safe since we only delete keys < firstStart.
+            for (auto entry = cursor->next(); entry && entry->first < *firstStart;
+                 entry = cursor->next()) {
+                collectKey(entry->first);
+            }
+
+            // Delete keys at and after lastEnd. lastEnd is kept as a seek anchor and deleted last.
+            // A key < lastEnd after flush indicates a write conflict reset the cursor so we re-seek
+            // lastEnd.
+            if (cursor->find(*lastEnd)) {
+                while (auto entry = cursor->next()) {
+                    if (entry->first < *lastEnd) {
+                        cursor->find(*lastEnd);
+                        continue;
+                    }
+                    collectKey(entry->first);
+                }
+                collectKey(*lastEnd);
+            }
         }
 
         if (!keysToDelete.empty()) {
