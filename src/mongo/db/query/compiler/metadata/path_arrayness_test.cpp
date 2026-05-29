@@ -32,10 +32,12 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness_test_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
@@ -907,4 +909,58 @@ TEST(MakeCopyFromExpressionContext, CopiesNonArrayPathsForNss) {
     ASSERT_EQ(count, 1);
 }
 
+// Tests for PathArrayness::isIndexEligibleToAddToPathArrayness.
+// Only BTREE indexes that are neither partial nor hidden are eligible.
+
+TEST(PathArraynessIndexEligibilityTest, BtreeIsEligible) {
+    BSONObj spec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name" << "a_1");
+    IndexDescriptor desc(IndexNames::BTREE, spec);
+    ASSERT_TRUE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
+}
+
+TEST(PathArraynessIndexEligibilityTest, BtreePartialIsNotEligible) {
+    BSONObj spec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                            << "a_1_partial"
+                            << "partialFilterExpression" << BSON("b" << BSON("$gt" << 5)));
+    IndexDescriptor desc(IndexNames::BTREE, spec);
+    ASSERT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
+}
+
+TEST(PathArraynessIndexEligibilityTest, BtreeHiddenIsNotEligible) {
+    BSONObj spec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                            << "a_1_hidden"
+                            << "hidden" << true);
+    IndexDescriptor desc(IndexNames::BTREE, spec);
+    ASSERT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
+}
+
+TEST(PathArraynessIndexEligibilityTest, TwoDSphereIsNotEligible) {
+    BSONObj spec = BSON("v" << 3 << "key" << BSON("loc" << "2dsphere") << "name" << "loc_2dsphere");
+    IndexDescriptor desc(IndexNames::GEO_2DSPHERE, spec);
+    ASSERT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
+}
+
+TEST(PathArraynessIndexEligibilityTest, TextIsNotEligible) {
+    BSONObj spec = BSON("v" << 2 << "key" << BSON("t" << "text") << "name" << "t_text");
+    IndexDescriptor desc(IndexNames::TEXT, spec);
+    ASSERT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
+}
+
+TEST(PathArraynessIndexEligibilityTest, HashedIsNotEligible) {
+    BSONObj spec = BSON("v" << 2 << "key" << BSON("a" << "hashed") << "name" << "a_hashed");
+    IndexDescriptor desc(IndexNames::HASHED, spec);
+    ASSERT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
+}
+
+TEST(PathArraynessIndexEligibilityTest, WildcardIsNotEligible) {
+    BSONObj spec = BSON("v" << 2 << "key" << BSON("$**" << 1) << "name" << "wildcard");
+    IndexDescriptor desc(IndexNames::WILDCARD, spec);
+    ASSERT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
+}
+
+TEST(PathArraynessIndexEligibilityTest, TwoDIsNotEligible) {
+    BSONObj spec = BSON("v" << 2 << "key" << BSON("loc" << "2d") << "name" << "loc_2d");
+    IndexDescriptor desc(IndexNames::GEO_2D, spec);
+    ASSERT_FALSE(PathArrayness::isIndexEligibleToAddToPathArrayness(desc));
+}
 }  // namespace mongo
