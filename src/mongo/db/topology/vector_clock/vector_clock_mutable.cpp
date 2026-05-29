@@ -116,6 +116,10 @@ LogicalTime VectorClockMutable::_advanceComponentTimeByTicks(Component component
         _vectorTime[component].addTicks(nTicks - 1);
     }
 
+    // storeRelaxed is sufficient: _mutex's unlock provides release semantics for later
+    // acquirers, and the _advanceTime precheck (vector_clock.cpp) tolerates staleness by design.
+    _vectorTimeShadow[component].storeRelaxed(_vectorTime[component].asTimestamp().asULL());
+
     return time;
 }
 
@@ -131,6 +135,7 @@ void VectorClockMutable::_advanceComponentTimeTo(Component component, LogicalTim
 
     if (newTime > _vectorTime[component]) {
         _vectorTime[component] = std::move(newTime);
+        _vectorTimeShadow[component].storeRelaxed(_vectorTime[component].asTimestamp().asULL());
     }
 }
 

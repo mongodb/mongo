@@ -45,6 +45,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <new>  // for std::hardware_destructive_interference_size
 #include <string>
 #include <utility>
 
@@ -376,6 +377,12 @@ protected:
 
     LogicalTimeArray _vectorTime = {
         kInitialComponentTime, kInitialComponentTime, kInitialComponentTime};
+
+    // Atomic shadow of _vectorTime used by the lock-free precheck in _advanceTime.
+    // Written under _mutex whenever _vectorTime is updated.
+    // Initialized to kInitialComponentTime in the constructor.
+    alignas(std::hardware_destructive_interference_size)
+        ComponentArray<AtomicWord<unsigned long long>> _vectorTimeShadow;
 
 private:
     class PlainComponentFormat;

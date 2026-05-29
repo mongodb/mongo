@@ -102,6 +102,10 @@ void VectorClock::registerVectorClockOnServiceContext(ServiceContext* service,
 
 VectorClock::VectorClock() {
     ObservableMutexRegistry::get().add("VectorClock::_mutex", _mutex);
+    const auto initialRaw = kInitialComponentTime.asTimestamp().asULL();
+    for (auto& slot : _vectorTimeShadow) {
+        slot.storeRelaxed(initialRaw);
+    }
 }
 
 VectorClock::~VectorClock() = default;
@@ -143,12 +147,24 @@ void VectorClock::_ensurePassesRateLimiter(ServiceContext* service,
 void VectorClock::_advanceTime(LogicalTimeArray&& newTime) {
     _ensurePassesRateLimiter(_service, newTime);
 
+    bool needsAdvance = false;
+    for (size_t i = 0; i < static_cast<size_t>(Component::_kNumComponents); ++i) {
+        auto component = static_cast<Component>(i);
+        if (newTime[component].asTimestamp().asULL() > _vectorTimeShadow[component].loadRelaxed()) {
+            needsAdvance = true;
+            break;
+        }
+    }
+    if (!needsAdvance) {
+        return;
+    }
+
     std::lock_guard lock(_mutex);
-    auto it = _vectorTime.begin();
-    auto newIt = newTime.begin();
-    for (; it != _vectorTime.end() && newIt != newTime.end(); ++it, ++newIt) {
-        if (*newIt > *it) {
-            *it = std::move(*newIt);
+    for (size_t i = 0; i < static_cast<size_t>(Component::_kNumComponents); ++i) {
+        auto component = static_cast<Component>(i);
+        if (newTime[component] > _vectorTime[component]) {
+            _vectorTime[component] = std::move(newTime[component]);
+            _vectorTimeShadow[component].storeRelaxed(_vectorTime[component].asTimestamp().asULL());
         }
     }
 }
@@ -445,6 +461,11 @@ void VectorClock::resetVectorClock_forTest() {
     auto it = _vectorTime.begin();
     for (; it != _vectorTime.end(); ++it) {
         *it = VectorClock::kInitialComponentTime;
+    }
+    // Reset the shadow alongside _vectorTime so the _advanceTime precheck sees fresh values.
+    const auto initialRaw = kInitialComponentTime.asTimestamp().asULL();
+    for (auto& slot : _vectorTimeShadow) {
+        slot.storeRelaxed(initialRaw);
     }
     _isEnabled.store(true);
 }
