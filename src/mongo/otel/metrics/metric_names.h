@@ -208,6 +208,27 @@ public:
     static constexpr MetricName kIndexBuildResumeFailed =
         MetricNameMaker::make("index_builds.resume.failed");
 
+    static constexpr MetricName kIndexCount =
+        MetricNameMaker::make("serverStatus.indexStats.count");
+
+    static constexpr MetricName kIndexBuildsTotal =
+        MetricNameMaker::make("serverStatus.indexBuilds.total");
+    static constexpr MetricName kIndexBuildPhasesCommit =
+        MetricNameMaker::make("serverStatus.indexBuilds.phases.commit");
+
+    static constexpr MetricName kIndexBulkBuilderNumSorted =
+        MetricNameMaker::make("serverStatus.indexBulkBuilder.numSorted");
+    static constexpr MetricName kIndexBulkBuilderBytesSorted =
+        MetricNameMaker::make("serverStatus.indexBulkBuilder.bytesSorted");
+    static constexpr MetricName kIndexBulkBuilderBytesSpilled =
+        MetricNameMaker::make("serverStatus.indexBulkBuilder.bytesSpilled");
+    static constexpr MetricName kIndexBulkBuilderBytesSpilledUncompressed =
+        MetricNameMaker::make("serverStatus.indexBulkBuilder.bytesSpilledUncompressed");
+    static constexpr MetricName kIndexBulkBuilderMemUsage =
+        MetricNameMaker::make("serverStatus.indexBulkBuilder.memUsage");
+    static constexpr MetricName kIndexBulkBuilderSpilledRanges =
+        MetricNameMaker::make("serverStatus.indexBulkBuilder.spilledRanges");
+
     // Replication Team Metrics
     static constexpr MetricName kOplogApplyBytes = MetricNameMaker::make("oplog.apply.bytes");
 
