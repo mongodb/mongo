@@ -146,6 +146,20 @@ void generatePlannerInfo(PlanExecutor* exec,
                             .getMeasureQueryExecutionTimeInNanoseconds()
                 ? QueryExecTimerPrecision::kNanos
                 : QueryExecTimerPrecision::kMillis;
+        } else {
+            // TODO (SERVER-127904): Remove else branch once this module can directly access ExpCtx
+            // without requiring a CanonicalQuery.
+
+            // For executors without a single canonical query
+            // (e.g. JOO), read the global value of the
+            // 'internalMeasureQueryExecutionTimeInNanoseconds' knob directly. Note that in this
+            // branch, the value of the knob can change during a query. In the worst case, the query
+            // may start with the server having one value of the knob but by the time this code
+            // executes for that query, it may see a different value if the knob was concurrently
+            // modified.
+            precision = internalMeasureQueryExecutionTimeInNanoseconds.load()
+                ? QueryExecTimerPrecision::kNanos
+                : QueryExecTimerPrecision::kMillis;
         }
 
         // Convert to Nanoseconds first to support all precisions, defaulting to zero if

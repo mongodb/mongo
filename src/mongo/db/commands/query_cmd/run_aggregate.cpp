@@ -1287,6 +1287,11 @@ Status executeResolvedAggregate(const AggExState& aggExState,
                                                 aggExState.getOpCtx(),
                                                 expCtx);
     if (swResForJoin.isOK()) {
+        // Stop the query planning timer now that all join optimization work is complete. In the
+        // non-JOO path this is handled inside get_executor.cpp, but the JOO path builds its
+        // executor directly and never passes through that code, so we stop the timer here instead.
+        CurOp::get(aggExState.getOpCtx())->stopQueryPlanningTimer();
+
         /**
          * We are careful to keep the AggJoinModel alive for the entirety of this function scope.
          * We've created several CanonicalQueries, which in turn may own memory to the backing BSON

@@ -31,9 +31,16 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
+
+/**
+ * Failpoint that introduces a sleep during join optimization. Used by tests to verify that
+ * optimizationTimeMillis is correctly measured and reported in explain output.
+ */
+extern FailPoint sleepWhileJoinOptimizing;
 
 struct JoinReorderedExecutorResult {
     // Executor for pushed-down & reordered SBE prefix.
