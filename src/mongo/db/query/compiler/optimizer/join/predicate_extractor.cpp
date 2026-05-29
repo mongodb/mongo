@@ -352,18 +352,26 @@ U tassert_cast(V* v) {
     return ret;
 }
 
-// Compute the field path which the given variable ID refers to in the local collection of a
-// $lookup. We assume that the given a set of let variables from $lookup all are defined to be
-// simple FieldPaths (i.e.are of the form {foo: '$foo'}). This allows us resolve a variable to
-// underlying FieldPath.
-FieldPath localCollectionFieldPath(const std::vector<LetVariable>& letVars, Variables::Id id) {
+// Compute the field path which the given variable reference resolves to in the local collection
+// of a $lookup. We assume that the given set of let variables from $lookup are all defined to be
+// simple FieldPaths (i.e. are of the form {foo: '$foo'}). The let variable's RHS provides the
+// base path (e.g. 'x' for {l: '$x'}); any trailing components on the variable reference itself
+// (e.g. the '.y' in '$$l.y') are appended, since '$$l.y' semantically means "the .y subfield of
+// whatever 'l' evaluates to".
+FieldPath localCollectionFieldPath(const std::vector<LetVariable>& letVars,
+                                   const ExpressionFieldPath* varRef) {
+    auto id = varRef->getVariableId();
     auto varIt =
         std::find_if(letVars.cbegin(), letVars.cend(), [&id](auto&& var) { return var.id == id; });
     tassert(
         11317201, "variable ID not found in given set of let variables", varIt != letVars.cend());
     auto& var = *varIt;
     auto localFieldPath = tassert_cast<const ExpressionFieldPath*>(var.expression.get());
-    return localFieldPath->getFieldPathWithoutCurrentPrefix();
+    auto baseLocalFieldPath = localFieldPath->getFieldPathWithoutCurrentPrefix();
+    if (varRef->getFieldPath().getPathLength() > 1) {
+        return baseLocalFieldPath.concat(varRef->getFieldPathWithoutCurrentPrefix());
+    }
+    return baseLocalFieldPath;
 }
 
 }  // namespace
@@ -374,7 +382,7 @@ JoinPredicateExpr JoinPredicateExpr::make(const ExpressionCompare* eqNode,
     auto right = tassert_cast<const ExpressionFieldPath*>(eqNode->getChildren()[1].get());
 
     if (left->isVariableReference()) {
-        return {localCollectionFieldPath(letVars, left->getVariableId()),
+        return {localCollectionFieldPath(letVars, left),
                 right->getFieldPathWithoutCurrentPrefix(),
                 eqNode};
     }
@@ -382,9 +390,8 @@ JoinPredicateExpr JoinPredicateExpr::make(const ExpressionCompare* eqNode,
     tassert(11317203,
             "Expected a variable & a field path in a join predicate",
             right->isVariableReference());
-    return {localCollectionFieldPath(letVars, right->getVariableId()),
-            left->getFieldPathWithoutCurrentPrefix(),
-            eqNode};
+    return {
+        localCollectionFieldPath(letVars, right), left->getFieldPathWithoutCurrentPrefix(), eqNode};
 }
 
 boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(

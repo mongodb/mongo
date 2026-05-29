@@ -427,6 +427,69 @@ TEST_F(PredicateExtractorTest, JoinPredicatesOverDottedFields) {
     });
 }
 
+// Verifies that the JoinPredicateExpr's localField() captures any trailing path suffix on the let
+// variable reference. The 'expectedJoinPredicates' check above only inspects the serialized
+// expression, which is unchanged from the input and so cannot distinguish '$$a' from '$$a.foo' in
+// the local field path.
+TEST_F(PredicateExtractorTest, LocalFieldIncludesPathSuffixOnLetVariable) {
+    std::vector<LetVariable> letVars;
+    auto idA = expCtx()->variablesParseState.defineVariable("a");
+    {
+        auto bson = fromjson("{'': '$x'}");
+        auto def = Expression::parseOperand(
+            expCtx().get(), bson.firstElement(), expCtx()->variablesParseState);
+        letVars.emplace_back("a", def, idA);
+    }
+
+    auto parseMatch = [&](StringData json) {
+        auto bson = fromjson(json);
+        return uassertStatusOK(
+            MatchExpressionParser::parse(bson,
+                                         expCtx(),
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kAllowAllSpecialFeatures));
+    };
+
+    // Variable reference on the right with a path suffix: '$$a.y' must resolve to local path
+    // 'x.y' (the let variable's RHS 'x', concatenated with the trailing 'y').
+    {
+        auto me = parseMatch("{$expr: {$eq: ['$z', '$$a.y']}}");
+        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        ASSERT(split.has_value());
+        ASSERT_EQ(1, split->joinPredicates.size());
+        ASSERT_EQ("x.y", split->joinPredicates[0].localField().fullPath());
+        ASSERT_EQ("z", split->joinPredicates[0].foreignField().fullPath());
+    }
+
+    // Variable reference on the left side; same semantics.
+    {
+        auto me = parseMatch("{$expr: {$eq: ['$$a.y', '$z']}}");
+        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        ASSERT(split.has_value());
+        ASSERT_EQ(1, split->joinPredicates.size());
+        ASSERT_EQ("x.y", split->joinPredicates[0].localField().fullPath());
+        ASSERT_EQ("z", split->joinPredicates[0].foreignField().fullPath());
+    }
+
+    // Multi-component suffix on the variable reference.
+    {
+        auto me = parseMatch("{$expr: {$eq: ['$z', '$$a.y.w']}}");
+        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        ASSERT(split.has_value());
+        ASSERT_EQ(1, split->joinPredicates.size());
+        ASSERT_EQ("x.y.w", split->joinPredicates[0].localField().fullPath());
+    }
+
+    // No suffix.
+    {
+        auto me = parseMatch("{$expr: {$eq: ['$z', '$$a']}}");
+        auto split = splitJoinAndSingleCollectionPredicates(me.get(), letVars);
+        ASSERT(split.has_value());
+        ASSERT_EQ(1, split->joinPredicates.size());
+        ASSERT_EQ("x", split->joinPredicates[0].localField().fullPath());
+    }
+}
+
 /**
  * Test suite for extractExprPredicates.
  */
