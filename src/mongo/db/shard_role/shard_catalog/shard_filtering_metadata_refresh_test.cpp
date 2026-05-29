@@ -467,11 +467,10 @@ TEST_F(AuthoritativeRefreshFixture, ClearFilteringMetadataDuringPostRecoveryWait
         csr->clearFilteringMetadata_authoritative(opCtx);
     }
 
-    // Hang the recovery thread inside _waitForConfigTimeOrChunkVersionChange after the version
-    // and majority waiters are registered but before whenAny is scheduled, so that we have a
-    // deterministic window to clear the filtering metadata and cancel the version waiter.
-    auto* fp = globalFailPointRegistry().find("hangBeforeWaitingForConfigTimeOrChunkVersionChange");
-    auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+    // Force the recovery thread to ignore the majority waiter since it's an immediately fulfilled
+    // future in unit tests.
+    auto* fp = globalFailPointRegistry().find("forceWaitForVersionOnly");
+    auto initialTimesEntered = fp->setMode(FailPoint::nTimes, 1);
 
     // Router reports UNTRACKED while the shard's on-disk metadata is tracked: the post-recovery
     // comparison cannot order the two, so recovery falls into Step 4's wait.

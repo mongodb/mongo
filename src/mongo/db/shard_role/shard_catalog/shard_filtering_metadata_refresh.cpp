@@ -116,7 +116,7 @@ MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
 MONGO_FAIL_POINT_DEFINE(hangBeforePlacementVersionCriticalSectionWait);
-MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForConfigTimeOrChunkVersionChange);
+MONGO_FAIL_POINT_DEFINE(forceWaitForVersionOnly);
 MONGO_FAIL_POINT_DEFINE(avoidTassertForInconsistentMetadata);
 MONGO_FAIL_POINT_DEFINE(hangBeforeAuthoritativeDbVersionMismatchWait);
 MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshDbVersionThread);
@@ -1278,9 +1278,14 @@ FilteringMetadataCache::_waitForConfigTimeOrChunkVersionChange(OperationContext*
     // above.
     makeNoopWriteToAdvanceClusterTime(opCtx, configTime).ignore();
 
-    hangBeforeWaitingForConfigTimeOrChunkVersionChange.pauseWhileSet(opCtx);
+    Status status = [&] {
+        if (MONGO_unlikely(forceWaitForVersionOnly.shouldFail())) {
+            return versionFuture.getNoThrow();
+        } else {
+            return waitForEither().result;
+        }
+    }();
 
-    auto status = waitForEither().result;
     if (!status.isOK()) {
         // clearFilteringMetadata cancels the CSS version waiter with CallbackCanceled. When that
         // happens the metadata we recovered is now stale, so the caller must retry the recovery.
