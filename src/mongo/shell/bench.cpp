@@ -845,7 +845,7 @@ void BenchRunState::waitForState(State awaitedState) {
             }
             break;
         default:
-            msgasserted(16152, str::stream() << "Cannot wait for state " << awaitedState);
+            masserted(16152, str::stream() << "Cannot wait for state " << awaitedState);
     }
 }
 

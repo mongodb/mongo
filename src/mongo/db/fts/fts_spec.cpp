@@ -96,11 +96,11 @@ FTSSpec::FTSSpec(const BSONObj& indexInfo) {
             _textIndexVersion = TEXT_INDEX_VERSION_1;
             break;
         default:
-            msgasserted(17364,
-                        str::stream() << "attempt to use unsupported textIndexVersion "
-                                      << textIndexVersionElt.numberInt()
-                                      << "; versions supported: " << TEXT_INDEX_VERSION_3 << ", "
-                                      << TEXT_INDEX_VERSION_2 << ", " << TEXT_INDEX_VERSION_1);
+            masserted(17364,
+                      str::stream() << "attempt to use unsupported textIndexVersion "
+                                    << textIndexVersionElt.numberInt()
+                                    << "; versions supported: " << TEXT_INDEX_VERSION_3 << ", "
+                                    << TEXT_INDEX_VERSION_2 << ", " << TEXT_INDEX_VERSION_1);
     }
 
     // Initialize _defaultLanguage.  Note that the FTSLanguage constructor requires

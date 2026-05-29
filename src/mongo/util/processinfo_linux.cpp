@@ -111,7 +111,7 @@ public:
         FILE* f = fopen(name.c_str(), "r");
         if (!f) {
             auto ec = lastSystemError();
-            msgasserted(13538, fmt::format("couldn't open [{}] {}", name, errorMessage(ec)));
+            masserted(13538, fmt::format("couldn't open [{}] {}", name, errorMessage(ec)));
         }
         int found = fscanf(f,
                            "%d %127s %c "

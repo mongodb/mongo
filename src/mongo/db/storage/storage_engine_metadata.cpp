@@ -245,9 +245,9 @@ void flushMyDirectory(const boost::filesystem::path& file) {
     int fd = ::open(dir.string().c_str(), O_RDONLY);  // DO NOT THROW OR ASSERT BEFORE CLOSING
     if (fd < 0) {
         auto ec = lastPosixError();
-        msgasserted(13650,
-                    str::stream() << "Couldn't open directory '" << dir.string()
-                                  << "' for flushing: " << errorMessage(ec));
+        masserted(13650,
+                  str::stream() << "Couldn't open directory '" << dir.string()
+                                << "' for flushing: " << errorMessage(ec));
     }
     if (fsync(fd) != 0) {
         auto ec = lastPosixError();
@@ -263,9 +263,9 @@ void flushMyDirectory(const boost::filesystem::path& file) {
             }
         } else {
             close(fd);
-            msgasserted(13651,
-                        str::stream() << "Couldn't fsync directory '" << dir.string()
-                                      << "': " << errorMessage(ec));
+            masserted(13651,
+                      str::stream() << "Couldn't fsync directory '" << dir.string()
+                                    << "': " << errorMessage(ec));
         }
     }
     close(fd);

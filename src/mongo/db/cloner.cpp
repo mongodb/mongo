@@ -242,7 +242,7 @@ struct DefaultClonerImpl::BatchHandler {
                 str::stream ss;
                 ss << "Cloner: found corrupt document in " << nss.toStringForErrorMsg() << ": "
                    << redact(status);
-                msgasserted(28531, ss);
+                masserted(28531, ss);
             }
 
             MONGO_verify(collection);

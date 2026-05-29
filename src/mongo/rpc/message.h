@@ -125,7 +125,7 @@ inline LogicalOp networkOpToLogicalOp(NetworkOp networkOp) {
         case opReply:
             break;  // This has no logical op since it should never be used in a request.
     }
-    msgasserted(34348, str::stream() << "cannot translate opcode " << int32_t(networkOp));
+    masserted(34348, str::stream() << "cannot translate opcode " << int32_t(networkOp));
 }
 
 inline const char* networkOpToString(NetworkOp networkOp) {
@@ -151,7 +151,7 @@ inline const char* networkOpToString(NetworkOp networkOp) {
         case dbMsg:
             return "msg";
     }
-    msgasserted(16141, str::stream() << "cannot translate opcode " << int32_t(networkOp));
+    masserted(16141, str::stream() << "cannot translate opcode " << int32_t(networkOp));
 }
 
 inline const char* logicalOpToString(LogicalOp logicalOp) {

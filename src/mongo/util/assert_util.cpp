@@ -286,7 +286,7 @@ MONGO_COMPILER_NOINLINE void uassertedWithLocation(const Status& status, SourceL
     error_details::throwExceptionForStatus(status);
 }
 
-MONGO_COMPILER_NOINLINE void msgassertedWithLocation(const Status& status, SourceLocation loc) {
+MONGO_COMPILER_NOINLINE void massertedWithLocation(const Status& status, SourceLocation loc) {
     assertionCount.condrollover(assertionCount.msg.addAndFetch(1));
     LOGV2_ERROR(23077, "Assertion", "error"_attr = redact(status), "location"_attr = loc);
     error_details::throwExceptionForStatus(status);

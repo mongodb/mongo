@@ -305,8 +305,8 @@ inline int canonicalizeBSONType(BSONType type) {
     if (ret != std::numeric_limits<std::int8_t>::min()) {
         return ret;
     }
-    msgasserted(ErrorCodes::InvalidBSONType,
-                fmt::format("Invalid/undefined BSONType value was provided ({:d})", type));
+    masserted(ErrorCodes::InvalidBSONType,
+              fmt::format("Invalid/undefined BSONType value was provided ({:d})", type));
 }
 
 template <typename T>

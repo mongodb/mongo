@@ -606,13 +606,13 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T uassertStatusOKWithContextAnd
         status, [&]() -> std::string { return (contextExpr); }, MONGO_SOURCE_LOCATION())
 
 namespace error_details {
-MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void msgassertedWithLocation(
+MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS MONGO_COMPILER_NORETURN void massertedWithLocation(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION());
 
 MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void massertStatusOKWithLocation(
     const Status& status, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     if (MONGO_unlikely(!status.isOK())) {
-        msgassertedWithLocation(status, loc);
+        massertedWithLocation(status, loc);
     }
 }
 
@@ -628,10 +628,10 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr T massertStatusOKWithLocation(
  * massert is like uassert but it logs the message before throwing.
  */
 #define massert(msgid, msg, expr) \
-    MONGO_BASE_ASSERT(::mongo::error_details::msgassertedWithLocation, msgid, msg, expr)
+    MONGO_BASE_ASSERT(::mongo::error_details::massertedWithLocation, msgid, msg, expr)
 
-#define msgasserted(msgid, msg) \
-    MONGO_BASE_ASSERT_FAILED(::mongo::error_details::msgassertedWithLocation, msgid, msg)
+#define masserted(msgid, msg) \
+    MONGO_BASE_ASSERT_FAILED(::mongo::error_details::massertedWithLocation, msgid, msg)
 
 #define massertStatusOK(...) \
     ::mongo::error_details::massertStatusOKWithLocation(__VA_ARGS__, MONGO_SOURCE_LOCATION())

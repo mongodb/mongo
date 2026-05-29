@@ -124,7 +124,7 @@ std::string toUtf8String(const std::wstring& wide) {
         }
     }
 
-    msgasserted(16091, str::stream() << "can't wstring to utf8: " << ::GetLastError());
+    masserted(16091, str::stream() << "can't wstring to utf8: " << ::GetLastError());
     return "";
 }
 

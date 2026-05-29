@@ -38,7 +38,7 @@ _CODE_PATTERNS = [
     re.compile(p + r"\s*(?P<code>\d+)", re.MULTILINE)
     for p in [
         # All the asserts and their optional variant suffixes
-        r"(?:f|i|m|msg|t|u)(?:assert)"
+        r"(?:f|i|m|t|u)(?:assert)"
         r"(?:ed)?"
         r"(?:Failed)?"
         r"(?:WithStatus)?"

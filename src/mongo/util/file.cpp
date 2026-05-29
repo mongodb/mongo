@@ -155,10 +155,10 @@ void File::read(fileofs o, char* data, unsigned len) {
               "error"_attr = errorMessage(ec));
     } else if (bytesRead != len) {
         _bad = true;
-        msgasserted(10438,
-                    str::stream() << "In File::read(), ReadFile for '" << _name << "' read "
-                                  << bytesRead << " bytes while trying to read " << len
-                                  << " bytes starting at offset " << o << ", truncated file?");
+        masserted(10438,
+                  str::stream() << "In File::read(), ReadFile for '" << _name << "' read "
+                                << bytesRead << " bytes while trying to read " << len
+                                << " bytes starting at offset " << o << ", truncated file?");
     }
 }
 
@@ -300,10 +300,10 @@ void File::read(fileofs o, char* data, unsigned len) {
               "error"_attr = errorMessage(ec));
     } else if (bytesRead != static_cast<ssize_t>(len)) {
         _bad = true;
-        msgasserted(16569,
-                    str::stream() << "In File::read(), ::pread for '" << _name << "' read "
-                                  << bytesRead << " bytes while trying to read " << len
-                                  << " bytes starting at offset " << o << ", truncated file?");
+        masserted(16569,
+                  str::stream() << "In File::read(), ::pread for '" << _name << "' read "
+                                << bytesRead << " bytes while trying to read " << len
+                                << " bytes starting at offset " << o << ", truncated file?");
     }
 }
 

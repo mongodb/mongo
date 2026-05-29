@@ -298,7 +298,7 @@ TEST(AssertUtils, InternalAssertWithExpression) {
 
 TEST(AssertUtils, MassertTypedExtraInfoWorks) {
     try {
-        msgasserted(ErrorExtraInfoExample(123), "");
+        masserted(ErrorExtraInfoExample(123), "");
     } catch (const DBException& ex) {
         ASSERT(ex.extraInfo());
         ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
