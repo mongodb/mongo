@@ -536,49 +536,53 @@ Status CollectionImpl::checkValidatorAPIVersionCompatability(OperationContext* o
     return Status::OK();
 }
 
-std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValidation(
+std::pair<Collection::DocumentValidationResult, Status> CollectionImpl::checkValidation(
     OperationContext* opCtx, const BSONObj& document) const {
+    using DVR = DocumentValidationResult;
+    using SVR = SchemaValidationResult;
+    using NCR = DocumentValidationResult::NonComplianceReason;
+
     if (!_validator.isOK()) {
-        return {SchemaValidationResult::kError, _validator.getStatus()};
+        return {DVR{SVR::kError, NCR::kValidatorError}, _validator.getStatus()};
     }
 
     const auto* const validatorMatchExpr = _validator.filter.getValue().get();
     if (!validatorMatchExpr)
-        return {SchemaValidationResult::kPass, Status::OK()};
+        return {DVR{SVR::kPass, NCR::kNone}, Status::OK()};
 
     if (validationLevelOrDefault(_metadata->options.validationLevel) == ValidationLevelEnum::off)
-        return {SchemaValidationResult::kPass, Status::OK()};
+        return {DVR{SVR::kPass, NCR::kNone}, Status::OK()};
 
     if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabledForInternalOp()) {
-        return {SchemaValidationResult::kPass, Status::OK()};
+        return {DVR{SVR::kPass, NCR::kNone}, Status::OK()};
     }
 
     if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled()) {
         if (_metadata->options.validationLevel == ValidationLevelEnum::constraint) {
             return {
-                SchemaValidationResult::kError,
+                DVR{SVR::kError, NCR::kBypassProhibitedWithConstraintLevel},
                 Status(
                     ErrorCodes::BadValue,
                     "bypassDocumentValidation is not permitted with 'constraint' validationLevel")};
         }
         if (isTimeseriesCollection()) {
-            return {SchemaValidationResult::kError,
+            return {DVR{SVR::kError, NCR::kBypassProhibitedForTimeseries},
                     Status(ErrorCodes::BadValue,
                            "bypassDocumentValidation is not permitted on timeseries collections")};
         }
-        return {SchemaValidationResult::kPass, Status::OK()};
+        return {DVR{SVR::kPass, NCR::kNone}, Status::OK()};
     }
 
     if (ns().isTemporaryReshardingCollection()) {
         // In resharding, the donor shard primary is responsible for performing document validation
         // and the recipient should not perform validation on documents inserted into the temporary
         // resharding collection.
-        return {SchemaValidationResult::kPass, Status::OK()};
+        return {DVR{SVR::kPass, NCR::kNone}, Status::OK()};
     }
 
     auto status = checkValidatorAPIVersionCompatability(opCtx);
     if (!status.isOK()) {
-        return {SchemaValidationResult::kError, status};
+        return {DVR{SVR::kError, NCR::kApiVersionIncompatible}, status};
     }
 
     // Regular schema validation for everything except timeseries collections which uses a stricter
@@ -586,7 +590,7 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
     if (!isTimeseriesCollection() || gTimeseriesDisableStrictBucketValidator.load()) {
         try {
             if (exec::matcher::matchesBSON(validatorMatchExpr, document)) {
-                return {SchemaValidationResult::kPass, Status::OK()};
+                return {DVR{SVR::kPass, NCR::kNone}, Status::OK()};
             }
         } catch (DBException&) {
         };
@@ -602,13 +606,13 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
                 if (validationLevelOrDefault(_metadata->options.validationLevel) ==
                     ValidationLevelEnum::constraint) {
                     // Warn is prohibited for constraint validationLevel.
-                    return {SchemaValidationResult::kError, status};
+                    return {DVR{SVR::kError, NCR::kSchemaViolationWarnConstraintLevel}, status};
                 }
-                return {SchemaValidationResult::kWarn, status};
+                return {DVR{SVR::kWarn, NCR::kSchemaViolation}, status};
             case ValidationActionEnum::error:
-                return {SchemaValidationResult::kError, status};
+                return {DVR{SVR::kError, NCR::kSchemaViolation}, status};
             case ValidationActionEnum::errorAndLog:
-                return {SchemaValidationResult::kErrorAndLog, status};
+                return {DVR{SVR::kErrorAndLog, NCR::kSchemaViolation}, status};
         }
         MONGO_UNREACHABLE_TASSERT(7488702);
     }
@@ -616,13 +620,14 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
     // Strict validation for bucket documents in timeseries collections
     try {
         timeseries::validateBucketConsistency(this, document);
-        return {SchemaValidationResult::kPass, Status::OK()};
+        return {DVR{SVR::kPass, NCR::kNone}, Status::OK()};
     } catch (DBException& ex) {
         // For strict timeseries validation we ensure that we only return kError or kErrorAndLog.
-        return {validationActionOrDefault(_metadata->options.validationAction) ==
-                        ValidationActionEnum::errorAndLog
-                    ? SchemaValidationResult::kErrorAndLog
-                    : SchemaValidationResult::kError,
+        const SVR svr = validationActionOrDefault(_metadata->options.validationAction) ==
+                ValidationActionEnum::errorAndLog
+            ? SVR::kErrorAndLog
+            : SVR::kError;
+        return {DVR{svr, NCR::kTimeseriesSchemaViolation},
                 Status(doc_validation_error::DocumentValidationFailureInfo(document),
                        ex.toStatus().toString())};
     };
@@ -630,8 +635,8 @@ std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValid
 
 Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
                                                      const BSONObj& document) const {
-    std::pair<SchemaValidationResult, Status> result = checkValidation(opCtx, document);
-    switch (result.first) {
+    auto result = checkValidation(opCtx, document);
+    switch (result.first.result) {
         case SchemaValidationResult::kPass:
             return Status::OK();
         case SchemaValidationResult::kWarn:

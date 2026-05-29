@@ -141,8 +141,8 @@ public:
         return _validator.validatorDoc.getOwned();
     }
 
-    std::pair<SchemaValidationResult, Status> checkValidation(OperationContext* opCtx,
-                                                              const BSONObj& document) const final;
+    std::pair<DocumentValidationResult, Status> checkValidation(
+        OperationContext* opCtx, const BSONObj& document) const final;
 
     Status checkValidationAndParseResult(OperationContext* opCtx,
                                          const BSONObj& document) const final;

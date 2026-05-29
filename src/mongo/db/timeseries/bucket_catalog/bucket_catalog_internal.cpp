@@ -399,7 +399,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
 
     // Validate the bucket document against the schema.
     auto result = validator(bucketDoc);
-    if (result.first != Collection::SchemaValidationResult::kPass) {
+    if (result.first.result != Collection::SchemaValidationResult::kPass) {
         stats.incNumBucketReopeningsFailedDueToValidator();
         return result.second;
     }

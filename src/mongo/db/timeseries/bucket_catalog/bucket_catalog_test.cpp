@@ -2365,8 +2365,11 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToMinMaxCalculation) {
     BSONObj compressedBucketDoc = _getCompressedBucketDoc(bucketDoc);
 
     const auto alwaysPassValidator =
-        [](const BSONObj& document) -> std::pair<Collection::SchemaValidationResult, Status> {
-        return {Collection::SchemaValidationResult::kPass, Status::OK()};
+        [](const BSONObj& document) -> std::pair<Collection::DocumentValidationResult, Status> {
+        return {Collection::DocumentValidationResult{
+                    Collection::SchemaValidationResult::kPass,
+                    Collection::DocumentValidationResult::NonComplianceReason::kNone},
+                Status::OK()};
     };
     ASSERT_NOT_OK(
         _reopenBucket(*autoColl,

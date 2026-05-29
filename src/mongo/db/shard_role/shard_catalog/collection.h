@@ -319,7 +319,35 @@ public:
      * validation rules, or warn about, but allow invalid documents.
      */
     enum class SchemaValidationResult { kPass, kWarn, kError, kErrorAndLog };
-    virtual std::pair<SchemaValidationResult, Status> checkValidation(
+
+    /**
+     * Bundles the coarse SchemaValidationResult with a fine-grained NonComplianceReason so callers
+     * can report disambiguated messages while still switching on the action (pass/warn/error).
+     */
+    struct DocumentValidationResult {
+        enum class NonComplianceReason {
+            kNone,
+            // The collection's validator expression itself is malformed.
+            kValidatorError,
+            // bypassDocumentValidation requested but validationLevel is 'constraint'.
+            kBypassProhibitedWithConstraintLevel,
+            // bypassDocumentValidation requested on a timeseries collection.
+            kBypassProhibitedForTimeseries,
+            // The validator uses expressions incompatible with the current API version.
+            kApiVersionIncompatible,
+            // Document failed schema validation; validationAction='warn' but
+            // validationLevel='constraint' overrides warn to behave as an error.
+            kSchemaViolationWarnConstraintLevel,
+            // Document failed schema validation; action is reflected in the result field.
+            kSchemaViolation,
+            // Timeseries bucket failed strict consistency check; action is in the result field.
+            kTimeseriesSchemaViolation,
+        };
+
+        SchemaValidationResult result;
+        NonComplianceReason reason;
+    };
+    virtual std::pair<DocumentValidationResult, Status> checkValidation(
         OperationContext* opCtx, const BSONObj& document) const = 0;
 
     /**

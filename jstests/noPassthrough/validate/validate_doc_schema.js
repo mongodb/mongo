@@ -30,6 +30,21 @@ function testSchemaValidation(validationAction) {
     assert.eq(res.errors.length, 0);
     assert.eq(res.warnings.length, 1);
     assert.eq(res.nNonCompliantDocuments, 2);
+    assert(
+        res.warnings.some((w) => w.includes("collection's schema")),
+        "Expected 'collection's schema' in warnings",
+        {warnings: res.warnings},
+    );
+    assert(
+        res.warnings.some((w) => w.includes(validationAction)),
+        "Expected validationAction '" + validationAction + "' in warnings",
+        {warnings: res.warnings},
+    );
+    assert(
+        res.warnings.some((w) => w.includes("5363500")),
+        "Expected log id 5363500 in warnings",
+        {warnings: res.warnings},
+    );
 
     checkLog.containsJson(conn, 5363500, {recordId: "2"});
     checkLog.containsJson(conn, 5363500, {recordId: "3"});

@@ -161,10 +161,13 @@ public:
         return BSONObj();
     }
 
-    std::pair<SchemaValidationResult, Status> checkValidation(OperationContext* opCtx,
-                                                              const BSONObj& document) const final {
+    std::pair<DocumentValidationResult, Status> checkValidation(
+        OperationContext* opCtx, const BSONObj& document) const final {
         unimplementedTasserted();
-        return {SchemaValidationResult::kError, Status(ErrorCodes::UnknownError, "unknown")};
+        return {DocumentValidationResult{
+                    SchemaValidationResult::kError,
+                    DocumentValidationResult::NonComplianceReason::kValidatorError},
+                Status(ErrorCodes::UnknownError, "unknown")};
     }
 
     Status checkValidationAndParseResult(OperationContext* opCtx,

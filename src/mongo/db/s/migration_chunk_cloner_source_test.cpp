@@ -207,7 +207,7 @@ public:
         return _coll->getValidatorDoc();
     }
 
-    std::pair<SchemaValidationResult, Status> checkValidation(
+    std::pair<DocumentValidationResult, Status> checkValidation(
         OperationContext* opCtx, const BSONObj& document) const override {
         return _coll->checkValidation(opCtx, document);
     }

@@ -112,7 +112,7 @@ public:
         return BSONObj();
     }
 
-    std::pair<SchemaValidationResult, Status> checkValidation(
+    std::pair<DocumentValidationResult, Status> checkValidation(
         OperationContext* opCtx, const BSONObj& document) const override {
         MONGO_UNREACHABLE;
     }

@@ -61,7 +61,7 @@ namespace mongo::timeseries::bucket_catalog::internal {
  * Typically, this should execute Collection::checkValidation.
  */
 using BucketDocumentValidator =
-    std::function<std::pair<Collection::SchemaValidationResult, Status>(const BSONObj&)>;
+    std::function<std::pair<Collection::DocumentValidationResult, Status>(const BSONObj&)>;
 
 enum class MONGO_MOD_PARENT_PRIVATE StageInsertBatchResult {
     Success,
