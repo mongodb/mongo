@@ -792,15 +792,6 @@ typedef struct MongoExtensionLogicalAggStageVTable {
                                    MongoExtensionLogicalAggStage** output);
 
     /**
-     * Populates outIsSortedByVectorSearchScore with true if the extension stage sorts by vector
-     * search score, false otherwise. Intended to be used by the extension $vectorSearch stage.
-     *
-     * This method is deprecated and will be removed in a future API version.
-     */
-    MongoExtensionStatus* (*is_stage_sorted_by_vector_search_score_deprecated)(
-        const MongoExtensionLogicalAggStage* logicalStage, bool* outIsSortedByVectorSearchScore);
-
-    /**
      * Populates extractedLimitVal with the extracted limit value for the $vectorSearch extension
      * stage to use in its optimizations.
      *
@@ -872,7 +863,7 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      *
      * Ownership of the output buffer is transferred to the caller.
      */
-    MongoExtensionStatus* (*get_sort_pattern)(MongoExtensionLogicalAggStage* logicalStage,
+    MongoExtensionStatus* (*get_sort_pattern)(const MongoExtensionLogicalAggStage* logicalStage,
                                               MongoExtensionByteBuf** sortPattern);
 
     /**

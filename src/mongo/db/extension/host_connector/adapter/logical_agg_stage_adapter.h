@@ -141,16 +141,6 @@ private:
         });
     }
 
-    static ::MongoExtensionStatus* _hostIsStageSortedByVectorSearchScore(
-        const ::MongoExtensionLogicalAggStage* logicalStage,
-        bool* outIsSortedByVectorSearchScore) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(12303705,
-                      "_hostIsStageSortedByVectorSearchScore should not be called on a "
-                      "host-allocated logical stage.");
-        });
-    }
-
     static ::MongoExtensionStatus* _hostSetVectorSearchLimitForOptimization(
         ::MongoExtensionLogicalAggStage* logicalStage, long long* extractedLimitVal) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {
@@ -199,7 +189,8 @@ private:
     }
 
     static ::MongoExtensionStatus* _hostGetSortPattern(
-        ::MongoExtensionLogicalAggStage* logicalStage, ::MongoExtensionByteBuf** output) noexcept {
+        const ::MongoExtensionLogicalAggStage* logicalStage,
+        ::MongoExtensionByteBuf** output) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             tasserted(
                 12327101,
@@ -233,7 +224,6 @@ private:
         .compile = &_hostCompile,
         .get_distributed_plan_logic = &_hostGetDistributedPlanLogic,
         .clone = &_hostClone,
-        .is_stage_sorted_by_vector_search_score_deprecated = &_hostIsStageSortedByVectorSearchScore,
         .set_vector_search_limit_for_optimization_deprecated =
             &_hostSetVectorSearchLimitForOptimization,
         .evaluate_rule_precondition = &_hostEvaluateRulePrecondition,

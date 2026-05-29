@@ -84,11 +84,6 @@ public:
     LogicalAggStageHandle clone() const;
 
     /**
-     * Returns true if the stage sorts by vector search score, false otherwise.
-     */
-    bool isSortedByVectorSearchScore_deprecated() const;
-
-    /**
      * Propagates the extracted limit value if it exists across the boundary, otherwise propagates
      * nullptr. This is needed by the $vectorSearch extension stage in order for it to apply its
      * optimizations requiring a limit value.
@@ -146,9 +141,6 @@ public:
                 "LogicalAggStage 'get_distributed_plan_logic' is null",
                 vtable.get_distributed_plan_logic != nullptr);
         tassert(11713400, "LogicalAggStage 'clone' is null", vtable.clone != nullptr);
-        tassert(11543600,
-                "LogicalAggStage 'is_stage_sorted_by_vector_search_score' is null",
-                vtable.is_stage_sorted_by_vector_search_score_deprecated != nullptr);
         tassert(11553300,
                 "LogicalAggStage 'set_vector_search_limit_for_optimization' is null",
                 vtable.set_vector_search_limit_for_optimization_deprecated != nullptr);

@@ -115,7 +115,7 @@ assertSortExistsAfterVectorSearch([
 ]);
 
 // Currently cannot optimize $sort that is not directly after $vectorSearch.
-// TODO SERVER-96068: check that $sort is removed for these types of pipelines.
+// TODO SERVER-127594: check that $sort is removed for these types of pipelines.
 assertSortExistsAfterVectorSearch([
     {$vectorSearch: vectorSearchQuery},
     {$limit: 10},

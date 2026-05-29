@@ -96,7 +96,7 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
 }
 
 bool isSortStageSbeCompatible(const DocumentSourceSort* sort) {
-    return !sort->shouldSetSortKeyMetadata() && isSortSbeCompatible(sort->getSortPattern());
+    return !sort->providesSortKeyMetadata() && isSortSbeCompatible(sort->getSortPattern());
 }
 
 /**

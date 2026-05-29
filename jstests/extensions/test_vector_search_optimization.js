@@ -20,13 +20,8 @@ coll.insert([
     {_id: 3, x: 3},
 ]);
 
-const buildTestVectorSearchOptStage = ({storedSource, ineligibleForSortOptimization}) => {
-    return {
-        $testVectorSearchOptimization: {
-            storedSource: storedSource,
-            ...(ineligibleForSortOptimization !== undefined && {ineligibleForSortOptimization}),
-        },
-    };
+const buildTestVectorSearchOptStage = ({storedSource}) => {
+    return {$testVectorSearchOptimization: {storedSource}};
 };
 
 const desugarFalseStage = {$testVectorSearchOptimization: {desugar: false}};
@@ -59,52 +54,55 @@ const verifySortOptimizationApplied = (
     }
 };
 
-const runTestWithDifferentStoredSourceVal = ({storedSource}) => {
-    const validStage = buildTestVectorSearchOptStage({storedSource});
+// storedSource=false desugars to [$testVectorSearch, $_internalSearchIdLookup, ...].
+// $_internalSearchIdLookup already sets preservesOrderAndMetadata=true, so REDUNDANT_SORT_REMOVAL
+// walks past it and finds $testVectorSearch's sort pattern and removes the $sort.
+const runTestStoredSourceFalse = () => {
+    const validStage = buildTestVectorSearchOptStage({storedSource: false});
+    const multiFieldSort = {$sort: {vectorSearchScore: {$meta: "vectorSearchScore"}, x: 1}};
 
-    // Standard case: single sort on 'vectorSearchScore' should be removed.
     verifySortOptimizationApplied(validStage);
-
-    // Multiple consecutive sorts on vector search score directly after the desugared pipeline are optimized away.
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore, sortStageVectorSearchScore]);
-
-    // Three consecutive sorts should all be removed (edge case).
     verifySortOptimizationApplied(validStage, [
         sortStageVectorSearchScore,
         sortStageVectorSearchScore,
         sortStageVectorSearchScore,
     ]);
-
-    // Verifies that a sort not on vector search score isn't optimized away.
     verifySortOptimizationApplied(validStage, [sortStageScore], false);
-
-    // $sort with multi-field criteria on 'vectorSearchScore' and another field should not be removed.
-    const multiFieldSort = {$sort: {vectorSearchScore: {$meta: "vectorSearchScore"}, x: 1}};
     verifySortOptimizationApplied(validStage, [multiFieldSort], false);
-
-    // Currently cannot optimize $sort that is not directly after $vectorSearch (with intervening stage).
-    // TODO SERVER-96068: check that $sort is removed for these types of pipelines.
+    // TODO SERVER-127594: check that $sort is removed for these types of pipelines.
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$limit: 67}]);
     verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$addFields: {"cats": 67}}]);
-
-    // Verify that an incorrectly desugared pipeline for vectorSearch (doesn't consist of the expected stages) does not undergo optimization.
-    const invalidStage = buildTestVectorSearchOptStage({storedSource: false, ineligibleForSortOptimization: true});
-    verifySortOptimizationApplied(invalidStage, [sortStageVectorSearchScore], false);
 };
 
-// Run optimizations when storedSource is false (desugared pipeline contains an $_internalSearchIdLookup stage).
-runTestWithDifferentStoredSourceVal({storedSource: false});
+// storedSource=true desugars to [$testVectorSearch, $replaceRoot, ...].
+// $replaceRoot (DocumentSourceSingleDocumentTransformation) does not yet set
+// preservesOrderAndMetadata=true, so the backward walk stops there and the $sort cannot be removed.
+// TODO SERVER-127594: expect sort removal once $replaceRoot sets preservesOrderAndMetadata=true.
+const runTestStoredSourceTrue = () => {
+    const validStage = buildTestVectorSearchOptStage({storedSource: true});
+    const multiFieldSort = {$sort: {vectorSearchScore: {$meta: "vectorSearchScore"}, x: 1}};
 
-// Run optimizations when storedSource is true (desugared pipeline contains an $replaceRoot stage).
-runTestWithDifferentStoredSourceVal({storedSource: true});
+    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false);
+    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore, sortStageVectorSearchScore], false);
+    verifySortOptimizationApplied(
+        validStage,
+        [sortStageVectorSearchScore, sortStageVectorSearchScore, sortStageVectorSearchScore],
+        false,
+    );
+    verifySortOptimizationApplied(validStage, [sortStageScore], false);
+    verifySortOptimizationApplied(validStage, [multiFieldSort], false);
+    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$limit: 67}]);
+    verifySortOptimizationApplied(validStage, [sortStageVectorSearchScore], false, [{$addFields: {"cats": 67}}]);
+};
 
-// Test case where desugar is false - stage only expands to $testVectorSearch without idLookup/replaceRoot.
-// The sort optimization should still work directly after $testVectorSearch.
+runTestStoredSourceFalse();
+runTestStoredSourceTrue();
+
+// desugar=false: stage expands only to $testVectorSearch (no intervening idLookup/replaceRoot).
+// REDUNDANT_SORT_REMOVAL walks directly to $testVectorSearch's sort pattern.
 const testDesugarFalse = () => {
-    // Valid sort on vectorSearchScore should be optimized away
     verifySortOptimizationApplied(desugarFalseStage, [sortStageVectorSearchScore], true);
-
-    // Invalid sort (not on vectorSearchScore) should NOT be optimized away
     verifySortOptimizationApplied(desugarFalseStage, [sortStageScore], false);
 };
 

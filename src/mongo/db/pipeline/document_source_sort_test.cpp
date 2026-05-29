@@ -45,8 +45,12 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/pipeline/pipeline_split_state.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -1387,6 +1391,63 @@ TEST_F(DocumentSourceSortExecutionTest, OutputSortKeyHoldsUpOverSerialization) {
     }();
     auto reparsed = DocumentSourceSort::createFromBson(serializedBson.firstElement(), expCtx);
     assertProducesSortKeyMetadata(expCtx, reparsed);
+}
+
+// ---------------------------------------------------------------------------
+// DocumentSourceSort::optimizeAt() — adjacent-sort coalescing tests
+// ---------------------------------------------------------------------------
+
+class DocumentSourceSortOptimizeAtTest : public DocumentSourceSortTest {
+protected:
+    std::vector<BSONObj> optimizeStages(std::vector<BSONObj> stages) {
+        auto pipeline =
+            pipeline_factory::makePipeline(stages, getExpCtx(), pipeline_factory::kOptionsMinimal);
+        pipeline_optimization::optimizePipeline(*pipeline);
+        return pipeline->serializeToBson();
+    }
+};
+
+// Adjacent $sorts with no limit: $sort is not guaranteed stable, so the first sort's ordering
+// is destroyed by any subsequent sort. optimizeAt() erases the first sort unconditionally.
+// REDUNDANT_SORT_REMOVAL does not fire (direction mismatch: {a:1} is not an extension of {a:-1}).
+// [$sort{a:1}, $sort{a:-1}] -> [$sort{a:-1}]
+TEST_F(DocumentSourceSortOptimizeAtTest, AdjacentOppositeDirectionSorts_ErasesFirstSort) {
+    auto result = optimizeStages({fromjson("{$sort: {a: 1}}"), fromjson("{$sort: {a: -1}}")});
+    ASSERT_EQ(result.size(), 1U);
+    ASSERT_BSONOBJ_EQ(result[0], fromjson("{$sort: {a: -1}}"));
+}
+
+// Adjacent $sorts on unrelated fields with no limit: first sort's ordering is destroyed by the
+// second (unstable sort). optimizeAt() erases the first sort unconditionally.
+// REDUNDANT_SORT_REMOVAL does not fire ({a:1} is not an extension of {b:1}).
+// [$sort{a:1}, $sort{b:1}] -> [$sort{b:1}]
+TEST_F(DocumentSourceSortOptimizeAtTest, AdjacentUnrelatedFieldSorts_ErasesFirstSort) {
+    auto result = optimizeStages({fromjson("{$sort: {a: 1}}"), fromjson("{$sort: {b: 1}}")});
+    ASSERT_EQ(result.size(), 1U);
+    ASSERT_BSONOBJ_EQ(result[0], fromjson("{$sort: {b: 1}}"));
+}
+
+// Adjacent $sorts where the first is a superset of the second, but in the wrong prefix order:
+// {a,b} does not cover {b} because the leading field differs, so REDUNDANT_SORT_REMOVAL does not
+// fire. optimizeAt() still erases the first sort (no limit, unstable sort assumption).
+// [$sort{a:1,b:1}, $sort{b:1}] -> [$sort{b:1}]
+TEST_F(DocumentSourceSortOptimizeAtTest, AdjacentSortsFirstIsSupersetButWrongPrefix_ErasesFirst) {
+    auto result = optimizeStages({fromjson("{$sort: {a: 1, b: 1}}"), fromjson("{$sort: {b: 1}}")});
+    ASSERT_EQ(result.size(), 1U);
+    ASSERT_BSONOBJ_EQ(result[0], fromjson("{$sort: {b: 1}}"));
+}
+
+// A $limit between two opposite-direction sorts blocks coalescing: optimizeAt() absorbs $limit{3}
+// into $sort{a:1}, then sees a direction mismatch with $sort{a:-1} and leaves both sorts.
+// REDUNDANT_SORT_REMOVAL also does not fire ({a:1} is not an extension of {a:-1}).
+// [$sort{a:1}, $limit{3}, $sort{a:-1}] -> [$sort{a:1}, $limit{3}, $sort{a:-1}]
+TEST_F(DocumentSourceSortOptimizeAtTest, AdjacentOppositeDirectionSortsWithLimit_KeepsBoth) {
+    auto result = optimizeStages(
+        {fromjson("{$sort: {a: 1}}"), fromjson("{$limit: 3}"), fromjson("{$sort: {a: -1}}")});
+    ASSERT_EQ(result.size(), 3U);
+    ASSERT_BSONOBJ_EQ(result[0], fromjson("{$sort: {a: 1}}"));
+    ASSERT_BSONOBJ_EQ(result[1], fromjson("{$limit: 3}"));
+    ASSERT_BSONOBJ_EQ(result[2], fromjson("{$sort: {a: -1}}"));
 }
 
 }  // namespace

@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/search/vector_search_helper.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::extension::host {
@@ -260,7 +261,7 @@ void DocumentSourceExtensionOptimizable::LiteParsedExpanded::bindViewInfo(
 
 bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isRankedStage() const {
     const auto& provided = _properties.getProvidedMetadataFields();
-    if (!provided.has_value() || provided->empty()) {
+    if (!provided || provided->empty()) {
         return false;
     }
     return std::find(provided->begin(),
@@ -271,7 +272,7 @@ bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isRankedStage() con
 
 bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isScoredStage() const {
     const auto& provided = _properties.getProvidedMetadataFields();
-    if (!provided.has_value() || provided->empty()) {
+    if (!provided || provided->empty()) {
         return false;
     }
     return std::any_of(
@@ -568,19 +569,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceExtensionOptimizable::clone(
 
 DocumentSourceContainer::iterator DocumentSourceExtensionOptimizable::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    // TODO SERVER-123972: Only apply the sort optimization when featureFlagExtensionsOptimizations
-    // is disabled.
-
-    // Attempt to remove a $sort on metadata if the extension stage is sorted by vector
-    // search score.
-    if (_logicalStage->isSortedByVectorSearchScore_deprecated()) {
-        if (auto result = search_helpers::applyVectorSearchSortOptimization(itr, container)) {
-            return *result;
-        }
-    }
-
-    // Only apply the special-case limit optimization when extension rewrite rules are not enabled.
-    // If rewrite rules are enabled, the extension can implement this optimization on its own.
+    // The REDUDNANT_SORT_REMOVAL rule takes care of $extensionVectorSearch's desired $sort
+    // optimization.
     if (!feature_flags::gFeatureFlagExtensionsOptimizations.isEnabled()) {
         _limit = search_helpers::setVectorSearchLimitForOptimization(itr, container, _limit);
         _logicalStage->setExtractedLimitVal_deprecated(_limit);

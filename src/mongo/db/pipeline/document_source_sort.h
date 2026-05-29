@@ -211,11 +211,7 @@ public:
         _outputSortKeyMetadata = true;
     }
 
-    /**
-     * Returns true if the output documents of this $sort stage are supposed to have the sort key
-     * metadata field populated.
-     */
-    bool shouldSetSortKeyMetadata() const {
+    bool providesSortKeyMetadata() const override {
         // TODO SERVER-98624 It would be preferable to just set '_outputSortKeyMetadata' based on
         // 'getNeedsMerge()' in the constructor or some earlier time. Sadly, we can't do this right
         // now without adding complexity elsewhere to account for mixed-version clusters. If you set
@@ -254,10 +250,6 @@ public:
 
     const std::shared_ptr<SortExecutor<Document>>& getSortExecutor() const {
         return _sortExecutor;
-    }
-
-    SortPattern getSortPattern() const override {
-        return _sortExecutor->sortPattern();
     }
 
     /**

@@ -103,6 +103,14 @@ assertNoSortExistsAfterVectorSearch([
     {$setWindowFields: {sortBy: {score: {$meta: "vectorSearchScore"}}, output: {rank: {$rank: {}}}}},
 ]);
 
+// Currently cannot optimize $sort that is not directly after $vectorSearch.
+// TODO SERVER-127594: check that $sort is removed for these types of pipelines.
+assertSortExistsAfterVectorSearch([
+    {$vectorSearch: vectorSearchQuery},
+    {$limit: 10},
+    {$sort: {score: {$meta: "vectorSearchScore"}}},
+]);
+
 // Cases where optimization should not apply and $sort should remain:
 
 // Explicit $sort that does not sort on 'vectorSearchScore' should not be removed.
@@ -112,14 +120,6 @@ assertSortExistsAfterVectorSearch([{$vectorSearch: vectorSearchQuery}, {$sort: {
 assertSortExistsAfterVectorSearch([
     {$vectorSearch: vectorSearchQuery},
     {$sort: {score: {$meta: "vectorSearchScore"}, a: 1}},
-]);
-
-// Currently cannot optimize $sort that is not directly after $vectorSearch.
-// TODO SERVER-96068: check that $sort is removed for these types of pipelines.
-assertSortExistsAfterVectorSearch([
-    {$vectorSearch: vectorSearchQuery},
-    {$limit: 10},
-    {$sort: {score: {$meta: "vectorSearchScore"}}},
 ]);
 
 dropSearchIndex(coll, {name: indexName});

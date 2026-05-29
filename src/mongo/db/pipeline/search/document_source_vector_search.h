@@ -158,12 +158,8 @@ public:
         return id;
     }
 
-    SortPattern getSortPattern() const override {
-        SortPattern::SortPatternPart part;
-        part.isAscending = false;
-        part.expression = make_intrusive<ExpressionMeta>(
-            getExpCtx().get(), DocumentMetadataFields::MetaType::kVectorSearchScore);
-        return SortPattern({std::move(part)});
+    bool providesSortKeyMetadata() const override {
+        return true;
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
@@ -233,8 +229,6 @@ private:
      *
      * Also, this optimization only applies to cases where the $sort comes directly after this
      * stage.
-     * TODO SERVER-96068 generalize this optimization to cases where any number of stages that
-     * preserve sort order come between this stage and the sort.
      *
      * Returns a pair of the iterator to return to the optimizer, and a bool of whether or not the
      * optimization was successful. If optimization was successful, the container will be modified

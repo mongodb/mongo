@@ -209,6 +209,11 @@ public:
         return nthNextStage(1);
     }
 
+    // Returns a range over all preceding stages in reverse order (nearest first).
+    auto prevStagesRange() const {
+        return std::ranges::subrange(std::make_reverse_iterator(_itr),
+                                     std::make_reverse_iterator(_container.begin()));
+    }
 
     bool atFirstStage() const {
         return _itr == _container.begin();

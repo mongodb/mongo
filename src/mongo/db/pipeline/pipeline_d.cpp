@@ -976,7 +976,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     // If the pushed-down sort stage will output sortKey metadata, mark it as available for the
     // remaining pipeline stages. This ensures that stages like extension stages or $setWindowFields
     // can declare dependencies on sortKey metadata even after the sort has been pushed down.
-    if (sortStage && sortStage->shouldSetSortKeyMetadata()) {
+    if (sortStage && sortStage->providesSortKeyMetadata()) {
         availableMetadata.set(DocumentMetadataFields::kSortKey);
     }
 
@@ -2046,7 +2046,7 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
                         }
                     }(),
                     sort->getLimit(),
-                    sort->shouldSetSortKeyMetadata(),
+                    sort->providesSortKeyMetadata(),
                     expCtx));
 
             if (!indexSortOrderAgree) {

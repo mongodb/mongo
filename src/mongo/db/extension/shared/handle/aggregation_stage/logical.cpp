@@ -94,16 +94,6 @@ LogicalAggStageHandle LogicalAggStageAPI::clone() const {
     return LogicalAggStageHandle(logicalAggStage);
 }
 
-bool LogicalAggStageAPI::isSortedByVectorSearchScore_deprecated() const {
-    bool outIsSortedByVectorSearchScore{false};
-    invokeCAndConvertStatusToException([&]() {
-        return _vtable().is_stage_sorted_by_vector_search_score_deprecated(
-            get(), &outIsSortedByVectorSearchScore);
-    });
-
-    return outIsSortedByVectorSearchScore;
-}
-
 void LogicalAggStageAPI::setExtractedLimitVal_deprecated(
     boost::optional<long long> extractedLimitVal) {
     invokeCAndConvertStatusToException([&]() {
@@ -171,9 +161,7 @@ void LogicalAggStageAPI::skipStream(::MongoExtensionStreamType streamType) {
  */
 BSONObj LogicalAggStageAPI::getSortPattern() const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    invokeCAndConvertStatusToException([&]() {
-        return _vtable().get_sort_pattern(const_cast<LogicalAggStageAPI*>(this)->get(), &buf);
-    });
+    invokeCAndConvertStatusToException([&]() { return _vtable().get_sort_pattern(get(), &buf); });
 
     if (!buf) {
         return BSONObj();

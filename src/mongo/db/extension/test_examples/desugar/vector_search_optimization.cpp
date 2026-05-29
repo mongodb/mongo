@@ -57,7 +57,8 @@ public:
         return mongo::extension::ExtensionGetNextResult::advanced(
             mongo::extension::ExtensionBSONObj::makeAsByteBuf(
                 input.resultDocument->getUnownedBSONObj()),
-            mongo::extension::ExtensionBSONObj::makeAsByteBuf(BSON("$vectorSearchScore" << 50.0)));
+            mongo::extension::ExtensionBSONObj::makeAsByteBuf(
+                BSON("$vectorSearchScore" << 50.0 << "$sortKey" << BSON_ARRAY(50.0))));
     }
 };
 
@@ -68,10 +69,6 @@ public:
 
     std::unique_ptr<extension::sdk::LogicalAggStage> clone() const override {
         return std::make_unique<TestVectorSearchLogicalStage>(_name, _arguments);
-    }
-
-    bool isSortedByVectorSearchScore_deprecated() const override {
-        return true;
     }
 
     BSONObj getSortPattern() const override {
@@ -169,7 +166,8 @@ public:
     mongo::BSONObj getProperties() const override {
         mongo::extension::MongoExtensionStaticProperties properties;
         mongo::BSONObjBuilder builder;
-        properties.setProvidedMetadataFields(std::vector<std::string>{"vectorSearchScore"});
+        properties.setProvidedMetadataFields(
+            std::vector<std::string>{"vectorSearchScore", "sortKey"});
         properties.serialize(&builder);
         return builder.obj();
     }
@@ -208,20 +206,13 @@ public:
         bool desugars =
             !_arguments.hasField("desugar") || _arguments.getField("desugar").booleanSafe();
         if (desugars) {
-            // The $addFields stage is ineligible for the $sort optimization.
-            if (_arguments.getField("ineligibleForSortOptimization").booleanSafe()) {
-                result.emplace_back(
-                    host->createHostAggStageParseNode(BSON("$addFields" << BSON("cats" << 67))));
+            if (_arguments.getField("storedSource").booleanSafe()) {
+                result.emplace_back(host->createHostAggStageParseNode(BSON(
+                    "$replaceRoot" << BSON(
+                        "newRoot" << BSON("$ifNull" << BSON_ARRAY("$storedSource" << "$$ROOT"))))));
             } else {
-                if (_arguments.getField("storedSource").booleanSafe()) {
-                    result.emplace_back(host->createHostAggStageParseNode(BSON(
-                        "$replaceRoot"
-                        << BSON("newRoot"
-                                << BSON("$ifNull" << BSON_ARRAY("$storedSource" << "$$ROOT"))))));
-                } else {
-                    result.emplace_back(host->createHostAggStageParseNode(
-                        BSON("$_internalSearchIdLookup" << BSON("limit" << 67LL))));
-                }
+                result.emplace_back(host->createHostAggStageParseNode(
+                    BSON("$_internalSearchIdLookup" << BSON("limit" << 67LL))));
             }
         }
         return result;
@@ -236,19 +227,15 @@ public:
  * $testVectorSearchOptimization is a transform stage that can accept the following inputs:
  * - desugar: a boolean input that defaults to true if not present and determines whether the stage
  desugars
- * If desugar is true, then it must specify either a storedSource or an
- ineligibleForSortOptimization input.
+ * If desugar is true, it must specify storedSource.
  * - storedSource: a boolean input that determines whether the stage desugars into an idLookup or
  replaceRoot stage.
- * - ineligibleForSortOptimization: a boolean input that determines whether the stage desugars into
- an pipeline that is ineligible for sort optimization.
  */
 class TestVectorSearchOptStageDescriptor
     : public sdk::TestStageDescriptor<"$testVectorSearchOptimization",
                                       TestVectorSearchOptParseNode> {
 public:
     void validate(const mongo::BSONObj& arguments) const override {
-        // Get desugar field (defaults to true if not present)
         bool desugar = true;
         if (arguments.hasField("desugar")) {
             sdk_uassert(11543601,
@@ -260,25 +247,12 @@ public:
             return;
         }
 
-        bool hasStoredSource = arguments.hasField("storedSource");
-        bool hasIneligibleForSortOptimization = arguments.hasField("ineligibleForSortOptimization");
-
         sdk_uassert(11543602,
-                    "expected either storedSource or ineligibleForSortOptimization input to " +
-                        kStageNameVectorSearchOpt,
-                    hasStoredSource || hasIneligibleForSortOptimization);
-
-        if (hasStoredSource) {
-            sdk_uassert(11543603,
-                        "expected storedSource input to be a boolean " + kStageNameVectorSearchOpt,
-                        arguments.getField("storedSource").isBoolean());
-        }
-        if (hasIneligibleForSortOptimization) {
-            sdk_uassert(11543604,
-                        "expected ineligibleForSortOptimization input to be a boolean " +
-                            kStageNameVectorSearchOpt,
-                        arguments.getField("ineligibleForSortOptimization").isBoolean());
-        }
+                    "expected storedSource input to " + kStageNameVectorSearchOpt,
+                    arguments.hasField("storedSource"));
+        sdk_uassert(11543603,
+                    "expected storedSource input to be a boolean " + kStageNameVectorSearchOpt,
+                    arguments.getField("storedSource").isBoolean());
     }
 };
 

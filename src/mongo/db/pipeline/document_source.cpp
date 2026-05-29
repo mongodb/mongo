@@ -46,8 +46,10 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-DocumentSource::DocumentSource(StringData stageName, const intrusive_ptr<ExpressionContext>& pCtx)
-    : _expCtx(pCtx) {}
+DocumentSource::DocumentSource(StringData stageName,
+                               const intrusive_ptr<ExpressionContext>& pCtx,
+                               SortPattern sortPattern)
+    : _expCtx(pCtx), _sortPattern(std::move(sortPattern)) {}
 
 DocumentSource::Id DocumentSource::allocateId(StringData name) {
     static AtomicWord<Id> next{kUnallocatedId + 1};

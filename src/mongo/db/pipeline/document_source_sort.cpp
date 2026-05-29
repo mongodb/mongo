@@ -134,7 +134,10 @@ const DocumentSourceSort::SortStageOptions DocumentSourceSort::kDefaultOptions =
 DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                        const SortPattern& sortOrder,
                                        SortStageOptions options)
-    : DocumentSource(kStageName, pExpCtx),
+    // sortOrder is intentionally stored twice: _sortExecutor has always owned its own SortPattern
+    // copy, and DocumentSource::_sortPattern was introduced later to support the getSortPattern()
+    // API. Both fields are const, so they remain in sync for the lifetime of the object.
+    : DocumentSource(kStageName, pExpCtx, sortOrder),
       _sortExecutor(std::make_shared<SortExecutor<Document>>(
           sortOrder,
           options.limit,

@@ -45,6 +45,22 @@ boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(
 }
 
 DocumentSourceMock::DocumentSourceMock(std::deque<GetNextResult> results,
+                                       const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                       SortPattern sortPattern)
+    : DocumentSource(kStageName, expCtx, std::move(sortPattern)),
+      mockConstraints(StreamType::kStreaming,
+                      PositionRequirement::kNone,
+                      HostTypeRequirement::kNone,
+                      DiskUseRequirement::kNoDiskUse,
+                      FacetRequirement::kAllowed,
+                      TransactionRequirement::kAllowed,
+                      LookupRequirement::kAllowed,
+                      UnionRequirement::kAllowed),
+      _results(std::move(results)) {
+    mockConstraints.setConstraintsForNoInputSources();
+}
+
+DocumentSourceMock::DocumentSourceMock(std::deque<GetNextResult> results,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSource(kStageName, expCtx),
       mockConstraints(StreamType::kStreaming,

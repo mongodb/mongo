@@ -76,9 +76,6 @@ bool findIdLookupOrReplaceRootStage(DocumentSource* currStage);
  * desugar into either one of those stages for the second stage in its desugared pipeline.
  * - The $sort stage sorts only by 'vectorSearchScore' metadata
  *
- * TODO SERVER-96068: Generalize this optimization to handle cases where stages that preserve
- * sort order come between the vector search stage and the $sort stage.
- *
  * @param itr Iterator pointing to the vector search stage in the container
  * @param container The document source container being optimized
  * @return the Iterator pointing to the vector search stage in the container if the optimization was

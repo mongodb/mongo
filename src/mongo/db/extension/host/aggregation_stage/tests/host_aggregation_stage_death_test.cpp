@@ -101,14 +101,6 @@ DEATH_TEST(HostLogicalAggStageAdapterDeathTest, CloneOnHostAllocatedStageTassert
 }
 
 DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
-           IsSortedByVectorSearchScoreOnHostAllocatedStageTasserts,
-           "12303705") {
-    auto [mock, adapter] = makeAdapterWithMock();
-    LogicalAggStageAPI api(adapter.get());
-    [[maybe_unused]] auto result = api.isSortedByVectorSearchScore_deprecated();
-}
-
-DEATH_TEST(HostLogicalAggStageAdapterDeathTest,
            SetVectorSearchLimitForOptimizationOnHostAllocatedStageTasserts,
            "12303706") {
     auto [mock, adapter] = makeAdapterWithMock();

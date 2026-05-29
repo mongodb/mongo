@@ -20,6 +20,7 @@ mongo_cc_library(
         "qi_rules_to_move.cpp",
         "qo_rules_to_move.cpp",
         "simple_rules.cpp",
+        "sort_rules.cpp",
     ],
     deps = [
         "//src/mongo/db/pipeline",

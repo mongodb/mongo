@@ -403,12 +403,28 @@ public:
     virtual BSONObj getQuery() const;
 
     /**
-     * Returns the sort pattern produced by this stage, or an empty SortPattern if this stage does
-     * not produce documents in a defined sort order. Subclasses that produce sorted output should
-     * override this method.
+     * Returns the sort order this stage establishes on its output. Stages that establish a sort
+     * order ($sort, $vectorSearch, $search, etc.) pass a SortPattern to the DocumentSource
+     * constructor. Stages that do not establish a sort order return an empty SortPattern.
+     *
+     * Virtual to allow DocumentSourceExtensionOptimizable to override: its sort pattern comes from
+     * its logical stage, which is a derived member initialized after the base DocumentSource
+     * constructor runs. Other DocumentSource subclasses shouldn't need to override this method and
+     * can provide the sort pattern via the base DocumentSource constructor.
+     *
+     * TODO SERVER-96067: audit every stage's preservesOrderAndMetadata value.
      */
-    virtual SortPattern getSortPattern() const {
-        return SortPattern({});
+    const SortPattern& getSortPattern() const {
+        return _sortPattern;
+    }
+
+    /**
+     * Returns true if this stage unconditionally sets $sortKey metadata on every output document.
+     * Note that `getSortPattern()` returns the sort pattern that defines a given stage's sorting
+     * behavior. Not all stages that exhibit sorting behavior set the sort key metadata.
+     */
+    virtual bool providesSortKeyMetadata() const {
+        return false;
     }
 
     /**
@@ -644,8 +660,10 @@ public:
         boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher) {}
 
 protected:
-    DocumentSource(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
+    DocumentSource(
+        StringData stageName,
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        SortPattern sortPattern = SortPattern(std::vector<SortPattern::SortPatternPart>{}));
 
     /**
      * Utility which describes when a stage needs to nominate a merging shard.
@@ -668,6 +686,7 @@ protected:
 
 private:
     boost::intrusive_ptr<ExpressionContext> _expCtx;
+    const SortPattern _sortPattern;
 };
 
 }  // namespace mongo

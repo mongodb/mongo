@@ -110,7 +110,19 @@ public:
 
     DocumentSourceSearch(const boost::intrusive_ptr<ExpressionContext> expCtx,
                          InternalSearchMongotRemoteSpec spec)
-        : DocumentSource(kStageName, expCtx), _spec(std::move(spec)) {}
+        : DocumentSource(kStageName,
+                         expCtx,
+                         [&]() -> SortPattern {
+                             if (spec.getSortSpec().has_value()) {
+                                 return SortPattern(spec.getSortSpec()->getOwned(), expCtx);
+                             }
+                             SortPattern::SortPatternPart part;
+                             part.isAscending = false;
+                             part.expression = make_intrusive<ExpressionMeta>(
+                                 expCtx.get(), DocumentMetadataFields::MetaType::kSearchScore);
+                             return SortPattern({std::move(part)});
+                         }()),
+          _spec(std::move(spec)) {}
 
     StringData getSourceName() const override;
     StageConstraints constraints(PipelineSplitState pipeState) const override;
@@ -125,15 +137,8 @@ public:
         return id;
     }
 
-    SortPattern getSortPattern() const override {
-        if (_spec.getSortSpec().has_value()) {
-            return SortPattern(_spec.getSortSpec()->getOwned(), getExpCtx());
-        }
-        SortPattern::SortPatternPart part;
-        part.isAscending = false;
-        part.expression = make_intrusive<ExpressionMeta>(
-            getExpCtx().get(), DocumentMetadataFields::MetaType::kSearchScore);
-        return SortPattern({std::move(part)});
+    bool providesSortKeyMetadata() const override {
+        return true;
     }
 
     boost::intrusive_ptr<DocumentSource> clone(

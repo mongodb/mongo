@@ -79,7 +79,15 @@ DocumentSourceVectorSearch::DocumentSourceVectorSearch(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     BSONObj originalSpec)
-    : DocumentSource(kStageName, expCtx),
+    : DocumentSource(kStageName,
+                     expCtx,
+                     [&]() -> SortPattern {
+                         SortPattern::SortPatternPart part;
+                         part.isAscending = false;
+                         part.expression = make_intrusive<ExpressionMeta>(
+                             expCtx.get(), DocumentMetadataFields::MetaType::kVectorSearchScore);
+                         return SortPattern({std::move(part)});
+                     }()),
       _taskExecutor(taskExecutor),
       _execStatsWrapper(std::make_shared<DSVectorSearchExecStatsWrapper>()),
       _originalSpec(originalSpec.getOwned()) {
@@ -252,13 +260,12 @@ DocumentSourceVectorSearch::_attemptSortAfterVectorSearchOptimization(
 
 DocumentSourceContainer::iterator DocumentSourceVectorSearch::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    // Attempt to remove a $sort on metadata after this $vectorSearch stage.
-    {
-        const auto&& [returnItr, optimizationSucceeded] =
-            _attemptSortAfterVectorSearchOptimization(itr, container);
-        if (optimizationSucceeded) {
-            return returnItr;
-        }
+    // The RBR's REDUNDANT_SORT_REMOVAL rule runs before optimizeAt, so if the following $sort was
+    // already removed as redundant, this is a noop.
+    const auto&& [returnItr, optimizationSucceeded] =
+        _attemptSortAfterVectorSearchOptimization(itr, container);
+    if (optimizationSucceeded) {
+        return returnItr;
     }
 
     auto stageItr = std::next(itr);

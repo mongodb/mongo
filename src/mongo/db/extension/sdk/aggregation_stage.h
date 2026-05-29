@@ -81,12 +81,6 @@ public:
     virtual std::unique_ptr<ExecAggStageBase> compile() const = 0;
     virtual boost::optional<DistributedPlanLogic> getDistributedPlanLogic() const = 0;
     virtual std::unique_ptr<LogicalAggStage> clone() const = 0;
-    // Extension stages (like $vectorSearch) that do sort by vector search score should override
-    // this and return true.
-    virtual bool isSortedByVectorSearchScore_deprecated() const {
-        return false;
-    }
-
     /**
      * Returns the filter predicate applied by this stage for shard targeting. Stages that filter
      * documents should override this to enable shard targeting. Returns an empty BSONObj by default
@@ -278,16 +272,6 @@ private:
         });
     }
 
-    static ::MongoExtensionStatus* _extIsStageSortedByVectorSearchScore(
-        const ::MongoExtensionLogicalAggStage* extLogicalStage,
-        bool* outIsSortedByVectorSearchScore) {
-        return wrapCXXAndConvertExceptionToStatus([&]() {
-            const auto& impl =
-                static_cast<const ExtensionLogicalAggStageAdapter*>(extLogicalStage)->getImpl();
-            *outIsSortedByVectorSearchScore = impl.isSortedByVectorSearchScore_deprecated();
-        });
-    }
-
     static ::MongoExtensionStatus* _extSetVectorSearchLimitForOptimization(
         ::MongoExtensionLogicalAggStage* extLogicalStage, long long* extractedLimitVal) {
         return wrapCXXAndConvertExceptionToStatus([&]() {
@@ -354,7 +338,7 @@ private:
     }
 
     static ::MongoExtensionStatus* _extGetSortPattern(
-        ::MongoExtensionLogicalAggStage* extLogicalStage,
+        const ::MongoExtensionLogicalAggStage* extLogicalStage,
         ::MongoExtensionByteBuf** output) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             *output = nullptr;
@@ -398,7 +382,6 @@ private:
         .compile = &_extCompile,
         .get_distributed_plan_logic = &_extGetDistributedPlanLogic,
         .clone = &_extClone,
-        .is_stage_sorted_by_vector_search_score_deprecated = &_extIsStageSortedByVectorSearchScore,
         .set_vector_search_limit_for_optimization_deprecated =
             &_extSetVectorSearchLimitForOptimization,
         .evaluate_rule_precondition = &_extEvaluateRulePrecondition,
