@@ -170,6 +170,7 @@ debian/mongodb
 
 # QtCreator
 *.config
+!.config
 *.creator
 *.creator.user
 *.files
@@ -359,6 +360,9 @@ src/mongo/shell/*_gen.d.ts
 
 # devcontainer uses pnpm which results in a large amount of environment files that aren't intended for git commits
 .pnpm-store
+
+# Rust/Cargo build artifacts (applies to all crates in the workspace)
+target
 
 # Claude Code local files
 .claude/settings.local.json

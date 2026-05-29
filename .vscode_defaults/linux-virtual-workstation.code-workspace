@@ -58,6 +58,10 @@
 			"editor.formatOnSave": true,
 			"editor.defaultFormatter": "charliermarsh.ruff",
 		},
+		"[rust]": {
+			"editor.defaultFormatter": "rust-lang.rust-analyzer",
+			"editor.formatOnSave": true,
+		},
 		"[starlark]": {
 			"editor.defaultFormatter": "BazelBuild.vscode-bazel"
 		},
@@ -117,6 +121,10 @@
 			"--pch-storage=disk",
 			"--malloc-trim",
 		],
+		"rust-analyzer.linkedProjects": [
+			"monguard/Cargo.toml",
+			"src/mongo/db/modules/enterprise/src/mfp/plugin/Cargo.toml",
+		]
 	},
 	"extensions": {
 		"recommendations": [
@@ -136,6 +144,7 @@
 			"augustocdias.tasks-shell-input",
 			"ms-vscode.cpptools",
 			"matepek.vscode-catch2-test-adapter",
+			"rust-lang.rust-analyzer",
 		]
 	},
 	"tasks": {

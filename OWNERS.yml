@@ -24,6 +24,9 @@ filters:
   - .bazelversion:
     approvers:
       - 10gen/devprod-build
+  - "/rust*.toml":
+    approvers:
+      - 10gen/devprod-build
   - ".vscode_defaults/**":
     approvers:
       - 10gen/devprod-build
