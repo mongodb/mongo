@@ -9,12 +9,11 @@
  * transaction (single oplog entry) and a large transaction split into chained applyOps entries.
  *
  * @tags: [
+ *   featureFlagReplicatedFastCount,
  *   requires_replication,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 const dbName = "test";
 
@@ -32,13 +31,6 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const testDB = primary.getDB(dbName);
-
-if (
-    PersistenceProviderUtil.allNodesHavePropertyWithValue(testDB, "shouldUseReplicatedFastCount", false) &&
-    !FeatureFlagUtil.isEnabled(testDB, "ReplicatedFastCount")
-) {
-    quit();
-}
 
 function getSizeAndCount(coll) {
     const size = testDB.runCommand({dataSize: coll.getFullName()}).size;
