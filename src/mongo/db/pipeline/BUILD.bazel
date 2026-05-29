@@ -104,6 +104,14 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "document_source_internal_document_results_and_metadata_gen",
+    src = "document_source_internal_document_results_and_metadata.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "document_sources_idl",
     srcs = [
@@ -114,6 +122,7 @@ mongo_cc_library(
         "document_source_graph_lookup_gen",
         "document_source_hybrid_scoring_input_util.cpp",
         "document_source_internal_apply_oplog_update_gen",
+        "document_source_internal_document_results_and_metadata_gen",
         "document_source_internal_projection_gen",
         "document_source_list_mql_entities_gen",
         "document_source_list_sampled_queries_gen",
@@ -391,6 +400,7 @@ mongo_cc_library(
         "document_source_index_stats.cpp",
         "document_source_internal_compute_geo_near_distance.cpp",
         "document_source_internal_convert_bucket_index_stats.cpp",
+        "document_source_internal_document_results_and_metadata.cpp",
         "document_source_internal_inhibit_optimization.cpp",
         "document_source_internal_join_hint.cpp",
         "document_source_internal_projection.cpp",
@@ -440,6 +450,7 @@ mongo_cc_library(
         "lite_parsed_graph_lookup.cpp",
         "lite_parsed_hybrid_search_desugarer.cpp",
         "lite_parsed_hybrid_search_desugarer_utils.cpp",
+        "lite_parsed_internal_document_results_and_metadata.cpp",
         "lite_parsed_lookup.cpp",
         "lite_parsed_pipeline_metadata_validation.cpp",
         "lite_parsed_rank_fusion.cpp",
@@ -1417,6 +1428,7 @@ mongo_cc_unit_test(
         "document_source_internal_apply_oplog_update_test.cpp",
         "document_source_internal_compute_geo_near_distance_test.cpp",
         "document_source_internal_convert_bucket_index_stats_test.cpp",
+        "document_source_internal_document_results_and_metadata_test.cpp",
         "document_source_internal_split_pipeline_test.cpp",
         "document_source_limit_test.cpp",
         "document_source_list_extensions_test.cpp",
@@ -1446,6 +1458,7 @@ mongo_cc_unit_test(
         "document_source_test.cpp",
         "document_source_union_with_test.cpp",
         "document_source_unwind_test.cpp",
+        "lite_parsed_internal_document_results_and_metadata_test.cpp",
         "lite_parsed_lookup_test.cpp",
         "lite_parsed_rank_fusion_desugarer_test.cpp",
         "lite_parsed_rank_fusion_test.cpp",

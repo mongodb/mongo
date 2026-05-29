@@ -8622,6 +8622,55 @@ export const authCommandsLib = {
             ],
         },
         {
+            testname: "aggregate_$_internalDocumentResultsAndMetadata",
+            command: {
+                aggregate: "foo",
+                // $collStats is used as the source stage because it requires an extra privilege
+                // (collStats action), verifying that the auth check propagates through the
+                // $_internalDocumentResultsAndMetadata container to its input stage.
+                pipeline: [{$_internalDocumentResultsAndMetadata: {source: {$collStats: {latencyStats: {}}}}}],
+                cursor: {},
+            },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {
+                        read: 1,
+                        readAnyDatabase: 1,
+                        readWrite: 1,
+                        readWriteAnyDatabase: 1,
+                        dbAdmin: 1,
+                        dbAdminAnyDatabase: 1,
+                        dbOwner: 1,
+                        clusterMonitor: 1,
+                        clusterAdmin: 1,
+                        backup: 1,
+                        root: 1,
+                        searchCoordinator: 1,
+                        __system: 1,
+                    },
+                    privileges: [{resource: {db: firstDbName, collection: "foo"}, actions: ["collStats"]}],
+                    expectFail: true, // TODO SERVER-126343: exec stage translation not yet implemented.
+                },
+                {
+                    runOnDb: secondDbName,
+                    roles: {
+                        readAnyDatabase: 1,
+                        readWriteAnyDatabase: 1,
+                        dbAdminAnyDatabase: 1,
+                        clusterMonitor: 1,
+                        clusterAdmin: 1,
+                        backup: 1,
+                        root: 1,
+                        searchCoordinator: 1,
+                        __system: 1,
+                    },
+                    privileges: [{resource: {db: secondDbName, collection: "foo"}, actions: ["collStats"]}],
+                    expectFail: true, // TODO SERVER-126343: exec stage translation not yet implemented.
+                },
+            ],
+        },
+        {
             testname: "aggregate_$_internalSearchIdLookup",
             command: {
                 aggregate: "foo",

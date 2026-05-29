@@ -354,6 +354,8 @@ const skippedStages = [
     "$searchBeta",
     "$listSearchIndexes",
     "$setVariableFromSubPipeline",
+    // Internal container stage produced during search pipeline expansion.
+    "$_internalDocumentResultsAndMetadata",
 
     // Stages tested in 'agg_stage_coverage_internal_client.js', since they require extra setup.
     "$mergeCursors",

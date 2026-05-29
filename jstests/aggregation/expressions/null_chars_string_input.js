@@ -412,6 +412,7 @@ const skips = new Set([
     "$_internalComputeGeoNearDistance",
     "$_internalConvertBucketIndexStats",
     "$_internalDensify",
+    "$_internalDocumentResultsAndMetadata",
     "$_internalFindAndModifyImageLookup",
     "$_internalInhibitOptimization",
     "$_internalListCollections",
