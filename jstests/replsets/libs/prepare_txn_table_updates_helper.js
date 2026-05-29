@@ -77,16 +77,13 @@ export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort, ch
             }
 
             if (
-                (FeatureFlagUtil.isPresentAndEnabled(
-                    primary.getDB("admin"),
-                    "featureFlagReplicatedFastCountDurability",
-                ) ||
+                (FeatureFlagUtil.isPresentAndEnabled(primary.getDB("admin"), "ReplicatedFastCountDurability") ||
                     PersistenceProviderUtil.allNodesHavePropertyWithValue(
                         primary,
                         "shouldUseReplicatedFastCount",
                         true,
                     )) &&
-                FeatureFlagUtil.isPresentAndEnabled(primary.getDB("admin"), "featureFlagReplicatedFastCount")
+                FeatureFlagUtil.isPresentAndEnabled(primary.getDB("admin"), "ReplicatedFastCount")
             ) {
                 assert(
                     primaryTxnEntry.hasOwnProperty("m"),

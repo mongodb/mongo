@@ -51,7 +51,7 @@ testColl = mongod.getDB(baseName)[collName];
 assert.eq(testCollUri, getUriForColl(testColl));
 assert.eq(testColl.find({}).itcount(), 0);
 // TODO SERVER-117520: Check this is correct after implementing repair.
-if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "ReplicatedFastCount")) {
     assert.eq(testColl.count(), 0);
 }
 
@@ -84,7 +84,7 @@ assert.neq(indexUri, getUriForIndex(testColl, indexName));
 assertQueryUsesIndex(testColl, doc, indexName);
 assert.eq(testColl.find(doc).itcount(), 1);
 // TODO SERVER-117520: Check this is correct after implementing repair.
-if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "ReplicatedFastCount")) {
     assert.eq(testColl.count(), 1);
 }
 
@@ -105,7 +105,7 @@ testColl = mongod.getDB(baseName)[collName];
 
 assert.eq(testColl.find(doc).itcount(), 1);
 // TODO SERVER-117520: Check this is correct after implementing repair.
-if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "ReplicatedFastCount")) {
     assert.eq(testColl.count(), 1);
 }
 MongoRunner.stopMongod(mongod);
@@ -127,7 +127,7 @@ assert.isnull(testColl.exists());
 
 assert.eq(testColl.find(doc).itcount(), 0);
 // TODO SERVER-117520: Check this is correct after implementing repair.
-if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "ReplicatedFastCount")) {
     assert.eq(testColl.count(), 0);
 }
 
@@ -160,7 +160,7 @@ testColl = mongod.getDB(baseName)[collName];
 assert.eq(testCollUri, getUriForColl(testColl));
 assert.eq(testColl.find({}).itcount(), 0);
 // TODO SERVER-117520: Check this is correct after implementing repair.
-if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "ReplicatedFastCount")) {
     assert.eq(testColl.count(), 0);
 }
 
@@ -188,7 +188,7 @@ testColl = mongod.getDB(baseName)[collName];
 
 assert.eq(testColl.find(doc).itcount(), 1);
 // TODO SERVER-117520: Check this is correct after implementing repair.
-if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "featureFlagReplicatedFastCount")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(mongod, "ReplicatedFastCount")) {
     assert.eq(testColl.count(), 1);
 }
 

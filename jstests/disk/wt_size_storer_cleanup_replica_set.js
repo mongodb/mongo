@@ -55,7 +55,7 @@ const indexIdent = getUriForIndex(coll(), "_id_");
 
 // TODO SERVER-121845: Re-enable this test when replicated fast count is correctly persisted on step
 // down.
-if (!FeatureFlagUtil.isPresentAndEnabled(primary, "featureFlagReplicatedFastCount")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(primary, "ReplicatedFastCount")) {
     assert.eq(coll().count(), 1);
 }
 assert(coll().drop());

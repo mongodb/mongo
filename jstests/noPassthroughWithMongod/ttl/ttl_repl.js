@@ -80,7 +80,7 @@ print("New Secondary stats:");
 printjson(secondary2col.stats());
 
 // TODO(SERVER-122560): Remove this check.
-if (!FeatureFlagUtil.isPresentAndEnabled(primary, "featureFlagReplicatedFastCount")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(primary, "ReplicatedFastCount")) {
     assert.eq(6, secondary2col.count(), "wrong number of docs on new secondary");
 }
 

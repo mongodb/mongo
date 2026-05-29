@@ -29,7 +29,7 @@ describe("FastCount validation", function () {
             {enforceFastSize: true},
             {enforceFastCount: true, enforceFastSize: true},
         ];
-        const featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(this.db, "featureFlagReplicatedFastCount");
+        const featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(this.db, "ReplicatedFastCount");
         const expectedFastCountType = featureFlagEnabled ? "both" : "legacySizeStorer";
 
         for (const flag of enforceFlagCombinations) {
