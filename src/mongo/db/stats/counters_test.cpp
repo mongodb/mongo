@@ -79,6 +79,35 @@ TEST(NetworkCounterOtelTest, EgressCountersAreExported) {
     EXPECT_EQ(1, capturer.readInt64Counter(MetricNames::kNetworkEgressNumRequests));
 }
 
+TEST(NetworkCounterOtelTest, SlowDNSOperationsAreExported) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    NetworkCounter nc;
+
+    nc.incrementNumSlowDNSOperations();
+    nc.incrementNumSlowDNSOperations();
+    nc.incrementNumSlowDNSOperations();
+
+    EXPECT_EQ(3, capturer.readInt64Counter(MetricNames::kNetworkNumSlowDNSOperations));
+}
+
+TEST(NetworkCounterOtelTest, SlowSSLOperationsAreExported) {
+    OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        return;
+    }
+
+    NetworkCounter nc;
+
+    nc.incrementNumSlowSSLOperations();
+    nc.incrementNumSlowSSLOperations();
+
+    EXPECT_EQ(2, capturer.readInt64Counter(MetricNames::kNetworkNumSlowSSLOperations));
+}
+
 TEST(NetworkCounterBsonTest, IngressBytesInAndNumRequests) {
     NetworkCounter nc;
 
@@ -111,6 +140,25 @@ TEST(NetworkCounterBsonTest, EgressSubObject) {
     EXPECT_EQ(400, egress["bytesIn"].numberLong());
     EXPECT_EQ(100, egress["bytesOut"].numberLong());
     EXPECT_EQ(1, egress["numRequests"].numberLong());
+}
+
+TEST(NetworkCounterBsonTest, NumSlowDNSOperations) {
+    NetworkCounter nc;
+
+    nc.incrementNumSlowDNSOperations();
+    nc.incrementNumSlowDNSOperations();
+
+    BSONObj obj = getNetworkBson(nc);
+    EXPECT_EQ(2, obj["numSlowDNSOperations"].numberLong());
+}
+
+TEST(NetworkCounterBsonTest, NumSlowSSLOperations) {
+    NetworkCounter nc;
+
+    nc.incrementNumSlowSSLOperations();
+
+    BSONObj obj = getNetworkBson(nc);
+    EXPECT_EQ(1, obj["numSlowSSLOperations"].numberLong());
 }
 
 }  // namespace

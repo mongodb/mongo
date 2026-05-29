@@ -115,6 +115,10 @@ public:
         MetricNameMaker::make("serverStatus.network.egress.bytesOut");
     static constexpr MetricName kNetworkEgressNumRequests =
         MetricNameMaker::make("serverStatus.network.egress.numRequests");
+    static constexpr MetricName kNetworkNumSlowDNSOperations =
+        MetricNameMaker::make("serverStatus.network.numSlowDNSOperations");
+    static constexpr MetricName kNetworkNumSlowSSLOperations =
+        MetricNameMaker::make("serverStatus.network.numSlowSSLOperations");
     static constexpr MetricName kPrometheusFileExporterWrites =
         MetricNameMaker::make("metrics.prometheus_file_exporter.writes");
     static constexpr MetricName kPrometheusFileExporterWritesFailed =

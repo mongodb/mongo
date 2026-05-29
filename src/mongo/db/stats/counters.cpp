@@ -75,7 +75,15 @@ NetworkCounter::NetworkCounter()
       _egressLogicalBytesOut(MetricsService::instance().createInt64Counter(
           MetricNames::kNetworkEgressBytesOut,
           "Total number of logical bytes sent on egress (outbound client) connections.",
-          MetricUnit::kBytes)) {}
+          MetricUnit::kBytes)),
+      _numSlowDNSOperations(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkNumSlowDNSOperations,
+          "Total number of slow DNS resolution operations.",
+          MetricUnit::kCount)),
+      _numSlowSSLOperations(MetricsService::instance().createInt64Counter(
+          MetricNames::kNetworkNumSlowSSLOperations,
+          "Total number of slow SSL handshake operations.",
+          MetricUnit::kCount)) {}
 
 void NetworkCounter::hitPhysicalIn(ConnectionType connectionType, long long bytes) {
     static const int64_t MAX = 1ULL << 60;
@@ -129,11 +137,11 @@ void NetworkCounter::hitLogicalOut(ConnectionType connectionType, long long byte
 }
 
 void NetworkCounter::incrementNumSlowDNSOperations() {
-    _numSlowDNSOperations->fetchAndAdd(1);
+    _numSlowDNSOperations.add(1);
 }
 
 void NetworkCounter::incrementNumSlowSSLOperations() {
-    _numSlowSSLOperations->fetchAndAdd(1);
+    _numSlowSSLOperations.add(1);
 }
 
 void NetworkCounter::acceptedTFOIngress() {
@@ -156,8 +164,8 @@ void NetworkCounter::append(BSONObjBuilder& b) {
     egressBuilder.append("numRequests", _egressNumRequests.valueForLegacyUse());
     egressBuilder.done();
 
-    b.append("numSlowDNSOperations", static_cast<long long>(_numSlowDNSOperations->loadRelaxed()));
-    b.append("numSlowSSLOperations", static_cast<long long>(_numSlowSSLOperations->loadRelaxed()));
+    b.append("numSlowDNSOperations", _numSlowDNSOperations.valueForLegacyUse());
+    b.append("numSlowSSLOperations", _numSlowSSLOperations.valueForLegacyUse());
     b.append("numRequests", _ingressNumRequests.valueForLegacyUse());
 
     BSONObjBuilder tfo;
