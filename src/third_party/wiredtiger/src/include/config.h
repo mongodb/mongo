@@ -228,6 +228,7 @@ extern const char __WT_CONFIG_CHOICE_compact_slow[];
 extern const char __WT_CONFIG_CHOICE_compatible[];
 extern const char __WT_CONFIG_CHOICE_configuration[];
 extern const char __WT_CONFIG_CHOICE_conn_close_stress_log_printf[];
+extern const char __WT_CONFIG_CHOICE_cross_checkpoint_cache[];
 extern const char __WT_CONFIG_CHOICE_cursor_check[];
 extern const char __WT_CONFIG_CHOICE_data[];
 extern const char __WT_CONFIG_CHOICE_default[];

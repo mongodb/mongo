@@ -19,11 +19,11 @@ __block_disagg_header_byteswap(WT_BLOCK_DISAGG_HEADER *blk)
 }
 
 /*
- * __wti_block_disagg_header_byteswap_copy --
+ * __wt_block_disagg_header_byteswap_copy --
  *     Place holder - might be necessary to handle network order.
  */
 void
-__wti_block_disagg_header_byteswap_copy(WT_BLOCK_DISAGG_HEADER *from, WT_BLOCK_DISAGG_HEADER *to)
+__wt_block_disagg_header_byteswap_copy(WT_BLOCK_DISAGG_HEADER *from, WT_BLOCK_DISAGG_HEADER *to)
 {
     *to = *from;
 }

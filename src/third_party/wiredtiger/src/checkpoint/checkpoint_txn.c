@@ -1224,11 +1224,14 @@ __checkpoint_can_skip(WT_SESSION_IMPL *session, WT_CHECKPOINT_DB_CONFIG *ckpt_cf
      * If the checkpoint is using timestamps, and the stable timestamp hasn't been updated since the
      * last checkpoint there is nothing more that could be written. Except when a non timestamped
      * file has been modified, as such if the connection has been modified it is currently unsafe to
-     * skip checkpoints.
+     * skip checkpoints. Also, don't skip if the stable disaggregated schema epoch changed, as the
+     * metadata operation queue may have entries to flush even without new committed data.
      */
     if (!conn->modified && ckpt_cfg->use_timestamp &&
       txn_global->last_ckpt_timestamp != WT_TS_NONE &&
-      txn_global->last_ckpt_timestamp == __wt_get_stable_timestamp(session)) {
+      txn_global->last_ckpt_timestamp == __wt_get_stable_timestamp(session) &&
+      txn_global->last_ckpt_disaggregated_schema_epoch ==
+        __wt_get_stable_disaggregated_schema_epoch(session)) {
         ckpt_cfg->can_skip = true;
         return (0);
     }

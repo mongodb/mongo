@@ -897,8 +897,14 @@ __page_inmem_prepare_update(WT_SESSION_IMPL *session, WT_ITEM *value, WT_CELL_UN
         upd->upd_durable_ts = unpack->tw.durable_start_ts;
         upd->upd_start_ts = unpack->tw.start_ts;
         F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
-        if (is_disagg)
-            F_SET(upd, WT_UPDATE_DURABLE);
+        /*
+         * We reach this branch only when the cell carries a prepared stop (the caller only routes
+         * here when the time window has a prepare and the if-branch above handled the start-prepare
+         * case). Do not mark the restored value as durable: if the prepared tombstone is rolled
+         * back, the next reconciliation must write this value again to clear the prepared cell from
+         * the disk image, and the durable flag would suppress that write.
+         */
+        WT_ASSERT(session, WT_TIME_WINDOW_HAS_STOP_PREPARE(&(unpack->tw)));
     }
     if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&(unpack->tw))) {
         WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, &size));
@@ -1095,7 +1101,7 @@ err:
  */
 int
 __wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32_t flags,
-  WT_PAGE **pagep, bool *instantiate_updp)
+  WT_SHARED_DSK_ITEM *shared_dsk_item, WT_PAGE **pagep, bool *instantiate_updp)
 {
     WT_CELL_UNPACK_ADDR unpack_addr;
     WT_DECL_RET;
@@ -1171,10 +1177,22 @@ __wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint3
         return (__wt_illegal_value(session, dsk->type));
     }
 
+    /*
+     * Mark the page as tied to the shared disk cache layer if a shared disk item was supplied. Set
+     * the local flag before any failure point so if we succeed on page alloc and fail later, page
+     * out accounting can identify shared disk pages on the error path.
+     */
+    if (shared_dsk_item != NULL)
+        LF_SET(WT_PAGE_DISK_SHARED);
+
     /* Allocate and initialize a new WT_PAGE. */
     WT_RET(__wt_page_alloc(session, dsk->type, alloc_entries, true, &page, flags));
     __wt_tsan_suppress_store_wt_page_header_ptr(&page->dsk, dsk);
     F_SET_ATOMIC_16(page, flags);
+
+    /* Update image stats early so the increment is balanced by the page out decrement on error. */
+    if (LF_ISSET(WT_PAGE_DISK_ALLOC) && !LF_ISSET(WT_PAGE_DISK_SHARED))
+        __wt_cache_page_image_incr(session, page);
 
     /*
      * Track the memory allocated to build this page so we can update the cache statistics in a
@@ -1207,11 +1225,16 @@ __wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint3
         WT_ERR(__wt_illegal_value(session, page->type));
     }
 
-    /* Update the page's cache statistics. */
-    __wt_cache_page_inmem_incr(session, page, size, false);
-
-    if (LF_ISSET(WT_PAGE_DISK_ALLOC))
-        __wt_cache_page_image_incr(session, page);
+    /*
+     * Update the page's cache statistics. For shared disk pages, cache totals exclude the disk size
+     * as it is owned by the shared disk cache layer.
+     */
+    if (!LF_ISSET(WT_PAGE_DISK_SHARED))
+        __wt_cache_page_inmem_incr(session, page, size, false);
+    else {
+        WT_ASSERT(session, size >= dsk->mem_size);
+        __wt_cache_page_inmem_incr(session, page, size - dsk->mem_size, false);
+    }
 
     /* Link the new internal page to the parent. */
     if (ref != NULL) {
@@ -1222,6 +1245,14 @@ __wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint3
             break;
         }
         ref->page = page;
+    }
+
+    WT_ASSERT(session, shared_dsk_item == NULL || page->disagg_info != NULL);
+    if (page->disagg_info != NULL) {
+        page->disagg_info->shared_dsk_item = shared_dsk_item;
+        /* memory footprint still includes disk size so per-page eviction logic stays unchanged. */
+        if (LF_ISSET(WT_PAGE_DISK_SHARED))
+            __wt_cache_page_footprint_incr(session, page, dsk->mem_size);
     }
 
     *pagep = page;

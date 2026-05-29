@@ -194,20 +194,26 @@ __drop_layered(
     WT_ERR(__wt_buf_fmt(session, stable_uri_buf, "file:%s.wt_stable", tablename));
     stable_uri = stable_uri_buf->data;
 
-    /* Only the leader can remove the metadata from shared metadata table and issue a trim command.
-     */
-    if (S2C(session)->layered_table_manager.leader) {
+    /* Only the leader can issue a trim command. */
+    if (S2C(session)->layered_table_manager.leader)
         WT_ERR(__drop_issue_trim(session, stable_uri));
 
-        /* Remove the all associated metadata from shared metadata table. */
-        WT_SAVE_DHANDLE(session,
-          ret = __wt_disagg_enqueue_metadata_operation(session, stable_uri, tablename,
-            WT_SHARED_METADATA_REMOVE, WT_SCHEMA_EPOCH_UNPUBLISHED, true));
-        WT_ERR(ret);
-    }
+    /* Remove all the associated metadata from shared metadata table. */
+    WT_SAVE_DHANDLE(session,
+      ret = __wt_disagg_enqueue_metadata_operation(session, stable_uri, tablename,
+        WT_SHARED_METADATA_REMOVE, WT_SCHEMA_EPOCH_UNPUBLISHED, true));
+    WT_ERR(ret);
 
-    WT_ERR(__wt_schema_drop(session, stable_uri, cfg, check_visibility));
-
+    /*
+     * Drop the layered table constituents. The stable table may not exist locally on a follower
+     * (followers don't create stable tables); that is fine because the shared metadata removal is
+     * handled by the enqueued REMOVE operation. Leaders always have the stable constituent, so
+     * treat ENOENT as an error for them.
+     */
+    WT_ERR_ERROR_OK(__wt_schema_drop(session, stable_uri, cfg, check_visibility), ENOENT, true);
+    if (WT_CHECK_AND_RESET(ret, ENOENT) && S2C(session)->layered_table_manager.leader)
+        WT_ERR_MSG(session, ENOENT,
+          "stable constituent \"%s\" not found when dropping \"%s\" on leader", stable_uri, uri);
     WT_ERR(__wt_schema_drop(session, ingest_uri, cfg, check_visibility));
 
     /* Now drop the top-level table. */
@@ -223,6 +229,7 @@ __drop_layered(
 err:
     __wt_scr_free(session, &ingest_uri_buf);
     __wt_scr_free(session, &stable_uri_buf);
+
     return (ret);
 }
 

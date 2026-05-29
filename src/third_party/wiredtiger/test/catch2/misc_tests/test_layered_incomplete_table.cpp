@@ -25,7 +25,7 @@
 /*
  * test_layered_incomplete_table.cpp
  *
- * Catch2 equivalent of test_layered90.py, covering all eight combinations of
+ * Catch2 equivalent of test_layered_checkpoint11.py, covering all eight combinations of
  * {file:T.wt_ingest, file:T.wt_stable} presence x {leader, follower} role by
  * directly removing metadata entries from an otherwise-complete layered table.
  *

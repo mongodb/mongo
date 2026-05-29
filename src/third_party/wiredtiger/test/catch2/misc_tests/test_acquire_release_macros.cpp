@@ -15,6 +15,7 @@ typedef uint64_t uint64;
 typedef uint32_t uint32;
 typedef uint16_t uint16;
 typedef uint8_t uint8;
+typedef uintmax_t uintmax;
 
 #define TEST_ACQUIRE_TYPE(type)                           \
     TEST_CASE("Test acquiring a " #type, "[acqrel]")      \
@@ -56,6 +57,7 @@ typedef uint8_t uint8;
  * This also helps verify the type checking in the acquire read macro, and that the barrier version
  * doesn't produce different results.
  */
+TEST_ACQUIRE_TYPE(uintmax);
 TEST_ACQUIRE_TYPE(uint64);
 TEST_ACQUIRE_TYPE(uint32);
 TEST_ACQUIRE_TYPE(uint16);
@@ -65,6 +67,7 @@ TEST_ACQUIRE_TYPE(uint8);
  * Test each branch of the release macro. Use values that can only fit inside the type being tested
  * to make sure integer truncation doesn't occur.
  */
+TEST_RELEASE_TYPE(uintmax, UINTMAX_MAX);
 TEST_RELEASE_TYPE(uint64, UINT64_MAX);
 TEST_RELEASE_TYPE(uint32, UINT32_MAX);
 TEST_RELEASE_TYPE(uint16, UINT16_MAX);

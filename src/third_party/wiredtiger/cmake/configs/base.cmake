@@ -212,12 +212,6 @@ config_bool(
 )
 
 config_bool(
-    WT_DISAGG_SLOW_TRUNCATE_BUILD
-    "Use slow truncate path on follower mode"
-    DEFAULT OFF
-)
-
-config_bool(
     HAVE_NO_CRC32_HARDWARE
     "Disable any crc32 hardware support"
     DEFAULT OFF

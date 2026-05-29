@@ -183,6 +183,9 @@ extern int __wt_block_disagg_addr_unpack(WT_SESSION_IMPL *session, const uint8_t
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_block_disagg_ckpt_size(WT_SESSION_IMPL *session, const char *uri, uint64_t *sizep)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_block_disagg_debug_read_page_id(WT_BM *bm, WT_SESSION_IMPL *session,
+  uint64_t page_id, uint64_t lsn, WT_PAGE_LOG_GET_ARGS *get_args, WT_ITEM *results_array,
+  u_int *results_count) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_block_disagg_manager_create(WT_SESSION_IMPL *session, WT_BUCKET_STORAGE *bstorage,
   const char *filename) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_block_disagg_manager_open(WT_SESSION_IMPL *session, const char *uri,
@@ -550,6 +553,8 @@ extern int __wt_debug_cursor_page(void *cursor_arg, const char *ofile) WT_GCC_FU
 extern int __wt_debug_cursor_tree_hs(void *cursor_arg, const char *ofile)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")))
     WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_debug_disagg_page_id(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t lsn,
+  const char *ofile) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_debug_layered_cursor_page(void *cursor_arg, const char *ofile)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")))
     WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -1055,6 +1060,10 @@ extern int __wt_session_reset_cursors(WT_SESSION_IMPL *session, bool free_buffer
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_set_return_func(WT_SESSION_IMPL *session, const char *func, int line, int err,
   const char *strerr) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_shared_dsk_cache_put(WT_SESSION_IMPL *session, void *data, size_t data_size,
+  const uint8_t *addr, size_t addr_size, WT_PAGE_BLOCK_META *block_meta,
+  WT_SHARED_DSK_ITEM **shared_dsk_retp, bool *insertedp)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_slvg_reconcile_free(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
@@ -1575,7 +1584,7 @@ extern int __wti_meta_track_insert(WT_SESSION_IMPL *session, const char *key)
 extern int __wti_meta_track_update(WT_SESSION_IMPL *session, const char *key)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image,
-  uint32_t flags, WT_PAGE **pagep, bool *instantiate_updp)
+  uint32_t flags, WT_SHARED_DSK_ITEM *shared_dsk_item, WT_PAGE **pagep, bool *instantiate_updp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -1649,6 +1658,8 @@ extern int __wti_session_compact(WT_SESSION *wt_session, const char *uri, const 
 extern int __wti_session_compact_readonly(WT_SESSION *wt_session, const char *uri,
   const char *config) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_session_notsup(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_shared_dsk_cache_init(WT_SESSION_IMPL *session, u_int hash_size)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -1737,6 +1748,8 @@ extern void __wt_block_compact_get_progress_stats(
   WT_SESSION_IMPL *session, WT_BM *bm, uint64_t *pages_reviewedp);
 extern void __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern void __wt_block_disagg_checkpoint_rollback(WT_SESSION_IMPL *session);
+extern void __wt_block_disagg_header_byteswap_copy(
+  WT_BLOCK_DISAGG_HEADER *from, WT_BLOCK_DISAGG_HEADER *to);
 extern void __wt_block_disagg_obsolete_delta_chain(
   WT_SESSION_IMPL *session, uint64_t cumulative_size);
 extern void __wt_block_disagg_set_size(WT_SESSION_IMPL *session, uint64_t size);
@@ -1859,6 +1872,10 @@ extern void __wt_session_rng_init_once(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_session_set_last_error(
   WT_SESSION_IMPL *session, int err, int sub_level_err, const char *fmt, ...);
+extern void __wt_shared_dsk_cache_get(WT_SESSION_IMPL *session, const uint8_t *addr,
+  size_t addr_size, WT_SHARED_DSK_ITEM **shared_dsk_retp);
+extern void __wt_shared_dsk_cache_release(
+  WT_SESSION_IMPL *session, WT_SHARED_DSK_ITEM *shared_dsk_item);
 extern void __wt_stash_discard(WT_SESSION_IMPL *session);
 extern void __wt_stash_discard_all(WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session);
 extern void __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *to);
@@ -1925,8 +1942,6 @@ extern void __wti_block_disagg_apply_root_size(
   WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_disagg, uint32_t new_root_size);
 extern void __wti_block_disagg_decrease_size(
   WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_disagg, uint64_t size);
-extern void __wti_block_disagg_header_byteswap_copy(
-  WT_BLOCK_DISAGG_HEADER *from, WT_BLOCK_DISAGG_HEADER *to);
 extern void __wti_block_disagg_increase_size(WT_BLOCK_DISAGG *block_disagg, uint64_t size);
 extern void __wti_block_ext_free(WT_SESSION_IMPL *session, WT_EXT **ext);
 extern void __wti_block_extlist_dump_all(WT_SESSION_IMPL *session, WT_BLOCK *block);
@@ -1966,6 +1981,7 @@ extern void __wti_rts_progress_msg_walk(WT_SESSION_IMPL *session, uint64_t btree
   uint64_t *last_report_clock, double npos, uint64_t btree_pages);
 extern void __wti_rts_work_free(WT_SESSION_IMPL *session, WT_RTS_WORK_UNIT *entry);
 extern void __wti_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp);
+extern void __wti_shared_dsk_cache_destroy(WT_SESSION_IMPL *session);
 extern void __wti_tiered_get_remove_shared(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entryp);
 extern void __wti_txn_clear_durable_timestamp(WT_SESSION_IMPL *session);
 extern void __wti_txn_clear_read_timestamp(WT_SESSION_IMPL *session);
@@ -2517,9 +2533,15 @@ static WT_INLINE void __wt_cache_dirty_decr_size(
   WT_SESSION_IMPL *session, size_t size, bool is_internal);
 static WT_INLINE void __wt_cache_dirty_incr_size(
   WT_SESSION_IMPL *session, size_t size, bool is_internal);
+static WT_INLINE void __wt_cache_image_decr(
+  WT_SESSION_IMPL *session, uint8_t image_type, uint32_t image_size);
+static WT_INLINE void __wt_cache_image_incr(
+  WT_SESSION_IMPL *session, uint8_t image_type, uint32_t image_size);
 static WT_INLINE void __wt_cache_page_byte_dirty_decr(
   WT_SESSION_IMPL *session, WT_PAGE *page, size_t size);
 static WT_INLINE void __wt_cache_page_byte_updates_decr(
+  WT_SESSION_IMPL *session, WT_PAGE *page, size_t size);
+static WT_INLINE void __wt_cache_page_footprint_incr(
   WT_SESSION_IMPL *session, WT_PAGE *page, size_t size);
 static WT_INLINE void __wt_cache_page_image_decr(WT_SESSION_IMPL *session, WT_PAGE *page);
 static WT_INLINE void __wt_cache_page_image_incr(WT_SESSION_IMPL *session, WT_PAGE *page);
@@ -2527,6 +2549,10 @@ static WT_INLINE void __wt_cache_page_inmem_decr(
   WT_SESSION_IMPL *session, WT_PAGE *page, size_t size);
 static WT_INLINE void __wt_cache_page_inmem_incr(
   WT_SESSION_IMPL *session, WT_PAGE *page, size_t size, bool new_update);
+static WT_INLINE void __wt_cache_shared_dsk_inmem_decr(
+  WT_SESSION_IMPL *session, uint8_t image_type, size_t size);
+static WT_INLINE void __wt_cache_shared_dsk_inmem_incr(
+  WT_SESSION_IMPL *session, uint8_t image_type, size_t size);
 static WT_INLINE void __wt_cell_build_addr_kv(WT_SESSION_IMPL *session, WT_CELL_KV *val_kv,
   uint8_t cell_type, WT_PAGE_DELETED *page_del, WT_TIME_AGGREGATE *ta, const void *data,
   size_t data_size);

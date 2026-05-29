@@ -923,7 +923,7 @@ __wti_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
      * the disk image on return, the in-memory object steals it.
      */
     WT_ERR(__wti_page_inmem(session, NULL, dsk.data,
-      WT_DATA_IN_ITEM(&dsk) ? WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page, NULL));
+      WT_DATA_IN_ITEM(&dsk) ? WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, NULL, &page, NULL));
     dsk.mem = NULL;
     if (page->disagg_info != NULL)
         page->disagg_info->block_meta = block_meta;

@@ -197,7 +197,7 @@ struct __wt_session_impl {
     /* Enforce the contract that a session is only used by a single thread at a time. */
     struct __wt_thread_check {
         WT_SPINLOCK lock;
-        uintmax_t owning_thread;
+        wt_shared uintmax_t owning_thread;
         uint32_t entry_count;
     } thread_check;
 

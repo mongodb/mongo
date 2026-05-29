@@ -321,8 +321,7 @@ functions:
           ${ENABLE_CPPSUITE|} \
           ${SPINLOCK_TYPE|} \
           ${ENABLE_COLORIZE_OUTPUT|-DENABLE_COLORIZE_OUTPUT=0} \
-          ${CC_OPTIMIZE_LEVEL|} \
-          ${WT_DISAGG_SLOW_TRUNCATE_BUILD|}"
+          ${CC_OPTIMIZE_LEVEL|}"
 
         # The RHEL PPC platform does not have ZSTD. Strip it out.
         if [ "${build_variant|}" = "rhel8-ppc" ] && [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS" =~ (\-DHAVE_BUILTIN_EXTENSION_ZSTD=1) ]]; then
@@ -1724,10 +1723,7 @@ variables:
     depends_on: *s-all-dep
     commands:
       - func: "get project"
-      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
       - func: "compile wiredtiger"
-        vars:
-          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - func: "format test script"
         vars:
           # FIXME-WT-17380: Enable prepare for switch mode once failures are resolved.
@@ -1744,10 +1740,7 @@ variables:
     depends_on: *s-all-dep
     commands:
       - func: "get project"
-      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
       - func: "compile wiredtiger"
-        vars:
-          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - func: "format test script"
         vars:
           # FIXME-WT-17380: Enable prepare for switch mode once failures are resolved.
@@ -1764,10 +1757,7 @@ variables:
     depends_on: *s-all-dep
     commands:
       - func: "get project"
-      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
       - func: "compile wiredtiger"
-        vars:
-          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - func: "format test script"
         vars:
           # run for 10 minutes.
@@ -4892,10 +4882,7 @@ tasks:
     depends_on: *s-all-dep
     commands:
       - func: "get project"
-      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
       - func: "compile wiredtiger"
-        vars:
-          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - command: shell.exec
         params:
           working_dir: "wiredtiger/test/evergreen"
@@ -5315,10 +5302,7 @@ tasks:
     depends_on: *s-all-dep
     commands:
       - func: "get project"
-      # FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate.
       - func: "compile wiredtiger"
-        vars:
-          WT_DISAGG_SLOW_TRUNCATE_BUILD: -DWT_DISAGG_SLOW_TRUNCATE_BUILD=1
       - func: "format test disagg"
         vars:
           # Limit the number of operations to avoid an internal TSAN issue; run more operations with detect_deadlocks=0.

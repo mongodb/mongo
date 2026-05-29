@@ -76,6 +76,24 @@ Working code samples live in `examples/c/` and `examples/python/`.
 
 Full rules in @CONTRIBUTING.md.
 
+### Comment Prose Style
+
+Mechanics — delimiter style, function-header layout, FIXME tags, wrap width — live in @CONTRIBUTING.md and are enforced by `dist/s_style`, `dist/comment_style.py`, and `dist/s_comment.py`. The guidance here is about what to write in the prose, not how to punctuate it.
+
+- **Be terse.** Aim for one sentence. If you are writing three, you are probably restating the code, explaining things the reader already knows, or narrating the editing session. The codebase prefers no comment to a wordy one — most lines have no comment at all.
+- **Write for a working WiredTiger engineer.** Do not explain concepts a developer in this codebase already understands — hazard pointers, reconciliation, the history store, eviction, dhandles, session and cursor semantics, btree splits, transactions, timestamps.
+- **Reserve block comments for *why*, not *what*.** Good targets:
+  - Concurrency invariants and the reason for an ordering, barrier, or lock.
+  - Counter-intuitive control flow, loop direction, or termination condition.
+  - Performance constraints, on-disk format constraints, or block-manager limits.
+  - References to the algorithm, data structure, or paper being implemented.
+  - Cross-references to other functions whose contract this code depends on.
+- **Do not block-comment routine code:** variable declarations, simple assignments, standard `WT_RET()` / `WT_ERR()` chains, obvious branches.
+- **Describe roles, not identifiers.** Write `the cursor` or `the page being evicted`, not `cbt` or `ref->page`.
+- **Anchor in the codebase, not the editing session.** A comment must read sensibly to someone who only sees the final code. Do not reference the Jira ticket, PR, branch, or author behind the change — that belongs in the commit message. Do not reference closed tickets or merged PRs. Above all, do not reference work that only ever existed in the editing session — earlier iterations, an approach that was reverted, an experiment that never landed. 
+- **Prefer `FIXME-WT-XXXX` over `TODO` and `XXX` in new code.** Legacy `TODO` / `XXX` markers exist but are not the preferred voice; file a ticket and reference it.
+- **No decorative material.** Skip banners, ASCII separators, and section dividers inside functions. Skip `added by` / `modified for X` / `see ticket Y` provenance notes.
+
 ## Test Frameworks
 
 | Framework | Location | Purpose |

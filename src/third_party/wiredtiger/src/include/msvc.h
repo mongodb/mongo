@@ -248,6 +248,7 @@ WT_ATOMIC_FUNC(int64, int64_t, 64, __int64)
 WT_ATOMIC_FUNC(size, size_t, 64, __int64)
 
 WT_ATOMIC_FUNC_STORE_LOAD(bool, bool, 8, char)
+WT_ATOMIC_FUNC_STORE_LOAD(uintmax, uintmax_t, 64, __int64)
 
 /*
  * __wt_atomic_load_double_relaxed --

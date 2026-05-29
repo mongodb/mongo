@@ -1820,12 +1820,10 @@ __wt_cursor_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop,
   int (*rmfunc)(WT_CURSOR_BTREE *, const WT_ITEM *, u_int))
 {
     WT_DECL_RET;
-    WT_SESSION_IMPL *session;
-    size_t records_truncated;
-    uint64_t sleep_usecs, yield_count;
-
-    session = CUR2S(start);
-    records_truncated = yield_count = sleep_usecs = 0;
+    WT_SESSION_IMPL *session = CUR2S(start);
+    size_t records_truncated = 0;
+    uint64_t sleep_usecs = 0, yield_count = 0;
+    const bool fast_truncate = !FLD_ISSET(S2C(session)->debug.flags, WT_CONN_DEBUG_SLOW_TRUNCATE);
 
 /*
  * First, call the cursor search method to re-position the cursor: we may not have a cursor position
@@ -1855,7 +1853,7 @@ retry:
             return (0);
         }
 
-        if ((ret = __wt_btcur_next(start, true)) == WT_NOTFOUND) {
+        if ((ret = __wt_btcur_next(start, fast_truncate)) == WT_NOTFOUND) {
             WT_STAT_CONN_INCRV(session, cursor_truncate_keys_deleted, records_truncated);
             return (0);
         }

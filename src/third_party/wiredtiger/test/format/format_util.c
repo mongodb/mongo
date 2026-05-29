@@ -258,7 +258,11 @@ cursor_dump_page(WT_CURSOR *cursor, const char *tag)
 
     testutil_snprintf(buf, sizeof(buf), "%s/FAIL.pagedump.%d", g.home, ++next);
 
-    fprintf(stderr, "%s: dumping to %s\n", tag, buf);
+    if (WT_PREFIX_MATCH(cursor->uri, "layered:"))
+        fprintf(
+          stderr, "%s: dumping to %s (suffixed with constituent for layered cursors)\n", tag, buf);
+    else
+        fprintf(stderr, "%s: dumping to %s\n", tag, buf);
     trace_msg(CUR2S(cursor), "%s: dumping to %s", tag, buf);
 
     /*

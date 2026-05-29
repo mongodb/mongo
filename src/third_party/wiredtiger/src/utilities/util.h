@@ -44,6 +44,7 @@ int util_flush(WT_SESSION *, const char *);
 int util_list(WT_SESSION *, int, char *[]);
 int util_load(WT_SESSION *, int, char *[]);
 int util_loadtext(WT_SESSION *, int, char *[]);
+int util_page(WT_SESSION *, int, char *[]);
 int util_printlog(WT_SESSION *, int, char *[]);
 int util_read(WT_SESSION *, int, char *[]);
 int util_read_line(WT_SESSION *, ULINE *, bool, bool *);

@@ -559,19 +559,40 @@ __layered_copy_ingest_table(
                          * timestamp is stored in durable timestamp.
                          */
                         WT_TXN_TIME_POINT txn_time_point;
+                        WT_ASSERT(session, start_prepared_id != WT_PREPARED_ID_NONE);
+                        WT_ASSERT(session, start_prepare_ts != WT_TS_NONE);
+                        WT_ASSERT(session, durable_start_ts != WT_TS_NONE);
+                        WT_CLEAR(txn_time_point);
                         txn_time_point.id = start_ts;
                         txn_time_point.prepared_id = start_prepared_id;
                         txn_time_point.prepare_timestamp = start_prepare_ts;
                         txn_time_point.rollback_timestamp = durable_start_ts;
+                        F_SET(&txn_time_point,
+                          WT_TXN_TIME_POINT_HAS_PREPARED_ID | WT_TXN_TIME_POINT_HAS_TS_PREPARE |
+                            WT_TXN_TIME_POINT_HAS_TS_ROLLBACK);
+                        /* Sessions that claimed by prepared id alone carry no transaction id. */
+                        if (start_ts != WT_TXN_NONE)
+                            F_SET(&txn_time_point, WT_TXN_TIME_POINT_HAS_ID);
                         WT_ERR(__wt_txn_resolve_prepared_op(session, stable_btree, &txn_time_point,
                           key, WT_RECNO_OOB, false, &prepare_cursor));
                     } else {
                         WT_TXN_TIME_POINT txn_time_point;
+                        WT_ASSERT(session, start_prepared_id != WT_PREPARED_ID_NONE);
+                        WT_ASSERT(session, start_prepare_ts != WT_TS_NONE);
+                        WT_ASSERT(session, start_ts != WT_TS_NONE);
+                        WT_ASSERT(session, durable_start_ts != WT_TS_NONE);
+                        WT_CLEAR(txn_time_point);
                         txn_time_point.id = start_txn;
                         txn_time_point.prepared_id = start_prepared_id;
                         txn_time_point.prepare_timestamp = start_prepare_ts;
                         txn_time_point.commit_timestamp = start_ts;
                         txn_time_point.durable_timestamp = durable_start_ts;
+                        F_SET(&txn_time_point,
+                          WT_TXN_TIME_POINT_HAS_PREPARED_ID | WT_TXN_TIME_POINT_HAS_TS_PREPARE |
+                            WT_TXN_TIME_POINT_HAS_TS_COMMIT | WT_TXN_TIME_POINT_HAS_TS_DURABLE);
+                        /* Sessions that claimed by prepared id alone carry no transaction id. */
+                        if (start_txn != WT_TXN_NONE)
+                            F_SET(&txn_time_point, WT_TXN_TIME_POINT_HAS_ID);
                         WT_ERR(__wt_txn_resolve_prepared_op(session, stable_btree, &txn_time_point,
                           key, WT_RECNO_OOB, true, &prepare_cursor));
                     }

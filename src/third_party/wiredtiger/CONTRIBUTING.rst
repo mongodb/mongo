@@ -73,6 +73,32 @@ existing example in the source code and copy it.
     // This is not a
     // valid multi-line comment.
 
+* Every function definition is preceded by a header comment of the form::
+
+    /*
+     * __wt_foo --
+     *     One-sentence description of what the function does.
+     */
+    int
+    __wt_foo(WT_SESSION_IMPL *session, ...)
+
+  The function name appears on its own line, followed by a space and ``--``.
+  The description is indented four spaces past the asterisk (text starts in
+  column 8). Additional paragraphs are separated by a blank `` *`` line.
+* Struct and typedef field comments are trailing single-line comments on
+  the same line as the field, kept to a short noun phrase::
+
+    uint32_t id; /* File ID, for logging */
+    const char *key_format; /* Key format */
+
+  Group-level explanation belongs in a block comment above the struct or
+  above a labelled group of fields, never above an individual field.
+* Flag definitions live between ``/* AUTOMATIC FLAG VALUE GENERATION START N */``
+  and ``/* AUTOMATIC FLAG VALUE GENERATION STOP N */`` markers.
+* A ``FIXME-WT-XXXX`` reference must point at an open Jira ticket. Remove
+  or re-target the comment once the ticket is closed.
+* Do not place any file-level overview comment between the copyright block
+  and the first ``#include``.
 * Lines that need to be wrapped should be split so successive lines
   are longer if possible. This applies to function signatures too
   (exceptions are possible here). If in doubt, Clang-Format will

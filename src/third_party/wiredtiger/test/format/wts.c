@@ -248,6 +248,8 @@ configure_debug_mode(char **p, size_t max)
         CONFIG_APPEND(*p, ",checkpoint_retention=%" PRIu32, GV(DEBUG_CHECKPOINT_RETENTION));
     if (GV(DEBUG_CURSOR_REPOSITION))
         CONFIG_APPEND(*p, ",cursor_reposition=true");
+    if (GV(DEBUG_DISAGG_SLOW_TRUNCATE_FOLLOWER))
+        CONFIG_APPEND(*p, ",disagg_slow_truncate_follower=true");
     if (GV(DEBUG_EVICTION))
         CONFIG_APPEND(*p, ",eviction=true");
     /*
@@ -263,6 +265,8 @@ configure_debug_mode(char **p, size_t max)
         CONFIG_APPEND(*p, ",realloc_malloc=true");
     if (GV(DEBUG_SLOW_CHECKPOINT))
         CONFIG_APPEND(*p, ",slow_checkpoint=true");
+    if (GV(DEBUG_SLOW_TRUNCATE))
+        CONFIG_APPEND(*p, ",slow_truncate=true");
     if (GV(DEBUG_TABLE_LOGGING))
         CONFIG_APPEND(*p, ",table_logging=true");
     if (GV(DEBUG_UPDATE_RESTORE_EVICT))

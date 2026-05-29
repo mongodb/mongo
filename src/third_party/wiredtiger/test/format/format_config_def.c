@@ -132,6 +132,11 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
     "the page for further operations",
     C_BOOL, 5, 0, 0, V_GLOBAL_DEBUG_CURSOR_REPOSITION},
 
+  /* FIXME-WT-17564: Remove once proper write conflict detection is implemented on fast truncate. */
+  {"debug.disagg_slow_truncate_follower",
+    "follower-side layered truncate uses the slow per-record delete path", C_BOOL, 2, 0, 0,
+    V_GLOBAL_DEBUG_DISAGG_SLOW_TRUNCATE_FOLLOWER},
+
   {"debug.eviction",
     "modify internal algorithms to force history store eviction to happen more aggressively",
     C_BOOL, 2, 0, 0, V_GLOBAL_DEBUG_EVICTION},
@@ -148,6 +153,9 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"debug.slow_checkpoint",
     "slow down checkpoint creation by slowing down internal page processing", C_BOOL, 2, 0, 0,
     V_GLOBAL_DEBUG_SLOW_CHECKPOINT},
+
+  {"debug.slow_truncate", "disable the fast-truncate page-skip optimization during range truncate",
+    C_BOOL, 2, 0, 0, V_GLOBAL_DEBUG_SLOW_TRUNCATE},
 
   {"debug.table_logging", "write transaction related information to the log for all operations",
     C_BOOL, 2, 0, 0, V_GLOBAL_DEBUG_TABLE_LOGGING},

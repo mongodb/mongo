@@ -1943,7 +1943,10 @@ __wti_log_release(WT_SESSION_IMPL *session, WTI_LOGSLOT *slot, bool *freep)
       FLD_ISSET(conn->server_flags, WT_CONN_SERVER_LOG)) {
         if (freep != NULL)
             *freep = false;
-        __wt_atomic_store_int64_v_relaxed(&slot->slot_state, WTI_LOG_SLOT_WRITTEN);
+        /*
+         * Guard: slot_state. Release-store pairs with the acquire-load in __wti_log_wrlsn.
+         */
+        __wt_atomic_store_int64_v_release(&slot->slot_state, WTI_LOG_SLOT_WRITTEN);
         /*
          * After this point the worker thread owns the slot. There is nothing more to do but return.
          */

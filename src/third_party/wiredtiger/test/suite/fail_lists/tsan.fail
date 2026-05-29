@@ -36,8 +36,8 @@ test_eviction02.py
 test_hs11.py
 test_hs32.py
 test_import09.py
-test_layered14.py
-test_layered39.py
+test_layered_cursor06.py
+test_layered_eviction01.py
 test_log03.py
 test_overwrite.py
 test_prepare08.py

@@ -699,6 +699,11 @@ connection_runtime_config = [
             if true, modify the disaggregated block manager to pretend that it has an optional
             field protected by a new flag.''',
             type='boolean', undoc=True),
+        Config('disagg_slow_truncate_follower', 'false', r'''
+            if true, follower-side layered-table truncate uses the slow per-record delete path
+            instead of the optimized range delete. Intended for debugging the disaggregated
+            slow/fast truncate split; leader always uses fast truncate.''',
+            type='boolean', undoc=True),
         Config('eviction', 'false', r'''
             if true, modify internal algorithms to change skew to force history store eviction
             to happen more aggressively. This includes but is not limited to not skewing newest,
@@ -730,6 +735,11 @@ connection_runtime_config = [
         Config('slow_checkpoint', 'false', r'''
             if true, slow down checkpoint creation by slowing down internal page processing.''',
             type='boolean'),
+        Config('slow_truncate', 'false', r'''
+            if true, disable the fast-truncate page-skip optimization during range truncate.
+            Intended for debugging the fast-truncate page-skip path on leader and
+            non-disaggregated truncates.''',
+            type='boolean', undoc=True),
         Config('stress_skiplist', 'false', r'''
             Configure various internal parameters to encourage race conditions and other issues
             with internal skip lists, e.g. using a more dense representation.''',
@@ -1047,6 +1057,7 @@ connection_runtime_config = [
             'compact',
             'compact_progress',
             'configuration',
+            'cross_checkpoint_cache',
             'disaggregated_storage',
             'error_returns',
             'eviction',

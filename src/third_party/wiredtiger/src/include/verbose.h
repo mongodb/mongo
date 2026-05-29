@@ -31,6 +31,7 @@ struct __wt_verbose_message_info {
     "WT_VERB_COMPACT", \
     "WT_VERB_COMPACT_PROGRESS", \
     "WT_VERB_CONFIGURATION", \
+    "WT_VERB_CROSS_CHECKPOINT_CACHE", \
     "WT_VERB_DEFAULT", \
     "WT_VERB_DISAGGREGATED_STORAGE", \
     "WT_VERB_ERROR_RETURNS", \

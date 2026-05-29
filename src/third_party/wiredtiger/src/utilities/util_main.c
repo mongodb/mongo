@@ -39,6 +39,89 @@ wt_explicit_zero(void *ptr, size_t len)
 }
 
 /*
+ * util_disagg_pick_up_latest_checkpoint --
+ *     If the connection is configured for disaggregated storage, fetch the latest complete
+ *     checkpoint metadata from the page log and install it via reconfigure.
+ *
+ * Returns 0 if disagg is not configured, if no checkpoint is available yet (WT_NOTFOUND from the
+ *     extension), or after a successful install. Returns the WT error code on failure.
+ */
+static int
+util_disagg_pick_up_latest_checkpoint(WT_CONNECTION *conn, WT_SESSION *session)
+{
+    WT_CONNECTION_IMPL *conn_impl;
+    WT_DECL_RET;
+    WT_PAGE_LOG *page_log;
+    WT_PAGE_LOG_GET_COMPLETE_CHECKPOINT_ARGS args;
+    WT_SESSION_IMPL *session_impl;
+    size_t reconfig_len;
+    char *reconfig;
+    const char *page_log_name;
+
+    session_impl = (WT_SESSION_IMPL *)session;
+    conn_impl = S2C(session_impl);
+    page_log = NULL;
+    reconfig = NULL;
+    WT_CLEAR(args);
+
+    /*
+     * Leader-mode pickup is handled inside wiredtiger_open by __wti_disagg_conn_config. Connections
+     * without a page log don't need pickup.
+     */
+    if (conn_impl->layered_table_manager.leader ||
+      conn_impl->disaggregated_storage.npage_log == NULL)
+        return (0);
+
+    page_log_name = conn_impl->disaggregated_storage.page_log;
+    WT_ASSERT(session_impl, page_log_name != NULL);
+
+    WT_RET(conn->get_page_log(conn, page_log_name, &page_log));
+
+    /* The wt utility tolerates page logs that do not implement pl_get_complete_checkpoint. */
+    if (page_log->pl_get_complete_checkpoint == NULL) {
+        fprintf(stderr,
+          "%s: disaggregated page log %s does not implement pl_get_complete_checkpoint; "
+          "proceeding with empty metadata\n",
+          progname, page_log_name);
+        goto done;
+    }
+
+    ret = page_log->pl_get_complete_checkpoint(page_log, session, &args);
+    if (ret == WT_NOTFOUND) {
+        fprintf(stderr,
+          "%s: no complete checkpoint found in disaggregated page log; proceeding with empty "
+          "metadata\n",
+          progname);
+        ret = 0;
+        goto done;
+    }
+    WT_ERR(ret);
+
+    /*
+     * Format the metadata as a disaggregated.checkpoint_meta config string and install via
+     * reconfigure.
+     */
+    reconfig_len =
+      strlen("disaggregated=(checkpoint_meta=\"\")") + args.checkpoint_metadata.size + 1;
+    if ((reconfig = util_malloc(reconfig_len)) == NULL) {
+        ret = errno;
+        goto err;
+    }
+    WT_ERR(__wt_snprintf(reconfig, reconfig_len, "disaggregated=(checkpoint_meta=\"%.*s\")",
+      (int)args.checkpoint_metadata.size, (const char *)args.checkpoint_metadata.data));
+    WT_ERR(conn->reconfigure(conn, reconfig));
+
+err:
+done:
+    __wt_buf_free(session_impl, &args.checkpoint_metadata);
+    util_free(reconfig);
+    if (page_log != NULL)
+        WT_TRET(page_log->terminate(page_log, session));
+
+    return (ret);
+}
+
+/*
  * usage --
  *     Display a usage message for the wt utility.
  */
@@ -59,10 +142,11 @@ usage(void)
       "compact", "compact an object", "copyright", "display copyright information", "create",
       "create an object", "downgrade", "downgrade a database", "drop", "drop an object", "dump",
       "dump an object", "list", "list database objects", "load", "load an object", "loadtext",
-      "load an object from a text file", "printlog", "display the database log", "read",
-      "read values from an object", "salvage", "salvage a file", "stat",
-      "display statistics for an object", "truncate", "truncate an object, removing all content",
-      "verify", "verify an object", "write", "write values to an object", NULL, NULL};
+      "load an object from a text file", "page", "read a single page through WT_PAGE_LOG",
+      "printlog", "display the database log", "read", "read values from an object", "salvage",
+      "salvage a file", "stat", "display statistics for an object", "truncate",
+      "truncate an object, removing all content", "verify", "verify an object", "write",
+      "write values to an object", NULL, NULL};
 
     fprintf(stderr, "WiredTiger Data Engine (version %d.%d)\n", WIREDTIGER_VERSION_MAJOR,
       WIREDTIGER_VERSION_MINOR);
@@ -238,7 +322,9 @@ main(int argc, char *argv[])
         }
         break;
     case 'p':
-        if (strcmp(command, "printlog") == 0) {
+        if (strcmp(command, "page") == 0)
+            func = util_page;
+        else if (strcmp(command, "printlog") == 0) {
             func = util_printlog;
             rec_config = REC_LOGOFF;
         }
@@ -349,6 +435,11 @@ open:
 
     if ((ret = conn->open_session(conn, NULL, session_config, &session)) != 0) {
         (void)util_err(NULL, ret, NULL);
+        goto err;
+    }
+
+    if ((ret = util_disagg_pick_up_latest_checkpoint(conn, session)) != 0) {
+        (void)util_err(session, ret, "failed to pick up latest disaggregated checkpoint");
         goto err;
     }
 

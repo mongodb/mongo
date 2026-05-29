@@ -25,11 +25,18 @@ __wt_single_thread_check_start(WT_SESSION_IMPL *s)
     WT_UNUSED(s);
     return;
 #else
-    uintmax_t current_tid;
+    uintmax_t current_tid, owning;
     WT_DECL_RET;
 
     __wt_thread_id(&current_tid);
-    if (!WT_SESSION_IS_DEFAULT(s) && s->thread_check.owning_thread != current_tid) {
+
+    /*
+     * Use relaxed atomics instead of seq-cst to avoid masking concurrency bugs in diagnostic
+     * builds. Relaxed ordering is safe because the spinlock guarantees mutual exclusion.
+     */
+    owning = __wt_atomic_load_uintmax_relaxed(&s->thread_check.owning_thread);
+
+    if (!WT_SESSION_IS_DEFAULT(s) && owning != current_tid) {
         ret = __wt_spin_trylock(s, &s->thread_check.lock);
 
         const char *session_name = __wt_atomic_load_ptr_relaxed(&s->name);
@@ -38,11 +45,11 @@ __wt_single_thread_check_start(WT_SESSION_IMPL *s)
           " is accessed concurrently by multiple threads: "
           "current thread %" PRIuMAX ", owning thread %" PRIuMAX
           " (active op: %s, last op: %s, api depth: %u, dhandle: %s)",
-          s->id, current_tid, s->thread_check.owning_thread,
-          session_name != NULL ? session_name : "none", s->lastop != NULL ? s->lastop : "none",
-          s->api_call_counter, s->dhandle != NULL ? s->dhandle->name : "none");
+          s->id, current_tid, owning, session_name != NULL ? session_name : "none",
+          s->lastop != NULL ? s->lastop : "none", s->api_call_counter,
+          s->dhandle != NULL ? s->dhandle->name : "none");
 
-        s->thread_check.owning_thread = current_tid;
+        __wt_atomic_store_uintmax_relaxed(&s->thread_check.owning_thread, current_tid);
     }
     ++s->thread_check.entry_count;
 #endif
@@ -60,7 +67,7 @@ __wt_single_thread_check_stop(WT_SESSION_IMPL *s)
     return;
 #else
     if (--s->thread_check.entry_count == 0 && !WT_SESSION_IS_DEFAULT(s)) {
-        s->thread_check.owning_thread = 0;
+        __wt_atomic_store_uintmax_relaxed(&s->thread_check.owning_thread, 0);
         __wt_spin_unlock(s, &s->thread_check.lock);
     }
 #endif

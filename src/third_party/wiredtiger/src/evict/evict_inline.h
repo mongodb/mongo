@@ -270,6 +270,18 @@ __wt_evict_inherit_page_state(WT_PAGE *orig_page, WT_PAGE *new_page)
         __wt_atomic_store_uint64_relaxed(&new_page->read_gen, orig_read_gen);
 }
 
+/*
+ * __wt_evict_shared_dsk_cache_bytes_decr --
+ *     Account for a shared disk image leaving the cache on its last release.
+ */
+static WT_INLINE void
+__wt_evict_shared_dsk_cache_bytes_decr(
+  WT_SESSION_IMPL *session, uint8_t dsk_type, uint32_t dsk_size)
+{
+    (void)__wt_atomic_add_uint64_relaxed(&S2C(session)->cache->bytes_evict, dsk_size);
+    __wt_cache_shared_dsk_inmem_decr(session, dsk_type, dsk_size);
+}
+
 /* !!!
  * __wt_evict_page_cache_bytes_decr --
  *     Decrement the in-memory byte count for the cache, B-tree, and page to reflect the eviction
@@ -294,6 +306,17 @@ __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
     modify = page->modify;
     memory_footprint = __wt_atomic_load_size_relaxed(&page->memory_footprint);
     is_disagg = __wt_conn_is_disagg(session);
+
+    /*
+     * For shared disk pages, page memory footprint includes disk size that is tracked by the shared
+     * disk cache layer. Subtract the disk size from the drain amount, let the shared disk cache
+     * layer drain the disk size on the matching last release.
+     */
+    if (WT_PAGE_HAS_SHARED_DSK_REF(page)) {
+        WT_ASSERT(session, page->dsk != NULL);
+        WT_ASSERT(session, memory_footprint >= page->dsk->mem_size);
+        memory_footprint -= page->dsk->mem_size;
+    }
 
     /* Update the bytes in-memory to reflect the eviction. */
     __wt_cache_decr_check_uint64(

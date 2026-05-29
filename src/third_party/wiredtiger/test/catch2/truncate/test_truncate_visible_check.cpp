@@ -373,21 +373,3 @@ TEST_CASE_METHOD(
         CHECK(stop_key.data == nullptr);
     }
 }
-
-TEST_CASE_METHOD(
-  TruncVisibleCheckFixture, "truncate_delete_visible_check: slow truncate mode", "[truncate]")
-{
-    /*
-     * When disagg_slow_truncate_2026 is true the function must return WT_NOTFOUND immediately
-     * without consulting the truncate list
-     */
-    SECTION("returns WT_NOTFOUND even when a matching entry exists")
-    {
-        add_truncate_entry("key100", "key200");
-        __wt_process.disagg_slow_truncate_2026 = true;
-        WT_ITEM key = make_key("key150");
-        CHECK(__wt_truncate_delete_visible_check(session, layered_table, &key, nullptr, nullptr) ==
-          WT_NOTFOUND);
-        __wt_process.disagg_slow_truncate_2026 = false;
-    }
-}

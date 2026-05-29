@@ -216,6 +216,8 @@ static WT_INLINE void __wt_evict_page_cache_bytes_decr(WT_SESSION_IMPL *session,
 static WT_INLINE void __wt_evict_page_first_dirty(WT_SESSION_IMPL *session, WT_PAGE *page);
 static WT_INLINE void __wt_evict_page_init(WT_PAGE *page);
 static WT_INLINE void __wt_evict_page_soon(WT_SESSION_IMPL *session, WT_REF *ref);
+static WT_INLINE void __wt_evict_shared_dsk_cache_bytes_decr(
+  WT_SESSION_IMPL *session, uint8_t dsk_type, uint32_t dsk_size);
 static WT_INLINE void __wt_evict_touch_page(
   WT_SESSION_IMPL *session, WT_PAGE *page, bool internal_only, bool wont_need);
 

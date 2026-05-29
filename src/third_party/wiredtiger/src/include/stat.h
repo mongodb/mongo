@@ -764,6 +764,9 @@ struct __wt_connection_stats {
     int64_t cache_scrub_restore;
     int64_t cache_reverse_splits;
     int64_t cache_reverse_splits_skipped_vlcs;
+    int64_t cache_shared_dsk_hash_size;
+    int64_t cache_shared_dsk_hit;
+    int64_t cache_shared_dsk_miss;
     int64_t cache_eviction_hs_shared_cursor_not_cached;
     int64_t cache_read_delta_updates;
     int64_t cache_read_restored_tombstone_bytes;
