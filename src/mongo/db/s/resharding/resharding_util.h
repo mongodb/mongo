@@ -38,6 +38,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/shard_key_util.h"
@@ -518,11 +519,10 @@ void validateReshardCollectionRequest(const boost::optional<ReshardingProvenance
 std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::string& poolName);
 
 /**
- * If 'performVerification' is true, asserts that featureFlagReshardingVerification is enabled.
+ * If 'performVerification' is true, asserts that both featureFlagReshardingVerification and the
+ * reshardingDocumentVerification server parameter are enabled.
  */
-void validatePerformVerification(const VersionContext& vCtx,
-                                 boost::optional<bool> performVerification);
-void validatePerformVerification(const VersionContext& vCtx, bool performVerification);
+void validatePerformVerification(const VersionContext& vCtx, OptionalBool performVerification);
 
 /**
  * Verifies that for each index spec in sourceIndexSpecs, there is an identical spec in

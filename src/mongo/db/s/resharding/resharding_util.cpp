@@ -589,21 +589,21 @@ std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::strin
     }());
 }
 
-void validatePerformVerification(const VersionContext& vCtx,
-                                 boost::optional<bool> performVerification) {
-    if (performVerification.has_value()) {
-        validatePerformVerification(vCtx, *performVerification);
+void validatePerformVerification(const VersionContext& vCtx, OptionalBool performVerification) {
+    if (!performVerification.value_or(false)) {
+        return;
     }
-}
-
-void validatePerformVerification(const VersionContext& vCtx, bool performVerification) {
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "Cannot set '"
                           << CommonReshardingMetadata::kPerformVerificationFieldName
                           << "' to true when featureFlagReshardingVerification is not enabled",
-            !performVerification ||
-                resharding::gFeatureFlagReshardingVerification.isEnabled(
-                    vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+            resharding::gFeatureFlagReshardingVerification.isEnabled(
+                vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Cannot set '"
+                          << CommonReshardingMetadata::kPerformVerificationFieldName
+                          << "' to true when reshardingDocumentVerification is false",
+            resharding::gReshardingDocumentVerification.load());
 }
 
 ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
@@ -675,7 +675,8 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     auto performVerification = request.getPerformVerification();
     if (!performVerification.has_value() &&
         resharding::gFeatureFlagReshardingVerification.isEnabled(
-            VersionContext::getDecoration(opCtx), fcv)) {
+            VersionContext::getDecoration(opCtx), fcv) &&
+        resharding::gReshardingDocumentVerification.load()) {
         performVerification = true;
     }
     coordinatorDoc.setPerformVerification(performVerification);

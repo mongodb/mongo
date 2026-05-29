@@ -527,3 +527,14 @@ server_parameters:
         cpp_varname: gReshardingCollectionOptionsVerification
         default: true
         redact: false
+
+    reshardingDocumentVerification:
+        description: >-
+            Controls whether resharding should perform document count verification between
+            donors and recipients. Has no effect when featureFlagReshardingVerification is
+            not enabled.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingDocumentVerification
+        default: true
+        redact: false
