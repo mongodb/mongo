@@ -67,6 +67,7 @@
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_manager.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
@@ -637,6 +638,7 @@ public:
                   _in, &cid, gPreAuthMaximumMessageSizeBytes.loadRelaxed()))
             : uassertStatusOK(compressorMgr().decompressMessage(_in, &cid));
         _compressorId = cid;
+        MessageHooks::onMessageReceived(*_swf->session(), _in);
     }
 
     Message compressResponse(Message msg) {
@@ -700,6 +702,7 @@ std::unique_ptr<SessionWorkflow::Impl::WorkItem> SessionWorkflow::Impl::_receive
             return session()->sourceMessage();
         }());
         invariant(!msg.empty());
+        MessageHooks::onMessageReceived(*session(), msg);
         return std::make_unique<WorkItem>(this, std::move(msg));
     } catch (const DBException& ex) {
         auto remote = session()->remote();
@@ -872,6 +875,8 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     toSink.header().setResponseToMsgId(work.in().header().getId());
     if (!isTLS() && OpMsg::isFlagSet(work.in(), OpMsg::kChecksumPresent))
         OpMsg::appendChecksum(&toSink);
+
+    MessageHooks::onReplyReady(*session(), _work->in(), toSink);
 
     // If the incoming message has the exhaust flag set, then bypass the normal RPC
     // behavior. Sink the response to the network, but also synthesize a new

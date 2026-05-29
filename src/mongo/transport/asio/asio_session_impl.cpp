@@ -44,6 +44,7 @@
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
+#include "mongo/transport/message_filter_hooks.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/transport/proxy_protocol_tlv_extraction.h"
 #include "mongo/transport/session_util.h"
@@ -595,6 +596,8 @@ ExecutorFuture<void> CommonAsioSession::parseProxyProtocolHeader(const ReactorHa
     return AsyncTry([this, buffer] {
                const auto bytesRead =
                    peekASIOStream(_socket, asio::buffer(buffer->data(), buffer->size()));
+               MessageHooks::onProxyHeaderReceived(
+                   *this, buffer->data(), bytesRead, isConnectedToProxyUnixSocket());
                return transport::parseProxyProtocolHeader(StringData(buffer->data(), bytesRead),
                                                           isConnectedToProxyUnixSocket());
            })
@@ -683,6 +686,9 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
     _asyncOpState.start();
     return read(asio::buffer(ptr, kHeaderSize), baton)
         .then([headerBuffer = std::move(headerBuffer), this, baton]() mutable {
+            if (isIngress())
+                MessageHooks::onHeaderReceived(*this, headerBuffer.get(), kHeaderSize);
+
             const auto msgLen = size_t(MSGHEADER::View(headerBuffer.get()).getMessageLength());
 
             const size_t maxMessageSize = isPreauthIngress()
