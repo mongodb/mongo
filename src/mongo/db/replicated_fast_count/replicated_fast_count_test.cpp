@@ -53,6 +53,9 @@
 
 namespace mongo::replicated_fast_count {
 namespace {
+
+using test_helpers::checkCommittedSizeCount;
+
 // Selects whether the fast count metadata is persisted through the collection-backed path or the
 // container-backed path. Used to parameterize tests so the same bodies exercise both paths.
 enum class FastCountStoreMode { kCollection, kContainer };
@@ -604,8 +607,7 @@ TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot)
                              docGeneratorForInsert,
                              sampleDocForInsert);
 
-    test_helpers::checkCommittedFastCountChanges(
-        _uuid1, _fastCountManager, numInitialDocs, initialSize);
+    checkCommittedSizeCount(_opCtx, _uuid1, {.size = initialSize, .count = numInitialDocs});
 
     stdx::thread iterThread;
 
@@ -636,8 +638,7 @@ TEST_P(ReplicatedFastCountTest, DirtyWriteNotLostIfWrittenAfterMetadataSnapshot)
                                  docGeneratorForInsert,
                                  sampleDocForInsert);
 
-        test_helpers::checkCommittedFastCountChanges(
-            _uuid1, _fastCountManager, numTotalDocs, totalSize);
+        checkCommittedSizeCount(_opCtx, _uuid1, {.size = totalSize, .count = numTotalDocs});
 
         // Disable failpoint by letting it go out of scope.
     }
@@ -710,10 +711,8 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsInsertsAreCorrectlyAccountedFor) {
     const int64_t expectedSizeColl1 = numDocsColl1 * sampleDocForInsert.objsize();
     const int64_t expectedSizeColl2 = numDocsColl2 * sampleDocForInsert.objsize();
 
-    test_helpers::checkCommittedFastCountChanges(
-        _uuid1, _fastCountManager, numDocsColl1, expectedSizeColl1);
-    test_helpers::checkCommittedFastCountChanges(
-        _uuid2, _fastCountManager, numDocsColl2, expectedSizeColl2);
+    checkCommittedSizeCount(_opCtx, _uuid1, {.size = expectedSizeColl1, .count = numDocsColl1});
+    checkCommittedSizeCount(_opCtx, _uuid2, {.size = expectedSizeColl2, .count = numDocsColl2});
 
     test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
     test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid2, 0, 0);
@@ -754,8 +753,7 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsUpdatesAreCorrectlyAccountedFor) {
     const int64_t expectedNewSize = startingSize + (totalUpdates * sizeDelta);
 
 
-    test_helpers::checkCommittedFastCountChanges(
-        _uuid1, _fastCountManager, numDocs, expectedNewSize);
+    checkCommittedSizeCount(_opCtx, _uuid1, {.size = expectedNewSize, .count = numDocs});
     test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
 }
 
@@ -793,8 +791,7 @@ TEST_P(ReplicatedFastCountTest, ApplyOpsDeletesAreCorrectlyAccountedFor) {
     const int64_t expectedCount = numDocs - numDeletes;
     const int64_t expectedSize = startingSize - deletedSize;
 
-    test_helpers::checkCommittedFastCountChanges(
-        _uuid1, _fastCountManager, expectedCount, expectedSize);
+    checkCommittedSizeCount(_opCtx, _uuid1, {.size = expectedSize, .count = expectedCount});
     test_helpers::checkUncommittedFastCountChanges(_opCtx, _uuid1, 0, 0);
 }
 
@@ -901,13 +898,15 @@ TEST_P(ReplicatedFastCountTest, ReplicatedFastCountDoesNotTrackLocalCollections)
         expectedSize += document.objsize();
     }
 
-    test_helpers::checkCommittedFastCountChanges(internalUuid, _fastCountManager, 0, 0);
+    checkCommittedSizeCount(
+        operationContext(), internalUuid, CollectionSizeCount{.size = 0, .count = 0});
     test_helpers::checkUncommittedFastCountChanges(_opCtx, internalUuid, 0, 0);
 
     wuow.commit();
 
     // Replicated fast count collection has no record of the writes to `internalColl`.
-    test_helpers::checkCommittedFastCountChanges(internalUuid, _fastCountManager, 0, 0);
+    checkCommittedSizeCount(
+        operationContext(), internalUuid, CollectionSizeCount{.size = 0, .count = 0});
     test_helpers::checkUncommittedFastCountChanges(_opCtx, internalUuid, 0, 0);
 
     // Size and count data for `internalColl` are still tracked through the record store.
@@ -938,15 +937,16 @@ TEST_P(ReplicatedFastCountTest, ReplicatedFastCountTracksNonLocalInternalCollect
             expectedSize += document.objsize();
         }
 
-        test_helpers::checkCommittedFastCountChanges(internalUuid, _fastCountManager, 0, 0);
+        checkCommittedSizeCount(
+            operationContext(), internalUuid, CollectionSizeCount{.size = 0, .count = 0});
         test_helpers::checkUncommittedFastCountChanges(
             _opCtx, internalUuid, docsToInsertCount, expectedSize);
 
         wuow.commit();
 
         // Replicated fast count collection has record of the writes to `internalColl`.
-        test_helpers::checkCommittedFastCountChanges(
-            internalUuid, _fastCountManager, docsToInsertCount, expectedSize);
+        checkCommittedSizeCount(
+            _opCtx, internalUuid, {.size = expectedSize, .count = docsToInsertCount});
         test_helpers::checkUncommittedFastCountChanges(_opCtx, internalUuid, 0, 0);
     }
 }

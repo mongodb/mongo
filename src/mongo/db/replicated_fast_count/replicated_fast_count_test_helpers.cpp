@@ -141,15 +141,13 @@ void checkUncommittedFastCountChanges(OperationContext* opCtx,
     EXPECT_EQ(uncommittedSizeAndCount.size, expectedSize);
 }
 
-void checkCommittedFastCountChanges(
-    const UUID& uuid,
-    replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
-    int64_t expectedCount,
-    int64_t expectedSize) {
-    auto committedSizeAndCount = fastCountManager->find(uuid);
-
-    EXPECT_EQ(committedSizeAndCount.count, expectedCount);
-    EXPECT_EQ(committedSizeAndCount.size, expectedSize);
+void checkCommittedSizeCount(OperationContext* opCtx, UUID uuid, CollectionSizeCount sizeCount) {
+    const auto catalog = CollectionCatalog::latest(opCtx->getServiceContext());
+    const Collection* collection = catalog->lookupCollectionByUUID(opCtx, uuid);
+    invariant(collection);
+    const RecordStore* recordStore = collection->getRecordStore();
+    EXPECT_EQ(recordStore->accurateNumRecords(), sizeCount.count);
+    EXPECT_EQ(recordStore->accurateDataSize(), sizeCount.size);
 }
 
 void insertDocs(OperationContext* opCtx,
@@ -175,19 +173,19 @@ void insertDocs(OperationContext* opCtx,
         }
         checkUncommittedFastCountChanges(
             opCtx, coll.uuid(), numDocs, numDocs * sampleDoc.objsize());
-        checkCommittedFastCountChanges(coll.uuid(), fastCountManager, startingCount, startingSize);
+        checkCommittedSizeCount(opCtx, coll.uuid(), {.size = startingSize, .count = startingCount});
         if (!abortWithoutCommit) {
             wuow.commit();
         }
     }
 
     if (abortWithoutCommit) {
-        checkCommittedFastCountChanges(coll.uuid(), fastCountManager, startingCount, startingSize);
+        checkCommittedSizeCount(opCtx, coll.uuid(), {.size = startingSize, .count = startingCount});
     } else {
-        checkCommittedFastCountChanges(coll.uuid(),
-                                       fastCountManager,
-                                       startingCount + numDocs,
-                                       startingSize + numDocs * sampleDoc.objsize());
+        checkCommittedSizeCount(opCtx,
+                                coll.uuid(),
+                                {.size = startingSize + numDocs * sampleDoc.objsize(),
+                                 .count = startingCount + numDocs});
     }
 
     checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, 0);
@@ -219,13 +217,15 @@ void updateDocs(OperationContext* opCtx,
             BSONObj updated = makeUpdatedDoc(i);
             Helpers::update(opCtx, coll, BSON("_id" << i), BSON("$set" << updated));
         }
-        checkCommittedFastCountChanges(coll.uuid(), fastCountManager, startingCount, startingSize);
+        checkCommittedSizeCount(opCtx, coll.uuid(), {.size = startingSize, .count = startingCount});
         checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, numTotalUpdates * sizeDelta);
         wuow.commit();
     }
 
-    checkCommittedFastCountChanges(
-        coll.uuid(), fastCountManager, startingCount, startingSize + numTotalUpdates * sizeDelta);
+    checkCommittedSizeCount(
+        opCtx,
+        coll.uuid(),
+        {.size = startingSize + numTotalUpdates * sizeDelta, .count = startingCount});
     checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, 0);
 }
 
@@ -253,16 +253,16 @@ void deleteDocsByIDRange(OperationContext* opCtx,
             RecordId rid = Helpers::findOne(opCtx, coll, BSON("_id" << i));
             Helpers::deleteByRid(opCtx, coll, rid);
         }
-        checkCommittedFastCountChanges(coll.uuid(), fastCountManager, startingCount, startingSize);
+        checkCommittedSizeCount(opCtx, coll.uuid(), {.size = startingSize, .count = startingCount});
         checkUncommittedFastCountChanges(
             opCtx, coll.uuid(), -numTotalDeletes, -numTotalDeletes * sampleDoc.objsize());
         wuow.commit();
     }
 
-    checkCommittedFastCountChanges(coll.uuid(),
-                                   fastCountManager,
-                                   startingCount - numTotalDeletes,
-                                   startingSize - (numTotalDeletes)*sampleDoc.objsize());
+    checkCommittedSizeCount(opCtx,
+                            coll.uuid(),
+                            {.size = startingSize - (numTotalDeletes)*sampleDoc.objsize(),
+                             .count = startingCount - numTotalDeletes});
     checkUncommittedFastCountChanges(opCtx, coll.uuid(), 0, 0);
 }
 

@@ -55,6 +55,8 @@
 namespace mongo::replicated_fast_count {
 namespace {
 
+using test_helpers::checkCommittedSizeCount;
+
 /**
  * Tests replicated fast count across multidocument transactions.
  */
@@ -251,13 +253,13 @@ TEST_F(ReplicatedFastCountTxnTest,
 
         // Since the transaction as a whole hasn't been committed, expect doc1 to only count toward
         // uncommitted changes.
-        test_helpers::checkCommittedFastCountChanges(*uuid, _fastCountManager, 0, 0);
+        checkCommittedSizeCount(opCtx1, *uuid, {.size = 0, .count = 0});
         test_helpers::checkUncommittedFastCountChanges(opCtx1, *uuid, 1, doc1.objsize());
     });
 
     // The insert shouldn't be visible outside the transaction.
     ASSERT(uuid.has_value());
-    test_helpers::checkCommittedFastCountChanges(*uuid, _fastCountManager, 0, 0);
+    checkCommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
     test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
 
     // Continue and commit the transaction.
@@ -276,12 +278,11 @@ TEST_F(ReplicatedFastCountTxnTest,
 
         // Uncommitted fast count changes should include both inserts, even though they were
         // executed on different OperationContexts.
-        test_helpers::checkCommittedFastCountChanges(*uuid, _fastCountManager, 0, 0);
+        checkCommittedSizeCount(opCtx2, *uuid, {.size = 0, .count = 0});
         test_helpers::checkUncommittedFastCountChanges(opCtx2, *uuid, expectedCount, expectedSize);
     });
 
-    test_helpers::checkCommittedFastCountChanges(
-        *uuid, _fastCountManager, expectedCount, expectedSize);
+    checkCommittedSizeCount(_opCtx, *uuid, {.size = expectedSize, .count = expectedCount});
     test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
 }
 
@@ -310,19 +311,19 @@ TEST_F(ReplicatedFastCountTxnTest, UncommittedChangesDiscardedAfterMultiDocument
 
         // Since the transaction as a whole hasn't been committed, expect doc1 to only count toward
         // uncommitted changes.
-        test_helpers::checkCommittedFastCountChanges(*uuid, _fastCountManager, 0, 0);
+        checkCommittedSizeCount(opCtx1, *uuid, {.size = 0, .count = 0});
         test_helpers::checkUncommittedFastCountChanges(opCtx1, *uuid, 1, doc1.objsize());
     });
 
     // The insert shouldn't be visible outside the transaction.
     ASSERT(uuid.has_value());
-    test_helpers::checkCommittedFastCountChanges(*uuid, _fastCountManager, 0, 0);
+    checkCommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
     test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
 
     abortTxn(sessionId, txnNumber);
 
     // Confirm the uncommitted changes were discarded.
-    test_helpers::checkCommittedFastCountChanges(*uuid, _fastCountManager, 0, 0);
+    checkCommittedSizeCount(_opCtx, *uuid, {.size = 0, .count = 0});
     test_helpers::checkUncommittedFastCountChanges(_opCtx, *uuid, 0, 0);
 }
 
@@ -350,7 +351,7 @@ TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) 
             wuow.commit();
         }
 
-        test_helpers::checkCommittedFastCountChanges(*uuid, _fastCountManager, 0, 0);
+        checkCommittedSizeCount(opCtx, *uuid, {.size = 0, .count = 0});
         test_helpers::checkUncommittedFastCountChanges(opCtx, *uuid, 1, doc1.objsize());
     });
     abortTxn(_opCtx, sessionId, txnNumber);
@@ -358,7 +359,7 @@ TEST_F(ReplicatedFastCountTxnTest, FastCountResetForSessionBetweenTransactions) 
     txnNumber = TxnNumber(2);
     beginTxn(_opCtx, sessionId, txnNumber, [&](OperationContext* opCtx) {
         // Nothing leaked over from the previous transaction on the session.
-        test_helpers::checkCommittedFastCountChanges(*uuid, _fastCountManager, 0, 0);
+        checkCommittedSizeCount(opCtx, *uuid, {.size = 0, .count = 0});
         test_helpers::checkUncommittedFastCountChanges(opCtx, *uuid, 0, 0);
     });
     abortTxn(_opCtx, sessionId, txnNumber);

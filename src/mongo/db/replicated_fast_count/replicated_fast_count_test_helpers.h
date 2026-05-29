@@ -179,13 +179,12 @@ void checkUncommittedFastCountChanges(OperationContext* opCtx,
                                       int64_t expectedSize);
 
 /**
- * Checks the committed fast count changes for the given UUID.
+ * Checks the committed size and count for the `RecordStore` with the provided `uuid`.
+ *
+ * It is an invariant that the provided `uuid` exists in the catalog.
  */
-void checkCommittedFastCountChanges(
-    const UUID& uuid,
-    replicated_fast_count::ReplicatedFastCountManager* fastCountManager,
-    int64_t expectedCount,
-    int64_t expectedSize);
+void checkCommittedSizeCount(OperationContext* opCtx, UUID uuid, CollectionSizeCount sizeCount);
+
 /**
  * Inserts the specified number of documents into the given collection, using the provided function
  * 'makeDoc' to generate each document. Checks whether uncommitted and committed changes are updated
