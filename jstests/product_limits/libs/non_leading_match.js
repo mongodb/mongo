@@ -4,8 +4,8 @@ import * as MatchWorkloads from "jstests/product_limits/libs/match.js";
 import * as GroupingWorkloads from "jstests/product_limits/libs/grouping.js";
 
 export class WorkloadAndOverSingleField extends MatchWorkloads.WorkloadAndOverSingleField {
-    pipeline() {
-        return [{$sort: {f0: 1}}, {$limit: 20}, {$match: {f0: {$gte: 0, $lt: 20}}}, ...super.pipeline()];
+    pipeline(dataset) {
+        return [{$sort: {f0: 1}}, {$limit: 20}, {$match: {f0: {$gte: 0, $lt: 20}}}, ...super.pipeline(dataset)];
     }
 
     result() {

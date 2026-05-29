@@ -10,11 +10,10 @@ export class Workload {
     }
 
     check(dataset, actualResult) {
-        actualResult.sort();
-        let expectedResult = this.result(dataset);
-        expectedResult.sort();
+        const expectedResult = this.result(dataset);
         print("Comparison start ...");
-        assert.eq(expectedResult, actualResult);
+        // Order-insensitive comparison
+        assert.sameMembers(expectedResult, actualResult);
         print("Comparison complete.");
     }
 

@@ -273,3 +273,6 @@ filters:
   - "session_jscore_passthrough.yml":
     approvers:
       - 10gen/server-transactions
+  - "product_limits.yml":
+    approvers:
+      - 10gen/query-optimization-correctness

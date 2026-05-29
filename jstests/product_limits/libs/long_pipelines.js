@@ -10,7 +10,7 @@ export class LongPipelineWorkload extends PipelineWorkload {
     }
 }
 
-export class WorkloadManyCollectionsInUnionWith extends LongPipelineWorkload {
+export class WorkloadManyCollectionsUnionWith extends LongPipelineWorkload {
     /** $unionWith of many collections. */
     // A pipeline can not have more than 1000 stages, and we tack $unset at the end
     scale() {
@@ -36,7 +36,7 @@ export class WorkloadManyCollectionsInUnionWith extends LongPipelineWorkload {
     }
 }
 
-export class WorkloadManyCollectionsInLookupBushy extends LongPipelineWorkload {
+export class WorkloadManyCollectionsLookupBushy extends LongPipelineWorkload {
     /** Many $lookup-s where each new collection is joined to the same column. */
     scale() {
         // Too many $lookups result in "errmsg" : "BSONObj size: 53097740 (0x32A350C) is invalid.
@@ -70,7 +70,7 @@ export class WorkloadManyCollectionsInLookupBushy extends LongPipelineWorkload {
     }
 }
 
-export class WorkloadManyCollectionsInLookupUnwind extends LongPipelineWorkload {
+export class WorkloadManyCollectionsLookupUnwind extends LongPipelineWorkload {
     // Many $lookup-$unwind-s where each new collection is joined to the same column.
     // Unwind each lookup result immediately after.
     scale() {
@@ -96,6 +96,38 @@ export class WorkloadManyCollectionsInLookupUnwind extends LongPipelineWorkload 
 
     result() {
         let result = {f0: 1};
+        for (let i = 1; i < this.scale(); i++) {
+            result[`asField_${i}`] = {f0: 1};
+        }
+        return [result];
+    }
+}
+
+export class WorkloadManyCollectionsLookupUnwindChained extends LongPipelineWorkload {
+    // Many $lookup-$unwind-s where each new collection is joined to the previous collection.
+    // Unwind each lookup result immediately after.
+    scale() {
+        return Math.min(500, super.scale());
+    }
+
+    pipeline() {
+        const pipeline = [];
+        const unsetList = ["_id"];
+        for (let i = 1; i < this.scale(); i++) {
+            const localField = i > 1 ? `asField_${i - 1}.f0` : "f0";
+            pipeline.push({
+                $lookup: {from: `coll${i}`, localField: localField, foreignField: "f0", as: `asField_${i}`},
+            });
+            pipeline.push({$unwind: `$asField_${i}`});
+            unsetList.push(`asField_${i}._id`);
+        }
+
+        pipeline.push({$unset: unsetList});
+        return pipeline;
+    }
+
+    result() {
+        const result = {f0: 1};
         for (let i = 1; i < this.scale(); i++) {
             result[`asField_${i}`] = {f0: 1};
         }

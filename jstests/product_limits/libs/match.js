@@ -7,18 +7,14 @@ export class WorkloadAndOverSingleField extends PipelineWorkload {
         return Math.min(1000, super.scale());
     }
 
-    pipeline() {
+    pipeline(dataset) {
         let match = [];
 
         for (let i = 0; i < this.scale(); i++) {
-            match.push({"f0": {$lt: this.scale() + i}});
+            match.push({"f0": {$lt: Math.max(this.scale(), dataset.scale()) + i}});
         }
 
         return [{$match: {$and: match}}, {$unset: "_id"}];
-    }
-
-    result() {
-        return range(this.scale()).map((i) => ({f0: i}));
     }
 }
 

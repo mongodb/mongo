@@ -21,3 +21,9 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        # Enable join optimization so that the
+        # various extreme $lookup+$unwind queries pass
+        # through the join optimization code
+        internalEnableJoinOptimization: true
+        # Required for join optimization
+        featureFlagPathArrayness: true
