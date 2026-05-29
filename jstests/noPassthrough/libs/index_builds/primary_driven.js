@@ -53,6 +53,17 @@ export const PdibPosition = Object.freeze({
     END: "end",
 });
 
+/**
+ * What to do with the old primary after each step-up.
+ *
+ * @enum {string}
+ */
+export const PdibFailoverMode = Object.freeze({
+    NO_RESTART: "noRestart", // Leave it running; it becomes a secondary in-process.
+    CLEAN_RESTART: "cleanRestart", // SIGTERM + restart.
+    UNCLEAN_RESTART: "uncleanRestart", // SIGKILL + restart.
+});
+
 const ALL_POSITIONS = [PdibPosition.BEGINNING, PdibPosition.MIDDLE, PdibPosition.END];
 
 // Each entry maps a phase to the fail point that pauses it and the log ID that fires when the fail
@@ -199,19 +210,23 @@ function indexNameForPosition(indexNames, position) {
 
 export const PrimaryDrivenResumableIndexBuildTest = class {
     /**
-     * Build and start a 2-node ReplSetTest with the OTel file exporter wired up so run() can
-     * verify index_builds.resume.* metrics. The metricsDir is stashed on the rst as
-     * `_pdibMetricsDir`; callers don't need to know where it lives. Always pair with tearDown(rst).
+     * Build and start a ReplSetTest with the OTel file exporter wired up so run() can verify
+     * index_builds.resume.* metrics. The metricsDir is stashed on the rst as `_pdibMetricsDir`;
+     * callers don't need to know where it lives. Always pair with tearDown(rst).
      *
      * @param {Object} [opts]
      * @param {string} [opts.testName=jsTestName()] - Stem for the OTel metrics directory.
-     * @returns {ReplSetTest} A started 2-node replica set with `_pdibMetricsDir` attached for use
-     *     by `run()`.
+     * @param {number} [opts.nodes=2] - Number of replica-set members. Use at least 3 for the
+     *     CLEAN_RESTART / UNCLEAN_RESTART failover modes, where the primary is taken down before
+     *     the secondary is stepped up: with only 2 nodes the surviving secondary can't form a
+     *     majority, so the election would fail.
+     * @returns {ReplSetTest} A started replica set with `_pdibMetricsDir` attached for use by
+     *     `run()` / `runMultiPhase()`.
      */
-    static setUp({testName} = {}) {
+    static setUp({testName, nodes = 2} = {}) {
         const name = testName || jsTestName();
         const {metricsDir, otelParams} = otelFileExportParams(name);
-        const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: {...otelParams}}});
+        const rst = new ReplSetTest({nodes, nodeOptions: {setParameter: {...otelParams}}});
         rst.startSet();
         rst.initiate();
         rst._pdibMetricsDir = metricsDir;
@@ -237,6 +252,8 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      * @param {string} options.phase - One of `PdibPhase`.
      * @param {string[]} [options.positions=ALL_POSITIONS] - Subset of `PdibPosition` values to
      *     exercise.
+     * @param {string} [options.failoverMode=PdibFailoverMode.NO_RESTART] - What to do with the
+     *     old primary after each step-up. See `PdibFailoverMode`.
      * @param {string} [options.dbName=jsTestName()]
      * @param {string} [options.collName="coll"]
      * @param {Object[]} [options.indexSpecs=DEFAULT_INDEX_SPECS] - The three index specs to build
@@ -258,6 +275,11 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         const phase = options.phase;
         assert(phase, "options.phase is required");
         const positions = options.positions || ALL_POSITIONS;
+        const failoverMode = options.failoverMode || PdibFailoverMode.NO_RESTART;
+        assert(
+            Object.values(PdibFailoverMode).includes(failoverMode),
+            `options.failoverMode=${failoverMode} is not a valid PdibFailoverMode value`,
+        );
 
         const dbName = options.dbName || jsTestName();
         const collName = options.collName || "coll";
@@ -300,6 +322,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             PrimaryDrivenResumableIndexBuildTest._runOne(rst, {
                 phase,
                 position,
+                failoverMode,
                 dbName,
                 collName,
                 indexSpecs,
@@ -323,6 +346,8 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      * @param {Object<string, string>} [options.positions={}] - Map from `PdibPhase` value to
      *     `PdibPosition` value selecting where in each phase the build pauses. Omitted phases
      *     default to `PdibPosition.MIDDLE`.
+     * @param {string} [options.failoverMode=PdibFailoverMode.NO_RESTART] - What to do with the
+     *     old primary after each step-up. See `PdibFailoverMode`.
      * @param {string} [options.dbName=jsTestName()]
      * @param {string} [options.collName="coll"]
      * @param {Object[]} [options.indexSpecs=DEFAULT_INDEX_SPECS] - The three index specs to build
@@ -358,6 +383,12 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             );
         }
         const posFor = (phase) => positions[phase] || PdibPosition.MIDDLE;
+
+        const failoverMode = options.failoverMode || PdibFailoverMode.NO_RESTART;
+        assert(
+            Object.values(PdibFailoverMode).includes(failoverMode),
+            `options.failoverMode=${failoverMode} is not a valid PdibFailoverMode value`,
+        );
 
         // Side writes are required because the `hangIndexBuildDuringDrainWritesPhase` fail point is
         // skipped when there are no writes to drain.
@@ -456,16 +487,30 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             // succeeded[previousPhase] exactly once.
             const beforeMetrics = PrimaryDrivenResumableIndexBuildTest._readResumeMetrics(rst._pdibMetricsDir);
 
+            const oldPrimary = rst.getPrimary();
             jsTest.log.info(
-                `PrimaryDrivenResumableIndexBuildTest: stepping up ${nextPrimaryNode.host} to ` +
-                    `resume from ${previousPhase}+${posFor(previousPhase)}` +
+                `PrimaryDrivenResumableIndexBuildTest: failover mode=${failoverMode}, stepping up ` +
+                    `${nextPrimaryNode.host} to resume from ${previousPhase}+${posFor(previousPhase)}` +
                     (nextPhase === null ? " and complete" : ` and pause at ${nextPhase}+${posFor(nextPhase)}`),
             );
-            const newPrimary = rst.stepUp(nextPrimaryNode);
 
-            // Release the current fail point so the old primary's build thread wakes up, sees
-            // it's no longer primary, and exits.
-            currentFp.off();
+            // Step up first so the state change interrupts the old primary's build thread at its
+            // fail point. If we released `currentFp` first, the build would simply continue past
+            // the iteration on the old primary and could complete before we ever stepped up.
+            const newPrimary = PrimaryDrivenResumableIndexBuildTest._failover(
+                rst,
+                oldPrimary,
+                nextPrimaryNode,
+                failoverMode,
+            );
+
+            // Release the current fail point (cleanup; the build thread on the old primary has
+            // already exited due to the state change). For restart modes the old mongod was
+            // recycled, so its in-memory fail point is already gone and the handle's connection
+            // is stale — skip.
+            if (failoverMode === PdibFailoverMode.NO_RESTART) {
+                currentFp.off();
+            }
 
             if (!shellDrained) {
                 // The parallel shell that called createIndexes against the very first primary
@@ -530,6 +575,9 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
     /**
      * Applies `setParameter` to every node in `rst`.
      *
+     * `setParameter` overrides applied here are stashed on `rst._pdibIndexBuildSettings` so that
+     * they can be re-applied later.
+     *
      * @param {ReplSetTest} rst
      * @param {Object} params - Key/value pairs forwarded as `setParameter` arguments.
      * @returns {void}
@@ -538,6 +586,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         for (const node of rst.nodes) {
             assert.commandWorked(node.adminCommand({setParameter: 1, ...params}));
         }
+        rst._pdibIndexBuildSettings = params;
     }
 
     /**
@@ -570,6 +619,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      * @param {Object} opts
      * @param {string} opts.phase - One of `PdibPhase`.
      * @param {string} opts.position - One of `PdibPosition`.
+     * @param {string} opts.failoverMode - One of `PdibFailoverMode`.
      * @param {string} opts.dbName
      * @param {string} opts.collName
      * @param {Object[]} opts.indexSpecs - All three index specs in build order.
@@ -583,6 +633,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         const {
             phase,
             position,
+            failoverMode,
             dbName,
             collName,
             indexSpecs,
@@ -642,13 +693,25 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         // point. This is more deterministic than replSetStepDown + waiting for the secondary to
         // win an election. The awaiter on the parallel shell will receive
         // InterruptedDueToReplStateChange.
+        //
+        // We must step up before releasing `phaseFp`. Step-up interrupts the build thread via the
+        // replication state change; if we instead released the fail point first, the build would
+        // simply continue past its current iteration on the old primary and could complete the
+        // entire build before we ever step up.
+        const oldPrimary = primary;
         const secondary = rst.getSecondary();
-        jsTest.log.info(`PrimaryDrivenResumableIndexBuildTest: stepping up ${secondary.host} to trigger resume on it`);
-        const newPrimary = rst.stepUp(secondary);
+        jsTest.log.info(
+            `PrimaryDrivenResumableIndexBuildTest: failover mode=${failoverMode}, stepping up ` +
+                `${secondary.host} to trigger resume on it`,
+        );
+        const newPrimary = PrimaryDrivenResumableIndexBuildTest._failover(rst, oldPrimary, secondary, failoverMode);
 
-        // Release the old primary's fail point so its build thread wakes up and exits cleanly (it
-        // sees the state change and aborts).
-        phaseFp.off();
+        // Release the now-stepped-down primary's fail point (cleanup; the build thread has already
+        // exited due to the state change). For restart modes the old mongod was recycled, so its
+        // in-memory fail point is already gone and the handle's connection is stale — skip.
+        if (failoverMode === PdibFailoverMode.NO_RESTART) {
+            phaseFp.off();
+        }
 
         // The shell's createIndexes call against the (now stepped-down) primary returns
         // InterruptedDueToReplStateChange. Don't enforce shell success.
@@ -735,6 +798,72 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         } else {
             checkLog.containsJson(primary, fpInfo.logId, {index: indexName});
         }
+    }
+
+    /**
+     * Triggers a failover according to `failoverMode`.
+     *
+     * The restart modes require a 3-node (or larger) replica set so the surviving secondary can win
+     * the election while the old primary is down — a 2-node set has no quorum once the primary is
+     * gone.
+     *
+     * @param {ReplSetTest} rst
+     * @param {Mongo} oldPrimary - The node currently serving as primary, to be displaced.
+     * @param {Mongo} nextPrimaryNode - The secondary to step up.
+     * @param {string} failoverMode - One of `PdibFailoverMode`.
+     * @returns {Mongo} The new primary (may be a fresh connection if a restart was involved).
+     */
+    static _failover(rst, oldPrimary, nextPrimaryNode, failoverMode) {
+        if (failoverMode === PdibFailoverMode.NO_RESTART) {
+            return rst.stepUp(nextPrimaryNode);
+        }
+
+        // Fail fast on misconfiguration: with only 2 nodes, the surviving secondary can't reach
+        // majority after we stop the primary, so `replSetStepUp` would hang in the retry loop.
+        assert.gte(
+            rst.nodes.length,
+            3,
+            `failoverMode=${failoverMode} requires a replica set with >= 3 nodes; use setUp({nodes: 3})`,
+        );
+
+        const signal = failoverMode === PdibFailoverMode.CLEAN_RESTART ? 15 /*SIGTERM*/ : 9; /*SIGKILL*/
+        const stopOpts =
+            failoverMode === PdibFailoverMode.UNCLEAN_RESTART ? {allowedExitCode: MongoRunner.EXIT_SIGKILL} : {};
+        // 1. Stop the old primary before the step-up.
+        rst.stop(oldPrimary, signal, stopOpts, {forRestart: true});
+
+        // 2. Step up the surviving secondary. We can't use `rst.stepUp(...)` here because, even
+        //    with `awaitReplicationBeforeStepUp: false`, it follows the `replSetStepUp` command
+        //    with `awaitNodesAgreeOnPrimary(this.nodes, ...)`, which hangs waiting for the down
+        //    node we just shut down. Send the command directly and poll for `isWritablePrimary`
+        //    against the candidate.
+        jsTest.log.info(`PrimaryDrivenResumableIndexBuildTest: issuing replSetStepUp on ${nextPrimaryNode.host}`);
+        assert.soonNoExcept(() => {
+            const res = nextPrimaryNode.adminCommand({replSetStepUp: 1});
+            return res.ok === 1;
+        }, `replSetStepUp on ${nextPrimaryNode.host} did not succeed`);
+        assert.soon(() => {
+            try {
+                return nextPrimaryNode.adminCommand({hello: 1}).isWritablePrimary;
+            } catch (e) {
+                return false;
+            }
+        }, `${nextPrimaryNode.host} did not become writable primary`);
+        const newPrimary = nextPrimaryNode;
+
+        // 3. Restart the old primary; it rejoins as a secondary.
+        const restartedNode = rst.start(oldPrimary, {}, /*restart=*/ true);
+
+        // Re-apply runtime setParameter overrides.
+        if (rst._pdibIndexBuildSettings) {
+            assert.commandWorked(restartedNode.adminCommand({setParameter: 1, ...rst._pdibIndexBuildSettings}));
+        }
+
+        // Wait for the restarted node to reach SECONDARY so subsequent getSecondary() /
+        // replSetStepUp calls don't race a node still in STARTUP / RECOVERING.
+        rst.awaitSecondaryNodes();
+
+        return newPrimary;
     }
 
     /**
