@@ -3482,15 +3482,16 @@ void IndexBuildsCoordinator::_resumeHybridIndexBuildFromPhase(
     invariant(indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kHybrid ||
               indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven);
 
-    if (replState->protocol == IndexBuildProtocol::kPrimaryDriven) {
-        index_builds::primary_driven::deleteSorterEntriesOutsideRanges(opCtx,
-                                                                       resumeInfo.getIndexes());
-    }
-
     if (resumeInfo.getPhase() == IndexBuildPhaseEnum::kInitialized ||
         resumeInfo.getPhase() == IndexBuildPhaseEnum::kCollectionScan) {
         boost::optional<RecordId> resumeAfterRecordId;
         if (replState->protocol == IndexBuildProtocol::kPrimaryDriven) {
+            // Orphaned sorter entries can only exist if the build was interrupted while populating
+            // the sorter (initialized or collection scan phases); later phases have finalized
+            // ranges, so there is nothing to clean up.
+            index_builds::primary_driven::deleteSorterEntriesOutsideRanges(opCtx,
+                                                                           resumeInfo.getIndexes());
+
             // Resume the scan after the lowest spilled record id across all indexes, or restart it
             // from the beginning if any index never spilled.
             resumeAfterRecordId = index_builds::minLastSpilledRecordId(resumeInfo.getIndexes());
