@@ -226,7 +226,22 @@ public:
     const CachedDatabaseInfo& getDatabaseInfo() const {
         return _dbInfo;
     }
-    const ShardId& getDbPrimaryShardId() const;
+    /**
+     * Returns the primary shard ID for the database.
+     *
+     * @return The primary shard ID for the database.
+     *
+     * @deprecated Use getDbPrimaryShardRef() instead.
+     * TODO SERVER-127411: Check if this method is still used and if so, migrate the callers to use
+     * getDbPrimaryShardRef().
+     */
+    ShardId getDbPrimaryShardId() const;
+    /**
+     * Returns the primary shard reference for the database.
+     *
+     * @return The primary shard reference for the database.
+     */
+    const ShardRef& getDbPrimaryShardRef() const;
     const DatabaseVersion& getDbVersion() const;
     // When set to true, the ShardVersions returned by this object will have the
     // 'ignoreCollectionUuidMismatch' flag set, thus instructing the receiving shards to ignore

@@ -54,6 +54,7 @@
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -89,7 +90,7 @@ Status insertDatabaseEntryForBackwardCompatibility(OperationContext* opCtx,
     DBDirectClient client(opCtx);
     auto commandResponse = client.runCommand([&] {
         auto dbMetadata =
-            DatabaseType(dbName, ShardId::kConfigServerId, DatabaseVersion::makeFixed());
+            DatabaseType(dbName, ShardRef{ShardId::kConfigServerId}, DatabaseVersion::makeFixed());
 
         write_ops::InsertCommandRequest insertOp(NamespaceString::kConfigCacheDatabasesNamespace);
         insertOp.setDocuments({dbMetadata.toBSON()});

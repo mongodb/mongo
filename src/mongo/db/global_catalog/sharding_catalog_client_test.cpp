@@ -1002,7 +1002,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardInvalidDoc) {
 
     onFindCommand([](const RemoteCommandRequest& request) {
         DatabaseType dbt1(DatabaseName::createDatabaseName_forTest(boost::none, "db1"),
-                          {"shard0000"},
+                          ShardRef(std::string{"shard0000"}),
                           DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
         return vector<BSONObj>{
             dbt1.toBSON(),

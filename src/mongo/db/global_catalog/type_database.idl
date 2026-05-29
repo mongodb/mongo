@@ -51,10 +51,10 @@ structs:
                     callback: "validateDatabaseName"
                 optional: false
             primary:
-                description: "Primary shard for this database."
-                type: shard_id
+                description: "Primary shard for this database. ShardRef is a string or a UUID."
+                type: shard_ref
                 validator:
-                    callback: "ShardId::validate"
+                    callback: "ShardRef::validate"
                 optional: false
             version:
                 description: "Version of the database."

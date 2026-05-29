@@ -383,6 +383,8 @@ DatabaseType ShardingCatalogManager::commitCreateDatabase(OperationContext* opCt
         const auto now = VectorClock::get(opCtx)->getTime();
         const auto clusterTime = now.clusterTime().asTimestamp();
 
+        // TODO SERVER-127411: once featureFlagUniqueShardIdentifiers is enabled, pass a ShardRef
+        // with the shard's UUID here instead of the ShardId string.
         DatabaseType db(dbName, primaryShard, DatabaseVersion(UUID::gen(), clusterTime));
 
         LOGV2(21938, "Registering new database in sharding catalog", "db"_attr = db);

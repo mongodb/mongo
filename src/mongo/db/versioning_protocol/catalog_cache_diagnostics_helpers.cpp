@@ -175,7 +175,7 @@ void appendLatestCachedDbInfo(OperationContext* opCtx,
         return;
     }
     builder->append("dbVersion", cachedDbInfo->getVersion().toBSON());
-    builder->append("primaryShard", cachedDbInfo->getPrimary());
+    cachedDbInfo->getPrimary().serialize("primaryShard", builder);
     builder->append("timeInStore", cachedDbInfo.getTime().toString());
 }
 

@@ -47,6 +47,7 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -144,7 +145,9 @@ public:
     }
 
     DatabaseType createDatabase(const UUID& uuid, const Timestamp& timestamp) {
-        return DatabaseType(kDbName, kShardList[0].getName(), DatabaseVersion(uuid, timestamp));
+        return DatabaseType(kDbName,
+                            ShardRef{std::string{kShardList[0].getName()}},
+                            DatabaseVersion(uuid, timestamp));
     }
 
     class RecoveryUnitMock : public RecoveryUnitNoop {
@@ -247,8 +250,8 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, CheckReceivedDatabaseVersion
 
     // Install DSR
     {
-        const auto dbInfoToInstall =
-            DatabaseType(kDbName, kShardList[0].getName(), installedDbVersion);
+        const auto dbInfoToInstall = DatabaseType(
+            kDbName, ShardRef{std::string{kShardList[0].getName()}}, installedDbVersion);
 
         AutoGetDb autoDb(operationContext(), kDbName, MODE_IX);
         const auto dsr =
@@ -352,8 +355,8 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader,
 
     // Install DSR
     {
-        const auto dbInfoToInstall =
-            DatabaseType(kDbName, kShardList[0].getName(), installedDbVersion);
+        const auto dbInfoToInstall = DatabaseType(
+            kDbName, ShardRef{std::string{kShardList[0].getName()}}, installedDbVersion);
 
         AutoGetDb autoDb(operationContext(), kDbName, MODE_IX);
         const auto dsr =
@@ -442,8 +445,8 @@ DEATH_TEST_REGEX_F(DatabaseShardingRuntimeTestWithMockedLoaderDeathTest,
 
     // Install DSR
     {
-        const auto dbInfoToInstall =
-            DatabaseType(kDbName, kShardList[0].getName(), installedDbVersion);
+        const auto dbInfoToInstall = DatabaseType(
+            kDbName, ShardRef{std::string{kShardList[0].getName()}}, installedDbVersion);
         AutoGetDb autoDb(operationContext(), kDbName, MODE_IX);
         const auto dsr =
             DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(operationContext(), kDbName);

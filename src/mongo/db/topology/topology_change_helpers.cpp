@@ -91,6 +91,7 @@
 #include "mongo/db/sharding_environment/cluster_identity_loader.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_config_server_parameters_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/add_shard_gen.h"
@@ -1762,16 +1763,19 @@ void addShardInTransaction(OperationContext* opCtx,
 
         if (!databasesInNewShard.empty()) {
             std::vector<BSONObj> databaseEntries;
-            std::transform(databasesInNewShard.begin(),
-                           databasesInNewShard.end(),
-                           std::back_inserter(databaseEntries),
-                           [&](const DatabaseName& dbName) {
-                               return DatabaseType(
-                                          dbName,
-                                          newShard.getName(),
-                                          DatabaseVersion(UUID::gen(), newShard.getTopologyTime()))
-                                   .toBSON();
-                           });
+            std::transform(
+                databasesInNewShard.begin(),
+                databasesInNewShard.end(),
+                std::back_inserter(databaseEntries),
+                [&](const DatabaseName& dbName) {
+                    const auto& shardUuid = newShard.getUuid();
+                    ShardRef shardRef = shardUuid ? ShardRef{*shardUuid}
+                                                  : ShardRef{std::string{newShard.getName()}};
+                    return DatabaseType(dbName,
+                                        std::move(shardRef),
+                                        DatabaseVersion(UUID::gen(), newShard.getTopologyTime()))
+                        .toBSON();
+                });
             write_ops::InsertCommandRequest insertDatabaseEntries(
                 NamespaceString::kConfigDatabasesNamespace, std::move(databaseEntries));
             auto dbMetadataInsertionResponse = txnClient.runCRUDOpSync(insertDatabaseEntries, {});

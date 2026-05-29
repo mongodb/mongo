@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/session_catalog_router.h"
@@ -100,7 +101,7 @@ public:
     void mockConfigServerQueriesForDbRefresh(const DatabaseName& dbName,
                                              const DatabaseVersion& dbVersion) {
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            DatabaseType db(dbName, {"0"}, dbVersion);
+            DatabaseType db(dbName, ShardRef{std::string{"0"}}, dbVersion);
             return std::vector<BSONObj>{db.toBSON()};
         }());
     }
@@ -1096,7 +1097,9 @@ TEST_F(RouterRoleTest, CollectionRouterExceedsMaxRetryAttempts) {
     // Simulate queries to update the cache when stale errors occur.
     for (int i = 0; i < maxTestRetries; i++) {
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            DatabaseType db(_nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp(1, 0)));
+            DatabaseType db(_nss.dbName(),
+                            ShardRef{std::string{"0"}},
+                            DatabaseVersion(UUID::gen(), Timestamp(1, 0)));
             return std::vector<BSONObj>{db.toBSON()};
         }());
 
@@ -1156,7 +1159,9 @@ TEST_F(RouterRoleTest, CollectionRouterRetryOnShardNotFound) {
                      });
     });
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        DatabaseType db(_nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp(1, 0)));
+        DatabaseType db(_nss.dbName(),
+                        ShardRef{std::string{"0"}},
+                        DatabaseVersion(UUID::gen(), Timestamp(1, 0)));
         return std::vector<BSONObj>{db.toBSON()};
     }());
     mockConfigServerQueriesForCollRefresh(_nss, epoch, timestamp);

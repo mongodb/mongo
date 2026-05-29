@@ -55,6 +55,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -158,7 +159,8 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
     size_t chunksPerShard) {
     ChunkVersion version({OID::gen(), Timestamp(42)}, {1, 0});
 
-    DatabaseType db(nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
+    DatabaseType db(
+        nss.dbName(), ShardRef{std::string{"0"}}, DatabaseVersion(UUID::gen(), Timestamp()));
 
     const auto uuid = UUID::gen();
     const BSONObj collectionBSON = [&]() {
@@ -241,7 +243,8 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUnshardedCollectionRoutin
 CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUntrackedCollectionRoutingInfo(
     const NamespaceString& nss) {
     setupNShards(1);
-    DatabaseType db(nss.dbName(), {"0"}, DatabaseVersion(UUID::gen(), Timestamp()));
+    DatabaseType db(
+        nss.dbName(), ShardRef{std::string{"0"}}, DatabaseVersion(UUID::gen(), Timestamp()));
 
     auto future = scheduleRoutingInfoUnforcedRefresh(nss);
     expectFindSendBSONObjVector(kConfigHostAndPort, {db.toBSON()});
@@ -251,7 +254,9 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUntrackedCollectionRoutin
 
 void CoreCatalogCacheTestFixture::expectGetDatabase(NamespaceString nss, std::string shardId) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        DatabaseType db(nss.dbName(), {shardId}, DatabaseVersion(UUID::gen(), Timestamp()));
+        DatabaseType db(nss.dbName(),
+                        ShardRef{std::string{shardId}},
+                        DatabaseVersion(UUID::gen(), Timestamp()));
         return std::vector<BSONObj>{db.toBSON()};
     }());
 }
