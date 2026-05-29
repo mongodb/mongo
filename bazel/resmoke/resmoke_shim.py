@@ -249,7 +249,9 @@ if __name__ == "__main__":
 
     outputs_dir = ctx.outputs_symlink if ctx.outputs_symlink else undeclared_output_dir
 
-    otel_dir = os.path.join(outputs_dir, "build", "metrics")
+    # Use the real path (not the symlink) so OTEL writes remain valid after __exit__ removes symlinks.
+    # The TracerProvider shuts down via atexit, which runs after ctx.__exit__ removes the symlinks.
+    otel_dir = os.path.join(undeclared_output_dir or outputs_dir, "build", "metrics")
     os.makedirs(otel_dir, exist_ok=True)
     resmoke_args.append(f"--otelCollectorDir={otel_dir}")
     resmoke_args.append(f"--taskWorkDir={outputs_dir}")
