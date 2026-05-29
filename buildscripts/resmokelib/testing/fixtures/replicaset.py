@@ -1307,17 +1307,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         previous_value = primary_client.admin.command({"getParameter": 1, "ttlMonitorEnabled": 1})
         primary_client.admin.command({"setParameter": 1, "ttlMonitorEnabled": False})
 
-        all_nodes_wc = pymongo.write_concern.WriteConcern(w=len(self.nodes))
-        coll = primary_client["test"]["validate.hook"].with_options(write_concern=all_nodes_wc)
-        res = primary_client.test.command(
-            {
-                "insert": "validate.hook",
-                "documents": [{"a": 1}],
-                "writeConcern": all_nodes_wc.document,
-            }
-        )
-        clusterTime = res["opTime"]["ts"]
-        coll.drop()
+        clusterTime = self._anchor_validation_cluster_time(primary_client)
 
         self.logger.info(f"Performing Internode Validation: atClusterTime={clusterTime}")
 
@@ -1437,6 +1427,22 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # Reset the TTL monitor to its original value.
         primary_client.admin.command({"setParameter": 1, "ttlMonitorEnabled": previous_value})
         self.logger.info("Internode Validation Successful")
+
+    def _anchor_validation_cluster_time(self, primary_client):
+        """Insert a marker doc, drop it, and return the insert's clusterTime.
+        TODO (SLS-2341): Inline this helper when DSC no longer needs it.
+        """
+        all_nodes_wc = pymongo.write_concern.WriteConcern(w=len(self.nodes))
+        coll = primary_client["test"]["validate.hook"].with_options(write_concern=all_nodes_wc)
+        res = primary_client.test.command(
+            {
+                "insert": "validate.hook",
+                "documents": [{"a": 1}],
+                "writeConcern": all_nodes_wc.document,
+            }
+        )
+        coll.drop()
+        return res["opTime"]["ts"]
 
 
 def get_last_optime(client, fixturelib):

@@ -26,7 +26,7 @@ executor:
             defaultConfigCommandTimeoutMS: 90000
           # This overrides the default number of nodes for each ReplicaSet created by a ShardingTest object.
           defaultReplSetNumNodes: 2
-          # TODO(SERVER-116998): Inter-node collection hash validation is an ASC-only check.
+          # TODO(SERVER-127698): Remove when inter-node hash validation through js is enabled
           skipInterNodeCollectionHashValidation: true
           # TODO(SERVER-115393): Remove if possible.
           supportsParallelReplSetInitiateAndStop: false
