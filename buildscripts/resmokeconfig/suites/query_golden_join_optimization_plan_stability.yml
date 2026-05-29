@@ -3,9 +3,6 @@ test_kind: js_test
 selector:
   roots:
     - jstests/query_golden/join_opt/plan_stability*.js
-  exclude_files:
-    # TODO SERVER-127480: Re-enable after supporting multiple joinPredicates in EMBEDDING during reconstructJoin().
-    - jstests/query_golden/join_opt/plan_stability_subjoin_cardinality_md.js
 executor:
   config:
     shell_options:

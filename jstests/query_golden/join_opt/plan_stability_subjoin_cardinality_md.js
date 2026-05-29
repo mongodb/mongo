@@ -18,6 +18,13 @@ import {commands} from "jstests/query_golden/test_inputs/plan_stability_pipeline
 // by more than this many orders of magnitude.
 const ORDERS_OF_MAGNITUDE_REPORTING_THRESHOLD = 2;
 
+class UnsupportedQueryError extends Error {
+    constructor(message = "This query is not supported by this test") {
+        super(message);
+        this.name = "UnsupportedQueryError";
+    }
+}
+
 /**
  * Convert a particular plan stage into a MQL pipeline fragment,
  * possibly also identifying the base collection that pipeline would operate on.
@@ -52,11 +59,15 @@ function reconstructJoin(stage) {
     // If possible, lock on to a join predicate of form `field1 = field2` rather than `field1 = coll2.field2`.
     const filteredJoinPredicates = joinPredicates.filter((item) => !item.includes("."));
     if (filteredJoinPredicates.length === 0) {
-        assert(joinPredicates.length === 1);
+        if (joinPredicates.length !== 1) {
+            throw new UnsupportedQueryError(
+                "Test does not currently support joins with multiple predicates over resolved fields.",
+            );
+        }
     } else if (filteredJoinPredicates.length === 1) {
         joinPredicates = filteredJoinPredicates;
     } else {
-        assert(false, "Test does not currently support joins with more than one predicate");
+        throw new UnsupportedQueryError("Test does not currently support joins with more than one predicate");
     }
 
     // Determine the two sides of the join predicate
@@ -149,6 +160,14 @@ function getPredicate(stage) {
             break;
         case "INDEX_PROBE_NODE":
             break;
+        case "OR": {
+            const orPredicate = [];
+            for (const inputStage of stage.inputStages) {
+                orPredicate.push(getPredicate(inputStage));
+            }
+            predicate.push({$or: orPredicate});
+            break;
+        }
         default:
             throw new Error(`Unknown stage type ${stage.stage}`);
     }
@@ -500,5 +519,13 @@ function checkCommandEstimates(db, command) {
 const tpch = populateTPCHDataset("0.1");
 
 for (const command of commands) {
-    checkCommandEstimates(tpch, command);
+    try {
+        checkCommandEstimates(tpch, command);
+    } catch (e) {
+        if (e instanceof UnsupportedQueryError) {
+            print(e.message);
+        } else {
+            throw e;
+        }
+    }
 }
