@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
@@ -1079,6 +1080,18 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
     OperationContext* opCtx,
     const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
     const boost::optional<TransactionRuntimeContext>& transactionRuntimeContext) {
+    auto limit = gMaxConcurrentMultiDocumentTransactions.load();
+    if (limit > 0 && !isProcessInternalClient(*opCtx->getClient())) {
+        auto currentOpen =
+            ServerTransactionsMetrics::get(opCtx->getServiceContext())->getCurrentOpen();
+        uassert(ErrorCodes::TooManyOpenTransactions,
+                str::stream() << "cannot start a new multi-document transaction; there are already "
+                              << currentOpen
+                              << " open transactions, which meets or exceeds the limit of "
+                              << limit,
+                currentOpen < static_cast<decltype(currentOpen)>(limit));
+    }
+
     // Aborts any in-progress txns.
     _setNewTxnNumberAndRetryCounter(opCtx, txnNumberAndRetryCounter);
     p().autoCommit = false;

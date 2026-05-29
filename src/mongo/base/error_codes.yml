@@ -1269,5 +1269,7 @@ error_codes:
   - {code: 507, name: ReplicaSetWritesBlocked}
   - {code: 508, name: SearchIndexManagementHostUnreachable}
 
+  - {code: 509, name: TooManyOpenTransactions, categories: [Interruption]}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.
