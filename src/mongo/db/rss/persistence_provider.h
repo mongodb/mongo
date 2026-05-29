@@ -32,10 +32,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/storage/checkpoint_schedule_policy.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/version/releases.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -287,8 +289,14 @@ public:
     virtual bool supportsColdCollections() const = 0;
 
     /**
-     * If true, the provider supports replSetTestEgress and replSetGetRBID commands. */
+     * If true, the provider supports replSetTestEgress and replSetGetRBID commands.
+     */
     virtual bool supportsLegacyReplSetCommands() const = 0;
+
+    /**
+     * Creates and returns a new policy that governs checkpoint scheduling for this provider.
+     */
+    virtual std::unique_ptr<CheckpointSchedulePolicy> makeCheckpointSchedulePolicy() const = 0;
 };
 
 }  // namespace rss

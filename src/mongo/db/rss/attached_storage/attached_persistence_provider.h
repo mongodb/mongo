@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/rss/persistence_provider.h"
+#include "mongo/db/storage/checkpoint_schedule_policy.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/modules.h"
 
@@ -240,8 +241,15 @@ public:
     bool supportsColdCollections() const override;
 
     /**
-     * Attached storage supports replSetTestEgress and replSetGetRBID commands. */
+     * Attached storage supports replSetTestEgress and replSetGetRBID commands.
+     */
     bool supportsLegacyReplSetCommands() const override;
+
+    /**
+     * Returns a FixedIntervalPolicy that schedules checkpoints at a fixed interval controlled by
+     * the syncdelay parameter.
+     */
+    std::unique_ptr<CheckpointSchedulePolicy> makeCheckpointSchedulePolicy() const override;
 };
 
 }  // namespace mongo::rss

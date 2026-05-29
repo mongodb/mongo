@@ -34,13 +34,11 @@
 #include "mongo/db/rss/snapshot_window_options_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/checkpoint_schedule_policy.h"
 #include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
 
 namespace mongo::rss {
 namespace {
-// Checkpoint every 60 seconds by default.
-constexpr double kDefaultAttachedSyncDelaySeconds = 60.0;
-
 ServiceContext::ConstructorActionRegisterer registerAttachedPersistenceProvider{
     "AttachedPersistenceProvider", [](ServiceContext* service) {
         auto& rss = ReplicatedStorageService::get(service);
@@ -240,6 +238,11 @@ bool AttachedPersistenceProvider::supportsColdCollections() const {
 
 bool AttachedPersistenceProvider::supportsLegacyReplSetCommands() const {
     return true;
+}
+
+std::unique_ptr<CheckpointSchedulePolicy>
+AttachedPersistenceProvider::makeCheckpointSchedulePolicy() const {
+    return createFixedIntervalPolicy();
 }
 
 }  // namespace mongo::rss

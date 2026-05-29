@@ -598,7 +598,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         }
     }();
 
-    StorageControl::startStorageControls(serviceContext);
+    StorageControl::startStorageControls(
+        serviceContext, false, rss.getPersistenceProvider().makeCheckpointSchedulePolicy());
 
     auto logStartupStats = std::make_unique<ScopeGuard<std::function<void()>>>([&] {
         initAndListenTotalTimer = {};

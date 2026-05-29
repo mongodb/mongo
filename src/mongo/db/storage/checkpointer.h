@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/checkpoint_schedule_policy.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/background.h"
 #include "mongo/util/modules.h"
@@ -43,12 +44,13 @@
 namespace MONGO_MOD_PUBLIC mongo {
 class Checkpointer final : public BackgroundJob {
 public:
-    Checkpointer()
+    explicit Checkpointer(std::unique_ptr<CheckpointSchedulePolicy> policy)
         : BackgroundJob(false /* deleteSelf */),
           _shuttingDown(false),
           _shutdownReason(Status::OK()),
           _hasTriggeredFirstStableCheckpoint(false),
-          _triggerCheckpoint(false) {}
+          _triggerCheckpoint(false),
+          _policy(std::move(policy)) {}
 
     static Checkpointer* get(ServiceContext* serviceCtx);
     static Checkpointer* get(OperationContext* opCtx);
@@ -59,7 +61,8 @@ public:
     }
 
     /**
-     * Starts the checkpoint thread that runs every storageGlobalParams.syncdelay seconds.
+     * Starts the checkpoint thread. Wake intervals are governed by the injected
+     * CheckpointSchedulePolicy.
      */
     void run() override;
 
@@ -67,8 +70,8 @@ public:
      * Triggers taking the first stable checkpoint if the stable timestamp has advanced past the
      * initial data timestamp.
      *
-     * The checkpoint thread runs automatically every storageGlobalParams.syncdelay seconds. This
-     * function avoids potentially waiting that full duration for a stable checkpoint, initiating
+     * The checkpoint thread wakes at intervals governed by the injected policy. This function
+     * avoids potentially waiting that full duration for a stable checkpoint, initiating
      * one immediately.
      *
      * Do not call this function if hasTriggeredFirstStableCheckpoint() returns true.
@@ -104,6 +107,9 @@ private:
 
     // This flag allows the checkpoint thread to wake up early when _sleepCV is signaled.
     bool _triggerCheckpoint;
+
+    // Policy that governs when the checkpoint thread wakes to take a checkpoint.
+    std::unique_ptr<CheckpointSchedulePolicy> _policy;
 };
 
 }  // namespace MONGO_MOD_PUBLIC mongo

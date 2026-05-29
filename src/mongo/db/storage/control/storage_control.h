@@ -31,7 +31,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/checkpoint_schedule_policy.h"
 #include "mongo/util/modules.h"
+
+#include <memory>
 
 MONGO_MOD_PUBLIC;
 
@@ -52,7 +55,9 @@ namespace mongo::StorageControl {
  * Safe to call again after stopStorageControls() has been called, to restart any processes that
  * were stopped.
  */
-void startStorageControls(ServiceContext* serviceContext, bool forTestOnly = false);
+void startStorageControls(ServiceContext* serviceContext,
+                          bool forTestOnly = false,
+                          std::unique_ptr<CheckpointSchedulePolicy> policy = nullptr);
 
 /**
  * Stops the processes begun by startStorageControls() and relays the reason to them.

@@ -51,6 +51,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/storage/checkpoint_schedule_policy.h"
 #include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 #include "mongo/db/storage/record_data.h"
@@ -386,7 +387,8 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
     // checkpoint frequency of 60 seconds, causing the test to fail due to a 10 second timeout.
     storageGlobalParams.syncdelay.store(1);
 
-    std::unique_ptr<Checkpointer> checkpointer = std::make_unique<Checkpointer>();
+    std::unique_ptr<Checkpointer> checkpointer =
+        std::make_unique<Checkpointer>(createFixedIntervalPolicy());
     checkpointer->go();
 
     // If the test fails we want to ensure the checkpoint thread shuts down to avoid accessing the

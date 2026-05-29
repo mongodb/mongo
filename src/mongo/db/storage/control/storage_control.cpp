@@ -51,7 +51,9 @@ bool journalFlusherPaused = false;
 
 }  // namespace
 
-void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
+void startStorageControls(ServiceContext* serviceContext,
+                          bool forTestOnly,
+                          std::unique_ptr<CheckpointSchedulePolicy> policy) {
     auto storageEngine = serviceContext->getStorageEngine();
     invariant(!areControlsStarted);
 
@@ -81,7 +83,8 @@ void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
 
     if (storageEngine->supportsCheckpoints() && !storageEngine->isEphemeral() &&
         !storageGlobalParams.queryableBackupMode) {
-        std::unique_ptr<Checkpointer> checkpointer = std::make_unique<Checkpointer>();
+        auto checkpointer = std::make_unique<Checkpointer>(policy ? std::move(policy)
+                                                                  : createFixedIntervalPolicy());
         checkpointer->go();
         Checkpointer::set(serviceContext, std::move(checkpointer));
     }

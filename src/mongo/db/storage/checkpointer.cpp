@@ -43,14 +43,12 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 #include <chrono>
-#include <cstdint>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -93,29 +91,10 @@ void Checkpointer::run() {
 
         {
             std::unique_lock<std::mutex> lock(_mutex);
-            MONGO_IDLE_THREAD_BLOCK;
 
-            // Wait for 'storageGlobalParams.syncdelay' seconds; or until either shutdown is
-            // signaled or a checkpoint is triggered.
-            LOGV2_DEBUG(7702900,
-                        1,
-                        "Checkpoint thread sleeping",
-                        "duration"_attr =
-                            static_cast<std::int64_t>(storageGlobalParams.syncdelay.load()));
-            _sleepCV.wait_for(lock,
-                              std::chrono::seconds(
-                                  static_cast<std::int64_t>(storageGlobalParams.syncdelay.load())),
-                              [&] { return _shuttingDown || _triggerCheckpoint; });
-
-            // If the syncdelay is set to 0, that means we should skip checkpointing. However,
-            // syncdelay is adjustable by a runtime server parameter, so we need to wake up to check
-            // periodically. The wakeup to check period is arbitrary.
-            while (storageGlobalParams.syncdelay.load() == 0 && !_shuttingDown &&
-                   !_triggerCheckpoint) {
-                _sleepCV.wait_for(lock, std::chrono::seconds(static_cast<std::int64_t>(3)), [&] {
-                    return _shuttingDown || _triggerCheckpoint;
-                });
-            }
+            // Delegate the wait logic to the injected policy.
+            _policy->waitUntilReady(
+                lock, _sleepCV, [&] { return _shuttingDown || _triggerCheckpoint; });
 
             if (_shuttingDown) {
                 invariant(!_shutdownReason.isOK());
@@ -134,7 +113,9 @@ void Checkpointer::run() {
         pauseCheckpointThread.pauseWhileSet();
 
         const Date_t startTime = Date_t::now();
+
         opCtx->getServiceContext()->getStorageEngine()->checkpoint();
+
         if (isReplicatedFastCountEnabled(opCtx.get())) {
             replicated_fast_count::ReplicatedFastCountManager::get(opCtx->getServiceContext())
                 .flushAsync();
