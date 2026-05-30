@@ -901,15 +901,6 @@ inline StringData nsToDatabaseSubstring(StringData ns) {
 }
 
 /**
- * "database.a.b.c" -> "database"
- *
- * TODO SERVER-123310: make this return a StringData
- */
-inline std::string nsToDatabase(StringData ns) {
-    return std::string{nsToDatabaseSubstring(ns)};
-}
-
-/**
  * "database.a.b.c" -> "a.b.c"
  */
 inline StringData nsToCollectionSubstring(StringData ns MONGO_COMPILER_LIFETIME_BOUND) {
