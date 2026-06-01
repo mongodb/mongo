@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "read_pref_cmd.js":
+    approvers:
+      - 10gen/query-integration-observability
   - "auto_split_vector_basic.js":
     approvers:
       - 10gen/server-cluster-scalability

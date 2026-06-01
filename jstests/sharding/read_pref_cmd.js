@@ -41,8 +41,24 @@ let setUp = function (rst) {
     rst.nodes.forEach(function (node) {
         // Increase the profiling lock deadline so that entries are not silently discarded when
         // there is brief lock contention on secondaries (e.g. during replication batch application).
-        // This test relies on profile entries to verify read-preference routing.
-        assert.commandWorked(node.adminCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}));
+        // This test relies on profile entries to verify read-preference routing. The parameter was
+        // introduced in 8.0; older nodes in multiversion tests won't have it (and don't need it).
+        const getProfilingLockDeadlineRes = node.adminCommand({
+            getParameter: 1,
+            internalQueryGlobalProfilingLockDeadlineMs: 1,
+        });
+        if (getProfilingLockDeadlineRes.ok) {
+            assert.commandWorked(
+                node.adminCommand({setParameter: 1, internalQueryGlobalProfilingLockDeadlineMs: 1000}),
+            );
+        } else {
+            assert.eq(getProfilingLockDeadlineRes.code, ErrorCodes.InvalidOptions, tojson(getProfilingLockDeadlineRes));
+            assert.eq(
+                getProfilingLockDeadlineRes.errmsg,
+                "no option found to get",
+                tojson(getProfilingLockDeadlineRes),
+            );
+        }
         assert(node.getDB(kDbName).setProfilingLevel(2));
         assert(node.getDB("admin").setProfilingLevel(2));
     });
