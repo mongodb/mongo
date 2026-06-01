@@ -31,9 +31,12 @@ function runTest(conn) {
     );
     db.auth("userAdmin", "userAdmin");
 
-    // Check that unknown users do not interrupt hello
+    // Unknown users receive the server's enabled mechanisms so the client can select an
+    // accepted one. The field is present but the contents may vary by server configuration.
     let res = assert.commandWorked(db.runCommand({hello: 1, saslSupportedMechs: "test.bogus"}));
-    assert.eq(undefined, res.saslSupportedMechs);
+    assert(Array.isArray(res.saslSupportedMechs), "saslSupportedMechs should be an array even for unknown users", {
+        res,
+    });
 
     // Check that invalid usernames produce the correct error code
     assert.commandFailedWithCode(db.runCommand({hello: 1, saslSupportedMechs: "bogus"}), ErrorCodes.BadValue);

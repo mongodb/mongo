@@ -307,7 +307,11 @@ TEST_F(MechanismRegistryTest, invalidUserCantAdvertiseMechs) {
     registry.registerFactory<FooMechanismFactory<true>>(
         SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
 
-    ASSERT_BSONOBJ_EQ(BSONObj(), getMechsFor(UserName("noSuchUser"_sd, "test"_sd)));
+    // Unknown users now return the server's enabled mechanisms so the client can select one
+    // that the server will accept. FOO lacks kNoPlainText so it is filtered out for internal
+    // DBs, producing an empty saslSupportedMechs array (field present, contents empty).
+    ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSONArray()),
+                      getMechsFor(UserName("noSuchUser"_sd, "test"_sd)));
 }
 
 TEST_F(MechanismRegistryTest, strongMechCanAdvertise) {

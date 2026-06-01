@@ -116,6 +116,23 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
             LOGV2(20251,
                   "Supported SASL mechanisms requested for unknown user",
                   "user"_attr = userName);
+            // Return the server's enabled mechanisms so the client can select one that the
+            // server will accept. Without this, the client falls back to a wire-version
+            // heuristic and may select a mechanism that has been explicitly disabled.
+            BSONArrayBuilder mechanismsBuilder;
+            const auto& mechList = _getMapRef(userName.getDB());
+            for (const auto& factoryIt : mechList) {
+                SecurityPropertySet properties = factoryIt->properties();
+                if (!properties.hasAllProperties(SecurityPropertySet{
+                        SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth}) &&
+                    userName.getDB() != "$external") {
+                    continue;
+                }
+                if (_mechanismSupportedByConfig(factoryIt->mechanismName())) {
+                    mechanismsBuilder << factoryIt->mechanismName();
+                }
+            }
+            builder->appendArray("saslSupportedMechs", mechanismsBuilder.arr());
             return;
         }
         uassertStatusOK(status);
