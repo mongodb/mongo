@@ -89,11 +89,12 @@ let awaitShellToRefineCollectionShardKey = startParallelShell(() => {
 hangBeforeCommitFailPoint.wait();
 
 // Verify that 'config.collections' has not been updated since we haven't committed the transaction,
-// except for the 'allowMigrations' property which is updated by the
+// except for the 'allowMigrations' and 'allowChunkOperations' property which are updated by the
 // RefineCollectionShardKeyCoordinator before the commit phase.
 let newCollArr = mongos.getCollection(kConfigCollections).find({_id: kNsName}).toArray();
 newCollArr.forEach((element) => {
     delete element["allowMigrations"];
+    delete element["allowChunkOperations"];
 });
 assert.sameMembers(oldCollArr, newCollArr);
 

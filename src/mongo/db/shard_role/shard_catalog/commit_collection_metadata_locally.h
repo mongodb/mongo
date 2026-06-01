@@ -90,5 +90,13 @@ void commitCollectionMetadataLocally(OperationContext* opCtx,
  */
 void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss);
 
+/**
+ * Commits the allowChunkOperations flag to the shard catalog (config.shard.catalog.collections).
+ */
+void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          bool allowChunkOperations,
+                                          const boost::optional<UUID>& uuid);
+
 }  // namespace shard_catalog_commit
 }  // namespace mongo

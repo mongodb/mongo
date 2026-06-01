@@ -167,7 +167,7 @@ public:
     virtual void stopMigrations(OperationContext* opCtx,
                                 const NamespaceString& nss,
                                 const UUID& expectedCollectionUUID,
-                                const OperationSessionInfo& osi) = 0;
+                                std::function<OperationSessionInfo()> osiGenerator) = 0;
 
     /**
      * To be called on completion (both success and abort) to unset allowMigrations, re-enabling
@@ -176,7 +176,7 @@ public:
     virtual void resumeMigrations(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const UUID& expectedCollectionUUID,
-                                  const OperationSessionInfo& osi) = 0;
+                                  std::function<OperationSessionInfo()> osiGenerator) = 0;
     /**
      * Builds a CausalityBarrier for the given participant shards, which is used to perform a no-op
      * retryable write on each shard.
@@ -260,12 +260,12 @@ public:
     void stopMigrations(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const UUID& expectedCollectionUUID,
-                        const OperationSessionInfo& osi) override;
+                        std::function<OperationSessionInfo()> osiGenerator) override;
 
     void resumeMigrations(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const UUID& expectedCollectionUUID,
-                          const OperationSessionInfo& osi) override;
+                          std::function<OperationSessionInfo()> osiGenerator) override;
 
     std::unique_ptr<CausalityBarrier> buildCausalityBarrier(
         std::vector<ShardId> participants,

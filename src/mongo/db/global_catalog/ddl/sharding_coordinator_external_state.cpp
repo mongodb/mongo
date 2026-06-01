@@ -66,19 +66,22 @@ bool ShardingCoordinatorExternalStateImpl::isTrackedTimeseries(
     }
 }
 
-void ShardingCoordinatorExternalStateImpl::allowMigrations(OperationContext* opCtx,
-                                                           const NamespaceString& nss,
-                                                           bool allowMigrations) {
+void ShardingCoordinatorExternalStateImpl::allowMigrations(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    bool allowMigrations,
+    std::function<OperationSessionInfo()> osiGetter,
+    AuthoritativeMetadataAccessLevelEnum authoritativeState) {
     if (allowMigrations) {
-        sharding_ddl_util::resumeMigrations(opCtx, nss, boost::none);
+        sharding_ddl_util::resumeMigrations(opCtx, nss, boost::none, osiGetter, authoritativeState);
     } else {
-        sharding_ddl_util::stopMigrations(opCtx, nss, boost::none);
+        sharding_ddl_util::stopMigrations(opCtx, nss, boost::none, osiGetter, authoritativeState);
     }
 }
 
-bool ShardingCoordinatorExternalStateImpl::checkAllowMigrations(OperationContext* opCtx,
-                                                                const NamespaceString& nss) {
-    return sharding_ddl_util::checkAllowMigrations(opCtx, nss);
+bool ShardingCoordinatorExternalStateImpl::checkAllowMigrationsOnConfigServer(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    return sharding_ddl_util::checkAllowMigrationsOnConfigServer(opCtx, nss);
 }
 
 std::shared_ptr<ShardingCoordinatorExternalState>

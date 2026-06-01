@@ -238,6 +238,10 @@ public:
      * Calls to clearFilteringMetadata + clears the _metadataManager object.
      */
     void clearFilteringMetadataForDroppedCollection_nonAuthoritative(OperationContext* opCtx);
+    /**
+     * Calls to clearFilteringMetadata + clears the _metadataManager object. Also resets the
+     * _allowChunkOperations flag (i.e. sets it to `true`).
+     */
     void clearFilteringMetadataForDroppedCollection_authoritative(OperationContext* opCtx,
                                                                   const UUID& collectionUuid);
 
@@ -355,6 +359,9 @@ public:
     void setCollectionRecoverer(std::shared_ptr<CollectionCacheRecoverer> recoverer);
     std::shared_ptr<CollectionCacheRecoverer> getCollectionCacheRecoverer() const;
 
+    bool allowChunkOperations() const;
+    void setAllowChunkOperations(bool allowChunkOperations);
+
 private:
     friend class CollectionShardingRuntimeTest;
 
@@ -467,6 +474,8 @@ private:
     // Tracks the fact that concurrent recovery of the collection's sharding metadata is taking
     // place by a concurrent thread handling a shard version mismatch
     std::shared_ptr<CollectionCacheRecoverer> _collectionRecoverer;
+
+    bool _allowChunkOperations{true};
 };
 
 /**
