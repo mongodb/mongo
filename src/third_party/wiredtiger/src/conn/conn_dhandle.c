@@ -718,6 +718,8 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session, const char *uri,
             time_start = __wt_clock(session);
             conn->ckpt_apply = conn->ckpt_skip = 0;
             conn->ckpt_apply_time = conn->ckpt_skip_time = 0;
+            conn->ckpt_drop = conn->ckpt_lock = conn->ckpt_meta_check = 0;
+            conn->ckpt_drop_time = conn->ckpt_lock_time = conn->ckpt_meta_check_time = 0;
             F_SET(conn, WT_CONN_CKPT_GATHER);
         }
         for (dhandle = NULL;;) {
