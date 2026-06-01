@@ -851,7 +851,7 @@ export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
         if (
             err.code == ErrorCodes.IllegalOperation &&
             err.errmsg &&
-            err.errmsg.includes("monotonicity") &&
+            (err.errmsg.includes("monotonicity") || err.errmsg.includes("characteristics")) &&
             err.errmsg.includes("empty collection")
         ) {
             print(
