@@ -23,7 +23,7 @@ struct __wt_crypt_header {
      * As we create new versions, bump the version number here, and consider what previous versions
      * are compatible with it.
      */
-#define WT_CRYPT_HEADER_VERSION 0x1u
+#define WT_CRYPT_HEADER_VERSION 0x2u
     uint8_t version; /* 04: Header version */
 #define WT_CRYPT_HEADER_COMPATIBLE_VERSION 0x1u
     uint8_t compatible_version; /* 05: Minimum compatibility version */
@@ -31,7 +31,14 @@ struct __wt_crypt_header {
     uint8_t unused[1];          /* 07: Unused padding */
     uint32_t crypt_size;        /* 08-11: Payload size, in bytes */
     uint32_t checksum;          /* 12-15: Payload CRC32 checksum */
+    uint64_t timestamp;         /* 16-23: Key rotation timestamp (0 if unused) */
 };
+
+/*
+ * Minimum number of header bytes every reader must always see. Fields beyond this point are
+ * optional and gated by the on-disk header_size value.
+ */
+#define WT_CRYPT_HEADER_MIN_SIZE 16
 
 /*
  * __wt_crypt_header_byteswap --
@@ -43,6 +50,7 @@ __wt_crypt_header_byteswap(WT_CRYPT_HEADER *hdr)
 #ifdef WORDS_BIGENDIAN
     hdr->signature = __wt_bswap32(hdr->signature);
     hdr->crypt_size = __wt_bswap32(hdr->crypt_size);
+    hdr->timestamp = __wt_bswap64(hdr->timestamp);
 #else
     WT_UNUSED(hdr);
 #endif

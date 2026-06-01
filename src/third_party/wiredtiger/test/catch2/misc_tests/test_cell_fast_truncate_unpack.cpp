@@ -123,6 +123,95 @@ TEST_CASE(
     CHECK(unpack.ta.prepare == 0);
 }
 
+TEST_CASE("Cell Fast Truncate Pack/Unpack: committed deletion round-trips correctly",
+  "[cell][fast_truncate]")
+{
+    auto session_mock = setup_mock_session();
+    WT_SESSION_IMPL *session = session_mock->get_wt_session_impl();
+
+    WT_PAGE_HEADER dsk = make_ft_page_header();
+
+    /* Build a committed page_del and pack it into a cell. */
+    WT_PAGE_DELETED page_del;
+    memset(&page_del, 0, sizeof(page_del));
+    page_del.txnid = 42;
+    page_del.pg_del_start_ts = 100;
+    page_del.pg_del_durable_ts = 110;
+    page_del.prepare_state = WT_PREPARE_INIT;
+    page_del.committed = true;
+
+    WT_TIME_AGGREGATE ta;
+    WT_TIME_AGGREGATE_INIT(&ta);
+
+    WT_CELL cell;
+    memset(&cell, 0, sizeof(cell));
+    WT_IGNORE_RET(__wt_cell_pack_addr(
+      session, &cell, WT_CELL_ADDR_DEL, WT_RECNO_OOB, &page_del, &ta, false, 0));
+
+    WT_CELL_UNPACK_ADDR unpack;
+    memset(&unpack, 0, sizeof(unpack));
+    __wt_cell_unpack_addr(session, &dsk, &cell, &unpack);
+
+    const WT_PAGE_DELETED &pd = unpack.page_del;
+    CHECK(pd.txnid == 42);
+    CHECK(pd.pg_del_start_ts == 100);
+    CHECK(pd.pg_del_durable_ts == 110);
+    CHECK(pd.prepare_state == WT_PREPARE_INIT);
+    CHECK(pd.committed == true);
+    CHECK(pd.selected_for_write == true);
+    CHECK(unpack.ta.prepare == 0);
+}
+
+TEST_CASE("Cell Fast Truncate Pack/Unpack: prepared deletion round-trips correctly",
+  "[cell][fast_truncate]")
+{
+    auto session_mock = setup_mock_session();
+    WT_SESSION_IMPL *session = session_mock->get_wt_session_impl();
+
+    /* Both flags are required to pack a prepared fast-truncate cell. */
+    F_SET(S2C(session), WT_CONN_PRESERVE_PREPARED);
+    F_SET(S2BT(session), WT_BTREE_DISAGGREGATED);
+
+    WT_PAGE_HEADER dsk = make_ft_page_header();
+
+    /* Build a prepared page_del and pack it into a cell. */
+    WT_PAGE_DELETED page_del;
+    memset(&page_del, 0, sizeof(page_del));
+    page_del.txnid = 99;
+    page_del.prepare_ts = 50;
+    page_del.prepared_id = 7;
+    page_del.pg_del_durable_ts = WT_TS_NONE;
+    page_del.prepare_state = WT_PREPARE_INPROGRESS;
+    page_del.committed = false;
+
+    WT_TIME_AGGREGATE ta;
+    WT_TIME_AGGREGATE_INIT(&ta);
+
+    WT_CELL cell;
+    memset(&cell, 0, sizeof(cell));
+    WT_IGNORE_RET(
+      __wt_cell_pack_addr(session, &cell, WT_CELL_ADDR_DEL, WT_RECNO_OOB, &page_del, &ta, true, 0));
+
+    WT_CELL_UNPACK_ADDR unpack;
+    memset(&unpack, 0, sizeof(unpack));
+    __wt_cell_unpack_addr(session, &dsk, &cell, &unpack);
+
+    const WT_PAGE_DELETED &pd = unpack.page_del;
+    CHECK(pd.txnid == 99);
+    CHECK(pd.prepare_ts == 50);
+    CHECK(pd.pg_del_start_ts == 50);
+    CHECK(pd.prepared_id == 7);
+    CHECK(pd.pg_del_durable_ts == WT_TS_NONE);
+    CHECK(pd.prepare_state == WT_PREPARE_INPROGRESS);
+    CHECK(pd.committed == false);
+    CHECK(pd.selected_for_write == true);
+    /* A prepared fast-truncate does not propagate prepare to the page-level visibility window. */
+    CHECK(unpack.ta.prepare == 0);
+
+    F_CLR(S2C(session), WT_CONN_PRESERVE_PREPARED);
+    F_CLR(S2BT(session), WT_BTREE_DISAGGREGATED);
+}
+
 TEST_CASE("Cell Fast Truncate: prepare flag on non-fast-truncate addr cell marks page as prepared",
   "[cell][fast_truncate]")
 {

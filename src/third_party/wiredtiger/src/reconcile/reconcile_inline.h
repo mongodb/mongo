@@ -355,7 +355,8 @@ __wti_rec_image_copy(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV *kv)
  */
 static WT_INLINE void
 __wti_rec_cell_build_addr(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_ADDR *addr,
-  WT_CELL_UNPACK_ADDR *vpack, uint64_t recno, WT_PAGE_DELETED *page_del)
+  WT_CELL_UNPACK_ADDR *vpack, uint64_t recno, WT_PAGE_DELETED *page_del,
+  bool is_prepared_fast_truncate)
 {
     WTI_REC_KV *val = &r->v;
     WT_TIME_AGGREGATE *ta;
@@ -404,7 +405,7 @@ __wti_rec_cell_build_addr(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_ADDR *a
     val->buf.data = data;
     val->buf.size = data_size;
     val->cell_len = (uint16_t)__wt_cell_build_addr(
-      session, &val->cell, cell_type, recno, page_del, ta, data_size);
+      session, &val->cell, cell_type, recno, page_del, ta, is_prepared_fast_truncate, data_size);
     val->len = val->cell_len + data_size;
 }
 
@@ -587,7 +588,7 @@ __rec_selected_key_changed(WT_SESSION_IMPL *session, WT_SAVE_UPD *supd)
         return (false);
 
     if (supd->onpage_upd == NULL) {
-        if (F_ISSET(supd->onpage_tombstone, WT_UPDATE_DELETE_DURABLE))
+        if (F_ISSET(supd->onpage_tombstone, WT_UPDATE_DURABLE))
             return (false);
     } else {
         WT_ASSERT(session, supd->onpage_upd->type != WT_UPDATE_TOMBSTONE);

@@ -2752,7 +2752,7 @@ __wt_btcur_skip_page(
      * Check the fast-truncate information; there are 3 cases:
      *
      * (1) The page is in the WT_REF_DELETED state and page_del is NULL. The page is deleted. This
-     *     case is folded into the next because __wt_page_del_visible handles it.
+     *     case is folded into the next because visibility of truncate function handles it.
      * (2) The page is in the WT_REF_DELETED state and page_del is not NULL. The page is deleted
      *     if the truncate operation is visible. Look at page_del; we could use the info from the
      *     address cell below too, but that's slower.
@@ -2760,7 +2760,7 @@ __wt_btcur_skip_page(
      *     will serve for readonly/unmodified pages, and for modified pages we can't skip the page.
      *     (This case is checked further below.)
      *
-     * In all cases, make use of the option to __wt_page_del_visible to hide prepared transactions,
+     * In all cases, make use of the option to hide prepared transactions,
      * as we shouldn't skip pages where the deletion is prepared but not committed.
      */
     if (previous_state == WT_REF_DELETED && __wt_page_del_visible(session, ref->page_del, true)) {

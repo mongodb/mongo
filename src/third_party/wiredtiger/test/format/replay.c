@@ -118,35 +118,52 @@ replay_maximum_committed(void)
 {
     wt_timestamp_t commit_ts, ts;
     uint32_t lane;
+    bool any_lane_in_use;
 
     /*
      * The calculation is expensive, and does not need to be accurate all the time, and it's okay to
      * be behind. So we use a cached value most of the time.
      */
     ts = g.replay_cached_committed;
-    if (ts == WT_TS_NONE || __wt_atomic_add_uint32_v(&g.replay_calculate_committed, 1) % 20 == 0) {
-        WT_ACQUIRE_READ_WITH_BARRIER(ts, g.timestamp);
-        testutil_check(pthread_rwlock_wrlock(&g.lane_lock));
-        for (lane = 0; lane < LANE_COUNT; ++lane) {
-            if (g.lanes[lane].in_use) {
-                commit_ts = g.lanes[lane].last_commit_ts;
-                if (commit_ts != WT_TS_NONE)
-                    ts = WT_MIN(ts, commit_ts);
-            }
-        }
-        if (ts == WT_TS_NONE)
-            ts = 1;
-        /*
-         * Only update the cached value when we've moved forward. A reclaimed lane's stale
-         * last_commit_ts can produce a lower minimum, but everything up to the previously cached
-         * value is already committed and safe to use as the stable timestamp.
-         */
-        if (ts < g.replay_cached_committed)
-            ts = g.replay_cached_committed;
+    if (ts != WT_TS_NONE && __wt_atomic_add_uint32_v(&g.replay_calculate_committed, 1) % 20 != 0)
+        return (ts);
 
-        g.replay_cached_committed = ts;
-        testutil_check(pthread_rwlock_unlock(&g.lane_lock));
+    WT_ACQUIRE_READ_WITH_BARRIER(ts, g.timestamp);
+    any_lane_in_use = false;
+    testutil_check(pthread_rwlock_wrlock(&g.lane_lock));
+    for (lane = 0; lane < LANE_COUNT; ++lane) {
+        if (g.lanes[lane].in_use) {
+            commit_ts = g.lanes[lane].last_commit_ts;
+            if (commit_ts != WT_TS_NONE)
+                ts = WT_MIN(ts, commit_ts);
+            any_lane_in_use = true;
+        }
     }
+
+    /*
+     * No lane in use: g.timestamp is unsafe -- the next op to claim a lane may pick a timestamp
+     * below it. Hold at the cached value (last computed while a lane WAS in flight). Only do this
+     * while workers exist (tinfo_list != NULL); outside of ops we're single-threaded over
+     * g.timestamp and falling through is correct (otherwise bulk load stalls on a stale cache).
+     */
+    if (!any_lane_in_use && tinfo_list != NULL) {
+        ts = g.replay_cached_committed;
+        goto done;
+    }
+    /*
+     * A reclaimed lane's stale last_commit_ts can produce a lower minimum, but everything up to the
+     * previously cached value is already committed; don't move the cache backwards.
+     */
+    if (ts < g.replay_cached_committed) {
+        ts = g.replay_cached_committed;
+        goto done;
+    }
+
+done:
+    if (ts == WT_TS_NONE)
+        ts = 1;
+    g.replay_cached_committed = ts;
+    testutil_check(pthread_rwlock_unlock(&g.lane_lock));
     return (ts);
 }
 

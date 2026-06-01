@@ -413,7 +413,7 @@ __rec_need_save_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_UPDATE_SELEC
              * search will be less efficient. Particularly it will be a problem for the history
              * store.
              */
-            if (!F_ISSET(upd_select->upd, WT_UPDATE_DELETE_DURABLE))
+            if (!F_ISSET(upd_select->upd, WT_UPDATE_DURABLE))
                 return (true);
         } else {
             if (!F_ISSET(upd_select->upd, WT_UPDATE_DURABLE | WT_UPDATE_PREPARE_DURABLE))
@@ -1133,6 +1133,7 @@ __rec_upd_select_inmem(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_CELL_UNPAC
 
         if (!found_last_upd_to_keep) {
             upd_select->upd = upd;
+            upd_select->was_modify = upd->type == WT_UPDATE_MODIFY;
 
             /*
              * For ingest btrees, skip the global visibility check for non-timestamped tombstones as
@@ -1669,14 +1670,14 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
              * the next write if the prepared update is rolled back.
              */
             if (first_committed_upd != NULL)
-                F_CLR(first_committed_upd, WT_UPDATE_DURABLE | WT_UPDATE_DELETE_DURABLE);
+                F_CLR(first_committed_upd, WT_UPDATE_DURABLE);
         } else if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&upd_select->tw))
             /*
              * When only writing a prepared tombstone, ensure the durable flags on the on-page value
              * are cleared. Otherwise, if the prepared tombstone is rolled back, the on-page value
              * may be missed in the next write.
              */
-            F_CLR(upd_select->upd, WT_UPDATE_DURABLE | WT_UPDATE_DELETE_DURABLE);
+            F_CLR(upd_select->upd, WT_UPDATE_DURABLE);
     }
 
     WT_ASSERT(

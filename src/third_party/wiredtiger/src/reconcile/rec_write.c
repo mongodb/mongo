@@ -2111,7 +2111,7 @@ __rec_set_updates_durable(WT_SESSION_IMPL *session, WT_MULTI *multi)
          * delta.
          */
         if (supd->onpage_upd == NULL)
-            F_SET(supd->onpage_tombstone, WT_UPDATE_DELETE_DURABLE);
+            F_SET(supd->onpage_tombstone, WT_UPDATE_DURABLE);
         else {
             if (supd->onpage_tombstone != NULL) {
                 if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&supd->tw)) {

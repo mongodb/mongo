@@ -1559,18 +1559,17 @@ struct __wt_update {
 
 /* When introducing a new flag, consider adding it to WT_UPDATE_SELECT_FOR_DS. */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_UPDATE_DELETE_DURABLE 0x001u  /* Key has been removed from disk image. */
-#define WT_UPDATE_DS 0x002u              /* Update has been chosen to the data store. */
-#define WT_UPDATE_DURABLE 0x004u         /* Update has been durable. */
-#define WT_UPDATE_HS 0x008u              /* Update has been written to hs. */
-#define WT_UPDATE_HS_MAX_STOP 0x010u     /* Update has been written to hs with a max stop. */
-#define WT_UPDATE_PREPARE_DURABLE 0x020u /* Prepared update has been durable. */
-#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x040u /* Prepared update restored from data store. */
-#define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x080u   /* Fast truncate instantiation. */
-#define WT_UPDATE_RESTORED_FROM_DS 0x100u         /* Update restored from data store. */
-#define WT_UPDATE_RESTORED_FROM_HS 0x200u         /* Update restored from history store. */
-#define WT_UPDATE_RESTORED_FROM_INGEST 0x400u     /* Update restored from ingest btree. */
-#define WT_UPDATE_RTS_DRYRUN_ABORT 0x800u         /* Used by dry run to mark a would-be abort. */
+#define WT_UPDATE_DS 0x001u              /* Update has been chosen to the data store. */
+#define WT_UPDATE_DURABLE 0x002u         /* Update has been durable. */
+#define WT_UPDATE_HS 0x004u              /* Update has been written to hs. */
+#define WT_UPDATE_HS_MAX_STOP 0x008u     /* Update has been written to hs with a max stop. */
+#define WT_UPDATE_PREPARE_DURABLE 0x010u /* Prepared update has been durable. */
+#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x020u /* Prepared update restored from data store. */
+#define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x040u   /* Fast truncate instantiation. */
+#define WT_UPDATE_RESTORED_FROM_DS 0x080u         /* Update restored from data store. */
+#define WT_UPDATE_RESTORED_FROM_HS 0x100u         /* Update restored from history store. */
+#define WT_UPDATE_RESTORED_FROM_INGEST 0x200u     /* Update restored from ingest btree. */
+#define WT_UPDATE_RTS_DRYRUN_ABORT 0x400u         /* Used by dry run to mark a would-be abort. */
                                                   /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
     uint16_t flags;
 

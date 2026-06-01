@@ -1717,10 +1717,6 @@ __debug_update_dump_flags(WT_DBG *ds, WT_UPDATE *upd)
     if (upd->flags != 0) {
         WT_RET(ds->f(ds, " | flags: ["));
         int flag_num = 0;
-        if (F_ISSET(upd, WT_UPDATE_DELETE_DURABLE)) {
-            WT_RET(ds->f(ds, "delete-durable"));
-            ++flag_num;
-        }
         if (F_ISSET(upd, WT_UPDATE_DS)) {
             WT_RET(flag_num == 0 ? ds->f(ds, "data-store") : ds->f(ds, ", data-store"));
             ++flag_num;
