@@ -1048,6 +1048,10 @@ public:
     static EncryptedFieldConfig getAndValidateSchema(const NamespaceString& nss,
                                                      const EncryptionInformation& ei);
 
+    // Range-indexed fields can only have at most 129 tags (128 edges for decimal128 + 1 root)
+    // per OST.
+    static constexpr uint32_t kFLE2RangeFieldMaxTags = 129;
+
     /**
      * checkTagLimitsAndStorageNotExceeded throws if either of the following conditions are met:
      *    1. There exists an indexed-encrypted field in the EncryptedFieldConfig, whose

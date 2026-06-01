@@ -998,11 +998,21 @@ void parseAndVerifyInsertUpdatePayload(std::vector<EDCServerPayloadInfo>* pField
                               << "' is not a valid type for Queryable Encryption Range",
                 isValidBSONType(payloadInfo.payload.getType()) &&
                     isFLE2RangeIndexedSupportedType(bsonType));
+        uassert(
+            12785600,
+            "Queryable Encryption insert/update payload contains too many range edge token sets",
+            payloadInfo.payload.getEdgeTokenSet()->size() <=
+                EncryptionInformationHelpers::kFLE2RangeFieldMaxTags);
     } else if (payloadInfo.isTextSearchPayload()) {
         uassert(9783802,
                 str::stream() << "Type '" << typeName(bsonType)
                               << "' is not a valid type for Queryable Encryption Text Search",
                 isValidBSONType(payloadInfo.payload.getType()) && bsonType == BSONType::string);
+        uassert(
+            12785601,
+            "Queryable Encryption insert/update payload contains too many string search token sets",
+            payloadInfo.getTotalTextSearchTokenSetCount() <=
+                EncryptionInformationHelpers::kFLE2PerFieldTagLimit);
     } else {
         uassert(6373504,
                 str::stream() << "Type '" << typeName(bsonType)
@@ -1018,7 +1028,7 @@ void collectEDCServerInfo(std::vector<EDCServerPayloadInfo>* pFields,
                           ConstDataRange cdr,
                           StringData fieldPath) {
 
-    // TODO - validate field is actually indexed in the schema?
+    // TODO: SERVER-127454 - validate field is actually indexed in the schema
 
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     auto encryptedType = encryptedTypeBinding;
@@ -2832,10 +2842,6 @@ FLE2IndexedRangeEncryptedValueV2 FLE2IndexedRangeEncryptedValueV2::fromUnencrypt
     const std::vector<PrfBlock>& tags,
     const std::vector<uint64_t>& counters) {
 
-    // Range-indexed fields can only have at most 129 tags (128 edges for decimal128 + 1 root)
-    // per OST.
-    static constexpr size_t kFLE2RangeFieldMaxTags = 129;
-
     uassert(9588700,
             "Non-range search InsertUpdatePayload supplied for FLE2IndexedRangeEncryptedValueV2",
             payload.getEdgeTokenSet().has_value());
@@ -2854,7 +2860,7 @@ FLE2IndexedRangeEncryptedValueV2 FLE2IndexedRangeEncryptedValueV2::fromUnencrypt
     // Ensure the total tags will not overflow the per-field tag limit.
     uassert(9588702,
             "InsertUpdatePayload for range-indexed field has an edge token set that is too large",
-            ets.size() <= kFLE2RangeFieldMaxTags);
+            ets.size() <= EncryptionInformationHelpers::kFLE2RangeFieldMaxTags);
     uassert(9588703,
             "FLE2IndexedRangeEncryptedValueV2 tags length must equal the total number of edges",
             tags.size() == ets.size());

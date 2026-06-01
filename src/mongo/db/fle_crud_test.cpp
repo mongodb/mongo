@@ -225,6 +225,17 @@ int32_t getTestSeed() {
 
     return rnd->nextInt32();
 }
+
+BSONObj insertUpdatePayloadAsDocument(StringData path, const FLE2InsertUpdatePayloadV2& iup) {
+    auto payload = iup.toBSON();
+    std::vector<uint8_t> buf(payload.objsize() + 1);
+    buf[0] = static_cast<uint8_t>(EncryptedBinDataType::kFLE2InsertUpdatePayloadV2);
+    std::copy(payload.objdata(), payload.objdata() + payload.objsize(), buf.data() + 1);
+    BSONObjBuilder builder;
+    builder.appendBinData(path, buf.size(), BinDataType::Encrypt, buf.data());
+    return builder.obj();
+}
+
 class FleCrudTest : public ServiceContextMongoDTest {
 protected:
     void setUp() override;
@@ -1048,15 +1059,67 @@ TEST_F(FleCrudTest, InsertPayloadIsBothRangeAndTextSearch) {
     payload.setEdgeTokenSet(std::vector<EdgeTokenSetV2>{{{}, {}, {}, bogusEncryptedTokens}});
     payload.setTextSearchTokenSets(
         TextSearchTokenSets{{{}, {}, {}, bogusEncryptedTokens}, {}, {}, {}});
-    auto iup = payload.toBSON();
-    std::vector<uint8_t> buf(iup.objsize() + 1);
-    buf[0] = static_cast<uint8_t>(EncryptedBinDataType::kFLE2InsertUpdatePayloadV2);
-    std::copy(iup.objdata(), iup.objdata() + iup.objsize(), buf.data() + 1);
-    BSONObjBuilder builder;
-    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
-    BSONObj document = builder.obj();
-
+    auto document = insertUpdatePayloadAsDocument("encrypted", payload);
     ASSERT_THROWS_CODE(EDCServerCollection::getEncryptedFieldInfo(document), DBException, 9783801);
+}
+
+// Test insert update range payload containing too many token sets is rejected.
+TEST_F(FleCrudTest, InsertRangePayloadHasTooManyTokenSets) {
+    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false, boost::none).encrypt({{}});
+    FLE2InsertUpdatePayloadV2 payload({},
+                                      {},
+                                      bogusEncryptedTokens,
+                                      indexKeyId,
+                                      stdx::to_underlying(BSONType::numberInt),
+                                      {},
+                                      {},
+                                      {},
+                                      0);
+    std::vector<EdgeTokenSetV2> ets(EncryptionInformationHelpers::kFLE2RangeFieldMaxTags + 1,
+                                    {{}, {}, {}, bogusEncryptedTokens});
+    payload.setEdgeTokenSet(ets);
+    auto document = insertUpdatePayloadAsDocument("encrypted", payload);
+    ASSERT_THROWS_CODE(EDCServerCollection::getEncryptedFieldInfo(document), DBException, 12785600);
+
+    ets.pop_back();
+    payload.setEdgeTokenSet(ets);
+    ASSERT_EQ(payload.getEdgeTokenSet()->size(),
+              EncryptionInformationHelpers::kFLE2RangeFieldMaxTags);
+    document = insertUpdatePayloadAsDocument("encrypted", payload);
+    ASSERT_DOES_NOT_THROW(EDCServerCollection::getEncryptedFieldInfo(document));
+}
+
+// Test insert update string search payload containing too many token sets is rejected.
+TEST_F(FleCrudTest, InsertStringSearchPayloadHasTooManyTokenSets) {
+    auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false, boost::none).encrypt({{}});
+    FLE2InsertUpdatePayloadV2 payload({},
+                                      {},
+                                      bogusEncryptedTokens,
+                                      indexKeyId,
+                                      stdx::to_underlying(BSONType::string),
+                                      {},
+                                      {},
+                                      {},
+                                      0);
+    // Split kFLE2PerFieldTagLimit token sets across all 3 token set types.
+    size_t affixCount = EncryptionInformationHelpers::kFLE2PerFieldTagLimit / 3;
+    size_t substringCount = affixCount + (EncryptionInformationHelpers::kFLE2PerFieldTagLimit % 3);
+
+    std::vector<TextSubstringTokenSet> subts(substringCount, {{}, {}, {}, bogusEncryptedTokens});
+    std::vector<TextSuffixTokenSet> sts(affixCount, {{}, {}, {}, bogusEncryptedTokens});
+    std::vector<TextPrefixTokenSet> pts(affixCount, {{}, {}, {}, bogusEncryptedTokens});
+
+    // Test with kFLE2PerFieldTagLimit + 1 total token sets (+1 due to exact match token set)
+    payload.setTextSearchTokenSets(
+        TextSearchTokenSets{{{}, {}, {}, bogusEncryptedTokens}, subts, sts, pts});
+    auto document = insertUpdatePayloadAsDocument("encrypted", payload);
+    ASSERT_THROWS_CODE(EDCServerCollection::getEncryptedFieldInfo(document), DBException, 12785601);
+
+    // Take out one substring token set to test with a total of kFLE2PerFieldTagLimit token sets
+    subts.pop_back();
+    payload.getTextSearchTokenSets()->setSubstringTokenSets(subts);
+    document = insertUpdatePayloadAsDocument("encrypted", payload);
+    ASSERT_DOES_NOT_THROW(EDCServerCollection::getEncryptedFieldInfo(document));
 }
 
 // Insert and delete one document
@@ -1452,24 +1515,16 @@ TEST_F(FleCrudTest, FindAndModify_SetSafeContent) {
 BSONObj makeInsertUpdatePayload(StringData path, const UUID& uuid) {
     // Actual values don't matter for these tests (apart from indexKeyId).
     auto encryptedTokens = StateCollectionTokensV2({{}}, boost::none, boost::none).encrypt({{}});
-    auto bson = FLE2InsertUpdatePayloadV2({},
-                                          {},
-                                          std::move(encryptedTokens),
-                                          uuid,
-                                          stdx::to_underlying(BSONType::string),
-                                          {},
-                                          {},
-                                          {},
-                                          0)
-                    .toBSON();
-    std::vector<std::uint8_t> bindata;
-    bindata.resize(bson.objsize() + 1);
-    bindata[0] = static_cast<std::uint8_t>(EncryptedBinDataType::kFLE2InsertUpdatePayloadV2);
-    memcpy(bindata.data() + 1, bson.objdata(), bson.objsize());
-
-    BSONObjBuilder bob;
-    bob.appendBinData(path, bindata.size(), BinDataType::Encrypt, bindata.data());
-    return bob.obj();
+    auto iup = FLE2InsertUpdatePayloadV2({},
+                                         {},
+                                         std::move(encryptedTokens),
+                                         uuid,
+                                         stdx::to_underlying(BSONType::string),
+                                         {},
+                                         {},
+                                         {},
+                                         0);
+    return insertUpdatePayloadAsDocument(path, iup);
 }
 
 TEST_F(FleCrudTest, validateIndexKeyValid) {
