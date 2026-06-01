@@ -34,6 +34,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/error_labels_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -304,7 +305,20 @@ BSONObj getErrorLabels(OperationContext* opCtx,
                                    lastOpAfterRun);
     labelBuilder.build(labelArray);
 
-    return (labelArray.arrSize() > 0) ? BSON(kErrorLabelsFieldName << labelArray.arr()) : BSONObj();
+    if (labelArray.arrSize() == 0) {
+        return BSONObj();
+    }
+
+    BSONObjBuilder responseBuilder;
+    responseBuilder.append(kErrorLabelsFieldName, labelArray.arr());
+
+    if (labelBuilder.isSystemOverloadedError() && labelBuilder.isOperationIdempotent()) {
+        if (auto retry = gOverloadRetryAfterMS.load(); retry > 0) {
+            responseBuilder.append(kRetryAfterMSFieldName, retry);
+        }
+    }
+
+    return responseBuilder.obj();
 }
 
 bool isTransientTransactionError(ErrorCodes::Error code,

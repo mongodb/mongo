@@ -1446,10 +1446,19 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "error_labels_gen",
+    src = "error_labels.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "error_labels",
     srcs = [
         "error_labels.cpp",
+        ":error_labels_gen",
     ],
     deps = [
         ":commands",
@@ -3136,6 +3145,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline:aggregation_request_helper",
         "//src/mongo/db/pipeline:change_stream_pipeline",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/third_party/asio",
     ],
 )

@@ -33,12 +33,14 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/error_labels_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/message.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -859,6 +861,63 @@ TEST_F(ErrorLabelBuilderTest, NoWritesPerformedNotAppliedDuringTransientTransact
     BSONArrayBuilder expectedLabelArray;
     expectedLabelArray << ErrorLabel::kTransientTransaction;
     ASSERT_BSONOBJ_EQ(actualErrorLabels, BSON(kErrorLabelsFieldName << expectedLabelArray.arr()));
+}
+
+class OverloadRetryAfterMsTest : public ErrorLabelBuilderTest {
+public:
+    // A code that has all required categories to generate a retryAfterMS label.
+    ErrorCodes::Error qualifyingError() const {
+        auto code = ErrorCodes::IngressRequestRateLimitExceeded;
+        invariant(ErrorCodes::isA<ErrorCategory::SystemOverloadedError>(code));
+        invariant(ErrorCodes::isA<ErrorCategory::RetriableError>(code));
+        return code;
+    }
+
+    // A code that should not generate the retryAfterMS error label because
+    // it doesn't have both qualifying categories.
+    ErrorCodes::Error errorThatIsMissingRetryable() const {
+        auto code = ErrorCodes::AdmissionQueueOverflow;
+        invariant(ErrorCodes::isA<ErrorCategory::SystemOverloadedError>(code));
+        invariant(!ErrorCodes::isA<ErrorCategory::RetriableError>(code));
+        return code;
+    }
+
+    BSONObj runGetErrorLabelsTest(long long serverParameterValue, ErrorCodes::Error code) {
+        RAIIServerParameterControllerForTest spGuard("overloadRetryAfterMS", serverParameterValue);
+        OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
+        return getErrorLabels(opCtx(),
+                              sessionInfo,
+                              "find",
+                              code,
+                              boost::none,
+                              false /* isInternalClient */,
+                              false /* isMongos */,
+                              false /* isComingFromRouter */,
+                              kOpTime,
+                              kOpTime);
+    }
+};
+
+TEST_F(OverloadRetryAfterMsTest, DefaultServerParameterIsZero) {
+    ASSERT_EQ(gOverloadRetryAfterMS.load(), 0);
+}
+
+TEST_F(OverloadRetryAfterMsTest, IncludedWhenBothCategoriesPresent) {
+    auto errorLabels = runGetErrorLabelsTest(1500, qualifyingError());
+    ASSERT_TRUE(errorLabels.hasField(kRetryAfterMSFieldName));
+    ASSERT_EQ(errorLabels[kRetryAfterMSFieldName].Long(), 1500);
+}
+
+TEST_F(OverloadRetryAfterMsTest, SuppressedByServerParameterZero) {
+    auto errorLabels = runGetErrorLabelsTest(0, qualifyingError());
+    ASSERT_TRUE(errorLabels.hasField(kErrorLabelsFieldName));
+    ASSERT_FALSE(errorLabels.hasField(kRetryAfterMSFieldName));
+}
+
+TEST_F(OverloadRetryAfterMsTest, AbsentForSystemOverloadedAlone) {
+    auto errorLabels = runGetErrorLabelsTest(1500, errorThatIsMissingRetryable());
+    ASSERT_TRUE(errorLabels.hasField(kErrorLabelsFieldName));
+    ASSERT_FALSE(errorLabels.hasField(kRetryAfterMSFieldName));
 }
 
 #ifdef MONGO_CONFIG_STREAMS

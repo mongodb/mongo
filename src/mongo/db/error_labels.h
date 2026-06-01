@@ -46,6 +46,7 @@ MONGO_MOD_PUBLIC;
 
 namespace mongo {
 static constexpr StringData kErrorLabelsFieldName = "errorLabels"_sd;
+static constexpr StringData kRetryAfterMSFieldName = "retryAfterMS"_sd;
 namespace ErrorLabel {
 // PLEASE CONSULT DRIVERS BEFORE ADDING NEW ERROR LABELS.
 constexpr inline auto kTransientTransaction = "TransientTransactionError"_sd;
