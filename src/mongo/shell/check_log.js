@@ -91,8 +91,10 @@ function checkContainsOnceJson(connOrFile, ids, attrsDict, severity = null) {
         try {
             obj = JSON.parse(logMsg);
         } catch (ex) {
-            print("checkLog.checkContainsOnce: JsonJSON.parse() failed: " + tojson(ex) + ": " + logMsg);
-            throw ex;
+            // The server log can contain non-JSON content interleaved with structured log lines
+            // (for instance a stack trace). We still want to be able to search through the rest of
+            // the logs, so simply swallow the error and continue searching.
+            continue;
         }
 
         if (
@@ -202,8 +204,10 @@ function getFilteredLogMessages(connOrFile, id, attrsDict, severity = null, isRe
         try {
             obj = JSON.parse(logMsg);
         } catch (ex) {
-            print("checkLog.checkContainsOnce: JsonJSON.parse() failed: " + tojson(ex) + ": " + logMsg);
-            throw ex;
+            // The server log can contain non-JSON content interleaved with structured log lines
+            // (for instance a stack trace). We still want to be able to search through the rest of
+            // the logs, so simply swallow the error and continue searching.
+            continue;
         }
 
         if (compareLogs(obj, id, severity, context, attrsDict, isRelaxed)) {
