@@ -830,7 +830,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
 
         curOp.raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                       .getDatabaseProfileLevel(nss.dbName()));
-        assertCanWrite_inlock(opCtx, collection->nss());
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangWithLockDuringBatchInsert, opCtx, "hangWithLockDuringBatchInsert");
@@ -1025,8 +1024,6 @@ UpdateResult performUpdate(OperationContext* opCtx,
             DatabaseHolder::get(opCtx)->getDb(opCtx, dbName));
     curOp->raiseDbProfileLevel(
         DatabaseProfileSettings::get(opCtx->getServiceContext()).getDatabaseProfileLevel(dbName));
-
-    assertCanWrite_inlock(opCtx, nsString);
 
     if (!remove && collection.exists() &&
         collection.getCollectionPtr()->getRecordStore()->isColdCollection()) {
@@ -1247,8 +1244,6 @@ long long performDelete(OperationContext* opCtx,
         curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                        .getDatabaseProfileLevel(dbName));
     }
-
-    assertCanWrite_inlock(opCtx, nsString);
 
     const auto exec = uassertStatusOK(
         getExecutorDelete(&curOp->debug(), collection, canonicalDelete, boost::none /* verbosity
@@ -1845,8 +1840,6 @@ static SingleWriteResult performSingleUpdateOp(
                                       .getDatabaseProfileLevel(ns.dbName()));
     }
 
-    assertCanWrite_inlock(opCtx, collection.nss());
-
     // No need to call writeConflictRetry() since it does not retry if in a transaction,
     // but calling it can cause WCE to be double counted.
     const auto inTransaction = opCtx->inMultiDocumentTransaction();
@@ -2367,8 +2360,6 @@ static SingleWriteResult performSingleDeleteOp(
         curOp.raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                       .getDatabaseProfileLevel(ns.dbName()));
     }
-
-    assertCanWrite_inlock(opCtx, collection.nss());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");

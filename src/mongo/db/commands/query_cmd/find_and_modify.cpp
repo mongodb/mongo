@@ -173,16 +173,6 @@ write_ops::FindAndModifyCommandReply buildResponse(
     return result;
 }
 
-void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) {
-    uassert(ErrorCodes::NotWritablePrimary,
-            str::stream() << "Not primary while running findAndModify command on collection "
-                          << nss.toStringForErrorMsg(),
-            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
-
-    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
-        ->checkShardVersionOrThrow(opCtx);
-}
-
 void recordStatsForTopCommand(OperationContext* opCtx) {
     auto curOp = CurOp::get(opCtx);
     Top::getDecoration(opCtx).record(opCtx,

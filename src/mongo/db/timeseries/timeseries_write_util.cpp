@@ -199,8 +199,6 @@ void performAtomicWrites(
     curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                    .getDatabaseProfileLevel(ns.dbName()));
 
-    write_ops_exec::assertCanWrite_inlock(opCtx, ns);
-
     // Groups all operations in one or several chained oplog entries to ensure the writes are
     // replicated atomically.
     auto groupOplogEntries =

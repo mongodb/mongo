@@ -16,7 +16,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/repl:repl_coordinator_interface",
     ],
 )

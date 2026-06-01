@@ -29,12 +29,7 @@
 
 #include "mongo/db/query/write_ops/write_ops_exec_util.h"
 
-#include "mongo/base/error_codes.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -69,16 +64,6 @@ void LastOpFixer::finishedOpSuccessfully() {
     // if it was a no-op write. If the op was successful and already bumped LastOp itself,
     // we don't need to do it again.
     _needToFixLastOp = _needToFixLastOp && (replClientInfo().getLastOp() == _opTimeAtLastOpStart);
-}
-
-void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) {
-    uassert(ErrorCodes::PrimarySteppedDown,
-            str::stream() << "Not primary while writing to " << nss.toStringForErrorMsg(),
-            repl::ReplicationCoordinator::get(opCtx->getServiceContext())
-                ->canAcceptWritesFor(opCtx, nss));
-
-    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
-        ->checkShardVersionOrThrow(opCtx);
 }
 
 }  // namespace mongo::write_ops_exec

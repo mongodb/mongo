@@ -970,8 +970,6 @@ Status performAtomicTimeseriesWrites(
     curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                    .getDatabaseProfileLevel(ns.dbName()));
 
-    mongo::write_ops_exec::assertCanWrite_inlock(opCtx, ns);
-
     WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
     if (insertOps.size() > 1 && updateOps.empty() &&
         !repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
