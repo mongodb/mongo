@@ -2,8 +2,6 @@
 //   requires_non_retryable_writes,
 //   # Uses $where operator
 //   requires_scripting,
-//   # TODO SERVER-116054: Add support for $where.
-//   mozjs_wasm_unsupported,
 // ]
 
 let t = db.jstests_js1;

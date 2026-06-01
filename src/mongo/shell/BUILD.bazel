@@ -280,7 +280,7 @@ MONGOJS_CPP_JSFILES = [
     "session.js",
     "session_global.js",
     "stringdiff.js",
-    "types.js",
+    "//src/mongo/scripting/mozjs/common/jsfiles:types.js",
     "utils.js",
     "utils_global.js",
     "utils_auth.js",

@@ -74,6 +74,7 @@ mongo_cc_library(
         "//src/mongo/base:string_data.h",
         "//src/mongo/scripting:engine.h",
         "//src/mongo/scripting:js_regex.h",
+        "//src/mongo/scripting/mozjs/common:jsfile.h",
     ],
     deps = [
         "//src/mongo:base",

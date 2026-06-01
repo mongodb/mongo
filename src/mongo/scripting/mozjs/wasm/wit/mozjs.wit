@@ -53,6 +53,9 @@ interface mozjs {
   /// Startup options for the WASM engine.
   record wasm-mozjs-startup-options {
     heap-size-mb: u32,
+    /// When true, BSON Code/CodeWScope values are not automatically eval()ed
+    /// (mirrors --enableJavaScriptProtection).
+    javascript-protection: bool,
   }
 
   /// Initialize/shutdown/interrupt
@@ -96,6 +99,7 @@ interface mozjs {
 
   /// Drain the emit buffer: returns accumulated {k,v} pairs as BSON, then clears.
   drain-emit-buffer: func() -> result<list<u8>, wasm-mozjs-error>;
+
 }
 
 world api {

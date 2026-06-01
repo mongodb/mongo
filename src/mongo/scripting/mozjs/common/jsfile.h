@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,43 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/json.h"
-#include "mongo/bson/oid.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/scripting/mozjs/common/hex_md5.h"
-#include "mongo/util/assert_util.h"
-
-#include <string>
+#pragma once
 
 namespace mongo {
 
-static BSONObj native_tostrictjson(const mongo::BSONObj& args, void* data) {
-    uassert(40275,
-            "tostrictjson takes a single BSON object argument, and on optional boolean argument "
-            "for prettyPrint -- tostrictjson(obj, prettyPrint = false)",
-            args.nFields() >= 1 && args.firstElement().isABSONObj() &&
-                (args.nFields() == 1 || (args.nFields() == 2 && args["1"].isBoolean())));
-
-    bool prettyPrint = false;
-    if (args.nFields() == 2) {
-        prettyPrint = args["1"].boolean();
-    }
-    return BSON("" << tojson(args.firstElement().embeddedObject(), LegacyStrict, prettyPrint));
-}
-
-// ---------------------------------
-// ---- installer           --------
-// ---------------------------------
-
-void installGlobalUtils(Scope& scope) {
-    scope.injectNative("hex_md5", native_hex_md5);
-    scope.injectNative("tostrictjson", native_tostrictjson);
-}
+struct MONGO_MOD_NEEDS_REPLACEMENT JSFile {
+    const char* name;
+    const StringData source;
+};
 
 }  // namespace mongo

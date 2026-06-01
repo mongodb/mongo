@@ -11,8 +11,6 @@
 //   # TODO(SERVER-84158): Try to include this test(s).
 //   exclude_from_timeseries_crud_passthrough,
 //   # TODO SERVER-116052: Add support for $function.
-//   # TODO SERVER-116054: Add support for $where.
-//   mozjs_wasm_unsupported,
 // ]
 
 const testDB = db.getSiblingDB("system_js_access");

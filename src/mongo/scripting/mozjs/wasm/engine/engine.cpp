@@ -32,6 +32,8 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/scripting/mozjs/common/error.h"
+#include "mongo/scripting/mozjs/common/hex_md5.h"
+#include "mongo/scripting/mozjs/common/jsfile.h"
 #include "mongo/scripting/mozjs/common/parse_function_helper.h"
 #include "mongo/scripting/mozjs/common/runtime.h"
 #include "mongo/scripting/mozjs/common/types/bindata.h"
@@ -79,6 +81,11 @@
 #include <mozilla/Utf8.h>
 
 namespace mongo {
+namespace JSFiles {
+extern const JSFile types;
+extern const JSFile assert_wasm;
+}  // namespace JSFiles
+
 namespace mozjs {
 namespace wasm {
 
@@ -148,6 +155,7 @@ err_code_t MozJSScriptEngine::init(const wasm_mozjs_startup_options_t* opt,
 
     // Store configured heap limit for GlobalInfo::getJSHeapLimitMB.
     g_wasmJsHeapLimitMB = opt->heapSize;
+    _javascriptProtection = opt->javascriptProtection;
 
     _rt = JS_GetRuntime(_cx);
     if (!_rt) {
@@ -225,6 +233,27 @@ err_code_t MozJSScriptEngine::init(const wasm_mozjs_startup_options_t* opt,
             shutdown(nullptr);
             return err ? err->code : SM_E_INTERNAL;
         }
+
+        _parseHelperFn.init(_cx);
+        {
+            // Cache and remove __parseJSFunctionOrExpression and Reflect from the global so they
+            // are not user-visible, mirroring the shell's behaviour of moving them to the
+            // MongoHelpers for native MozJS.
+            ObjectWrapper gw(_cx, _global);
+            JS::RootedValue helperVal(_cx);
+            gw.getValue("__parseJSFunctionOrExpression", &helperVal);
+            _parseHelperFn = helperVal;
+            gw.deleteProperty("__parseJSFunctionOrExpression");
+            gw.deleteProperty("Reflect");
+        }
+
+        invariant(exec(JSFiles::types.source, JSFiles::types.name));
+        invariant(exec(JSFiles::assert_wasm.source, JSFiles::assert_wasm.name));
+
+        // Like in native MozJS treatment we rebind the ECMAScript Map with BSONAwareMap.
+        ObjectWrapper(_cx, _global).renameAndDeleteProperty("BSONAwareMap", "Map");
+
+        injectNative("hex_md5", native_hex_md5);
     }
 
     _initialized = true;
@@ -242,6 +271,8 @@ err_code_t MozJSScriptEngine::shutdown(wasm_mozjs_error_t* err) {
     _internedStrings.reset();
     _prototypeInstaller.reset();
 
+    if (_parseHelperFn.initialized())
+        _parseHelperFn.reset();
     _global.reset();
     if (_cx) {
         // Do NOT null context-private before DestroyContext:
@@ -275,13 +306,61 @@ bool MozJSScriptEngine::_parseFunctionSource(StringData raw,
                                              std::string* out,
                                              wasm_mozjs_error_t* err) {
     ExecutionCheck chk(_cx, err);
-    if (!chk.ok(parseJSFunctionOrExpression(_cx, _global, raw, out), SM_E_COMPILE)) {
+
+    JS::RootedValue inputVal(_cx);
+    ValueReader(_cx, &inputVal).fromStringData(raw);
+
+    JS::RootedValue result(_cx);
+    JS::RootedValue helperFn(_cx, _parseHelperFn.get());
+    bool success = JS::Call(_cx, _global, helperFn, JS::HandleValueArray(inputVal), &result);
+    if (!chk.ok(success, SM_E_COMPILE)) {
         if (err && err->code == SM_E_PENDING_EXCEPTION)
             err->code = SM_E_COMPILE;
         return false;
     }
+
+    *out = ValueWriter(_cx, result).toString();
     return true;
 }
+
+bool MozJSScriptEngine::exec(StringData code, const std::string& name) {
+    JS::CompileOptions co(_cx);
+    co.setFileAndLine(name.c_str(), 1);
+
+    JS::SourceText<mozilla::Utf8Unit> srcBuf;
+    bool success = srcBuf.init(_cx, code.data(), code.size(), JS::SourceOwnership::Borrowed);
+    if (!success) {
+        return false;
+    }
+
+    JSScript* scriptPtr = JS::Compile(_cx, co, srcBuf);
+    success = scriptPtr != nullptr;
+
+    if (!success) {
+        return false;
+    }
+
+    JS::RootedValue out(_cx);
+    JS::RootedScript script(_cx, scriptPtr);
+    success = JS_ExecuteScript(_cx, script, &out);
+
+    if (!success) {
+        return false;
+    }
+
+    return true;
+}
+
+void MozJSScriptEngine::injectNative(const char* field, NativeFunction func, void* data) {
+    JS::RootedObject obj(_cx);
+
+    NativeFunctionInfo::make(_cx, &obj, func, data);
+
+    JS::RootedValue value(_cx);
+    value.setObjectOrNull(obj);
+    ObjectWrapper(_cx, _global).setValue(field, value);
+}
+
 
 err_code_t MozJSScriptEngine::createFunction(const uint8_t* src,
                                              size_t len,
@@ -911,9 +990,7 @@ void MozJSScriptEngine::setStatus(Status status) {
 }
 
 bool MozJSScriptEngine::isJavaScriptProtectionEnabled() const {
-    // JavaScript protection (--enableJavaScriptProtection) is not applicable
-    // in WASM builds where the engine runs in a sandboxed component.
-    return false;
+    return _javascriptProtection;
 }
 
 bool MozJSScriptEngine::requiresOwnedObjects() const {
@@ -922,9 +999,10 @@ bool MozJSScriptEngine::requiresOwnedObjects() const {
 }
 
 void MozJSScriptEngine::newFunction(StringData raw, JS::MutableHandleValue out) {
-    JS::RootedObject global(_cx, JS::CurrentGlobalOrNull(_cx));
+    // Use the cached helper (not the free parseJSFunctionOrExpression) because
+    // __parseJSFunctionOrExpression is removed from the global during init.
     std::string parsed;
-    if (!parseJSFunctionOrExpression(_cx, global, raw, &parsed))
+    if (!_parseFunctionSource(raw, &parsed, nullptr))
         return;  // JS exception is pending
 
     std::string wrapped;

@@ -2559,6 +2559,44 @@ TEST_F(WasmMozJSBridgeTest, PostJsCallExceptionDoesNotTrapBridge) {
     ASSERT_THROWS_CODE(invokeFunction(handle, BSONObj()), DBException, ErrorCodes::BadValue);
 }
 
+/**
+ * Tests exposed javascript functions.
+ */
+TEST_F(WasmMozJSBridgeTest, InvokeToJSON) {
+    auto handle = createFunction("function() { return {answer: tojson(42)}; }");
+
+    // Invoke with empty BSON args
+    BSONObj emptyArgs;
+    auto result = invokeFunction(handle, emptyArgs);
+
+    // Retrieve result
+    ASSERT_FALSE(result.isEmpty());
+    ASSERT_EQ(result.getStringField("answer"), "42");
+}
+
+TEST_F(WasmMozJSBridgeTest, InvokeHex) {
+    auto handle = createFunction("function() { return {answer: hex_md5(\"42\")}; }");
+
+    // Invoke with empty BSON args
+    BSONObj emptyArgs;
+    auto result = invokeFunction(handle, emptyArgs);
+
+    // Retrieve result
+    ASSERT_FALSE(result.isEmpty());
+    ASSERT_EQ(result.getStringField("answer"), "a1d0c6e83f027327d8461063f4ac58a6");
+}
+
+TEST_F(WasmMozJSBridgeTest, AssertTest) {
+    // No args (empty BSON) — function receives no arguments
+    auto handle = createFunction(
+        "function() {"
+        "  assert(true);"
+        "  assert.eq(true, true);"
+        "}");
+
+    BSONObj emptyArgs;
+    auto result = invokeFunction(handle, emptyArgs);
+}
 }  // namespace
 }  // namespace wasm
 }  // namespace mozjs

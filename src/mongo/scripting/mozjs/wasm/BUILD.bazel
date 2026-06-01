@@ -1,4 +1,5 @@
 load("//bazel/wasm_rules:wasm_cc_binary.bzl", "wasm_cc_binary")
+load("//bazel/config:render_template.bzl", "render_template")
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 load("//bazel/wasm_rules:embed_binary.bzl", "embed_binary_obj", "embed_binary_rc")
 load("//bazel/wasm_rules:wasm_aot_compile.bzl", "aot_compile_wasm")
@@ -54,6 +55,40 @@ genrule(
     ],
 )
 
+MONGO_WASM_JS_CPP_JSFILES = [
+    "//src/mongo/scripting/mozjs/wasm/jsfiles:assert_wasm.js",
+    "//src/mongo/scripting/mozjs/common/jsfiles:types.js",
+]
+
+# Converts core JS file content into CPP structures to be loaded directly
+# into the native binary via bytecode upon startup.
+render_template(
+    name = "mongowasmjs_cpp",
+    srcs = MONGO_WASM_JS_CPP_JSFILES,
+    cmd = [
+        "$(location mongowasmjs.cpp)",
+    ] + [
+        "$(location {})".format(file)
+        for file in MONGO_WASM_JS_CPP_JSFILES
+    ],
+    output = "mongowasmjs.cpp",
+    python_file = "//buildscripts:jstoh.py",
+)
+
+mongo_cc_library(
+    name = "mongowasmjs",
+    srcs = [
+        "mongowasmjs.cpp",
+    ],
+    auto_header = False,
+    private_hdrs = [
+        "//src/mongo/scripting/mozjs/common:jsfile.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
 mongo_cc_library(
     name = "mozjs_wasm_lib",
     srcs = glob(
@@ -85,7 +120,9 @@ mongo_cc_library(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
+        ":mongowasmjs",
         "//src/mongo:base",
+        "//src/mongo/scripting/mozjs/common:hex_md5",
         "//src/mongo/scripting/mozjs/common:mozjs_common",
         "//src/mongo/scripting/mozjs/shared:mozjs_shared_types",
         "@spidermonkey_wasi//:spidermonkey",
@@ -127,7 +164,6 @@ exports_files([
 mongo_cc_library(
     name = "bridge",
     srcs = [
-        "//src/mongo/scripting:config_engine_gen",
         "//src/mongo/scripting/mozjs/wasm/bridge:bridge.cpp",
         "//src/mongo/scripting/mozjs/wasm/bridge:wasm_helpers.cpp",
     ],
@@ -143,6 +179,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:server_parameter",
+        "//src/mongo/scripting:scripting_common",
         "@crates//:wasmtime_c",
     ] + select({
         "@platforms//os:windows": ["//bazel/rules_rust:win_allocator_shim"],

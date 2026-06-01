@@ -12,8 +12,6 @@
  *   requires_getmore,
  *   requires_fcv_62,
  *   requires_scripting,
- *   # TODO SERVER-116054: Add support for $where.
- *   mozjs_wasm_unsupported,
  *  ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

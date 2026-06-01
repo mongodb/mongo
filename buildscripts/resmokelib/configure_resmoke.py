@@ -779,13 +779,15 @@ flags in common: {common_set}
 
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
 
-    # TODO SERVER-116054, SERVER-116052: Remove this js_engine handling
-    # section and _detect_js_engine once mozjs-wasm supports $where and $function,
+    # TODO SERVER-116052: Remove this js_engine handling
+    # section and _detect_js_engine once mozjs-wasm supports $function,
     # eliminating the need for this startup-time binary invocation.
     _config.JS_ENGINE = _detect_js_engine(_config.MONGOD_EXECUTABLE)
     if _config.JS_ENGINE == "mozjs-wasm":
         _config.EXCLUDE_WITH_ANY_TAGS.append("mozjs_wasm_unsupported")
         _config.EXCLUDE_FILES = _find_mozjs_jstestfuzz_files()
+    else:
+        _config.EXCLUDE_WITH_ANY_TAGS.append("requires_mozjs_wasm")
 
     mongod_set_parameters = config.pop("mongod_set_parameters")
 
@@ -1194,8 +1196,6 @@ def _set_logging_config():
 _MOZJS_PATTERNS = (
     # TODO SERVER-116052: Add support for $function.
     '"$function"',
-    # TODO SERVER-116054: Add support for $where.
-    '"$where"',
 )
 
 

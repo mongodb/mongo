@@ -1,8 +1,6 @@
 // @tags: [
 //   requires_fast_memory,
 //   requires_scripting,
-//   # TODO SERVER-116054: Add support for $where.
-//   mozjs_wasm_unsupported,
 // ]
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "unable to start mongod");
@@ -44,7 +42,11 @@ function assertMemoryError(func) {
     try {
         func();
     } catch (e) {
-        if (e.message.includes("Out of memory") || e.message.includes("JavaScript execution interrupted")) {
+        if (
+            e.message.includes("Out of memory") ||
+            e.message.includes("JavaScript execution interrupted") ||
+            e.message.includes("out of memory")
+        ) {
             return;
         }
         throw e;
