@@ -42,6 +42,12 @@ StringData toString(MetricUnit unit) {
             return "events";
         case MetricUnit::kCount:
             return "count";
+        case MetricUnit::kId:
+            return "id";
+        case MetricUnit::kState:
+            return "state";
+        case MetricUnit::kBoolean:
+            return "bool";
 
         // Time
         case MetricUnit::kMicroseconds:
