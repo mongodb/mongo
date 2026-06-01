@@ -42,9 +42,6 @@ namespace mongo {
  * metrics are written directly to the query stats store.
  * NOTE: Metrics are taken from opDebug.additiveMetrics, so CurOp::setEndOfOpMetrics must be called
  * *prior* to calling these.
- *
- * Currently, query stats are only collected for find, aggregate, count, and distinct requests (and
- * their subsequent getMore requests), so these should only be called from those request paths.
  */
 void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& cursor);
 // TODO SERVER-112083 Move this function to a better location since it has nothing to do with

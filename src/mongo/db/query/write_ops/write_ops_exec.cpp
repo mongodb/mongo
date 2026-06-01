@@ -1416,6 +1416,28 @@ size_t getTunedMaxBatchSize(OperationContext* opCtx,
     }
     return maxBatchSize;
 }
+
+/**
+ * Collect query stats metrics on mongod.
+ */
+static void collectQueryStats(OperationContext* opCtx,
+                              CurOp& curOp,
+                              const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // Only collect query stats if a QueryStats key was generated during registration, which
+    // indicates that query stats was enabled and this operation was sampled for query stats.
+    // metricsRequested is set when a remote caller (e.g. mongos) has requested per-op execution
+    // metrics be included in the write response, independently of whether the operation was
+    // sampled. We snapshot end-of-op metrics in both cases, but only write to the query stats store
+    // when a key exists.
+    auto key = std::move(curOp.debug().getQueryStatsInfo().key);
+    if (key || curOp.debug().getQueryStatsInfo().metricsRequested) {
+        curOp.setEndOfOpMetrics(0 /* no documents returned */);
+    }
+    if (key) {
+        collectQueryStatsMongod(opCtx, expCtx, std::move(key));
+    }
+}
+
 }  // namespace
 
 WriteResult performInserts(
@@ -1601,15 +1623,8 @@ WriteResult performInserts(
     }
     tassert(11052014, "Expected empty batch", batch.empty());
 
-    // Collect query stats for the insert operation if a QueryStats key was registered.
     if (source != OperationSource::kTimeseriesInsert) {
-        auto key = std::move(curOp.debug().getQueryStatsInfo().key);
-        if (key || curOp.debug().getQueryStatsInfo().metricsRequested) {
-            curOp.setEndOfOpMetrics(0 /* no documents returned */);
-        }
-        if (key) {
-            collectQueryStatsMongod(opCtx, nullptr, std::move(key));
-        }
+        collectQueryStats(opCtx, curOp, nullptr);
     }
 
     return out;
@@ -1682,16 +1697,7 @@ static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
         *containsDotsAndDollarsField = true;
     }
 
-    // Collect query stats for the update operation if a QueryStats key was generated during
-    // registration. This ensures that we minimize the overhead of query stats collection for
-    // updates even if it does not have query stats enabled.
-    auto key = std::move(curOp.debug().getQueryStatsInfo().key);
-    if (key || curOp.debug().getQueryStatsInfo().metricsRequested) {
-        curOp.setEndOfOpMetrics(0 /* no documents returned */);
-    }
-    if (key) {
-        collectQueryStatsMongod(opCtx, canonicalUpdate.expCtx(), std::move(key));
-    }
+    collectQueryStats(opCtx, curOp, canonicalUpdate.expCtx());
 
     return result;
 }
@@ -2394,6 +2400,8 @@ static SingleWriteResult performSingleDeleteOp(
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         curOp.debug().execStats = std::move(stats);
     }
+
+    collectQueryStats(opCtx, curOp, canonicalDelete.expCtx());
 
     SingleWriteResult result;
     result.setN(nDeleted);

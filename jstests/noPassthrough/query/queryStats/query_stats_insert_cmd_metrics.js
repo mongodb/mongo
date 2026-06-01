@@ -8,11 +8,10 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
     assertAggregatedMetricsSingleExec,
-    assertExpectedResults,
-    getLatestQueryStatsEntry,
     getQueryStatsInsertCmd,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
+import {assertWriteCmdQueryStatsSingleExec} from "jstests/libs/query/query_stats_write_cmd_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -22,34 +21,12 @@ const kQueryStatsServerParams = {
 
 function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
     assert.commandWorked(coll.deleteMany({}));
-
-    const cmd = {
-        insert: collName,
-        documents: [{v: 1}],
-    };
-
-    assert.commandWorked(testDB.runCommand(cmd));
-
-    const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
-    assert.eq(entry.key.queryShape.command, "insert");
-
-    assertAggregatedMetricsSingleExec(entry, {
+    assert.commandWorked(testDB.runCommand({insert: collName, documents: [{v: 1}]}));
+    assertWriteCmdQueryStatsSingleExec(testDB, coll, {
+        command: "insert",
         keysExamined: 0,
         docsExamined: 0,
-        hasSortStage: false,
-        usedDisk: false,
-        fromMultiPlanner: false,
-        fromPlanCache: false,
         writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 1, nUpdateOps: 0},
-    });
-    assertExpectedResults({
-        results: entry,
-        expectedQueryStatsKey: entry.key,
-        expectedExecCount: 1,
-        expectedDocsReturnedSum: 0,
-        expectedDocsReturnedMax: 0,
-        expectedDocsReturnedMin: 0,
-        expectedDocsReturnedSumOfSq: 0,
     });
 
     if (shardConn) {
@@ -70,34 +47,12 @@ function testSingleDocInsert(testDB, coll, collName, shardConn = null) {
 
 function testMultiDocInsert(testDB, coll, collName, shardConn = null) {
     assert.commandWorked(coll.deleteMany({}));
-
-    const cmd = {
-        insert: collName,
-        documents: [{v: 1}, {v: 2}, {v: 3}],
-    };
-
-    assert.commandWorked(testDB.runCommand(cmd));
-
-    const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
-    assert.eq(entry.key.queryShape.command, "insert");
-
-    assertAggregatedMetricsSingleExec(entry, {
+    assert.commandWorked(testDB.runCommand({insert: collName, documents: [{v: 1}, {v: 2}, {v: 3}]}));
+    assertWriteCmdQueryStatsSingleExec(testDB, coll, {
+        command: "insert",
         keysExamined: 0,
         docsExamined: 0,
-        hasSortStage: false,
-        usedDisk: false,
-        fromMultiPlanner: false,
-        fromPlanCache: false,
         writes: {nMatched: 0, nUpserted: 0, nModified: 0, nDeleted: 0, nInserted: 3, nUpdateOps: 0},
-    });
-    assertExpectedResults({
-        results: entry,
-        expectedQueryStatsKey: entry.key,
-        expectedExecCount: 1,
-        expectedDocsReturnedSum: 0,
-        expectedDocsReturnedMax: 0,
-        expectedDocsReturnedMin: 0,
-        expectedDocsReturnedSumOfSq: 0,
     });
 
     if (shardConn) {

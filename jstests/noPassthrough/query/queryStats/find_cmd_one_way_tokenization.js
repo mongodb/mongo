@@ -1,10 +1,8 @@
 /**
  * Test that $queryStats properly tokenizes find commands, on mongod and mongos.
  */
-import {getQueryStatsFindCmd} from "jstests/libs/query/query_stats_utils.js";
+import {getQueryStatsFindCmd, kHashedFieldName} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-
-const kHashedFieldName = "lU7Z0mLRPRUL+RfAD5jhYPRRpXBsZBxS/20EzDwfOG4=";
 
 function runTest(conn) {
     const db = conn.getDB("test");
