@@ -2754,7 +2754,7 @@ sdkroot(
 
 js_engine(
     name = "js_engine",
-    build_setting_default = "mozjs",
+    build_setting_default = "wasm",
 )
 
 config_setting(
