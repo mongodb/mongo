@@ -303,7 +303,6 @@ functions:
         # Note that the config flags are resolved prior to changing to cmake_build directory.
         DEFINED_EVERGREEN_CONFIG_FLAGS="${CMAKE_BUILD_TYPE|} \
           ${CMAKE_INSTALL_PREFIX|-DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL} \
-          ${CMAKE_TOOLCHAIN_FILE|-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake} \
           ${ENABLE_LAZYFS|} \
           ${NONSTANDALONE|} \
           ${ENABLE_SHARED|} \
@@ -391,6 +390,13 @@ functions:
             # Run this script in its own process as it depends on managing
             # shell options.
             /bin/bash test/evergreen/tcmalloc_install_or_build.sh ${build_variant}
+          fi
+
+          # Use cmake preset on Linux, if available. Newer branches use presets instead of toolchain files.
+          if [[ "$(uname -s)" == "Linux" && -f CMakePresets.json ]]; then
+            DEFINED_EVERGREEN_CONFIG_FLAGS="--preset linux-gcc $DEFINED_EVERGREEN_CONFIG_FLAGS"
+          else
+            DEFINED_EVERGREEN_CONFIG_FLAGS="${CMAKE_TOOLCHAIN_FILE|-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake} $DEFINED_EVERGREEN_CONFIG_FLAGS"
           fi
 
           # Compiling with CMake.

@@ -92,13 +92,26 @@ class test_config09(wttest.WiredTigerTestCase):
         self.assertEqual(val, 1024)
 
         self.update_tables()
-        val = self.get_stat(stat.conn.checkpoint_handle_applied)
+        applied = self.get_stat(stat.conn.checkpoint_handle_applied)
         # We cannot assert it is equal to half because there could be other
         # internal tables in the count. Assert it is less than 75% and at least
         # half.
-        self.assertGreaterEqual(val, self.ntables // 2)
-        self.assertLess(val, self.ntables // 4 * 3)
-        val = self.get_stat(stat.conn.checkpoint_handle_skipped)
-        self.assertNotEqual(val, 0)
+        self.assertGreaterEqual(applied, self.ntables // 2)
+        self.assertLess(applied, self.ntables // 4 * 3)
+        skipped = self.get_stat(stat.conn.checkpoint_handle_skipped)
+        self.assertNotEqual(skipped, 0)
+
+        # The handle stats should be reset at the start of each gather and
+        # then set to the per-checkpoint value. Two back-to-back checkpoints
+        # over the same working set must therefore publish the same value;
+        # if the reset is missing, the second value will be roughly double
+        # the first.
+        locked_1 = self.get_stat(stat.conn.checkpoint_handle_locked)
+        meta_checked_1 = self.get_stat(stat.conn.checkpoint_handle_meta_checked)
+        self.session.checkpoint()
+        locked_2 = self.get_stat(stat.conn.checkpoint_handle_locked)
+        meta_checked_2 = self.get_stat(stat.conn.checkpoint_handle_meta_checked)
+        self.assertEqual(locked_1, locked_2)
+        self.assertEqual(meta_checked_1, meta_checked_2)
 
         self.conn.close()
