@@ -219,6 +219,11 @@ public:
         return value::rawToView(_maxVal);
     }
 
+    int getApproximateSize() const final {
+        return sizeof(*this) + sbe::value::getApproximateSize(_minVal.first, _minVal.second) +
+            sbe::value::getApproximateSize(_maxVal.first, _maxVal.second);
+    }
+
 private:
     std::pair<value::TypeTags, value::Value> _minVal = {value::TypeTags::Nothing, 0};
     std::pair<value::TypeTags, value::Value> _maxVal = {value::TypeTags::Nothing, 0};
@@ -4512,6 +4517,10 @@ public:
 
     size_t count() override {
         return 0;
+    }
+
+    int getApproximateSize() const final {
+        return sizeof(*this);
     }
 
 private:

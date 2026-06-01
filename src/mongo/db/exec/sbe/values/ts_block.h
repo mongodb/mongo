@@ -213,6 +213,17 @@ public:
         return _decompressedBlock.get();
     }
 
+    int getApproximateSize() const final {
+        int result = sizeof(*this);
+        if (_block.owned()) {
+            result += sbe::value::getApproximateSize(_block.tag(), _block.value());
+        }
+        if (_decompressedBlock) {
+            result += _decompressedBlock->getApproximateSize();
+        }
+        return result;
+    }
+
 private:
     void ensureDeblocked();
 
@@ -280,6 +291,15 @@ public:
 
     const std::vector<int32_t>& filterPositionInfo() override {
         return _positionInfo;
+    }
+
+    int getApproximateSize() const override {
+        int result = sizeof(*this);
+        result += static_cast<int>(_positionInfo.capacity() * sizeof(int32_t));
+        if (_ownedTsBlock) {
+            result += _ownedTsBlock->getApproximateSize();
+        }
+        return result;
     }
 
 private:

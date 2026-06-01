@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/values/column_op.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/value_size.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -352,6 +353,8 @@ struct ValueBlock {
         return boost::none;
     }
 
+    virtual int getApproximateSize() const = 0;
+
 protected:
     virtual DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) = 0;
 
@@ -480,6 +483,10 @@ public:
         return {_tag, _val};
     }
 
+    int getApproximateSize() const final {
+        return sbe::value::getApproximateSize(_tag, _val);
+    }
+
 private:
     // Always owned.
     TypeTags _tag;
@@ -559,6 +566,14 @@ public:
     }
 
     std::unique_ptr<ValueBlock> map(const ColumnOp& op) override;
+
+    int getApproximateSize() const final {
+        int result = sizeof(*this);
+        for (size_t i = 0; i < _vals.size(); ++i) {
+            result += sbe::value::getApproximateSize(_tags[i], _vals[i]);
+        }
+        return result;
+    }
 
 private:
     void release() noexcept {
@@ -777,6 +792,22 @@ public:
 
     const std::vector<Value>& getVector() const {
         return _vals;
+    }
+
+    int getApproximateSize() const final {
+        const int bitsetHeapBytes = static_cast<int>(_presentBitset.num_blocks() *
+                                                     sizeof(HomogeneousBlockBitset::block_type));
+        if constexpr (isShallowType(TypeTag)) {
+            return sizeof(Value) * _vals.capacity() + bitsetHeapBytes + sizeof(*this);
+        } else {
+            int result = sizeof(*this) + bitsetHeapBytes;
+            for (size_t i = 0; i < _vals.size(); ++i) {
+                if (_presentBitset.at(i)) {
+                    result += sbe::value::getApproximateSize(TypeTag, _vals[i]);
+                }
+            }
+            return result;
+        }
     }
 
 private:

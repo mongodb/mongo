@@ -1714,6 +1714,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe/values:util.cpp",
         "//src/mongo/db/exec/sbe/values:value.cpp",
         "//src/mongo/db/exec/sbe/values:value_printer.cpp",
+        "//src/mongo/db/exec/sbe/values:value_size.cpp",
     ],
     deps = [
         "//src/mongo:base",
