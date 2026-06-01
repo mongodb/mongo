@@ -3,6 +3,7 @@ test_kind: js_test
 selector:
   roots:
     - src/mongo/db/modules/*/jstests/streams_kafka/kafka5_crash.js
+    - src/mongo/db/modules/*/jstests/streams_kafka/kafka_stop_on_broker_error.js
 
 executor:
   fixture:
