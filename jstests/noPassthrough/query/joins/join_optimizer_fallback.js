@@ -303,6 +303,21 @@ runTestCaseEligiblePipeline({
     expectedCount: 1,
 });
 
+// The second lookup's "as" field shadows the first lookup's localField. Embedding the second
+// lookup's result at "x" overwrites "x.c", which the first lookup reads as its localField. The two
+// joins are not commutable, so the second lookup must stay in the suffix: otherwise a reordered
+// plan would evaluate "x.c = c" against the overwritten value and drop the matching document.
+runTestCaseIneligibleSuffix({
+    pipeline: [
+        {$lookup: {from: coll12.getName(), as: "matched", localField: "x.c", foreignField: "c"}},
+        {$unwind: "$matched"},
+        {$lookup: {from: coll13.getName(), as: "x", localField: "b", foreignField: "b"}},
+        {$unwind: "$x"},
+    ],
+    expectedCount: 1,
+    expectedJoinNodesInPrefix: 1,
+});
+
 // $lookup with no join predicate can still be optimized if the rest of the pipeline establishes
 // a connected join graph.
 runTestCaseEligiblePipeline({

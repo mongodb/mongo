@@ -68,6 +68,10 @@ bool PathResolver::pathResolvesToJoinNode(const FieldPath& asField, NodeId baseN
     if (auto resolved = resolveNodeByEmbedPath(asField); resolved) {
         auto [nodeId, pathWithoutEmbedPath] = *resolved;
         if (nodeId == baseNodeId) {
+            // Signal that $lookup "as" field shadows an earlier localField.
+            if (shadowsResolvedPath(nodeId, pathWithoutEmbedPath)) {
+                return true;
+            }
             // Hooray, this path is not owned by any join nodes in the graph so it's good to go!
             return false;
         }
@@ -124,6 +128,20 @@ boost::optional<std::pair<NodeId, FieldPath>> PathResolver::resolveNodeByEmbedPa
 
     // Base node with empty embedPath is a prefix for every path.
     MONGO_UNREACHABLE_TASSERT(11721301);
+}
+
+bool PathResolver::shadowsResolvedPath(NodeId nodeId, const FieldPath& path) const {
+    for (const auto& resolvedPath : _resolvedPaths) {
+        if (resolvedPath.nodeId != nodeId) {
+            continue;
+        }
+        // isPrefixOf() also returns true for equal paths, so this catches exact overwrites as well
+        // as overwrites of an ancestor or descendant of an already-resolved path.
+        if (path.isPrefixOf(resolvedPath.fieldName) || resolvedPath.fieldName.isPrefixOf(path)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 boost::optional<PathResolver::Scope&> PathResolver::getScopeForNode(NodeId node) {

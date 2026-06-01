@@ -282,33 +282,62 @@ TEST(PathResolverTests, ConflictingEmbedPaths) {
     PathResolver pathResolver{baseNodeId, resolvedPaths};
 
     // At this momment all paths are resolved to the base node.
-    ASSERT_EQ(false, pathResolver.pathResolvesToJoinNode("a", baseNodeId));
-    ASSERT_EQ(false, pathResolver.pathResolvesToJoinNode("a.b", baseNodeId));
-    ASSERT_EQ(false, pathResolver.pathResolvesToJoinNode("b", baseNodeId));
-    ASSERT_EQ(false, pathResolver.pathResolvesToJoinNode("b.c", baseNodeId));
-    ASSERT_EQ(false, pathResolver.pathResolvesToJoinNode("b.e", baseNodeId));
+    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("a", baseNodeId));
+    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("a.b", baseNodeId));
+    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b", baseNodeId));
+    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b.c", baseNodeId));
+    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b.e", baseNodeId));
 
     constexpr NodeId firstNodeId = 10;  // The index of nodes does not really matter.
     pathResolver.addNode(firstNodeId, "b.c");
 
     // These paths will no longer resolve to the base node because we have added
     // the "b.c" prefix to the graph in firstNode.
-    ASSERT_EQ(true, pathResolver.pathResolvesToJoinNode("b", baseNodeId));
-    ASSERT_EQ(true, pathResolver.pathResolvesToJoinNode("b.c", baseNodeId));
+    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("b", baseNodeId));
+    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("b.c", baseNodeId));
 
     // These paths will still resolve to the base node.
-    ASSERT_EQ(false, pathResolver.pathResolvesToJoinNode("b.e", baseNodeId));
-    ASSERT_EQ(false, pathResolver.pathResolvesToJoinNode("a", baseNodeId));
-    ASSERT_EQ(false, pathResolver.pathResolvesToJoinNode("a.b", baseNodeId));
+    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b.e", baseNodeId));
+    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("a", baseNodeId));
+    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("a.b", baseNodeId));
 
     constexpr NodeId secondNodeId = 100;  // The index of nodes does not really matter.
     pathResolver.addNode(secondNodeId, "a");
-    ASSERT_EQ(true, pathResolver.pathResolvesToJoinNode("a", baseNodeId));
-    ASSERT_EQ(true, pathResolver.pathResolvesToJoinNode("a.b", baseNodeId));
+    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("a", baseNodeId));
+    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("a.b", baseNodeId));
 
     // This path doesn't conflict with "a" or "b.e".
-    ASSERT_EQ(false, pathResolver.pathResolvesToJoinNode("b.e", baseNodeId));
+    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b.e", baseNodeId));
 }
 
+TEST(PathResolverTests, EmbedPathShadowsResolvedPredicatePath) {
+    constexpr NodeId baseNodeId = 0;
+    std::vector<ResolvedPath> resolvedPaths;
+    PathResolver pathResolver{baseNodeId, resolvedPaths};
 
+    // Simulate the first $lookup: {localField: "a.x", foreignField: "k", as: "matched"}. The
+    // localField "a.x" resolves to the base node and the foreignField "k" is added to the foreign
+    // node, mimicking how AggJoinModel processes a $lookup with a local/foreign field join.
+    auto localPath = pathResolver.resolve("a.x");
+    ASSERT_TRUE(localPath.has_value());
+    ASSERT_EQ(resolvedPaths[*localPath].nodeId, baseNodeId);
+
+    constexpr NodeId matchedNodeId = 1;
+    pathResolver.addNode(matchedNodeId, "matched");
+    pathResolver.addPath(matchedNodeId, "k");
+
+    // A second $lookup with as: "a" embeds its results at "a", which overwrites the base field
+    // "a.x" that the first lookup uses as its localField. Reordering the second lookup ahead of
+    // the first would corrupt that predicate, so this $lookup's "as" field must be rejected even
+    // though "a" does not collide with any existing embed path.
+    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("a", baseNodeId));
+    // Overwriting the resolved path exactly is also a conflict.
+    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("a.x", baseNodeId));
+    // Overwriting a path nested under the resolved path is a conflict too.
+    ASSERT_TRUE(pathResolver.pathResolvesToJoinNode("a.x.y", baseNodeId));
+
+    // Sibling paths that don't overlap the resolved path "a.x" remain eligible.
+    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("a.y", baseNodeId));
+    ASSERT_FALSE(pathResolver.pathResolvesToJoinNode("b", baseNodeId));
+}
 }  // namespace mongo::join_ordering

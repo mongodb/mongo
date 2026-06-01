@@ -161,6 +161,15 @@ private:
     boost::optional<std::pair<NodeId, FieldPath>> resolveNodeByEmbedPath(
         const FieldPath& fieldPath) const;
 
+    /**
+     * Returns true if embedding a $lookup's results at 'path' on node 'nodeId' would overwrite a
+     * field that has already been resolved to that node (i.e. 'path' and an existing resolved path
+     * have a prefix relationship, in either direction). Such an overwrite makes reordering the
+     * $lookup unsafe, since a previously-resolved join predicate field would observe a different
+     * value depending on the join order.
+     */
+    bool shadowsResolvedPath(NodeId nodeId, const FieldPath& path) const;
+
     boost::optional<Scope&> getScopeForNode(NodeId node);
 
     std::vector<ResolvedPath>& _resolvedPaths;
