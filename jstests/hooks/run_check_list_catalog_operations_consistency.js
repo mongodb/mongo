@@ -6,7 +6,14 @@ assert.neq(typeof db, "undefined", "No `db` object, is the shell connected to a 
 const multitenancyRes = db.adminCommand({getParameter: 1, multitenancySupport: 1});
 const multitenancy = multitenancyRes.ok && multitenancyRes["multitenancySupport"];
 const cmdObj = multitenancy ? {listDatabasesForAllTenants: 1} : {listDatabases: 1};
-const dbs = assert.commandWorked(db.adminCommand(cmdObj)).databases;
+let dbs;
+assert.soonRetryOnNetworkErrors(
+    () => {
+        dbs = assert.commandWorked(db.adminCommand(cmdObj)).databases;
+        return true;
+    },
+    () => "Timed out while retrying " + tojson(cmdObj) + " for catalog operations consistency check",
+);
 
 for (const dbRes of dbs) {
     try {

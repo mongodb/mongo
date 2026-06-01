@@ -42,3 +42,6 @@ filters:
   - "*check_metadata_consistency*":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "run_check_list_catalog_operations_consistency.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
