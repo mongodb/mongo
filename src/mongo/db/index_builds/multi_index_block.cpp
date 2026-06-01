@@ -116,6 +116,7 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseBeforeInsertion);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseAfterInsertion);
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYield);
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYieldSecond);
+MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSpillBeforeStatePersisted);
 
 namespace {
 
@@ -579,6 +580,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                         },
                     .onSpill =
                         [this, opCtx, &lastSpilledRecordId = index.lastSpilledRecordId] {
+                            hangAfterIndexBuildSpillBeforeStatePersisted.pauseWhileSet();
                             lastSpilledRecordId = _lastRecordIdInserted;
                             if (_isResumable) {
                                 _writeStateToContainer(opCtx);

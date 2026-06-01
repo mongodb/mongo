@@ -563,6 +563,143 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
     }
 
     /**
+     * Drives a single end-to-end "sorter orphan cleanup" scenario for a primary-driven index build.
+     *
+     * A single-index build is started and paused at `hangAfterIndexBuildSpillBeforeStatePersisted`,
+     * which is after the sorter spills to disk but before the metadata about that spill is
+     * persisted. Then, after failover, the new primary cleans up these orphaned sorter entries.
+     *
+     * `skipSpills` selects which branch of `deleteSorterEntriesOutsideRanges` is exercised:
+     *   - `skipSpills: 0` — the first spill is orphaned so all sorter entries are deleted and the
+     *     scan restarts from the beginning.
+     *   - `skipSpills: 1` — the first spill persists its ranges normally and the second spill is
+     *     orphaned, so keys outside the persisted range are deleted.
+     *
+     * Requires a 3-node set (see `_failover`'s UNCLEAN_RESTART path).
+     *
+     * @param {ReplSetTest} rst - Must have been constructed via `setUp({nodes: 3})`.
+     * @param {Object} options
+     * @param {number} options.skipSpills - Spills to let persist before the orphaning spill: 0
+     *     exercises the "no persisted ranges" branch, 1 the "persisted ranges" branch.
+     * @param {string} [options.collName="coll"]
+     * @returns {void}
+     */
+    static runSorterOrphanCleanup(rst, {skipSpills, collName = "coll"}) {
+        assert(skipSpills === 0 || skipSpills === 1, `skipSpills must be 0 or 1, got ${skipSpills}`);
+        assert.gte(rst.nodes.length, 3, "runSorterOrphanCleanup requires a 3-node set; use setUp({nodes: 3})");
+
+        if (!PrimaryDrivenResumableIndexBuildTest._featureFlagsEnabled(rst.getPrimary().getDB(jsTestName()))) {
+            jsTest.log.info(
+                "PrimaryDrivenResumableIndexBuildTest: skipping runSorterOrphanCleanup because the " +
+                    "primary-driven index build feature flags are disabled",
+            );
+            return;
+        }
+
+        const docCount = 3_000;
+        const indexName = "pdib_orphan_a";
+        const padBytes = 1500;
+        const docTemplate = (i) => ({_id: i, a: String(i).padStart(8, "0") + "x".repeat(padBytes)});
+
+        // Tight memory limit so the first iterations spill quickly.
+        PrimaryDrivenResumableIndexBuildTest._setIndexBuildSettings(rst, {
+            maxIndexBuildMemoryUsageMegabytes: 1,
+            primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys: 100,
+        });
+
+        const dbName = jsTestName();
+        const primary = rst.getPrimary();
+        const coll = primary.getDB(dbName).getCollection(collName);
+        coll.drop();
+        bulkInsert(coll, docCount, docTemplate);
+        rst.awaitReplication();
+
+        // Pause the build in the window where a spill's data is committed but its ranges are not.
+        // `{skip: skipSpills}` selects which spill is orphaned (see method docstring).
+        const hangBeforeBuildingIndexFp = configureFailPoint(primary, "hangBeforeBuildingIndex");
+        const orphanFp = configureFailPoint(
+            primary,
+            "hangAfterIndexBuildSpillBeforeStatePersisted",
+            {},
+            {skip: skipSpills},
+        );
+
+        // Kick off the build in a parallel shell.
+        const awaitCreateIndexes = startParallelShell(
+            funWithArgs(
+                function (dbName, collName, indexName) {
+                    db.getSiblingDB(dbName).runCommand({
+                        createIndexes: collName,
+                        indexes: [{key: {a: 1}, name: indexName}],
+                    });
+                },
+                dbName,
+                collName,
+                indexName,
+            ),
+            primary.port,
+        );
+
+        // Wait for the build to register, then extract its buildUUID.
+        let indexes;
+        assert.soonNoExcept(function () {
+            indexes = IndexBuildTest.assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true});
+            return true;
+        });
+        const buildUUID = extractUUIDFromObject(indexes[indexName].buildUUID);
+
+        // Wait for the build to reach `hangBeforeBuildingIndex` so the fail point is definitely
+        // armed before the build progresses into scan/spill.
+        checkLog.containsJson(primary, [4940900, 10978300], {
+            buildUUID: function (uuid) {
+                return uuid && uuid.uuid && uuid.uuid["$uuid"] === buildUUID;
+            },
+        });
+
+        rst.awaitLastOpCommitted();
+        hangBeforeBuildingIndexFp.off();
+
+        jsTest.log.info(
+            "PrimaryDrivenResumableIndexBuildTest: waiting for " +
+                `hangAfterIndexBuildSpillBeforeStatePersisted (skipSpills=${skipSpills})`,
+        );
+        orphanFp.wait();
+
+        // Wait for the secondary to replicate the orphaned spill writes before we uncleanly shut
+        // down the primary. The spill's container writes replicate asynchronously, so without this
+        // the stepped-up node could win the election without them, leaving the resumed build with
+        // no orphans to clean up.
+        rst.awaitReplication();
+
+        // Uncleanly shut down the primary, step up the secondary, and then restart the old primary.
+        const secondary = rst.getSecondary();
+        const newPrimary = PrimaryDrivenResumableIndexBuildTest._failover(
+            rst,
+            primary,
+            secondary,
+            PdibFailoverMode.UNCLEAN_RESTART,
+        );
+
+        awaitCreateIndexes({checkExitSuccess: false});
+        PrimaryDrivenResumableIndexBuildTest._waitForBuildOutcome(newPrimary, buildUUID);
+
+        checkLog.containsJson(newPrimary, 12784900, {
+            numDeleted: function (numDeleted) {
+                return numDeleted > 0;
+            },
+        });
+        checkLog.containsJson(newPrimary, 12500800, {phase: skipSpills === 0 ? "initialized" : "collection scan"});
+
+        rst.awaitReplication();
+        for (const node of rst.nodes) {
+            const nodeColl = node.getDB(dbName).getCollection(collName);
+            IndexBuildTest.assertIndexes(nodeColl, 2, ["_id_", indexName]);
+            assert.commandWorked(nodeColl.validate());
+        }
+        rst.checkReplicatedDataHashes();
+    }
+
+    /**
      * @param {DB} db
      * @returns {boolean} True iff `featureFlagContainerWrites`, `featureFlagPrimaryDrivenIndexBuilds` and
      *     `featureFlagResumablePrimaryDrivenIndexBuilds` are enabled.
