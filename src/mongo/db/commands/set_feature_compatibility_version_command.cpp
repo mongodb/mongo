@@ -56,6 +56,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
+#include "mongo/db/global_catalog/type_shard_identity.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
@@ -94,6 +95,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -186,6 +188,127 @@ void uassertStatusOKIgnoreNSNotFound(Status status) {
 
     uassertStatusOK(status);
 }
+
+/**
+ * Generates values for the 'uuid' field of each document of 'config.shards', and then applies those
+ * values to the shard identity document on each shard. Already existing 'uuids' values (which may
+ * have been generated in a previous call of this function) are preserved. (For dedicated config
+ * server, the generated and 'uuid' value will only be persisted on its own identify document).
+ */
+void generateShardUUIDs(OperationContext* opCtx) {
+    // Ensure stable topology throughout the execution of this method against concurrent removeShard
+    // requests.
+    DDLLockManager::ScopedCollectionDDLLock ddlLock(
+        opCtx, NamespaceString::kConfigsvrShardsNamespace, "generateShardUUIDs", LockMode::MODE_IS);
+    // Some of the steps performed by this function are dispatched through a DBDirectClient.
+    // Instantiate an AlternativeClientRegion to avoid polluting the original opCtx.
+    const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    {
+        const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        auto isConfigServerDedicated = true;
+
+        auto newClient =
+            opCtx->getService()->makeClient("generateShardUUIDs updateConfigShardsDocs");
+        const AlternativeClientRegion clientRegion{newClient};
+        auto altOpCtxHolder = CancelableOperationContext(
+            cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
+        auto* const altOpCtx = altOpCtxHolder.get();
+
+        DBDirectClient directClient(altOpCtx);
+
+        std::vector<write_ops::UpdateOpEntry> entries;
+        entries.reserve(shardIds.size());
+        // Create per-shard statements to assign new uuid values where missing (and update
+        // isConfigServerDedicated for later usage if needed).
+        for (const auto& shardId : shardIds) {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(BSON(ShardType::name.name() << shardId.toString() << ShardType::uuid.name()
+                                                   << BSON("$exists" << false)));
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                BSON("$set" << BSON(ShardType::uuid.name() << UUID::gen()))));
+            entry.setUpsert(false);
+            entry.setMulti(false);
+            entries.push_back(std::move(entry));
+            if (shardId == ShardId::kConfigServerId) {
+                isConfigServerDedicated = false;
+            }
+        }
+
+        if (!entries.empty()) {
+            write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrShardsNamespace);
+            updateOp.setUpdates(entries);
+            updateOp.setWriteConcern(defaultMajorityWriteConcern());
+            const auto result = directClient.update(updateOp);
+            write_ops::checkWriteErrors(result);
+        }
+
+        LOGV2(12696400, "Successfully generated 'uuid' fields for 'config.shards'");
+
+        if (isConfigServerDedicated) {
+            write_ops::UpdateCommandRequest configIdentityUpdateOp(
+                NamespaceString::kServerConfigurationNamespace);
+            write_ops::UpdateOpEntry configIdentityEntry;
+            configIdentityEntry.setQ(BSON("_id" << ShardIdentityType::IdName
+                                                << ShardType::uuid.name()
+                                                << BSON("$exists" << false)));
+            configIdentityEntry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                BSON("$set" << BSON(ShardType::uuid.name() << UUID::gen()))));
+            configIdentityEntry.setUpsert(false);
+            configIdentityEntry.setMulti(false);
+            configIdentityUpdateOp.setUpdates({configIdentityEntry});
+            configIdentityUpdateOp.setWriteConcern(defaultMajorityWriteConcern());
+            const auto configIdentityResult = directClient.update(configIdentityUpdateOp);
+            write_ops::checkWriteErrors(configIdentityResult);
+            LOGV2(12696404,
+                  "Successfully generated 'uuid' field for config server's shardIdentity document");
+        }
+    }
+    Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+
+    const auto opTimeWithShards =
+        ShardingCatalogManager::get(opCtx)->localCatalogClient()->getAllShards(
+            opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+
+    std::vector<AsyncRequestsSender::Request> requests;
+    for (const auto& shardType : opTimeWithShards.value) {
+        const auto& uuid = shardType.getUuid();
+        if (!uuid) {
+            LOGV2(12696403,
+                  "Shard does not have a 'uuid' field, skipping",
+                  "shard"_attr = shardType.getName());
+            continue;
+        }
+        write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON("_id" << ShardIdentityType::IdName));
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$set" << BSON(ShardType::uuid.name() << *uuid))));
+        entry.setUpsert(false);
+        entry.setMulti(false);
+        updateOp.setUpdates({entry});
+        updateOp.setWriteConcern(defaultMajorityWriteConcern());
+        requests.emplace_back(shardType.getName(), updateOp.toBSON());
+    }
+
+    AsyncRequestsSender ars(opCtx,
+                            executor,
+                            DatabaseName::kAdmin,
+                            requests,
+                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                            Shard::RetryPolicy::kIdempotent,
+                            nullptr /* resourceYielder */,
+                            {} /* designatedHostsMap */);
+
+    while (!ars.done()) {
+        auto response = ars.next();
+        uassertStatusOKWithContext(AsyncRequestsSender::Response::getEffectiveStatus(response),
+                                   str::stream() << "Failed to update ShardIdentity uuid on shard '"
+                                                 << response.shardId << "'");
+    }
+
+    LOGV2(12696402, "Successfully updated 'uuid' field in ShardIdentity on all shards");
+}
+
 
 void cloneAuthoritativeDatabaseMetadataOnShards(OperationContext* opCtx) {
     // No shards should be added until we have forwarded the clone command to all shards. We use the
@@ -935,6 +1058,11 @@ private:
         // Run the authoritative clone phase on ALL shards (including the config
         // server if it's also a shard).
         if (role && role->has(ClusterRole::ConfigServer)) {
+            if (feature_flags::gFeatureFlagUniqueShardIdentifiers
+                    .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                                                                  originalVersion)) {
+                generateShardUUIDs(opCtx);
+            }
             if (feature_flags::gAuthoritativeShardsDDL.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
                     requestedVersion, originalVersion)) {
                 cloneAuthoritativeDatabaseMetadataOnShards(opCtx);
