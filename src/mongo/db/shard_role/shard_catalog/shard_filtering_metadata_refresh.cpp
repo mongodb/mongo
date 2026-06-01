@@ -1025,10 +1025,33 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
     //       zero chunks on this shard.
 
     bool needsDbPrimaryShardCheck = false;
-    const int maxAttempts = maxShardMetadataDiskRecoveryAttempts.loadRelaxed();
+    const int maxNoProgressAttempts = maxShardMetadataDiskRecoveryAttempts.loadRelaxed();
+    int noProgressAttempts = 0;
     StringData lastRetryReason;
 
-    for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
+    auto resetConsecutiveNoProgressAttempts = [&](StringData retryReason) {
+        lastRetryReason = retryReason;
+        noProgressAttempts = 0;
+    };
+
+    auto incrementConsecutiveNoProgressAttempts = [&](StringData retryReason) {
+        lastRetryReason = retryReason;
+        ++noProgressAttempts;
+        tassert(StaleConfigInfo(nss,
+                                ShardVersionFactory::make(chunkVersionReceived
+                                                              ? *chunkVersionReceived
+                                                              : ChunkVersion::IGNORED()),
+                                boost::none /* wantedVersion */,
+                                ShardingState::get(opCtx)->shardId()),
+                str::stream() << "Exhausted maximum number (" << maxNoProgressAttempts
+                              << ") of consecutive no-progress authoritative collection metadata "
+                                 "recovery attempts for "
+                              << nss.toStringForErrorMsg()
+                              << "; last retry reason: " << lastRetryReason,
+                noProgressAttempts < maxNoProgressAttempts);
+    };
+
+    while (true) {
         std::shared_ptr<CollectionCacheRecoverer> recoverer;
         SharedPromise<void> promise;
         CancellationToken cancellationToken = CancellationToken::uncancelable();
@@ -1049,7 +1072,8 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                 boost::make_optional(CollectionShardingRuntime::acquireExclusive(opCtx, nss));
 
             if (joinPlacementVersionOperations(opCtx, &scopedCsr)) {
-                lastRetryReason = "ongoing collection critical section or concurrent refresh"_sd;
+                resetConsecutiveNoProgressAttempts(
+                    "ongoing collection critical section or concurrent refresh"_sd);
                 continue;
             }
 
@@ -1058,7 +1082,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                     boost::make_optional(DatabaseShardingRuntime::acquireShared(opCtx, dbName));
 
                 if (waitForCriticalSectionIfNeeded(opCtx, &scopedDsr)) {
-                    lastRetryReason = "ongoing database critical section"_sd;
+                    resetConsecutiveNoProgressAttempts("ongoing database critical section"_sd);
                     continue;
                 }
 
@@ -1115,7 +1139,7 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                         logAttrs(nss),
                         "error"_attr = status);
 
-            lastRetryReason = "disk recoverer initial pass failed"_sd;
+            incrementConsecutiveNoProgressAttempts("disk recoverer initial pass failed"_sd);
             continue;
         }
 
@@ -1133,7 +1157,8 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                     "Authoritative metadata recovery: interrupted by an invalidate oplog entry",
                     logAttrs(nss));
 
-                lastRetryReason = "interrupted by an invalidate oplog entry"_sd;
+                incrementConsecutiveNoProgressAttempts(
+                    "interrupted by an invalidate oplog entry"_sd);
                 continue;
             }
 
@@ -1145,7 +1170,8 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                     "retrying",
                     logAttrs(nss));
 
-                lastRetryReason = "collection critical section entered after drain"_sd;
+                incrementConsecutiveNoProgressAttempts(
+                    "collection critical section entered after drain"_sd);
                 continue;
             }
 
@@ -1154,8 +1180,8 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
             // DSR.
             if (!needsDbPrimaryShardCheck && !metadata->hasRoutingTable()) {
                 needsDbPrimaryShardCheck = true;
-                lastRetryReason =
-                    "no collection metadata found, switching to DB primary check mode"_sd;
+                incrementConsecutiveNoProgressAttempts(
+                    "no collection metadata found, switching to DB primary check mode"_sd);
                 continue;
             }
 
@@ -1168,7 +1194,8 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
 
                 if ((*scopedDsr)
                         ->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite)) {
-                    lastRetryReason = "database critical section entered after drain"_sd;
+                    incrementConsecutiveNoProgressAttempts(
+                        "database critical section entered after drain"_sd);
                     continue;
                 }
 
@@ -1183,7 +1210,8 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                                 "currentPrimary"_attr = (*scopedDsr)->getDbPrimaryShard(opCtx),
                                 "snapshottedMutations"_attr = dbMetadataMutationsSnapshot,
                                 "currentMutations"_attr = (*scopedDsr)->getNumMetadataMutations());
-                    lastRetryReason = "DB primary shard changed during drain"_sd;
+                    incrementConsecutiveNoProgressAttempts(
+                        "DB primary shard changed during drain"_sd);
                     continue;
                 }
             }
@@ -1221,16 +1249,6 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
 
         return;
     }
-
-    tasserted(
-        StaleConfigInfo(nss,
-                        ShardVersionFactory::make(chunkVersionReceived ? *chunkVersionReceived
-                                                                       : ChunkVersion::IGNORED()),
-                        boost::none /* wantedVersion */,
-                        ShardingState::get(opCtx)->shardId()),
-        str::stream() << "Exhausted maximum number (" << maxAttempts
-                      << ") of authoritative collection metadata recovery attempts for "
-                      << nss.toStringForErrorMsg() << "; last retry reason: " << lastRetryReason);
 }
 
 FilteringMetadataCache::WasWaitInterrupted

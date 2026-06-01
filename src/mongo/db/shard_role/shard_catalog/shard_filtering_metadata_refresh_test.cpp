@@ -45,6 +45,7 @@
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_capture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/notification.h"
@@ -453,6 +454,67 @@ TEST_F(AuthoritativeRefreshFixture, CriticalSectionBlocksRecoveryThenProceeds) {
     auto metadataOpt = csr->getCurrentMetadataIfKnown();
     ASSERT_TRUE(metadataOpt.has_value());
     ASSERT_EQ(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
+}
+
+TEST_F(AuthoritativeRefreshFixture, CollectionCriticalSectionWaitDoesNotCountAsNoProgress) {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
+    RAIIServerParameterControllerForTest maxAttempts("maxShardMetadataDiskRecoveryAttempts", 1);
+    auto* opCtx = operationContext();
+
+    const auto [collType, chunks] = makeShardedMetadataForDisk(opCtx, 5, kMyShardName);
+    populateDiskCatalog(opCtx, collType, chunks);
+
+    auto dummyVersion = ChunkVersion({OID::gen(), Timestamp(50, 1)}, {1, 0});
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+        csr->enterCriticalSectionCatchUpPhase(opCtx, BSONObj());
+        csr->enterCriticalSectionCommitPhase(opCtx, BSONObj());
+    }
+
+    auto* fp = globalFailPointRegistry().find("hangBeforePlacementVersionCriticalSectionWait");
+    auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+
+    stdx::thread recoveryThread([&] {
+        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgCriticalSection");
+        auto bgOpCtx = bgClient->makeOperationContext();
+        ASSERT_OK(onShardVersionMismatch(bgOpCtx.get(), kTestNss, dummyVersion));
+    });
+
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->exitCriticalSection(opCtx, BSONObj());
+    }
+
+    fp->setMode(FailPoint::off);
+    recoveryThread.join();
+
+    auto csr = CollectionShardingRuntime::acquireShared(opCtx, kTestNss);
+    auto metadataOpt = csr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadataOpt.has_value());
+    ASSERT_EQ(metadataOpt->getCollPlacementVersion(), chunks.back().getVersion());
+}
+
+using AuthoritativeRefreshFixtureDeathTest = AuthoritativeRefreshFixture;
+DEATH_TEST_REGEX_F(AuthoritativeRefreshFixtureDeathTest,
+                   PostDrainRetryCountsAgainstNoProgressBudget,
+                   "Tripwire assertion.*Exhausted maximum number") {
+    RAIIServerParameterControllerForTest featureFlag("featureFlagAuthoritativeShardsCRUD", true);
+    RAIIServerParameterControllerForTest maxAttempts("maxShardMetadataDiskRecoveryAttempts", 1);
+    auto* opCtx = operationContext();
+
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
+
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    uassertStatusOK(onShardVersionMismatch(opCtx, kTestNss, boost::none));
 }
 
 TEST_F(AuthoritativeRefreshFixture, ClearFilteringMetadataDuringPostRecoveryWaitTriggersRetry) {

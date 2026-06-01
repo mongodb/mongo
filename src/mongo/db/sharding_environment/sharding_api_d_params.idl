@@ -89,10 +89,9 @@ server_parameters:
 
     maxShardMetadataDiskRecoveryAttempts:
         description: >-
-            Maximum number of attempts the shard will make while recovering a collection's
-            authoritative collection metadata from the on-disk catalog. Each iteration of the
-            disk-recovery loop (including retries triggered by ongoing critical sections,
-            concurrent refreshes, invalidates, or cancellations) counts toward this cap.
+            Maximum number of consecutive no-progress attempts the shard will make while recovering
+            a collection's authoritative collection metadata from the on-disk catalog. Attempts that
+            wait for concurrent placement-version work reset this cap.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: maxShardMetadataDiskRecoveryAttempts
