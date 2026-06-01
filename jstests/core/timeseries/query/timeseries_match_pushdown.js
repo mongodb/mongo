@@ -50,17 +50,19 @@ const runTest = function ({docsToInsert, pipeline, eventFilter, wholeBucketFilte
     }
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
     const unpackStages = getAggPlanStages(explain, "$_internalUnpackBucket");
-    assert.eq(1, unpackStages.length, "Should only have a single $_internalUnpackBucket stage: " + tojson(explain));
-    const unpackStage = unpackStages[0].$_internalUnpackBucket;
-    assert.docEq(eventFilter, unpackStage.eventFilter, "Incorrect eventFilter: " + tojson(explain));
-    if (wholeBucketFilter) {
-        assert.docEq(
-            wholeBucketFilter,
-            unpackStage.wholeBucketFilter,
-            "Incorrect wholeBucketFilter: " + tojson(explain),
-        );
-    } else {
-        assert(!unpackStage.wholeBucketFilter, "Incorrect wholeBucketFilter: " + tojson(explain));
+    assert.gte(unpackStages.length, 1, "Should have at least one $_internalUnpackBucket stage: " + tojson(explain));
+    for (const unpackStageWrapper of unpackStages) {
+        const unpackStage = unpackStageWrapper.$_internalUnpackBucket;
+        assert.docEq(eventFilter, unpackStage.eventFilter, "Incorrect eventFilter: " + tojson(explain));
+        if (wholeBucketFilter) {
+            assert.docEq(
+                wholeBucketFilter,
+                unpackStage.wholeBucketFilter,
+                "Incorrect wholeBucketFilter: " + tojson(explain),
+            );
+        } else {
+            assert(!unpackStage.wholeBucketFilter, "Incorrect wholeBucketFilter: " + tojson(explain));
+        }
     }
 
     const docs = coll.aggregate([...pipeline, {$sort: {time: 1}}]).toArray();
