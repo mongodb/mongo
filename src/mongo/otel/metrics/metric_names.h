@@ -234,6 +234,22 @@ public:
 
     // Query Integration Team Metrics
 
+    // Global Lock
+    static constexpr MetricName kGlobalLockTotalTime =
+        MetricNameMaker::make("serverStatus.globalLock.totalTime");
+    static constexpr MetricName kGlobalLockCurrentQueueTotal =
+        MetricNameMaker::make("serverStatus.globalLock.currentQueue.total");
+    static constexpr MetricName kGlobalLockCurrentQueueReaders =
+        MetricNameMaker::make("serverStatus.globalLock.currentQueue.readers");
+    static constexpr MetricName kGlobalLockCurrentQueueWriters =
+        MetricNameMaker::make("serverStatus.globalLock.currentQueue.writers");
+    static constexpr MetricName kGlobalLockActiveClientsTotal =
+        MetricNameMaker::make("serverStatus.globalLock.activeClients.total");
+    static constexpr MetricName kGlobalLockActiveClientsReaders =
+        MetricNameMaker::make("serverStatus.globalLock.activeClients.readers");
+    static constexpr MetricName kGlobalLockActiveClientsWriters =
+        MetricNameMaker::make("serverStatus.globalLock.activeClients.writers");
+
     // Op Counters
     static constexpr MetricName kInsertOpCount =
         MetricNameMaker::make("serverStatus.opcounters.inserts");

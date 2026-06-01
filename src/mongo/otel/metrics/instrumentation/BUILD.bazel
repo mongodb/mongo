@@ -69,3 +69,40 @@ mongo_cc_unit_test(
         "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )
+
+mongo_cc_library(
+    name = "global_lock_metrics",
+    srcs = ["global_lock_metrics.cpp"],
+    hdrs = ["global_lock_metrics.h"],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/stats:serveronly_stats_base",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/util:periodic_runner",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "global_lock_metrics_test",
+    srcs = ["global_lock_metrics_test.cpp"],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":global_lock_metrics",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/db/auth:authmocks",
+        "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/db/stats:serveronly_stats_base",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_library(
+    name = "metrics_installer",
+    srcs = ["metrics_installer.cpp"],
+    hdrs = ["metrics_installer.h"],
+    deps = [
+        ":disk_metrics",
+        ":global_lock_metrics",
+        ":system_mount_metrics",
+    ],
+)

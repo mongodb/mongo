@@ -187,12 +187,28 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "serveronly_stats_base",
+    srcs = [
+        "global_lock_stats.cpp",
+    ],
+    hdrs = [
+        "global_lock_stats.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/shard_role",
+    ],
+)
+
+mongo_cc_library(
     name = "serveronly_stats",
     srcs = [
         "lock_server_status_section.cpp",
         "storage_stats.cpp",
     ],
     deps = [
+        ":serveronly_stats_base",
         ":top",
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands/server_status:server_status_core",
@@ -268,6 +284,8 @@ mongo_cc_unit_test(
     name = "db_stats_test",
     srcs = [
         "api_version_metrics_test.cpp",
+        "global_lock_stats_test.cpp",
+        "lock_server_status_section_test.cpp",
         "operation_latency_histogram_test.cpp",
         "timer_stats_test.cpp",
         "top_test.cpp",
@@ -275,13 +293,18 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_first_group"],
     deps = [
         ":api_version_metrics",
+        ":serveronly_stats",
+        ":serveronly_stats_base",
         ":timer_stats",
         ":top",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db:shared_request_handling",
+        "//src/mongo/db/admission/execution_control:ticketing_system",
+        "//src/mongo/db/admission/ticketing:ticketholder",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/shard_role:service_context_non_d",
+        "//src/mongo/db/shard_role:shard_role_api_stor_ex",
         "//src/mongo/db/sharding_environment:unittest_noop_sharding_initialization_mongod",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",

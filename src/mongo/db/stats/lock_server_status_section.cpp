@@ -35,13 +35,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_stats.h"
-#include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/stats/global_lock_stats.h"
 #include "mongo/util/time_support.h"
-
-#include <memory>
-#include <mutex>
-#include <valarray>
 
 namespace mongo {
 namespace {
@@ -49,9 +44,7 @@ namespace {
 class GlobalLockServerStatusSection : public ServerStatusSection {
 public:
     GlobalLockServerStatusSection(std::string name, ClusterRole role)
-        : ServerStatusSection(name, role) {
-        _started = curTimeMillis64();
-    }
+        : ServerStatusSection(name, role), _startedAt(Date_t::now()) {}
 
     bool includeByDefault() const override {
         return true;
@@ -59,55 +52,34 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        std::valarray<int> clientStatusCounts(5);
+        const auto snap =
+            collectGlobalLockStatsSnapshot(opCtx->getClient()->getServiceContext(), _startedAt);
 
-        // This returns the blocked lock states
-        for (ServiceContext::LockedClientsCursor cursor(opCtx->getClient()->getServiceContext());
-             Client* client = cursor.next();) {
-            invariant(client);
-            std::unique_lock<Client> uniqueLock(*client);
-
-            const OperationContext* clientOpCtx = client->getOperationContext();
-            auto state = clientOpCtx ? shard_role_details::getLocker(clientOpCtx)->getClientState()
-                                     : Locker::kInactive;
-            invariant(state < clientStatusCounts.size());
-            clientStatusCounts[state]++;
-        }
-
-        // Construct the actual return value out of the mutex
         BSONObjBuilder ret;
-
-        ret.append("totalTime", (long long)(1000 * (curTimeMillis64() - _started)));
+        ret.append("totalTime", snap.totalTimeMicros);
 
         {
             BSONObjBuilder currentQueueBuilder(ret.subobjStart("currentQueue"));
-
-            currentQueueBuilder.append("total",
-                                       clientStatusCounts[Locker::kQueuedReader] +
-                                           clientStatusCounts[Locker::kQueuedWriter]);
-            currentQueueBuilder.append("readers", clientStatusCounts[Locker::kQueuedReader]);
-            currentQueueBuilder.append("writers", clientStatusCounts[Locker::kQueuedWriter]);
+            currentQueueBuilder.append("total", snap.queuedReaders + snap.queuedWriters);
+            currentQueueBuilder.append("readers", snap.queuedReaders);
+            currentQueueBuilder.append("writers", snap.queuedWriters);
             currentQueueBuilder.done();
         }
 
         {
             BSONObjBuilder activeClientsBuilder(ret.subobjStart("activeClients"));
-
-            activeClientsBuilder.append("total",
-                                        clientStatusCounts[Locker::kActiveReader] +
-                                            clientStatusCounts[Locker::kActiveWriter]);
-            activeClientsBuilder.append("readers", clientStatusCounts[Locker::kActiveReader]);
-            activeClientsBuilder.append("writers", clientStatusCounts[Locker::kActiveWriter]);
+            activeClientsBuilder.append("total", snap.activeReaders + snap.activeWriters);
+            activeClientsBuilder.append("readers", snap.activeReaders);
+            activeClientsBuilder.append("writers", snap.activeWriters);
             activeClientsBuilder.done();
         }
 
         ret.done();
-
         return ret.obj();
     }
 
 private:
-    unsigned long long _started;
+    const Date_t _startedAt;
 };
 auto& globalLockServerStatusSection =
     *ServerStatusSectionBuilder<GlobalLockServerStatusSection>("globalLock").forShard();

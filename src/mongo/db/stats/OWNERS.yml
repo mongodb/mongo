@@ -49,3 +49,9 @@ filters:
   - "counter_ops.h":
     approvers:
       - 10gen/server-programmability
+  - "lock_server_status_section*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "global_lock_stats*":
+    approvers:
+      - 10gen/server-catalog-and-routing

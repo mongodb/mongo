@@ -231,8 +231,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/otel/metrics/instrumentation/disk_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_mount_metrics.h"
+#include "mongo/otel/metrics/instrumentation/metrics_installer.h"
 #include "mongo/otel/metrics/metrics_initialization.h"
 #include "mongo/otel/traces/trace_initialization.h"
 #include "mongo/platform/atomic_word.h"
@@ -1023,8 +1022,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         startFLECrud(serviceContext);
 
         DiskSpaceMonitor::start(serviceContext);
-        installSystemMountOtelMetrics(serviceContext);
-        installDiskOtelMetrics(serviceContext);
+        installOtelMetrics(serviceContext);
         if (!storageEngine->storesFilesInDbPath()) {
             LOGV2(7333400,
                   "The index builds DiskSpaceMonitor action which periodically checks if we "
