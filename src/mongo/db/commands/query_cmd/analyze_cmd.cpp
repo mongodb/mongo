@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
@@ -301,6 +302,10 @@ public:
                 return;
             }
 
+            uassert(ErrorCodes::CommandNotSupported,
+                    "no such command: analyze",
+                    getTestCommandsEnabled());
+
             auto key = cmd.getKey();
             if (mode && *mode == AnalyzeModeEnum::kHistograms) {
                 uassert(9820001, "Histograms mode requires a key to be specified", key);
@@ -428,7 +433,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(CmdAnalyze).forShard().testOnly();
+MONGO_REGISTER_COMMAND(CmdAnalyze).forShard();
 
 }  // namespace
 }  // namespace mongo

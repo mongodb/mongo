@@ -1,6 +1,3 @@
-/**
- * @tags: [featureFlagSbeFull]
- */
 import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const conn = MongoRunner.runMongod();
@@ -206,6 +203,37 @@ cleanup();
     } finally {
         // Ensure that query knob doesn't leak into other testcases in the suite.
         cleanup();
+    }
+})();
+
+assert.commandWorked(coll.insertMany([{a: 1}, {a: 2}, {a: 3}]));
+
+(function validateHistogramsModeExplicit() {
+    res = db.runCommand({analyze: coll.getName(), key: "a", mode: "histograms"});
+    assert.commandWorked(res);
+
+    const stats = syscoll.find({_id: "a"}).toArray();
+    assert.eq(1, stats.length, "expected a statistics document for key 'a'", {stats});
+})();
+
+(function validateHistogramsModeFailsWhenTestCommandsDisabled() {
+    TestData.enableTestCommands = false;
+    const conn2 = MongoRunner.runMongod();
+    TestData.enableTestCommands = true;
+    const db2 = conn2.getDB(jsTestName());
+    const coll2 = db2.test_coll;
+    try {
+        coll2.drop();
+        assert.commandWorked(coll2.insertMany([{a: 1}, {a: 2}, {a: 3}]));
+
+        res = db2.runCommand({analyze: coll2.getName(), key: "a", mode: "histograms"});
+        assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+
+        res = db2.runCommand({analyze: coll2.getName(), key: "a"});
+        assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+    } finally {
+        coll2.drop();
+        MongoRunner.stopMongod(conn2);
     }
 })();
 

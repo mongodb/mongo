@@ -11,6 +11,5 @@ export const testOnlyCommands = [
     "_mongotConnPoolStats",
     "_mirrorMaestroConnPoolStats",
     "_dropMirrorMaestroConnections",
-    "analyze",
     "_shardsvrRunSearchIndexCommand",
 ];
