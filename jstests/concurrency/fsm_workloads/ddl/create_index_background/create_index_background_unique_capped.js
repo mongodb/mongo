@@ -7,8 +7,6 @@
  *  creates_background_indexes,
  *  requires_capped,
  *  assumes_balancer_off,
- *  # TODO (SERVER-124037): Re-enable this test.
- *  featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 

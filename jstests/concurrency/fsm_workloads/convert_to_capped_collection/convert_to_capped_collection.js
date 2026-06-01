@@ -17,8 +17,6 @@
  *   incompatible_with_concurrency_simultaneous,
  *   requires_collstats,
  *   requires_capped,
- *   # TODO(SERVER-124037): Remove.
- *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 export const $config = (function () {
