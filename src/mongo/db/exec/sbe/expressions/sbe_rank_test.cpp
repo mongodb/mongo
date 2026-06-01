@@ -120,15 +120,15 @@ TEST_F(SBERankTest, ComputeRankBeyond32Bit) {
     auto setInt32MaxRankState = [](value::OwnedValueAccessor& accessor) {
         auto [newStateTag, newStateVal] = value::makeNewArray();
         auto newState = value::getArrayView(newStateVal);
-        newState->push_back(value::TypeTags::NumberInt32, 0);  // kLastValue
-        newState->push_back(value::TypeTags::Boolean,
-                            value::bitcastFrom<bool>(false));  // kLastValueIsNothing
-        newState->push_back(value::TypeTags::NumberInt64,
-                            std::numeric_limits<int32_t>::max());  // kLastRank
-        newState->push_back(value::TypeTags::NumberInt64, 1);      // kSameRankCount
+        newState->push_back_raw(value::TypeTags::NumberInt32, 0);  // kLastValue
+        newState->push_back_raw(value::TypeTags::Boolean,
+                                value::bitcastFrom<bool>(false));  // kLastValueIsNothing
+        newState->push_back_raw(value::TypeTags::NumberInt64,
+                                std::numeric_limits<int32_t>::max());  // kLastRank
+        newState->push_back_raw(value::TypeTags::NumberInt64, 1);      // kSameRankCount
         auto sortSpec = std::make_unique<SortSpec>(BSON("sortKey" << 1));
-        newState->push_back(value::TypeTags::sortSpec,
-                            value::bitcastFrom<SortSpec*>(sortSpec.release()));  // kSortSpec
+        newState->push_back_raw(value::TypeTags::sortSpec,
+                                value::bitcastFrom<SortSpec*>(sortSpec.release()));  // kSortSpec
         accessor.reset(newStateTag, newStateVal);
     };
     setInt32MaxRankState(rankAccessor);

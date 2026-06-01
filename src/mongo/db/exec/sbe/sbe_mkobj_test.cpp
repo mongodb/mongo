@@ -56,7 +56,7 @@ public:
         auto [tag, val] = value::copyValue(value::TypeTags::bsonObject,
                                            value::bitcastFrom<const char*>(obj.objdata()));
 
-        arr->push_back(tag, val);
+        arr->push_back_raw(tag, val);
     }
 
     void addObjectToArray(value::Array* arr, const BSONObj& obj) {
@@ -73,7 +73,7 @@ public:
 
             objView->push_back(sv, tag, val);
         }
-        arr->push_back(objTag, objVal);
+        arr->push_back_raw(objTag, objVal);
     }
 
     template <class MkObjStageType>

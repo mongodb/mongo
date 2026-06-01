@@ -200,10 +200,12 @@ void ArithmeticAverageHashAggAccumulatorBase::initialize(vm::ByteCode& bytecode,
     // per tassert 5755312.
     auto [tagSum, valSum] = value::makeNewArray();
     value::Array* arraySum = reinterpret_cast<value::Array*>(valSum);
-    arraySum->push_back(value::TypeTags::NumberInt32, 0);   // AggSumValueElems::kNonDecimalTotalTag
-    arraySum->push_back(value::TypeTags::NumberDouble, 0);  // AggSumValueElems::kNonDecimalTotalSum
-    arraySum->push_back(value::TypeTags::NumberDouble,
-                        0);  // AggSumValueElems::kNonDecimalTotalAddend
+    arraySum->push_back_raw(value::TypeTags::NumberInt32,
+                            0);  // AggSumValueElems::kNonDecimalTotalTag
+    arraySum->push_back_raw(value::TypeTags::NumberDouble,
+                            0);  // AggSumValueElems::kNonDecimalTotalSum
+    arraySum->push_back_raw(value::TypeTags::NumberDouble,
+                            0);  // AggSumValueElems::kNonDecimalTotalAddend
     // AggSumValueElems::kDecimalTotal is added at runtime only if a decimal value is encountered.
 
     // Create the value for the count of inputs, which is just a scalar NumberInt64.
@@ -213,8 +215,8 @@ void ArithmeticAverageHashAggAccumulatorBase::initialize(vm::ByteCode& bytecode,
     // Create an array of [sum, count] states as the complete state value for new-style $avg.
     auto [tagState, valState] = value::makeNewArray();
     value::Array* arrayState = reinterpret_cast<value::Array*>(valState);
-    arrayState->push_back(tagSum, valSum);
-    arrayState->push_back(tagCount, valCount);
+    arrayState->push_back_raw(tagSum, valSum);
+    arrayState->push_back_raw(tagCount, valCount);
 
     // Set 'accState' to the initial state we just constructed.
     accumulatorState.reset(value::TagValueOwned{tagState, valState});

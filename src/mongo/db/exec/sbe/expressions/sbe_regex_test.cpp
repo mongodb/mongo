@@ -100,7 +100,7 @@ protected:
         obj->push_back("idx", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(idx));
         obj->push_back("captures", capturesTag, capturesVal);
         objGuard.reset();
-        arrayPtr->push_back(objTag, objVal);
+        arrayPtr->push_back_raw(objTag, objVal);
     }
 
     void runAndAssertFindAllExpression(const vm::CodeFragment* compiledExpr,

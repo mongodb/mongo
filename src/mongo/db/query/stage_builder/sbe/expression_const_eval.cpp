@@ -568,7 +568,7 @@ void ExpressionConstEval::transport(abt::ABT& n,
                     auto [tag, val] = arg.cast<abt::Constant>()->get();
                     // Copy the value before inserting into the array.
                     auto [tagCopy, valCopy] = sbe::value::copyValue(tag, val);
-                    array.push_back(tagCopy, valCopy);
+                    array.push_back_raw(tagCopy, valCopy);
                 }
                 auto [tag, val] = sbe::value::makeCopyArray(array);
                 swapAndUpdate(n, abt::make<abt::Constant>(tag, val));

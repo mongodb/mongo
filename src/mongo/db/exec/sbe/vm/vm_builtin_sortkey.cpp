@@ -135,7 +135,7 @@ value::TagValueMaybeOwned ByteCode::builtinSortKeyComponentVectorToArray(ArityTy
         for (size_t i = 0; i < sortVec->elts.size(); ++i) {
             auto [tag, val] = sortVec->elts[i];
             auto [copyTag, copyVal] = value::copyValue(tag, val);
-            array->push_back(copyTag, copyVal);
+            array->push_back_raw(copyTag, copyVal);
         }
         arrayGuard.reset();
         return {true, arrayTag, arrayVal};

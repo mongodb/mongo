@@ -123,7 +123,7 @@ protected:
         auto sortedResultsView = sbe::value::getArrayView(sortedResultsVal);
         for (auto [tag, val] : resultsContents) {
             auto [tagCopy, valCopy] = copyValue(tag, val);
-            sortedResultsView->push_back(tagCopy, valCopy);
+            sortedResultsView->push_back_raw(tagCopy, valCopy);
         }
         sortedResultsGuard.reset();
         return {sortedResultsTag, sortedResultsVal};
@@ -2491,12 +2491,12 @@ public:
             auto [pushedValsTag, pushedValsVal] = accumType == Accumulator::kPush
                 ? sbe::makeArray(partialBsonArr)
                 : sbe::makeArraySet(partialBsonArr);
-            partialAggArr->push_back(pushedValsTag, pushedValsVal);
+            partialAggArr->push_back_raw(pushedValsTag, pushedValsVal);
 
-            partialAggArr->push_back(sbe::value::TypeTags::NumberInt64,
-                                     sbe::value::bitcastFrom<int64_t>(size));
+            partialAggArr->push_back_raw(sbe::value::TypeTags::NumberInt64,
+                                         sbe::value::bitcastFrom<int64_t>(size));
 
-            resultArr->push_back(partialAggTag, partialAggVal);
+            resultArr->push_back_raw(partialAggTag, partialAggVal);
         }
 
         resultGuard.reset();
@@ -2509,7 +2509,7 @@ public:
 
         for (auto elem : arr) {
             auto [tag, val] = sbe::bson::convertToOwned(elem).releaseToRaw();
-            arrView->push_back(tag, val);
+            arrView->push_back_raw(tag, val);
         }
         return {arrTag, arrVal};
     }
@@ -2573,7 +2573,7 @@ public:
             ASSERT(element.type() == BSONType::array);
             auto [tag, val] =
                 makeOnePartialAggregate(aggFuncName, BSONArray{element.embeddedObject()});
-            arr->push_back(tag, val);
+            arr->push_back_raw(tag, val);
         }
 
         guard.reset();
@@ -2586,7 +2586,7 @@ public:
 
         for (auto elem : arr) {
             auto [tag, val] = sbe::bson::convertToOwned(elem).releaseToRaw();
-            arrView->push_back(tag, val);
+            arrView->push_back_raw(tag, val);
         }
         return {arrTag, arrVal};
     }

@@ -671,7 +671,7 @@ int addNewPair(value::Array* mergeArr,
     // The caller of this function will take ownership of the pair array.
     pairArrGuard.reset();
 
-    mergeArr->push_back(pairArrTag, pairArrVal);
+    mergeArr->push_back_raw(pairArrTag, pairArrVal);
 
     auto& mergeHeap = mergeArr->values();
     std::push_heap(mergeHeap.begin(), mergeHeap.end(), keyLess);
@@ -1165,7 +1165,7 @@ public:
         for (size_t i = 0; i < _keys.size(); ++i) {
             auto [keyTag, keyVal] = _keys[i][_blockIndex];
             std::tie(keyTag, keyVal) = value::copyValue(keyTag, keyVal);
-            keysArr->push_back(keyTag, keyVal);
+            keysArr->push_back_raw(keyTag, keyVal);
         }
 
         return keys;
@@ -1178,7 +1178,7 @@ public:
         for (size_t i = 0; i < _values.size(); ++i) {
             auto [valueTag, valueVal] = _values[i][_blockIndex];
             std::tie(valueTag, valueVal) = value::copyValue(valueTag, valueVal);
-            valuesArr->push_back(valueTag, valueVal);
+            valuesArr->push_back_raw(valueTag, valueVal);
         }
 
         return values;

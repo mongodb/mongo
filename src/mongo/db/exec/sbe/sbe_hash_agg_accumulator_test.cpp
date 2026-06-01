@@ -957,8 +957,8 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulator) {
     std::tie(tagInput, valInput) = value::makeNewArray();
     inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
-    value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
-                                             value::bitcastFrom<int64_t>(5));
+    value::getArrayView(valInput)->push_back_raw(value::TypeTags::NumberInt64,
+                                                 value::bitcastFrom<int64_t>(5));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -1050,8 +1050,8 @@ TEST_F(HashAggAccumulatorTest, PushHashAggAccumulatorSpilled) {
     std::tie(tagInput, valInput) = value::makeNewArray();
     inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
-    value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
-                                             value::bitcastFrom<int64_t>(5));
+    value::getArrayView(valInput)->push_back_raw(value::TypeTags::NumberInt64,
+                                                 value::bitcastFrom<int64_t>(5));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1225,8 +1225,8 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulator) {
     std::tie(tagInput, valInput) = value::makeNewArray();
     inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
-    value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
-                                             value::bitcastFrom<int64_t>(5));
+    value::getArrayView(valInput)->push_back_raw(value::TypeTags::NumberInt64,
+                                                 value::bitcastFrom<int64_t>(5));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -1306,8 +1306,8 @@ TEST_F(HashAggAccumulatorTest, FirstHashAggAccumulatorSpilled) {
     std::tie(tagInput, valInput) = value::makeNewArray();
     inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
-    value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
-                                             value::bitcastFrom<int64_t>(4));
+    value::getArrayView(valInput)->push_back_raw(value::TypeTags::NumberInt64,
+                                                 value::bitcastFrom<int64_t>(4));
     accumulator.accumulate(bytecode, accumulatorState());
 
     // Spill and reset the accumulator.
@@ -1378,8 +1378,8 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorTerminal) {
     std::tie(tagInput, valInput) = value::makeNewArray();
     inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
-    value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
-                                             value::bitcastFrom<int64_t>(3));
+    value::getArrayView(valInput)->push_back_raw(value::TypeTags::NumberInt64,
+                                                 value::bitcastFrom<int64_t>(3));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());
@@ -1566,8 +1566,8 @@ TEST_F(HashAggAccumulatorTest, CountHashAggAccumulatorPartial) {
     std::tie(tagInput, valInput) = value::makeNewArray();
     inAccessor().reset(value::TagValueOwned{tagInput, valInput});
     ASSERT(tagInput == value::TypeTags::Array);
-    value::getArrayView(valInput)->push_back(value::TypeTags::NumberInt64,
-                                             value::bitcastFrom<int64_t>(3));
+    value::getArrayView(valInput)->push_back_raw(value::TypeTags::NumberInt64,
+                                                 value::bitcastFrom<int64_t>(3));
     accumulator.accumulate(bytecode, accumulatorState());
 
     accumulator.finalize(bytecode, accumulatorState());

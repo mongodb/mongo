@@ -77,10 +77,10 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoublePartialSumFinalizeImpl(
         auto [sum, addend] = res.getDoubleDouble();
 
         // The merge-side expects that the first element is the BSON type, not internal slot type.
-        newArr->push_back(value::TypeTags::NumberInt32,
-                          value::bitcastFrom<int>(stdx::to_underlying(resType)));
-        newArr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(sum));
-        newArr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(addend));
+        newArr->push_back_raw(value::TypeTags::NumberInt32,
+                              value::bitcastFrom<int>(stdx::to_underlying(resType)));
+        newArr->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(sum));
+        newArr->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(addend));
 
         guard.reset();
         return {true, tag, val};

@@ -324,7 +324,7 @@ value::TagValueMaybeOwned ByteCode::builtinObjectToArray(ArityType arity) {
         elemObj->push_back("v"_sd, valueCopyTag, valueCopyVal);
 
         // insert the object to array
-        array->push_back(elemTag, elemVal);
+        array->push_back_raw(elemTag, elemVal);
         elemGuard.reset();
 
         objectEnumerator.advance();

@@ -400,7 +400,7 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib,
         // Add a histogram bucket.
         const auto v = dataDistrib._bounds[startBucketIdx];
         const auto [copyTag, copyVal] = value::copyValue(v.getTag(), v.getValue());
-        bounds.push_back(copyTag, copyVal);
+        bounds.push_back_raw(copyTag, copyVal);
         buckets.emplace_back(freq, rangeFreq, cumulativeFreq, ndv, cumulativeNDV);
         startBucketIdx++;
     }

@@ -208,7 +208,7 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     auto sortedResultsView = value::getArrayView(sortedResultsVal);
     for (auto [tag, val] : resultsContents) {
         auto [tagCopy, valCopy] = copyValue(tag, val);
-        sortedResultsView->push_back(tagCopy, valCopy);
+        sortedResultsView->push_back_raw(tagCopy, valCopy);
     }
 
     assertValuesEqual(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal);
@@ -315,7 +315,7 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
     for (auto&& sv : std::array<StringData, 4>{"Aa", "BB", "cc", "dD"}) {
         auto [tag, val] = value::makeNewString(sv);
-        value::getArrayView(expectedVal)->push_back(tag, val);
+        value::getArrayView(expectedVal)->push_back_raw(tag, val);
     }
 
     auto collator =
@@ -1192,7 +1192,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     auto testData = sbe::value::getArrayView(inputVal);
     for (auto id : ids) {
         auto [ridTag, ridVal] = sbe::value::makeNewRecordId(id);
-        testData->push_back(ridTag, ridVal);
+        testData->push_back_raw(ridTag, ridVal);
     }
     auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
 

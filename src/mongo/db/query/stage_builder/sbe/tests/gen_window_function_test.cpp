@@ -181,7 +181,7 @@ public:
                                 enumerator.advance();
 
                                 auto [copyTag, copyVal] = sbe::value::copyValue(tag, val);
-                                arrView->push_back(copyTag, copyVal);
+                                arrView->push_back_raw(copyTag, copyVal);
                             }
                             std::tie(resultTag, resultVal) = std::tie(arrTag, arrVal);
                             guard.reset();

@@ -2742,7 +2742,7 @@ public:
         sbe::value::ValueGuard arrayWithEmptyStringGuard{arrayWithEmptyStringTag,
                                                          arrayWithEmptyStringVal};
         auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
-        sbe::value::getArrayView(arrayWithEmptyStringVal)->push_back(emptyStrTag, emptyStrVal);
+        sbe::value::getArrayView(arrayWithEmptyStringVal)->push_back_raw(emptyStrTag, emptyStrVal);
 
         auto delimiter = popExpr();
         auto stringExpression = popExpr();

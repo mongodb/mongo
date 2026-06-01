@@ -137,14 +137,14 @@ TEST_F(AbtToSbeExpression, Lower3) {
 TEST_F(AbtToSbeExpression, Lower4) {
     auto [tagArr, valArr] = sbe::value::makeNewArray();
     auto arr = sbe::value::getArrayView(valArr);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 1);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 2);
+    arr->push_back_raw(sbe::value::TypeTags::NumberInt64, 1);
+    arr->push_back_raw(sbe::value::TypeTags::NumberInt64, 2);
     auto [tagArrNest, valArrNest] = sbe::value::makeNewArray();
     auto arrNest = sbe::value::getArrayView(valArrNest);
-    arrNest->push_back(sbe::value::TypeTags::NumberInt64, 21);
-    arrNest->push_back(sbe::value::TypeTags::NumberInt64, 22);
-    arr->push_back(tagArrNest, valArrNest);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 3);
+    arrNest->push_back_raw(sbe::value::TypeTags::NumberInt64, 21);
+    arrNest->push_back_raw(sbe::value::TypeTags::NumberInt64, 22);
+    arr->push_back_raw(tagArrNest, valArrNest);
+    arr->push_back_raw(sbe::value::TypeTags::NumberInt64, 3);
 
     auto tree = make<FunctionCall>(
         "traverseP",
@@ -194,14 +194,14 @@ TEST_F(AbtToSbeExpression, Lower4) {
 TEST_F(AbtToSbeExpression, Lower4TwoArgsOneLevel) {
     auto [tagArr, valArr] = sbe::value::makeNewArray();
     auto arr = sbe::value::getArrayView(valArr);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 1);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 2);
+    arr->push_back_raw(sbe::value::TypeTags::NumberInt64, 1);
+    arr->push_back_raw(sbe::value::TypeTags::NumberInt64, 2);
     auto [tagArrNest, valArrNest] = sbe::value::makeNewArray();
     auto arrNest = sbe::value::getArrayView(valArrNest);
-    arrNest->push_back(sbe::value::TypeTags::NumberInt64, 21);
-    arrNest->push_back(sbe::value::TypeTags::NumberInt64, 22);
-    arr->push_back(tagArrNest, valArrNest);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 3);
+    arrNest->push_back_raw(sbe::value::TypeTags::NumberInt64, 21);
+    arrNest->push_back_raw(sbe::value::TypeTags::NumberInt64, 22);
+    arr->push_back_raw(tagArrNest, valArrNest);
+    arr->push_back_raw(sbe::value::TypeTags::NumberInt64, 3);
 
     auto tree = make<FunctionCall>(
         "traverseP",
@@ -245,14 +245,14 @@ TEST_F(AbtToSbeExpression, Lower4TwoArgsOneLevel) {
 TEST_F(AbtToSbeExpression, Lower4TwoArgsAnyLevel) {
     auto [tagArr, valArr] = sbe::value::makeNewArray();
     auto arr = sbe::value::getArrayView(valArr);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 1);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 2);
+    arr->push_back_raw(sbe::value::TypeTags::NumberInt64, 1);
+    arr->push_back_raw(sbe::value::TypeTags::NumberInt64, 2);
     auto [tagArrNest, valArrNest] = sbe::value::makeNewArray();
     auto arrNest = sbe::value::getArrayView(valArrNest);
-    arrNest->push_back(sbe::value::TypeTags::NumberInt64, 21);
-    arrNest->push_back(sbe::value::TypeTags::NumberInt64, 22);
-    arr->push_back(tagArrNest, valArrNest);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 3);
+    arrNest->push_back_raw(sbe::value::TypeTags::NumberInt64, 21);
+    arrNest->push_back_raw(sbe::value::TypeTags::NumberInt64, 22);
+    arr->push_back_raw(tagArrNest, valArrNest);
+    arr->push_back_raw(sbe::value::TypeTags::NumberInt64, 3);
 
     auto tree = make<FunctionCall>(
         "traverseP",

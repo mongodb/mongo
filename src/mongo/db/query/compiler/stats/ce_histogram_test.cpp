@@ -110,7 +110,7 @@ TEST(CEHistograms, BSONEdgeValues) {
             sbe::value::Array largeArray;
             largeArray.reserve(10000);
             for (int i = 0; i < 10000; ++i) {
-                largeArray.push_back(sbe::value::TypeTags::NumberInt64, i);
+                largeArray.push_back_raw(sbe::value::TypeTags::NumberInt64, i);
             }
             return largeArray;
         }()),
@@ -391,10 +391,10 @@ TEST(CEHistograms, Golden) {
         makeDateValue(dateFromISOString("2015-10-21T07:28:00+0000").getValue()),
         sbe::value::makeCopyArray([] {
             sbe::value::Array arr;
-            arr.push_back(sbe::value::TypeTags::NumberInt64, 8);
-            arr.push_back(sbe::value::TypeTags::NumberInt64, 8);
-            arr.push_back(sbe::value::TypeTags::NumberInt64, 9);
-            arr.push_back(sbe::value::TypeTags::NumberInt64, 10);
+            arr.push_back_raw(sbe::value::TypeTags::NumberInt64, 8);
+            arr.push_back_raw(sbe::value::TypeTags::NumberInt64, 8);
+            arr.push_back_raw(sbe::value::TypeTags::NumberInt64, 9);
+            arr.push_back_raw(sbe::value::TypeTags::NumberInt64, 10);
             return arr;
         }()),
     };

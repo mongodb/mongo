@@ -80,7 +80,7 @@ std::pair<value::TypeTags, value::Value> makeNestedArray(size_t depth,
     }
     auto [aTag, aVal] = value::makeNewArray();
     auto arrV = value::getArrayView(arr);
-    arrV->push_back(aTag, aVal);
+    arrV->push_back_raw(aTag, aVal);
     return makeNestedArray(depth - 1, aVal, topArr);
 }
 
@@ -192,7 +192,7 @@ TEST(WriteValueToStream, BigArrayTest) {
     value::ValueGuard sGuard{sTag, sVal};
     auto testArr = value::getArrayView(aVal);
     for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
-        testArr->push_back(sTag, sVal);
+        testArr->push_back_raw(sTag, sVal);
     }
     std::ostringstream oss;
     writeToStream(oss, {value::TypeTags::Array, aVal});
@@ -229,7 +229,7 @@ TEST(WriteValueToStream, BigArrayInObjectInArrayTest) {
 
     auto arrV = value::getArrayView(aVal);
     auto [oTag, oVal] = value::makeNewObject();
-    arrV->push_back(oTag, oVal);
+    arrV->push_back_raw(oTag, oVal);
 
     auto [iaTag, iaVal] = value::makeNewArray();
     auto objV = value::getObjectView(oVal);
@@ -238,7 +238,7 @@ TEST(WriteValueToStream, BigArrayInObjectInArrayTest) {
     auto testArr = value::getArrayView(iaVal);
     auto [sTag, sVal] = value::makeNewString("a");
     for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
-        testArr->push_back(sTag, sVal);
+        testArr->push_back_raw(sTag, sVal);
     }
 
     std::ostringstream oss;
@@ -258,7 +258,7 @@ TEST(WriteValueToStream, BigObjectInArrayInObjectTest) {
 
     auto [ioTag, ioVal] = value::makeNewObject();
     auto arrV = value::getArrayView(aVal);
-    arrV->push_back(ioTag, ioVal);
+    arrV->push_back_raw(ioTag, ioVal);
 
     auto testObj = value::getObjectView(ioVal);
     auto [sTag, sVal] = value::makeNewString("a");
@@ -281,7 +281,7 @@ TEST(WriteValueToStream, SmallArrayTest) {
     value::ValueGuard sGuard{sTag, sVal};
     auto testArr = value::getArrayView(aVal);
     for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth - 1; ++i) {
-        testArr->push_back(sTag, sVal);
+        testArr->push_back_raw(sTag, sVal);
     }
     std::ostringstream oss;
     writeToStream(oss, {aTag, aVal});

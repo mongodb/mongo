@@ -48,12 +48,12 @@ public:
     std::pair<value::TypeTags, value::Value> initState() {
         auto [stateTag, stateVal] = value::makeNewArray();
         auto state = value::getArrayView(stateVal);
-        state->push_back(value::TypeTags::Null, 0);
-        state->push_back(value::TypeTags::Null, 0);
-        state->push_back(value::TypeTags::Null, 0);
-        state->push_back(value::TypeTags::Null, 0);
-        state->push_back(value::TypeTags::Null, 0);
-        state->push_back(value::TypeTags::NumberInt64, 0);
+        state->push_back_raw(value::TypeTags::Null, 0);
+        state->push_back_raw(value::TypeTags::Null, 0);
+        state->push_back_raw(value::TypeTags::Null, 0);
+        state->push_back_raw(value::TypeTags::Null, 0);
+        state->push_back_raw(value::TypeTags::Null, 0);
+        state->push_back_raw(value::TypeTags::NumberInt64, 0);
         return {stateTag, stateVal};
     }
 

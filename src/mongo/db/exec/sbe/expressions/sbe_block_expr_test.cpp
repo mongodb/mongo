@@ -56,7 +56,7 @@ public:
         auto [arrTag, arrVal] = value::makeNewArray();
         value::ValueGuard guard(arrTag, arrVal);
         for (auto [t, v] : vals) {
-            value::getArrayView(arrVal)->push_back(t, v);
+            value::getArrayView(arrVal)->push_back_raw(t, v);
         }
         guard.reset();
         return {arrTag, arrVal};

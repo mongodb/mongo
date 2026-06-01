@@ -975,7 +975,7 @@ public:
             for (auto&& r : regexes) {
                 auto [pcreRegexTag, pcreRegexVal] =
                     sbe::makeNewPcreRegex(r->getString(), r->getFlags());
-                pcreArr->push_back(pcreRegexTag, pcreRegexVal);
+                pcreArr->push_back_raw(pcreRegexTag, pcreRegexVal);
 
                 auto [regexSetTag, regexSetVal] =
                     sbe::value::makeNewBsonRegex(r->getString(), r->getFlags());
@@ -1334,8 +1334,8 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
         for (size_t index = 0; index < bitPositions.size(); ++index) {
             auto currentBit = bitPositions[index];
             if (auto result = seenBits.insert(currentBit); result.second) {
-                arr->push_back(sbe::value::TypeTags::NumberInt64,
-                               sbe::value::bitcastFrom<int64_t>(currentBit));
+                arr->push_back_raw(sbe::value::TypeTags::NumberInt64,
+                                   sbe::value::bitcastFrom<int64_t>(currentBit));
             }
         }
     }

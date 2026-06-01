@@ -210,7 +210,7 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
             arrView->push_back(accessors[i]->getCopyOfValue());
         }
         guard.reset();
-        resultsView->push_back(arrTag, arrVal);
+        resultsView->push_back_raw(arrTag, arrVal);
 
         // Test out saveState() and restoreState() for 50% of the documents (the first document,
         // the third document, the fifth document, and so on).

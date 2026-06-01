@@ -109,7 +109,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewArrayFromRange(ArityType arity) {
 
     arr->reserve(length);
     for (auto i = startVal; stepVal > 0 ? i < endVal : i > endVal; i += stepVal) {
-        arr->push_back(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
+        arr->push_back_raw(value::TypeTags::NumberInt32, value::bitcastTo<int32_t>(i));
     }
 
     return result;
@@ -153,7 +153,8 @@ value::TagValueMaybeOwned ByteCode::builtinAddToArrayCappedImpl(
         // AggArrayWithSize::kValues, and the size should be at index
         // AggArrayWithSize::kSizeOfValues.
         accumulatorState->push_back(value::makeNewArray());
-        accumulatorState->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
+        accumulatorState->push_back_raw(value::TypeTags::NumberInt64,
+                                        value::bitcastFrom<int64_t>(0));
     }
     tassert(11004212,
             "Expected array for set accumulator state",
@@ -308,7 +309,7 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
                     value::copyValue(defaultElem.tag, defaultElem.value));
             } else {
                 // Add a null default value.
-                intermediateResView->push_back(value::TypeTags::Null, 0);
+                intermediateResView->push_back_raw(value::TypeTags::Null, 0);
             }
         }
         resView->push_back(intermediateRes.releaseToRaw());
@@ -757,7 +758,7 @@ void extractTopOrBottomN(std::vector<std::pair<value::TypeTags, value::Value>>& 
     for (size_t i = 0; i < nSize; i++) {
         auto [tag, val] = sortVector[startIdx + i];
         auto [copyTag, copyVal] = copyValue(tag, val);
-        resultView->push_back(copyTag, copyVal);
+        resultView->push_back_raw(copyTag, copyVal);
     }
 }
 

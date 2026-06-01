@@ -59,7 +59,8 @@ protected:
         value::ValueGuard inputGuard{inputTag, inputVal};
         auto inputView = value::getArrayView(inputVal);
         for (long long i = 0; i < kValueCount; ++i) {
-            inputView->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<long long>(i));
+            inputView->push_back_raw(value::TypeTags::NumberInt64,
+                                     value::bitcastFrom<long long>(i));
         }
 
         // Make a "limit <limitValue> skip <skipValue>" stage.

@@ -91,8 +91,8 @@ public:
                 auto [outValArrTag, outValArrVal] = value::makeNewArray();
                 auto* outValArr = value::getArrayView(outValArrVal);
                 outValArr->push_back(value::copyValue(outVals[i][j].first, outVals[i][j].second));
-                outValArr->push_back(value::TypeTags::NumberInt64,
-                                     value::bitcastFrom<size_t>(i + startIdx));
+                outValArr->push_back_raw(value::TypeTags::NumberInt64,
+                                         value::bitcastFrom<size_t>(i + startIdx));
                 outValBlocks[j]->as<OutBlockType>()->push_back(outValArrTag, outValArrVal);
             }
         }
@@ -999,7 +999,7 @@ TEST_F(SBEBlockTopBottomTest, TopBottomNHomogeneousTest) {
             auto [outValArrTag, outValArrVal] = value::makeNewArray();
             auto* outValArr = value::getArrayView(outValArrVal);
             outValArr->push_back(value::makeCopyDecimal(Decimal128(i)));
-            outValArr->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<size_t>(i));
+            outValArr->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<size_t>(i));
             decimalBlock->push_back(outValArrTag, outValArrVal);
         }
         return decimalBlock;

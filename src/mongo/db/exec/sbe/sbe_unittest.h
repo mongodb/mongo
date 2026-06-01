@@ -226,7 +226,7 @@ static std::pair<value::TypeTags, value::Value> makeArray(const BSONArray& arr) 
         enumerator.advance();
 
         auto [copyTag, copyVal] = value::copyValue(tag, val);
-        arrView->push_back(copyTag, copyVal);
+        arrView->push_back_raw(copyTag, copyVal);
     }
     guard.reset();
 

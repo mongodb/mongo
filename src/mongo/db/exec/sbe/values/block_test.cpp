@@ -1122,7 +1122,7 @@ TEST(SbeBlockTest, GetApproximateSize_HeterogeneousBlock_DeepType_Array) {
         auto [arrTag, arrVal] = value::makeNewArray();
         auto* arr = value::getArrayView(arrVal);
         for (int j = 0; j < kArrayLen; ++j) {
-            arr->push_back(TypeTags::NumberInt64, value::bitcastFrom<int64_t>(j));
+            arr->push_back_raw(TypeTags::NumberInt64, value::bitcastFrom<int64_t>(j));
         }
         block->push_back(arrTag, arrVal);
     }

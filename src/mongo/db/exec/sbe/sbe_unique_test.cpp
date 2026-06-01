@@ -92,7 +92,7 @@ TEST_F(UniqueRoaringStageTest, DeduplicatesAndPreservesOrderSimpleRecordId) {
         auto arr = value::getArrayView(arrVal);
         for (auto rid : rids) {
             auto [ridTag, ridVal] = value::makeNewRecordId(rid);
-            arr->push_back(ridTag, ridVal);
+            arr->push_back_raw(ridTag, ridVal);
         }
         return {arrTag, arrVal};
     };

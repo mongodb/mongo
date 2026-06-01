@@ -58,24 +58,25 @@ TEST(ValueSerializeForSorter, Serialize) {
     sbe::value::ValueGuard testDataGuard{testDataTag, testDataVal};
     auto testData = sbe::value::getArrayView(testDataVal);
 
-    testData->push_back(value::TypeTags::Nothing, 0);
-    testData->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(33550336));
+    testData->push_back_raw(value::TypeTags::Nothing, 0);
+    testData->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(33550336));
     auto [ridTag, ridVal] = value::makeNewRecordId(8589869056);
-    testData->push_back(ridTag, ridVal);
-    testData->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(137438691328));
-    testData->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.305e18));
+    testData->push_back_raw(ridTag, ridVal);
+    testData->push_back_raw(value::TypeTags::NumberInt64,
+                            value::bitcastFrom<int64_t>(137438691328));
+    testData->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.305e18));
 
     auto [decimalTag, decimalVal] =
         value::makeCopyDecimal(Decimal128("2658455991569831744654692615953842176"));
-    testData->push_back(decimalTag, decimalVal);
+    testData->push_back_raw(decimalTag, decimalVal);
 
-    testData->push_back(value::TypeTags::Date, value::bitcastFrom<int64_t>(1234));
-    testData->push_back(value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(5678));
-    testData->push_back(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
-    testData->push_back(value::TypeTags::Null, 0);
-    testData->push_back(value::TypeTags::MinKey, 0);
-    testData->push_back(value::TypeTags::MaxKey, 0);
-    testData->push_back(value::TypeTags::bsonUndefined, 0);
+    testData->push_back_raw(value::TypeTags::Date, value::bitcastFrom<int64_t>(1234));
+    testData->push_back_raw(value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(5678));
+    testData->push_back_raw(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+    testData->push_back_raw(value::TypeTags::Null, 0);
+    testData->push_back_raw(value::TypeTags::MinKey, 0);
+    testData->push_back_raw(value::TypeTags::MaxKey, 0);
+    testData->push_back_raw(value::TypeTags::bsonUndefined, 0);
 
     StringData smallString = "perfect"_sd;
     invariant(sbe::value::canUseSmallString(smallString));
@@ -100,16 +101,16 @@ TEST(ValueSerializeForSorter, Serialize) {
 
     for (const auto& stringCase : stringCases) {
         auto [stringTag, stringVal] = value::makeNewString(stringCase);
-        testData->push_back(stringTag, stringVal);
+        testData->push_back_raw(stringTag, stringVal);
     }
 
     for (const auto& stringCase : stringCases) {
         auto [symbolTag, symbolVal] = value::makeNewBsonSymbol(stringCase);
-        testData->push_back(symbolTag, symbolVal);
+        testData->push_back_raw(symbolTag, symbolVal);
     }
 
     auto [objectTag, objectVal] = value::makeNewObject();
-    testData->push_back(objectTag, objectVal);
+    testData->push_back_raw(objectTag, objectVal);
 
     auto object = value::getObjectView(objectVal);
     object->push_back("num", value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
@@ -118,8 +119,8 @@ TEST(ValueSerializeForSorter, Serialize) {
     object->push_back("arr", arrayTag, arrayVal);
 
     auto array = value::getArrayView(arrayVal);
-    array->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
-    array->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
+    array->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
+    array->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
 
     auto [arraySetTag, arraySetVal] = value::makeNewArraySet();
     object->push_back("set", arraySetTag, arraySetVal);
@@ -129,7 +130,7 @@ TEST(ValueSerializeForSorter, Serialize) {
     arraySet->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(5));
 
     auto [oidTag, oidVal] = value::makeCopyObjectId({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
-    testData->push_back(oidTag, oidVal);
+    testData->push_back_raw(oidTag, oidVal);
 
     auto [arrayMultiSetTag, arrayMultiSetVal] = value::makeNewArrayMultiSet();
     object->push_back("mset", arrayMultiSetTag, arrayMultiSetVal);
@@ -140,7 +141,7 @@ TEST(ValueSerializeForSorter, Serialize) {
     arrayMultiSet->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(7));
 
     auto [msetTag, msetVal] = value::makeCopyArrayMultiSet(*arrayMultiSet);
-    testData->push_back(msetTag, msetVal);
+    testData->push_back_raw(msetTag, msetVal);
 
     uint8_t byteArray[] = {8, 7, 6, 5, 4, 3, 2, 1};
     auto bson =
@@ -152,36 +153,36 @@ TEST(ValueSerializeForSorter, Serialize) {
 
     auto [bsonObjTag, bsonObjVal] = value::copyValue(
         value::TypeTags::bsonObject, value::bitcastFrom<const char*>(bson["obj"].value()));
-    testData->push_back(bsonObjTag, bsonObjVal);
+    testData->push_back_raw(bsonObjTag, bsonObjVal);
 
     auto [bsonArrayTag, bsonArrayVal] = value::copyValue(
         value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bson["arr"].value()));
-    testData->push_back(bsonArrayTag, bsonArrayVal);
+    testData->push_back_raw(bsonArrayTag, bsonArrayVal);
 
     auto [bsonBinDataGeneralTag, bsonBinDataGeneralVal] =
         value::copyValue(value::TypeTags::bsonBinData,
                          value::bitcastFrom<const char*>(bson["binDataGeneral"].value()));
-    testData->push_back(bsonBinDataGeneralTag, bsonBinDataGeneralVal);
+    testData->push_back_raw(bsonBinDataGeneralTag, bsonBinDataGeneralVal);
 
     auto [bsonBinDataDeprecatedTag, bsonBinDataDeprecatedVal] =
         value::copyValue(value::TypeTags::bsonBinData,
                          value::bitcastFrom<const char*>(bson["binDataDeprecated"].value()));
-    testData->push_back(bsonBinDataDeprecatedTag, bsonBinDataDeprecatedVal);
+    testData->push_back_raw(bsonBinDataDeprecatedTag, bsonBinDataDeprecatedVal);
 
     key_string::Builder keyStringBuilder(key_string::Version::V1);
     keyStringBuilder.appendNumberLong(1);
     keyStringBuilder.appendNumberLong(2);
     keyStringBuilder.appendNumberLong(3);
     auto [keyStringTag, keyStringVal] = value::makeKeyString(keyStringBuilder.getValueCopy());
-    testData->push_back(keyStringTag, keyStringVal);
+    testData->push_back_raw(keyStringTag, keyStringVal);
 
     auto [plainCodeTag, plainCodeVal] =
         value::makeCopyBsonJavascript("function test() { return 'Hello world!'; }"_sd);
-    testData->push_back(value::TypeTags::bsonJavascript, plainCodeVal);
+    testData->push_back_raw(value::TypeTags::bsonJavascript, plainCodeVal);
 
     auto [codeWithNullTag, codeWithNullVal] =
         value::makeCopyBsonJavascript("function test() { return 'Danger\0us!'; }"_sd);
-    testData->push_back(value::TypeTags::bsonJavascript, codeWithNullVal);
+    testData->push_back_raw(value::TypeTags::bsonJavascript, codeWithNullVal);
 
     auto regexBson =
         BSON("noOptions" << BSONRegEx("[a-z]+") << "withOptions" << BSONRegEx(".*", "i")
@@ -191,24 +192,24 @@ TEST(ValueSerializeForSorter, Serialize) {
     for (const auto& element : regexBson) {
         auto [copyTag, copyVal] = value::copyValue(
             value::TypeTags::bsonRegex, value::bitcastFrom<const char*>(element.value()));
-        testData->push_back(copyTag, copyVal);
+        testData->push_back_raw(copyTag, copyVal);
     }
 
     auto [dbptrTag, dbptrVal] = value::makeNewBsonDBPointer(
         "db.c", value::ObjectIdType{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}.data());
-    testData->push_back(dbptrTag, dbptrVal);
+    testData->push_back_raw(dbptrTag, dbptrVal);
 
     auto [cwsTag1, cwsVal1] = value::makeNewBsonCodeWScope(
         "function test() { return 'Hello world!'; }", BSONObj().objdata());
-    testData->push_back(cwsTag1, cwsVal1);
+    testData->push_back_raw(cwsTag1, cwsVal1);
 
     auto [cwsTag2, cwsVal2] = value::makeNewBsonCodeWScope(
         "function test() { return 'Danger\0us!'; }", BSON("a" << 1).objdata());
-    testData->push_back(cwsTag2, cwsVal2);
+    testData->push_back_raw(cwsTag2, cwsVal2);
 
     auto [cwsTag3, cwsVal3] =
         value::makeNewBsonCodeWScope("", BSON("b" << 2 << "c" << BSON_ARRAY(3 << 4)).objdata());
-    testData->push_back(cwsTag3, cwsVal3);
+    testData->push_back_raw(cwsTag3, cwsVal3);
 
     value::MultiMap map{};
     map.insert({value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)},
@@ -217,7 +218,7 @@ TEST(ValueSerializeForSorter, Serialize) {
                {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(4)});
 
     auto [mapTag, mapVal] = value::makeCopyMultiMap(map);
-    testData->push_back(mapTag, mapVal);
+    testData->push_back_raw(mapTag, mapVal);
 
     value::MaterializedRow originalRow{testData->size()};
     for (size_t i = 0; i < testData->size(); i++) {
@@ -296,9 +297,9 @@ TEST_F(ValueSerializeForKeyString, SbeArray) {
     sbe::value::ValueGuard testDataGuard{testDataTag, testDataVal};
     auto testData = sbe::value::getArrayView(testDataVal);
 
-    testData->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
-    testData->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
-    testData->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0));
+    testData->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    testData->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
+    testData->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0));
 
     runTest({{testDataTag, testDataVal}});
 }

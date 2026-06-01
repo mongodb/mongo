@@ -54,7 +54,7 @@ value::TagValueMaybeOwned ByteCode::builtinSplit(ArityType arity) {
     size_t splitPos;
     while ((splitPos = inputStr.find(separatorStr)) != std::string::npos) {
         auto [tag, val] = value::makeNewString(inputStr.substr(0, splitPos));
-        arr->push_back(tag, val);
+        arr->push_back_raw(tag, val);
 
         splitPos += separatorStr.size();
         inputStr = inputStr.substr(splitPos);
@@ -63,7 +63,7 @@ value::TagValueMaybeOwned ByteCode::builtinSplit(ArityType arity) {
     // This is the last string.
     {
         auto [tag, val] = value::makeNewString(inputStr);
-        arr->push_back(tag, val);
+        arr->push_back_raw(tag, val);
     }
 
     guard.reset();

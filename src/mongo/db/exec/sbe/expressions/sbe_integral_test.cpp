@@ -52,10 +52,10 @@ public:
         auto queue = value::getArrayView(queueVal);
         auto [queueInternalArrTag, queueInternalArrVal] = value::makeNewArray();
         auto arr = value::getArrayView(queueInternalArrVal);
-        arr->push_back(value::TypeTags::Null, 0);
-        queue->push_back(queueInternalArrTag, queueInternalArrVal);
-        queue->push_back(value::TypeTags::NumberInt64, 0);
-        queue->push_back(value::TypeTags::NumberInt64, 0);
+        arr->push_back_raw(value::TypeTags::Null, 0);
+        queue->push_back_raw(queueInternalArrTag, queueInternalArrVal);
+        queue->push_back_raw(value::TypeTags::NumberInt64, 0);
+        queue->push_back_raw(value::TypeTags::NumberInt64, 0);
         return {queueTag, queueVal};
     }
 
@@ -66,11 +66,11 @@ public:
 
         // input queue
         auto [inputQueueTag, inputQueueVal] = initQueue();
-        state->push_back(inputQueueTag, inputQueueVal);
+        state->push_back_raw(inputQueueTag, inputQueueVal);
 
         // sortBy queue
         auto [sortByQueueTag, sortByQueueVal] = initQueue();
-        state->push_back(sortByQueueTag, sortByQueueVal);
+        state->push_back_raw(sortByQueueTag, sortByQueueVal);
 
         // sum acc state
         auto [removableSumAccTag, removableSumAccVal] = value::makeNewArray();
@@ -79,31 +79,31 @@ public:
         auto sumAcc = value::getArrayView(sumAccVal);
         // DoubleDoubleSum Acc
         sumAcc->reserve(AggSumValueElems::kMaxSizeOfArray);
-        sumAcc->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
-        sumAcc->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
-        sumAcc->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+        sumAcc->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
+        sumAcc->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+        sumAcc->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
         // RemovableSum Acc
-        removableSumAcc->push_back(sumAccTag, sumAccVal);
-        removableSumAcc->push_back(value::TypeTags::NumberInt64, 0);
-        removableSumAcc->push_back(value::TypeTags::NumberInt64, 0);
-        removableSumAcc->push_back(value::TypeTags::NumberInt64, 0);
-        removableSumAcc->push_back(value::TypeTags::NumberInt64, 0);
-        removableSumAcc->push_back(value::TypeTags::NumberInt64, 0);
-        state->push_back(removableSumAccTag, removableSumAccVal);
+        removableSumAcc->push_back_raw(sumAccTag, sumAccVal);
+        removableSumAcc->push_back_raw(value::TypeTags::NumberInt64, 0);
+        removableSumAcc->push_back_raw(value::TypeTags::NumberInt64, 0);
+        removableSumAcc->push_back_raw(value::TypeTags::NumberInt64, 0);
+        removableSumAcc->push_back_raw(value::TypeTags::NumberInt64, 0);
+        removableSumAcc->push_back_raw(value::TypeTags::NumberInt64, 0);
+        state->push_back_raw(removableSumAccTag, removableSumAccVal);
 
         // nanCount
-        state->push_back(value::TypeTags::NumberInt64, 0);
+        state->push_back_raw(value::TypeTags::NumberInt64, 0);
 
         // unitMillis
         if (unitMillis) {
-            state->push_back(value::TypeTags::NumberInt64,
-                             value::bitcastFrom<int64_t>(*unitMillis));
+            state->push_back_raw(value::TypeTags::NumberInt64,
+                                 value::bitcastFrom<int64_t>(*unitMillis));
         } else {
-            state->push_back(value::TypeTags::Null, 0);
+            state->push_back_raw(value::TypeTags::Null, 0);
         }
 
         // isNonRemovable
-        state->push_back(value::TypeTags::Boolean, value::bitcastFrom<bool>(isNonRemovable));
+        state->push_back_raw(value::TypeTags::Boolean, value::bitcastFrom<bool>(isNonRemovable));
 
         return {stateTag, stateVal};
     }

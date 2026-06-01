@@ -67,12 +67,12 @@ void DataTypeDistr::generate(value::Array* randValueArray, std::mt19937_64& gen)
     auto rand = _selector(gen);
     if (_nullsRatio > 0 && rand < _nullsRatio) {
         auto [tag, val] = makeNullValue();
-        randValueArray->push_back(tag, val);
+        randValueArray->push_back_raw(tag, val);
     } else {
         size_t idx = (*_idxDist)(gen);
         const auto val = _valSet.at(idx);
         auto [copyTag, copyVal] = copyValue(val.getTag(), val.getValue());
-        randValueArray->push_back(copyTag, copyVal);
+        randValueArray->push_back_raw(copyTag, copyVal);
     }
 }
 
@@ -544,7 +544,7 @@ std::vector<SBEValue> nestArrays(const std::vector<SBEValue>& input, size_t empt
         } else {
             // 50% of the values are grouped into arrays of size 10.
             value::Array* arr = value::getArrayView(arrayVal);
-            arr->push_back(tagCopy, valCopy);
+            arr->push_back_raw(tagCopy, valCopy);
             if (arr->size() == 10) {
                 result.emplace_back(arrayTag, arrayVal);
                 std::tie(arrayTag, arrayVal) = value::makeNewArray();

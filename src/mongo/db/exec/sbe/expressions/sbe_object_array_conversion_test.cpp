@@ -118,7 +118,7 @@ public:
 
         for (auto elem : arr) {
             auto [tag, val] = bson::convertToOwned(elem).releaseToRaw();
-            arrView->push_back(tag, val);
+            arrView->push_back_raw(tag, val);
         }
         return {arrTag, arrVal};
     }

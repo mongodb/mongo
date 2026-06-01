@@ -303,7 +303,7 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
             retTag = copyTag;
             retVal = copyVal;
         }
-        arrOutput->push_back(retTag, retVal);
+        arrOutput->push_back_raw(retTag, retVal);
     });
     guard.reset();
     pushStack(true, tagArrOutput, valArrOutput);
@@ -587,9 +587,9 @@ void ByteCode::genericResetDoubleDoubleSumState(value::Array* state) {
     // The order of the following three elements should match to 'AggSumValueElems'. An absent
     // 'kDecimalTotal' element means that we've not seen any decimal value. So, we're not adding
     // 'kDecimalTotal' element yet.
-    state->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
-    state->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
-    state->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+    state->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
+    state->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
+    state->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
 }
 
 std::pair<value::TypeTags, value::Value> ByteCode::genericInitializeDoubleDoubleSumState() {
@@ -725,8 +725,9 @@ value::TagValueMaybeOwned ByteCode::addToSetCappedImpl(value::TagValueOwned accu
         // The order is important! The accumulated array should be at index
         // AggArrayWithSize::kValues, and the size should be at index
         // AggArrayWithSize::kSizeOfValues.
-        accumulatorState->push_back(tagAccSet, valAccSet);
-        accumulatorState->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
+        accumulatorState->push_back_raw(tagAccSet, valAccSet);
+        accumulatorState->push_back_raw(value::TypeTags::NumberInt64,
+                                        value::bitcastFrom<int64_t>(0));
     }
     tassert(10936800,
             "Expected array for set accumulator state",
@@ -794,8 +795,9 @@ value::TagValueMaybeOwned ByteCode::setUnionAccumImpl(value::TagValueOwned accum
         // The order is important! The accumulated array should be at index
         // AggArrayWithSize::kValues, and the size should be at index
         // AggArrayWithSize::kSizeOfValues.
-        accumulatorState->push_back(tagAccSet, valAccSet);
-        accumulatorState->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
+        accumulatorState->push_back_raw(tagAccSet, valAccSet);
+        accumulatorState->push_back_raw(value::TypeTags::NumberInt64,
+                                        value::bitcastFrom<int64_t>(0));
     }
     tassert(7039521,
             "Expected array for set accumulator state",

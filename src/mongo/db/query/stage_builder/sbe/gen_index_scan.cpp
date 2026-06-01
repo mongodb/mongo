@@ -1011,7 +1011,7 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
                        sbe::value::TypeTags::keyString,
                        sbe::value::makeKeyString(std::move(highKey)).second);
         guard.reset();
-        arr->push_back(tag, val);
+        arr->push_back_raw(tag, val);
     }
     boundsGuard.reset();
     return {boundsTag, boundsVal};

@@ -317,7 +317,7 @@ TEST_F(SbeValueTest, ArrayMoveIsDestructive) {
     value::Array arr1;
     auto pushStr = [](value::Array* arr, StringData str) {
         auto [t, v] = value::makeBigString(str);
-        arr->push_back(t, v);
+        arr->push_back_raw(t, v);
     };
 
     pushStr(&arr1, "foo");
@@ -337,7 +337,7 @@ TEST_F(SbeValueTest, ArrayForEachMoveIsDestructive) {
 
     auto pushStr = [](value::Array* arr, StringData str) {
         auto [t, v] = value::makeBigString(str);
-        arr->push_back(t, v);
+        arr->push_back_raw(t, v);
     };
 
     pushStr(&arr1, "foo");
@@ -354,8 +354,9 @@ TEST_F(SbeValueTest, ArrayForEachMoveIsDestructive) {
 
     value::Array arr2;
     // Move elements from arr1 into arr2.
-    value::arrayForEach<true>(
-        tag, val, [&](value::TypeTags elTag, value::Value elVal) { arr2.push_back(elTag, elVal); });
+    value::arrayForEach<true>(tag, val, [&](value::TypeTags elTag, value::Value elVal) {
+        arr2.push_back_raw(elTag, elVal);
+    });
 
     ASSERT_EQ(arr1.size(), 0);
     {
@@ -398,7 +399,7 @@ std::pair<value::TypeTags, value::Value> createArray(Args... args) {
     auto [arrayTag, arrayVal] = value::makeNewArray();
     auto array = value::getArrayView(arrayVal);
     for (const auto& [tag, val] : {args...}) {
-        array->push_back(tag, val);
+        array->push_back_raw(tag, val);
     }
     return {arrayTag, arrayVal};
 }

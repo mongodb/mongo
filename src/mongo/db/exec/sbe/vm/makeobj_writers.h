@@ -159,7 +159,7 @@ public:
 
     MONGO_COMPILER_ALWAYS_INLINE void appendValue(value::TypeTags tag, value::Value val) {
         auto [copyTag, copyVal] = value::copyValue(tag, val);
-        _arr->push_back(copyTag, copyVal);
+        _arr->push_back_raw(copyTag, copyVal);
     }
 
     MONGO_COMPILER_ALWAYS_INLINE_WITH_INLINE_SPEC ObjectWriter startObj();
@@ -171,8 +171,8 @@ public:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE void finishArr(ArrayWriter nestedWriter) {
-        _arr->push_back(value::TypeTags::Array,
-                        value::bitcastFrom<value::Array*>(nestedWriter._arr.release()));
+        _arr->push_back_raw(value::TypeTags::Array,
+                            value::bitcastFrom<value::Array*>(nestedWriter._arr.release()));
     }
 
     MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> done() {
@@ -237,7 +237,7 @@ inline ObjectWriter ArrayWriter::startObj() {
 }
 
 inline void ArrayWriter::finishObj(ObjectWriter nestedWriter) {
-    _arr->push_back(value::TypeTags::Object,
-                    value::bitcastFrom<value::Object*>(nestedWriter._obj.release()));
+    _arr->push_back_raw(value::TypeTags::Object,
+                        value::bitcastFrom<value::Object*>(nestedWriter._obj.release()));
 }
 }  // namespace mongo::sbe::vm

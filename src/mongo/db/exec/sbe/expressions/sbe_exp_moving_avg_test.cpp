@@ -54,10 +54,10 @@ public:
 
         auto [stateArrayTag, stateArrayVal] = value::makeNewArray();
         auto stateArray = value::getArrayView(stateArrayVal);
-        stateArray->push_back(value::TypeTags::Null, 0);
-        stateArray->push_back(value::TypeTags::NumberDecimal,
-                              value::makeCopyDecimal(Decimal128{alpha}).second);
-        stateArray->push_back(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
+        stateArray->push_back_raw(value::TypeTags::Null, 0);
+        stateArray->push_back_raw(value::TypeTags::NumberDecimal,
+                                  value::makeCopyDecimal(Decimal128{alpha}).second);
+        stateArray->push_back_raw(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
 
         aggAccessor.reset(stateArrayTag, stateArrayVal);
 

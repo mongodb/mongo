@@ -777,11 +777,11 @@ void BlockStagesTest::testBlockToBitmap(
                 bitsetBlock.push_back(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
             }
         }
-        chunk->push_back(value::TypeTags::valueBlock,
-                         value::bitcastFrom<value::ValueBlock*>(valBlock->clone().release()));
-        chunk->push_back(value::TypeTags::valueBlock,
-                         value::bitcastFrom<value::ValueBlock*>(bitsetBlock.clone().release()));
-        scanData->push_back(chunkTag, chunkVal);
+        chunk->push_back_raw(value::TypeTags::valueBlock,
+                             value::bitcastFrom<value::ValueBlock*>(valBlock->clone().release()));
+        chunk->push_back_raw(value::TypeTags::valueBlock,
+                             value::bitcastFrom<value::ValueBlock*>(bitsetBlock.clone().release()));
+        scanData->push_back_raw(chunkTag, chunkVal);
     }
 
     // Construct the SBE PlanStage tree.
@@ -834,7 +834,7 @@ value::Array makeIntArray(std::vector<int> ints) {
 
     value::Array out;
     for (auto i : ints) {
-        out.push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
+        out.push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
     }
     return out;
 }
@@ -905,7 +905,7 @@ TEST_F(BlockStagesTest, BlockToRowNoValuesFilteredObjects) {
         auto [tagArg2, valArg2] = value::makeNewObject();
         auto obj = value::getObjectView(valArg2);
         obj->push_back("a", value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
-        expected->push_back(value::TypeTags::Object, valArg2);
+        expected->push_back_raw(value::TypeTags::Object, valArg2);
     }
     value::ValueGuard expectedGuard(tagExpected, valExpected);
 

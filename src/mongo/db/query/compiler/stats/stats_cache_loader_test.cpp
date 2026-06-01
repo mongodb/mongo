@@ -95,9 +95,9 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
     auto [boundsTag, boundsVal] = sbe::value::makeNewArray();
     sbe::value::ValueGuard boundsGuard{boundsTag, boundsVal};
     auto bounds = sbe::value::getArrayView(boundsVal);
-    bounds->push_back(sbe::value::TypeTags::NumberDouble, 1.0);
-    bounds->push_back(sbe::value::TypeTags::NumberDouble, 2.0);
-    bounds->push_back(sbe::value::TypeTags::NumberDouble, 3.0);
+    bounds->push_back_raw(sbe::value::TypeTags::NumberDouble, 1.0);
+    bounds->push_back_raw(sbe::value::TypeTags::NumberDouble, 2.0);
+    bounds->push_back_raw(sbe::value::TypeTags::NumberDouble, 3.0);
 
     // Create a scalar histogram.
     TypeCounts tc{
@@ -147,9 +147,9 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
 
     auto nonEmptyArrayVal = sbe::value::makeNewArray().second;
     auto nonEmptyArray = sbe::value::getArrayView(nonEmptyArrayVal);
-    nonEmptyArray->push_back(sbe::value::TypeTags::NumberDouble, 1.0);
-    nonEmptyArray->push_back(sbe::value::TypeTags::NumberDouble, 2.0);
-    nonEmptyArray->push_back(sbe::value::TypeTags::NumberDouble, 3.0);
+    nonEmptyArray->push_back_raw(sbe::value::TypeTags::NumberDouble, 1.0);
+    nonEmptyArray->push_back_raw(sbe::value::TypeTags::NumberDouble, 2.0);
+    nonEmptyArray->push_back_raw(sbe::value::TypeTags::NumberDouble, 3.0);
 
     auto emptyArray1Val = sbe::value::makeNewArray().second;
     auto emptyArray2Val = sbe::value::makeNewArray().second;

@@ -1380,7 +1380,7 @@ public:
         }
     }
 
-    void push_back(TypeTags tag, Value val) {
+    void push_back_raw(TypeTags tag, Value val) {
         if (tag != TypeTags::Nothing) {
             ValueGuard guard{tag, val};
             MONGO_COMPILER_DIAGNOSTIC_PUSH
@@ -1391,16 +1391,16 @@ public:
         }
     }
 
-    void push_back(std::pair<TypeTags, Value> val) {
+    void push_back_raw(std::pair<TypeTags, Value> val) {
         MONGO_COMPILER_DIAGNOSTIC_PUSH
         MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wstringop-overflow")
-        push_back(val.first, val.second);
+        push_back_raw(val.first, val.second);
         MONGO_COMPILER_DIAGNOSTIC_POP
     }
 
     void push_back(TagValueOwned value) {
         auto [tag, val] = value.releaseToRaw();
-        push_back(tag, val);
+        push_back_raw(tag, val);
     }
 
     void pop_back() {

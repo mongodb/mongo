@@ -108,7 +108,7 @@ public:
         auto [arrTag, arrVal] = value::makeNewArray();
         value::ValueGuard guard(arrTag, arrVal);
         for (auto [t, v] : vals) {
-            value::getArrayView(arrVal)->push_back(t, v);
+            value::getArrayView(arrVal)->push_back_raw(t, v);
         }
         guard.reset();
         return {arrTag, arrVal};
@@ -280,24 +280,24 @@ public:
             if (!bucket.ids.empty()) {
                 for (auto& id : bucket.ids) {
                     auto clone = id->clone();
-                    arr->push_back(value::TypeTags::valueBlock,
-                                   value::bitcastFrom<value::ValueBlock*>(clone.release()));
+                    arr->push_back_raw(value::TypeTags::valueBlock,
+                                       value::bitcastFrom<value::ValueBlock*>(clone.release()));
                 }
             } else {
                 auto [cpTag, cpVal] =
                     value::copyValue(bucket.scalarId.first, bucket.scalarId.second);
-                arr->push_back(cpTag, cpVal);
+                arr->push_back_raw(cpTag, cpVal);
             }
 
             // Append corresponding bitset.
             auto bitsetBlock = makeBoolBlock(bucket.bitset);
-            arr->push_back(sbe::value::TypeTags::valueBlock,
-                           value::bitcastFrom<value::ValueBlock*>(bitsetBlock.release()));
+            arr->push_back_raw(sbe::value::TypeTags::valueBlock,
+                               value::bitcastFrom<value::ValueBlock*>(bitsetBlock.release()));
 
             for (const auto& block : bucket.dataBlocks) {
                 auto clone = block->clone();
-                arr->push_back(value::TypeTags::valueBlock,
-                               value::bitcastFrom<value::ValueBlock*>(clone.release()));
+                arr->push_back_raw(value::TypeTags::valueBlock,
+                                   value::bitcastFrom<value::ValueBlock*>(clone.release()));
             }
 
             bucketVals.push_back(std::pair(arrTag, arrVal));

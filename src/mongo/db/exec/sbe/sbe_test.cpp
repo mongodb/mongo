@@ -85,7 +85,7 @@ TEST(SBEValues, Basic) {
         auto obj = value::getArrayView(val);
 
         const auto [fieldTag, fieldVal] = value::makeNewString("not so small string"_sd);
-        obj->push_back(fieldTag, fieldVal);
+        obj->push_back_raw(fieldTag, fieldVal);
 
         ASSERT_EQUALS(obj->size(), 1);
         const auto [checkTag, checkVal] = obj->getAt(0);
@@ -213,15 +213,15 @@ TEST(SBEValues, HashCompound) {
     {
         auto [tag1, val1] = value::makeNewArray();
         auto arr1 = value::getArrayView(val1);
-        arr1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
-        arr1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
-        arr1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
+        arr1->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
+        arr1->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
+        arr1->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
 
         auto [tag2, val2] = value::makeNewArray();
         auto arr2 = value::getArrayView(val2);
-        arr2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
-        arr2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
-        arr2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
+        arr2->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
+        arr2->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
+        arr2->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
 
         ASSERT_EQUALS(value::hashValue(tag1, val1), value::hashValue(tag2, val2));
 
@@ -467,7 +467,7 @@ TEST(SBEVM, ConvertBinDataToBsonObj) {
     value::Array array;
     auto [binDataTag, binDataVal] = value::copyValue(
         value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(originalBinData[0].value()));
-    array.push_back(binDataTag, binDataVal);
+    array.push_back_raw(binDataTag, binDataVal);
 
     BSONArrayBuilder builder;
     bson::convertToBsonArr(builder, &array);

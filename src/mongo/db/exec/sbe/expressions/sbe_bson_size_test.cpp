@@ -138,9 +138,9 @@ TEST_F(SBEBsonSizeTest, ReturnsNothingForNonObject) {
     auto [tagArg2, valArg2] = value::makeNewArray();
     value::ValueGuard guard2(tagArg2, valArg2);
     auto arr = value::getArrayView(valArg2);
-    arr->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(32));
+    arr->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(32));
     auto [tagArg3, valArg3] = value::copyValue(tagArg1, valArg1);
-    arr->push_back(tagArg3, valArg3);
+    arr->push_back_raw(tagArg3, valArg3);
 
     std::vector<std::pair<value::TypeTags, value::Value>> testData = {
         std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(12789)),

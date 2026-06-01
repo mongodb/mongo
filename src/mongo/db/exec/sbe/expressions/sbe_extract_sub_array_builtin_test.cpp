@@ -253,7 +253,7 @@ TEST_F(SBEBuiltinExtractSubArrayTest, MemoryManagement) {
         obj->push_back("field"_sd, fieldTag, fieldVal);
         const auto [arrTag, arrVal] = value::makeNewArray();
         auto arr = value::getArrayView(arrVal);
-        arr->push_back(objTag, objVal);
+        arr->push_back_raw(objTag, objVal);
 
         // Use 'extractSubArray' to create a stack owned array and extract object from it, then test
         // if 'getField' can return the value with correct memory management.

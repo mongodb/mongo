@@ -1072,7 +1072,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
         inputView->reserve(vsn->docs.size());
         for (auto& doc : vsn->docs) {
             auto [tag, val] = makeValue(doc);
-            inputView->push_back(tag, val);
+            inputView->push_back_raw(tag, val);
         }
     }
 

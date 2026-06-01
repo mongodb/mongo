@@ -126,7 +126,7 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf,
                 arr->reserve(cnt);
                 for (size_t idx = 0; idx < cnt; ++idx) {
                     auto [tag, val] = deserializeValue(buf, collator);
-                    arr->push_back(tag, val);
+                    arr->push_back_raw(tag, val);
                 }
             }
             tag = arrTag;

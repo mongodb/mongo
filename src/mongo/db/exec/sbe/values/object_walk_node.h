@@ -85,7 +85,7 @@ void ProjectionPositionInfoRecorder<T>::recordValue(TypeTags tag, Value val) {
     } else {
         // We always need value ownership when adding to an array, regardless of recorder type.
         auto [cpyTag, cpyVal] = copyValue(tag, val);
-        arrayStack.back()->push_back(cpyTag, cpyVal);
+        arrayStack.back()->push_back_raw(cpyTag, cpyVal);
     }
 }
 
@@ -102,7 +102,7 @@ void ProjectionPositionInfoRecorder<T>::endArray() {
         // For a nested array, we cram it into its parent.
         auto releasedArray = arrayStack.back().release();
         arrayStack.pop_back();
-        arrayStack.back()->push_back(TypeTags::Array, bitcastFrom<Array*>(releasedArray));
+        arrayStack.back()->push_back_raw(TypeTags::Array, bitcastFrom<Array*>(releasedArray));
     } else {
         static_cast<T*>(this)->saveOwnedArray(std::move(arrayStack.front()));
         arrayStack.clear();

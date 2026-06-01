@@ -573,7 +573,7 @@ private:
         sbe::value::Array* arr = sbe::value::getArrayView(val);
         for (auto&& element : other) {
             auto [tag1, val1] = element.moveValue();
-            arr->push_back(tag1, val1);
+            arr->push_back_raw(tag1, val1);
         }
         addValue(tag, val, append);
         return *this;

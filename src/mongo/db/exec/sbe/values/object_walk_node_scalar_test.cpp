@@ -76,7 +76,7 @@ value::Array convertToArray(value::TypeTags inputTag, value::Value inputVal) {
                 outVal = inVal;
             }
         }
-        ret.push_back(outTag, outVal);
+        ret.push_back_raw(outTag, outVal);
     };
     arrayForEach(inputTag, inputVal, callback);
     return ret;

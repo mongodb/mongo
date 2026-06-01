@@ -339,11 +339,9 @@ void setDecimalTotal(TypeTags nonDecimalTotalTag,
                      const Decimal128& decimalTotal,
                      Array* arr) {
     setNonDecimalTotal(nonDecimalTotalTag, nonDecimalTotal, arr);
-    // We don't need to use 'ValueGuard' for decimal because we've already allocated enough storage
-    // and Array::push_back() is guaranteed to not throw.
     auto [tag, val] = makeCopyDecimal(decimalTotal);
     if (arr->size() < AggSumValueElems::kMaxSizeOfArray) {
-        arr->push_back(tag, val);
+        arr->push_back_raw(tag, val);
     } else {
         arr->setAt(AggSumValueElems::kDecimalTotal, tag, val);
     }

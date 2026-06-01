@@ -71,7 +71,7 @@ stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
     for (size_t i = 0; i < values.size(); i++) {
         const auto& val = values[i];
         const auto [tag, value] = copyValue(val.getTag(), val.getValue());
-        bounds.push_back(tag, value);
+        bounds.push_back_raw(tag, value);
 
         const auto& item = data[i];
         cumulativeFreq += item._equalFreq + item._rangeFreq;

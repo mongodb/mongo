@@ -86,10 +86,10 @@ value::TagValueMaybeOwned pcreNextMatch(pcre::Regex* pcre,
     for (size_t i = 0; i < m.captureCount(); ++i) {
         StringData cap = m[i + 1];
         if (!cap.data()) {
-            arrayView->push_back(value::TypeTags::Null, 0);
+            arrayView->push_back_raw(value::TypeTags::Null, 0);
         } else {
             auto [tag, val] = value::makeNewString(cap);
-            arrayView->push_back(tag, val);
+            arrayView->push_back_raw(tag, val);
         }
     }
 
@@ -223,7 +223,7 @@ value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
 
         auto [matchTag, matchVal] = match.raw();
         match.disownAndClear();
-        arrayView->push_back(matchTag, matchVal);
+        arrayView->push_back_raw(matchTag, matchVal);
 
         // Move indexes after the current matched string to prepare for the next search.
         auto [mstrTag, mstrVal] = value::getObjectView(matchVal)->getField("match");

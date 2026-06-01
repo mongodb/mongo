@@ -104,7 +104,7 @@ TEST_F(SBEBuiltinReverseArrayTest, ArraySet) {
 
     for (auto it = testArrayContents.rbegin(); it != testArrayContents.rend(); ++it) {
         auto [copyTag, copyVal] = copyValue(it->tag, it->value);
-        expectedResultView->push_back(copyTag, copyVal);
+        expectedResultView->push_back_raw(copyTag, copyVal);
     }
 
     runAndAssertExpression(testArray, expectedResult);
