@@ -4411,6 +4411,38 @@ TEST_F(BatchedWriteOutputsTest, TestRetryableVectoredInsertApplyOpsGrouping) {
     }
 }
 
+TEST_F(BatchedWriteOutputsTest, AtomicWriteWithMultipleStatementBearingOpsTrips) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    std::unique_ptr<MongoDSessionCatalog::Session> session;
+    beginRetryableWriteWithTxnNumber(opCtx, TxnNumber(1), session);
+    AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+
+    // Two separate inserts in one WUOW, each its own statement-bearing operation.
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForAtomicWrite);
+    std::vector<InsertStatement> inserts;
+    inserts.emplace_back(StmtId(0), BSON("_id" << 0));
+    inserts.emplace_back(StmtId(1), BSON("_id" << 1));
+    opCtx->getServiceContext()->getOpObserver()->onInserts(
+        opCtx,
+        *autoColl,
+        inserts.begin(),
+        inserts.end(),
+        /*recordIds=*/{},
+        /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+        /*defaultFromMigrate=*/false);
+
+    // Committing trips the kGroupForAtomicWrite assertion. tassert both throws and arms the
+    // tripwire; clear the tripwire so the test process doesn't abort at shutdown.
+    ASSERT_THROWS_WITH_CHECK(wuow.commit(), DBException, [](const DBException& ex) {
+        EXPECT_EQ(ex.code(), 12782600);
+        assertionCount.tripwire.subtractAndFetch(1);
+    });
+}
+
 // Test to make sure vectored inserts work if the vectored inserts don't fit into an applyOps.  This
 // should never happen except in tests which specifically set the batching parameters, but it makes
 // the code simpler to assume it does happen, and testing that it works is simpler and more reliable

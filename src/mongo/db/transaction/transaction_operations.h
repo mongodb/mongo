@@ -189,6 +189,11 @@ public:
     std::size_t getNumberOfPrePostImagesToWrite() const;
 
     /**
+     * Returns the number of collected operations that carry statement ids.
+     */
+    std::size_t getNumberOfOperationsWithStatementIds() const;
+
+    /**
      * Clears the operations stored in this container along with corresponding statistics.
      */
     void clear();

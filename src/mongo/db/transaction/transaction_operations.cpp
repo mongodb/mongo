@@ -145,6 +145,14 @@ std::size_t TransactionOperations::getNumberOfPrePostImagesToWrite() const {
     return _numberOfPrePostImagesToWrite;
 }
 
+std::size_t TransactionOperations::getNumberOfOperationsWithStatementIds() const {
+    return static_cast<std::size_t>(std::count_if(_transactionOperations.begin(),
+                                                  _transactionOperations.end(),
+                                                  [](const TransactionOperation& operation) {
+                                                      return !operation.getStatementIds().empty();
+                                                  }));
+}
+
 void TransactionOperations::clear() {
     _transactionOperations.clear();
     _transactionStmtIds.clear();

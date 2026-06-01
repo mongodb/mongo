@@ -148,6 +148,52 @@ TEST(TransactionOperationsTest, AddTransactionFailsOnDuplicateStatementIds) {
     ASSERT_OK(ops.addOperation(op6));
 }
 
+TEST(TransactionOperationsTest, GetNumberOfOperationsWithStatementIds) {
+    TransactionOperations ops;
+
+    // No operations.
+    ASSERT_EQ(ops.getNumberOfOperationsWithStatementIds(), 0);
+
+    // A single operation carrying no statement ids.
+    TransactionOperations::TransactionOperation noStmtIdOp;
+    ASSERT_OK(ops.addOperation(noStmtIdOp));
+    ASSERT_EQ(ops.getNumberOfOperationsWithStatementIds(), 0);
+
+    // A single operation carrying one statement id.
+    ops.clear();
+    TransactionOperations::TransactionOperation oneStmtIdOp;
+    oneStmtIdOp.setStatementIds(std::vector<StmtId>{0});
+    ASSERT_OK(ops.addOperation(oneStmtIdOp));
+    ASSERT_EQ(ops.getNumberOfOperationsWithStatementIds(), 1);
+
+    // A single operation carrying multiple statement ids still counts as one statement-bearing
+    // operation.
+    ops.clear();
+    TransactionOperations::TransactionOperation multiStmtIdOp;
+    multiStmtIdOp.setStatementIds(std::vector<StmtId>{0, 1, 2});
+    ASSERT_OK(ops.addOperation(multiStmtIdOp));
+    ASSERT_EQ(ops.getNumberOfOperationsWithStatementIds(), 1);
+
+    // One statement-bearing operation alongside operations carrying no statement ids.
+    ops.clear();
+    TransactionOperations::TransactionOperation sideOp;
+    TransactionOperations::TransactionOperation userOp;
+    userOp.setStatementIds(std::vector<StmtId>{3});
+    ASSERT_OK(ops.addOperation(sideOp));
+    ASSERT_OK(ops.addOperation(userOp));
+    ASSERT_EQ(ops.getNumberOfOperationsWithStatementIds(), 1);
+
+    // Two operations that each carry statement ids.
+    ops.clear();
+    TransactionOperations::TransactionOperation firstUserOp;
+    firstUserOp.setStatementIds(std::vector<StmtId>{0});
+    TransactionOperations::TransactionOperation secondUserOp;
+    secondUserOp.setStatementIds(std::vector<StmtId>{1});
+    ASSERT_OK(ops.addOperation(firstUserOp));
+    ASSERT_OK(ops.addOperation(secondUserOp));
+    ASSERT_EQ(ops.getNumberOfOperationsWithStatementIds(), 2);
+}
+
 TEST(TransactionOperationsTest, AddTransactionIncludesPreImageStatistics) {
     TransactionOperations ops;
 

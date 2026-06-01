@@ -107,6 +107,7 @@
 #include <utility>
 
 #include <boost/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -2342,6 +2343,15 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
             default:
                 break;
         }
+    }
+
+    if (oplogGroupingFormat == WriteUnitOfWork::kGroupForAtomicWrite) {
+        auto numOpsWithStatementIds = batchedOps->getNumberOfOperationsWithStatementIds();
+        tassert(12782600,
+                fmt::format("kGroupForAtomicWrite WUOW must contain at most one operation with "
+                            "retryable statements, but found {}",
+                            numOpsWithStatementIds),
+                numOpsWithStatementIds <= 1);
     }
 
     // Serialize batched statements to BSON and determine their assignment to "applyOps"
