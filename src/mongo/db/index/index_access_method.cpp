@@ -1076,6 +1076,8 @@ BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* entry,
       _progressMessage("Index Build: inserting keys from external sorter into index"),
       _indexName(entry->descriptor()->indexName()),
       _isMultiKey(stateInfo.getIsMultikey()),
+      _hasMultiKeyMetadataKeys(_isMultiKey &&
+                               entry->descriptor()->getAccessMethodName() == IndexNames::WILDCARD),
       _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())),
       _sorter(_makeSorter(std::move(spiller), opts, stateInfo.getRanges())),
       _containerWriteBehavior(containerWriteBehavior) {
