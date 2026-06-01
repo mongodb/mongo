@@ -34,6 +34,7 @@
 #include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -69,6 +70,18 @@ MONGO_FAIL_POINT_DEFINE(searchReturnEofImmediately);
 
 namespace search_helpers {
 namespace {
+// Returns true if 'source' is an $_internalDocumentResultsAndMetadata stage wrapping an extension
+// search stage.
+bool isExtensionSearchWrappedInDocResAndMetadata(
+    const boost::intrusive_ptr<DocumentSource>& source) {
+    if (auto* wrapper =
+            dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(source.get())) {
+        const auto& inner = wrapper->getSourceStage();
+        return inner && isExtensionSearchStage(std::string(inner->getSourceName()));
+    }
+    return false;
+}
+
 // Asserts that $$SEARCH_META is accessed correctly, that is, it is set by a prior stage, and is
 // not accessed in a subpipline. It is assumed that if there is a
 // 'DocumentSourceInternalSearchMongotRemote' then '$$SEARCH_META' will be set at some point in the
@@ -89,7 +102,11 @@ void assertSearchMetaAccessValidHelper(
             auto stageName = StringData(source->getSourceName());
             if (stageName == DocumentSourceInternalSearchMongotRemote::kStageName ||
                 stageName == DocumentSourceSearch::kStageName || stageName == kSetVarName ||
-                stageName == kExtensionSearchStageName) {
+                // TODO SERVER-126017: Remove kExtensionSearchStageName once search.cpp's
+                // expand() always wraps $_extensionSearch inside
+                // $_internalDocumentResultsAndMetadata and never emits it as a top-level stage.
+                stageName == kExtensionSearchStageName ||
+                isExtensionSearchWrappedInDocResAndMetadata(source)) {
                 searchMetaSet = true;
                 if (stageName == kSetVarName) {
                     tassert(6448003,
@@ -330,7 +347,8 @@ bool isExtensionMongotPipeline(const Pipeline* pipeline) {
     const auto& stages = pipeline->getSources();
     return std::any_of(stages.begin(), stages.end(), [](const auto& stage) {
         return isExtensionVectorSearchStage(stage->getSourceName()) ||
-            isExtensionSearchStage(stage->getSourceName());
+            isExtensionSearchStage(stage->getSourceName()) ||
+            isExtensionSearchWrappedInDocResAndMetadata(stage);
     });
 }
 

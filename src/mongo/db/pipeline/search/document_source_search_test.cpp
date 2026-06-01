@@ -34,10 +34,14 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/mongot_options.h"
@@ -245,6 +249,68 @@ TEST_F(SearchTest, IsExtensionMongotPipelineReturnsFalseForSearchMetaFlagDisable
 
     ASSERT_FALSE(search_helper_bson_obj::isExtensionMongotPipeline(ifrContext, pipeline));
     ASSERT_TRUE(search_helper_bson_obj::isMongotPipeline(ifrContext, pipeline));
+}
+
+TEST_F(SearchTest, AssertSearchMetaAccessValidForDocumentResultsAndMetadataWrappingSearch) {
+    auto expCtx = getExpCtx();
+    auto searchStage = DocumentSourceSearch::createFromBson(
+        BSON("$search" << fromjson("{term: 'asdf'}")).firstElement(), expCtx);
+    DocumentSourceContainer pipeline{
+        DocumentSourceInternalDocumentResultsAndMetadata::create(
+            expCtx, searchStage, MetadataBindSpec("SEARCH_META")),
+        DocumentSourceAddFields::createFromBson(
+            BSON("$addFields" << BSON("meta" << "$$SEARCH_META")).firstElement(), expCtx)};
+    ASSERT_DOES_NOT_THROW(search_helpers::assertSearchMetaAccessValid(pipeline, expCtx.get()));
+}
+
+TEST_F(SearchTest,
+       AssertSearchMetaAccessValidThrowsForDocumentResultsAndMetadataWrappingNonExtension) {
+    // $_internalDocumentResultsAndMetadata wrapping a non-extension stage must not be credited
+    // as setting $$SEARCH_META, so accessing $$SEARCH_META afterwards must fail.
+    auto expCtx = getExpCtx();
+    auto nonExtensionStage = DocumentSourceAddFields::createFromBson(
+        BSON("$addFields" << BSON("x" << 1)).firstElement(), expCtx);
+    DocumentSourceContainer pipeline{
+        DocumentSourceInternalDocumentResultsAndMetadata::create(
+            expCtx, nonExtensionStage, boost::none),
+        DocumentSourceAddFields::createFromBson(
+            BSON("$addFields" << BSON("meta" << "$$SEARCH_META")).firstElement(), expCtx)};
+    ASSERT_THROWS_CODE(search_helpers::assertSearchMetaAccessValid(pipeline, expCtx.get()),
+                       AssertionException,
+                       6347902);
+}
+
+TEST_F(SearchTest, AssertSearchMetaAccessValidThrowsWhenNoSetterPresent) {
+    auto expCtx = getExpCtx();
+    DocumentSourceContainer pipeline{DocumentSourceAddFields::createFromBson(
+        BSON("$addFields" << BSON("meta" << "$$SEARCH_META")).firstElement(), expCtx)};
+    ASSERT_THROWS_CODE(search_helpers::assertSearchMetaAccessValid(pipeline, expCtx.get()),
+                       AssertionException,
+                       6347902);
+}
+
+TEST_F(SearchTest,
+       IsExtensionMongotPipelineReturnsTrueForDocumentResultsAndMetadataWrappingSearch) {
+    auto expCtx = getExpCtx();
+    auto searchStage = DocumentSourceSearch::createFromBson(
+        BSON("$search" << fromjson("{term: 'asdf'}")).firstElement(), expCtx);
+    DocumentSourceContainer stages{
+        DocumentSourceInternalDocumentResultsAndMetadata::create(expCtx, searchStage, boost::none)};
+    auto pipeline = Pipeline::create(std::move(stages), expCtx);
+    ASSERT_TRUE(search_helpers::isExtensionMongotPipeline(pipeline.get()));
+}
+
+TEST_F(SearchTest,
+       IsExtensionMongotPipelineReturnsFalseForDocumentResultsAndMetadataWrappingNonExtension) {
+    // $_internalDocumentResultsAndMetadata wrapping a generic stage (e.g. $addFields) must not
+    // be misclassified as an extension mongot pipeline.
+    auto expCtx = getExpCtx();
+    auto nonExtensionStage = DocumentSourceAddFields::createFromBson(
+        BSON("$addFields" << BSON("x" << 1)).firstElement(), expCtx);
+    DocumentSourceContainer stages{DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, nonExtensionStage, boost::none)};
+    auto pipeline = Pipeline::create(std::move(stages), expCtx);
+    ASSERT_FALSE(search_helpers::isExtensionMongotPipeline(pipeline.get()));
 }
 
 }  // namespace
