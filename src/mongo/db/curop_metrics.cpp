@@ -72,7 +72,9 @@ struct InBoth {
         : killedDueToClientDisconnect{makeCounter("operation.killedDueToClientDisconnect", role)},
           killedDueToMaxTimeMSExpired{makeCounter("operation.killedDueToMaxTimeMSExpired", role)},
           killedDueToDefaultMaxTimeMSExpired{
-              makeCounter("operation.killedDueToDefaultMaxTimeMSExpired", role)} {}
+              makeCounter("operation.killedDueToDefaultMaxTimeMSExpired", role)},
+          killedDueToInterruptedDueToOverload{
+              makeCounter("operation.killedDueToInterruptedDueToOverload", role)} {}
 
     void record(OperationContext* opCtx) {
         auto* curOp = CurOp::get(opCtx);
@@ -89,11 +91,16 @@ struct InBoth {
                 killedDueToMaxTimeMSExpired->increment();
             }
         }
+        if (killStatus == ErrorCodes::InterruptedDueToOverload ||
+            debug.errInfo == ErrorCodes::InterruptedDueToOverload) {
+            killedDueToInterruptedDueToOverload->increment();
+        }
     }
 
     Counter64* killedDueToClientDisconnect;
     Counter64* killedDueToMaxTimeMSExpired;
     Counter64* killedDueToDefaultMaxTimeMSExpired;
+    Counter64* killedDueToInterruptedDueToOverload;
 };
 
 /** Counters that are in shard service. */
