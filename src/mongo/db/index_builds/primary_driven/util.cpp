@@ -44,7 +44,9 @@
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/lazy_record_store.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
@@ -328,20 +330,33 @@ ResumeIndexInfo resumeInfo(OperationContext* opCtx,
             "Invalid index build resume state ident",
             ident::isInternalIdent(ident, kIndexBuildIdentStem));
 
-    auto resumeIndexInfoDoc = index_builds::readResumeIndexInfo(
-        opCtx->getServiceContext()->getStorageEngine(), opCtx, ident);
+    // Distinguish "no persisted state" from "persisted state failed to parse".
+    auto hasRecords = [&] {
+        auto& engine = *opCtx->getServiceContext()->getStorageEngine()->getEngine();
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
-    boost::optional<ResumeIndexInfo> resumeIndexInfo;
-    if (resumeIndexInfoDoc) {
-        resumeIndexInfo = index_builds::parseResumeIndexInfo(*resumeIndexInfoDoc);
-    } else {
+        if (!engine.hasIdent(ru, ident)) {
+            return false;
+        }
+
+        return engine
+            .getRecordStore(
+                opCtx, NamespaceString::kEmpty, ident, RecordStore::Options{}, /*uuid=*/boost::none)
+            ->getCursor(opCtx, ru)
+            ->next()
+            .has_value();
+    }();
+
+    if (!hasRecords) {
         // If we don't have a persisted resume state but we did have the index build in the
         // registry, synthesize an initial phase resume state so that index builds that are
         // interrupted prior to persisting their resume state can be handled properly.
-        resumeIndexInfo = index_builds::synthesizeResumeIndexInfo(
+        return index_builds::synthesizeResumeIndexInfo(
             buildUUID, IndexBuildPhaseEnum::kInitialized, collectionUUID, indexes);
     }
 
+    auto resumeIndexInfo = index_builds::readAndParseResumeIndexInfo(
+        opCtx->getServiceContext()->getStorageEngine(), opCtx, ident);
     uassert(ErrorCodes::FailedToParse,
             "Failed to read/parse the index build resume state",
             resumeIndexInfo);

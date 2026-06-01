@@ -366,13 +366,32 @@ private:
     void _writeStateToDisk(OperationContext* opCtx);
 
     /**
-     * Performs a container write to persist build state to the resumable table.
+     * Performs an update-or-insert of a single record into the index build container. Caller must
+     * already be inside a WriteUnitOfWork.
      */
-    void _writeStateToContainer(OperationContext* opCtx) const;
+    void _upsertIntoContainer(OperationContext* opCtx, int64_t key, const BSONObj& obj) const;
+
+    /**
+     * Writes the IndexBuildMetadata to the index build container. No-op when not replicating
+     * container writes or not resumable.
+     */
+    void _writeIndexBuildMetadataToContainer(OperationContext* opCtx) const;
+
+    /**
+     * Writes a single IndexStateInfo to the index build container for the given index. No-op when
+     * not replicating container writes or not resumable.
+     */
+    void _writeIndexStateInfoToContainer(OperationContext* opCtx, size_t index) const;
+
+    /**
+     * Writes the IndexBuildMetadata and the IndexStateInfo for all indexes to the index build
+     * container. No-op when not replicating container writes or not resumable.
+     */
+    void _writeAllStateToContainer(OperationContext* opCtx) const;
 
     BSONObj _constructStateObject() const;
 
-    ResumeIndexInfo _buildResumeIndexInfo() const;
+    IndexBuildMetadata _buildIndexBuildMetadata() const;
 
     IndexStateInfo _buildIndexStateInfo(const IndexToBuild& index) const;
 

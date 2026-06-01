@@ -688,7 +688,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
                 return numDeleted > 0;
             },
         });
-        checkLog.containsJson(newPrimary, 12500800, {phase: skipSpills === 0 ? "initialized" : "collection scan"});
+        checkLog.containsJson(newPrimary, 12500800, {phase: "collection scan"});
 
         rst.awaitReplication();
         for (const node of rst.nodes) {

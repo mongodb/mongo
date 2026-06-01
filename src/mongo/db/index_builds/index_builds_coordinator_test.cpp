@@ -743,14 +743,30 @@ void persistPrimaryDrivenResumeState(OperationContext* opCtx,
                                      IndexBuildPhaseEnum phase) {
     auto resumeIndexInfo =
         index_builds::synthesizeResumeIndexInfo(buildUUID, phase, collectionUUID, indexes);
-    auto obj = resumeIndexInfo.toBSON();
+
+    IndexBuildMetadata metadata;
+    metadata.setBuildUUID(resumeIndexInfo.getBuildUUID());
+    metadata.setPhase(resumeIndexInfo.getPhase());
+    metadata.setCollectionUUID(resumeIndexInfo.getCollectionUUID());
+    auto metadataObj = metadata.toBSON();
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     WriteUnitOfWork wuow(opCtx);
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto rs =
         storageEngine->getEngine()->getInternalRecordStore(ru, resumeStateIdent, KeyFormat::Long);
-    ASSERT_OK(rs->insertRecord(opCtx, ru, obj.objdata(), obj.objsize(), Timestamp()));
+    ASSERT_OK(rs->insertRecord(
+        opCtx, ru, RecordId(1), metadataObj.objdata(), metadataObj.objsize(), Timestamp()));
+    auto& indexStates = resumeIndexInfo.getIndexes();
+    for (size_t i = 0; i < indexStates.size(); ++i) {
+        auto idxObj = indexStates[i].toBSON();
+        ASSERT_OK(rs->insertRecord(opCtx,
+                                   ru,
+                                   RecordId(static_cast<int64_t>(i) + 2),
+                                   idxObj.objdata(),
+                                   idxObj.objsize(),
+                                   Timestamp()));
+    }
     wuow.commit();
 }
 

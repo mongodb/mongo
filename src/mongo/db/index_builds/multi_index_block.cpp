@@ -130,6 +130,8 @@ auto& bulkKeysGeneratedCounter = otel::metrics::MetricsService::instance().creat
     "Total number of keys generated from collection scan",
     otel::metrics::MetricUnit::kOperations);
 
+constexpr int64_t indexBuildMetadataKey = 1;
+
 size_t getEachIndexBuildMaxMemoryUsageBytes(boost::optional<size_t> maxMemoryUsageBytes,
                                             size_t numIndexSpecs) {
     if (numIndexSpecs == 0) {
@@ -579,11 +581,11 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                             _exec->saveState();
                         },
                     .onSpill =
-                        [this, opCtx, &lastSpilledRecordId = index.lastSpilledRecordId] {
+                        [this, opCtx, i, &lastSpilledRecordId = index.lastSpilledRecordId] {
                             hangAfterIndexBuildSpillBeforeStatePersisted.pauseWhileSet();
                             lastSpilledRecordId = _lastRecordIdInserted;
                             if (_isResumable) {
-                                _writeStateToContainer(opCtx);
+                                _writeIndexStateInfoToContainer(opCtx, i);
                             }
                         },
                     .postSpill =
@@ -947,7 +949,12 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
     invariant(_phase == IndexBuildPhaseEnum::kInitialized ||
                   _phase == IndexBuildPhaseEnum::kCollectionScan,
               idl::serialize(_phase));
-    _phase = IndexBuildPhaseEnum::kCollectionScan;
+
+    // If transitioning from initialization to the scan phase, seed the index build container.
+    if (std::exchange(_phase, IndexBuildPhaseEnum::kCollectionScan) ==
+        IndexBuildPhaseEnum::kInitialized) {
+        _writeAllStateToContainer(opCtx);
+    }
 
     // If a key constraint violation is found, it may be suppressed and written to the constraint
     // violations side table. The plan executor must be passed down to save and restore the
@@ -1150,7 +1157,10 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
         index.bulk->done();
     }
 
-    _phase = IndexBuildPhaseEnum::kBulkLoad;
+    // If the phase changed, write the new phase to the index build container.
+    if (std::exchange(_phase, IndexBuildPhaseEnum::kBulkLoad) != IndexBuildPhaseEnum::kBulkLoad) {
+        _writeIndexBuildMetadataToContainer(opCtx);
+    }
 
     // Doesn't allow yielding when in a foreground index build.
     const int32_t kYieldIterations =
@@ -1243,8 +1253,9 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
             },
             onDuplicateRecord,
             yieldFn,
-            periodicResumeStateWrites ? IndexAccessMethod::OnNKeysLoadedFn(
-                                            [this, opCtx] { _writeStateToContainer(opCtx); })
+            periodicResumeStateWrites ? IndexAccessMethod::OnNKeysLoadedFn([this, opCtx, i] {
+                _writeIndexStateInfoToContainer(opCtx, i);
+            })
                                       : IndexAccessMethod::OnNKeysLoadedFn([]() {}),
             primaryDrivenIndexBuildLoadResumeStateWriteIntervalKeys.load(),
             (this->_containerWriteBehavior == ContainerWriteBehavior::kReplicate)
@@ -1287,12 +1298,12 @@ Status MultiIndexBlock::drainBackgroundWrites(
         CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, _collectionUUID.value()));
     coll.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, coll));
 
-    // Write to the container if the collection is non-empty or if the index build was
-    // resumed from a prior generation (e.g. kCollectionScan or kBulkLoad phase) and this
-    // generation's scan inserted no new records.
+    // Record the transition to the drain phase if the collection is non-empty or if the index build
+    // was resumed from a prior phase. Rewrite both the IndexBuildMetadata and every per-index
+    // IndexStateInfo since the metadata about the spilled data is no longer needed.
     if (firstDrain && _containerWriteBehavior == ContainerWriteBehavior::kReplicate &&
         _isResumable && (_lastRecordIdInserted.has_value() || _wasResumed)) {
-        _writeStateToContainer(opCtx);
+        _writeAllStateToContainer(opCtx);
     }
 
     // Drain side-writes table for each index. This only drains what is visible. Assuming intent
@@ -1531,9 +1542,9 @@ void MultiIndexBlock::persistResumeState(OperationContext* opCtx, const Collecti
     invariant(!_buildIsCleanedUp);
     invariant(_buildUUID);
 
-    if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
-        _writeStateToContainer(opCtx);
-    } else {
+    // When replicating container writes, the index build metadata is written periodically so
+    // nothing to do here.
+    if (_containerWriteBehavior == ContainerWriteBehavior::kDoNotReplicate) {
         _writeStateToDisk(opCtx);
     }
 }
@@ -1561,9 +1572,9 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
             index.block->createDeferredTables(opCtx);
         }
 
-        if (_containerWriteBehavior == ContainerWriteBehavior::kReplicate) {
-            _writeStateToContainer(opCtx);
-        } else {
+        // When replicating container writes, the index build metadata is written periodically so
+        // nothing to do here.
+        if (_containerWriteBehavior == ContainerWriteBehavior::kDoNotReplicate) {
             _writeStateToDisk(opCtx);
         }
     }
@@ -1618,55 +1629,107 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx) {
           "details"_attr = obj);
 }
 
-void MultiIndexBlock::_writeStateToContainer(OperationContext* opCtx) const {
-    auto obj = _constructStateObject();
+void MultiIndexBlock::_upsertIntoContainer(OperationContext* opCtx,
+                                           int64_t key,
+                                           const BSONObj& obj) const {
     auto& rs = _resumeStateTempRecordStore->getTableOrThrow();
     invariant(rs.keyFormat() == KeyFormat::Long);
     IntegerKeyedContainer& container =
         std::get<std::reference_wrapper<IntegerKeyedContainer>>(rs.getContainer()).get();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
-    static constexpr int64_t kResumeStateKey = 1;
+    std::span<const char> value(obj.objdata(), obj.objsize());
+    auto status = container.getCursor(ru)->find(key).has_value()
+        ? container_write::update(opCtx, ru, container, key, value)
+        : container_write::insert(opCtx, ru, container, key, value);
+    massertStatusOK(status.withContext(
+        str::stream() << "Index build: failed to write resumable state via container write. "
+                      << "buildUUID: " << _buildUUID << ", collectionUUID: " << _collectionUUID
+                      << ", key: " << key << ", details: " << obj.toString()));
+}
 
-    writeConflictRetry(opCtx, "writeIndexBuildStateToContainer", NamespaceString::kEmpty, [&] {
+void MultiIndexBlock::_writeIndexBuildMetadataToContainer(OperationContext* opCtx) const {
+    if (!_isResumable || _containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
+        return;
+    }
+
+    auto obj = _buildIndexBuildMetadata().toBSON();
+    writeConflictRetry(opCtx, "writeIndexBuildMetadataToContainer", NamespaceString::kEmpty, [&] {
         WriteUnitOfWork wuow(opCtx);
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
-        std::span<const char> value(obj.objdata(), obj.objsize());
-        const bool keyExists = container.getCursor(ru)->find(kResumeStateKey).has_value();
-        auto status = keyExists
-            ? container_write::update(opCtx, ru, container, kResumeStateKey, value)
-            : container_write::insert(opCtx, ru, container, kResumeStateKey, value);
-        massertStatusOK(status.withContext(
-            str::stream() << "Index build: failed to write resumable state via container write. "
-                          << "buildUUID: " << _buildUUID << ", collectionUUID: " << _collectionUUID
-                          << ", details: " << obj.toString()));
-
+        _upsertIntoContainer(opCtx, indexBuildMetadataKey, obj);
         wuow.commit();
     });
 
     LOGV2_DEBUG(12558700,
                 1,
-                "Index build: wrote resumable state to disk via container write",
+                "Index build: wrote IndexBuildMetadata to container for resumability",
                 "buildUUID"_attr = _buildUUID,
                 "collectionUUID"_attr = _collectionUUID,
                 "details"_attr = obj);
 }
 
-ResumeIndexInfo MultiIndexBlock::_buildResumeIndexInfo() const {
-    ResumeIndexInfo resumeIndexInfo;
-    resumeIndexInfo.setBuildUUID(*_buildUUID);
-    resumeIndexInfo.setPhase(_phase);
+void MultiIndexBlock::_writeIndexStateInfoToContainer(OperationContext* opCtx, size_t index) const {
+    if (!_isResumable || _containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
+        return;
+    }
+    invariant(index < _indexes.size());
+
+    auto obj = _buildIndexStateInfo(_indexes[index]).toBSON();
+    auto key = indexBuildMetadataKey + static_cast<int64_t>(index) + 1;
+    writeConflictRetry(opCtx, "writeIndexStateInfoToContainer", NamespaceString::kEmpty, [&] {
+        WriteUnitOfWork wuow(opCtx);
+        _upsertIntoContainer(opCtx, key, obj);
+        wuow.commit();
+    });
+
+    LOGV2_DEBUG(12558701,
+                1,
+                "Index build: wrote IndexStateInfo to container for resumability",
+                "buildUUID"_attr = _buildUUID,
+                "collectionUUID"_attr = _collectionUUID,
+                "index"_attr = index,
+                "details"_attr = obj);
+}
+
+void MultiIndexBlock::_writeAllStateToContainer(OperationContext* opCtx) const {
+    if (!_isResumable || _containerWriteBehavior != ContainerWriteBehavior::kReplicate) {
+        return;
+    }
+
+    auto metadataObj = _buildIndexBuildMetadata().toBSON();
+    writeConflictRetry(opCtx, "writeAllIndexBuildState", NamespaceString::kEmpty, [&] {
+        // Group all records into a single replicated transaction so secondaries apply the writes
+        // atomically.
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
+        _upsertIntoContainer(opCtx, indexBuildMetadataKey, metadataObj);
+        for (size_t i = 0; i < _indexes.size(); ++i) {
+            _upsertIntoContainer(opCtx,
+                                 indexBuildMetadataKey + static_cast<int64_t>(i) + 1,
+                                 _buildIndexStateInfo(_indexes[i]).toBSON());
+        }
+        wuow.commit();
+    });
+
+    LOGV2_DEBUG(12558702,
+                1,
+                "Index build: wrote IndexBuildMetadata and IndexStateInfo for all indexes to "
+                "container for resumability",
+                "buildUUID"_attr = _buildUUID,
+                "collectionUUID"_attr = _collectionUUID,
+                "numIndexes"_attr = _indexes.size(),
+                "details"_attr = metadataObj);
+}
+
+IndexBuildMetadata MultiIndexBlock::_buildIndexBuildMetadata() const {
+    IndexBuildMetadata metadata;
+    metadata.setBuildUUID(*_buildUUID);
+    metadata.setPhase(_phase);
 
     if (_collectionUUID) {
-        resumeIndexInfo.setCollectionUUID(*_collectionUUID);
+        metadata.setCollectionUUID(*_collectionUUID);
     }
 
-    // We can be interrupted by shutdown before inserting the first document from the collection
-    // scan, in which case there is no _lastRecordIdInserted.
-    if (_phase == IndexBuildPhaseEnum::kCollectionScan && _lastRecordIdInserted) {
-        resumeIndexInfo.setCollectionScanPosition(_lastRecordIdInserted);
-    }
-
-    return resumeIndexInfo;
+    return metadata;
 }
 
 IndexStateInfo MultiIndexBlock::_buildIndexStateInfo(const IndexToBuild& index) const {
@@ -1725,7 +1788,12 @@ IndexStateInfo MultiIndexBlock::_buildIndexStateInfo(const IndexToBuild& index) 
 }
 
 BSONObj MultiIndexBlock::_constructStateObject() const {
-    auto resumeIndexInfo = _buildResumeIndexInfo();
+    ResumeIndexInfo resumeIndexInfo;
+    resumeIndexInfo.setMetadata(_buildIndexBuildMetadata());
+
+    if (_phase == IndexBuildPhaseEnum::kCollectionScan && _lastRecordIdInserted) {
+        resumeIndexInfo.setCollectionScanPosition(_lastRecordIdInserted);
+    }
 
     std::vector<IndexStateInfo> indexInfos;
     indexInfos.reserve(_indexes.size());

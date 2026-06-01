@@ -54,15 +54,20 @@ assert.commandWorked(coll.insertOne({x: 0, big: hugeString}));
 IndexBuildTest.resumeIndexBuilds(primary);
 awaitIndex();
 
-// Inspect the oplog.rs for applyOps generated from the concurrent write during index build.
+// Inspect the oplog.rs for applyOps generated from the concurrent write during index build. Filter
+// out the index build's periodic writes to the `internal-indexBuild-<UUID>` container, which are
+// unrelated to the concurrent write.
 const oplog = primary.getDB("local").getCollection("oplog.rs");
 const nss = coll.getFullName();
 const containerNss = "admin.$container";
 const applyOps = oplog
     .find({
         op: "c",
-        "o.applyOps": {$exists: true},
-        "o.applyOps.ns": {$in: [nss, containerNss]},
+        "o.applyOps": {
+            $elemMatch: {
+                $or: [{ns: nss}, {ns: containerNss, container: {$not: /^internal-indexBuild-/}}],
+            },
+        },
     })
     .sort({ts: 1})
     .toArray();

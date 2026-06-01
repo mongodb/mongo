@@ -43,17 +43,6 @@ MONGO_FAIL_POINT_DEFINE(failToParseResumeIndexInfo);
 boost::optional<ResumeIndexInfo> readAndParseResumeIndexInfo(StorageEngine* engine,
                                                              OperationContext* opCtx,
                                                              const std::string& ident) {
-    auto doc = readResumeIndexInfo(engine, opCtx, ident);
-    if (!doc) {
-        return boost::none;
-    }
-
-    return parseResumeIndexInfo(*doc);
-}
-
-boost::optional<BSONObj> readResumeIndexInfo(StorageEngine* engine,
-                                             OperationContext* opCtx,
-                                             const std::string& ident) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     if (!engine->getEngine()->hasIdent(ru, ident)) {
         return boost::none;
@@ -66,12 +55,7 @@ boost::optional<BSONObj> readResumeIndexInfo(StorageEngine* engine,
     if (!record) {
         return boost::none;
     }
-    return record.value().data.getOwned().releaseToBson();
-}
 
-boost::optional<ResumeIndexInfo> parseResumeIndexInfo(const BSONObj& doc) {
-    // Parse the documents here so that we can restart (or abort) the build if the document
-    // doesn't contain all the necessary information to be able to resume building the index.
     ResumeIndexInfo resumeInfo;
     try {
         if (MONGO_unlikely(failToParseResumeIndexInfo.shouldFail())) {
@@ -79,7 +63,28 @@ boost::optional<ResumeIndexInfo> parseResumeIndexInfo(const BSONObj& doc) {
                       "failToParseResumeIndexInfo fail point is enabled");
         }
 
-        resumeInfo = ResumeIndexInfo::parse(doc, IDLParserContext("ResumeIndexInfo"));
+        // Peek at the last record. If first.id == last.id, the table has exactly one record that is
+        // a complete ResumeIndexInfo. Otherwise, the record is an IndexBuildMetadata and each
+        // subsequent record is an IndexStateInfo.
+        auto isSingleRecord = [&] {
+            auto reverseCursor = rs->getCursor(opCtx, ru, /*forward=*/false);
+            auto lastRecord = reverseCursor->next();
+            return lastRecord && lastRecord->id == record->id;
+        }();
+
+        if (isSingleRecord) {
+            resumeInfo =
+                ResumeIndexInfo::parse(record->data.toBson(), IDLParserContext("ResumeIndexInfo"));
+        } else {
+            resumeInfo.setMetadata(IndexBuildMetadata::parse(
+                record->data.toBson(), IDLParserContext("IndexBuildMetadata")));
+            std::vector<IndexStateInfo> indexes;
+            while (auto indexStateInfo = cursor->next()) {
+                indexes.emplace_back(IndexStateInfo::parse(indexStateInfo->data.toBson(),
+                                                           IDLParserContext("IndexStateInfo")));
+            }
+            resumeInfo.setIndexes(std::move(indexes));
+        }
     } catch (const DBException& e) {
         LOGV2(4916300, "Failed to parse resumable index info", "error"_attr = e.toStatus());
 

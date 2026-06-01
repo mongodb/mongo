@@ -41,28 +41,13 @@
 namespace mongo::index_builds {
 
 /**
- * Read and parse the document storing the index build resume state from the resume state table,
- * specified by the given ident. Will return boost::none if the record cannot be found or
- * the document fails to parse.
+ * Read and parse the index build resume state from the table at `ident`. Returns boost::none if the
+ * table is missing, empty, or any record fails to parse.
  */
 MONGO_MOD_PUBLIC
 boost::optional<ResumeIndexInfo> readAndParseResumeIndexInfo(StorageEngine* engine,
                                                              OperationContext* opCtx,
                                                              const std::string& ident);
-
-/**
- * Read the document storing the index build resume state from the resume state table,
- * specified by the given ident, if available, otherwise will return boost::none.
- */
-boost::optional<BSONObj> readResumeIndexInfo(StorageEngine* engine,
-                                             OperationContext* opCtx,
-                                             const std::string& ident);
-
-/**
- * Parse the document storing the index build resume state. Will return boost::none if the document
- * fails to parse.
- */
-boost::optional<ResumeIndexInfo> parseResumeIndexInfo(const BSONObj& data);
 
 /**
  * Synthesizes an index build resume state, using default values for the state of each
