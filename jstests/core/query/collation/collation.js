@@ -1250,7 +1250,7 @@ try {
     assert.eq(mrResult.length, 1, mrResult);
     assert.eq(mrResult[0].value, 1000, mrResult);
 } catch (error) {
-    assert.commandFailedWithCode(error, 51183);
+    assert.commandFailedWithCode(error, [51183, 11749300]);
 }
 
 //

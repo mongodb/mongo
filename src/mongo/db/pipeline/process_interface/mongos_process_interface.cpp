@@ -506,9 +506,19 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
 
         routingCtx = uassertStatusOK(getRoutingContext(expCtx->getOperationContext(), {outputNs}));
         const auto& cri = routingCtx->getCollectionRoutingInfo(outputNs);
+
         if (!cri.isSharded()) {
             return boost::none;
         }
+
+        // Without explicit fieldPaths, for sharded target collections, mongods use _id + shard key
+        // for uniqueness. The _id comparison uses the collection's default collation. Check the _id
+        // collation matches the query's collation. Shard keys must use the simple collation.
+        uassert(
+            11749300,
+            "$merge aggregation pipeline collation does not match destination collection collation",
+            CollatorInterface::collatorsMatch(expCtx->getCollator(),
+                                              cri.getChunkManager().getDefaultCollator()));
 
         return cri.getCollectionVersion().placementVersion();
     }();
