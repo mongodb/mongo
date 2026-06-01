@@ -962,9 +962,13 @@ public:
     void awaitChangeStreamsMonitorCompleted(OperationContext* opCtx,
                                             RecipientStateMachine& recipient,
                                             const ReshardingRecipientDocument& recipientDoc) {
-        auto swDocumentsDelta =
-            recipient.awaitChangeStreamsMonitorCompletedForTest().getNoThrow(opCtx);
-        if (recipientDoc.getPerformVerification() && !recipientDoc.getSkipCloningAndApplying()) {
+        auto swDocumentsDelta = recipient.awaitChangeStreamsMonitorCompleted().getNoThrow(opCtx);
+        if (recipientDoc.getPerformVerification()) {
+            if (recipientDoc.getSkipCloningAndApplying()) {
+                // Skip-cloning recipients have no change streams monitor; they report a delta of 0.
+                ASSERT_EQ(swDocumentsDelta.getValue(), 0);
+                return;
+            }
             ASSERT_OK(swDocumentsDelta.getStatus());
 
             // Verify the delta.
@@ -1329,12 +1333,15 @@ protected:
                     ASSERT_EQ(*mutableState.getTotalNumDocuments(), expectedDocsCopied);
                     ASSERT_EQ(*mutableState.getTotalDocumentSize(), expectedBytesCopied);
                 } else if (state >= RecipientStateEnum::kStrictConsistency) {
-                    ASSERT_EQ(*mutableState.getTotalNumDocuments(),
-                              expectedDocsCopied + getExpectedDocumentsDelta());
-                    // Upon transitioning to the "strict-consistency" state, 'totalDocumentSize' is
-                    // set to the fast count size. This test deliberately leaves the temporary
-                    // collection empty when testing verification so this is expected to be equal to
-                    // the delta.
+                    // The change streams monitor delta is not added to this field. The recipient
+                    // tracks only the count of documents it cloned; the post-delta final count
+                    // is the coordinator's responsibility on a separate field, written after
+                    // the coordinator fetches the delta from each participant.
+                    ASSERT_EQ(*mutableState.getTotalNumDocuments(), expectedDocsCopied);
+                    // 'totalDocumentSize' is set to the fast count byte size of the temporary
+                    // collection. This test deliberately leaves the temp collection empty when
+                    // testing verification (resume-data path), so the value equals the delta
+                    // bytes contributed by the in-test writes.
                     ASSERT_EQ(*mutableState.getTotalDocumentSize(),
                               testOptions.performVerification
                                   ? getExpectedDocumentsDeltaBytes()
@@ -2825,7 +2832,7 @@ TEST_F(ReshardingRecipientServiceTest, AbortWhileChangeStreamsMonitorInProgress)
 
     recipient->abort(false);
 
-    auto status = recipient->awaitChangeStreamsMonitorCompletedForTest().getNoThrow();
+    auto status = recipient->awaitChangeStreamsMonitorCompleted().getNoThrow();
     ASSERT((status == ErrorCodes::CallbackCanceled) || (status == ErrorCodes::Interrupted))
         << "Expected CSM to be interrupted by abort, got: " << status;
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
@@ -2857,6 +2864,47 @@ TEST_F(ReshardingRecipientServiceTest, RetryableErrorDuringChangeStreamsMonitorT
 
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
     checkRecipientDocumentRemoved(opCtx.get());
+}
+
+TEST_F(ReshardingRecipientServiceTest,
+       AwaitChangeStreamsMonitorCompletedReturnsZeroWhenSkipCloningAndApplying) {
+    // A recipient that won't own any chunks skips cloning and applying, and intentionally does
+    // not start its change streams monitor. The coordinator's recipient fetch command still
+    // queries every recipient via awaitChangeStreamsMonitorCompleted(); for skip-cloning
+    // recipients it must return a delta of 0 so verification can complete (rather than blocking
+    // forever on a promise that will never be fulfilled).
+    TestOptions testOptions{.isAlsoDonor = false,
+                            .skipCloningAndApplying = true,
+                            .noChunksToCopy = true,
+                            .performVerification = true};
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    auto swDocumentsDelta = recipient->awaitChangeStreamsMonitorCompleted().getNoThrow(opCtx.get());
+    ASSERT_OK(swDocumentsDelta.getStatus());
+    ASSERT_EQ(swDocumentsDelta.getValue(), 0);
+
+    recipient->abort(false /* isUserCancelled */);
+    ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(ReshardingRecipientServiceTest,
+       AwaitChangeStreamsMonitorCompletedReturnsIllegalOperationWhenVerificationDisabled) {
+    TestOptions testOptions{.isAlsoDonor = false, .performVerification = false};
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    auto swDocumentsDelta = recipient->awaitChangeStreamsMonitorCompleted().getNoThrow(opCtx.get());
+    ASSERT_EQ(swDocumentsDelta.getStatus(), ErrorCodes::IllegalOperation);
+
+    recipient->abort(false /* isUserCancelled */);
+    ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
 }
 
 // TODO SERVER-121788: Remove death test once validation no longer runs in critical section.
@@ -2925,7 +2973,7 @@ TEST_F(ReshardingRecipientServiceTest, AbortWhileWaitingForCriticalSectionStarte
             recipient->abort(testOptions.abortOptions->isUserCancelled);
 
             auto changeStreamsMonitorCompletedStatus =
-                recipient->awaitChangeStreamsMonitorCompletedForTest().getNoThrow();
+                recipient->awaitChangeStreamsMonitorCompleted().getNoThrow();
             ASSERT_EQ(changeStreamsMonitorCompletedStatus, ErrorCodes::IllegalOperation);
             ASSERT_EQ(recipient->awaitInStrictConsistencyOrError().getNoThrow(),
                       ErrorCodes::ReshardCollectionAborted);

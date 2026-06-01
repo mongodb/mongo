@@ -564,7 +564,28 @@ std::map<ShardId, int64_t> ReshardingCoordinatorExternalStateImpl::getDocumentsD
     const UUID& reshardingUUID,
     const NamespaceString& nss,
     const std::vector<ShardId>& shardIds) {
-    MONGO_UNREACHABLE;
+    ShardsvrReshardingRecipientFetchFinalCollectionStats cmd(nss, reshardingUUID);
+    const auto opts = std::make_shared<
+        async_rpc::AsyncRPCOptions<ShardsvrReshardingRecipientFetchFinalCollectionStats>>(
+        executor, token, cmd);
+    opts->cmd.setDbName(DatabaseName::kAdmin);
+    auto responses = resharding::sendCommandToShards(opCtx, opts, shardIds);
+
+    std::map<ShardId, int64_t> docsDelta;
+
+    for (auto&& response : responses) {
+        const auto& recipientShardId = response.shardId;
+
+        uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
+        auto collStatsResponse =
+            ShardsvrReshardingRecipientFetchFinalCollectionStatsResponse::parse(
+                response.swResponse.getValue().data,
+                IDLParserContext("getDocumentsDeltaFromRecipients"));
+
+        docsDelta.emplace(recipientShardId, collStatsResponse.getDocumentsDelta());
+    }
+
+    return docsDelta;
 }
 
 void ReshardingCoordinatorExternalStateImpl::verifyClonedCollection(
@@ -633,14 +654,14 @@ void ReshardingCoordinatorExternalStateImpl::verifyFinalCollection(
     int64_t numDocsTemporary = 0;
     BSONObjBuilder recipientReportBuilder;
     for (const auto& recipientEntry : coordinatorDoc.getRecipientShards()) {
-        auto mutableState = recipientEntry.getMutableState();
+        auto finalCount = recipientEntry.getDocumentsFinal();
         uassert(ErrorCodes::ReshardingValidationIncompleteData,
                 str::stream() << "Expected the coordinator document to have the "
                                  "final number of documents on the recipient shard '"
                               << recipientEntry.getId() << "'",
-                mutableState.getTotalNumDocuments());
-        numDocsTemporary += *mutableState.getTotalNumDocuments();
-        recipientReportBuilder.append(recipientEntry.getId(), *mutableState.getTotalNumDocuments());
+                finalCount);
+        numDocsTemporary += *finalCount;
+        recipientReportBuilder.append(recipientEntry.getId(), *finalCount);
     }
 
     LOGV2(9858601,

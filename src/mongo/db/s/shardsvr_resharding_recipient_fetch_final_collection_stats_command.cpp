@@ -94,9 +94,18 @@ public:
                                   << request().getReshardingUUID(),
                     recipientMachine);
 
-            uasserted(ErrorCodes::NotImplemented,
-                      "_shardsvrReshardingRecipientFetchFinalCollectionStats is not yet "
-                      "implemented");
+            LOGV2(12723401,
+                  "Start waiting for the resharding change streams monitor to complete on "
+                  "recipient",
+                  "reshardingUUID"_attr = request().getReshardingUUID());
+            auto documentsDelta =
+                (*recipientMachine)->awaitChangeStreamsMonitorCompleted().get(opCtx);
+            LOGV2(12723402,
+                  "Finished waiting for the resharding change streams monitor to complete on "
+                  "recipient",
+                  "reshardingUUID"_attr = request().getReshardingUUID(),
+                  "documentsDelta"_attr = documentsDelta);
+            return Response{documentsDelta};
         }
 
     private:

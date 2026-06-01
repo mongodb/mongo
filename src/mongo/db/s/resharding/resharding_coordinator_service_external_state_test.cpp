@@ -149,9 +149,8 @@ public:
 
         std::vector<RecipientShardEntry> recipientShards;
         for (auto&& [recipientShardId, recipientDocsFinal] : docsFinalOnRecipients) {
-            RecipientShardContext mutableState;
-            mutableState.setTotalNumDocuments(recipientDocsFinal);
-            RecipientShardEntry recipientEntry(recipientShardId, mutableState);
+            RecipientShardEntry recipientEntry(recipientShardId, {});
+            recipientEntry.setDocumentsFinal(recipientDocsFinal);
             recipientShards.emplace_back(recipientEntry);
         }
 
@@ -316,42 +315,55 @@ public:
         return whenAllSucceed(std::move(expectations));
     }
 
-    auto mockDonorDeltaMetricsResponses(const std::map<ShardId, int64_t>& docsDelta) {
+    template <typename CmdType, typename ResponseType>
+    auto mockDeltaMetricsResponses(const std::map<ShardId, int64_t>& docsDelta,
+                                   const NamespaceString& expectedNss,
+                                   std::string label) {
         std::vector<Future<void>> expectations;
 
-        for (auto donorIter = docsDelta.begin(); donorIter != docsDelta.end(); ++donorIter) {
-            auto donorShardId = donorIter->first;
-            auto donorDocsDelta = donorIter->second;
+        for (auto iter = docsDelta.begin(); iter != docsDelta.end(); ++iter) {
+            auto participantShardId = iter->first;
+            auto participantDocsDelta = iter->second;
 
             auto asyncRPCRunner = dynamic_cast<async_rpc::AsyncMockAsyncRPCRunner*>(
                 async_rpc::detail::AsyncRPCRunner::get(operationContext()->getServiceContext()));
 
-            auto matcher = [this, donorShardId = donorShardId](
+            auto matcher = [this, participantShardId, expectedNss, label](
                                const async_rpc::AsyncMockAsyncRPCRunner::Request& req) {
                 ShardId shardId{req.target.host()};
 
-                if (shardId != donorShardId) {
+                if (shardId != participantShardId) {
                     return false;
                 }
 
-                auto fetchCmd = ShardsvrReshardingDonorFetchFinalCollectionStats::parse(
-                    req.cmdBSON.addFields(BSON("$db" << req.dbName)),
-                    IDLParserContext("mockDonorDeltaMetricsResponses"));
+                auto fetchCmd = CmdType::parse(req.cmdBSON.addFields(BSON("$db" << req.dbName)),
+                                               IDLParserContext(label));
 
-                ASSERT_EQ(fetchCmd.getCommandParameter(), sourceNss);
+                ASSERT_EQ(fetchCmd.getCommandParameter(), expectedNss);
                 ASSERT_EQ(fetchCmd.getReshardingUUID(), reshardingUUID);
                 return true;
             };
 
-            ShardsvrReshardingDonorFetchFinalCollectionStatsResponse response(donorDocsDelta);
-            expectations.push_back(asyncRPCRunner
-                                       ->expect(matcher,
-                                                response.toBSON().addFields(BSON("ok" << 1)),
-                                                "mockDonorDeltaMetricsResponses")
-                                       .unsafeToInlineFuture());
+            ResponseType response(participantDocsDelta);
+            expectations.push_back(
+                asyncRPCRunner->expect(matcher, response.toBSON().addFields(BSON("ok" << 1)), label)
+                    .unsafeToInlineFuture());
         }
 
         return whenAllSucceed(std::move(expectations));
+    }
+
+    auto mockDonorDeltaMetricsResponses(const std::map<ShardId, int64_t>& docsDelta) {
+        return mockDeltaMetricsResponses<ShardsvrReshardingDonorFetchFinalCollectionStats,
+                                         ShardsvrReshardingDonorFetchFinalCollectionStatsResponse>(
+            docsDelta, sourceNss, "mockDonorDeltaMetricsResponses");
+    }
+
+    auto mockRecipientDeltaMetricsResponses(const std::map<ShardId, int64_t>& docsDelta) {
+        return mockDeltaMetricsResponses<
+            ShardsvrReshardingRecipientFetchFinalCollectionStats,
+            ShardsvrReshardingRecipientFetchFinalCollectionStatsResponse>(
+            docsDelta, tempNss, "mockRecipientDeltaMetricsResponses");
     }
 
 
@@ -906,6 +918,28 @@ TEST_F(ReshardingCoordinatorServiceExternalStateTest, GetDocumentsDeltaFromDonor
                                                   reshardingUUID,
                                                   sourceNss,
                                                   shardIds);
+    ASSERT_EQ(docsDelta[shardId0], delta0);
+    ASSERT_EQ(docsDelta[shardId1], delta1);
+
+    future.get();
+}
+
+TEST_F(ReshardingCoordinatorServiceExternalStateTest,
+       GetDocumentsDeltaFromRecipients_SuccessBasic) {
+    std::vector<ShardId> shardIds{shardId0, shardId1};
+    auto delta0 = 123;
+    auto delta1 = 0;
+
+    auto future = mockRecipientDeltaMetricsResponses({{shardId0, delta0}, {shardId1, delta1}});
+
+    ReshardingCoordinatorExternalStateImpl externalState;
+    auto docsDelta =
+        externalState.getDocumentsDeltaFromRecipients(operationContext(),
+                                                      **taskExecutor,
+                                                      operationContext()->getCancellationToken(),
+                                                      reshardingUUID,
+                                                      tempNss,
+                                                      shardIds);
     ASSERT_EQ(docsDelta[shardId0], delta0);
     ASSERT_EQ(docsDelta[shardId1], delta1);
 

@@ -213,7 +213,7 @@ public:
      * Waits for the monitor to complete and returns the final document delta from the applying
      * phase. Throws an error if verification is not enabled or skipCloningAndApplying is true.
      */
-    SharedSemiFuture<int64_t> awaitChangeStreamsMonitorCompletedForTest();
+    SharedSemiFuture<int64_t> awaitChangeStreamsMonitorCompleted();
 
     inline const CommonReshardingMetadata& getMetadata() const {
         return _metadata;

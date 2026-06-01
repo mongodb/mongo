@@ -138,6 +138,15 @@ public:
         const std::map<ShardId, int64_t>& documentsCopiedFinal,
         boost::optional<TxnNumber> txnNumber = boost::none);
 
+    /*
+     * Updates every recipient shard's documentsFinal value on the coordinator document in the
+     * blocking writes phase. Will invariant if called in any other phase.
+     */
+    ReshardingCoordinatorDocument updateRecipientDocumentsFinal(
+        OperationContext* opCtx,
+        const std::map<ShardId, int64_t>& recipientDocumentsFinal,
+        boost::optional<TxnNumber> txnNumber = boost::none);
+
     ReshardingCoordinatorDocument transitionToAbortingPhase(
         OperationContext* opCtx,
         Date_t now,

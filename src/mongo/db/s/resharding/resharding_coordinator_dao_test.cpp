@@ -327,6 +327,51 @@ DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
         }});
 }
 
+TEST_F(ReshardingCoordinatorDaoFixture, UpdateRecipientDocumentsFinal) {
+    std::map<ShardId, int64_t> shardDocumentsFinal;
+    ShardId shard1("shard1");
+    ShardId shard2("shard2");
+
+    shardDocumentsFinal.emplace(shard1, 100);
+    shardDocumentsFinal.emplace(shard2, 200);
+
+    // Set up recipient shards in the coordinator document.
+    std::vector<RecipientShardEntry> recipientShards;
+    RecipientShardContext recipientContext;
+    recipientContext.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
+    recipientShards.emplace_back(shard1, recipientContext);
+    recipientShards.emplace_back(shard2, recipientContext);
+    _state->document.setRecipientShards(recipientShards);
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kBlockingWrites,
+        .transitionFn = [&]() { _dao->updateRecipientDocumentsFinal(_opCtx, shardDocumentsFinal); },
+        .set = BSON(std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) + ".0." +
+                        std::string(RecipientShardEntry::kDocumentsFinalFieldName)
+                    << 100
+                    << std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
+                        ".1." + std::string(RecipientShardEntry::kDocumentsFinalFieldName)
+                    << 200)});
+}
+
+DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
+             UpdateRecipientDocumentsFinalPhasePreviousStateInvariant,
+             "invariant") {
+
+    std::map<ShardId, int64_t> shardDocumentsFinal;
+
+    ShardId shard1("shard1");
+    ShardId shard2("shard2");
+
+    shardDocumentsFinal.emplace(shard1, 100);
+    shardDocumentsFinal.emplace(shard2, 200);
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kApplying, .transitionFn = [&]() {
+            _dao->updateRecipientDocumentsFinal(_opCtx, shardDocumentsFinal);
+        }});
+}
+
 DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
              TransitionToCloningPhasePreviousStateInvariant,
              "invariant") {

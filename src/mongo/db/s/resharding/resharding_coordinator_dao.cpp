@@ -279,6 +279,36 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::updateNumberOfDocsCopied
     return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
 }
 
+ReshardingCoordinatorDocument ReshardingCoordinatorDao::updateRecipientDocumentsFinal(
+    OperationContext* opCtx,
+    const std::map<ShardId, int64_t>& recipientDocumentsFinal,
+    boost::optional<TxnNumber> txnNumber) {
+
+    auto client = _clientFactory->createDaoStorageClient(txnNumber);
+    auto doc = client->readState(opCtx, _reshardingUUID);
+    invariant(doc.getState() == CoordinatorStateEnum::kBlockingWrites);
+
+    BSONObjBuilder updateBuilder;
+    {
+        BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+
+        for (size_t i = 0; i < doc.getRecipientShards().size(); i++) {
+            const auto& shardId = doc.getRecipientShards().at(i).getId();
+            auto it = recipientDocumentsFinal.find(shardId);
+            if (it != recipientDocumentsFinal.end()) {
+                int64_t documentsFinal = it->second;
+                setBuilder.append(
+                    std::string{ReshardingCoordinatorDocument::kRecipientShardsFieldName} + "." +
+                        std::to_string(i) + "." +
+                        std::string{RecipientShardEntry::kDocumentsFinalFieldName},
+                    documentsFinal);
+            }
+        }
+    }
+
+    return buildAndExecuteRequest(opCtx, std::move(client), _reshardingUUID, updateBuilder);
+}
+
 ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToApplyingPhase(
     OperationContext* opCtx, Date_t now, boost::optional<TxnNumber> txnNumber) {
 

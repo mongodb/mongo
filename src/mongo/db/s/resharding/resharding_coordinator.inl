@@ -587,7 +587,8 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
                        }
                    })
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
-                       _launchDonorPostCloningDeltaCollector(executor, telemetryCtx);
+                       _launchDonorPostCloningDeltaCollector(executor, telemetryCtx->clone());
+                       _launchRecipientDeltaCollector(executor, telemetryCtx->clone());
                    })
                    .then([this, executor, telemetryCtx = telemetryCtx->clone()]() {
                        auto span = _startSpan(
@@ -957,18 +958,21 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
                 .onCompletion([outerStatus](Status) { return outerStatus; });
         })
         .onCompletion([this](Status outerStatus) {
-            // Wait for the donor post-cloning delta collector to halt if it was started.
-            // We ignore any errors because the ReshardingCoordinator instance is already exiting at
-            // this point.
-            auto deltaFuture = _deltaFuture;
-            if (!deltaFuture) {
-                return ExecutorFuture<void>(_coordinatorService->getInstanceCleanupExecutor(),
-                                            outerStatus);
+            // Wait for any pre-launched delta collectors to halt before exiting. We ignore any
+            // errors because the ReshardingCoordinator instance is already exiting at this point.
+            auto cleanupExecutor = _coordinatorService->getInstanceCleanupExecutor();
+            auto chain = ExecutorFuture<void>(cleanupExecutor);
+            if (_donorDeltaFuture) {
+                chain = std::move(chain).then([f = *_donorDeltaFuture, cleanupExecutor] {
+                    return f.thenRunOn(cleanupExecutor).onCompletion([](auto) {});
+                });
             }
-
-            return std::move(*deltaFuture)
-                .thenRunOn(_coordinatorService->getInstanceCleanupExecutor())
-                .onCompletion([outerStatus](auto) { return outerStatus; });
+            if (_recipientDeltaFuture) {
+                chain = std::move(chain).then([f = *_recipientDeltaFuture, cleanupExecutor] {
+                    return f.thenRunOn(cleanupExecutor).onCompletion([](auto) {});
+                });
+            }
+            return std::move(chain).then([outerStatus] { return outerStatus; });
         })
         .onCompletion([this, self = shared_from_this(), telemetryCtx = telemetryCtx->clone()](
                           Status status) mutable {
@@ -1706,8 +1710,45 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
         });
 }
 
-void ReshardingCoordinator::_persistDocumentsDelta(OperationContext* opCtx,
-                                                   std::map<ShardId, int64_t> documentsDelta) {
+void ReshardingCoordinator::_persistRecipientDocumentsDelta(
+    OperationContext* opCtx, const std::map<ShardId, int64_t>& recipientDelta) {
+    if (recipientDelta.empty()) {
+        return;
+    }
+
+    const auto& recipientShards = _coordinatorDoc.getRecipientShards();
+    std::map<ShardId, int64_t> recipientDocumentsFinal;
+
+    tassert(12723403,
+            str::stream() << "Number of shards from recipientDelta does not "
+                             "match expected number of recipient shards.",
+            recipientDelta.size() == recipientShards.size());
+
+    for (const auto& recipientShard : recipientShards) {
+        auto it = recipientDelta.find(recipientShard.getId());
+        tassert(12723404,
+                str::stream() << "Recipient shard " << recipientShard.getId()
+                              << " not found in recipientDelta map",
+                it != recipientDelta.end());
+        auto totalNumDocuments = recipientShard.getMutableState().getTotalNumDocuments();
+        tassert(12723405,
+                str::stream() << "Expected the total number of documents on recipient shard '"
+                              << recipientShard.getId() << "' to have been set",
+                totalNumDocuments);
+        recipientDocumentsFinal.emplace(recipientShard.getId(), *totalNumDocuments + it->second);
+    }
+
+    auto updatedCoordinatorDoc =
+        _coordinatorDao.updateRecipientDocumentsFinal(opCtx, recipientDocumentsFinal);
+    _installCoordinatorDoc(updatedCoordinatorDoc);
+
+    LOGV2(12723406,
+          "Finished fetching the change in the number of documents from all recipient shards",
+          "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
+}
+
+void ReshardingCoordinator::_persistDonorDocumentsDelta(OperationContext* opCtx,
+                                                        std::map<ShardId, int64_t> documentsDelta) {
     // This means that we didn't try to fetch the documents because verification was not enabled or
     // we've already persisted the final numbers.
     if (documentsDelta.empty()) {
@@ -1783,7 +1824,8 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
     _metrics->setStartFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit,
                           verifyPreCommitStart);
 
-    _persistDocumentsDelta(opCtx.get(), _deltaFuture->get(opCtx.get()));
+    _persistDonorDocumentsDelta(opCtx.get(), _donorDeltaFuture->get(opCtx.get()));
+    _persistRecipientDocumentsDelta(opCtx.get(), _recipientDeltaFuture->get(opCtx.get()));
 
     // Fetch the coordinator doc from disk since the 'coordinatorDocChangedOnDisk'
     // above came from the OpObserver and may not reflect the latest version
@@ -1802,6 +1844,7 @@ ReshardingCoordinatorDocument ReshardingCoordinator::_verifyFinalCollection(
                       "strict consistency",
                       "error"_attr = redact(ex.toString()));
     }
+
     auto verifyPreCommitEnd = resharding::getCurrentTime();
     _metrics->setEndFor(ReshardingMetrics::TimedPhase::kVerificationPreCommit, verifyPreCommitEnd);
     LOGV2(9858413,
@@ -2266,17 +2309,39 @@ void ReshardingCoordinator::_launchDonorPostCloningDeltaCollector(
         return;
     }
 
-    if (_deltaCollector) {
+    if (_donorDeltaCollector) {
         return;
     }
 
-    _deltaCollector = std::make_shared<ReshardingDonorPostCloningDeltaCollector>(
+    _donorDeltaCollector = std::make_shared<ReshardingDonorPostCloningDeltaCollector>(
         _coordinatorDoc,
         _reshardingCoordinatorExternalState,
         _ctHolder->getAbortToken(),
         _cancelableOpCtxFactory->createChild());
-    _deltaFuture = _deltaCollector->launch(
-        executor, _startSpan(telemetryCtx, "ReshardingCoordinator::PostCloningDeltaCollector"));
+    _donorDeltaFuture = _donorDeltaCollector->launch(
+        executor,
+        _startSpan(telemetryCtx, "ReshardingCoordinator::DonorPostCloningDeltaCollector"));
+}
+
+void ReshardingCoordinator::_launchRecipientDeltaCollector(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    std::shared_ptr<otel::TelemetryContext> telemetryCtx) {
+    if (!_metadata.getPerformVerification()) {
+        return;
+    }
+
+    if (_recipientDeltaCollector) {
+        return;
+    }
+
+    _recipientDeltaCollector = std::make_shared<ReshardingRecipientPostCloningDeltaCollector>(
+        _coordinatorDoc,
+        _reshardingCoordinatorExternalState,
+        _ctHolder->getAbortToken(),
+        _cancelableOpCtxFactory->createChild());
+    _recipientDeltaFuture = _recipientDeltaCollector->launch(
+        executor,
+        _startSpan(telemetryCtx, "ReshardingCoordinator::RecipientPostCloningDeltaCollector"));
 }
 
 void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& nss) {

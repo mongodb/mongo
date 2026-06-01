@@ -407,12 +407,6 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                                    "awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency");
                     return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(executor,
                                                                                           factory);
-                })
-                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
-                    auto span = _startSpan(
-                        telemetryCtx,
-                        "ReshardingRecipientService::_awaitChangeStreamsMonitorCompleted");
-                    return _awaitChangeStreamsMonitorCompleted(executor, factory);
                 });
         })
         .onTransientError([](const Status& status) {
@@ -745,12 +739,16 @@ ReshardingRecipientService::RecipientStateMachine::awaitChangeStreamsMonitorStar
 }
 
 SharedSemiFuture<int64_t>
-ReshardingRecipientService::RecipientStateMachine::awaitChangeStreamsMonitorCompletedForTest() {
-    if (!_metadata.getPerformVerification() || _skipCloningAndApplying) {
-        return Status{ErrorCodes::IllegalOperation,
-                      "Change streams monitor not active. The monitor only exists when "
-                      "verification is enabled and the recipient needs to clone "
-                      "documents and fetch/apply oplog entries."};
+ReshardingRecipientService::RecipientStateMachine::awaitChangeStreamsMonitorCompleted() {
+    if (!_metadata.getPerformVerification()) {
+        return Status{ErrorCodes::IllegalOperation, "Verification is not enabled."};
+    }
+
+    if (_skipCloningAndApplying) {
+        // _skipCloningAndApplying recipients own no chunks after resharding, so the change streams
+        // monitor is never started and there is no delta to wait for. Return 0 directly so callers
+        // do not block indefinitely on a promise that will never be fulfilled.
+        return SemiFuture<int64_t>::makeReady(int64_t{0}).share();
     }
 
     return _changeStreamsMonitorCompleted.getFuture();
@@ -1017,6 +1015,15 @@ void ReshardingRecipientService::RecipientStateMachine::_createAndStartChangeStr
 
     _createChangeStreamsMonitor(executor, factory);
     _changeStreamsMonitorStarted.emplaceValue();
+
+    // Kick off the change-streams monitor await as a fire-and-forget task. It runs in the
+    // background through the remainder of the resharding operation. The monitor's final change
+    // event arrives after donors complete blocking writes (around the time the recipient
+    // reaches strict consistency), so the chain spends most of its life waiting on a pending
+    // future. The coordinator's _shardsvrReshardingRecipientFetchFinalCollectionStats command
+    // reads _changeStreamsMonitorCompleted, which this background task fulfills.
+    _awaitChangeStreamsMonitorCompleted(executor, factory)
+        .getAsync([anchor = shared_from_this()](Status) {});
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_createChangeStreamsMonitor(
@@ -2140,11 +2147,10 @@ void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
                 std::lock_guard<std::mutex> lk(_mutex);
                 if (_changeStreamsMonitorCtx) {
                     uassert(9858303,
-                            "Donor failed to record total number of documents copied "
+                            "Recipient failed to record total number of documents copied "
                             "despite performVerification being enabled",
                             _recipientCtx.getTotalNumDocuments() != boost::none);
-                    return *_recipientCtx.getTotalNumDocuments() +
-                        _changeStreamsMonitorCtx->getDocumentsDelta();
+                    return *_recipientCtx.getTotalNumDocuments();
                 }
             }
             return coll.getCollectionPtr()->numRecords(opCtx);

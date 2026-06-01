@@ -39,6 +39,7 @@
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/s/resharding/resharding_donor_post_cloning_delta_collector.h"
+#include "mongo/db/s/resharding/resharding_recipient_post_cloning_delta_collector.h"
 #include "mongo/db/s/resharding/shardsvr_resharding_commands_gen.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/otel/telemetry_context.h"
@@ -411,7 +412,15 @@ private:
      * Computes the final document count for each donor shard from the given per-shard delta map
      * and persists the result in the coordinator state document.
      */
-    void _persistDocumentsDelta(OperationContext* opCtx, std::map<ShardId, int64_t> documentsDelta);
+    void _persistDonorDocumentsDelta(OperationContext* opCtx,
+                                     std::map<ShardId, int64_t> documentsDelta);
+
+    /**
+     * Computes each recipient's documentsFinal = totalNumDocuments + delta, and persists the
+     * result in the coordinator state document.
+     */
+    void _persistRecipientDocumentsDelta(OperationContext* opCtx,
+                                         const std::map<ShardId, int64_t>& recipientDelta);
 
     /**
      * Waits on _reshardingCoordinatorObserver to notify that all recipients have entered
@@ -579,6 +588,15 @@ private:
         std::shared_ptr<otel::TelemetryContext> telemetryCtx);
 
     /**
+     * When the new verification flow is enabled, pre-launches async commands to all recipients to
+     * wait for their change-stream monitors and stores the results in _recipientDeltaFuture, so
+     * that network time overlaps with waiting for recipients to reach strict consistency.
+     */
+    void _launchRecipientDeltaCollector(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        std::shared_ptr<otel::TelemetryContext> telemetryCtx);
+
+    /**
      * Best effort attempt to update the chunk imbalance metrics.
      */
     void _updateChunkImbalanceMetrics(const NamespaceString& nss);
@@ -695,8 +713,10 @@ private:
     SharedSemiFuture<void> _commitMonitorQuiesced;
     std::shared_ptr<resharding::CoordinatorCommitMonitor> _commitMonitor;
 
-    std::shared_ptr<ReshardingDonorPostCloningDeltaCollector> _deltaCollector;
-    boost::optional<SharedSemiFuture<std::map<ShardId, int64_t>>> _deltaFuture;
+    std::shared_ptr<ReshardingDonorPostCloningDeltaCollector> _donorDeltaCollector;
+    boost::optional<SharedSemiFuture<std::map<ShardId, int64_t>>> _donorDeltaFuture;
+    std::shared_ptr<ReshardingRecipientPostCloningDeltaCollector> _recipientDeltaCollector;
+    boost::optional<SharedSemiFuture<std::map<ShardId, int64_t>>> _recipientDeltaFuture;
 
     std::shared_ptr<ReshardingCoordinatorExternalState> _reshardingCoordinatorExternalState;
 

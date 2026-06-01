@@ -357,12 +357,6 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                                    "ReshardingDonorService::_"
                                    "writeTransactionOplogEntryThenTransitionToBlockingWrites");
                     _writeTransactionOplogEntryThenTransitionToBlockingWrites(factory);
-                })
-                .then([this, executor, factory, telemetryCtx = telemetryCtx->clone()]() mutable {
-                    auto span =
-                        _startSpan(telemetryCtx,
-                                   "ReshardingDonorService::_awaitChangeStreamsMonitorCompleted");
-                    return _awaitChangeStreamsMonitorCompleted(executor, factory);
                 });
         })
         .onTransientError([](const Status& status) {
@@ -1069,8 +1063,19 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_createAndStartC
         })
         .then([this, executor, factory] {
             _createChangeStreamsMonitor(executor, factory);
-            std::lock_guard<std::mutex> lk(_mutex);
-            ensureFulfilledPromise(lk, _changeStreamsMonitorStarted);
+            {
+                std::lock_guard<std::mutex> lk(_mutex);
+                ensureFulfilledPromise(lk, _changeStreamsMonitorStarted);
+            }
+
+            // Kick off the change-streams monitor await as a fire-and-forget task. It runs in
+            // the background through the remainder of the resharding operation. The monitor's
+            // final change event arrives after blocking writes complete, so the chain spends
+            // most of its life waiting on a pending future. The coordinator's
+            // _shardsvrReshardingDonorFetchFinalCollectionStats command reads
+            // _changeStreamsMonitorCompleted, which this background task fulfills.
+            _awaitChangeStreamsMonitorCompleted(executor, factory)
+                .getAsync([anchor = shared_from_this()](Status) {});
         });
 }
 

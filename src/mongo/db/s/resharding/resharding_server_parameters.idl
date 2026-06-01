@@ -43,7 +43,7 @@ server_parameters:
         set_at: startup
         cpp_vartype: int
         cpp_varname: gReshardingCoordinatorServiceMaxThreadCount
-        default: 3
+        default: 5
         validator:
             gte: 1
             lte: 256

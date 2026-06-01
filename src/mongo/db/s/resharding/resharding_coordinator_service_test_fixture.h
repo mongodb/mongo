@@ -251,13 +251,22 @@ public:
     }
 
     std::map<ShardId, int64_t> getDocumentsDeltaFromRecipients(
-        OperationContext*,
+        OperationContext* opCtx,
         const std::shared_ptr<executor::TaskExecutor>&,
         CancellationToken,
         const UUID&,
         const NamespaceString&,
-        const std::vector<ShardId>&) override {
-        MONGO_UNREACHABLE;
+        const std::vector<ShardId>& shardIds) override {
+        std::map<ShardId, int64_t> docsDelta;
+        for (const auto& shardId : shardIds) {
+            auto it = _options.documentsDelta.find(shardId);
+            if (it != _options.documentsDelta.end()) {
+                docsDelta.emplace(shardId, it->second);
+            } else {
+                docsDelta.emplace(shardId, 0);
+            }
+        }
+        return docsDelta;
     }
 
     void verifyClonedCollection(OperationContext*,
@@ -665,10 +674,15 @@ public:
         ASSERT_LTE(coordDoc.getMetrics()->getOplogApplication()->getStart(),
                    coordDoc.getMetrics()->getOplogApplication()->getStop());
 
+        auto recipientShards = coordDoc.getRecipientShards();
         BSONObj updates = BSON(
-            "$set" << BSON(std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
-                               ".$[].mutableState.state"
-                           << idl::serialize(RecipientStateEnum::kStrictConsistency)));
+            "$set" << BSON(
+                std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
+                    ".$[].mutableState.state"
+                << idl::serialize(RecipientStateEnum::kStrictConsistency)
+                << std::string(ReshardingCoordinatorDocument::kRecipientShardsFieldName) +
+                    ".$[].mutableState.totalNumDocuments"
+                << static_cast<long long>(totalApproxDocumentsToClone / recipientShards.size())));
         updateCoordinatorDoc(opCtx, coordDoc.getReshardingUUID(), updates);
     }
 
