@@ -186,6 +186,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
 
     // Run a brief MP trial phase to collect execution stats.
     trialConfig.maxNumWorksPerPlan = numWorksPerPlanEst;
+    trialConfig.isCappedTrialPhase = true;
     auto trialStatus = mp.runTrials(trialConfig);
     if (!trialStatus.isOK()) {
         return trialStatus;
@@ -242,6 +243,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
                    "minProductivityForMPAdjusted"_attr = minProductivityForMP,
                    "minProductivityForMP"_attr =
                        static_cast<double>(numResultsMP) / numWorksPerPlanMP);
+        mp.emitAccumulatedStats();
         return getBestCBRPlan(opCtx, query, plannerParams, yieldPolicy, collections);
     }
 
@@ -282,6 +284,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
 
     // CBR is substantially more efficient than the remaining MP, choose the best plan using CBR
     LOGV2_INFO(11306800, "AutomaticCE chooses CBR (5)", "Reason"_attr = "it is cheaper than MP");
+    mp.emitAccumulatedStats();
     return getBestCBRPlan(opCtx, query, plannerParams, yieldPolicy, collections);
 }
 

@@ -110,8 +110,12 @@ void MultiPlanner::abandonTrialsExceptHashes(const boost::container::flat_set<si
     _multiplanStage->abandonTrialsExceptHashes(hashes);
 }
 
-void MultiPlanner::stopCollectingMetrics() {
-    _multiplanStage->stopCollectingMetrics();
+void MultiPlanner::markCBRChoseWinner() {
+    _multiplanStage->markCBRChoseWinner();
+}
+
+void MultiPlanner::emitAccumulatedStats() {
+    _multiplanStage->emitAccumulatedStats();
 }
 
 }  // namespace mongo::classic_runtime_planner

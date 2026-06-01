@@ -45,6 +45,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
@@ -229,8 +230,21 @@ public:
         return _isStateSaved;
     }
 
-    void stopCollectingMetrics() {
-        _shouldNotCollectMetrics = true;
+    // Call when CBR has chosen the winning plan, before the finishing-up trial runs. Emits the
+    // accumulated stats from the capped trial, then suppresses all further metric collection so
+    // the finishing-up trial's work/time are not counted.
+    void markCBRChoseWinner();
+
+    // Emits the accumulated multi-planner metrics without running a new trial. Used by strategies
+    // that run a capped estimation trial followed by a non-MP ranker (e.g., CBR), ensuring
+    // metrics are emitted exactly once per planning invocation even when no finishing-up trial
+    // runs.
+    void emitAccumulatedStats();
+
+    // Call when this MultiPlanStage is planning a subquery (e.g. a branch of an $or query).
+    // Prevents increment of multiPlannerChoseWinningPlan counter.
+    void markBranchPlanner() {
+        _isBranchPlanner = true;
     }
 
 protected:
@@ -336,7 +350,20 @@ private:
     // query.multiplanner.choseWinningPlan does not make sense to update, because the winning plan
     // had already been chosen by CBR). This boolean is used to conditionally increment metrics in
     // order to prevent this.
+    // Also set by markCBRChoseWinner() (after emitting capped-trial stats) to suppress all metric
+    // collection in the finishing-up trial.
     bool _shouldNotCollectMetrics = false;
+
+    // Set by markBranchPlanner() when this MP is planning a subquery.
+    // Prevents incrementing multiPlannerChoseWinningPlan since it does not choose the overall
+    // winning plan. Does NOT affect accumulation of stats (time, works).
+    bool _isBranchPlanner = false;
+
+    // Counters accumulated across all runTrials() phases. Emitted once on the finishing-up trial
+    // (!isCappedTrialPhase) or on the capped trial if it finishes with an early exit.
+    size_t _accumulatedNumPlans{0};
+    size_t _accumulatedWorks{0};
+    Microseconds _accumulatedMicros{0};
 };
 
 }  // namespace mongo
