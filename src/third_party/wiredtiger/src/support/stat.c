@@ -175,6 +175,7 @@ static const char *const __stats_dsrc_desc[] = {
   "checkpoint-cleanup: pages removed",
   "checkpoint-cleanup: pages skipped during tree walk",
   "checkpoint-cleanup: pages visited",
+  "checkpoint-cleanup: successful calls",
   "compression: compressed page maximum internal page size prior to compression",
   "compression: compressed page maximum leaf page size prior to compression ",
   "compression: compressed pages read",
@@ -523,6 +524,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cc_pages_removed = 0;
     stats->cc_pages_walk_skipped = 0;
     stats->cc_pages_visited = 0;
+    stats->cc_success = 0;
     /* not clearing compress_precomp_intl_max_page_size */
     /* not clearing compress_precomp_leaf_max_page_size */
     stats->compress_read = 0;
@@ -859,6 +861,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cc_pages_removed += from->cc_pages_removed;
     to->cc_pages_walk_skipped += from->cc_pages_walk_skipped;
     to->cc_pages_visited += from->cc_pages_visited;
+    to->cc_success += from->cc_success;
     to->compress_precomp_intl_max_page_size += from->compress_precomp_intl_max_page_size;
     to->compress_precomp_leaf_max_page_size += from->compress_precomp_leaf_max_page_size;
     to->compress_read += from->compress_read;
@@ -1202,6 +1205,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->cc_pages_removed += WT_STAT_READ(from, cc_pages_removed);
     to->cc_pages_walk_skipped += WT_STAT_READ(from, cc_pages_walk_skipped);
     to->cc_pages_visited += WT_STAT_READ(from, cc_pages_visited);
+    to->cc_success += WT_STAT_READ(from, cc_success);
     to->compress_precomp_intl_max_page_size +=
       WT_STAT_READ(from, compress_precomp_intl_max_page_size);
     to->compress_precomp_leaf_max_page_size +=
@@ -1620,6 +1624,7 @@ static const char *const __stats_connection_desc[] = {
   "checkpoint-cleanup: pages removed",
   "checkpoint-cleanup: pages skipped during tree walk",
   "checkpoint-cleanup: pages visited",
+  "checkpoint-cleanup: successful calls",
   "connection: auto adjusting condition resets",
   "connection: auto adjusting condition wait calls",
   "connection: auto adjusting condition wait raced to update timeout and skipped updating",
@@ -2292,6 +2297,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cc_pages_removed = 0;
     stats->cc_pages_walk_skipped = 0;
     stats->cc_pages_visited = 0;
+    stats->cc_success = 0;
     stats->cond_auto_wait_reset = 0;
     stats->cond_auto_wait = 0;
     stats->cond_auto_wait_skipped = 0;
@@ -2984,6 +2990,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cc_pages_removed += WT_STAT_READ(from, cc_pages_removed);
     to->cc_pages_walk_skipped += WT_STAT_READ(from, cc_pages_walk_skipped);
     to->cc_pages_visited += WT_STAT_READ(from, cc_pages_visited);
+    to->cc_success += WT_STAT_READ(from, cc_success);
     to->cond_auto_wait_reset += WT_STAT_READ(from, cond_auto_wait_reset);
     to->cond_auto_wait += WT_STAT_READ(from, cond_auto_wait);
     to->cond_auto_wait_skipped += WT_STAT_READ(from, cond_auto_wait_skipped);

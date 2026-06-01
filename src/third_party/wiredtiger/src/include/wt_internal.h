@@ -111,6 +111,8 @@ struct __wt_cell_unpack_common;
 typedef struct __wt_cell_unpack_common WT_CELL_UNPACK_COMMON;
 struct __wt_cell_unpack_kv;
 typedef struct __wt_cell_unpack_kv WT_CELL_UNPACK_KV;
+struct __wt_checkpoint_cleanup;
+typedef struct __wt_checkpoint_cleanup WT_CHECKPOINT_CLEANUP;
 struct __wt_ckpt;
 typedef struct __wt_ckpt WT_CKPT;
 struct __wt_ckpt_snapshot;

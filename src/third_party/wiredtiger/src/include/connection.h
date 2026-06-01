@@ -243,6 +243,15 @@ struct __wt_backup_target {
 };
 typedef TAILQ_HEAD(__wt_backuphash, __wt_backup_target) WT_BACKUPHASH;
 
+struct __wt_checkpoint_cleanup {
+    WT_SESSION_IMPL *session; /* checkpoint cleanup session */
+    wt_thread_t tid;          /* checkpoint cleanup thread */
+    int tid_set;              /* checkpoint cleanup thread set */
+    WT_CONDVAR *cond;         /* checkpoint cleanup wait mutex */
+    uint64_t interval;        /* Checkpoint cleanup interval */
+    bool use_thread;          /* use a dedicated thread instead of inline checkpoint cleanup */
+};
+
 /*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
@@ -335,7 +344,8 @@ struct __wt_connection_impl {
     TAILQ_HEAD(__wt_blockhash, __wt_block) * blockhash;
     TAILQ_HEAD(__wt_block_qh, __wt_block) blockqh;
 
-    WT_BLKCACHE blkcache; /* Block cache */
+    WT_BLKCACHE blkcache;             /* Block cache */
+    WT_CHECKPOINT_CLEANUP cc_cleanup; /* Checkpoint cleanup */
 
     /* Locked: handles in each bucket */
     uint64_t *dh_bucket_count;
@@ -688,11 +698,12 @@ struct __wt_connection_impl {
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CONN_SERVER_CAPACITY 0x01u
 #define WT_CONN_SERVER_CHECKPOINT 0x02u
-#define WT_CONN_SERVER_LOG 0x04u
-#define WT_CONN_SERVER_LSM 0x08u
-#define WT_CONN_SERVER_STATISTICS 0x10u
-#define WT_CONN_SERVER_SWEEP 0x20u
-#define WT_CONN_SERVER_TIERED 0x40u
+#define WT_CONN_SERVER_CHECKPOINT_CLEANUP 0x04u
+#define WT_CONN_SERVER_LOG 0x08u
+#define WT_CONN_SERVER_LSM 0x10u
+#define WT_CONN_SERVER_STATISTICS 0x20u
+#define WT_CONN_SERVER_SWEEP 0x40u
+#define WT_CONN_SERVER_TIERED 0x80u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t server_flags;
 

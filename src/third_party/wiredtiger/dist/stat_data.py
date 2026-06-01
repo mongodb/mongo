@@ -991,6 +991,7 @@ conn_dsrc_stats = [
     CheckpointCleanupStat('cc_pages_removed', 'pages removed'),
     CheckpointCleanupStat('cc_pages_visited', 'pages visited'),
     CheckpointCleanupStat('cc_pages_walk_skipped', 'pages skipped during tree walk'),
+    CheckpointCleanupStat('cc_success', 'successful calls'),
 
     ##########################################
     # LSM statistics

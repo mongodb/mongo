@@ -580,6 +580,7 @@ struct __wt_connection_stats {
     int64_t cc_pages_removed;
     int64_t cc_pages_walk_skipped;
     int64_t cc_pages_visited;
+    int64_t cc_success;
     int64_t cond_auto_wait_reset;
     int64_t cond_auto_wait;
     int64_t cond_auto_wait_skipped;
@@ -1127,6 +1128,7 @@ struct __wt_dsrc_stats {
     int64_t cc_pages_removed;
     int64_t cc_pages_walk_skipped;
     int64_t cc_pages_visited;
+    int64_t cc_success;
     int64_t compress_precomp_intl_max_page_size;
     int64_t compress_precomp_leaf_max_page_size;
     int64_t compress_read;
