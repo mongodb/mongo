@@ -1,15 +1,20 @@
 """Test that resmoke can be invoked via 'bazel run //buildscripts:resmoke'."""
 
+import platform
 import subprocess
 import sys
 import unittest
 
 
+@unittest.skipIf(
+    sys.platform == "win32",
+    "TODO(SERVER-123249), enable this test once the win32api dependency is handled properly.",
+)
+@unittest.skipIf(
+    platform.machine().lower() in {"ppc64le", "s390x"},
+    "//buildscripts:resmoke is not compatible with ppc64le/s390x (use python buildscripts/resmoke.py instead).",
+)
 class TestBazelRunResmoke(unittest.TestCase):
-    @unittest.skipIf(
-        sys.platform == "win32",
-        "TODO(SERVER-123249), enable this test once the win32api dependency is handled properly.",
-    )
     def test_dry_run_core_suite(self):
         """Verify 'bazel run //buildscripts:resmoke -- run --suite=core --dryRun=tests' succeeds."""
         result = subprocess.run(
