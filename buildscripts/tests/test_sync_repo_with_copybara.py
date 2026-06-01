@@ -1,3 +1,4 @@
+import datetime
 import io
 import json
 import os
@@ -11,6 +12,7 @@ import traceback
 import unittest
 from collections.abc import Sequence
 from contextlib import redirect_stdout
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
@@ -100,6 +102,66 @@ def make_source_commit(
         author_date="2026-05-01T00:00:00+00:00",
         subject=subject or f"Subject for {sha}",
     )
+
+
+class FakeS3Body:
+    def __init__(self, body: str):
+        self.body = body
+
+    def read(self) -> bytes:
+        return self.body.encode("utf-8")
+
+
+class FakeS3Client:
+    def __init__(self):
+        self.objects: dict[tuple[str, str], dict[str, str]] = {}
+        self.put_calls: list[dict[str, object]] = []
+        self.next_etag = 1
+
+    @staticmethod
+    def make_error(code: str, status_code: int):
+        return sync_repo_with_copybara.ClientError(
+            {
+                "Error": {
+                    "Code": code,
+                    "Message": code,
+                },
+                "ResponseMetadata": {
+                    "HTTPStatusCode": status_code,
+                },
+            },
+            "FakeS3",
+        )
+
+    def put_object(self, **kwargs):
+        self.put_calls.append(kwargs)
+        object_key = (kwargs["Bucket"], kwargs["Key"])
+        existing = self.objects.get(object_key)
+        if kwargs.get("IfNoneMatch") == "*" and existing is not None:
+            raise self.make_error("PreconditionFailed", 412)
+        if "IfMatch" in kwargs and (existing is None or existing["etag"] != kwargs["IfMatch"]):
+            raise self.make_error("PreconditionFailed", 412)
+
+        body = kwargs["Body"]
+        if isinstance(body, bytes):
+            body = body.decode("utf-8")
+        etag = f'"etag-{self.next_etag}"'
+        self.next_etag += 1
+        self.objects[object_key] = {
+            "body": body,
+            "etag": etag,
+        }
+        return {"ETag": etag}
+
+    def get_object(self, **kwargs):
+        object_key = (kwargs["Bucket"], kwargs["Key"])
+        existing = self.objects.get(object_key)
+        if existing is None:
+            raise self.make_error("NoSuchKey", 404)
+        return {
+            "Body": FakeS3Body(existing["body"]),
+            "ETag": existing["etag"],
+        }
 
 
 def write_copybara_path_rules_template(path: Path, template_text: str | None = None) -> None:
@@ -357,6 +419,69 @@ class TestBranchFunctions(unittest.TestCase):
         sync_repo_with_copybara.run_command(f"git branch {branch_name}")
 
     @staticmethod
+    def make_target_sync(
+        source_dir: str,
+        destination_dir: str,
+        target_ref: str,
+        target_source_commit: str,
+        branch: str = "master",
+    ) -> sync_repo_with_copybara.PreparedBranchSync:
+        return sync_repo_with_copybara.PreparedBranchSync(
+            branch=branch,
+            source_ref=target_source_commit,
+            config_sha="local",
+            workflow_name=f"prod_{branch}",
+            config_file=Path("/tmp/copy.bara.sky"),
+            preview_dir=Path("/tmp/preview"),
+            docker_command=("echo",),
+            copybara_config=sync_repo_with_copybara.CopybaraConfig(
+                source=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url=source_dir,
+                    repo_name=sync_repo_with_copybara.SOURCE_REPO_NAME,
+                    branch=branch,
+                    ref=target_source_commit,
+                ),
+                destination=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url=destination_dir,
+                    repo_name=sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_NAME,
+                    branch=branch,
+                ),
+            ),
+            target_ref=target_ref,
+            target_source_commit=target_source_commit,
+        )
+
+    @staticmethod
+    def make_branch_sync(
+        source_dir: str,
+        destination_dir: str,
+        source_ref: str,
+        branch: str = "master",
+    ) -> sync_repo_with_copybara.PreparedBranchSync:
+        return sync_repo_with_copybara.PreparedBranchSync(
+            branch=branch,
+            source_ref=source_ref,
+            config_sha="local",
+            workflow_name=f"prod_{branch}",
+            config_file=Path("/tmp/copy.bara.sky"),
+            preview_dir=Path("/tmp/preview"),
+            docker_command=("echo",),
+            copybara_config=sync_repo_with_copybara.CopybaraConfig(
+                source=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url=source_dir,
+                    repo_name=sync_repo_with_copybara.SOURCE_REPO_NAME,
+                    branch=branch,
+                    ref=source_ref,
+                ),
+                destination=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url=destination_dir,
+                    repo_name=sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_NAME,
+                    branch=branch,
+                ),
+            ),
+        )
+
+    @staticmethod
     def mock_search(test_name, num_commits, matched_public_commits):
         """
         Mock search function to simulate finding matching commits.
@@ -422,7 +547,7 @@ class TestBranchFunctions(unittest.TestCase):
         result = self.mock_search(test_name, 2, 0)
         self.assertIsNone(result, f"{test_name}: SUCCESS!")
 
-    def test_duplicate_destination_origin_commits_fail_on_same_branch(self):
+    def test_duplicate_destination_origin_commits_use_newest_same_branch_match(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_dir = os.path.join(tmpdir, "destination")
@@ -430,14 +555,16 @@ class TestBranchFunctions(unittest.TestCase):
             os.mkdir(destination_dir)
 
             private_hashes = TestBranchFunctions.create_mock_repo_commits(source_dir, 1)
-            TestBranchFunctions.create_mock_repo_commits(
+            public_hashes = TestBranchFunctions.create_mock_repo_commits(
                 destination_dir,
                 2,
                 [private_hashes[0], private_hashes[0]],
             )
 
-            with self.assertRaises(SystemExit):
-                sync_repo_with_copybara.find_matching_commit(source_dir, destination_dir)
+            self.assertEqual(
+                sync_repo_with_copybara.find_matching_commit(source_dir, destination_dir),
+                public_hashes[-1],
+            )
 
     def test_duplicate_destination_origin_commits_are_ignored_outside_source_ref(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -483,7 +610,7 @@ class TestBranchFunctions(unittest.TestCase):
                 ),
             )
 
-    def test_duplicate_destination_origin_commits_fail_on_unrelated_branches(self):
+    def test_duplicate_destination_origin_commits_on_unrelated_branches_are_candidates(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             destination_dir = os.path.join(tmpdir, "destination")
@@ -503,6 +630,9 @@ class TestBranchFunctions(unittest.TestCase):
             sync_repo_with_copybara.run_command(
                 f'git commit -m "master commit\nGitOrigin-RevId: {private_hashes[0]}"'
             )
+            master_public_hash = sync_repo_with_copybara.run_command(
+                'git log --pretty=format:"%H" -1'
+            )
 
             sync_repo_with_copybara.run_command("git checkout --orphan v8.2")
             with open("test.txt", "w") as file:
@@ -511,9 +641,14 @@ class TestBranchFunctions(unittest.TestCase):
             sync_repo_with_copybara.run_command(
                 f'git commit -m "release commit\nGitOrigin-RevId: {private_hashes[0]}"'
             )
+            release_public_hash = sync_repo_with_copybara.run_command(
+                'git log --pretty=format:"%H" -1'
+            )
 
-            with self.assertRaises(SystemExit):
-                sync_repo_with_copybara.find_matching_commit(source_dir, destination_dir)
+            self.assertIn(
+                sync_repo_with_copybara.find_matching_commit(source_dir, destination_dir),
+                {master_public_hash, release_public_hash},
+            )
 
     def test_find_matching_commit_pair_uses_bottom_most_origin_trailer(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -718,6 +853,1084 @@ class TestBranchFunctions(unittest.TestCase):
         mock_sleep.assert_called_once_with(
             sync_repo_with_copybara.GIT_REMOTE_COMMAND_RETRY_DELAY_SECONDS
         )
+
+    def test_resolve_branch_target_ref_accepts_commit_in_branch_history(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            os.mkdir(source_dir)
+            private_hashes = self.create_mock_repo_commits(source_dir, 3)
+
+            self.assertEqual(
+                sync_repo_with_copybara.resolve_branch_target_ref(
+                    source_dir, "master", private_hashes[1]
+                ),
+                private_hashes[1],
+            )
+
+    def test_resolve_branch_target_ref_accepts_tag_in_branch_history(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            os.mkdir(source_dir)
+            private_hashes = self.create_mock_repo_commits(source_dir, 3)
+            os.chdir(source_dir)
+            sync_repo_with_copybara.run_command(f"git tag target-tag {private_hashes[1]}")
+
+            self.assertEqual(
+                sync_repo_with_copybara.resolve_branch_target_ref(
+                    source_dir, "master", "target-tag"
+                ),
+                private_hashes[1],
+            )
+            self.assertEqual(
+                sync_repo_with_copybara.resolve_branch_target_ref(
+                    source_dir, "master", "refs/tags/target-tag"
+                ),
+                private_hashes[1],
+            )
+
+    def test_resolve_branch_target_ref_rejects_tag_outside_branch_history(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            os.mkdir(source_dir)
+            self.create_mock_repo_commits(source_dir, 2)
+            os.chdir(source_dir)
+            sync_repo_with_copybara.run_command("git checkout --orphan unrelated")
+            Path(source_dir, "unrelated.txt").write_text("unrelated")
+            sync_repo_with_copybara.run_command("git add unrelated.txt")
+            sync_repo_with_copybara.run_command('git commit -m "unrelated"')
+            sync_repo_with_copybara.run_command("git tag unrelated-tag")
+            sync_repo_with_copybara.run_command("git checkout master")
+
+            with self.assertRaises(SystemExit):
+                sync_repo_with_copybara.resolve_branch_target_ref(
+                    source_dir, "master", "unrelated-tag"
+                )
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_optional_remote_tag_commit")
+    def test_resolve_target_ref_redacts_remote_url_when_tag_is_missing(self, mock_tag_commit):
+        mock_tag_commit.return_value = None
+        stdout = io.StringIO()
+        remote_url = "https://x-access-token:secret-token@github.com/10gen/mongo.git"
+
+        with redirect_stdout(stdout), self.assertRaises(SystemExit):
+            sync_repo_with_copybara.resolve_target_ref_from_fetched_branch(
+                Path("/unused"), remote_url, "refs/tags/missing-tag"
+            )
+
+        self.assertNotIn("secret-token", stdout.getvalue())
+        self.assertIn("https://x-access-token:<REDACTED>@github.com", stdout.getvalue())
+
+    def test_validate_destination_not_past_target_passes_when_destination_is_behind_or_at_target(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            behind_destination_dir = os.path.join(tmpdir, "behind_destination")
+            at_destination_dir = os.path.join(tmpdir, "at_destination")
+            os.mkdir(source_dir)
+            os.mkdir(behind_destination_dir)
+            os.mkdir(at_destination_dir)
+
+            private_hashes = self.create_mock_repo_commits(source_dir, 3)
+            self.create_mock_repo_commits(behind_destination_dir, 1, [private_hashes[0]])
+            self.create_mock_repo_commits(
+                at_destination_dir,
+                2,
+                [private_hashes[0], private_hashes[1]],
+            )
+
+            sync_repo_with_copybara.validate_destination_not_past_target(
+                self.make_target_sync(
+                    source_dir,
+                    behind_destination_dir,
+                    "target-tag",
+                    private_hashes[1],
+                )
+            )
+            sync_repo_with_copybara.validate_destination_not_past_target(
+                self.make_target_sync(
+                    source_dir,
+                    at_destination_dir,
+                    "target-tag",
+                    private_hashes[1],
+                )
+            )
+
+    def test_validate_destination_not_past_target_fails_when_destination_is_past_target(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            destination_dir = os.path.join(tmpdir, "destination")
+            os.mkdir(source_dir)
+            os.mkdir(destination_dir)
+
+            private_hashes = self.create_mock_repo_commits(source_dir, 3)
+            self.create_mock_repo_commits(
+                destination_dir,
+                2,
+                [private_hashes[0], private_hashes[2]],
+            )
+
+            with self.assertRaises(sync_repo_with_copybara.BranchSyncError) as raised:
+                sync_repo_with_copybara.validate_destination_not_past_target(
+                    self.make_target_sync(
+                        source_dir,
+                        destination_dir,
+                        "target-tag",
+                        private_hashes[1],
+                    )
+                )
+
+            self.assertIn("already synced past target_ref target-tag", str(raised.exception))
+
+    def test_fast_forward_destination_to_existing_match_reuses_synced_sibling_branch(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            destination_work_dir = os.path.join(tmpdir, "destination_work")
+            destination_remote_dir = os.path.join(tmpdir, "destination.git")
+            os.mkdir(source_dir)
+            os.mkdir(destination_work_dir)
+
+            private_hashes = self.create_mock_repo_commits(source_dir, 3)
+            os.chdir(source_dir)
+            sync_repo_with_copybara.run_command("git branch v8.3")
+
+            os.chdir(destination_work_dir)
+            sync_repo_with_copybara.run_command("git init")
+            sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
+            sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
+            sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
+            with open("test.txt", "w") as file:
+                file.write("public base")
+            sync_repo_with_copybara.run_command("git add test.txt")
+            sync_repo_with_copybara.run_command(
+                f'git commit -m "public base\nGitOrigin-RevId: {private_hashes[0]}"'
+            )
+            public_base = sync_repo_with_copybara.run_command('git log --pretty=format:"%H" -1')
+            sync_repo_with_copybara.run_command("git branch v8.3")
+
+            sync_repo_with_copybara.run_command("git checkout -b v8.3.0")
+            with open("test.txt", "w") as file:
+                file.write("already synced on sibling branch")
+            sync_repo_with_copybara.run_command("git add test.txt")
+            sync_repo_with_copybara.run_command(
+                f'git commit -m "already synced\nGitOrigin-RevId: {private_hashes[1]}"'
+            )
+            already_synced_public = sync_repo_with_copybara.run_command(
+                'git log --pretty=format:"%H" -1'
+            )
+
+            sync_repo_with_copybara.run_command(
+                f"git clone --bare {destination_work_dir} {destination_remote_dir}"
+            )
+            self.assertEqual(
+                sync_repo_with_copybara.run_command(
+                    f"git --git-dir={destination_remote_dir} rev-parse refs/heads/v8.3"
+                ).strip(),
+                public_base,
+            )
+
+            sync_repo_with_copybara.fast_forward_destination_to_existing_match(
+                self.make_branch_sync(
+                    source_dir,
+                    destination_remote_dir,
+                    private_hashes[2],
+                    branch="v8.3",
+                )
+            )
+
+            self.assertEqual(
+                sync_repo_with_copybara.run_command(
+                    f"git --git-dir={destination_remote_dir} rev-parse refs/heads/v8.3"
+                ).strip(),
+                already_synced_public,
+            )
+
+    def test_fast_forward_destination_to_existing_match_uses_branch_match_when_duplicated(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            destination_work_dir = os.path.join(tmpdir, "destination_work")
+            destination_remote_dir = os.path.join(tmpdir, "destination.git")
+            os.mkdir(source_dir)
+            os.mkdir(destination_work_dir)
+
+            private_hashes = self.create_mock_repo_commits(source_dir, 3)
+            os.chdir(source_dir)
+            sync_repo_with_copybara.run_command("git branch v8.3")
+
+            os.chdir(destination_work_dir)
+            sync_repo_with_copybara.run_command("git init")
+            sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
+            sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
+            sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
+            with open("test.txt", "w") as file:
+                file.write("public base")
+            sync_repo_with_copybara.run_command("git add test.txt")
+            sync_repo_with_copybara.run_command(
+                f'git commit -m "public base\nGitOrigin-RevId: {private_hashes[0]}"'
+            )
+            sync_repo_with_copybara.run_command("git checkout -b v8.3")
+            with open("test.txt", "w") as file:
+                file.write("already synced on v8.3")
+            sync_repo_with_copybara.run_command("git add test.txt")
+            sync_repo_with_copybara.run_command(
+                f'git commit -m "already synced\nGitOrigin-RevId: {private_hashes[2]}"'
+            )
+            already_synced_public = sync_repo_with_copybara.run_command(
+                'git log --pretty=format:"%H" -1'
+            )
+
+            sync_repo_with_copybara.run_command("git checkout --orphan duplicate")
+            with open("test.txt", "w") as file:
+                file.write("duplicate synced elsewhere")
+            sync_repo_with_copybara.run_command("git add test.txt")
+            sync_repo_with_copybara.run_command(
+                f'git commit -m "duplicate\nGitOrigin-RevId: {private_hashes[2]}"'
+            )
+
+            sync_repo_with_copybara.run_command(
+                f"git clone --bare {destination_work_dir} {destination_remote_dir}"
+            )
+
+            sync_repo_with_copybara.fast_forward_destination_to_existing_match(
+                self.make_branch_sync(
+                    source_dir,
+                    destination_remote_dir,
+                    private_hashes[2],
+                    branch="v8.3",
+                )
+            )
+
+            self.assertEqual(
+                sync_repo_with_copybara.run_command(
+                    f"git --git-dir={destination_remote_dir} rev-parse refs/heads/v8.3"
+                ).strip(),
+                already_synced_public,
+            )
+
+    def test_find_destination_branch_match_for_source_commit_uses_branch_usable_duplicate(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            destination_work_dir = os.path.join(tmpdir, "destination_work")
+            destination_remote_dir = os.path.join(tmpdir, "destination.git")
+            destination_lookup_dir = os.path.join(tmpdir, "destination_lookup")
+            os.mkdir(destination_work_dir)
+
+            source_commit = "a" * 40
+            os.chdir(destination_work_dir)
+            sync_repo_with_copybara.run_command("git init")
+            sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
+            sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
+            sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
+            with open("test.txt", "w") as file:
+                file.write("public base")
+            sync_repo_with_copybara.run_command("git add test.txt")
+            sync_repo_with_copybara.run_command("git commit -m 'public base'")
+            sync_repo_with_copybara.run_command("git checkout -b v8.3")
+            with open("test.txt", "w") as file:
+                file.write("already synced on v8.3")
+            sync_repo_with_copybara.run_command("git add test.txt")
+            sync_repo_with_copybara.run_command(
+                f'git commit -m "already synced\nGitOrigin-RevId: {source_commit}"'
+            )
+            expected_public = sync_repo_with_copybara.run_command('git log --pretty=format:"%H" -1')
+
+            sync_repo_with_copybara.run_command("git checkout --orphan duplicate")
+            with open("test.txt", "w") as file:
+                file.write("duplicate synced elsewhere")
+            sync_repo_with_copybara.run_command("git add test.txt")
+            sync_repo_with_copybara.run_command(
+                f'git commit -m "duplicate\nGitOrigin-RevId: {source_commit}"'
+            )
+
+            sync_repo_with_copybara.run_command(
+                f"git clone --bare {destination_work_dir} {destination_remote_dir}"
+            )
+            sync_repo_with_copybara.run_command(
+                f"git clone --no-checkout {destination_remote_dir} {destination_lookup_dir}"
+            )
+
+            matching_commit = (
+                sync_repo_with_copybara.find_destination_branch_match_for_source_commit(
+                    self.make_branch_sync(
+                        "/source",
+                        destination_remote_dir,
+                        source_commit,
+                        branch="v8.3",
+                    ),
+                    Path(destination_lookup_dir),
+                    source_commit,
+                )
+            )
+
+            self.assertEqual(
+                matching_commit,
+                sync_repo_with_copybara.MatchingCommit(
+                    source_commit=source_commit,
+                    destination_commit=expected_public,
+                ),
+            )
+
+    def test_fast_forward_destination_to_existing_match_uses_older_branch_start_point(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            destination_work_dir = os.path.join(tmpdir, "destination_work")
+            destination_remote_dir = os.path.join(tmpdir, "destination.git")
+            os.mkdir(source_dir)
+            os.mkdir(destination_work_dir)
+
+            private_hashes = self.create_mock_repo_commits(source_dir, 3)
+            os.chdir(source_dir)
+            sync_repo_with_copybara.run_command("git branch v8.3")
+
+            os.chdir(destination_work_dir)
+            sync_repo_with_copybara.run_command("git init")
+            sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
+            sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
+            sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
+            with open("test.txt", "w") as file:
+                file.write("public base")
+            sync_repo_with_copybara.run_command("git add test.txt")
+            sync_repo_with_copybara.run_command(
+                f'git commit -m "public base\nGitOrigin-RevId: {private_hashes[0]}"'
+            )
+            public_base = sync_repo_with_copybara.run_command('git log --pretty=format:"%H" -1')
+            sync_repo_with_copybara.run_command("git branch v8.3")
+
+            sync_repo_with_copybara.run_command("git checkout --orphan v8.3.0")
+            with open("test.txt", "w") as file:
+                file.write("already synced on divergent sibling branch")
+            sync_repo_with_copybara.run_command("git add test.txt")
+            sync_repo_with_copybara.run_command(
+                f'git commit -m "already synced\nGitOrigin-RevId: {private_hashes[1]}"'
+            )
+
+            sync_repo_with_copybara.run_command(
+                f"git clone --bare {destination_work_dir} {destination_remote_dir}"
+            )
+
+            sync_repo_with_copybara.fast_forward_destination_to_existing_match(
+                self.make_branch_sync(
+                    source_dir,
+                    destination_remote_dir,
+                    private_hashes[2],
+                    branch="v8.3",
+                )
+            )
+            self.assertEqual(
+                sync_repo_with_copybara.run_command(
+                    f"git --git-dir={destination_remote_dir} rev-parse refs/heads/v8.3"
+                ).strip(),
+                public_base,
+            )
+
+    def test_s3_commit_lock_key_is_global_across_branches_for_same_destination(self):
+        lock_config = sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket")
+        sync_v83 = replace(
+            self.make_branch_sync("/source", "/destination", "commit1", branch="v8.3"),
+            s3_lock_config=lock_config,
+        )
+        sync_v830 = replace(
+            self.make_branch_sync("/source", "/destination", "commit1", branch="v8.3.0"),
+            s3_lock_config=lock_config,
+        )
+        self.assertEqual(
+            sync_repo_with_copybara.build_s3_commit_lock_key(sync_v83, "commit1"),
+            sync_repo_with_copybara.build_s3_commit_lock_key(sync_v830, "commit1"),
+        )
+
+        destination = sync_v83.copybara_config.destination._replace(
+            repo_name=sync_repo_with_copybara.TEST_REPO_NAME
+        )
+        sync_test_destination = replace(
+            sync_v83,
+            copybara_config=sync_v83.copybara_config._replace(destination=destination),
+        )
+        self.assertNotEqual(
+            sync_repo_with_copybara.build_s3_commit_lock_key(sync_v83, "commit1"),
+            sync_repo_with_copybara.build_s3_commit_lock_key(sync_test_destination, "commit1"),
+        )
+
+    def test_s3_commit_lock_key_uses_shared_repo_namespace(self):
+        lock_config = sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket")
+        sync_v83 = replace(
+            self.make_branch_sync("/source", "/destination", "commit1", branch="v8.3"),
+            s3_lock_config=lock_config,
+        )
+        sync_v830 = replace(
+            self.make_branch_sync("/source", "/destination", "commit1", branch="v8.3.0"),
+            s3_lock_config=lock_config,
+        )
+
+        key = sync_repo_with_copybara.build_s3_commit_lock_key(sync_v83, "commit1")
+
+        self.assertIn("/repo/", key)
+        self.assertNotIn("copybara_test_branch", key)
+        self.assertEqual(
+            key,
+            sync_repo_with_copybara.build_s3_commit_lock_key(sync_v830, "commit1"),
+        )
+
+    def test_find_destination_commit_for_source_commit_returns_newest_duplicate(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            destination_dir = os.path.join(tmpdir, "destination")
+            os.mkdir(destination_dir)
+            source_commit = "a" * 40
+            public_hashes = self.create_mock_repo_commits(
+                destination_dir, 2, [source_commit, source_commit]
+            )
+
+            self.assertEqual(
+                sync_repo_with_copybara.find_destination_commit_for_source_commit(
+                    destination_dir,
+                    source_commit,
+                ),
+                sync_repo_with_copybara.MatchingCommit(
+                    source_commit=source_commit,
+                    destination_commit=public_hashes[-1],
+                ),
+            )
+
+    def test_try_acquire_s3_commit_lock_uses_create_if_absent(self):
+        s3_client = FakeS3Client()
+        lock_config = sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket")
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "commit1"),
+            s3_lock_config=lock_config,
+        )
+        key = sync_repo_with_copybara.build_s3_commit_lock_key(sync, "commit1")
+
+        held_lock = sync_repo_with_copybara.try_acquire_s3_commit_lock(
+            sync,
+            s3_client,
+            key,
+            "owner1",
+            "commit1",
+        )
+
+        self.assertIsNotNone(held_lock)
+        self.assertEqual(s3_client.put_calls[-1]["IfNoneMatch"], "*")
+        self.assertNotIn("IfMatch", s3_client.put_calls[-1])
+
+    def test_try_acquire_s3_commit_lock_can_take_over_with_etag(self):
+        s3_client = FakeS3Client()
+        lock_config = sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket")
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "commit1"),
+            s3_lock_config=lock_config,
+        )
+        key = sync_repo_with_copybara.build_s3_commit_lock_key(sync, "commit1")
+        stale_record = sync_repo_with_copybara.make_s3_commit_lock_record(
+            sync,
+            "commit1",
+            state="active",
+            owner_id="old-owner",
+        )
+        stale_record["expires_at"] = "2000-01-01T00:00:00Z"
+        s3_client.objects[(lock_config.bucket, key)] = {
+            "body": json.dumps(stale_record),
+            "etag": '"old-etag"',
+        }
+
+        held_lock = sync_repo_with_copybara.try_acquire_s3_commit_lock(
+            sync,
+            s3_client,
+            key,
+            "new-owner",
+            "commit1",
+            if_match='"old-etag"',
+        )
+
+        self.assertIsNotNone(held_lock)
+        self.assertEqual(s3_client.put_calls[-1]["IfMatch"], '"old-etag"')
+        self.assertNotIn("IfNoneMatch", s3_client.put_calls[-1])
+
+    def test_renew_s3_commit_lock_uses_current_etag(self):
+        s3_client = FakeS3Client()
+        lock_config = sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket")
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "commit1"),
+            s3_lock_config=lock_config,
+        )
+        key = sync_repo_with_copybara.build_s3_commit_lock_key(sync, "commit1")
+        held_lock = sync_repo_with_copybara.try_acquire_s3_commit_lock(
+            sync,
+            s3_client,
+            key,
+            "owner1",
+            "commit1",
+        )
+        original_etag = held_lock.etag
+
+        sync_repo_with_copybara.renew_s3_commit_lock(held_lock)
+
+        self.assertEqual(s3_client.put_calls[-1]["IfMatch"], original_etag)
+        self.assertNotEqual(held_lock.etag, original_etag)
+        record = json.loads(s3_client.objects[(lock_config.bucket, key)]["body"])
+        self.assertEqual(record["state"], "active")
+        self.assertEqual(record["owner_id"], "owner1")
+
+    def test_held_s3_commit_lock_raises_on_heartbeat_failure(self):
+        lock_config = sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket")
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "commit1"),
+            s3_lock_config=lock_config,
+        )
+        held_lock = sync_repo_with_copybara.HeldS3CommitLock(
+            sync=sync,
+            config=lock_config,
+            s3_client=FakeS3Client(),
+            key="lock.json",
+            owner_id="owner1",
+            source_commit="commit1",
+            etag='"etag"',
+            record={},
+            heartbeat_error=RuntimeError("lock changed"),
+        )
+
+        with self.assertRaises(sync_repo_with_copybara.BranchSyncError) as raised:
+            held_lock.raise_if_heartbeat_failed("start Copybara migrate")
+
+        self.assertIn("lock changed", str(raised.exception))
+
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_branch_to_matching_commit"
+    )
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.find_destination_branch_match_for_source_commit"
+    )
+    @patch("buildscripts.copybara.sync_repo_with_copybara.clone_destination_repo_for_commit_lookup")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_s3_client")
+    def test_acquire_s3_commit_lock_or_skip_reuses_commit_synced_by_lock_holder(
+        self,
+        mock_get_s3_client,
+        mock_clone_destination,
+        mock_find_destination_branch_match,
+        mock_fast_forward_destination,
+    ):
+        s3_client = FakeS3Client()
+        mock_get_s3_client.return_value = s3_client
+        lock_config = sync_repo_with_copybara.CopybaraS3LockConfig(
+            bucket="test-bucket",
+            poll_seconds=1,
+        )
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "commit1"),
+            s3_lock_config=lock_config,
+        )
+        key = sync_repo_with_copybara.build_s3_commit_lock_key(sync, "commit1")
+        active_record = sync_repo_with_copybara.make_s3_commit_lock_record(
+            sync,
+            "commit1",
+            state="active",
+            owner_id="other-owner",
+        )
+        s3_client.objects[(lock_config.bucket, key)] = {
+            "body": json.dumps(active_record),
+            "etag": '"active-etag"',
+        }
+        matching_commit = sync_repo_with_copybara.MatchingCommit(
+            source_commit="commit1",
+            destination_commit="public1",
+        )
+        mock_find_destination_branch_match.return_value = matching_commit
+
+        self.assertIsNone(sync_repo_with_copybara.acquire_s3_commit_lock_or_skip(sync, "commit1"))
+
+        mock_clone_destination.assert_called_once()
+        mock_find_destination_branch_match.assert_called_once()
+        mock_fast_forward_destination.assert_called_once()
+        self.assertEqual(mock_fast_forward_destination.call_args.args[2], matching_commit)
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.time.sleep")
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_branch_to_matching_commit"
+    )
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.find_destination_branch_match_for_source_commit"
+    )
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.refresh_destination_repo_for_commit_lookup"
+    )
+    @patch("buildscripts.copybara.sync_repo_with_copybara.clone_destination_repo_for_commit_lookup")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_s3_client")
+    def test_acquire_s3_commit_lock_or_skip_waits_for_released_migrated_commit(
+        self,
+        mock_get_s3_client,
+        mock_clone_destination,
+        mock_refresh_destination,
+        mock_find_destination_branch_match,
+        mock_fast_forward_destination,
+        mock_sleep,
+    ):
+        s3_client = FakeS3Client()
+        mock_get_s3_client.return_value = s3_client
+        lock_config = sync_repo_with_copybara.CopybaraS3LockConfig(
+            bucket="test-bucket",
+            ttl_seconds=60,
+            poll_seconds=1,
+        )
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "commit1"),
+            s3_lock_config=lock_config,
+        )
+        key = sync_repo_with_copybara.build_s3_commit_lock_key(sync, "commit1")
+        released_record = sync_repo_with_copybara.make_s3_commit_lock_record(
+            sync,
+            "commit1",
+            state="released",
+            owner_id="other-owner",
+            result="migrated",
+        )
+        s3_client.objects[(lock_config.bucket, key)] = {
+            "body": json.dumps(released_record),
+            "etag": '"released-etag"',
+        }
+        matching_commit = sync_repo_with_copybara.MatchingCommit(
+            source_commit="commit1",
+            destination_commit="public1",
+        )
+        mock_find_destination_branch_match.side_effect = [
+            None,
+            None,
+            matching_commit,
+        ]
+
+        self.assertIsNone(sync_repo_with_copybara.acquire_s3_commit_lock_or_skip(sync, "commit1"))
+
+        mock_clone_destination.assert_called_once()
+        self.assertEqual(mock_refresh_destination.call_count, 2)
+        mock_sleep.assert_called_once_with(1)
+        mock_fast_forward_destination.assert_called_once()
+        self.assertEqual(mock_fast_forward_destination.call_args.args[2], matching_commit)
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.time.sleep")
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.find_destination_branch_match_for_source_commit"
+    )
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.refresh_destination_repo_for_commit_lookup"
+    )
+    @patch("buildscripts.copybara.sync_repo_with_copybara.clone_destination_repo_for_commit_lookup")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_s3_client")
+    def test_acquire_s3_commit_lock_or_skip_takes_over_expired_released_migrated_lock(
+        self,
+        mock_get_s3_client,
+        mock_clone_destination,
+        mock_refresh_destination,
+        mock_find_destination_branch_match,
+        mock_sleep,
+    ):
+        s3_client = FakeS3Client()
+        mock_get_s3_client.return_value = s3_client
+        lock_config = sync_repo_with_copybara.CopybaraS3LockConfig(
+            bucket="test-bucket",
+            ttl_seconds=60,
+            poll_seconds=1,
+        )
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "commit1"),
+            s3_lock_config=lock_config,
+        )
+        key = sync_repo_with_copybara.build_s3_commit_lock_key(sync, "commit1")
+        released_record = sync_repo_with_copybara.make_s3_commit_lock_record(
+            sync,
+            "commit1",
+            state="released",
+            owner_id="other-owner",
+            result="migrated",
+        )
+        stale_released_at = sync_repo_with_copybara.format_s3_lock_timestamp(
+            sync_repo_with_copybara.current_utc_datetime() - datetime.timedelta(minutes=20)
+        )
+        released_record["released_at"] = stale_released_at
+        released_record["updated_at"] = stale_released_at
+        s3_client.objects[(lock_config.bucket, key)] = {
+            "body": json.dumps(released_record),
+            "etag": '"released-etag"',
+        }
+        mock_find_destination_branch_match.return_value = None
+
+        held_lock = sync_repo_with_copybara.acquire_s3_commit_lock_or_skip(sync, "commit1")
+
+        self.assertIsNotNone(held_lock)
+        mock_clone_destination.assert_called_once()
+        mock_refresh_destination.assert_called_once()
+        mock_sleep.assert_not_called()
+        record = json.loads(s3_client.objects[(lock_config.bucket, key)]["body"])
+        self.assertEqual(record["state"], "active")
+        self.assertNotEqual(record["owner_id"], "other-owner")
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.release_s3_commit_lock")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.acquire_s3_commit_lock_or_skip")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_exact_match")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_destination_branch_head")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.prepare_local_source_mirror")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.rewrite_copybara_config")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.list_pending_source_commits")
+    def test_run_branch_commit_sync_releases_s3_commit_lock_after_migrate(
+        self,
+        mock_list_pending_source_commits,
+        _mock_rewrite_copybara_config,
+        mock_prepare_local_source_mirror,
+        _mock_reset_preview_dir,
+        mock_run_branch_dry_run,
+        _mock_run_branch_migrate,
+        mock_get_destination_head,
+        _mock_fast_forward_destination,
+        mock_acquire_s3_commit_lock,
+        mock_release_s3_commit_lock,
+    ):
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "headsha", branch="v8.2"),
+            last_rev="privatebase123",
+            s3_lock_config=sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket"),
+        )
+        mock_prepare_local_source_mirror.return_value = sync
+        mock_list_pending_source_commits.return_value = [make_source_commit("commit1")]
+        mock_run_branch_dry_run.return_value = sync_repo_with_copybara.BranchDryRunResult(
+            branch="v8.2"
+        )
+        mock_get_destination_head.return_value = "public-before"
+        held_lock = MagicMock(spec=sync_repo_with_copybara.HeldS3CommitLock)
+        mock_acquire_s3_commit_lock.return_value = held_lock
+
+        result = sync_repo_with_copybara.run_branch_commit_sync(sync, {})
+
+        self.assertEqual(
+            result,
+            sync_repo_with_copybara.BranchCommitSyncResult(
+                branch="v8.2",
+                discovered_commits=1,
+                migrated_commits=1,
+            ),
+        )
+        held_lock.start_heartbeat.assert_called_once()
+        mock_get_destination_head.assert_called_once()
+        mock_release_s3_commit_lock.assert_called_once_with(held_lock, "migrated")
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.release_s3_commit_lock")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.acquire_s3_commit_lock_or_skip")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_exact_match")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_destination_branch_head")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.prepare_local_source_mirror")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.rewrite_copybara_config")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.list_pending_source_commits")
+    def test_run_branch_commit_sync_releases_s3_commit_lock_as_noop_after_migrate_noop(
+        self,
+        mock_list_pending_source_commits,
+        _mock_rewrite_copybara_config,
+        mock_prepare_local_source_mirror,
+        _mock_reset_preview_dir,
+        mock_run_branch_dry_run,
+        mock_run_branch_migrate,
+        mock_get_destination_head,
+        _mock_fast_forward_destination,
+        mock_acquire_s3_commit_lock,
+        mock_release_s3_commit_lock,
+    ):
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "headsha", branch="v8.2"),
+            last_rev="privatebase123",
+            s3_lock_config=sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket"),
+        )
+        mock_prepare_local_source_mirror.return_value = sync
+        mock_list_pending_source_commits.return_value = [make_source_commit("commit1")]
+        mock_run_branch_dry_run.return_value = sync_repo_with_copybara.BranchDryRunResult(
+            branch="v8.2"
+        )
+        mock_run_branch_migrate.return_value = sync_repo_with_copybara.BranchMigrateResult(
+            branch="v8.2",
+            noop=True,
+        )
+        mock_get_destination_head.return_value = "public-before"
+        held_lock = MagicMock(spec=sync_repo_with_copybara.HeldS3CommitLock)
+        mock_acquire_s3_commit_lock.return_value = held_lock
+
+        result = sync_repo_with_copybara.run_branch_commit_sync(sync, {})
+
+        self.assertEqual(
+            result,
+            sync_repo_with_copybara.BranchCommitSyncResult(
+                branch="v8.2",
+                discovered_commits=1,
+                noop_commits=1,
+            ),
+        )
+        mock_get_destination_head.assert_called_once()
+        mock_release_s3_commit_lock.assert_called_once_with(held_lock, "noop")
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.release_s3_commit_lock")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.acquire_s3_commit_lock_or_skip")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_exact_match")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_destination_branch_head")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.prepare_local_source_mirror")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.rewrite_copybara_config")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.list_pending_source_commits")
+    def test_run_branch_commit_sync_releases_s3_commit_lock_as_noop_when_migrate_creates_no_commit(
+        self,
+        mock_list_pending_source_commits,
+        _mock_rewrite_copybara_config,
+        mock_prepare_local_source_mirror,
+        _mock_reset_preview_dir,
+        mock_run_branch_dry_run,
+        mock_run_branch_migrate,
+        mock_get_destination_head,
+        mock_fast_forward_destination,
+        mock_acquire_s3_commit_lock,
+        mock_release_s3_commit_lock,
+    ):
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "headsha", branch="v8.2"),
+            last_rev="privatebase123",
+            s3_lock_config=sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket"),
+        )
+        mock_prepare_local_source_mirror.return_value = sync
+        mock_list_pending_source_commits.return_value = [make_source_commit("commit1")]
+        mock_run_branch_dry_run.return_value = sync_repo_with_copybara.BranchDryRunResult(
+            branch="v8.2"
+        )
+        mock_run_branch_migrate.return_value = sync_repo_with_copybara.BranchMigrateResult(
+            branch="v8.2"
+        )
+        mock_get_destination_head.side_effect = ["public-before", "public-before"]
+        mock_fast_forward_destination.return_value = False
+        held_lock = MagicMock(spec=sync_repo_with_copybara.HeldS3CommitLock)
+        mock_acquire_s3_commit_lock.return_value = held_lock
+
+        result = sync_repo_with_copybara.run_branch_commit_sync(sync, {})
+
+        self.assertEqual(
+            result,
+            sync_repo_with_copybara.BranchCommitSyncResult(
+                branch="v8.2",
+                discovered_commits=1,
+                noop_commits=1,
+            ),
+        )
+        mock_fast_forward_destination.assert_called_once()
+        self.assertEqual(mock_get_destination_head.call_count, 2)
+        mock_release_s3_commit_lock.assert_called_once_with(held_lock, "noop")
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.release_s3_commit_lock")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.acquire_s3_commit_lock_or_skip")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_exact_match")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_destination_branch_head")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.prepare_local_source_mirror")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.rewrite_copybara_config")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.list_pending_source_commits")
+    def test_run_branch_commit_sync_aborts_before_migrate_after_s3_heartbeat_failure(
+        self,
+        mock_list_pending_source_commits,
+        _mock_rewrite_copybara_config,
+        mock_prepare_local_source_mirror,
+        _mock_reset_preview_dir,
+        mock_run_branch_dry_run,
+        mock_run_branch_migrate,
+        _mock_get_destination_head,
+        _mock_fast_forward_destination,
+        mock_acquire_s3_commit_lock,
+        mock_release_s3_commit_lock,
+    ):
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "headsha", branch="v8.2"),
+            last_rev="privatebase123",
+            s3_lock_config=sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket"),
+        )
+        mock_prepare_local_source_mirror.return_value = sync
+        mock_list_pending_source_commits.return_value = [make_source_commit("commit1")]
+        mock_run_branch_dry_run.return_value = sync_repo_with_copybara.BranchDryRunResult(
+            branch="v8.2"
+        )
+        held_lock = MagicMock(spec=sync_repo_with_copybara.HeldS3CommitLock)
+        held_lock.raise_if_heartbeat_failed.side_effect = sync_repo_with_copybara.BranchSyncError(
+            branch="v8.2",
+            stage="s3 lock",
+            message="lock changed",
+        )
+        mock_acquire_s3_commit_lock.return_value = held_lock
+
+        with self.assertRaises(sync_repo_with_copybara.BranchSyncError):
+            sync_repo_with_copybara.run_branch_commit_sync(sync, {})
+
+        held_lock.start_heartbeat.assert_called_once()
+        held_lock.raise_if_heartbeat_failed.assert_called_once_with("start Copybara migrate")
+        mock_run_branch_migrate.assert_not_called()
+        mock_release_s3_commit_lock.assert_called_once_with(held_lock, "failed")
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.acquire_s3_commit_lock_or_skip")
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_existing_match"
+    )
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.prepare_local_source_mirror")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.rewrite_copybara_config")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.list_pending_source_commits")
+    def test_run_branch_commit_sync_skips_commit_synced_while_waiting_for_s3_lock(
+        self,
+        mock_list_pending_source_commits,
+        mock_rewrite_copybara_config,
+        mock_prepare_local_source_mirror,
+        mock_reset_preview_dir,
+        mock_run_branch_dry_run,
+        mock_run_branch_migrate,
+        _mock_fast_forward_destination,
+        mock_acquire_s3_commit_lock,
+    ):
+        sync = replace(
+            self.make_branch_sync("/source", "/destination", "headsha", branch="v8.2"),
+            last_rev="privatebase123",
+            s3_lock_config=sync_repo_with_copybara.CopybaraS3LockConfig(bucket="test-bucket"),
+        )
+        mock_prepare_local_source_mirror.return_value = sync
+        mock_list_pending_source_commits.return_value = [make_source_commit("commit1")]
+        mock_acquire_s3_commit_lock.return_value = None
+
+        result = sync_repo_with_copybara.run_branch_commit_sync(sync, {})
+
+        self.assertEqual(
+            result,
+            sync_repo_with_copybara.BranchCommitSyncResult(
+                branch="v8.2",
+                discovered_commits=1,
+                noop_commits=1,
+            ),
+        )
+        mock_rewrite_copybara_config.assert_not_called()
+        mock_reset_preview_dir.assert_not_called()
+        mock_run_branch_dry_run.assert_not_called()
+        mock_run_branch_migrate.assert_not_called()
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.list_pending_source_commits")
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_existing_match"
+    )
+    def test_run_branch_commit_sync_skips_fast_forward_for_test_workflow(
+        self,
+        mock_fast_forward_destination,
+        mock_list_pending_source_commits,
+    ):
+        sync = sync_repo_with_copybara.PreparedBranchSync(
+            branch="v8.2",
+            source_ref="copybara_test_branch_patch123_v8.2",
+            config_sha="local",
+            workflow_name="test_v8.2",
+            config_file=Path("/tmp/copy.bara.sky"),
+            preview_dir=Path("/tmp/preview"),
+            docker_command=("echo",),
+            last_rev="privatebase123",
+            copybara_config=sync_repo_with_copybara.CopybaraConfig(
+                source=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url="https://example.com/source.git",
+                    repo_name=sync_repo_with_copybara.SOURCE_REPO_NAME,
+                    branch="copybara_test_branch_patch123_v8.2",
+                    ref="copybara_test_branch_patch123_v8.2",
+                ),
+                destination=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url="https://example.com/destination.git",
+                    repo_name=sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_NAME,
+                    branch="copybara_test_branch_patch123_v8.2",
+                ),
+            ),
+        )
+        mock_list_pending_source_commits.return_value = []
+
+        result = sync_repo_with_copybara.run_branch_commit_sync(sync, {})
+
+        self.assertEqual(result, sync_repo_with_copybara.BranchCommitSyncResult(branch="v8.2"))
+        mock_fast_forward_destination.assert_not_called()
+        mock_list_pending_source_commits.assert_called_once_with(sync)
+
+    @patch("buildscripts.copybara.sync_repo_with_copybara.release_s3_commit_lock")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.acquire_s3_commit_lock_or_skip")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_exact_match")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_destination_branch_head")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.prepare_local_source_mirror")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.rewrite_copybara_config")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.list_pending_source_commits")
+    def test_run_branch_commit_sync_uses_s3_commit_lock_for_test_workflow(
+        self,
+        mock_list_pending_source_commits,
+        _mock_rewrite_copybara_config,
+        mock_prepare_local_source_mirror,
+        _mock_reset_preview_dir,
+        mock_run_branch_dry_run,
+        _mock_run_branch_migrate,
+        mock_get_destination_head,
+        mock_fast_forward_destination,
+        mock_acquire_s3_commit_lock,
+        mock_release_s3_commit_lock,
+    ):
+        test_lock_config = sync_repo_with_copybara.CopybaraS3LockConfig(
+            bucket="test-bucket",
+        )
+        sync = sync_repo_with_copybara.PreparedBranchSync(
+            branch="v8.2",
+            source_ref="copybara_test_branch_patch123_v8.2",
+            config_sha="local",
+            workflow_name="test_v8.2",
+            config_file=Path("/tmp/copy.bara.sky"),
+            preview_dir=Path("/tmp/preview"),
+            docker_command=("echo",),
+            last_rev="privatebase123",
+            copybara_config=sync_repo_with_copybara.CopybaraConfig(
+                source=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url="https://example.com/source.git",
+                    repo_name=sync_repo_with_copybara.SOURCE_REPO_NAME,
+                    branch="copybara_test_branch_patch123_v8.2",
+                    ref="copybara_test_branch_patch123_v8.2",
+                ),
+                destination=sync_repo_with_copybara.CopybaraRepoConfig(
+                    git_url="https://example.com/destination.git",
+                    repo_name=sync_repo_with_copybara.TEST_REPO_NAME,
+                    branch="copybara_test_branch_patch123_v8.2",
+                ),
+            ),
+            s3_lock_config=test_lock_config,
+        )
+        mock_prepare_local_source_mirror.return_value = sync
+        mock_list_pending_source_commits.return_value = [make_source_commit("commit1")]
+        mock_run_branch_dry_run.return_value = sync_repo_with_copybara.BranchDryRunResult(
+            branch="v8.2"
+        )
+        mock_get_destination_head.return_value = "public-before"
+        held_lock = MagicMock(spec=sync_repo_with_copybara.HeldS3CommitLock)
+        mock_acquire_s3_commit_lock.return_value = held_lock
+
+        result = sync_repo_with_copybara.run_branch_commit_sync(sync, {})
+
+        self.assertEqual(
+            result,
+            sync_repo_with_copybara.BranchCommitSyncResult(
+                branch="v8.2",
+                discovered_commits=1,
+                migrated_commits=1,
+            ),
+        )
+        mock_fast_forward_destination.assert_called_once()
+        acquired_sync, acquired_commit = mock_acquire_s3_commit_lock.call_args.args
+        self.assertEqual(acquired_commit, "commit1")
+        self.assertEqual(acquired_sync.last_rev, "privatebase123")
+        self.assertEqual(acquired_sync.s3_lock_config, test_lock_config)
+        held_lock.start_heartbeat.assert_called_once()
+        mock_release_s3_commit_lock.assert_called_once_with(held_lock, "migrated")
 
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
     def test_check_destination_branch_exists_requires_exact_branch_match(self, mock_run_command):
@@ -1032,6 +2245,46 @@ class TestReleaseTagHelpers(unittest.TestCase):
                 ],
             )
 
+    def test_extract_branch_calls_from_fragment_reads_target_ref(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fragment_path = Path(tmpdir) / "branch.sky"
+            fragment_path.write_text(
+                'sync_branch("v8.2", target_ref = "r8.2.7", evergreen_activate = True)\n'
+            )
+
+            self.assertEqual(
+                sync_repo_with_copybara.extract_branch_calls_from_fragment(fragment_path),
+                [
+                    sync_repo_with_copybara.CopybaraFragmentCall(
+                        "v8.2",
+                        evergreen_activate=True,
+                        target_ref="r8.2.7",
+                    )
+                ],
+            )
+            self.assertEqual(
+                sync_repo_with_copybara.get_sync_branch_target_ref(fragment_path, "v8.2"),
+                "r8.2.7",
+            )
+
+    def test_extract_branch_calls_rejects_invalid_target_ref(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fragment_path = Path(tmpdir) / "branch.sky"
+
+            fragment_path.write_text('sync_branch("v8.2", target_ref = "")\n')
+            with self.assertRaises(SystemExit):
+                sync_repo_with_copybara.extract_branch_calls_from_fragment(fragment_path)
+
+            fragment_path.write_text(
+                'sync_branch("v8.2", target_ref = "first", target_ref = "second")\n'
+            )
+            with self.assertRaises(SystemExit):
+                sync_repo_with_copybara.extract_branch_calls_from_fragment(fragment_path)
+
+            fragment_path.write_text('sync_branch("v8.2", target_ref = target_tag)\n')
+            with self.assertRaises(SystemExit):
+                sync_repo_with_copybara.extract_branch_calls_from_fragment(fragment_path)
+
     def test_extract_release_tag_calls_from_fragment_reads_evergreen_activate(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             fragment_path = Path(tmpdir) / "release_tag.sky"
@@ -1115,7 +2368,7 @@ def write_base_copybara_config(
         f"):\n"
         f"    pass\n"
         f"\n"
-        f"def sync_branch(branch_name, evergreen_activate = False):\n"
+        f"def sync_branch(branch_name, evergreen_activate = False, target_ref = None):\n"
         f"    source_ref = source_refs.get(branch_name, branch_name)\n"
         f'    make_workflow("prod_" + branch_name, prod_url, source_ref, branch_name)\n'
         f"    make_workflow(\n"
@@ -1191,6 +2444,21 @@ class TestSkyExclusionChecks(unittest.TestCase):
                 sky_path.read_text()
                 + '\nrelease_files_to_exclude = [\n    "docs/private-notes/**",\n]\n'
                 + 'sync_branch("v8.2", release_files_to_exclude, evergreen_activate = True)\n'
+            )
+
+            patterns = sync_repo_with_copybara.get_preview_excluded_patterns(str(sky_path), "v8.2")
+
+            self.assertIn("docs/private-notes/**", patterns)
+            self.assertIn("AGENTS.md", patterns)
+
+    def test_get_preview_excluded_patterns_ignores_target_ref(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sky_path = Path(tmpdir) / "copy.bara.sky"
+            write_base_copybara_config(sky_path)
+            sky_path.write_text(
+                sky_path.read_text()
+                + '\nrelease_files_to_exclude = [\n    "docs/private-notes/**",\n]\n'
+                + 'sync_branch("v8.2", release_files_to_exclude, target_ref = "r8.2.7")\n'
             )
 
             patterns = sync_repo_with_copybara.get_preview_excluded_patterns(str(sky_path), "v8.2")
@@ -1540,6 +2808,9 @@ class TestCopybaraConfigHelpers(unittest.TestCase):
                 destination_base_revision="publicdeadbeef456",
                 public_branch="v8.2",
             )
+            test_lock_config = sync_repo_with_copybara.CopybaraS3LockConfig(
+                bucket="test-bucket",
+            )
 
             stdout = io.StringIO()
             with redirect_stdout(stdout):
@@ -1557,6 +2828,7 @@ class TestCopybaraConfigHelpers(unittest.TestCase):
                     },
                     test_branch_prefix="copybara_test_branch_patch123",
                     test_baseline=test_baseline,
+                    s3_lock_config=test_lock_config,
                 )
             log_output = stdout.getvalue()
 
@@ -1579,6 +2851,7 @@ class TestCopybaraConfigHelpers(unittest.TestCase):
             self.assertEqual(prepared.copybara_config.destination.branch, expected_test_branch)
             self.assertEqual(prepared.last_rev, "feedface123")
             self.assertEqual(prepared.test_baseline, test_baseline)
+            self.assertEqual(prepared.s3_lock_config, test_lock_config)
             self.assertEqual(
                 prepared.dry_run_args,
                 ("--init-history", "--last-rev=feedface123"),
@@ -2857,7 +4130,7 @@ class TestMainWorkflow(unittest.TestCase):
             base_config_path = Path(tmpdir) / "copy.bara.sky"
             fragment_path = Path(tmpdir) / "v8_2.sky"
             write_base_copybara_config(base_config_path)
-            fragment_path.write_text('sync_branch("v8.2")\n')
+            fragment_path.write_text('sync_branch("v8.2", target_ref = "r8.2.7")\n')
             mock_get_local_copybara_config_bundle.return_value = (
                 sync_repo_with_copybara.CopybaraConfigBundle(
                     config_sha="local",
@@ -2918,6 +4191,14 @@ class TestMainWorkflow(unittest.TestCase):
             expansions=mock_read_config_file.return_value,
             release_tag=None,
             release_source_commit=None,
+            target_ref=None,
+            target_source_commit=None,
+            s3_lock_config=sync_repo_with_copybara.CopybaraS3LockConfig(
+                bucket=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_BUCKET,
+                prefix=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_PREFIX,
+                ttl_seconds=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_TTL_SECONDS,
+                poll_seconds=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_POLL_SECONDS,
+            ),
         )
         mock_push_test_branches.assert_called_once()
         self.assertEqual(
@@ -3172,6 +4453,15 @@ class TestMainWorkflow(unittest.TestCase):
         self.assertEqual(prepare_call["release_tag"], "r8.2.7")
         self.assertEqual(prepare_call["release_source_commit"], "tagsha123")
         self.assertEqual(prepare_call["prod_url_override"], authenticated_test_url)
+        self.assertEqual(
+            prepare_call["s3_lock_config"],
+            sync_repo_with_copybara.CopybaraS3LockConfig(
+                bucket=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_BUCKET,
+                prefix=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_PREFIX,
+                ttl_seconds=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_TTL_SECONDS,
+                poll_seconds=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_POLL_SECONDS,
+            ),
+        )
         self.assertIn('sync_tag("r8.2.7")', tag_fragment_contents)
         mock_get_local_copybara_config_bundle.assert_called_once_with("/repo")
         mock_fetch_remote_copybara_config_bundle.assert_not_called()
@@ -3279,9 +4569,126 @@ class TestMainWorkflow(unittest.TestCase):
         self.assertEqual(prepare_call["source_ref"], "mastersha123")
         self.assertEqual(prepare_call["config_bundle"], config_bundle)
         self.assertEqual(prepare_call["prod_url_override"], authenticated_test_url)
+        self.assertEqual(
+            prepare_call["s3_lock_config"],
+            sync_repo_with_copybara.CopybaraS3LockConfig(
+                bucket=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_BUCKET,
+                prefix=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_PREFIX,
+                ttl_seconds=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_TTL_SECONDS,
+                poll_seconds=sync_repo_with_copybara.DEFAULT_COPYBARA_S3_LOCK_POLL_SECONDS,
+            ),
+        )
         mock_get_local_copybara_config_bundle.assert_called_once_with("/repo")
         mock_fetch_remote_copybara_config_bundle.assert_not_called()
         mock_get_remote_branch_head.assert_called_once_with(authenticated_source_url, "master")
+        mock_ensure_generated_copybara_evergreen_is_current.assert_called_once_with(Path(tmpdir))
+        mock_activate_new_hotfix_tasks.assert_not_called()
+        mock_run_branch_commit_sync.assert_called_once_with(prepared_sync, tokens)
+        mock_handle_failure.assert_not_called()
+
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.ensure_generated_copybara_evergreen_is_current"
+    )
+    @patch("buildscripts.copybara.sync_repo_with_copybara.handle_failure")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_commit_sync")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.prepare_branch_sync")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.activate_new_hotfix_tasks")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_remote_branch_head")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.resolve_branch_target_ref")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.fetch_remote_copybara_config_bundle")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_local_copybara_config_bundle")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.get_copybara_tokens")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.create_mongodb_bot_gitconfig")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.ensure_copybara_checkout_and_image")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.read_config_file")
+    @patch("buildscripts.copybara.sync_repo_with_copybara.os.getcwd")
+    def test_main_uses_sync_branch_target_ref_for_prod_branch_request(
+        self,
+        mock_getcwd,
+        mock_read_config_file,
+        mock_ensure_copybara_checkout_and_image,
+        mock_create_mongodb_bot_gitconfig,
+        mock_get_copybara_tokens,
+        mock_get_local_copybara_config_bundle,
+        mock_fetch_remote_copybara_config_bundle,
+        mock_resolve_branch_target_ref,
+        mock_get_remote_branch_head,
+        mock_activate_new_hotfix_tasks,
+        mock_prepare_branch_sync,
+        mock_run_branch_commit_sync,
+        mock_handle_failure,
+        mock_ensure_generated_copybara_evergreen_is_current,
+    ):
+        mock_read_config_file.return_value = {
+            "project": sync_repo_with_copybara.EXPECTED_EVERGREEN_PROJECT,
+        }
+        mock_getcwd.return_value = "/repo"
+        tokens = {
+            sync_repo_with_copybara.SOURCE_REPO_URL: "source-token",
+            sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_URL: "prod-token",
+            sync_repo_with_copybara.TEST_REPO_URL: "test-token",
+        }
+        mock_get_copybara_tokens.return_value = tokens
+        mock_resolve_branch_target_ref.return_value = "targetsha123"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_config_path = Path(tmpdir) / "copy.bara.sky"
+            write_base_copybara_config(
+                base_config_path,
+                prod_url=sync_repo_with_copybara.PUBLIC_GITHUB_APP_REPO_URL,
+                test_url=sync_repo_with_copybara.TEST_REPO_URL,
+            )
+            fragment_path = Path(tmpdir) / "master.sky"
+            fragment_path.write_text('sync_branch("master", target_ref = "r8.2.7")\n')
+            config_bundle = sync_repo_with_copybara.CopybaraConfigBundle(
+                config_sha="local",
+                bundle_dir=Path(tmpdir),
+                base_config_path=base_config_path,
+                path_rules_path=Path(tmpdir) / "copybara_path_rules.json",
+                path_rules_module_path=Path(tmpdir) / "copybara_path_rules.bara.sky",
+                branch_to_fragment={"master": fragment_path},
+            )
+            mock_get_local_copybara_config_bundle.return_value = config_bundle
+            prepared_sync = sync_repo_with_copybara.PreparedBranchSync(
+                branch="master",
+                source_ref="targetsha123",
+                config_sha="local",
+                workflow_name="prod_master",
+                config_file=Path(tmpdir) / "generated.sky",
+                preview_dir=Path(tmpdir) / "preview",
+                docker_command=("echo",),
+                target_ref="r8.2.7",
+                target_source_commit="targetsha123",
+            )
+            mock_prepare_branch_sync.return_value = prepared_sync
+            mock_run_branch_commit_sync.return_value = (
+                sync_repo_with_copybara.BranchCommitSyncResult(branch="master")
+            )
+
+            argv = [
+                "buildscripts/copybara/sync_repo_with_copybara.py",
+                "--workflow=prod",
+                "--prod-destination=test",
+                "--branches=master",
+            ]
+            with patch.object(sys, "argv", argv):
+                sync_repo_with_copybara.main()
+
+        authenticated_source_url = "https://x-access-token:source-token@github.com/10gen/mongo.git"
+        authenticated_test_url = (
+            "https://x-access-token:test-token@github.com/10gen/mongo-copybara.git"
+        )
+        prepare_call = mock_prepare_branch_sync.call_args.kwargs
+        self.assertEqual(prepare_call["source_ref"], "targetsha123")
+        self.assertEqual(prepare_call["target_ref"], "r8.2.7")
+        self.assertEqual(prepare_call["target_source_commit"], "targetsha123")
+        self.assertEqual(prepare_call["prod_url_override"], authenticated_test_url)
+        mock_resolve_branch_target_ref.assert_called_once_with(
+            authenticated_source_url, "master", "r8.2.7"
+        )
+        mock_get_remote_branch_head.assert_not_called()
+        mock_get_local_copybara_config_bundle.assert_called_once_with("/repo")
+        mock_fetch_remote_copybara_config_bundle.assert_not_called()
         mock_ensure_generated_copybara_evergreen_is_current.assert_called_once_with(Path(tmpdir))
         mock_activate_new_hotfix_tasks.assert_not_called()
         mock_run_branch_commit_sync.assert_called_once_with(prepared_sync, tokens)
@@ -4034,6 +5441,28 @@ class TestMainWorkflow(unittest.TestCase):
         mock_get_copybara_tokens.assert_called_once_with(sync.expansions)
         mock_rewrite_copybara_config.assert_called_once_with(sync.config_file, refreshed_tokens)
 
+    @patch("buildscripts.copybara.sync_repo_with_copybara.run_command")
+    def test_run_branch_migrate_returns_noop_for_acceptable_noop_output(self, mock_run_command):
+        sync = sync_repo_with_copybara.PreparedBranchSync(
+            branch="v8.2",
+            source_ref="deadbeef123",
+            config_sha="local",
+            workflow_name="prod_v8.2",
+            config_file=Path("/tmp/copy.bara.sky"),
+            preview_dir=Path("/tmp/preview"),
+            docker_command=("echo", "copybara"),
+        )
+        mock_run_command.side_effect = subprocess.CalledProcessError(
+            1,
+            "copybara",
+            output="No new changes to import for resolved ref",
+        )
+
+        self.assertEqual(
+            sync_repo_with_copybara.run_branch_migrate(sync),
+            sync_repo_with_copybara.BranchMigrateResult(branch="v8.2", noop=True),
+        )
+
     def make_release_tag_sync(self) -> sync_repo_with_copybara.PreparedBranchSync:
         return sync_repo_with_copybara.PreparedBranchSync(
             branch="v8.2.7",
@@ -4183,6 +5612,9 @@ class TestMainWorkflow(unittest.TestCase):
             ]
         )
 
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_existing_match"
+    )
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
     @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
@@ -4199,6 +5631,7 @@ class TestMainWorkflow(unittest.TestCase):
         mock_reset_preview_dir,
         mock_run_branch_dry_run,
         mock_run_branch_migrate,
+        _mock_fast_forward_destination,
     ):
         sync = sync_repo_with_copybara.PreparedBranchSync(
             branch="v8.2",
@@ -4276,6 +5709,9 @@ class TestMainWorkflow(unittest.TestCase):
         self.assertEqual(mock_reset_preview_dir.call_count, 2)
         mock_run_branch_migrate.assert_called_once()
 
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_existing_match"
+    )
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
     @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
@@ -4290,6 +5726,7 @@ class TestMainWorkflow(unittest.TestCase):
         mock_reset_preview_dir,
         mock_run_branch_dry_run,
         mock_run_branch_migrate,
+        _mock_fast_forward_destination,
     ):
         sync = sync_repo_with_copybara.PreparedBranchSync(
             branch="v8.2",
@@ -4399,6 +5836,9 @@ class TestMainWorkflow(unittest.TestCase):
         mock_get_copybara_tokens.assert_not_called()
         self.assertEqual(mock_reset_preview_dir.call_count, 4)
 
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_existing_match"
+    )
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
     @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
@@ -4415,6 +5855,7 @@ class TestMainWorkflow(unittest.TestCase):
         mock_reset_preview_dir,
         mock_run_branch_dry_run,
         mock_run_branch_migrate,
+        _mock_fast_forward_destination,
     ):
         sync = sync_repo_with_copybara.PreparedBranchSync(
             branch="v8.2",
@@ -4482,6 +5923,9 @@ class TestMainWorkflow(unittest.TestCase):
         self.assertEqual(mock_reset_preview_dir.call_count, 4)
         self.assertEqual(mock_run_branch_migrate.call_count, 2)
 
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_existing_match"
+    )
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
     @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
@@ -4496,6 +5940,7 @@ class TestMainWorkflow(unittest.TestCase):
         mock_reset_preview_dir,
         mock_run_branch_dry_run,
         mock_run_branch_migrate,
+        _mock_fast_forward_destination,
     ):
         sync = sync_repo_with_copybara.PreparedBranchSync(
             branch="v8.2",
@@ -4563,6 +6008,9 @@ class TestMainWorkflow(unittest.TestCase):
             [initial_tokens, refreshed_tokens],
         )
 
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_existing_match"
+    )
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
     @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
@@ -4577,6 +6025,7 @@ class TestMainWorkflow(unittest.TestCase):
         mock_reset_preview_dir,
         mock_run_branch_dry_run,
         mock_run_branch_migrate,
+        _mock_fast_forward_destination,
     ):
         sync = sync_repo_with_copybara.PreparedBranchSync(
             branch="v8.2",
@@ -4617,6 +6066,9 @@ class TestMainWorkflow(unittest.TestCase):
         )
         mock_run_branch_migrate.assert_not_called()
 
+    @patch(
+        "buildscripts.copybara.sync_repo_with_copybara.fast_forward_destination_to_existing_match"
+    )
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_migrate")
     @patch("buildscripts.copybara.sync_repo_with_copybara.run_branch_dry_run")
     @patch("buildscripts.copybara.sync_repo_with_copybara.reset_preview_dir")
@@ -4631,6 +6083,7 @@ class TestMainWorkflow(unittest.TestCase):
         mock_reset_preview_dir,
         mock_run_branch_dry_run,
         mock_run_branch_migrate,
+        _mock_fast_forward_destination,
     ):
         sync = sync_repo_with_copybara.PreparedBranchSync(
             branch="v8.2",
@@ -5334,7 +6787,10 @@ class TestEnsureCopybaraSourceRefSupport(unittest.TestCase):
         )
         self.assertIn("source_refs = {}", result)
         self.assertIn("source_ref = source_refs.get(branch_name, branch_name)", result)
-        self.assertIn("def sync_branch(branch_name, evergreen_activate = False):", result)
+        self.assertIn(
+            "def sync_branch(branch_name, evergreen_activate = False, target_ref = None):",
+            result,
+        )
 
     def test_preserves_legacy_source_refs_with_public_files(self):
         contents = self._make_legacy_config_with_source_refs()
@@ -5346,6 +6802,46 @@ class TestEnsureCopybaraSourceRefSupport(unittest.TestCase):
         self.assertIn('branch_public_files = ["**"],', result)
         self.assertIn("evergreen_activate = False", result)
         self.assertIn("branch_public_files,\n    )", result)
+
+    def test_updates_existing_source_ref_helper_without_duplicating_sync_tag(self):
+        contents = textwrap.dedent("""\
+            source_url = "https://github.com/10gen/mongo.git"
+            test_branch_prefix = "copybara_test_branch"
+            source_refs = {}
+
+            def sync_branch(branch_name, evergreen_activate = False):
+                source_ref = source_refs.get(branch_name, target_ref or branch_name)
+                make_workflow("prod_" + branch_name, prod_url, source_ref, branch_name)
+                make_workflow(
+                    "test_" + branch_name,
+                    test_url,
+                    source_ref,
+                    test_branch_prefix + "_" + branch_name,
+                )
+
+            def sync_tag(tag_name, evergreen_activate = False):
+                branch_name = public_branch_for_release_tag(tag_name)
+                source_ref = source_refs.get(branch_name, "refs/tags/" + tag_name)
+                make_workflow("prod_" + tag_name, prod_url, source_ref, branch_name)
+                make_workflow(
+                    "test_" + tag_name,
+                    test_url,
+                    source_ref,
+                    test_branch_prefix + "_" + branch_name,
+                )
+            """)
+
+        result = sync_repo_with_copybara.ensure_copybara_source_ref_support(
+            contents, Path("test.sky")
+        )
+
+        self.assertEqual(result.count("def sync_tag("), 1)
+        self.assertIn(
+            "def sync_branch(branch_name, evergreen_activate = False, target_ref = None):",
+            result,
+        )
+        self.assertIn("source_ref = source_refs.get(branch_name, branch_name)", result)
+        self.assertNotIn("target_ref or branch_name", result)
 
     def test_exits_when_sync_branch_not_found(self):
         contents = textwrap.dedent("""\
