@@ -637,7 +637,7 @@ void FindAndModifyCmd::Invocation::explain(OperationContext* opCtx,
     }();
     const auto originalNss = ns();
 
-    if (originalRequest.getRawData().has_value() || originalNss.isTimeseriesBucketsCollection()) {
+    if (originalRequest.getRawData() || originalNss.isTimeseriesBucketsCollection()) {
         isRawDataOperation(opCtx) = true;
     }
 
@@ -758,7 +758,7 @@ void FindAndModifyCmd::Invocation::run(OperationContext* opCtx, rpc::ReplyBuilde
     const auto& originalCmdObj = unparsedRequest().body;
     const auto& originalRequest = request();
 
-    if (originalRequest.getRawData().has_value() || originalNss.isTimeseriesBucketsCollection()) {
+    if (originalRequest.getRawData() || originalNss.isTimeseriesBucketsCollection()) {
         isRawDataOperation(opCtx) = true;
     }
 
