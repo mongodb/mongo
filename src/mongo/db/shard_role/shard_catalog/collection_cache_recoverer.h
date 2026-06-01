@@ -80,11 +80,15 @@ public:
         repl::OpTime id;
     };
 
-    CollectionCacheRecoverer(const NamespaceString& nss, CollectionMetadata existingMetadata)
-        : _collMetadata(
+    CollectionCacheRecoverer(const NamespaceString& nss,
+                             const CancellationToken& cancelToken,
+                             CollectionMetadata existingMetadata)
+        : _cancellationSource(cancelToken),
+          _collMetadata(
               SemiFuture<CollectionMetadata>::makeReady(std::move(existingMetadata)).share()),
           _nss(nss) {};
-    CollectionCacheRecoverer(const NamespaceString& nss) : _nss(nss) {};
+    CollectionCacheRecoverer(const NamespaceString& nss, const CancellationToken& cancelToken)
+        : _cancellationSource(cancelToken), _nss(nss) {};
 
     RecoveryRoundId start(OperationContext* opCtx, ExecutorPtr executor);
 

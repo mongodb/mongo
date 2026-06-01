@@ -1259,7 +1259,6 @@ TEST_F(AuthoritativeRefreshFixture, PrimaryChangeDuringRecoveryForcesModeBRetry)
     ASSERT_EQ(stats.getIntField("diskRecoveriesPerformed"), 1);
 }
 
-
 class RefreshCancellationFixture : public ShardServerTestFixtureWithCatalogCacheLoaderMock {};
 
 TEST_F(RefreshCancellationFixture, CancelAuthRefreshRetriesAsNonAuthoritative) {
@@ -1344,6 +1343,144 @@ TEST_F(RefreshCancellationFixture, CancelNonAuthRefreshRetriesAsAuthoritative) {
     ASSERT_EQ(1,
               logs.countBSONContainingSubset(
                   BSON("id" << 12436401 << "attr" << BSON("isAuthoritative" << false))));
+}
+
+TEST_F(RefreshCancellationFixture, CancelAuthCollectionRefreshRetriesAsNonAuthoritative) {
+    auto* opCtx = operationContext();
+
+    // Force the flag on so the bg thread picks the auth path on the first attempt.
+    RAIIServerParameterControllerForTest authoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                            true);
+
+    // Auth CSR with no metadata: forces the authoritative path to recover from disk.
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    auto sharedMetadata =
+        makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardName, kMyShardName);
+    const auto receivedShardVersion = sharedMetadata.getShardPlacementVersion();
+
+    unittest::LogCaptureGuard logs;
+
+    auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshThread");
+    const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+
+    stdx::thread t([&] {
+        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgAuthColl");
+        auto bgOpCtx = bgClient->makeOperationContext();
+        ASSERT_OK(FilteringMetadataCache::get(bgOpCtx.get())
+                      ->onCollectionPlacementVersionMismatch(
+                          bgOpCtx.get(), kTestNss, receivedShardVersion));
+    });
+
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+
+    // Transition the CSR to non-auth with matching metadata so the retry's non-auth handler
+    // observes that the cached version satisfies receivedShardVersion and returns immediately.
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->setFilteringMetadata_nonAuthoritative(opCtx, sharedMetadata);
+    }
+
+    // Flip the flag before cancelling so the outer retry dispatches to the non-auth path.
+    RAIIServerParameterControllerForTest nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                               false);
+
+    FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
+
+    fp->setMode(FailPoint::off);
+    t.join();
+
+    // The retry-after-cancel log must have fired for the canceled auth attempt.
+    ASSERT_EQ(1,
+              logs.countBSONContainingSubset(
+                  BSON("id" << 12436300 << "attr" << BSON("isAuthoritative" << true))));
+}
+
+TEST_F(RefreshCancellationFixture, CancelNonAuthCollectionRefreshRetriesAsAuthoritative) {
+    auto* opCtx = operationContext();
+
+    // Force the flag off so the bg thread picks the non-auth path on the first attempt.
+    RAIIServerParameterControllerForTest nonAuthoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                               false);
+
+    auto sharedMetadata =
+        makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardName, kMyShardName);
+    const auto receivedShardVersion = sharedMetadata.getShardPlacementVersion();
+
+    unittest::LogCaptureGuard logs;
+
+    auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshThread");
+    const auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
+
+    stdx::thread t([&] {
+        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgNonAuthColl");
+        auto bgOpCtx = bgClient->makeOperationContext();
+        ASSERT_OK(FilteringMetadataCache::get(bgOpCtx.get())
+                      ->onCollectionPlacementVersionMismatch(
+                          bgOpCtx.get(), kTestNss, receivedShardVersion));
+    });
+
+    fp->waitForTimesEntered(initialTimesEntered + 1);
+
+    // Promote the CSR to authoritative with matching metadata so the retry's auth path sees the
+    // version as already sufficient and returns without performing full disk recovery.
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->setFilteringMetadata_authoritative(
+            opCtx, sharedMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+    }
+
+    // Flip the flag before cancelling so the outer retry dispatches to the auth path.
+    RAIIServerParameterControllerForTest authoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                            true);
+
+    FilteringMetadataRefreshTracker::get(opCtx)->interruptIncompatibleRefreshes(opCtx);
+
+    fp->setMode(FailPoint::off);
+    t.join();
+
+    // The retry-after-cancel log must have fired for the canceled non-auth attempt.
+    ASSERT_EQ(1,
+              logs.countBSONContainingSubset(
+                  BSON("id" << 12436300 << "attr" << BSON("isAuthoritative" << false))));
+}
+
+// Test that the refresh path respects the maxTimeMS on the original OperationContext.
+TEST_F(RefreshCancellationFixture, MaxTimeMsOnOperationContextInterruptsRefresh) {
+    auto* opCtx = operationContext();
+
+    RAIIServerParameterControllerForTest authoritativeScope("featureFlagAuthoritativeShardsCRUD",
+                                                            true);
+
+    // Force the authoritative path to recover from disk and block.
+    {
+        auto csr = CollectionShardingRuntime::acquireExclusive(opCtx, kTestNss);
+        csr->clearFilteringMetadata_authoritative(opCtx);
+    }
+
+    auto sharedMetadata =
+        makeShardedMetadataInMemory(opCtx, UUID::gen(), kMyShardName, kMyShardName);
+    const auto receivedShardVersion = sharedMetadata.getShardPlacementVersion();
+
+    auto* fp = globalFailPointRegistry().find("hangInRecoverRefreshThread");
+    fp->setMode(FailPoint::alwaysOn);
+
+    stdx::thread t([&] {
+        auto bgClient = getGlobalServiceContext()->getService()->makeClient("bgMaxTimeMs");
+        auto bgOpCtx = bgClient->makeOperationContext();
+        // Match how the command dispatch path sets a client's maxTimeMS deadline.
+        bgOpCtx->setDeadlineAfterNowBy(Milliseconds(500), ErrorCodes::MaxTimeMSExpired);
+        ASSERT_EQ(FilteringMetadataCache::get(bgOpCtx.get())
+                      ->onCollectionPlacementVersionMismatch(
+                          bgOpCtx.get(), kTestNss, receivedShardVersion),
+                  ErrorCodes::MaxTimeMSExpired);
+    });
+
+    t.join();
+    fp->setMode(FailPoint::off);
 }
 
 }  // namespace

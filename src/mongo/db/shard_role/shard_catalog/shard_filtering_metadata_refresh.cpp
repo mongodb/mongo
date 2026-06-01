@@ -355,20 +355,74 @@ void FilteringMetadataCache::report(BSONObjBuilder* builder) const {
         _cache->report(builder);
 }
 
+// Runs the refresh under a new opCtx that gets cancelled if either the given token is canceled,
+// or the parent opCtx is interrupted.
+template <typename Fn>
+bool runRefreshInChildOperationContext(OperationContext* parent,
+                                       CancellationToken cancellationToken,
+                                       Fn&& fn) {
+    ServiceContext::UniqueClient client =
+        parent->getServiceContext()->getService()->makeClient("FilteringMetadataRefresh");
+    AlternativeClientRegion acr(client);
+    CancellationSource combinedCancellationSource(parent->getCancellationToken());
+    // If the parent OperationContext gets killed, interrupt the child OperationContext as well.
+    cancellationToken.onCancel().unsafeToInlineFuture().getAsync(
+        [src = combinedCancellationSource](Status) mutable { src.cancel(); });
+    CancelableOperationContext cancelableOpCtx(
+        cc().makeOperationContext(),
+        combinedCancellationSource.token(),
+        Grid::get(parent)->getExecutorPool()->getFixedExecutor());
+    // Propagate metadata from the parent to the child.
+    ForwardableOperationMetadata(parent).setOn(cancelableOpCtx.get());
+    // Propagate whether the parent OperationContext is in a multi-document transaction
+    // to preserve the behavior associated with metadataRefreshInTransactionMaxWaitMS.
+    if (parent->inMultiDocumentTransaction()) {
+        cancelableOpCtx.get()->setInMultiDocumentTransaction();
+    }
+    // Propagate the parent's deadline so the synchronously-run refresh still honors maxTimeMS.
+    if (parent->hasDeadline()) {
+        cancelableOpCtx.get()->setDeadlineByDate(parent->getDeadline(), parent->getTimeoutError());
+    }
+    try {
+        fn(cancelableOpCtx.get());
+        return false;
+    } catch (const DBException&) {
+        // If the caller's opCtx was killed, propagate its actual kill status instead of retrying.
+        parent->checkForInterrupt();
+        if (cancellationToken.isCanceled()) {
+            return true;
+        }
+        throw;
+    }
+}
+
 Status FilteringMetadataCache::onCollectionPlacementVersionMismatch(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    boost::optional<ChunkVersion> chunkVersionReceived) noexcept {
-    try {
-        auto shouldUseAuthoritativePath = [&] {
-            if (!feature_flags::gAuthoritativeShardsCRUD.isEnabled(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
-                return false;
+    boost::optional<ChunkVersion> chunkVersionReceived) noexcept try {
+    while (true) {
+        // Force non-authoritative if the CSR isn't authoritative; otherwise decide the kind of
+        // refresh based on the Authoritative Shards CRUD feature flag.
+        const auto forcedKind = [&]() -> boost::optional<FilteringMetadataRefreshKind> {
             auto scopedCsr = CollectionShardingRuntime::acquireShared(opCtx, nss);
-            return scopedCsr->getAuthoritativeState() ==
-                CollectionShardingRuntime::AuthoritativeState::kAuthoritative;
+            if (scopedCsr->getAuthoritativeState() !=
+                CollectionShardingRuntime::AuthoritativeState::kAuthoritative)
+                return FilteringMetadataRefreshKind::kNonAuthoritative;
+            return boost::none;
         }();
+        const auto refresh =
+            FilteringMetadataRefreshTracker::get(opCtx)->acquire(opCtx, forcedKind);
+        const bool isAuthoritative = (refresh.kind == FilteringMetadataRefreshKind::kAuthoritative);
+
+        invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+        invariant(!opCtx->getClient()->isInDirectClient());
+        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+
+        Timer t;
+        ScopeGuard finishTiming([&] {
+            CurOp::get(opCtx)->debug().placementVersionRefreshMillis += Milliseconds(t.millis());
+        });
+
         // This check can flip by the time the function returns meaning a CSR has changed from
         // authoritative to non-authoritative and viceversa. However, it's not an issue since any of
         // the two state transitions will lead to the correct result once the function returns:
@@ -378,19 +432,30 @@ Status FilteringMetadataCache::onCollectionPlacementVersionMismatch(
         // - Start authoritative and end up non-authoritative: The check that occurs at the end of
         //   the authoritative recovery will notice that the CSS is now non-authoritative and
         //   perform an early return so that we retry the entire operation again.
-        if (shouldUseAuthoritativePath) {
-            _onCollectionPlacementVersionMismatchAuthoritative(opCtx, nss, chunkVersionReceived);
-        } else {
-            _onCollectionPlacementVersionMismatch(opCtx, nss, chunkVersionReceived);
+        const bool shouldRetry = runRefreshInChildOperationContext(
+            opCtx, refresh.cancellationToken, [&](OperationContext* refreshOpCtx) {
+                if (isAuthoritative) {
+                    _onCollectionPlacementVersionMismatchAuthoritative(
+                        refreshOpCtx, nss, chunkVersionReceived);
+                } else {
+                    _onCollectionPlacementVersionMismatch(refreshOpCtx, nss, chunkVersionReceived);
+                }
+            });
+        if (shouldRetry) {
+            LOGV2(12436300,
+                  "Collection placement version mismatch refresh was canceled; retrying",
+                  logAttrs(nss),
+                  "isAuthoritative"_attr = isAuthoritative);
+            continue;
         }
         return Status::OK();
-    } catch (const DBException& ex) {
-        LOGV2(22062,
-              "Failed to refresh metadata for collection",
-              logAttrs(nss),
-              "error"_attr = redact(ex));
-        return ex.toStatus();
     }
+} catch (const DBException& ex) {
+    LOGV2(22062,
+          "Failed to refresh metadata for collection",
+          logAttrs(nss),
+          "error"_attr = redact(ex));
+    return ex.toStatus();
 }
 
 void FilteringMetadataCache::forceCollectionPlacementRefresh(OperationContext* opCtx,
@@ -1060,10 +1125,6 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
         // Snapshot of the DSR mutation counter. Used to detect ABA transitions.
         uint64_t dbMetadataMutationsSnapshot = 0;
 
-        // Stop retrying and bubble up the error if we have been interrupted (e.g. due to stepdown)
-        // TODO(SERVER-124363): Evaluate if this can be removed
-        opCtx->checkForInterrupt();
-
         // Prepare: under the CSR exclusive lock, decide whether to recover and, if so, register a
         // CollectionCacheRecoverer for this round. In Mode B also snapshot the DSR state we will
         // re-verify after the drain.
@@ -1106,10 +1167,11 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
             ShardingStatistics::get(opCtx)
                 .authoritativeCollectionMetadataStatistics.registerCreationOfRecoverer();
 
-            recoverer = std::make_shared<CollectionCacheRecoverer>(nss);
+            recoverer =
+                std::make_shared<CollectionCacheRecoverer>(nss, opCtx->getCancellationToken());
             (*scopedCsr)->setCollectionRecoverer(recoverer);
 
-            CancellationSource cancellationSource;
+            CancellationSource cancellationSource(opCtx->getCancellationToken());
             cancellationToken = cancellationSource.token();
             (*scopedCsr)
                 ->setPlacementVersionRecoverRefreshFuture(promise.getFuture(),
@@ -1139,8 +1201,11 @@ void FilteringMetadataCache::_recoverCollectionMetadataFromDisk(
                         logAttrs(nss),
                         "error"_attr = status);
 
-            incrementConsecutiveNoProgressAttempts("disk recoverer initial pass failed"_sd);
-            continue;
+            if (status == ErrorCodes::AtomicityFailure) {
+                incrementConsecutiveNoProgressAttempts("disk recoverer initial pass failed"_sd);
+                continue;
+            }
+            uassertStatusOK(status);
         }
 
         // Install: under the CSR exclusive lock, drain the last oplog entries, validate the
@@ -1413,15 +1478,6 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatchAuthoritative(
     OperationContext* opCtx,
     const NamespaceString& nss,
     boost::optional<ChunkVersion> receivedShardVersion) {
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-    invariant(!opCtx->getClient()->isInDirectClient());
-    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
-
-    Timer t;
-    ScopeGuard finishTiming([&] {
-        CurOp::get(opCtx)->debug().placementVersionRefreshMillis += Milliseconds(t.millis());
-    });
-
     if (nss.isNamespaceAlwaysUntracked()) {
         return;
     }
@@ -1445,7 +1501,7 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatchAuthoritative(
                   "Authoritative collection metadata recovery completed successfully",
                   logAttrs(nss),
                   "outcome"_attr = "versionAlreadySufficientBeforeRecovery",
-                  "durationMillis"_attr = t.millis());
+                  "durationMillis"_attr = durationCount<Milliseconds>(opCtx->getElapsedTime()));
             return;
         }
 
@@ -1460,7 +1516,7 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatchAuthoritative(
                   "Authoritative collection metadata recovery completed successfully",
                   logAttrs(nss),
                   "outcome"_attr = "forcedDiskRecovery",
-                  "durationMillis"_attr = t.millis());
+                  "durationMillis"_attr = durationCount<Milliseconds>(opCtx->getElapsedTime()));
             return;
         }
 
@@ -1476,7 +1532,7 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatchAuthoritative(
                   "Authoritative collection metadata recovery completed successfully",
                   logAttrs(nss),
                   "outcome"_attr = "versionMatchedAfterDiskRecovery",
-                  "durationMillis"_attr = t.millis());
+                  "durationMillis"_attr = durationCount<Milliseconds>(opCtx->getElapsedTime()));
             return;
         }
 
@@ -1500,7 +1556,7 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatchAuthoritative(
               "Authoritative collection metadata recovery completed successfully",
               logAttrs(nss),
               "outcome"_attr = "shardVersionMatchOrConfigTimeWait",
-              "durationMillis"_attr = t.millis());
+              "durationMillis"_attr = durationCount<Milliseconds>(opCtx->getElapsedTime()));
         return;
     }
 }
@@ -1620,18 +1676,9 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatch(
     OperationContext* opCtx,
     const NamespaceString& nss,
     boost::optional<ChunkVersion> chunkVersionReceived) {
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
-    invariant(!opCtx->getClient()->isInDirectClient());
-    ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
-
     if (MONGO_unlikely(skipShardFilteringMetadataRefresh.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
     }
-
-    Timer t{};
-    ScopeGuard finishTiming([&] {
-        CurOp::get(opCtx)->debug().placementVersionRefreshMillis += Milliseconds(t.millis());
-    });
 
     if (nss.isNamespaceAlwaysUntracked()) {
         return;
@@ -1686,7 +1733,7 @@ void FilteringMetadataCache::_onCollectionPlacementVersionMismatch(
 
             // If the shard doesn't yet know its filtering metadata, recovery needs to be run
             const bool runRecover = (*scopedCsr)->getCurrentMetadataIfKnown() ? false : true;
-            CancellationSource cancellationSource;
+            CancellationSource cancellationSource(opCtx->getCancellationToken());
             CancellationToken cancellationToken = cancellationSource.token();
             (*scopedCsr)
                 ->setPlacementVersionRecoverRefreshFuture(

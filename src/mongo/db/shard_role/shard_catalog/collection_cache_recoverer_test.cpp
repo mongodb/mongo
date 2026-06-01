@@ -114,7 +114,7 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDisk) {
         client.insert(NamespaceString::kConfigShardCatalogChunksNamespace, chunk.toConfigBSON());
     }
 
-    CollectionCacheRecoverer recoverer{kTestNss};
+    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
 
     auto roundId = recoverer.start(operationContext(), getExecutor());
     ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
@@ -135,7 +135,7 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskAnUntrackedCollection) 
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogCollectionsNamespace);
     createTestCollection(opCtx, NamespaceString::kConfigShardCatalogChunksNamespace);
 
-    CollectionCacheRecoverer recoverer{kTestNss};
+    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
 
     auto roundId = recoverer.start(operationContext(), getExecutor());
     ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
@@ -165,7 +165,7 @@ TEST_F(RecovererFixture, CacheRecovererAppliesOplogChanges) {
     }
 
     auto collMetadata = [&] {
-        CollectionCacheRecoverer recoverer{kTestNss};
+        CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
 
         auto roundId = recoverer.start(operationContext(), getExecutor());
         ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
@@ -174,7 +174,8 @@ TEST_F(RecovererFixture, CacheRecovererAppliesOplogChanges) {
 
     ASSERT_TRUE(collMetadata);
 
-    CollectionCacheRecoverer recoverer{kTestNss, std::move(*collMetadata)};
+    CollectionCacheRecoverer recoverer{
+        kTestNss, CancellationToken::uncancelable(), std::move(*collMetadata)};
     auto roundId = recoverer.start(operationContext(), getExecutor());
     recoverer.onOplogEntry(
         operationContext(), Timestamp(Date_t::now()), CollectionShardingStateDeltaOplogEntry{});
@@ -201,7 +202,7 @@ TEST_F(RecovererFixture, CacheRecovererCanRecoverFromDiskWithConcurrentOplogEntr
         client.insert(NamespaceString::kConfigShardCatalogChunksNamespace, chunk.toConfigBSON());
     }
 
-    CollectionCacheRecoverer recoverer{kTestNss};
+    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
 
     auto collMetadata = [&]() {
         auto roundId = recoverer.start(operationContext(), getExecutor());
@@ -250,7 +251,7 @@ TEST_F(RecovererFixture, CacheRecovererBubblesUpCachePressureErrors) {
 
     FailPointEnableBlock intermittentFailure{"WTWriteConflictExceptionForReads"};
 
-    CollectionCacheRecoverer recoverer{kTestNss};
+    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
 
     auto roundId = recoverer.start(operationContext(), getExecutor());
     auto status = recoverer.waitForInitialPass(operationContext(), roundId);
@@ -271,7 +272,7 @@ TEST_F(RecovererFixture, CacheRecovererBubblesUpDiskReadingFailure) {
     }
 
     {
-        CollectionCacheRecoverer recoverer{kTestNss};
+        CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
 
         // The CollectionType is parsed via an IDL parser. So it should throw an IDL failure.
         auto roundId = recoverer.start(operationContext(), getExecutor());
@@ -295,7 +296,7 @@ TEST_F(RecovererFixture, CacheRecovererBubblesUpDiskReadingFailure) {
                   BSON("uuid" << collType.getUuid() << "lastmod" << "Invalid value"));
 
     {
-        CollectionCacheRecoverer recoverer{kTestNss};
+        CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
 
         // The ChunkType uses a custom parser that returns a different family of errors compared to
         // the CollectionType. Let's make sure that's the case.
@@ -324,7 +325,7 @@ TEST_F(RecovererFixture, CacheRecovererFailsDueToDifferentRoundId) {
         client.insert(NamespaceString::kConfigShardCatalogChunksNamespace, chunk.toConfigBSON());
     }
 
-    CollectionCacheRecoverer recoverer{kTestNss};
+    CollectionCacheRecoverer recoverer{kTestNss, CancellationToken::uncancelable()};
 
     auto roundId = recoverer.start(operationContext(), getExecutor());
     ASSERT_OK(recoverer.waitForInitialPass(operationContext(), roundId));
