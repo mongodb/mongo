@@ -9,7 +9,8 @@ selector:
       # its own broker
       - streams_kafka
       # This suite requires sidecar containers.
-      - streams_aspio
+      - streams_aspio_0
+      - streams_aspio_1
       - streams_aspio_iceberg_0
       - streams_aspio_iceberg_1
       - streams_aspio_iceberg_2
