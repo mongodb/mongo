@@ -61,8 +61,8 @@ public:
 protected:
     RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
                 const NamespaceString& nss,
-                const EncryptionInformation& encryptInfo,
-                bool allowEmptySchema);
+                const NamespaceString& escNss,
+                const EncryptionInformation& encryptInfo);
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
     const NamespaceString nssEsc;
@@ -81,7 +81,8 @@ public:
                   const NamespaceString& nss,
                   const EncryptionInformation& encryptInfo,
                   BSONObj toRewrite,
-                  EncryptedCollScanModeAllowed mode);
+                  EncryptedCollScanModeAllowed mode,
+                  const EncryptedFieldConfig& validatedConfig);
 
     ~FilterRewrite() override {};
 
