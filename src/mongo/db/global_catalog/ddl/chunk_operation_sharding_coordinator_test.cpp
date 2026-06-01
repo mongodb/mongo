@@ -37,6 +37,8 @@
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/s/move_range_coordinator.h"
 #include "mongo/db/shard_role/lock_manager/locker.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 
 #include <memory>
@@ -58,6 +60,10 @@ public:
 
 class ChunkOperationShardingCoordinatorTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
+    static inline const auto kTestNs = NamespaceString::createNamespaceString_forTest("test.test");
+    static inline const ShardId kTestShardId{"test-shard"};
+    static inline const KeyPattern kTestKeyPattern{BSON("x" << 1)};
+
     ChunkOperationShardingCoordinatorTest()
         : repl::PrimaryOnlyServiceMongoDTest(
               Options{}.addClientObserver(std::make_unique<ClientObserver>())),
@@ -72,11 +78,20 @@ public:
 
     void setUp() override {
         repl::PrimaryOnlyServiceMongoDTest::setUp();
+
+        ShardingState::get(getServiceContext())
+            ->setRecoveryCompleted({OID::gen(),
+                                    ClusterRole::ShardServer,
+                                    ConnectionString(HostAndPort("localhost", 27017)),
+                                    kTestShardId});
+
         _opCtx = cc().getOperationContext();
         if (!_opCtx) {
             _opCtxHolder = cc().makeOperationContext();
             _opCtx = _opCtxHolder.get();
         }
+
+        setupCollectionMetadata();
 
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _network = network.get();
@@ -108,15 +123,51 @@ protected:
     ServiceContext::UniqueOperationContext _opCtxHolder;
     OperationContext* _opCtx;
 
+    ChunkType generateChunk(const UUID& collUuid) {
+        ChunkType chunk;
+        chunk.setName(OID::gen());
+        chunk.setCollectionUUID(collUuid);
+        chunk.setVersion(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0}));
+        chunk.setShard(kTestShardId);
+        chunk.setRange({kTestKeyPattern.globalMin(), kTestKeyPattern.globalMax()});
+        chunk.setOnCurrentShardSince(Timestamp(1, 0));
+        chunk.setHistory({});
+        return chunk;
+    }
+
+    void setupCollectionMetadata() {
+        const auto uuid = UUID::gen();
+        const std::vector chunks{generateChunk(uuid)};
+        auto rt = RoutingTableHistory::makeNewAllowingGaps(kTestNs,
+                                                           uuid,
+                                                           kTestKeyPattern,
+                                                           false,
+                                                           nullptr,
+                                                           false,
+                                                           chunks[0].getVersion().epoch(),
+                                                           chunks[0].getVersion().getTimestamp(),
+                                                           boost::none,
+                                                           boost::none,
+                                                           true,
+                                                           chunks);
+        const auto version = rt.getVersion();
+        const auto rtHandle = RoutingTableHistoryValueHandle(
+            std::make_shared<RoutingTableHistory>(std::move(rt)),
+            ComparableChunkVersion::makeComparableChunkVersion(version));
+        const auto collectionMetadata =
+            CollectionMetadata(CurrentChunkManager(rtHandle), kTestShardId);
+        auto scopedCSR = CollectionShardingRuntime::acquireExclusive(_opCtx, kTestNs);
+        scopedCSR->setFilteringMetadata_authoritative(
+            _opCtx, collectionMetadata, CollectionShardingRuntime::NoRoutingTableAs::kUntracked);
+    }
+
     MergeChunksCoordinatorDocument makeMergeChunksCoordinatorDoc(std::vector<BSONObj> bounds,
                                                                  OID epoch) {
         MergeChunksCoordinatorDocument doc;
         ShardsvrMergeChunksRequest req;
         req.setBounds(bounds);
         req.setEpoch(epoch);
-        ShardingCoordinatorMetadata metadata{
-            {NamespaceString::createNamespaceString_forTest("test.coll"),
-             CoordinatorTypeEnum::kMergeChunks}};
+        ShardingCoordinatorMetadata metadata{{kTestNs, CoordinatorTypeEnum::kMergeChunks}};
         ForwardableOperationMetadata forwardableOpMetadata(_opCtx);
         metadata.setForwardableOpMetadata(forwardableOpMetadata);
         doc.setShardingCoordinatorMetadata(std::move(metadata));
@@ -153,9 +204,7 @@ protected:
         req.setSplitKeys(std::move(splitKeys));
         req.setFrom("shard0000");
         req.setEpoch(epoch);
-        ShardingCoordinatorMetadata metadata{
-            {NamespaceString::createNamespaceString_forTest("test.split"),
-             CoordinatorTypeEnum::kSplitChunk}};
+        ShardingCoordinatorMetadata metadata{{kTestNs, CoordinatorTypeEnum::kSplitChunk}};
         ForwardableOperationMetadata forwardableOpMetadata(_opCtx);
         metadata.setForwardableOpMetadata(forwardableOpMetadata);
         doc.setShardingCoordinatorMetadata(std::move(metadata));
@@ -224,9 +273,7 @@ TEST_F(ChunkOperationShardingCoordinatorTest, SmokeTest) {
     CancellationSource cancellationSource;
 
     TestChunkOperationShardingCoordinatorDocument doc;
-    ShardingCoordinatorMetadata coorMetadata{
-        {NamespaceString::createNamespaceString_forTest("test"),
-         CoordinatorTypeEnum::kTestCoordinator}};
+    ShardingCoordinatorMetadata coorMetadata{{kTestNs, CoordinatorTypeEnum::kTestCoordinator}};
 
     ForwardableOperationMetadata forwardableOpMetadata(_opCtx);
     coorMetadata.setForwardableOpMetadata(forwardableOpMetadata);

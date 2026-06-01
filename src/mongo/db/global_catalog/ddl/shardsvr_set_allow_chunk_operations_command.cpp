@@ -37,6 +37,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
+#include "mongo/db/global_catalog/ddl/sharding_coordinator_service.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -112,14 +113,24 @@ public:
                 }
             }
 
+            // Release the collection acquisition at this point. If some chunk operation (or
+            // migration) was in the commit phase, we have to release the acquisition so that it can
+            // acquire the critical section to attempt to commit. The commit should always fail,
+            // because by the time this command is invoked, the CSRS has already stored
+            // "allowMigrations: false", so it should reject any commit attempt.
+            acq.reset();
+
             if (waitForMigrationAbort) {
-                // Release the collection acquisition at this point. If some chunk operation (or
-                // migration) was in the commit phase, we have to release the acquisition so that it
-                // can acquire the critical section to attempt to commit. The commit should always
-                // fail, because by the time this command is invoked, the CSRS has already stored
-                // "allowMigrations: false", so it should reject any commit attempt.
-                acq.reset();
                 waitForMigrationAbort->get(opCtx);
+            }
+
+            // Wait for all chunk operation coordinators.
+            auto* const service = ShardingCoordinatorService::getService(opCtx);
+            for (const auto coordType : std::array{CoordinatorTypeEnum::kMoveRange,
+                                                   CoordinatorTypeEnum::kSplitChunk,
+                                                   CoordinatorTypeEnum::kMergeChunks,
+                                                   CoordinatorTypeEnum::kMergeAllChunks}) {
+                service->waitForCoordinatorsOfGivenTypeToComplete(opCtx, coordType);
             }
         }
 

@@ -33,10 +33,17 @@
 
 namespace mongo {
 
+class MONGO_MOD_PRIVATE ChunkOperationShardingCoordinatorMixin {
+protected:
+    virtual ~ChunkOperationShardingCoordinatorMixin() = default;
+    void _checkSetAllowChunkOperations(OperationContext* opCtx, const NamespaceString& nss);
+};
+
 template <typename StateDoc>
 class MONGO_MOD_UNFORTUNATELY_OPEN ChunkOperationShardingCoordinator
     : public RecoverableShardingCoordinator,
-      protected RecoverableTypedDocMixin<ChunkOperationShardingCoordinator<StateDoc>, StateDoc> {
+      protected RecoverableTypedDocMixin<ChunkOperationShardingCoordinator<StateDoc>, StateDoc>,
+      protected ChunkOperationShardingCoordinatorMixin {
 
     friend RecoverableTypedDocMixin<ChunkOperationShardingCoordinator<StateDoc>, StateDoc>;
 
@@ -77,7 +84,9 @@ protected:
 private:
     void _initialize(OperationContext* opCtx) override {}
 
-    void _checkCoordinatorPreconditions(OperationContext* opCtx, bool afterAcquiringLocks) final {}
+    void _checkCoordinatorPreconditions(OperationContext* opCtx, bool afterAcquiringLocks) final {
+        this->_checkSetAllowChunkOperations(opCtx, nss());
+    }
 
     ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,
                                             std::shared_ptr<executor::ScopedTaskExecutor> executor,

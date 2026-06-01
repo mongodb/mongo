@@ -587,6 +587,7 @@ mongo_cc_library(
         "//src/mongo/db:cleanup_structured_encryption_data_coordinator_gen",
         "//src/mongo/db:compact_structured_encryption_data_coordinator.cpp",
         "//src/mongo/db:compact_structured_encryption_data_coordinator_gen",
+        "//src/mongo/db/global_catalog/ddl:chunk_operation_sharding_coordinator.cpp",
         "//src/mongo/db/global_catalog/ddl:clone_authoritative_metadata_coordinator.cpp",
         "//src/mongo/db/global_catalog/ddl:clone_authoritative_metadata_coordinator_gen",
         "//src/mongo/db/global_catalog/ddl:collmod_coordinator.cpp",
