@@ -55,9 +55,13 @@ Status insert(OperationContext* opCtx,
               IntegerKeyedContainer& container,
               int64_t key,
               std::span<const char> value,
-              container::ExistingKeyPolicy policy) {
+              boost::optional<NonexistentKeyGuarantee> nkg) {
     assertCanAcceptContainerWrites(opCtx);
-    auto status = container.insert(ru, key, value, policy);
+    auto status = container.insert(ru,
+                                   key,
+                                   value,
+                                   nkg ? container::ExistingKeyPolicy::overwrite
+                                       : container::ExistingKeyPolicy::reject);
     if (!status.isOK()) {
         return status;
     }
@@ -73,9 +77,13 @@ Status insert(OperationContext* opCtx,
               StringKeyedContainer& container,
               std::span<const char> key,
               std::span<const char> value,
-              container::ExistingKeyPolicy policy) {
+              boost::optional<NonexistentKeyGuarantee> nkg) {
     assertCanAcceptContainerWrites(opCtx);
-    auto status = container.insert(ru, key, value, policy);
+    auto status = container.insert(ru,
+                                   key,
+                                   value,
+                                   nkg ? container::ExistingKeyPolicy::overwrite
+                                       : container::ExistingKeyPolicy::reject);
     if (!status.isOK()) {
         return status;
     }

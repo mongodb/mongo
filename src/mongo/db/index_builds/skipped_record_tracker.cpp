@@ -119,7 +119,7 @@ void SkippedRecordTracker::record(OperationContext* opCtx,
                     container,
                     reservedRidBlock[0].getLong(),
                     std::span<const char>(toInsert.objdata(), toInsert.objsize()),
-                    container::ExistingKeyPolicy::overwrite));
+                    container_write::NonexistentKeyGuarantee{}));
             } else {
                 uassertStatusOK(rs.insertRecord(opCtx,
                                                 *shard_role_details::getRecoveryUnit(opCtx),

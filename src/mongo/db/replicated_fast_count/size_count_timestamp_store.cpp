@@ -180,12 +180,8 @@ void ContainerSizeCountTimestampStore::write(OperationContext* opCtx, Timestamp 
         massertStatusOK(
             container_write::update(opCtx, ru, container, kTimestampContainerKey, valSpan));
     } else {
-        massertStatusOK(container_write::insert(opCtx,
-                                                ru,
-                                                container,
-                                                kTimestampContainerKey,
-                                                valSpan,
-                                                container::ExistingKeyPolicy::reject));
+        massertStatusOK(
+            container_write::insert(opCtx, ru, container, kTimestampContainerKey, valSpan));
     }
 }
 }  // namespace mongo::replicated_fast_count

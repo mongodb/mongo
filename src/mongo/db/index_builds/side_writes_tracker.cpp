@@ -138,7 +138,7 @@ Status SideWritesTracker::bufferSideWrite(OperationContext* opCtx,
                                         container,
                                         rid.getLong(),
                                         std::span<const char>(doc.objdata(), doc.objsize()),
-                                        container::ExistingKeyPolicy::overwrite);
+                                        container_write::NonexistentKeyGuarantee{});
             if (!status.isOK())
                 return status;
         }

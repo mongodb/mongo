@@ -37,29 +37,44 @@
 
 #include <span>
 
+#include <boost/optional.hpp>
+
 MONGO_MOD_PUBLIC;
 
 namespace mongo::container_write {
 
 /**
- * Inserts into the given container and logs the operation in the oplog.
+ * A tag struct that callers pass to insert() to assert that the key being inserted is guaranteed
+ * not to already exist in the container. This enables a performance optimization of doing blind
+ * writes, but actually overwriting an existing key is unsafe for replication (a write that
+ * overwrites an existing key will fail to replicate). Only pass this when the calling code can
+ * guarantee no duplicate key will be written.
+ */
+struct NonexistentKeyGuarantee {};
+
+/**
+ * Inserts into the given container and logs the operation in the oplog. If nkg is provided, the
+ * caller guarantees the key does not already exist; otherwise, the insert will be rejected if the
+ * key exists.
  */
 Status insert(OperationContext* opCtx,
               RecoveryUnit& ru,
               IntegerKeyedContainer& container,
               int64_t key,
               std::span<const char> value,
-              container::ExistingKeyPolicy policy);
+              boost::optional<NonexistentKeyGuarantee> nkg = boost::none);
 
 /**
- * Inserts into the given container and logs the operation in the oplog.
+ * Inserts into the given container and logs the operation in the oplog. If nkg is provided, the
+ * caller guarantees the key does not already exist; otherwise, the insert will be rejected if the
+ * key exists.
  */
 Status insert(OperationContext* opCtx,
               RecoveryUnit& ru,
               StringKeyedContainer& container,
               std::span<const char> key,
               std::span<const char> value,
-              container::ExistingKeyPolicy policy);
+              boost::optional<NonexistentKeyGuarantee> nkg = boost::none);
 
 /**
  * Updates the value at the given key in the container and logs the operation in the oplog.

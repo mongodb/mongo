@@ -250,8 +250,7 @@ void ContainerSizeCountStore::write(OperationContext* opCtx, UUID uuid, const En
     if (cursor->find(keySpan)) {
         massertStatusOK(container_write::update(opCtx, ru, container, keySpan, valSpan));
     } else {
-        massertStatusOK(container_write::insert(
-            opCtx, ru, container, keySpan, valSpan, container::ExistingKeyPolicy::reject));
+        massertStatusOK(container_write::insert(opCtx, ru, container, keySpan, valSpan));
     }
 }
 
@@ -259,12 +258,8 @@ void ContainerSizeCountStore::insert(OperationContext* opCtx, UUID uuid, const E
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto& container = _getStringKeyedContainer();
     auto val = entryToContainerValue(entry);
-    massertStatusOK(container_write::insert(opCtx,
-                                            ru,
-                                            container,
-                                            uuidToContainerKey(uuid),
-                                            bsonToSpan(val),
-                                            container::ExistingKeyPolicy::reject));
+    massertStatusOK(
+        container_write::insert(opCtx, ru, container, uuidToContainerKey(uuid), bsonToSpan(val)));
 }
 
 void ContainerSizeCountStore::remove(OperationContext* opCtx, UUID uuid) {

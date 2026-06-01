@@ -273,8 +273,12 @@ public:
 
         WriteUnitOfWork wuow(&_opCtx);
         _ru.onRollback([this](OperationContext*) { --_nextKey; });
-        uassertStatusOK(container_write::insert(
-            &_opCtx, _ru, _container, _nextKey++, value, container::ExistingKeyPolicy::overwrite));
+        uassertStatusOK(container_write::insert(&_opCtx,
+                                                _ru,
+                                                _container,
+                                                _nextKey++,
+                                                value,
+                                                container_write::NonexistentKeyGuarantee{}));
         if (size > 0) {
             this->_checksumCalculator.addUncommittedData(buffer.buf(), size);
         }

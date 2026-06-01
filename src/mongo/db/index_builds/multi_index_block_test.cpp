@@ -2142,7 +2142,7 @@ TEST_F(MultiIndexBlockTest, CommitToleratesKeysAlreadyInContainer) {
                                           iam->getSortedDataInterface()->getContainer(),
                                           keys.begin()->getView(),
                                           keys.begin()->getTypeBitsView(),
-                                          container::ExistingKeyPolicy::overwrite));
+                                          container_write::NonexistentKeyGuarantee{}));
         wuow.commit();
     }
 

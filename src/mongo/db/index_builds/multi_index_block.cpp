@@ -1634,12 +1634,7 @@ void MultiIndexBlock::_writeStateToContainer(OperationContext* opCtx) const {
         const bool keyExists = container.getCursor(ru)->find(kResumeStateKey).has_value();
         auto status = keyExists
             ? container_write::update(opCtx, ru, container, kResumeStateKey, value)
-            : container_write::insert(opCtx,
-                                      ru,
-                                      container,
-                                      kResumeStateKey,
-                                      value,
-                                      container::ExistingKeyPolicy::reject);
+            : container_write::insert(opCtx, ru, container, kResumeStateKey, value);
         massertStatusOK(status.withContext(
             str::stream() << "Index build: failed to write resumable state via container write. "
                           << "buildUUID: " << _buildUUID << ", collectionUUID: " << _collectionUUID

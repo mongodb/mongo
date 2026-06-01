@@ -470,8 +470,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
                                              ru,
                                              _newInterface->getContainer(),
                                              keyString.getView(),
-                                             keyString.getTypeBitsView(),
-                                             container::ExistingKeyPolicy::reject);
+                                             keyString.getTypeBitsView());
             if (auto& status = std::get<Status>(result); status == ErrorCodes::KeyExists) {
                 // It's okay if the entire key (including record id) matches a key already inserted.
                 status = Status::OK();
@@ -1040,12 +1039,12 @@ private:
     std::unique_ptr<Sorter> _sorter;
     std::unique_ptr<Iterator> _sortedIterator;
     ContainerWriteBehavior _containerWriteBehavior;
-    // We start out with container::ExistingKeyPolicy::reject because it's not safe to write blindly
-    // unless we know for certain that we're inserting something that is definitely not already in
-    // the table; secondaries make their own decisions of whether to apply their writes blindly or
-    // not. Once we're past any keys that already exist in the table, we can switch to
-    // container::ExistingKeyPolicy::overwrite as a performance optimization.
-    container::ExistingKeyPolicy _containerExistingKeyPolicy = container::ExistingKeyPolicy::reject;
+    // We start out without a NonexistentKeyGuarantee because it's not safe to write blindly unless
+    // we know for certain that we're inserting something that is definitely not already in the
+    // table; secondaries make their own decisions of whether to apply their writes blindly or not.
+    // Once we're past any keys that already exist in the table, we can set this as a performance
+    // optimization.
+    boost::optional<container_write::NonexistentKeyGuarantee> _nonexistentKeyGuarantee;
 };
 
 BulkBuilderImpl::BulkBuilderImpl(const IndexCatalogEntry* entry,
@@ -1430,15 +1429,14 @@ void BulkBuilderImpl::_addKeyForCommit(OperationContext* opCtx,
                                               _iam->getSortedDataInterface()->getContainer(),
                                               key.getKeyAndRecordIdView(),
                                               key.getTypeBitsView(),
-                                              _containerExistingKeyPolicy);
+                                              _nonexistentKeyGuarantee);
         if (status == ErrorCodes::KeyExists) {
             // The key was already inserted by a previous bulk builder on this same container.
             return;
-        } else if (_containerExistingKeyPolicy == container::ExistingKeyPolicy::reject &&
-                   status.isOK()) {
+        } else if (!_nonexistentKeyGuarantee && status.isOK()) {
             // We've reached the end of any keys previously inserted. From this point forward, we
             // can assume that the keys we're inserting do not already exist in the container.
-            _containerExistingKeyPolicy = container::ExistingKeyPolicy::overwrite;
+            _nonexistentKeyGuarantee.emplace();
         }
         uassertStatusOK(status);
         keysInsertedCounter.add(1);

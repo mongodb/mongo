@@ -608,7 +608,7 @@ void insertSorterEntries(OperationContext* opCtx,
                                           container,
                                           key,
                                           std::span<const char>(dummyValue, sizeof(dummyValue)),
-                                          mongo::container::ExistingKeyPolicy::overwrite));
+                                          container_write::NonexistentKeyGuarantee{}));
     }
     wuow.commit();
 }

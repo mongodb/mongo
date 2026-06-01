@@ -117,7 +117,7 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
                                               container,
                                               reservedRidBlock[0].getLong(),
                                               std::span<const char>(builder.buf(), builder.len()),
-                                              container::ExistingKeyPolicy::overwrite);
+                                              container_write::NonexistentKeyGuarantee{});
         if (!status.isOK())
             return status;
     } else {
