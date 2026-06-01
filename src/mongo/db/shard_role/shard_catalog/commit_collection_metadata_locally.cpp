@@ -128,13 +128,6 @@ void writeCollectionMetadataLocally(OperationContext* opCtx,
                                     const std::vector<ChunkType>& chunks) {
     DBDirectClient dbClient(opCtx);
 
-    auto serializedNs = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
-    executeLocalUpdates(
-        dbClient,
-        NamespaceString::kConfigShardCatalogCollectionsNamespace,
-        {makeUpsertEntry(BSON(ShardCatalogCollectionTypeBase::kNssFieldName << serializedNs),
-                         coll.toBSON())});
-
     // Persist Chunk Metadata, we do this in batches because of the 16MB BSON limit.
     for (auto it = chunks.begin(); it != chunks.end();) {
         size_t updateSize = 0;
@@ -171,6 +164,13 @@ void writeCollectionMetadataLocally(OperationContext* opCtx,
         executeLocalUpdates(
             dbClient, NamespaceString::kConfigShardCatalogChunksNamespace, std::move(chunkUpdates));
     }
+
+    auto serializedNs = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
+    executeLocalUpdates(
+        dbClient,
+        NamespaceString::kConfigShardCatalogCollectionsNamespace,
+        {makeUpsertEntry(BSON(ShardCatalogCollectionTypeBase::kNssFieldName << serializedNs),
+                         coll.toBSON())});
 }
 
 void deleteCollectionEntryLocally(OperationContext* opCtx, const NamespaceString& nss) {
