@@ -20,12 +20,18 @@ const coll12 = conn.getDB(db1)[jsTestName() + "_coll2"];
 const coll13 = conn.getDB(db1)[jsTestName() + "_coll3"];
 const coll2 = conn.getDB(db2)[jsTestName() + "_coll2"];
 const coll3 = conn.getDB(db3)[jsTestName() + "_coll3"];
+const collBase = conn.getDB(db1)[jsTestName() + "_base"];
+const collLeft = conn.getDB(db1)[jsTestName() + "_left"];
+const collRight = conn.getDB(db1)[jsTestName() + "_right"];
 
 coll1.drop();
 coll12.drop();
 coll13.drop();
 coll2.drop();
 coll3.drop();
+collBase.drop();
+collLeft.drop();
+collRight.drop();
 
 assert.commandWorked(coll1.insertOne({a: 1, b: 1, x: {c: 1}}));
 assert.commandWorked(coll12.insertOne({a: 1, b: 1, c: 1, d: "foo"}));
@@ -38,6 +44,12 @@ assert.commandWorked(coll12.createIndex({dummy: 1, a: 1, b: 1, c: 1, d: 1}));
 assert.commandWorked(coll13.createIndex({dummy: 1, a: 1, b: 1, d: 1}));
 assert.commandWorked(coll2.createIndex({dummy: 1, a: 1, b: 1}));
 assert.commandWorked(coll3.createIndex({dummy: 1, a: 1, b: 1}));
+assert.commandWorked(collBase.insert({_id: 0, lk: 1, rk: 1}));
+assert.commandWorked(collLeft.insert({_id: "left", lk: 1, a: 1}));
+assert.commandWorked(collRight.insert({_id: "right", rk: 1, b: 1}));
+assert.commandWorked(collBase.createIndex({lk: 1, rk: 1}));
+assert.commandWorked(collLeft.createIndex({lk: 1}));
+assert.commandWorked(collRight.createIndex({rk: 1}));
 
 function assertSameResultsWithJoinOptToggled(coll, pipeline, aggOptions, expectedCount) {
     assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
@@ -612,5 +624,101 @@ runTestCaseIneligibleSuffix({
         expectedCount: 0,
     });
 }
+
+// Verifies the pipeline produces stable results with join opt toggled and that join opt is engaged.
+function assertResultsStableAndJoinOptUsed(pipeline, expected) {
+    assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
+    assert.sameMembers(expected, collBase.aggregate(pipeline).toArray());
+    assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
+    assert.sameMembers(expected, collBase.aggregate(pipeline).toArray());
+    const explain = collBase.explain().aggregate(pipeline);
+    assert(joinOptUsed(explain), "Expected join optimization to be used", {explain});
+}
+
+// Verifies that join optimization handles system reference variables ($$NOW, $$ROOT, $$CURRENT)
+// used in a $match comparison after a join.
+for (const systemVar of ["$$NOW", "$$ROOT", "$$CURRENT"]) {
+    assertResultsStableAndJoinOptUsed(
+        [
+            {$lookup: {from: collLeft.getName(), localField: "lk", foreignField: "lk", as: "left"}},
+            {$unwind: "$left"},
+            {$lookup: {from: collRight.getName(), localField: "rk", foreignField: "rk", as: "right"}},
+            {$unwind: "$right"},
+            {$match: {$expr: {$eq: [systemVar, "$left.a"]}}},
+        ],
+        [],
+    );
+}
+
+// $$NOW.x: $$NOW is a Date so $$NOW.x is always missing; the $match matches nothing.
+assertResultsStableAndJoinOptUsed(
+    [
+        {$lookup: {from: collLeft.getName(), localField: "lk", foreignField: "lk", as: "left"}},
+        {$unwind: "$left"},
+        {$lookup: {from: collRight.getName(), localField: "rk", foreignField: "rk", as: "right"}},
+        {$unwind: "$right"},
+        {$match: {$expr: {$eq: ["$$NOW.x", "$left.a"]}}},
+    ],
+    [],
+);
+
+// A $lookup subpipeline whose only predicate is a system variable reference has no extractable
+// join predicate, so it is treated as a cross-product and the pipeline is ineligible for join opt.
+for (const systemVar of ["$$NOW", "$$ROOT", "$$CURRENT"]) {
+    runTestCaseIneligiblePipeline({
+        coll: collBase,
+        pipeline: [
+            {
+                $lookup: {
+                    from: collLeft.getName(),
+                    pipeline: [{$match: {$expr: {$eq: [systemVar, "$a"]}}}],
+                    as: "left",
+                },
+            },
+            {$unwind: "$left"},
+        ],
+        expectedCount: 0,
+    });
+}
+
+// A $lookup subpipeline that mixes a valid let-bound join predicate with a system variable
+// reference: the system variable is treated as a residual filter and join optimization is still
+// engaged for the valid predicate.
+for (const systemVar of ["$$NOW", "$$ROOT", "$$CURRENT"]) {
+    assertResultsStableAndJoinOptUsed(
+        [
+            {$lookup: {from: collLeft.getName(), localField: "lk", foreignField: "lk", as: "left"}},
+            {$unwind: "$left"},
+            {
+                $lookup: {
+                    from: collRight.getName(),
+                    let: {rk: "$rk"},
+                    pipeline: [{$match: {$expr: {$and: [{$eq: ["$$rk", "$rk"]}, {$eq: [systemVar, "$b"]}]}}}],
+                    as: "right",
+                },
+            },
+            {$unwind: "$right"},
+        ],
+        [],
+    );
+}
+
+// $$NOW.x in a $lookup subpipeline alongside a valid join predicate: also treated as residual.
+assertResultsStableAndJoinOptUsed(
+    [
+        {$lookup: {from: collLeft.getName(), localField: "lk", foreignField: "lk", as: "left"}},
+        {$unwind: "$left"},
+        {
+            $lookup: {
+                from: collRight.getName(),
+                let: {rk: "$rk"},
+                pipeline: [{$match: {$expr: {$and: [{$eq: ["$$rk", "$rk"]}, {$eq: ["$$NOW.x", "$b"]}]}}}],
+                as: "right",
+            },
+        },
+        {$unwind: "$right"},
+    ],
+    [],
+);
 
 MongoRunner.stopMongod(conn);

@@ -646,6 +646,42 @@ TEST_F(ExtractExprPredicatesTest, ExpressionAndWithGt) {
 }
 
 /**
+ * An equality against a bare single-component system variable reference (e.g. '$$NOW', '$$ROOT',
+ * '$$CURRENT') cannot be a join predicate and must not crash while extracting predicates. These
+ * paths have a single component, so attempting to strip the variable prefix would tassert 16409.
+ */
+TEST_F(ExtractExprPredicatesTest, EqualityAgainstBareSystemVariable) {
+    for (StringData json : {"{$expr: {$eq: ['$$NOW', '$first.a']}}"_sd,
+                            "{$expr: {$eq: ['$first.a', '$$NOW']}}"_sd,
+                            "{$expr: {$eq: ['$$ROOT', '$first.a']}}"_sd,
+                            "{$expr: {$eq: ['$first.a', '$$ROOT']}}"_sd,
+                            "{$expr: {$eq: ['$$CURRENT', '$first.a']}}"_sd,
+                            "{$expr: {$eq: ['$first.a', '$$CURRENT']}}"_sd,
+                            "{$expr: {$eq: ['$$NOW', '$$ROOT']}}"_sd}) {
+        auto result = extract(json);
+        ASSERT_FALSE(result.expressionIsFullyAbsorbed) << json;
+        ASSERT_EQ(0, result.predicates.size()) << json;
+    }
+}
+
+/**
+ * An equality against a system variable with a subfield (e.g. '$$NOW.x', '$$CLUSTER_TIME.foo')
+ * also cannot be a join predicate. The path length > 1 so it passes the bare-variable check, but
+ * isVariableReference() is true and stripping the variable name would yield a spurious field path.
+ */
+TEST_F(ExtractExprPredicatesTest, EqualityAgainstSystemVariableWithSubfield) {
+    for (StringData json : {"{$expr: {$eq: ['$$NOW.x', '$first.a']}}"_sd,
+                            "{$expr: {$eq: ['$first.a', '$$NOW.x']}}"_sd,
+                            "{$expr: {$eq: ['$$CLUSTER_TIME.foo', '$first.a']}}"_sd,
+                            "{$expr: {$eq: ['$first.a', '$$CLUSTER_TIME.foo']}}"_sd,
+                            "{$expr: {$eq: ['$$NOW.x', '$$CLUSTER_TIME.foo']}}"_sd}) {
+        auto result = extract(json);
+        ASSERT_FALSE(result.expressionIsFullyAbsorbed) << json;
+        ASSERT_EQ(0, result.predicates.size()) << json;
+    }
+}
+
+/**
  * An expression that constains non-expr $eq predicate cannot be fully absorbed.
  */
 TEST_F(ExtractExprPredicatesTest, MatchNonExprEquality) {
