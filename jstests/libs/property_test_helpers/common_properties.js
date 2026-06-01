@@ -43,9 +43,9 @@ function getAllVariationsOfQueryShape(shapeIx, getQuery, testHelpers) {
 export function createCorrectnessProperty(
     controlColl,
     experimentColl,
-    {statsCollectorFn, jsTestLogExplain, modifyExperimentQueryFn, sortArraysComparator} = {},
+    {statsCollectorFn, jsTestLogExplain, modifyExperimentQueryFn, sortArraysComparator, preconditionFn} = {},
 ) {
-    return function queryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
+    return function queryHasSameResultsAsControlCollScan(getQuery, testHelpers, extraParams) {
         const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
 
         // Compute the control results all at once.
@@ -58,12 +58,12 @@ export function createCorrectnessProperty(
 
             const {pipeline, options} = modifyExperimentQueryFn ? modifyExperimentQueryFn(query) : query;
             const experimentResults = experimentColl.aggregate(pipeline, options).toArray();
-            if (jsTestLogExplain) {
-                jsTest.log.info(experimentColl.explain().aggregate(pipeline, options));
-            }
-            if (statsCollectorFn) {
-                statsCollectorFn(experimentColl.explain().aggregate(pipeline, options));
-            }
+
+            const needsExplain = preconditionFn || jsTestLogExplain || statsCollectorFn;
+            const explain = needsExplain ? experimentColl.explain().aggregate(pipeline, options) : null;
+            if (preconditionFn) preconditionFn(explain, extraParams);
+            if (jsTestLogExplain) jsTest.log.info(explain);
+            if (statsCollectorFn) statsCollectorFn(explain);
 
             const cmpFn = sortArraysComparator ? testHelpers.compSortArrays : testHelpers.comp;
             if (!cmpFn(controlResults, experimentResults)) {
@@ -71,7 +71,7 @@ export function createCorrectnessProperty(
                     passed: false,
                     message: "Query results from experiment collection did not match plain collection using collscan.",
                     query: {pipeline, options},
-                    explain: experimentColl.explain().aggregate(pipeline, options),
+                    explain: explain ?? experimentColl.explain().aggregate(pipeline, options),
                     controlResults,
                     experimentResults,
                 };

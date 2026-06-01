@@ -320,7 +320,10 @@ export function runDeoptimized(controlColl, queries) {
     try {
         return queries.map((query) => {
             assert(Array.isArray(query.pipeline) && typeof query.options === "object");
-            return controlColl.aggregate(unoptimize(query.pipeline), query.options).toArray();
+            // Strip any hint: the control collection has no indexes, so a hint referencing an
+            // experiment-only index would cause "hint does not correspond to an existing index".
+            const {hint: _hint, ...controlOptions} = query.options;
+            return controlColl.aggregate(unoptimize(query.pipeline), controlOptions).toArray();
         });
     } finally {
         assert.commandWorked(
