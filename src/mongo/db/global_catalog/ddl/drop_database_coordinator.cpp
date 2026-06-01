@@ -191,8 +191,11 @@ Timestamp commitDropDatabaseOnGlobalCatalog(
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
 
     const auto commitTime = [&] {
-        const auto currentTime = VectorClock::get(opCtx)->getTime();
-        return currentTime.clusterTime().asTimestamp();
+        // Bump the cluster time value before picking it; this ensures that the commitTime is always
+        // strictly greater than the timestamp assigned to the dropDatabase op entry of the primary
+        // shard (a condition necessary for the correct resumability of change streams during the
+        // execution of this DDL).
+        return VectorClockMutable::get(opCtx)->tickClusterTime(1).asTimestamp();
     }();
 
     const auto transactionChain = [&](const txn_api::TransactionClient& txnClient,

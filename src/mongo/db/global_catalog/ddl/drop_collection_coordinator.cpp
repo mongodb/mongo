@@ -447,8 +447,11 @@ void DropCollectionCoordinator::_commitDropCollection(
     if (collIsTracked) {
         // 3. Insert the effects of the commit into config.placementHistory, if not already present.
         const auto commitTime = [&]() {
-            const auto currentTime = VectorClock::get(opCtx)->getTime();
-            return currentTime.clusterTime().asTimestamp();
+            // Bump the cluster time value before picking it; this ensures that the commitTime is
+            // always strictly greater than the timestamp assigned to the dropCollection op entry of
+            // the notifier shard (a condition necessary for the correct resumability of change
+            // streams during the execution of this DDL).
+            return VectorClockMutable::get(opCtx)->tickClusterTime(1).asTimestamp();
         }();
 
 
