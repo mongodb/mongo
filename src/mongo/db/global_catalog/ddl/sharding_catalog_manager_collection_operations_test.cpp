@@ -263,7 +263,7 @@ TEST_F(ShardingCatalogManagerCollectionOperationTest,
     auto opCtx = operationContext();
 
     const auto getFixedBucketing = [&]() -> boost::optional<bool> {
-        const auto& opt = getConfigCollectionEntry(kNss).getTimeseriesFields()->getFixedBucketing();
+        const auto opt = getConfigCollectionEntry(kNss).getTimeseriesFields()->getFixedBucketing();
         if (!opt.has_value()) {
             return boost::none;
         }
