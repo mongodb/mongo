@@ -56,6 +56,7 @@
 #include "mongo/db/sharding_environment/cluster_identity_loader.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -257,15 +258,15 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
     ChunkType chunk1(uuid,
                      ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
                      ChunkVersion({epoch, timestamp}, {1, 1}),
-                     shard1.getName());
+                     ShardRef{shard1.getName()});
     ChunkType chunk2(uuid,
                      ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
                      ChunkVersion({epoch, timestamp}, {1, 2}),
-                     shard1.getName());
+                     ShardRef{shard1.getName()});
     ChunkType chunk3(uuid,
                      ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
                      ChunkVersion({epoch, timestamp}, {1, 3}),
-                     shard1.getName());
+                     ShardRef{shard1.getName()});
 
     chunk3.setJumbo(true);
 
@@ -336,15 +337,15 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     ChunkType chunk1(uuid,
                      ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
                      ChunkVersion({epoch, timestamp}, {1, 1}),
-                     shard1.getName());
+                     ShardRef{shard1.getName()});
     ChunkType chunk2(uuid,
                      ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
                      ChunkVersion({epoch, timestamp}, {1, 2}),
-                     shard1.getName());
+                     ShardRef{shard1.getName()});
     ChunkType chunk3(uuid,
                      ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
                      ChunkVersion({epoch, timestamp}, {1, 3}),
-                     shard1.getName());
+                     ShardRef{shard1.getName()});
 
     std::vector<ChunkType> chunks{chunk1, chunk2, chunk3};
 
@@ -373,7 +374,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     const NamespaceString chunkNS(NamespaceString::kConfigsvrChunksNamespace);
     for (const ChunkType& chunk : chunks) {
         ChunkType updatedChunk = chunk;
-        updatedChunk.setShard(shard2.getName());
+        updatedChunk.setShard(ShardRef{shard2.getName()});
         ASSERT_OK(updateToConfigCollection(
             operationContext(), chunkNS, chunk.toConfigBSON(), updatedChunk.toConfigBSON(), false));
     }
@@ -439,15 +440,15 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemainingMaxBSONSize) {
     ChunkType chunk1(uuid,
                      ChunkRange(BSON("_id" << 0), BSON("_id" << 20)),
                      ChunkVersion({epoch, timestamp}, {1, 1}),
-                     shard1.getName());
+                     ShardRef{shard1.getName()});
     ChunkType chunk2(uuid,
                      ChunkRange(BSON("_id" << 21), BSON("_id" << 50)),
                      ChunkVersion({epoch, timestamp}, {1, 2}),
-                     shard1.getName());
+                     ShardRef{shard1.getName()});
     ChunkType chunk3(uuid,
                      ChunkRange(BSON("_id" << 51), BSON("_id" << 1000)),
                      ChunkVersion({epoch, timestamp}, {1, 3}),
-                     shard1.getName());
+                     ShardRef{shard1.getName()});
 
     chunk3.setJumbo(true);
 

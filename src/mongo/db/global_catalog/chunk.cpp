@@ -50,7 +50,7 @@ ChunkInfo::ChunkInfo(const ChunkType& from)
     : _maxKeyString(ShardKeyPattern::toKeyString(from.getRange().getMax())),
       _minKeyString(ShardKeyPattern::toKeyString(from.getRange().getMin())),
       _range(from.getRange()),
-      _shardId(from.getShard()),
+      _shardRef(from.getShard()),
       _lastmod(from.getVersion()),
       _history(from.getHistory()),
       _jumbo(from.getJumbo()) {
@@ -60,27 +60,27 @@ ChunkInfo::ChunkInfo(const ChunkType& from)
 ChunkInfo::ChunkInfo(ChunkRange range,
                      std::string maxKeyString,
                      std::string minKeyString,
-                     ShardId shardId,
+                     ShardRef shardRef,
                      ChunkVersion version,
                      std::vector<ChunkHistory> history,
                      bool jumbo)
     : _maxKeyString(std::move(maxKeyString)),
       _minKeyString(std::move(minKeyString)),
       _range(std::move(range)),
-      _shardId(shardId),
+      _shardRef(std::move(shardRef)),
       _lastmod(std::move(version)),
       _history(std::move(history)),
       _jumbo(jumbo) {}
 
-const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) const {
+const ShardRef& ChunkInfo::getShardRefAt(const boost::optional<Timestamp>& ts) const {
     // This chunk was refreshed from FCV 3.6 config server so it doesn't have history
     if (_history.empty()) {
-        return _shardId;
+        return _shardRef;
     }
 
-    // If the timestamp is not provided than we return the latest shardid
+    // If the timestamp is not provided then we return the current shard
     if (!ts) {
-        invariant(_shardId == _history.front().getShard());
+        invariant(_shardRef == _history.front().getShard());
         return _history.front().getShard();
     }
 
@@ -91,8 +91,17 @@ const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) con
     }
 
     uasserted(ErrorCodes::StaleChunkHistory,
-              str::stream() << "Cannot find shardId the chunk belonged to at cluster time "
+              str::stream() << "Cannot find shard the chunk belonged to at cluster time "
                             << ts.value().toString());
+}
+
+const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) const {
+    const auto& shardRef = getShardRefAt(ts);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Cannot represent shard " << shardRef
+                          << " as a ShardId because it is a UUID; use getShardRefAt() instead",
+            shardRef.isString());
+    return shardRef.getShardId();
 }
 
 void ChunkInfo::throwIfMovedSince(const Timestamp& ts) const {
@@ -126,7 +135,7 @@ BSONObj ChunkInfo::toBSON() const {
     _range.serialize(&bob);
     bob.append("maxKeyString", _maxKeyString);
     bob.append("minKeyString", _minKeyString);
-    bob.append("shardId", _shardId);
+    _shardRef.serialize("shard", &bob);
     _lastmod.serialize("lastmod", &bob);
     bob.append("jumbo", _jumbo.load());
 

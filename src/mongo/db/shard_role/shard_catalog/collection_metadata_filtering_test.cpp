@@ -50,7 +50,6 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/shard_role/shard_role.h"
-#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
@@ -118,31 +117,33 @@ protected:
                 ChunkType chunk1(uuid,
                                  {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
                                  version,
-                                 {"0"});
+                                 ShardRef{"0"});
                 chunk1.setOnCurrentShardSince(Timestamp(75, 0));
-                chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardId("0")),
-                                   ChunkHistory(Timestamp(25, 0), ShardId("1"))});
+                chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardRef("0")),
+                                   ChunkHistory(Timestamp(25, 0), ShardRef("1"))});
                 version.incMinor();
 
-                ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
+                ChunkType chunk2(
+                    uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, ShardRef{"1"});
                 chunk2.setOnCurrentShardSince(Timestamp(75, 0));
-                chunk2.setHistory({ChunkHistory(*chunk2.getOnCurrentShardSince(), ShardId("1")),
-                                   ChunkHistory(Timestamp(25, 0), ShardId("0"))});
+                chunk2.setHistory({ChunkHistory(*chunk2.getOnCurrentShardSince(), ShardRef("1")),
+                                   ChunkHistory(Timestamp(25, 0), ShardRef("0"))});
                 version.incMinor();
 
-                ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
+                ChunkType chunk3(
+                    uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, ShardRef{"0"});
                 chunk3.setOnCurrentShardSince(Timestamp(75, 0));
-                chunk3.setHistory({ChunkHistory(*chunk3.getOnCurrentShardSince(), ShardId("0")),
-                                   ChunkHistory(Timestamp(25, 0), ShardId("1"))});
+                chunk3.setHistory({ChunkHistory(*chunk3.getOnCurrentShardSince(), ShardRef("0")),
+                                   ChunkHistory(Timestamp(25, 0), ShardRef("1"))});
                 version.incMinor();
 
                 ChunkType chunk4(uuid,
                                  {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
                                  version,
-                                 {"1"});
+                                 ShardRef{"1"});
                 chunk4.setOnCurrentShardSince(Timestamp(75, 0));
-                chunk4.setHistory({ChunkHistory(*chunk4.getOnCurrentShardSince(), ShardId("1")),
-                                   ChunkHistory(Timestamp(25, 0), ShardId("0"))});
+                chunk4.setHistory({ChunkHistory(*chunk4.getOnCurrentShardSince(), ShardRef("1")),
+                                   ChunkHistory(Timestamp(25, 0), ShardRef("0"))});
                 version.incMinor();
 
                 return std::vector<ChunkType>{chunk1, chunk2, chunk3, chunk4};

@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -66,6 +67,25 @@ TEST(ShardRef, ImplicitConversionToShardId) {
     ShardRef ref{std::string{"someShardName"}};
     ShardId id = ref;
     ASSERT_EQUALS(id.toString(), std::string{"someShardName"});
+}
+
+TEST(ShardRef, GetShardIdReturnsReferenceIntoShardRef) {
+    ShardRef ref{std::string{"someShardName"}};
+    const ShardId& id = ref.getShardId();
+    ASSERT_EQUALS(id.toString(), std::string{"someShardName"});
+    // The returned reference must alias the ShardId stored inside the ShardRef, not a temporary.
+    ASSERT_EQUALS(&id, &ref.getShardId());
+}
+
+TEST(ShardRef, StreamingUsesToStringAndDoesNotInvariantOnUUID) {
+    ShardRef strRef{std::string{"myShard"}};
+    ASSERT_EQUALS(str::stream() << strRef, std::string{"myShard"});
+
+    // Streaming a UUID-backed ShardRef must render via toString() rather than routing through the
+    // implicit ShardId conversion, which would invariant.
+    UUID uuid = UUID::gen();
+    ShardRef uuidRef{uuid};
+    ASSERT_EQUALS(str::stream() << uuidRef, uuid.toString());
 }
 
 TEST(ShardRef, EqualityStringVsString) {

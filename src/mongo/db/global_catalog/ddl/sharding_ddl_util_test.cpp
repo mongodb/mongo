@@ -53,6 +53,7 @@
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/idl/basic_types_serialization.h"
 #include "mongo/unittest/unittest.h"
@@ -116,9 +117,10 @@ public:
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(UUID::gen());
         chunk.setVersion(chunkVersion);
-        chunk.setShard(shard0.getName());
+        chunk.setShard(ShardRef{shard0.getName()});
         chunk.setOnCurrentShardSince(Timestamp(1, 1));
-        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
+        chunk.setHistory(
+            {ChunkHistory(*chunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
         chunk.setRange({kMinBSONKey, kMaxBSONKey});
 
         // Initialize the sharded collection

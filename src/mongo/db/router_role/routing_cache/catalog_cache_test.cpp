@@ -188,7 +188,7 @@ protected:
                         {kShardKeyPattern.getKeyPattern().globalMin(),
                          kShardKeyPattern.getKeyPattern().globalMax()},
                         version,
-                        {"0"});
+                        ShardRef{"0"});
         chunk.setName(OID::gen());
         return {chunk};
     }

@@ -69,7 +69,7 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
         ShardType shard;
-        shard.setHandle(ShardHandle{ShardId(_shardName), boost::none});
+        shard.setHandle(ShardHandle{_shard, boost::none});
         shard.setHost("shard:12");
         setupShards({shard});
     }
@@ -82,7 +82,7 @@ protected:
         chunk.setName(OID::gen());
         chunk.setCollectionUUID(collUuid);
         chunk.setVersion(ChunkVersion({epoch, timestamp}, {12, 7}));
-        chunk.setShard(_shardName);
+        chunk.setShard(_shard);
         chunk.setRange(jumboChunk());
         chunk.setJumbo(true);
 
@@ -90,13 +90,13 @@ protected:
         otherChunk.setName(OID::gen());
         otherChunk.setCollectionUUID(collUuid);
         otherChunk.setVersion(ChunkVersion({epoch, timestamp}, {14, 7}));
-        otherChunk.setShard(_shardName);
+        otherChunk.setShard(_shard);
         otherChunk.setRange(nonJumboChunk());
 
         setupCollection(nss, kKeyPattern, {chunk, otherChunk});
     }
 
-    const std::string _shardName = "shard";
+    const ShardRef _shard{"shard"};
     const NamespaceString _nss1 =
         NamespaceString::createNamespaceString_forTest("TestDB.TestColl1");
     const NamespaceString _nss2 =

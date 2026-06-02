@@ -206,7 +206,7 @@ protected:
             ChunkType chunk(uuid,
                             {skey.getKeyPattern().globalMin(), skey.getKeyPattern().globalMax()},
                             version,
-                            {"0"});
+                            ShardRef{"0"});
             chunk.setName(OID::gen());
             version.incMinor();
 
@@ -231,7 +231,7 @@ protected:
             ChunkType chunk(uuid,
                             {skey.getKeyPattern().globalMin(), skey.getKeyPattern().globalMax()},
                             version,
-                            {"0"});
+                            ShardRef{"0"});
             chunk.setName(OID::gen());
             version.incMinor();
 

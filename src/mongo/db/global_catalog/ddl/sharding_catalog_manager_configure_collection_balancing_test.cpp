@@ -47,6 +47,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -94,7 +95,7 @@ protected:
         ChunkType chunkType1(uuid,
                              ChunkRange(BSON("_id" << MINKEY), BSON("_id" << MAXKEY)),
                              ChunkVersion({epoch, timestamp}, {1, 1}),
-                             _shardName);
+                             ShardRef{_shardName});
 
         setupShards({ShardType(_shardName, _shardHostName)});
         setupDatabase(_dbName, _shardName);
@@ -167,7 +168,7 @@ TEST_F(ConfigureCollectionBalancingTest, SettingChunkSizeMBToZeroLogicalSessions
     ChunkType chunkType(uuid,
                         ChunkRange(BSON("_id" << MINKEY), BSON("_id" << MAXKEY)),
                         ChunkVersion({epoch, timestamp}, {1, 1}),
-                        _shardName);
+                        ShardRef{_shardName});
     setupCollection(NamespaceString::kLogicalSessionsNamespace, _keyPattern, {chunkType});
 
     // Set maxChunkSizeBytes to 1MB

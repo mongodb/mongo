@@ -173,8 +173,13 @@ bool CollectionRoutingInfo::hasRoutingTable() const {
     return getChunkManager().hasRoutingTable();
 }
 
-ShardId CollectionRoutingInfo::getDbPrimaryShardId() const {
-    return _dbInfo->getPrimary();
+const ShardId& CollectionRoutingInfo::getDbPrimaryShardId() const {
+    const auto& shardRef = _dbInfo->getPrimary();
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Cannot represent shard " << shardRef
+                          << " as a ShardId because it is a UUID; use getShardRefAt() instead",
+            shardRef.isString());
+    return shardRef.getShardId();
 }
 
 const ShardRef& CollectionRoutingInfo::getDbPrimaryShardRef() const {

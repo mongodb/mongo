@@ -55,6 +55,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/logv2/log.h"
@@ -130,10 +131,10 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
         migratedChunk.setName(OID::gen());
         migratedChunk.setCollectionUUID(collUUID);
         migratedChunk.setVersion(origVersion);
-        migratedChunk.setShard(shard0.getName());
+        migratedChunk.setShard(ShardRef{shard0.getName()});
         migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
         migratedChunk.setHistory(
-            {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
+            {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
         migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
         origVersion.incMinor();
@@ -141,10 +142,10 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
         controlChunk.setName(OID::gen());
         controlChunk.setCollectionUUID(collUUID);
         controlChunk.setVersion(origVersion);
-        controlChunk.setShard(shard0.getName());
+        controlChunk.setShard(ShardRef{shard0.getName()});
         controlChunk.setOnCurrentShardSince(Timestamp(50, 0));
         controlChunk.setHistory(
-            {ChunkHistory(*controlChunk.getOnCurrentShardSince(), shard0.getName())});
+            {ChunkHistory(*controlChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
         controlChunk.setRange({BSON("a" << 10), BSON("a" << 20)});
         controlChunk.setJumbo(true);
     }
@@ -223,9 +224,9 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
     chunk0.setName(OID::gen());
     chunk0.setCollectionUUID(collUUID);
     chunk0.setVersion(origVersion);
-    chunk0.setShard(shard0.getName());
+    chunk0.setShard(ShardRef{shard0.getName()});
     chunk0.setOnCurrentShardSince(Timestamp(100, 0));
-    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), shard0.getName())});
+    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -289,9 +290,9 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     chunk0.setName(OID::gen());
     chunk0.setCollectionUUID(collUUID);
     chunk0.setVersion(origVersion);
-    chunk0.setShard(shard0.getName());
+    chunk0.setShard(ShardRef{shard0.getName()});
     chunk0.setOnCurrentShardSince(Timestamp(100, 0));
-    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), shard0.getName())});
+    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -354,9 +355,9 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
     chunk0.setName(OID::gen());
     chunk0.setCollectionUUID(collUUID);
     chunk0.setVersion(origVersion);
-    chunk0.setShard(shard0.getName());
+    chunk0.setShard(ShardRef{shard0.getName()});
     chunk0.setOnCurrentShardSince(Timestamp(100, 1));
-    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), shard0.getName())});
+    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -402,7 +403,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
     chunk0.setName(OID::gen());
     chunk0.setCollectionUUID(collUUID);
     chunk0.setVersion(origVersion);
-    chunk0.setShard(shard0.getName());
+    chunk0.setShard(ShardRef{shard0.getName()});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -413,7 +414,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
     chunk1.setName(OID::gen());
     chunk1.setCollectionUUID(collUUID);
     chunk1.setVersion(origVersion);
-    chunk1.setShard(shard0.getName());
+    chunk1.setShard(ShardRef{shard0.getName()});
 
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setRange({chunkMax, chunkMaxax});
@@ -454,7 +455,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     chunk0.setName(OID::gen());
     chunk0.setCollectionUUID(collUUID);
     chunk0.setVersion(origVersion);
-    chunk0.setShard(shard0.getName());
+    chunk0.setShard(ShardRef{shard0.getName()});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -465,7 +466,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     chunk1.setName(OID::gen());
     chunk1.setCollectionUUID(collUUID);
     chunk1.setVersion(otherVersion);
-    chunk1.setShard(shard0.getName());
+    chunk1.setShard(ShardRef{shard0.getName()});
 
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setRange({chunkMax, chunkMaxax});
@@ -507,9 +508,9 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     chunk0.setName(OID::gen());
     chunk0.setCollectionUUID(collUUID);
     chunk0.setVersion(origVersion);
-    chunk0.setShard(shard0.getName());
+    chunk0.setShard(ShardRef{shard0.getName()});
     chunk0.setOnCurrentShardSince(Timestamp(100, 0));
-    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), shard0.getName())});
+    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -520,14 +521,14 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     chunk1.setName(OID::gen());
     chunk1.setCollectionUUID(collUUID);
     chunk1.setVersion(origVersion);
-    chunk1.setShard(shard1.getName());
+    chunk1.setShard(ShardRef{shard1.getName()});
 
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setRange({chunkMax, chunkMaxax});
 
     Timestamp ctrlChunkValidAfter = Timestamp(50, 0);
     chunk1.setOnCurrentShardSince(ctrlChunkValidAfter);
-    chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), shard1.getName())});
+    chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardRef{shard1.getName()})});
 
     setupCollection(kNamespace, kKeyPattern, {chunk0, chunk1});
 
@@ -592,20 +593,20 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
     ChunkType migratedChunk;
     migratedChunk.setName(OID::gen());
     migratedChunk.setCollectionUUID(collUUID);
-    migratedChunk.setShard(shard0.getName());
+    migratedChunk.setShard(ShardRef{shard0.getName()});
     migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
     migratedChunk.setHistory(
-        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
+        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
     migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     ChunkType currentChunk;
     currentChunk.setName(OID::gen());
     currentChunk.setCollectionUUID(collUUID);
     currentChunk.setVersion(origVersion);
-    currentChunk.setShard(shard0.getName());
+    currentChunk.setShard(ShardRef{shard0.getName()});
     currentChunk.setOnCurrentShardSince(Timestamp(100, 0));
     currentChunk.setHistory(
-        {ChunkHistory(*currentChunk.getOnCurrentShardSince(), shard0.getName())});
+        {ChunkHistory(*currentChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
     currentChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     setupCollection(kNamespace, kKeyPattern, {currentChunk});
@@ -642,10 +643,10 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
     migratedChunk.setName(OID::gen());
     migratedChunk.setCollectionUUID(collUUID);
     migratedChunk.setVersion(origVersion);
-    migratedChunk.setShard(shard0.getName());
+    migratedChunk.setShard(ShardRef{shard0.getName()});
     migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
     migratedChunk.setHistory(
-        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
+        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
     migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     ChunkVersion currentChunkVersion({epoch, Timestamp(42)}, {14, 7});
@@ -654,10 +655,10 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
     currentChunk.setName(OID::gen());
     currentChunk.setCollectionUUID(collUUID);
     currentChunk.setVersion(currentChunkVersion);
-    currentChunk.setShard(shard0.getName());
+    currentChunk.setShard(ShardRef{shard0.getName()});
     currentChunk.setOnCurrentShardSince(Timestamp(100, 0));
     currentChunk.setHistory(
-        {ChunkHistory(*currentChunk.getOnCurrentShardSince(), shard0.getName())});
+        {ChunkHistory(*currentChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
     currentChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     setupCollection(kNamespace, kKeyPattern, {currentChunk});
@@ -694,10 +695,10 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
     migratedChunk.setName(OID::gen());
     migratedChunk.setCollectionUUID(collUUID);
     migratedChunk.setVersion(origVersion);
-    migratedChunk.setShard(shard0.getName());
+    migratedChunk.setShard(ShardRef{shard0.getName()});
     migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
     migratedChunk.setHistory(
-        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
+        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
     migratedChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     ChunkVersion currentChunkVersion({OID::gen(), Timestamp(42)}, {12, 7});
@@ -706,10 +707,10 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
     currentChunk.setName(OID::gen());
     currentChunk.setCollectionUUID(collUUID);
     currentChunk.setVersion(currentChunkVersion);
-    currentChunk.setShard(shard0.getName());
+    currentChunk.setShard(ShardRef{shard0.getName()});
     currentChunk.setOnCurrentShardSince(Timestamp(100, 0));
     currentChunk.setHistory(
-        {ChunkHistory(*currentChunk.getOnCurrentShardSince(), shard0.getName())});
+        {ChunkHistory(*currentChunk.getOnCurrentShardSince(), ShardRef{shard0.getName()})});
     currentChunk.setRange({BSON("a" << 1), BSON("a" << 10)});
 
     setupCollection(kNamespace, kKeyPattern, {currentChunk});

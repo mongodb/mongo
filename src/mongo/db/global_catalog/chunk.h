@@ -33,6 +33,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
@@ -57,7 +58,7 @@ public:
     ChunkInfo(ChunkRange range,
               std::string maxKeyString,
               std::string minKeyString,
-              ShardId shardId,
+              ShardRef shardRef,
               ChunkVersion version,
               std::vector<ChunkHistory> history,
               bool jumbo);
@@ -89,10 +90,19 @@ public:
         return _minKeyString;
     }
 
-    const ShardId& getShardId() const {
-        return _shardId;
+    const ShardRef& getShardRef() const {
+        return _shardRef;
     }
 
+    // TODO SERVER-127411: remove this method once all call sites have been migrated to
+    // getShardRef().
+    ShardId getShardId() const {
+        return static_cast<ShardId>(_shardRef);
+    }
+
+    const ShardRef& getShardRefAt(const boost::optional<Timestamp>& ts) const;
+    // TODO SERVER-127411: remove this method once all call sites have been migrated to
+    // getShardRefAt().
     const ShardId& getShardIdAt(const boost::optional<Timestamp>& ts) const;
 
     /**
@@ -141,7 +151,7 @@ private:
 
     const ChunkRange _range;
 
-    const ShardId _shardId;
+    const ShardRef _shardRef;
 
     const ChunkVersion _lastmod;
 
@@ -167,6 +177,11 @@ public:
         return _chunkInfo.getMax();
     }
 
+    const ShardRef& getShardRef() const {
+        return _chunkInfo.getShardRefAt(_atClusterTime);
+    }
+
+    // TODO SERVER-127411: remove this method if we don't need it
     const ShardId& getShardId() const {
         return _chunkInfo.getShardIdAt(_atClusterTime);
     }

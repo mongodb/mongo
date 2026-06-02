@@ -62,6 +62,7 @@
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/sharding_environment/shard_server_op_observer.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_mongod_test_fixture.h"
@@ -925,12 +926,16 @@ public:
                                         const UUID& uuid,
                                         const Timestamp& timestamp) {
         auto range1 = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << 5));
-        ChunkType chunk1(
-            uuid, range1, ChunkVersion({epoch, timestamp}, {1, 0}), kShardList[0].getName());
+        ChunkType chunk1(uuid,
+                         range1,
+                         ChunkVersion({epoch, timestamp}, {1, 0}),
+                         ShardRef{kShardList[0].getName()});
 
         auto range2 = ChunkRange(BSON(kShardKey << 5), BSON(kShardKey << MAXKEY));
-        ChunkType chunk2(
-            uuid, range2, ChunkVersion({epoch, timestamp}, {1, 1}), kShardList[0].getName());
+        ChunkType chunk2(uuid,
+                         range2,
+                         ChunkVersion({epoch, timestamp}, {1, 1}),
+                         ShardRef{kShardList[0].getName()});
 
         return {chunk1, chunk2};
     }

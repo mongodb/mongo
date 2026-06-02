@@ -46,5 +46,7 @@ structs:
                 type: timestamp
                 description: The time after which this chunk is at this shard.
             shard:
-                type: shard_id
-                description: Shard this chunk lives in, starting at the "validAfter" time.
+                type: shard_ref
+                description: 'Shard this chunk lives in, starting at the "validAfter" time. ShardRef is a string or a UUID.'
+                validator:
+                    callback: "ShardRef::validate"

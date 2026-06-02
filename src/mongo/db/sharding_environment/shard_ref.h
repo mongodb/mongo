@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
@@ -48,8 +49,8 @@ namespace mongo {
 class MONGO_MOD_PUBLIC ShardRef {
 public:
     // Required for IDL-generated code which default-constructs the field before parsing.
-    ShardRef() : _ref(std::string{}) {}
-    explicit ShardRef(std::string name) : _ref(std::move(name)) {}
+    ShardRef() : _ref(ShardId{}) {}
+    explicit ShardRef(std::string name) : _ref(ShardId(std::move(name))) {}
     explicit ShardRef(UUID uuid) : _ref(std::move(uuid)) {}
 
     /**
@@ -60,10 +61,10 @@ public:
      * constructor.
      */
     // NOLINTNEXTLINE(google-explicit-constructor)
-    ShardRef(const ShardId& id) : _ref(std::string{id.toString()}) {}
+    ShardRef(const ShardId& id) : _ref(id) {}
 
     bool isString() const {
-        return std::holds_alternative<std::string>(_ref);
+        return std::holds_alternative<ShardId>(_ref);
     }
 
     bool isUUID() const {
@@ -71,17 +72,34 @@ public:
     }
 
     const std::string& getString() const {
-        return std::get<std::string>(_ref);
+        return std::get<ShardId>(_ref).toString();
     }
 
     const UUID& getUUID() const {
         return std::get<UUID>(_ref);
     }
 
+    /**
+     * Returns the stored ShardId by reference. Only valid when this ShardRef holds a string (i.e.
+     * isString() is true); invariants otherwise.
+     *
+     * TODO SERVER-127411: this is a transitional convenience while ShardId still exists. Once all
+     * catalog types and APIs have been migrated to ShardRef and ShardId has been removed, drop this
+     * accessor.
+     */
+    const ShardId& getShardId() const {
+        invariant(isString());
+        return std::get<ShardId>(_ref);
+    }
+
     std::string toString() const;
 
     /**
      * Implicit conversion to ShardId.
+     *
+     * Returns by value on purpose: lifetime extension does not propagate through a reference
+     * returned by a conversion operator, so a reference-returning conversion would dangle for
+     * temporaries. Callers that want a reference into this ShardRef should use getShardId().
      *
      * TODO SERVER-127411: this is a transitional convenience while ShardId still exists. Once all
      * catalog types and APIs have been migrated to ShardRef and ShardId has been removed, drop this
@@ -114,7 +132,7 @@ public:
     }
 
 private:
-    std::variant<std::string, UUID> _ref;
+    std::variant<ShardId, UUID> _ref;
 };
 
 /**
@@ -143,6 +161,21 @@ MONGO_MOD_PUBLIC inline bool operator!=(const ShardRef& ref, const ShardId& id) 
 
 MONGO_MOD_PUBLIC inline bool operator!=(const ShardId& id, const ShardRef& ref) {
     return !(id == ref);
+}
+
+/**
+ * Streaming operators that route through ShardRef::toString(), which renders both the string and
+ * UUID variants safely. These must exist so that streaming a ShardRef does not fall back to the
+ * implicit ShardId conversion, which invariants when the ref holds a UUID.
+ */
+inline std::ostream& operator<<(std::ostream& os, const ShardRef& ref) {
+    return os << ref.toString();
+}
+
+template <typename Allocator>
+StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& stream,
+                                         const ShardRef& ref) {
+    return stream << ref.toString();
 }
 
 }  // namespace mongo

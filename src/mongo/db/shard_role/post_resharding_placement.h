@@ -30,7 +30,7 @@
 
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
-#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -53,13 +53,13 @@ public:
     PostReshardingCollectionPlacement& operator=(PostReshardingCollectionPlacement&&) = default;
 
     // Returns the post-resharding placement for the document
-    const ShardId& getReshardingDestinedRecipient(const BSONObj& fullDocument) const;
+    const ShardRef& getReshardingDestinedRecipient(const BSONObj& fullDocument) const;
 
     // Extract the resharding key from the input document
     BSONObj extractReshardingKeyFromDocument(const BSONObj& fullDocument) const;
 
     // Returns the post-resharding placement given the extracted shard key.
-    const ShardId& getReshardingDestinedRecipientFromShardKey(const BSONObj& reshardingKey) const;
+    const ShardRef& getReshardingDestinedRecipientFromShardKey(const BSONObj& reshardingKey) const;
 
 private:
     boost::optional<ShardKeyPattern> _reshardingKeyPattern;

@@ -43,6 +43,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/sharding_environment/config_server_test_fixture.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -100,14 +101,15 @@ protected:
 
         ChunkVersion latestVersion({epoch, collectionTimestamp}, {1, 0});
 
+        // TODO SERVER-127411: use ShardRef/UUID instead of std::string for shardName
         ChunkType chunk(collectionUuid,
                         {kTimestampShardKeyPattern.getKeyPattern().globalMin(),
                          kTimestampShardKeyPattern.getKeyPattern().globalMax()},
                         latestVersion,
-                        _shardName);
+                        ShardRef{_shardName});
         chunk.setName(OID::gen());
         chunk.setOnCurrentShardSince(Timestamp(200, 0));
-        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), _shardName)});
+        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), ShardRef{_shardName})});
 
         auto setTsFieldsLambda = [&](CollectionType& c) {
             TypeCollectionTimeseriesFields tsFields;

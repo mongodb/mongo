@@ -445,7 +445,9 @@ boost::optional<MigrateInfo> chooseRandomMigration(
         return rndChunk;
     }();
 
-    tassert(8245222, "randomChunk's shard is invalid", randomChunk.getShard().isValid());
+    tassert(8245222,
+            "randomChunk's shard is invalid",
+            ShardRef::validate(randomChunk.getShard()).isOK());
 
     return MigrateInfo{recipientShard.get(),
                        randomChunk.getShard(),

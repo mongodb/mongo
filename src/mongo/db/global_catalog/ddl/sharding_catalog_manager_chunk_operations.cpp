@@ -776,7 +776,9 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
 
     ShardingCatalogManager::SplitChunkInTransactionResult splitChunkResult;
     auto updateChunksFn = [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-        ChunkType chunk(origChunk.getCollectionUUID(), range, collPlacementVersion, shardName);
+        // TODO SERVER-127411: use ShardRef/UUID instead of std::string for shardName
+        ChunkType chunk(
+            origChunk.getCollectionUUID(), range, collPlacementVersion, ShardRef{shardName});
 
         // Verify that the range matches exactly a single chunk
         auto countRequest = buildCountSingleChunkCommand(chunk);

@@ -318,13 +318,17 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
 
     ChunkVersion version({epoch, timestamp}, {2, 0});
 
-    ChunkType chunk1(
-        uuid, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
+    ChunkType chunk1(uuid,
+                     {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)},
+                     version,
+                     ShardRef{"0"});
     chunk1.setName(OID::gen());
     version.incMinor();
 
-    ChunkType chunk2(
-        uuid, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"1"});
+    ChunkType chunk2(uuid,
+                     {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()},
+                     version,
+                     ShardRef{"1"});
     chunk2.setName(OID::gen());
     version.incMinor();
 

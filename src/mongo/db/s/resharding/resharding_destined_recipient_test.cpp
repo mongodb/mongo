@@ -232,12 +232,16 @@ protected:
                                         const Timestamp& timestamp,
                                         const std::string& shardKey) {
         auto range1 = ChunkRange(BSON(shardKey << MINKEY), BSON(shardKey << 5));
-        ChunkType chunk1(
-            uuid, range1, ChunkVersion({epoch, timestamp}, {1, 0}), kShardList[0].getName());
+        ChunkType chunk1(uuid,
+                         range1,
+                         ChunkVersion({epoch, timestamp}, {1, 0}),
+                         ShardRef(kShardList[0].getName()));
 
         auto range2 = ChunkRange(BSON(shardKey << 5), BSON(shardKey << MAXKEY));
-        ChunkType chunk2(
-            uuid, range2, ChunkVersion({epoch, timestamp}, {1, 0}), kShardList[1].getName());
+        ChunkType chunk2(uuid,
+                         range2,
+                         ChunkVersion({epoch, timestamp}, {1, 0}),
+                         ShardRef(kShardList[1].getName()));
 
         return {chunk1, chunk2};
     }

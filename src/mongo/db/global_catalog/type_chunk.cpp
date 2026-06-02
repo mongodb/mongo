@@ -38,6 +38,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -113,21 +114,27 @@ StatusWith<std::vector<ChunkHistory>> ChunkHistory::fromBSON(const BSONArray& so
 
 ChunkType::ChunkType() = default;
 
-ChunkType::ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version, ShardId shardId)
+ChunkType::ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version, ShardRef shard)
     : _collectionUUID(collectionUUID),
       _range(range),
       _version(std::move(version)),
-      _shard(std::move(shardId)) {}
+      _shard(std::move(shard)) {}
 
 StatusWith<ChunkType> ChunkType::_parseChunkBase(const BSONObj& source) {
     ChunkType chunk;
 
     {
-        std::string chunkShard;
-        Status status = bsonExtractStringField(source, shard.name(), &chunkShard);
-        if (!status.isOK())
-            return status;
-        chunk._shard = chunkShard;
+        BSONElement shardElem = source[shard.name()];
+        if (shardElem.eoo()) {
+            return {ErrorCodes::NoSuchKey,
+                    str::stream() << "The field '" << shard.name() << "' is missing"};
+        }
+        try {
+            chunk._shard = ShardRef::parse(shardElem);
+        } catch (const DBException& e) {
+            return e.toStatus().withContext(str::stream() << "The field '" << shard.name()
+                                                          << "' cannot be parsed");
+        }
     }
 
     {
@@ -369,7 +376,7 @@ BSONObj ChunkType::toConfigBSON() const {
     if (_range)
         _range->serialize(&builder);
     if (_shard)
-        builder.append(shard.name(), getShard().toString());
+        getShard().serialize(shard.name(), &builder);
     if (_version)
         builder.appendTimestamp(lastmod.name(), _version->toLong());
     if (_estimatedSizeBytes)
@@ -388,7 +395,7 @@ BSONObj ChunkType::toShardBSON() const {
     invariant(_version);
     builder.append(minShardID.name(), _range->getMin());
     builder.append(ChunkRange::kMaxFieldName, _range->getMax());
-    builder.append(shard.name(), getShard().toString());
+    getShard().serialize(shard.name(), &builder);
     builder.appendTimestamp(lastmod.name(), _version->toLong());
     addHistoryToBSON(builder);
     return builder.obj();
@@ -416,8 +423,8 @@ void ChunkType::setVersion(const ChunkVersion& version) {
     _version = version;
 }
 
-void ChunkType::setShard(const ShardId& shard) {
-    invariant(shard.isValid());
+void ChunkType::setShard(const ShardRef& shard) {
+    invariant(ShardRef::validate(shard));
     _shard = shard;
 }
 
@@ -462,7 +469,7 @@ Status ChunkType::validate() const {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing version field");
     }
 
-    if (!_shard.has_value() || !_shard->isValid()) {
+    if (!_shard.has_value() || !ShardRef::validate(*_shard).isOK()) {
         return Status(ErrorCodes::NoSuchKey,
                       str::stream() << "missing " << shard.name() << " field");
     }

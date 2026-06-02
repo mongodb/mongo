@@ -41,15 +41,14 @@ namespace mongo {
 
 std::string ShardRef::toString() const {
     return visit(OverloadedVisitor{
-                     [](const std::string& name) { return name; },
+                     [](const ShardId& id) -> std::string { return id.toString(); },
                      [](const UUID& uuid) { return uuid.toString(); },
                  },
                  _ref);
 }
 
 ShardRef::operator ShardId() const {
-    invariant(isString());
-    return ShardId(getString());
+    return getShardId();
 }
 
 ShardRef ShardRef::parse(const BSONElement& element) {
@@ -65,7 +64,7 @@ ShardRef ShardRef::parse(const BSONElement& element) {
 
 void ShardRef::serialize(StringData fieldName, BSONObjBuilder* builder) const {
     visit(OverloadedVisitor{
-              [&](const std::string& ref) { builder->append(fieldName, ref); },
+              [&](const ShardId& ref) { builder->append(fieldName, ref.toString()); },
               [&](const UUID& ref) { ref.appendToBuilder(builder, fieldName); },
           },
           _ref);

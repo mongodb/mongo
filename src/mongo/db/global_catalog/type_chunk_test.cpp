@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/sharding_environment/shard_ref.h"
 #include "mongo/logv2/log_debug.h"
 #include "mongo/unittest/unittest.h"
 
@@ -228,7 +229,7 @@ TEST(ChunkType, ToFromConfigBSON) {
     ASSERT_BSONOBJ_EQ(chunk.getMax(), BSON("a" << 20));
     ASSERT_EQUALS(chunk.getVersion().toLong(), chunkVersion.toLong());
     ASSERT_EQUALS(chunk.getVersion().epoch(), chunkVersion.epoch());
-    ASSERT_EQUALS(chunk.getShard(), "shard0001");
+    ASSERT_EQUALS(chunk.getShard(), ShardRef{"shard0001"});
     ASSERT_EQUALS(*chunk.getOnCurrentShardSince(), onCurrentShardSince);
     ASSERT_OK(chunk.validate());
 }
@@ -284,8 +285,81 @@ TEST(ChunkType, ParseFromNetworkRequest) {
                                 << onCurrentShardSince << ChunkHistoryBase::kShardFieldName
                                 << "shard0001")))));
 
-    ASSERT_EQ("shard0001"_sd, chunk.getShard());
+    ASSERT_EQ(ShardRef{"shard0001"}, chunk.getShard());
     ASSERT_EQ(chunkVersion, chunk.getVersion());
+}
+
+TEST(ChunkType, ShardRefStringRoundTrip) {
+    const auto collUuid = UUID::gen();
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(1);
+    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
+    const auto onCurrentShardSince = Timestamp(2);
+    const ShardRef strShard{std::string{"shard0001"}};
+
+    // Build and parse a chunk with a string ShardRef.
+    ChunkType original(
+        collUuid, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, chunkVersion, strShard);
+    original.setName(OID::gen());
+    original.setOnCurrentShardSince(onCurrentShardSince);
+    original.setHistory({ChunkHistory{onCurrentShardSince, strShard}});
+
+    ASSERT_OK(original.validate());
+
+    // Config BSON round-trip.
+    auto bson = original.toConfigBSON();
+    auto parsed = assertGet(ChunkType::parseFromConfigBSON(bson, collEpoch, collTimestamp));
+    ASSERT_TRUE(parsed.getShard().isString());
+    ASSERT_EQ(parsed.getShard(), strShard);
+    ASSERT_EQ(parsed.getHistory().front().getShard(), strShard);
+    ASSERT_BSONOBJ_EQ(parsed.toConfigBSON(), bson);
+}
+
+TEST(ChunkType, ShardRefUUIDRoundTrip) {
+    const auto collUuid = UUID::gen();
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(1);
+    ChunkVersion chunkVersion({collEpoch, collTimestamp}, {1, 2});
+    const auto onCurrentShardSince = Timestamp(2);
+    const ShardRef uuidShard{UUID::gen()};
+
+    // Build and parse a chunk with a UUID ShardRef.
+    ChunkType original(
+        collUuid, ChunkRange{BSON("a" << 10), BSON("a" << 20)}, chunkVersion, uuidShard);
+    original.setName(OID::gen());
+    original.setOnCurrentShardSince(onCurrentShardSince);
+    original.setHistory({ChunkHistory{onCurrentShardSince, uuidShard}});
+
+    ASSERT_OK(original.validate());
+
+    // Config BSON round-trip.
+    auto bson = original.toConfigBSON();
+    auto parsed = assertGet(ChunkType::parseFromConfigBSON(bson, collEpoch, collTimestamp));
+    ASSERT_TRUE(parsed.getShard().isUUID());
+    ASSERT_EQ(parsed.getShard(), uuidShard);
+    ASSERT_EQ(parsed.getHistory().front().getShard(), uuidShard);
+    ASSERT_BSONOBJ_EQ(parsed.toConfigBSON(), bson);
+}
+
+TEST(ChunkType, ShardRefInvalidTypeFails) {
+    const auto collEpoch = OID::gen();
+    const auto collTimestamp = Timestamp(1);
+    const auto chunkVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 2});
+    const auto onCurrentShardSince = Timestamp(2);
+
+    // Build a BSON where the shard field has an invalid type (integer).
+    BSONObj obj =
+        BSON(ChunkType::name(OID::gen())
+             << ChunkType::collectionUUID() << UUID::gen() << ChunkType::min(BSON("a" << 10))
+             << ChunkType::max(BSON("a" << 20)) << "lastmod" << Timestamp(chunkVersion.toLong())
+             << "lastmodEpoch" << chunkVersion.epoch() << "lastmodTimestamp"
+             << chunkVersion.getTimestamp() << "shard" << 42 << ChunkType::onCurrentShardSince()
+             << onCurrentShardSince << ChunkType::history()
+             << BSON_ARRAY(BSON(ChunkHistoryBase::kValidAfterFieldName
+                                << onCurrentShardSince << ChunkHistoryBase::kShardFieldName
+                                << "shard0001")));
+    auto chunkRes = ChunkType::parseFromConfigBSON(obj, collEpoch, collTimestamp);
+    ASSERT_NOT_OK(chunkRes.getStatus());
 }
 
 }  // namespace
