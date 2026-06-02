@@ -57,6 +57,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -122,6 +123,24 @@ void updateTimeseriesDocument(OperationContext* opCtx,
         args.update = update_oplog_entry::makeReplacementOplogEntry(updated);
     } else {
         invariant(false, "Unexpected update type");
+    }
+
+    // Verify that control.min.time has not changed between the original and updated bucket
+    // documents. For time-series collections sharded on time, control.min.time is the shard key.
+    // Changing it would orphan the bucket.
+    if constexpr (kDebugBuild) {
+        if (auto tsOptions = coll->getTimeseriesOptions()) {
+            auto timeField = tsOptions->getTimeField();
+            auto originalMin = original.value()
+                                   .getObjectField(kBucketControlFieldName)
+                                   .getObjectField(kBucketControlMinFieldName);
+            auto updatedMin = updated.getObjectField(kBucketControlFieldName)
+                                  .getObjectField(kBucketControlMinFieldName);
+            auto originalMinTime = originalMin.getField(timeField);
+            auto updatedMinTime = updatedMin.getField(timeField);
+            invariant(originalMinTime.binaryEqualValues(updatedMinTime),
+                      "control.min.time must not change in a bucket update");
+        }
     }
 
     collection_internal::updateDocument(opCtx,

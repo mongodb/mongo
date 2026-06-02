@@ -172,6 +172,7 @@ mongo_cc_library(
     deps = [
         ":bucket_compression",
         ":bucket_compression_failure",
+        ":timeseries_constants",
         ":timeseries_conversion_util",
         ":timeseries_options",
         "//src/mongo/db:dbdirectclient",

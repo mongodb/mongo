@@ -48,6 +48,7 @@
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
@@ -990,6 +991,65 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
         EXPECT_EQ(bucketIds.size(), 2);
     }
 }
+
+// Verifies that the debug-only invariant in updateTimeseriesDocument fires when a user delete
+// would change control.min.time. This is the path SERVER-94559 regressed on: deleting the
+// earliest measurement and recomputing (rather than preserving) the bucket's minimum time. For
+// collections sharded on time, control.min.time is the shard key, so silently changing it would
+// orphan the bucket. The companion insert-path invariant is covered by
+// PerformAtomicTimeseriesWritesInvariantFailsWhenControlMinTimeChanges in
+// timeseries_write_ops_test.cpp.
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+using TimeseriesWriteUtilDeathTest = TimeseriesWriteUtilTest;
+DEATH_TEST_F(TimeseriesWriteUtilDeathTest,
+             PerformAtomicWritesForDeleteInvariantFailsWhenControlMinTimeChanges,
+             "control.min.time must not change in a bucket update") {
+    // Inserts a bucket whose control.min.time is 2024-09-11T17:51:00.
+    const BSONObj uncompressedDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"66e1d884953633cfd2c479f2"},
+            "control":{"version":1,"min":{"time":{"$date":"2024-09-11T17:51:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2024-09-11T17:53:18.428Z"},"a":3,"b":3},
+                                   "count":3},
+            "data":{"time":{"0":{"$date":"2024-09-11T17:51:30.000Z"},
+                            "1":{"$date":"2024-09-11T17:52:12.000Z"},
+                            "2":{"$date":"2024-09-11T17:53:18.428Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+
+    CompressionResult compressionResult = compressBucket(uncompressedDoc,
+                                                         _timeField,
+                                                         _nsNoMeta,
+                                                         /*validateDecompression*/ true);
+    const BSONObj& bucketDoc = compressionResult.compressedBucket.value();
+    auto originalMinTime = bucketDoc.getObjectField(kBucketControlFieldName)
+                               .getObjectField(kBucketControlMinFieldName)
+                               .getField("time")
+                               .Date();
+    OID bucketId = bucketDoc["_id"].OID();
+    auto recordId = record_id_helpers::keyForOID(bucketId);
+
+    AutoGetCollection autoColl(_opCtx, _resolveTimeseriesNss(_nsNoMeta), LockMode::MODE_IX);
+    {
+        WriteUnitOfWork wunit{_opCtx};
+        ASSERT_OK(Helpers::insert(_opCtx, *autoColl, bucketDoc));
+        wunit.commit();
+    }
+
+    // Deletes the earliest measurement but passes a currentMinTime that differs from the bucket's
+    // actual minimum. The rebuilt bucket therefore carries a changed control.min.time, which must
+    // trip the invariant in updateTimeseriesDocument.
+    auto changedMinTime = originalMinTime + Seconds(60);
+    ASSERT_NE(changedMinTime, originalMinTime);
+    performAtomicWritesForDelete(
+        _opCtx,
+        *autoColl,
+        recordId,
+        {::mongo::fromjson(R"({"time":{"$date":"2024-09-11T17:53:18.428Z"},"a":3,"b":3})")},
+        /*fromMigrate=*/false,
+        /*stmtId=*/kUninitializedStmtId,
+        changedMinTime);
+}
+#endif  // MONGO_CONFIG_DEBUG_BUILD
 
 }  // namespace
 }  // namespace mongo::timeseries

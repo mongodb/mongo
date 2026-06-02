@@ -44,10 +44,12 @@
 #include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -306,6 +308,59 @@ TEST_F(TimeseriesWriteOpsShardedTest, PerformTimeseriesWritesFailCollectionAcqui
     const auto status = cmdReply.getWriteErrors()->front().getStatus();
     EXPECT_EQ(status.code(), ErrorCodes::FailPointEnabled) << status;
 }
+
+
+// Verify that the invariant in performAtomicTimeseriesWrites fires when a transform update
+// changes control.min.time.
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+using TimeseriesWriteOpsDeathTest = TimeseriesWriteOpsTest;
+DEATH_TEST_F(TimeseriesWriteOpsDeathTest,
+             PerformAtomicTimeseriesWritesInvariantFailsWhenControlMinTimeChanges,
+             "control.min.time must not change in a bucket update") {
+    const BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+    OID bucketId = OID::createFromString("629e1e680958e279dc29a517"_sd);
+    auto compressionResult = timeseries::compressBucket(bucketDoc, "time", _nsNoMeta, false);
+    ASSERT_TRUE(compressionResult.compressedBucket.has_value());
+    const BSONObj compressedBucket = compressionResult.compressedBucket.value();
+
+    const auto bucketsNss = _resolveTimeseriesNss(_nsNoMeta);
+    AutoGetCollection bucketsColl(_opCtx, bucketsNss, LockMode::MODE_IX);
+    {
+        WriteUnitOfWork wunit{_opCtx};
+        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, compressedBucket));
+        wunit.commit();
+    }
+
+    // Delta diff that changes control.min.time -- this must trigger the invariant.
+    // performAtomicTimeseriesWrites only handles kDelta updates, so we use the doc_diff format.
+    auto badDiff = BSON(
+        "scontrol" << BSON("smin" << BSON("u" << BSON("time" << Date_t::fromMillisSinceEpoch(0)))));
+    mongo::write_ops::UpdateModification::DiffOptions diffOptions;
+    write_ops::UpdateModification u(
+        badDiff, write_ops::UpdateModification::DeltaTag{}, diffOptions);
+    write_ops::UpdateOpEntry update(BSON("_id" << bucketId), std::move(u));
+    write_ops::UpdateCommandRequest op(bucketsNss, {update});
+
+    write_ops::WriteCommandRequestBase base;
+    base.setBypassDocumentValidation(true);
+    base.setStmtIds(std::vector<StmtId>{kUninitializedStmtId});
+    op.setWriteCommandRequestBase(std::move(base));
+    op.setCollectionUUID(bucketsColl->uuid());
+
+    auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
+        _opCtx, _nsNoMeta, /*expectedUUID=*/boost::none);
+    uassertStatusOK(timeseries::write_ops::internal::performAtomicTimeseriesWrites(
+        _opCtx, preConditions, {}, {op}));
+}
+#endif  // MONGO_CONFIG_DEBUG_BUILD
 
 }  // namespace
 }  // namespace mongo

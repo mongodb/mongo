@@ -43,6 +43,7 @@
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/collection_pre_conditions_util.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
@@ -1090,6 +1091,24 @@ Status performAtomicTimeseriesWrites(
             fassert(5481600,
                     shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(
                         args.oplogSlots[0].getTimestamp()));
+        }
+
+        // Verify that control.min.time has not changed between the original and updated
+        // bucket documents. For time-series collections sharded on time, control.min.time
+        // is the shard key. Changing it would orphan the bucket.
+        if constexpr (kDebugBuild) {
+            if (auto tsOptions = coll.getCollectionPtr()->getTimeseriesOptions()) {
+                auto timeField = tsOptions->getTimeField();
+                auto originalMin = original.value()
+                                       .getObjectField(timeseries::kBucketControlFieldName)
+                                       .getObjectField(timeseries::kBucketControlMinFieldName);
+                auto updatedMin = updated.getObjectField(timeseries::kBucketControlFieldName)
+                                      .getObjectField(timeseries::kBucketControlMinFieldName);
+                auto originalMinTime = originalMin.getField(timeField);
+                auto updatedMinTime = updatedMin.getField(timeField);
+                invariant(originalMinTime.binaryEqualValues(updatedMinTime),
+                          "control.min.time must not change in a bucket update");
+            }
         }
 
         collection_internal::updateDocument(opCtx,
