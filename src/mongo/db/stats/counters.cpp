@@ -362,6 +362,7 @@ DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 QueryFrameworkCounters queryFrameworkCounters;
 LookupPushdownCounters lookupPushdownCounters;
 ValidatorCounters validatorCounters;
+ValidationLevelCounters validationLevelCounters;
 GroupCounters groupCounters;
 SetWindowFieldsCounters setWindowFieldsCounters;
 GraphLookupCounters graphLookupCounters;

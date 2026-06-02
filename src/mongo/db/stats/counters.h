@@ -35,6 +35,7 @@
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/shard_role/shard_catalog/collection_options_gen.h"
 #include "mongo/db/stats/opcounters.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/otel/metrics/metrics_counter.h"
@@ -777,6 +778,68 @@ private:
 };
 
 extern ValidatorCounters validatorCounters;
+
+class ValidationLevelCounters {
+public:
+    ValidationLevelCounters() {
+        _validationLevelCounterMap["create"] = std::make_unique<ValidationLevelCounter>("create");
+        _validationLevelCounterMap["collMod"] = std::make_unique<ValidationLevelCounter>("collMod");
+    }
+
+    // Passing boost::none counts as "default" (validator present, no explicit level).
+    void increment(StringData cmdName, boost::optional<ValidationLevelEnum> level) {
+        auto it = _validationLevelCounterMap.find(cmdName);
+        tassert(12371400,
+                str::stream() << "Validation level counters not supported for command: " << cmdName,
+                it != _validationLevelCounterMap.end());
+        if (!level) {
+            it->second->defaultLevel.incrementRelaxed();
+            return;
+        }
+        switch (*level) {
+            case ValidationLevelEnum::off:
+                it->second->off.incrementRelaxed();
+                break;
+            case ValidationLevelEnum::moderate:
+                it->second->moderate.incrementRelaxed();
+                break;
+            case ValidationLevelEnum::strict:
+                it->second->strict.incrementRelaxed();
+                break;
+            case ValidationLevelEnum::constraint:
+                it->second->constraint.incrementRelaxed();
+                break;
+        }
+    }
+
+private:
+    struct ValidationLevelCounter {
+        explicit ValidationLevelCounter(StringData name)
+            : defaultLevel{makeMetric(name, "default")},
+              off{makeMetric(name, "off")},
+              moderate{makeMetric(name, "moderate")},
+              strict{makeMetric(name, "strict")},
+              constraint{makeMetric(name, "constraint")} {}
+
+        ValidationLevelCounter& operator=(const ValidationLevelCounter&) = delete;
+        ValidationLevelCounter(const ValidationLevelCounter&) = delete;
+
+        static Counter64& makeMetric(StringData name, StringData level) {
+            return *MetricBuilder<Counter64>{
+                fmt::format("commands.{}.validationLevel.{}", name, level)};
+        }
+
+        Counter64& defaultLevel;
+        Counter64& off;
+        Counter64& moderate;
+        Counter64& strict;
+        Counter64& constraint;
+    };
+
+    StringMap<std::unique_ptr<ValidationLevelCounter>> _validationLevelCounterMap;
+};
+
+extern ValidationLevelCounters validationLevelCounters;
 
 // Global counters for expressions inside aggregation pipelines.
 extern OperatorCounters operatorCountersAggExpressions;

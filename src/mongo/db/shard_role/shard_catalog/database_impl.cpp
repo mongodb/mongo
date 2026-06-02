@@ -1113,6 +1113,13 @@ Status DatabaseImpl::userCreateNS(
                           << ". Options: " << collectionOptions.toBSON());
     }
 
+    // Skip counting on participant shards: the coordinator already counted this operation, and
+    // participant shards call userCreateNS via MigrationDestinationManager with fromMigrate=true.
+    if (!fromMigrate &&
+        (!collectionOptions.validator.isEmpty() || collectionOptions.validationLevel)) {
+        validationLevelCounters.increment("create", collectionOptions.validationLevel);
+    }
+
     return Status::OK();
 }
 

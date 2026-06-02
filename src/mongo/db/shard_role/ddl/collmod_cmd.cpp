@@ -54,6 +54,7 @@
 #include "mongo/db/shard_role/shard_catalog/coll_mod.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/timeseries/collection_pre_conditions_util.h"
@@ -202,6 +203,10 @@ public:
             auto result = reply->getBodyBuilder();
             uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
                 opCtx, nss, cmd, true, &result));
+
+            if (const auto level = cmd.getValidationLevel()) {
+                validationLevelCounters.increment(cmd.kCommandName, *level);
+            }
 
             // Only validate results in test mode so that we don't expose users to errors if we
             // construct an invalid reply.

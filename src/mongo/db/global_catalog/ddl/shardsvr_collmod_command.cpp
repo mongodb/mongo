@@ -50,6 +50,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/coll_mod_gen.h"
 #include "mongo/db/shard_role/ddl/coll_mod_reply_validation.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -134,6 +135,11 @@ public:
             service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
 
         result.appendElements(collModCoordinator->getResult(opCtx));
+
+        if (const auto level = cmd.getCollModRequest().getValidationLevel()) {
+            validationLevelCounters.increment(CollMod::kCommandName, *level);
+        }
+
         return true;
     }
 
