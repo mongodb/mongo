@@ -53,6 +53,7 @@
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/value_size.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/storage/index_entry_comparison.h"

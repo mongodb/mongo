@@ -309,6 +309,15 @@ public:
         return std::make_unique<ElementStorageValueBlock>(_storage, _tags, _vals);
     }
 
+    int getApproximateSize() const final {
+        int result =
+            sizeof(*this) + _tags.capacity() * sizeof(TypeTags) + _vals.capacity() * sizeof(Value);
+        if (_storage) {
+            result += _storage->totalBlocksMemory() + sizeof(mongo::bsoncolumn::ElementStorage);
+        }
+        return result;
+    }
+
 private:
     // Storage for the values.
     boost::intrusive_ptr<mongo::bsoncolumn::ElementStorage> _storage;

@@ -439,8 +439,6 @@ private:
 
 typedef RowHasher<MaterializedRow> MaterializedRowHasher;
 
-int getApproximateSize(TypeTags tag, Value val);
-
 typedef std::conditional<true, int, int> myint;
 
 }  // namespace mongo::sbe::value

@@ -37,6 +37,7 @@
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
+#include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -216,6 +217,11 @@ public:
 
     std::pair<value::TypeTags, value::Value> tryMax() const override {
         return _maxVal;
+    }
+
+    int getApproximateSize() const final {
+        return sizeof(*this) + sbe::value::getApproximateSize(_minVal.first, _minVal.second) +
+            sbe::value::getApproximateSize(_maxVal.first, _maxVal.second);
     }
 
 private:
@@ -4495,6 +4501,10 @@ public:
 
     size_t count() override {
         return 0;
+    }
+
+    int getApproximateSize() const final {
+        return sizeof(*this);
     }
 
 private:

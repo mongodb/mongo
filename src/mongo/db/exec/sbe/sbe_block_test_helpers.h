@@ -304,6 +304,15 @@ public:
         }
         return value::ValueBlock::tryMax();
     }
+
+    int getApproximateSize() const final {
+        int result = sizeof(*this);
+        for (size_t i = 0; i < _vals.size(); ++i) {
+            result += sbe::value::getApproximateSize(_tags[i], _vals[i]);
+        }
+        return result;
+    }
+
     std::pair<value::TypeTags, value::Value> at(size_t idx) override {
         invariant(idx < _vals.size());
         return {_tags[idx], _vals[idx]};
