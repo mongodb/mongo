@@ -108,6 +108,12 @@ common:linux --host_features=-asan
 common:linux --host_features=-fsan
 common:linux --host_features=-ubsan
 common:linux --host_features=-tsan
+# we dont need to profile or super optimize just built tools
+common:linux --host_features=-pgo_profile_generate
+common:linux --host_features=-cspgo_profile_generate
+common:linux --host_features=-thin_lto
+common:linux --host_features=-pgo_profile_use
+common:linux --host_features=-cspgo_profile_use
 
 # while in hybrid build state, using local unsandboxed linking should be faster. When most of our link
 # targets have been converted (i.e. unittest binaries) and we can BWOB, remote linking should be faster
