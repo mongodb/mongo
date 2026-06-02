@@ -33,6 +33,7 @@
 #include <memory>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -175,7 +176,9 @@ public:
      *    "end" : Date_t,      <- Time at which all collecting ended
      * }
      */
-    std::tuple<BSONObj, Date_t> collect(Client* client, UseMultiServiceSchema multiServiceSchema);
+    std::tuple<BSONObj, Date_t> collect(Client* client,
+                                        UseMultiServiceSchema multiServiceSchema,
+                                        std::vector<std::pair<std::string, int>>& sectionSizes);
 
 private:
     // collection of collectors

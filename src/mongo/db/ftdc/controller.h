@@ -200,7 +200,8 @@ private:
      */
     void doLoop(Service* service);
 
-    void logCollectionError(Status error);
+    void logCollectionError(Status error,
+                            const std::vector<std::pair<std::string, int>>& sectionSizes);
 
 private:
     /**

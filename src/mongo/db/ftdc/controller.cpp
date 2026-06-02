@@ -33,7 +33,10 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include <memory>
 #include <mutex>
+#include <string>
 #include <tuple>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
@@ -245,6 +248,7 @@ void FTDCController::doLoop(Service* service) try {
     // reset to _config.metadataCaptureFrequency and countdown starts again.
     std::uint64_t metadataCaptureFrequencyCountdown = 1;
 
+    std::vector<std::pair<std::string, int>> sectionSizes;
     while (true) {
         _env->onStartLoop();
 
@@ -301,12 +305,14 @@ void FTDCController::doLoop(Service* service) try {
             iassert(_mgr->rotate(client));
         }
 
+        sectionSizes.clear();
         try {
             if (MONGO_unlikely(ftdcThrowBSONObjectTooLarge.shouldFail())) {
                 uasserted(ErrorCodes::BSONObjectTooLarge,
                           "Injected BSONObjectTooLarge exception for testing");
             }
-            auto collectSample = _periodicCollectors.collect(client, _multiServiceSchema);
+            auto collectSample =
+                _periodicCollectors.collect(client, _multiServiceSchema, sectionSizes);
             Status s = _mgr->writeSampleAndRotateIfNeeded(
                 client, std::get<0>(collectSample), std::get<1>(collectSample));
 
@@ -318,7 +324,7 @@ void FTDCController::doLoop(Service* service) try {
                 _mostRecentPeriodicDocument = std::get<0>(collectSample);
             }
         } catch (const DBException& e) {
-            logCollectionError(e.toStatus());
+            logCollectionError(e.toStatus(), sectionSizes);
             // 13548 is the error code for BufBuilder attempting to grow past the size limit. We
             // catch the code directly because it does not have a definition in error_codes.yml.
             if ((e.code() == 13548 || e.code() == ErrorCodes::BSONObjectTooLarge) &&
@@ -328,21 +334,22 @@ void FTDCController::doLoop(Service* service) try {
             }
             throw;
         } catch (...) {
-            logCollectionError(exceptionToStatus());
+            logCollectionError(exceptionToStatus(), sectionSizes);
             throw;
         }
 
         if (--metadataCaptureFrequencyCountdown == 0) {
             metadataCaptureFrequencyCountdown = _config.metadataCaptureFrequency;
+            sectionSizes.clear();
             try {
                 auto collectSample =
-                    _periodicMetadataCollectors.collect(client, _multiServiceSchema);
+                    _periodicMetadataCollectors.collect(client, _multiServiceSchema, sectionSizes);
                 Status s = _mgr->writePeriodicMetadataSampleAndRotateIfNeeded(
                     client, std::get<0>(collectSample), std::get<1>(collectSample));
                 iassert(s);
 
             } catch (const DBException& e) {
-                logCollectionError(e.toStatus());
+                logCollectionError(e.toStatus(), sectionSizes);
                 // 13548 is the error code for BufBuilder attempting to grow past the size limit. We
                 // catch the code directly because it does not have a definition in error_codes.yml.
                 if ((e.code() == 13548 || e.code() == ErrorCodes::BSONObjectTooLarge) &&
@@ -361,11 +368,13 @@ void FTDCController::doLoop(Service* service) try {
                 "exception"_attr = exceptionToStatus());
 }
 
-void FTDCController::logCollectionError(Status error) {
+void FTDCController::logCollectionError(
+    Status error, const std::vector<std::pair<std::string, int>>& sectionSizes) {
     LOGV2_DEBUG(11558500,
                 _serverStatusSectionsLogSeverity().toInt(),
                 "Encountered an error while collecting an FTDC sample",
-                "error"_attr = error);
+                "error"_attr = error,
+                "sectionSizes"_attr = logv2::mapLog(sectionSizes));
 }
 
 }  // namespace mongo

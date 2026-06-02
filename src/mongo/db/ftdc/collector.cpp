@@ -58,7 +58,9 @@ void FTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collec
 }
 
 std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
-    Client* client, UseMultiServiceSchema multiServiceSchema) {
+    Client* client,
+    UseMultiServiceSchema multiServiceSchema,
+    std::vector<std::pair<std::string, int>>& sectionSizes) {
     static constexpr auto roles = std::to_array<std::pair<ClusterRole::Value, StringData>>({
         {ClusterRole::ShardServer, "shard"_sd},
         {ClusterRole::RouterServer, "router"_sd},
@@ -136,11 +138,14 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(
 
                 end = client->getServiceContext()->getPreciseClockSource()->now();
                 subObjBuilder.appendDate(kFTDCCollectEndField, end);
+                sectionSizes.emplace_back(collector->name(), subObjBuilder.len());
             } catch (...) {
                 LOGV2_ERROR(9761500,
                             "Collector threw an error",
                             "error"_attr = exceptionToStatus(),
-                            "collector"_attr = collector->name());
+                            "collector"_attr = collector->name(),
+                            "size"_attr = parent->len());
+                sectionSizes.emplace_back(collector->name(), parent->len());
                 throw;
             }
 

@@ -382,7 +382,7 @@ void FTDCControllerTest::testPeriodicCollector(UseMultiServiceSchema multiServic
     }
     _checkpoint->wait();
 
-    // Wait for numCollections samples to have occured
+    // Wait for numCollections samples to have occurred
     LOGV2_DEBUG(9129201, 0, "Collecting");
     auto collectUntilDocCount = [&](auto& collectorPtr, size_t docs) {
         while (collectorPtr->getDocs().size() < docs)
@@ -586,7 +586,7 @@ DEATH_TEST_REGEX_F(FTDCControllerTest,
 
 DEATH_TEST_REGEX_F(FTDCControllerTest,
                    LogAndTerminateWhenExceptionThrown,
-                   "9761500.*MockFailCollector") {
+                   "9761500.*MockFailCollector.*size") {
     FTDCConfig config;
     config.period = Milliseconds(100);
     setUpControllerAndCheckpoint(config);
@@ -602,7 +602,7 @@ DEATH_TEST_REGEX_F(FTDCControllerTest,
 
 DEATH_TEST_REGEX_F(FTDCControllerTest,
                    LogAndTerminateWhenLargeDataCollectionFails,
-                   "11558500.*Encountered an error while collecting an FTDC sample") {
+                   "11558500.*Encountered an error while collecting an FTDC sample.*sectionSizes") {
     FTDCConfig config;
     config.period = Milliseconds(100);
     setUpControllerAndCheckpoint(config);
