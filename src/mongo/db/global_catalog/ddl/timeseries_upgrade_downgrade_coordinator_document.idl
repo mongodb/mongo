@@ -50,6 +50,7 @@ enums:
             kPrepareOnShards: "prepareOnShards"
             kCommitOnShards: "commitOnShards"
             kCommitOnGlobalCatalog: "commitOnGlobalCatalog"
+            kCommitOnShardCatalog: "commitOnShardCatalog"
             kReleaseCriticalSection: "releaseCriticalSection"
             kResumeMigrations: "resumeMigrations"
 

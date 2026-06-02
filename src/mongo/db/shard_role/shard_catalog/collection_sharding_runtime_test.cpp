@@ -162,7 +162,7 @@ public:
     static repl::OplogEntry makeInvalidateCollectionMetadataOplogEntry(const NamespaceString& nss,
                                                                        const UUID& uuid) {
         return repl::makeCommandOplogEntry(repl::OpTime(Timestamp(1, 1), 1),
-                                           nss,
+                                           nss.getCommandNS(),
                                            BSON("invalidateCollectionMetadata" << nss.coll()),
                                            boost::none,
                                            uuid);

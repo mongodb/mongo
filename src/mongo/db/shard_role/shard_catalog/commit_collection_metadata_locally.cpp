@@ -245,7 +245,7 @@ void invalidateCollectionMetadataOnSecondaries(OperationContext* opCtx,
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
-    oplogEntry.setNss(nss);
+    oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(uuid);
     auto entry = InvalidateCollectionMetadataOplogEntry{std::string(nss.coll())};
     entry.setForDroppedCollection(forDroppedCollection);
@@ -276,7 +276,7 @@ void setAllowChunkOperationsOnSecondaries(OperationContext* opCtx,
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
-    oplogEntry.setNss(nss);
+    oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(uuid);
     auto entry = SetAllowChunkOperationsOplogEntry{std::string(nss.coll()), allowChunkOperations};
     oplogEntry.setObject(entry.toBSON());

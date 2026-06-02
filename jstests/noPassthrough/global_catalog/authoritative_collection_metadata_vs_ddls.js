@@ -6,10 +6,14 @@
  *
  * @tags: [
  *   featureFlagAuthoritativeShardsDDL,
+ *   requires_timeseries,
  * ]
  */
 
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    getTimeseriesBucketsColl,
+    getTimeseriesCollForDDLOps,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -53,12 +57,19 @@ describe("Authoritative collection metadata vs DDLs", function () {
         [st.rs0, st.rs1].forEach((rs) => rs.nodes.forEach(fn));
     }
 
-    function assertShardCatalogOnNode(node, ns, {expectedUuid, expectedKey, expectedChunks, expectedTimeseriesFields}) {
+    function assertShardCatalogOnNode(
+        node,
+        ns,
+        {expectedUuid, expectedKey, expectedChunks, expectedTimeseriesFields, expectedTimestamp},
+    ) {
         const label = node.host;
         const meta = getShardCatalogCollMetadata(node, ns);
         assert.neq(null, meta, `${label}: missing collection metadata in shard catalog`);
         assert.eq(expectedUuid.toString(), meta.uuid.toString(), `${label}: uuid mismatch`);
         assert.eq(tojson(expectedKey), tojson(meta.key), `${label}: shard key mismatch`);
+        if (expectedTimestamp) {
+            assert.eq(tojson(expectedTimestamp), tojson(meta.timestamp), `${label}: timestamp mismatch`);
+        }
         if (expectedTimeseriesFields) {
             assert.eq(
                 tojson(expectedTimeseriesFields),
@@ -86,12 +97,42 @@ describe("Authoritative collection metadata vs DDLs", function () {
 
     function assertShardCatalogAbsentOnNode(node, ns, uuid) {
         const label = node.host;
+        assertShardCatalogCollMetadataAbsentAtNsOnNode(node, ns);
+        assert.eq(0, getShardCatalogChunks(node, uuid).length, `${label}: unexpected chunks in shard catalog`);
+    }
+
+    function assertShardCatalogCollMetadataAbsentAtNsOnNode(node, ns) {
+        const label = node.host;
         assert.eq(
             null,
             getShardCatalogCollMetadata(node, ns),
             `${label}: unexpected collection metadata in shard catalog`,
         );
-        assert.eq([], getShardCatalogChunks(node, uuid), `${label}: unexpected chunks in shard catalog`);
+    }
+
+    function assertShardCatalogChunklessOnNode(
+        node,
+        ns,
+        {expectedUuid, expectedKey, expectedTimeseriesFields, expectedTimestamp},
+    ) {
+        const label = node.host;
+        const meta = getShardCatalogCollMetadata(node, ns);
+        assert.neq(null, meta, `${label}: chunkless primary is missing collection metadata`);
+        assert.eq(expectedUuid.toString(), meta.uuid.toString(), `${label}: uuid mismatch`);
+        assert.eq(tojson(expectedKey), tojson(meta.key), `${label}: shard key mismatch`);
+        if (expectedTimestamp) {
+            assert.eq(tojson(expectedTimestamp), tojson(meta.timestamp), `${label}: timestamp mismatch`);
+        }
+        if (expectedTimeseriesFields) {
+            assert.eq(
+                tojson(expectedTimeseriesFields),
+                tojson(meta.timeseriesFields),
+                `${label}: time-series fields mismatch`,
+            );
+        }
+
+        const shardChunks = getShardCatalogChunks(node, expectedUuid);
+        assert.eq(0, shardChunks.length, `${label}: chunkless primary must not carry shard catalog chunks`);
     }
 
     // We assert the in-memory metadata is not sharded rather than completely absent because a
@@ -142,6 +183,44 @@ describe("Authoritative collection metadata vs DDLs", function () {
         const db = st.s.getDB(dbName);
         assert.commandWorked(db.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
         return db;
+    }
+
+    function assertTrackedCollectionMetadataOnShardCatalogs(
+        ns,
+        {oldTrackedNs, dbPrimaryShardName = st.shard0.shardName},
+    ) {
+        const globalMeta = getGlobalCatalogCollMetadata(ns);
+        assert.neq(null, globalMeta, `${ns}: missing collection metadata in global catalog`);
+
+        [
+            {rs: st.rs0, shardName: st.shard0.shardName},
+            {rs: st.rs1, shardName: st.shard1.shardName},
+        ].forEach(({rs, shardName}) => {
+            const shardGlobalChunks = getGlobalCatalogChunks(globalMeta.uuid, shardName);
+
+            rs.nodes.forEach((node) => {
+                assertShardCatalogCollMetadataAbsentAtNsOnNode(node, oldTrackedNs);
+
+                if (shardGlobalChunks.length > 0) {
+                    assertShardCatalogOnNode(node, ns, {
+                        expectedUuid: globalMeta.uuid,
+                        expectedKey: globalMeta.key,
+                        expectedChunks: shardGlobalChunks,
+                        expectedTimeseriesFields: globalMeta.timeseriesFields,
+                        expectedTimestamp: globalMeta.timestamp,
+                    });
+                } else if (shardName === dbPrimaryShardName) {
+                    assertShardCatalogChunklessOnNode(node, ns, {
+                        expectedUuid: globalMeta.uuid,
+                        expectedKey: globalMeta.key,
+                        expectedTimeseriesFields: globalMeta.timeseriesFields,
+                        expectedTimestamp: globalMeta.timestamp,
+                    });
+                } else {
+                    assertShardCatalogAbsentOnNode(node, ns, globalMeta.uuid);
+                }
+            });
+        });
     }
 
     before(function () {
@@ -629,6 +708,91 @@ describe("Authoritative collection metadata vs DDLs", function () {
             assert.commandWorked(db.runCommand({convertToCapped: "coll", size: 1024}));
 
             dropCollectionAndAssertCleanup(db, "coll");
+        });
+    });
+
+    describe("viewless time-series upgrade/downgrade", function () {
+        it("moves shard catalog metadata between user and bucket namespaces", function () {
+            if (lastLTSFCV !== "8.0") {
+                jsTest.log.info("Skipping test because last LTS FCV is no longer 8.0");
+                return;
+            }
+
+            const db = setupDb("ts_upgrade_downgrade");
+
+            const shardedCollName = "shardedTs";
+            const shardedColl = db.getCollection(shardedCollName);
+            const shardedUserNs = shardedColl.getFullName();
+            const shardedBucketsNs = getTimeseriesBucketsColl(shardedColl).getFullName();
+
+            assert.commandWorked(
+                db.adminCommand({
+                    shardCollection: shardedUserNs,
+                    key: {tag: 1},
+                    timeseries: {timeField: "time", metaField: "tag"},
+                }),
+            );
+            assert.commandWorked(db.adminCommand({split: shardedUserNs, middle: {meta: 0}}));
+            assert.commandWorked(
+                db.adminCommand({
+                    moveChunk: shardedUserNs,
+                    find: {meta: 1},
+                    to: st.shard1.shardName,
+                    _waitForDelete: true,
+                }),
+            );
+            assert.commandWorked(
+                shardedColl.insert([
+                    {time: ISODate("2026-01-01T00:00:00.000Z"), tag: -1},
+                    {time: ISODate("2026-01-01T00:00:00.000Z"), tag: 1},
+                ]),
+            );
+
+            const trackedCollName = "trackedTs";
+            const trackedColl = db.getCollection(trackedCollName);
+            const trackedUserNs = trackedColl.getFullName();
+            const trackedBucketsNs = getTimeseriesBucketsColl(trackedColl).getFullName();
+
+            assert.commandWorked(
+                db.runCommand({
+                    createUnsplittableCollection: trackedCollName,
+                    dataShard: st.shard1.shardName,
+                    timeseries: {timeField: "time", metaField: "tag"},
+                }),
+            );
+            assert.commandWorked(trackedColl.insert([{time: ISODate("2026-01-01T00:00:00.000Z"), tag: "tracked"}]));
+
+            assert.neq(null, getGlobalCatalogCollMetadata(shardedUserNs));
+            assert.neq(null, getGlobalCatalogCollMetadata(trackedUserNs));
+
+            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+            st.awaitReplicationOnShards();
+
+            assert.eq(null, getGlobalCatalogCollMetadata(shardedUserNs));
+            assert.eq(null, getGlobalCatalogCollMetadata(trackedUserNs));
+            assert.neq(null, getGlobalCatalogCollMetadata(shardedBucketsNs));
+            assert.neq(null, getGlobalCatalogCollMetadata(trackedBucketsNs));
+            assertTrackedCollectionMetadataOnShardCatalogs(shardedBucketsNs, {
+                oldTrackedNs: shardedUserNs,
+            });
+            assertTrackedCollectionMetadataOnShardCatalogs(trackedBucketsNs, {
+                oldTrackedNs: trackedUserNs,
+            });
+
+            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+            st.awaitReplicationOnShards();
+
+            assert.eq(null, getGlobalCatalogCollMetadata(shardedBucketsNs));
+            assert.eq(null, getGlobalCatalogCollMetadata(trackedBucketsNs));
+            assertTrackedCollectionMetadataOnShardCatalogs(shardedUserNs, {
+                oldTrackedNs: shardedBucketsNs,
+            });
+            assertTrackedCollectionMetadataOnShardCatalogs(trackedUserNs, {
+                oldTrackedNs: trackedBucketsNs,
+            });
+
+            assert.eq(2, shardedColl.countDocuments({}));
+            assert.eq(1, trackedColl.countDocuments({}));
         });
     });
 

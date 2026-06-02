@@ -34,7 +34,9 @@
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -482,6 +484,45 @@ TEST_F(CommitCollectionMetadataLocallyTest, DropCollectionOnlyDeletesTargetColle
 
     auto remainingColls = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
     ASSERT_EQ(UUID::fromCDR(remainingColls[0].getField("uuid").uuid()), collType2.getUuid());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest,
+       DropCollectionMetadataInvalidationOplogEntryUsesCommandNamespace) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    seedShardCatalog(collType, chunks);
+
+    shard_catalog_commit::commitDropCollectionLocally(
+        operationContext(), kTestNss, collType.getUuid());
+
+    auto oplogEntries =
+        findLocalDocs(NamespaceString::kRsOplogNamespace,
+                      BSON("op" << "c" << "o.invalidateCollectionMetadata" << kTestNss.coll()));
+    ASSERT_EQ(oplogEntries.size(), 1u);
+    ASSERT_EQ(oplogEntries.front().getStringField("ns"), kTestNss.getCommandNS().ns_forTest());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, SetAllowChunkOperationsOplogEntryUsesCommandNamespace) {
+    auto [collType, chunks] = makeCollectionMetadata(1);
+    mockCatalogClient()->setCollectionMetadata(collType, chunks);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, true);
+
+    auto shardVersion = [&] {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadata);
+        return ShardVersionFactory::make(*metadata);
+    }();
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(), kTestNss, shardVersion, boost::none /* databaseVersion */};
+
+    shard_catalog_commit::commitSetAllowChunkOperationsLocally(
+        operationContext(), kTestNss, false /* allowChunkOperations */, collType.getUuid());
+
+    auto oplogEntries =
+        findLocalDocs(NamespaceString::kRsOplogNamespace,
+                      BSON("op" << "c" << "o.setAllowChunkOperations" << kTestNss.coll()));
+    ASSERT_EQ(oplogEntries.size(), 1u);
+    ASSERT_EQ(oplogEntries.front().getStringField("ns"), kTestNss.getCommandNS().ns_forTest());
 }
 
 // ---------------------------------------------------------------------------

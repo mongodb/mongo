@@ -55,6 +55,8 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
+
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -238,6 +240,14 @@ void TimeseriesUpgradeDowngradeCoordinator::_releaseCriticalSectionFor(
     ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss);
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     unblockCRUDOperationsRequest.setReason(_critSecReason);
+    // When shards are authoritative, there is no need to clear the filtering metadata upon
+    // releasing the critical section; the commit phase is responsible for updating the shard
+    // catalog with current information. This flag is evaluated at insertion time because on
+    // secondaries, metadata is cleared during the onDelete of the critical section document.
+    if (_doc.getAuthoritativeMetadataAccessLevel() >=
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+        unblockCRUDOperationsRequest.setClearCollMetadata(false);
+    }
 
     generic_argument_util::setMajorityWriteConcern(unblockCRUDOperationsRequest);
     generic_argument_util::setOperationSessionInfo(unblockCRUDOperationsRequest,
@@ -280,19 +290,18 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
 
                 // Freeze migrations on both namespaces. One of them will be the tracked namespace
                 // and the other will be a no-op since it doesn't exist in the sharding catalog.
-                // TODO (SERVER-126811): take AuthoritativeMetadataAccessLevelEnum from _doc.
                 sharding_ddl_util::stopMigrations(
                     opCtx,
                     originalNss(),
                     boost::none,
                     [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
+                    _doc.getAuthoritativeMetadataAccessLevel());
                 sharding_ddl_util::stopMigrations(
                     opCtx,
                     originalNss().makeTimeseriesBucketsNamespace(),
                     boost::none,
                     [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
+                    _doc.getAuthoritativeMetadataAccessLevel());
             }))
         .then(_buildPhaseHandler(
             Phase::kAcquireCriticalSection,
@@ -314,6 +323,15 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
                     blockCRUDOperationsRequest.setBlockType(
                         CriticalSectionBlockTypeEnum::kReadsAndWrites);
                     blockCRUDOperationsRequest.setReason(_critSecReason);
+                    // When shards are authoritative, there is no need to clear the filtering
+                    // metadata upon releasing the critical section; the commit phase is responsible
+                    // for updating the shard catalog with current information. This flag is
+                    // evaluated at insertion time because on secondaries, metadata is cleared
+                    // during the onDelete of the critical section document.
+                    if (_doc.getAuthoritativeMetadataAccessLevel() >=
+                        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
+                        blockCRUDOperationsRequest.setClearCollMetadata(false);
+                    }
 
                     generic_argument_util::setMajorityWriteConcern(blockCRUDOperationsRequest);
                     generic_argument_util::setOperationSessionInfo(blockCRUDOperationsRequest,
@@ -485,6 +503,34 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
                                                                    **executor);
             }))
         .then(_buildPhaseHandler(
+            Phase::kCommitOnShardCatalog,
+            [this](OperationContext* opCtx) {
+                (void)opCtx;
+                return _isTracked() &&
+                    _doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+            },
+            [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
+                const auto collUuid = _doc.getOptTrackedCollInfo()->getUuid();
+                const bool isUpgrade =
+                    _doc.getMode() == TimeseriesUpgradeDowngradeModeEnum::kToViewless;
+                const auto bucketsNss = originalNss().makeTimeseriesBucketsNamespace();
+                const auto& oldTrackedNss = isUpgrade ? bucketsNss : originalNss();
+                const auto& newTrackedNss = isUpgrade ? originalNss() : bucketsNss;
+                const auto session = getNewSession(opCtx);
+                sharding_ddl_util::commitRenameCollectionMetadataToShardCatalog(
+                    opCtx,
+                    oldTrackedNss,
+                    newTrackedNss,
+                    collUuid,
+                    boost::none /* targetUUID */,
+                    boost::none /* newTargetUUID */,
+                    Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
+                    session,
+                    executor,
+                    token);
+            }))
+        .then(_buildPhaseHandler(
             Phase::kReleaseCriticalSection,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 const bool isTracked = _isTracked();
@@ -518,19 +564,18 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
 
                 // Resume migrations on both namespaces. One of them will be the tracked namespace
                 // and the other will be a no-op since it doesn't exist in the sharding catalog.
-                // TODO (SERVER-126811): take AuthoritativeMetadataAccessLevelEnum from _doc.
                 sharding_ddl_util::resumeMigrations(
                     opCtx,
                     originalNss(),
                     boost::none,
                     [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
+                    _doc.getAuthoritativeMetadataAccessLevel());
                 sharding_ddl_util::resumeMigrations(
                     opCtx,
                     originalNss().makeTimeseriesBucketsNamespace(),
                     boost::none,
                     [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
+                    _doc.getAuthoritativeMetadataAccessLevel());
             }))
         .then([this, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext();
@@ -627,19 +672,18 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_cleanupOnAbort(
 
                 // Resume migrations on both namespaces. One of them will be the tracked namespace
                 // and the other will be a no-op since it doesn't exist in the sharding catalog.
-                // TODO (SERVER-126811): take AuthoritativeMetadataAccessLevelEnum from _doc.
                 sharding_ddl_util::resumeMigrations(
                     opCtx,
                     originalNss(),
                     boost::none,
                     [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
+                    _doc.getAuthoritativeMetadataAccessLevel());
                 sharding_ddl_util::resumeMigrations(
                     opCtx,
                     originalNss().makeTimeseriesBucketsNamespace(),
                     boost::none,
                     [&] { return getNewSession(opCtx); },
-                    AuthoritativeMetadataAccessLevelEnum::kNone);
+                    _doc.getAuthoritativeMetadataAccessLevel());
             }
         });
 }
