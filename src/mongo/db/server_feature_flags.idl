@@ -335,7 +335,7 @@ feature_flags:
     featureFlagDSCLinearizableReadConcern:
         description: "Enable linearizable read concern for dsc."
         cpp_varname: gFeatureFlagDSCLinearizableReadConcern
-        default: false
+        default: true
         fcv_gated: false
     featureFlagKEKPushMode:
         description: "Enable push mode for KEKs."
