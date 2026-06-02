@@ -208,6 +208,22 @@ public:
     static constexpr MetricName kIndexBuildResumeFailed =
         MetricNameMaker::make("index_builds.resume.failed");
 
+    static constexpr MetricName kTtlPasses =
+        MetricNameMaker::make("serverStatus.metrics.ttl.passes");
+    static constexpr MetricName kTtlSubPasses =
+        MetricNameMaker::make("serverStatus.metrics.ttl.subPasses");
+    static constexpr MetricName kTtlDuration =
+        MetricNameMaker::make("serverStatus.metrics.ttl.durationMicros");
+    static constexpr MetricName kTtlDeletedDocuments =
+        MetricNameMaker::make("serverStatus.metrics.ttl.deletedDocuments");
+    static constexpr MetricName kTtlDeletedKeys =
+        MetricNameMaker::make("serverStatus.metrics.ttl.deletedKeys");
+    static constexpr MetricName kTtlExaminedDocuments =
+        MetricNameMaker::make("serverStatus.metrics.ttl.examinedDocuments");
+    static constexpr MetricName kTtlExaminedKeys =
+        MetricNameMaker::make("serverStatus.metrics.ttl.examinedKeys");
+    static constexpr MetricName kTtlInvalidTtlIndexSkips =
+        MetricNameMaker::make("serverStatus.metrics.ttl.invalidTTLIndexSkips");
     static constexpr MetricName kIndexCount =
         MetricNameMaker::make("serverStatus.indexStats.count");
 

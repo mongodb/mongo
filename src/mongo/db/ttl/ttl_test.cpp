@@ -58,6 +58,8 @@
 #include "mongo/db/timeseries/timeseries_test_util.h"
 #include "mongo/db/ttl/ttl_monitor.h"
 #include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -117,43 +119,59 @@ protected:
     }
 
     long long getTTLPasses() {
-        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
-        return ttlMonitor->getTTLPasses_forTest();
+        if (_capturer.canReadMetrics()) {
+            return _capturer.readInt64Counter(otel::metrics::MetricNames::kTtlPasses);
+        }
+        return TTLMonitor::get(getGlobalServiceContext())->getTTLPasses_forTest();
     }
 
     long long getTTLSubPasses() {
-        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
-        return ttlMonitor->getTTLSubPasses_forTest();
+        if (_capturer.canReadMetrics()) {
+            return _capturer.readInt64Counter(otel::metrics::MetricNames::kTtlSubPasses);
+        }
+        return TTLMonitor::get(getGlobalServiceContext())->getTTLSubPasses_forTest();
     }
 
     long long getTTLDurationMicros() {
-        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
-        return ttlMonitor->getTTLDurationMicros_forTest();
+        if (_capturer.canReadMetrics()) {
+            return _capturer.readInt64Counter(otel::metrics::MetricNames::kTtlDuration);
+        }
+        return TTLMonitor::get(getGlobalServiceContext())->getTTLDurationMicros_forTest();
     }
 
     long long getTTLDeletedDocuments() {
-        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
-        return ttlMonitor->getTTLDeletedDocuments_forTest();
+        if (_capturer.canReadMetrics()) {
+            return _capturer.readInt64Counter(otel::metrics::MetricNames::kTtlDeletedDocuments);
+        }
+        return TTLMonitor::get(getGlobalServiceContext())->getTTLDeletedDocuments_forTest();
     }
 
     long long getTTLDeletedKeys() {
-        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
-        return ttlMonitor->getTTLDeletedKeys_forTest();
+        if (_capturer.canReadMetrics()) {
+            return _capturer.readInt64Counter(otel::metrics::MetricNames::kTtlDeletedKeys);
+        }
+        return TTLMonitor::get(getGlobalServiceContext())->getTTLDeletedKeys_forTest();
     }
 
     long long getTTLExaminedDocuments() {
-        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
-        return ttlMonitor->getTTLExaminedDocuments_forTest();
+        if (_capturer.canReadMetrics()) {
+            return _capturer.readInt64Counter(otel::metrics::MetricNames::kTtlExaminedDocuments);
+        }
+        return TTLMonitor::get(getGlobalServiceContext())->getTTLExaminedDocuments_forTest();
     }
 
     long long getTTLExaminedKeys() {
-        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
-        return ttlMonitor->getTTLExaminedKeys_forTest();
+        if (_capturer.canReadMetrics()) {
+            return _capturer.readInt64Counter(otel::metrics::MetricNames::kTtlExaminedKeys);
+        }
+        return TTLMonitor::get(getGlobalServiceContext())->getTTLExaminedKeys_forTest();
     }
 
     long long getInvalidTTLIndexSkips() {
-        TTLMonitor* ttlMonitor = TTLMonitor::get(getGlobalServiceContext());
-        return ttlMonitor->getInvalidTTLIndexSkips_forTest();
+        if (_capturer.canReadMetrics()) {
+            return _capturer.readInt64Counter(otel::metrics::MetricNames::kTtlInvalidTtlIndexSkips);
+        }
+        return TTLMonitor::get(getGlobalServiceContext())->getInvalidTTLIndexSkips_forTest();
     }
 
     // Asserts that the 'indexSpec' is persisted as-is in the durable catalog.
@@ -217,6 +235,7 @@ protected:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
+    otel::metrics::OtelMetricsCapturer _capturer;
 };
 
 namespace {

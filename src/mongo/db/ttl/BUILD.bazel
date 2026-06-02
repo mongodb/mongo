@@ -47,6 +47,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/ddl:coll_mod_command_idl",
         "//src/mongo/db/shard_role/ddl:index_commands_idl",
         "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
+        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 
@@ -70,5 +71,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/index_builds:index_builds_coordinator_mongod",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/shard_role",
+        "//src/mongo/otel/metrics:metrics_test_util",
     ],
 )

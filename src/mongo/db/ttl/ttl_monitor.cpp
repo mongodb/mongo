@@ -81,6 +81,10 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_names.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/server_status_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
@@ -104,6 +108,11 @@
 namespace mongo {
 
 namespace {
+using otel::metrics::MetricNames;
+using otel::metrics::MetricsService;
+using otel::metrics::MetricUnit;
+using otel::metrics::ServerStatusOptions;
+
 using TTLTaskType = std::variant<admission::execution_control::ScopedTaskTypeBackground,
                                  admission::execution_control::ScopedTaskTypeNonDeprioritizable>;
 
@@ -114,24 +123,66 @@ MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
 // consist of multiple sub-passes. Each sub-pass deletes all the expired documents it can up to
 // 'ttlSubPassTargetSecs'. It is possible for a sub-pass to complete before all expired documents
 // have been removed.
-auto& ttlPasses = *MetricBuilder<Counter64>{"ttl.passes"};
-auto& ttlSubPasses = *MetricBuilder<Counter64>{"ttl.subPasses"};
+auto& ttlPasses = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlPasses,
+    "Number of passes performed by the TTL monitor.",
+    MetricUnit::kEvents,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "ttl.passes", .role = ClusterRole::None}});
+auto& ttlSubPasses = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlSubPasses,
+    "Number of sub-passes performed by the TTL monitor.",
+    MetricUnit::kEvents,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "ttl.subPasses", .role = ClusterRole::None}});
 
 // Tracks the total amount of time spent deleting documents in TTL passes.
-auto& ttlDurationMicros = *MetricBuilder<Counter64>{"ttl.durationMicros"};
+auto& ttlDuration = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlDuration,
+    "The cumulative amount of time that the TTL monitor has spent deleting expired documents and "
+    "index keys.",
+    MetricUnit::kMicroseconds,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "ttl.durationMicros", .role = ClusterRole::None}});
 
 // Tracks the number of deleted documents, as well as the number of deleted keys from indexes.
-auto& ttlDeletedDocuments = *MetricBuilder<Counter64>{"ttl.deletedDocuments"};
-auto& ttlDeletedKeys = *MetricBuilder<Counter64>{"ttl.deletedKeys"};
+auto& ttlDeletedDocuments = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlDeletedDocuments,
+    "The total number of documents deleted from collections with a TTL index.",
+    MetricUnit::kCount,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "ttl.deletedDocuments", .role = ClusterRole::None}});
+auto& ttlDeletedKeys = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlDeletedKeys,
+    "The number of index keys that the TTL monitor deleted.",
+    MetricUnit::kCount,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "ttl.deletedKeys", .role = ClusterRole::None}});
 
 // Tracks the number of documents and keys examined in TTL passes.
-auto& ttlExaminedDocuments = *MetricBuilder<Counter64>{"ttl.examinedDocuments"};
-auto& ttlExaminedKeys = *MetricBuilder<Counter64>{"ttl.examinedKeys"};
+auto& ttlExaminedDocuments = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlExaminedDocuments,
+    "The number of documents that the TTL monitor examined.",
+    MetricUnit::kCount,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "ttl.examinedDocuments", .role = ClusterRole::None}});
+auto& ttlExaminedKeys = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlExaminedKeys,
+    "The number of index keys that the TTL monitor examined.",
+    MetricUnit::kCount,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "ttl.examinedKeys", .role = ClusterRole::None}});
 
 // Tracks the number of TTL deletes skipped due to a TTL secondary index being present, but not
 // valid for TTL removal. A non-zero value indicates there is a TTL non-conformant index present and
 // users must manually modify the secondary index to utilize automatic TTL deletion.
-auto& ttlInvalidTTLIndexSkips = *MetricBuilder<Counter64>{"ttl.invalidTTLIndexSkips"};
+auto& ttlInvalidTTLIndexSkips = MetricsService::instance().createInt64Counter(
+    MetricNames::kTtlInvalidTtlIndexSkips,
+    "Number of TTL deletes skipped due to a TTL secondary index being present, but not valid for "
+    "TTL deletion.",
+    MetricUnit::kCount,
+    {.serverStatusOptions =
+         ServerStatusOptions{.dottedPath = "ttl.invalidTTLIndexSkips", .role = ClusterRole::None}});
 
 const auto getTTLMonitor = ServiceContext::declareDecoration<std::unique_ptr<TTLMonitor>>();
 
@@ -227,12 +278,12 @@ const IndexCatalogEntry* getValidTTLIndex(OperationContext* opCtx,
         LOGV2_ERROR(22541,
                     "special index can't be used as a TTL index, skipping TTL job",
                     "index"_attr = spec);
-        ttlInvalidTTLIndexSkips.increment();
+        ttlInvalidTTLIndexSkips.add(1);
         return nullptr;
     }
 
     if (auto status = index_key_validate::validateIndexSpecTTL(spec); !status.isOK()) {
-        ttlInvalidTTLIndexSkips.increment();
+        ttlInvalidTTLIndexSkips.add(1);
         LOGV2_ERROR(6909100,
                     "Skipping TTL job due to invalid index spec",
                     "reason"_attr = status.reason(),
@@ -395,7 +446,7 @@ void TTLMonitor::_doTTLPass(OperationContext* opCtx, Date_t at) {
     }
 
     // Increment the metric after the TTL work has been finished.
-    ON_BLOCK_EXIT([&] { ttlPasses.increment(); });
+    ON_BLOCK_EXIT([&] { ttlPasses.add(1); });
 
     bool moreToDelete = true;
     while (moreToDelete) {
@@ -413,7 +464,7 @@ bool TTLMonitor::_doTTLSubPass(OperationContext* opCtx, Date_t at) {
         !repl::ReplicationCoordinator::get(opCtx)->getMemberState().readable())
         return false;
 
-    ON_BLOCK_EXIT([&] { ttlSubPasses.increment(); });
+    ON_BLOCK_EXIT([&] { ttlSubPasses.add(1); });
 
     TTLCollectionCache& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
 
@@ -497,7 +548,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         if (MONGO_unlikely(hangTTLMonitorWithLock.shouldFail())) {
             LOGV2(22534,
                   "Hanging due to hangTTLMonitorWithLock fail point",
-                  "ttlPasses"_attr = ttlPasses.get());
+                  "ttlPasses"_attr = ttlPasses.valueForLegacyUse());
             hangTTLMonitorWithLock.pauseWhileSet(opCtx);
         }
 
@@ -637,16 +688,16 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
     try {
         const auto numDeletedDocs = exec->executeDelete();
         const auto numDeletedKeys = opDebug.getAdditiveMetrics().keysDeleted.value_or(0ll);
-        ttlDeletedDocuments.increment(numDeletedDocs);
-        ttlDeletedKeys.increment(numDeletedKeys);
+        ttlDeletedDocuments.add(numDeletedDocs);
+        ttlDeletedKeys.add(numDeletedKeys);
 
         const auto duration = timer.elapsed();
         PlanSummaryStats summaryStats;
         const auto& explainer = exec->getPlanExplainer();
         explainer.getSummaryStats(&summaryStats);
-        ttlExaminedDocuments.increment(summaryStats.totalDocsExamined);
-        ttlExaminedKeys.increment(summaryStats.totalKeysExamined);
-        ttlDurationMicros.increment(durationCount<Microseconds>(duration));
+        ttlExaminedDocuments.add(summaryStats.totalDocsExamined);
+        ttlExaminedKeys.add(summaryStats.totalKeysExamined);
+        ttlDuration.add(durationCount<Microseconds>(duration));
 
         if (shouldLogSlowOpWithSampling(opCtx,
                                         logv2::LogComponent::kIndex,
@@ -790,16 +841,16 @@ bool TTLMonitor::_performDeleteExpiredWithCollscan(OperationContext* opCtx,
     try {
         const auto numDeletedDocs = exec->executeDelete();
         const auto numDeletedKeys = opDebug.getAdditiveMetrics().keysDeleted.value_or(0ll);
-        ttlDeletedDocuments.increment(numDeletedDocs);
-        ttlDeletedKeys.increment(numDeletedKeys);
+        ttlDeletedDocuments.add(numDeletedDocs);
+        ttlDeletedKeys.add(numDeletedKeys);
 
         const auto duration = timer.elapsed();
         PlanSummaryStats summaryStats;
         const auto& explainer = exec->getPlanExplainer();
         explainer.getSummaryStats(&summaryStats);
-        ttlExaminedDocuments.increment(summaryStats.totalDocsExamined);
-        ttlExaminedKeys.increment(summaryStats.totalKeysExamined);
-        ttlDurationMicros.increment(durationCount<Microseconds>(duration));
+        ttlExaminedDocuments.add(summaryStats.totalDocsExamined);
+        ttlExaminedKeys.add(summaryStats.totalKeysExamined);
+        ttlDuration.add(durationCount<Microseconds>(duration));
 
         if (shouldLogSlowOpWithSampling(opCtx,
                                         logv2::LogComponent::kIndex,
@@ -847,35 +898,35 @@ void shutdownTTLMonitor(ServiceContext* serviceContext) {
 }
 
 long long TTLMonitor::getTTLPasses_forTest() {
-    return ttlPasses.get();
+    return ttlPasses.valueForLegacyUse();
 }
 
 long long TTLMonitor::getTTLSubPasses_forTest() {
-    return ttlSubPasses.get();
+    return ttlSubPasses.valueForLegacyUse();
 }
 
 long long TTLMonitor::getTTLDurationMicros_forTest() {
-    return ttlDurationMicros.get();
+    return ttlDuration.valueForLegacyUse();
 }
 
 long long TTLMonitor::getTTLDeletedDocuments_forTest() {
-    return ttlDeletedDocuments.get();
+    return ttlDeletedDocuments.valueForLegacyUse();
 }
 
 long long TTLMonitor::getTTLDeletedKeys_forTest() {
-    return ttlDeletedKeys.get();
+    return ttlDeletedKeys.valueForLegacyUse();
 }
 
 long long TTLMonitor::getTTLExaminedDocuments_forTest() {
-    return ttlExaminedDocuments.get();
+    return ttlExaminedDocuments.valueForLegacyUse();
 }
 
 long long TTLMonitor::getTTLExaminedKeys_forTest() {
-    return ttlExaminedKeys.get();
+    return ttlExaminedKeys.valueForLegacyUse();
 }
 
 long long TTLMonitor::getInvalidTTLIndexSkips_forTest() {
-    return ttlInvalidTTLIndexSkips.get();
+    return ttlInvalidTTLIndexSkips.valueForLegacyUse();
 }
 
 void TTLMonitor::_scheduleMetadataRecovery(OperationContext* opCtx,
