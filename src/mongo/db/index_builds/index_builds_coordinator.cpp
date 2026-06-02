@@ -89,6 +89,9 @@
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -115,6 +118,9 @@
 
 namespace mongo {
 namespace {
+using otel::metrics::MetricNames;
+using otel::metrics::MetricsService;
+using otel::metrics::MetricUnit;
 
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
@@ -135,6 +141,14 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnSetupBeforeTakingLocks);
 MONGO_FAIL_POINT_DEFINE(hangAbortIndexBuildByBuildUUIDAfterLocks);
 MONGO_FAIL_POINT_DEFINE(hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry);
+
+auto& indexBuildsTotalMetric = MetricsService::instance().createInt64Counter(
+    MetricNames::kIndexBuildsTotal, "Total number of index builds.", MetricUnit::kCount);
+
+auto& indexBuildsPhasesCommitMetric =
+    MetricsService::instance().createInt64Counter(MetricNames::kIndexBuildPhasesCommit,
+                                                  "Total number of index build commits.",
+                                                  MetricUnit::kCount);
 
 /**
  * Aggregate metrics for index builds reported via server status.
@@ -900,6 +914,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
             return status;
         }
         indexBuildsSSS.registered.addAndFetch(1);
+        indexBuildsTotalMetric.add(1);
 
         IndexBuildsManager::SetupOptions options;
         options.protocol = protocol;
@@ -1033,6 +1048,7 @@ Status IndexBuildsCoordinator::_registerResumeIndexBuild(OperationContext* opCtx
         return status;
     }
     indexBuildsSSS.registered.addAndFetch(1);
+    indexBuildsTotalMetric.add(1);
     return Status::OK();
 }
 
@@ -2881,6 +2897,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
         return status;
     }
     indexBuildsSSS.registered.addAndFetch(1);
+    indexBuildsTotalMetric.add(1);
 
     // The index has been registered on the Coordinator in an unstarted state. Return an
     // uninitialized Future so that the caller can set up the index build by calling
@@ -3952,6 +3969,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         }
 
         indexBuildsSSS.commit.addAndFetch(1);
+        indexBuildsPhasesCommitMetric.add(1);
         storeLastCommittedDuration(*replState);
 
         auto onCommitFn = [&](const std::vector<boost::optional<MultikeyPaths>>& multikeys) {

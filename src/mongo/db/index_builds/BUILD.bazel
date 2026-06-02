@@ -143,6 +143,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage:storage_repair_observer",
         "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util:progress_meter",
     ],
 )
