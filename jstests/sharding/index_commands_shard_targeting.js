@@ -166,10 +166,18 @@ const testCases = {
         return {
             command: {dropIndexes: collName, index: index.name},
             bumpExpectedCollectionVersionAfterCommand: (expectedCollVersion) => {
-                if (FeatureFlagUtil.isEnabled(testDB, "featureFlagDropIndexesDDLCoordinator")) {
-                    // When the dropIndexes command spawns a sharding DDL coordinator, the collection version will be bumped twice: once for stopping migrations, and once for resuming migrations.
+                if (
+                    FeatureFlagUtil.isEnabled(testDB, "featureFlagDropIndexesDDLCoordinator") &&
+                    !FeatureFlagUtil.isEnabled(testDB, "featureFlagAuthoritativeShardsDDL")
+                ) {
+                    // When the dropIndexes command spawns a sharding DDL coordinator that stops and
+                    // resumes migrations via setAllowMigrations, the collection version is bumped
+                    // twice: once for stopping migrations, and once for resuming migrations.
                     return new Timestamp(expectedCollVersion.getTime(), expectedCollVersion.getInc() + 2);
                 }
+                // With featureFlagAuthoritativeShardsDDL enabled, the coordinator stops/resumes
+                // migrations via setAllowChunkOperations, which updates the collection metadata
+                // without bumping the collection placement version.
                 return expectedCollVersion;
             },
             setUpFuncForCheckShardVersionTest: () => {
