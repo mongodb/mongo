@@ -342,6 +342,12 @@ feature_flags:
         cpp_varname: gFeatureFlagKEKPushMode
         default: false
         fcv_gated: false
+    featureFlagCMKRotation:
+        description: "Enable rotation of the customer master key (CMK)."
+        cpp_varname: gFeatureFlagCMKRotation
+        default: true
+        version: 9.0
+        fcv_gated: true
 
 server_parameters:
     allowDirectSystemBucketsAccess:
