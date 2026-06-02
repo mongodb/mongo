@@ -96,11 +96,14 @@ export const $config = (function () {
     //   OperationNotSupportedInTransaction: an in-txn write implicitly created the dropped
     //     collection, then prepare/commit rejected because distributed txns disallow implicit
     //     collection creation.
+    //   QueryPlanKilled: an in-flight plan executor (e.g. EXPRESS_UPDATE) was killed when the
+    //     collection was dropped underneath it.
     function isCollDropError(e) {
         return (
             e.code === ErrorCodes.NamespaceNotFound ||
             e.code === ErrorCodes.CollectionUUIDMismatch ||
-            e.code === ErrorCodes.OperationNotSupportedInTransaction
+            e.code === ErrorCodes.OperationNotSupportedInTransaction ||
+            e.code === ErrorCodes.QueryPlanKilled
         );
     }
 
