@@ -446,7 +446,11 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
             builtSetWindowFieldsStageForMinMaxScalerNormalization(expCtx, inputPipelineName));
     }
 
-    std::vector<BSONObj> bsonPipeline = oneInputPipeline->serializeToBson();
+    // The serialized pipeline is immediately reparsed below via
+    // DocumentSourceUnionWith::createFromBson. Use serializeForReparse so stages emit user
+    // form and doesn't trip on internal-field checks.
+    SerializationOptions reparseOpts{.serializeForReparse = true};
+    std::vector<BSONObj> bsonPipeline = oneInputPipeline->serializeToBson(reparseOpts);
 
     auto collName = expCtx->getUserNss().coll();
 
@@ -1169,7 +1173,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::creat
     // reject the query if it is run over a view.
 
     // This flag's value is also used to gate an internal client error. See
-    // search_helper::validateViewNotSetByUser(...) for more details.
+    // search_helper::validateInternalSearchFieldsNotSetByUser(...) for more details.
     pExpCtx->setIsHybridSearch();
 
     return constructDesugaredOutput(spec, std::move(inputPipelines), pExpCtx);

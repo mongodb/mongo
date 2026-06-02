@@ -368,8 +368,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceGraphLookUp::makePipeli
             _from);
 
         // Update '_fromPipeline' with the resolved view definition to avoid triggering this
-        // exception next time.
-        _fromPipeline = pipeline->serializeToBson();
+        // exception next time. The stored serialization is reparsed on subsequent iterations
+        // via Pipeline::makePipeline; use serializeForReparse so search stages emit user form
+        // to be safely re-parsed.
+        SerializationOptions reparseOpts{.serializeForReparse = true};
+        _fromPipeline = pipeline->serializeToBson(reparseOpts);
 
         // Update the expression context with any new namespaces the resolved pipeline has
         // introduced.

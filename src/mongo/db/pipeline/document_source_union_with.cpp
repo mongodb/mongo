@@ -317,7 +317,11 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                 expCtx->variablesParseState.copyWith(_variables.useIdGenerator());
         }
 
-        auto serializedPipe = _pipeline->serializeToBson();
+        // If this throws CommandOnShardedViewNotSupportedOnMongod, the serialized pipe is fed back
+        // through buildPipelineFromViewDefinition which reparses. Use serializeForReparse so
+        // search stages emit user form and the re-parse doesn't trip the internal-field check.
+        SerializationOptions serializeOptsForViewResolutionReparse{.serializeForReparse = true};
+        auto serializedPipe = _pipeline->serializeToBson(serializeOptsForViewResolutionReparse);
         logStartingSubPipeline(serializedPipe);
         try {
             // Query settings are looked up after parsing and therefore are not populated in the
@@ -517,7 +521,10 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         };
 
         BSONObj explainLocal = [&] {
-            auto serializedPipe = pipeCopy->serializeToBson();
+            // Pre-serialize with serializeForReparse so the catch path below can feed it into
+            // buildPipelineFromViewDefinition. Otherwise, the serialized pipe is discarded.
+            SerializationOptions serializeOptsForViewResolutionReparse{.serializeForReparse = true};
+            auto serializedPipe = pipeCopy->serializeToBson(serializeOptsForViewResolutionReparse);
             try {
                 return preparePipelineAndExplain(pipeCopy);
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {

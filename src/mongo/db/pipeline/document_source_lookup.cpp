@@ -711,8 +711,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipelineFr
         _fromExpCtx, resolvedNamespace, std::move(serializedPipeline), opts, _fromNs);
 
     // Store the pipeline with resolved namespaces so that we only trigger this exception on the
-    // first input document.
-    _resolvedPipeline = pipeline->serializeToBson();
+    // first input document. _resolvedPipeline is later reparsed (e.g. by Pipeline::makePipeline);
+    // use serializeForReparse so search stages emit user form and the re-parse doesn't trip the
+    // internal-field check.
+    SerializationOptions reparseOpts{.serializeForReparse = true};
+    _resolvedPipeline = pipeline->serializeToBson(reparseOpts);
 
     // The index of the field join match stage needs to be set to the length of the view
     // pipeline, as it is no longer the first stage in the resolved pipeline.
@@ -814,8 +817,11 @@ PipelinePtr DocumentSourceLookUp::buildPipeline(
 
     // We can store the unoptimized serialization of the pipeline so that if we need to resolve
     // a sharded view later on, and we have a local-foreign field join, we will need to update
-    // metadata tracking the position of this join in the _resolvedPipeline.
-    auto serializedPipeline = pipeline->serializeToBson();
+    // metadata tracking the position of this join in the _resolvedPipeline. This serialized
+    // pipeline is reparsed on the sharded-view exception path; use serializeForReparse so search
+    // stages emit user form.
+    SerializationOptions reparseOpts{.serializeForReparse = true};
+    auto serializedPipeline = pipeline->serializeToBson(reparseOpts);
 
     addCacheStageAndOptimize(*pipeline);
 
