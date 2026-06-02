@@ -2014,6 +2014,39 @@ export const authCommandsLib = {
             testcases: [{runOnDb: "config", roles: roles_all}],
         },
         {
+            // $_internalPredicate is only allowed for internal clients.
+            testname: "aggregate_listSessions_internalPredicate",
+            command: {
+                aggregate: "system.sessions",
+                pipeline: [{$listSessions: {$_internalPredicate: {"_id.uid": {$exists: true}}}}],
+                cursor: {},
+            },
+            testcases: [
+                {runOnDb: "config", roles: {__system: 1}},
+                {
+                    runOnDb: "config",
+                    privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                },
+            ],
+        },
+        {
+            // Combining allUsers:true with $_internalPredicate requires both 'listSessions' and
+            // 'internal' on the cluster resource.
+            testname: "aggregate_listSessions_allUsers_internalPredicate",
+            command: {
+                aggregate: "system.sessions",
+                pipeline: [{$listSessions: {allUsers: true, $_internalPredicate: {"_id.uid": {$exists: true}}}}],
+                cursor: {},
+            },
+            testcases: [
+                {runOnDb: "config", roles: {__system: 1}},
+                {
+                    runOnDb: "config",
+                    privileges: [{resource: {cluster: true}, actions: ["listSessions", "internal"]}],
+                },
+            ],
+        },
+        {
             testname: "aggregate_lookup",
             command: {
                 aggregate: "foo",
