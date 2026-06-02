@@ -2,7 +2,6 @@
 // Test that the cardinality estimates for two-table joins approximate reality
 // @tags: [
 //   requires_sbe,
-//   featureFlagPathArrayness,
 //   requires_fcv_90
 // ]
 //

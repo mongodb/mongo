@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_fcv_90,
  *   requires_sbe,
- *   featureFlagPathArrayness
  * ]
  */
 import {code, section, subSection} from "jstests/libs/query/pretty_md.js";

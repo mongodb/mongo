@@ -2,7 +2,7 @@
 // actual coefficients that are used or any future calibration work.
 // @tags: [
 //   requires_sbe,
-//   featureFlagPathArrayness
+//   requires_fcv_90
 // ]
 
 import {describe, it} from "jstests/libs/mochalite.js";

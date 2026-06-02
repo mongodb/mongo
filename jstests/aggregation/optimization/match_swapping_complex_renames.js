@@ -6,8 +6,6 @@
  *   requires_pipeline_optimization,
  *   # Tests a rewrite that was added in v9.0.
  *   requires_fcv_90,
- *   # Pushdown over complex renames needs PathArrayness from indexes to prove paths are non-array.
- *   featureFlagPathArrayness,
  *   # The test asserts on explain output.
  *   assumes_unsharded_collection,
  * ]

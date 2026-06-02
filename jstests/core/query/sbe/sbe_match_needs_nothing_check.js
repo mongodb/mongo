@@ -11,7 +11,7 @@
  *    does_not_support_stepdowns,
  *    # Explain for the aggregate command cannot run within a multi-document transaction
  *    does_not_support_transactions,
- *    featureFlagPathArrayness
+ *    requires_fcv_90
  * ]
  */
 

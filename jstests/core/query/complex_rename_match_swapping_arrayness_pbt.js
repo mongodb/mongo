@@ -9,7 +9,6 @@
  * requires_getmore,
  * # Tests a rewrite that was added in v9.0.
  * requires_fcv_90,
- * featureFlagPathArrayness,
  * # Time series collections do not support indexing array values in measurement fields.
  * exclude_from_timeseries_crud_passthrough,
  * ]

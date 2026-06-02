@@ -12,7 +12,7 @@
  *    # Explain for the aggregate command cannot run within a multi-document transaction
  *    does_not_support_transactions,
  *    assumes_no_implicit_index_creation,
- *    featureFlagPathArrayness
+ *    requires_fcv_90
  * ]
  */
 

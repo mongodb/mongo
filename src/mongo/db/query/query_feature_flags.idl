@@ -355,7 +355,7 @@ feature_flags:
         description: "Feature flag to enable tracking of path arrayness."
         cpp_varname: gFeatureFlagPathArrayness
         fcv_gated: false
-        default: false
+        default: true
 
     featureFlagUnifiedWriteExecutor:
         description: "Feature flag to use the unified write executor."

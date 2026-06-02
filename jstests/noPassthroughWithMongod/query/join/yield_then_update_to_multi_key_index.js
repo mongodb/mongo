@@ -6,7 +6,6 @@
  * @tags: [
  *   requires_fcv_90,
  *   requires_sbe,
- *   featureFlagPathArrayness
  * ]
  */
 import {assertAllJoinsUseMethod} from "jstests/libs/query/join_utils.js";

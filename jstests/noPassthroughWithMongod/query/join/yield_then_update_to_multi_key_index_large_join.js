@@ -10,7 +10,6 @@
  * @tags: [
  *   requires_fcv_90,
  *   requires_sbe,
- *   featureFlagPathArrayness
  * ]
  */
 

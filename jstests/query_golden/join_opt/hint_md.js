@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_fcv_90,
  *   requires_sbe,
- *   featureFlagPathArrayness
  * ]
  */
 import {normalizeArray} from "jstests/libs/query_optimization/golden_test.js";
