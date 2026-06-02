@@ -54,6 +54,7 @@ SamplingEstimatorMap makeSamplingEstimators(const MultipleCollectionAccessor& co
 
             const auto& cq = node.accessPath;
             const auto& qkc = cq->getExpCtx()->getQueryKnobConfiguration();
+            // TODO SERVER-127609: propagate outerExpCtx for path arrayness checking.
             std::unique_ptr<ce::SamplingEstimator> estimator =
                 std::make_unique<ce::SamplingEstimatorImpl>(
                     cq->getOpCtx(),

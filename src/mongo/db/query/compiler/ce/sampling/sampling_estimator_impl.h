@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/sampling/ce_multikey_dotted_path_support.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
@@ -70,17 +71,17 @@ public:
      * 'analyze' passes kOnTheFlySample to bypass the persisted read. Prefer the factory method
      * above outside tests.
      */
-    SamplingEstimatorImpl(
-        OperationContext* opCtx,
-        const MultipleCollectionAccessor& collections,
-        const NamespaceString& nss,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        SamplingCEMethodEnum samplingStyle,
-        CardinalityEstimate collectionCard,
-        SamplingConfidenceIntervalEnum ci,
-        double marginOfError,
-        boost::optional<int> numChunks,
-        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
+    SamplingEstimatorImpl(OperationContext* opCtx,
+                          const MultipleCollectionAccessor& collections,
+                          const NamespaceString& nss,
+                          PlanYieldPolicy::YieldPolicy yieldPolicy,
+                          SamplingCEMethodEnum samplingStyle,
+                          CardinalityEstimate collectionCard,
+                          SamplingConfidenceIntervalEnum ci,
+                          double marginOfError,
+                          boost::optional<int> numChunks,
+                          SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample,
+                          boost::intrusive_ptr<const ExpressionContext> outerExpCtx = nullptr);
 
     /*
      * This constructor allows the caller to specify the sample size if necessary. This constructor
@@ -88,16 +89,16 @@ public:
      * to do preliminary data distribution analysis with a small sample size. Testing cases may
      * require only a small sample. Prefer the factory method above outside tests.
      */
-    SamplingEstimatorImpl(
-        OperationContext* opCtx,
-        const MultipleCollectionAccessor& collections,
-        const NamespaceString& nss,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        size_t sampleSize,
-        SamplingCEMethodEnum samplingStyle,
-        boost::optional<int> numChunks,
-        CardinalityEstimate collectionCard,
-        SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample);
+    SamplingEstimatorImpl(OperationContext* opCtx,
+                          const MultipleCollectionAccessor& collections,
+                          const NamespaceString& nss,
+                          PlanYieldPolicy::YieldPolicy yieldPolicy,
+                          size_t sampleSize,
+                          SamplingCEMethodEnum samplingStyle,
+                          boost::optional<int> numChunks,
+                          CardinalityEstimate collectionCard,
+                          SamplingSourceEnum samplingSource = SamplingSourceEnum::kPersistentSample,
+                          boost::intrusive_ptr<const ExpressionContext> outerExpCtx = nullptr);
 
     /*
      * Convenience constructor that accepts a raw record count instead of a CardinalityEstimate,
@@ -319,8 +320,10 @@ protected:
      * preparing the sampling plan for execution in SBE. That function uses the CanonicalQuery to
      * bind input parameters, but this is a no-op for sampling CE.
      */
-    static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(const NamespaceString& nss,
-                                                                   OperationContext* opCtx);
+    static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(
+        const NamespaceString& nss,
+        OperationContext* opCtx,
+        boost::intrusive_ptr<const ExpressionContext> outerExpCtx = nullptr);
 
     /**
      * This helper calls the given callback for each document
@@ -409,6 +412,7 @@ private:
     // The collection the sampling plan runs against and is the one accessed by the query being
     // optimized.
     const MultipleCollectionAccessor& _collections;
+    boost::intrusive_ptr<const ExpressionContext> _outerExpCtx;
     NamespaceString _nss;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     SamplingCEMethodEnum _samplingStyle;
