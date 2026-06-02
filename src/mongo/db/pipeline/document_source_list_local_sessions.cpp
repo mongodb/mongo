@@ -127,11 +127,15 @@ mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(const ListSessionsS
             users.cbegin(), users.cend(), [myName](const auto& name) { return myName == name; });
     })();
 
+    PrivilegeVector privileges;
     if (needsPrivs) {
-        return {Privilege(ResourcePattern::forClusterResource(), ActionType::listSessions)};
-    } else {
-        return PrivilegeVector();
+        privileges.emplace_back(ResourcePattern::forClusterResource(), ActionType::listSessions);
     }
+    // $_internalPredicate is only allowed for internal clients.
+    if (spec.getPredicate()) {
+        privileges.emplace_back(ResourcePattern::forClusterResource(), ActionType::internal);
+    }
+    return privileges;
 }
 
 mongo::ListSessionsSpec mongo::listSessionsParseSpec(StringData stageName,
