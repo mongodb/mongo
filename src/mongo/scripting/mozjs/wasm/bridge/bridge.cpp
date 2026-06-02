@@ -133,7 +133,11 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options
 
     // Instantiate directly from the shared compiled component, no deserialization.
     auto instanceResult = linker.instantiate(storeCtx, _ctx->_component);
-    invariant(instanceResult);
+    if (!instanceResult) {
+        uasserted(
+            ErrorCodes::JSInterpreterFailure,
+            fmt::format("WASM component instantiation failed: {}", instanceResult.err().message()));
+    }
     _instance = wc::Instance(instanceResult.ok());
 
     _initEngineFunc = _getFunc(kInitEngine);

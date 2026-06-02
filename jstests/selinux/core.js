@@ -75,6 +75,21 @@ export class TestDefinition extends SelinuxBaseTest {
                     throw "Failure occurred while checking tags of test: " + t;
                 }
 
+                // Server-side JavaScript is disabled under SELinux
+                checkTagRc = runNonMongoProgram(
+                    python,
+                    "buildscripts/resmokelib/utils/check_has_tag.py",
+                    t,
+                    "^requires_scripting$",
+                );
+                if (HAS_TAG == checkTagRc) {
+                    jsTest.log("Skipping test due to requires_scripting tag: " + t);
+                    continue;
+                }
+                if (NO_TAG != checkTagRc) {
+                    throw "Failure occurred while checking tags of test: " + t;
+                }
+
                 TestData.testName = t.substring(t.lastIndexOf("/") + 1, t.length - ".js".length);
 
                 jsTest.log("Running test: " + t);

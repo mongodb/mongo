@@ -28,6 +28,7 @@ export class SelinuxBaseTest {
             },
             "net": {"port": 27017, "bindIp": "127.0.0.1"},
             "storage": {"dbPath": "/var/lib/mongo"},
+            "security": {"javascriptEnabled": false},
             "setParameter": {"enableTestCommands": 1},
         };
     }

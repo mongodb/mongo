@@ -8,6 +8,8 @@
  *   assumes_against_mongod_not_mongos,
  *   # Timeseries collections cannot have unique indexes.
  *   exclude_from_timeseries_crud_passthrough,
+ *   # Uses mapReduce which requires server-side JavaScript.
+ *   requires_scripting,
  * ]
  */
 

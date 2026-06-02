@@ -12,6 +12,8 @@
 //   uses_map_reduce_with_temp_collections,
 //   # The test runs getLatestProfileEntry(). The downstream syncing node affects the profiler.
 //   run_getLatestProfilerEntry,
+//   # Uses mapReduce which requires server-side JavaScript.
+//   requires_scripting,
 // ]
 
 import {isLinux} from "jstests/libs/os_helpers.js";
