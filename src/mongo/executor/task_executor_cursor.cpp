@@ -67,14 +67,16 @@ TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> e
         _lsid = rcr.opCtx->getLogicalSessionId();
     }
     if (_options.pinConnection) {
+        tassert(12712200,
+                "TaskExecutorCursor in pinning mode must have an opCtx to register the "
+                "PinnedConnectionTaskExecutor for shutdown ordering",
+                rcr.opCtx);
         _executor = makePinnedConnectionTaskExecutor(executor);
         _underlyingExecutor = std::move(executor);
         // Hold a (PCTE, underlying executor) pair so shutdown can drain the PCTE before
         // 'underlying' is destroyed.
-        if (rcr.opCtx) {
-            _pcteToken = std::make_unique<PinnedExecutorRegistryToken>(
-                rcr.opCtx->getServiceContext(), _executor, _underlyingExecutor);
-        }
+        _pcteToken = std::make_unique<PinnedExecutorRegistryToken>(
+            rcr.opCtx->getServiceContext(), _executor, _underlyingExecutor);
     } else {
         _executor = std::move(executor);
     }
@@ -111,9 +113,9 @@ TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> e
 }
 
 TaskExecutorCursor::TaskExecutorCursor(TaskExecutorCursor&& other) noexcept
-    : _executor(std::move(other._executor)),
+    : _pcteToken(std::move(other._pcteToken)),
+      _executor(std::move(other._executor)),
       _underlyingExecutor(std::move(other._underlyingExecutor)),
-      _pcteToken(std::move(other._pcteToken)),
       _rcr(other._rcr),  // NOLINT
       _options(std::move(other._options)),
       _lsid(other._lsid),  // NOLINT
@@ -184,19 +186,26 @@ TaskExecutorCursor::~TaskExecutorCursor() {
             tassert(12080501,
                     "TaskExecutorCursor in pinning mode must have an underlying executor",
                     _underlyingExecutor != nullptr);
-            callbackToRun = [main = _executor, underlying = _underlyingExecutor](const auto&) {
-                underlying->schedule([main = std::move(main)](const auto&) {
-                    if (MONGO_unlikely(
-                            blockBeforePinnedExecutorIsDestroyedOnUnderlying.shouldFail())) {
-                        LOGV2(7361300,
-                              "Hanging before destroying a TaskExecutorCursor's pinning executor.");
-                        blockBeforePinnedExecutorIsDestroyedOnUnderlying.pauseWhileSet();
-                    }
-                    // Returning from this callback will destroy the pinned executor on
-                    // underlying if this is the last TaskExecutorCursor using that pinned executor.
-                });
-            };
-            _pcteToken.reset();
+            // Move the registry token into the callback so the PCTE stays registered until
+            // it is fully destroyed. This prevents shutdownPinnedExecutors from missing the
+            // PCTE if server shutdown races with cursor teardown.
+            auto token = std::shared_ptr<PinnedExecutorRegistryToken>(std::move(_pcteToken));
+            callbackToRun =
+                [main = _executor, underlying = _underlyingExecutor, token](const auto&) {
+                    underlying->schedule([main = std::move(main), token](const auto&) {
+                        if (MONGO_unlikely(
+                                blockBeforePinnedExecutorIsDestroyedOnUnderlying.shouldFail())) {
+                            LOGV2(7361300,
+                                  "Hanging before destroying a TaskExecutorCursor's pinning "
+                                  "executor.");
+                            blockBeforePinnedExecutorIsDestroyedOnUnderlying.pauseWhileSet();
+                        }
+                        // Returning from this callback will destroy the pinned executor on
+                        // underlying if this is the last TaskExecutorCursor using that pinned
+                        // executor. The registry token is also released here, keeping the PCTE
+                        // registered until it is fully destroyed.
+                    });
+                };
         }
         auto swCallback = _executor->scheduleRemoteCommand(
             _createRequest(nullptr, KillCursorsCommandRequest(_ns, {_cursorId}).toBSON()),
