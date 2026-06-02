@@ -263,6 +263,53 @@ TEST_F(InternalBucketGeoWithinExpression, BigBBoxContainsWithinRegion) {
     ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
 }
 
+// Regression: GeoJSON->S2Point->S2LatLng round-trip can produce slightly different latitudes for
+// identical input latitudes at different longitudes, tripping S2LatLngRect's is_valid() DCHECK.
+// Values from a property-based test (PBT) failure.
+TEST_F(InternalBucketGeoWithinExpression, LatitudeRoundTripPrecision) {
+    auto expr = getDummyBucketGeoExpr();
+
+    auto obj =
+        createBucketObj(BSON("loc" << BSON("type" << "Point"
+                                                  << "coordinates" << BSON_ARRAY(-2.599 << 2.763)))
+                            .firstElement(),
+                        BSON("loc" << BSON("type" << "Point"
+                                                  << "coordinates" << BSON_ARRAY(2.500 << 2.763)))
+                            .firstElement());
+
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+}
+
+// Verifies same-longitude points produce ordered latitudes, so this exercises the normal path.
+TEST_F(InternalBucketGeoWithinExpression, SameLongitudeDifferentLatitude) {
+    auto expr = getDummyBucketGeoExpr();
+
+    auto obj =
+        createBucketObj(BSON("loc" << BSON("type" << "Point"
+                                                  << "coordinates" << BSON_ARRAY(2.763 << 1.0)))
+                            .firstElement(),
+                        BSON("loc" << BSON("type" << "Point"
+                                                  << "coordinates" << BSON_ARRAY(2.763 << 3.0)))
+                            .firstElement());
+
+    ASSERT_TRUE(exec::matcher::matchesBSON(expr.get(), obj));
+}
+
+// Verifies FromPointPair fix does not make the filter over-conservative for same-latitude buckets.
+TEST_F(InternalBucketGeoWithinExpression, SameLatitudeDisjointBucket) {
+    auto expr = getDummyBucketGeoExpr();
+
+    auto obj =
+        createBucketObj(BSON("loc" << BSON("type" << "Point"
+                                                  << "coordinates" << BSON_ARRAY(10.0 << 10.0)))
+                            .firstElement(),
+                        BSON("loc" << BSON("type" << "Point"
+                                                  << "coordinates" << BSON_ARRAY(20.0 << 10.0)))
+                            .firstElement());
+
+    ASSERT_FALSE(exec::matcher::matchesBSON(expr.get(), obj));
+}
+
 TEST_F(InternalBucketGeoWithinExpression, BucketContainsNonPointType) {
     auto expr = getDummyBucketGeoExpr();
 

@@ -262,7 +262,26 @@ bool matchesBSONObj(const InternalBucketGeoWithinMatchExpression* expr, const BS
     }
 
     if (crs == SPHERE && expr->getGeoContainer().hasS2Region()) {
-        const S2LatLngRect rect(S2LatLng(minPoint.point), S2LatLng(maxPoint.point));
+        // Use R1Interval::FromPointPair for latitude to handle a floating-point
+        // precision edge case. Converting GeoJSON to S2Point computes
+        // x = cos(lat)*cos(lng), y = cos(lat)*sin(lng). Recovering latitude uses
+        // sqrt(x^2 + y^2), which depends on cos^2(lng) + sin^2(lng). In floating
+        // point this sum is not exactly 1.0 and varies by longitude, so two points
+        // at the same latitude but different longitudes can recover slightly
+        // different latitudes. This can flip min > max by the smallest
+        // representable amount, which fails R1Interval's validity check.
+        // FromPointPair swaps if needed, avoiding the assertion.
+        // Longitude does not have an equivalent precision issue: atan2(y,x) always
+        // returns values in [-pi, pi], and S1Interval permits lo > hi for
+        // antimeridian wrapping. We use the directed S1Interval constructor instead
+        // of FromPointPair because FromPointPair always picks the shorter arc
+        // (<= 180 degrees), which would shrink bounding boxes wider than 180
+        // degrees to their complement.
+        const S2LatLng minLatLng(minPoint.point);
+        const S2LatLng maxLatLng(maxPoint.point);
+        const S2LatLngRect rect(
+            R1Interval::FromPointPair(minLatLng.lat().radians(), maxLatLng.lat().radians()),
+            S1Interval(minLatLng.lng().radians(), maxLatLng.lng().radians()));
 
         S2RegionCoverer coverer;
         S2CellUnion cellUnionRect;
