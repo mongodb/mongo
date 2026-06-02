@@ -72,6 +72,21 @@ namespace mongo {
 
 namespace dps = ::mongo::bson;
 
+namespace {
+// Cap on the per-element snippet appended to geo parser reason strings, so the error
+// shape stays bounded while preserving the offending element's BSON prefix.
+constexpr size_t kReasonSnippetMax = 256;
+
+std::string boundedSnippet(const BSONElement& elem) {
+    auto s = elem.toString(false);
+    if (s.size() > kReasonSnippetMax) {
+        s.resize(kReasonSnippetMax);
+        s.append("...");
+    }
+    return s;
+}
+}  // namespace
+
 // Convenience function to extract flat point coordinates from enclosing element.
 // Note, coordinate elements must not outlive the parent element.
 Status GeoParser::parseFlatPointCoordinates(const BSONElement& elem,
@@ -242,12 +257,12 @@ static void eraseDuplicatePoints(vector<S2Point>* vertices) {
 
 static Status isLoopClosed(const vector<S2Point>& loop, const BSONElement loopElt) {
     if (loop.empty()) {
-        return BAD_VALUE("Loop has no vertices: " << loopElt.toString(false));
+        return BAD_VALUE("Loop has no vertices: " << boundedSnippet(loopElt));
     }
 
     if (loop[0] != loop[loop.size() - 1]) {
         return BAD_VALUE("Loop is not closed, first vertex does not equal last vertex: "
-                         << loopElt.toString(false));
+                         << boundedSnippet(loopElt));
     }
 
     return Status::OK();
@@ -288,7 +303,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
         if (points.size() < 3) {
             return BAD_VALUE("Loop must have at least 3 different vertices, "
                              << points.size() << " unique vertices were provided: "
-                             << coordinateElt.toString(false));
+                             << boundedSnippet(coordinateElt));
         }
 
         loops.push_back(std::make_unique<S2Loop>(points));
@@ -301,7 +316,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
         // 3. Loops are not allowed to have any duplicate vertices.
         // 4. Non-adjacent edges are not allowed to intersect.
         if (!skipValidation && !loop->IsValid(&err)) {
-            return BAD_VALUE("Loop is not valid: " << coordinateElt.toString(false) << " " << err);
+            return BAD_VALUE("Loop is not valid: " << boundedSnippet(coordinateElt) << " " << err);
         }
         // If the loop is more than one hemisphere, invert it.
         loop->Normalize();
@@ -312,8 +327,8 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
             return BAD_VALUE(
                 "Secondary loops not contained by first exterior loop - "
                 "secondary loops must be holes: "
-                << coordinateElt.toString(false)
-                << " first loop: " << elem.Obj().firstElement().toString(false));
+                << boundedSnippet(coordinateElt)
+                << " first loop: " << boundedSnippet(elem.Obj().firstElement()));
         }
     }
 
@@ -335,7 +350,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
     // 2. No loop covers more than half of the sphere.
     // 3. No two loops cross.
     if (!skipValidation && !S2Polygon::IsValid(rawLoops, &err))
-        return BAD_VALUE("Polygon isn't valid: " << err << " " << elem.toString(false));
+        return BAD_VALUE("Polygon isn't valid: " << err << " " << boundedSnippet(elem));
 
     // Given all loops are valid / normalized and S2Polygon::IsValid() above returns true.
     // The polygon must be valid. See S2Polygon member function IsValid().
@@ -350,7 +365,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
     // its parent loop.
     if (!out->IsNormalized(&err))
         // "err" looks like "Loop 1 shares more than one vertex with its parent loop 0"
-        return BAD_VALUE(err << ": " << elem.toString(false));
+        return BAD_VALUE(err << ": " << boundedSnippet(elem));
 
     // S2Polygon contains more than one ring, which is allowed by S2, but not by GeoJSON.
     //
@@ -358,7 +373,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
     // GetLastDescendant() returns the index of the last loop that is contained within
     // a given loop. We guarantee that the first loop is the exterior ring.
     if (out->GetLastDescendant(0) < out->num_loops() - 1) {
-        return BAD_VALUE("Only one exterior polygon loop is allowed: " << elem.toString(false));
+        return BAD_VALUE("Only one exterior polygon loop is allowed: " << boundedSnippet(elem));
     }
 
     // In GeoJSON, only one nesting is allowed.
@@ -366,7 +381,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
     // so the exterior ring's depth is 0, a hole in it is 1, etc.
     for (int i = 0; i < out->num_loops(); i++) {
         if (out->loop(i)->depth() > 1) {
-            return BAD_VALUE("Polygon interior loops cannot be nested: " << elem.toString(false));
+            return BAD_VALUE("Polygon interior loops cannot be nested: " << boundedSnippet(elem));
         }
     }
     return Status::OK();
@@ -383,7 +398,7 @@ static Status parseBigSimplePolygonCoordinates(const BSONElement& elem, BigSimpl
     // Only one loop is allowed in a BigSimplePolygon
     if (coordinates.size() != 1) {
         return BAD_VALUE("Only one simple loop is allowed in a big polygon, instead provided "
-                         << coordinates.size() << " loops: " << elem.toString(false));
+                         << coordinates.size() << " loops: " << boundedSnippet(elem));
     }
 
     vector<S2Point> exteriorVertices;
@@ -408,13 +423,13 @@ static Status parseBigSimplePolygonCoordinates(const BSONElement& elem, BigSimpl
     if (exteriorVertices.size() < 3) {
         return BAD_VALUE("Loop must have at least 3 different vertices, "
                          << exteriorVertices.size()
-                         << " unique vertices were provided: " << elem.toString(false));
+                         << " unique vertices were provided: " << boundedSnippet(elem));
     }
 
     std::unique_ptr<S2Loop> loop(new S2Loop(exteriorVertices));
     // Check whether this loop is valid.
     if (!loop->IsValid(&err)) {
-        return BAD_VALUE("Loop is not valid: " << elem.toString(false) << " " << err);
+        return BAD_VALUE("Loop is not valid: " << boundedSnippet(elem) << " " << err);
     }
 
     out->Init(loop.release());
@@ -489,12 +504,12 @@ static Status parseGeoJSONLineCoordinates(const BSONElement& elem,
     if (!skipValidation) {
         if (vertices.size() < 2)
             return BAD_VALUE("GeoJSON LineString must have at least 2 vertices, instead got "
-                             << vertices.size() << " vertices: " << elem.toString(false));
+                             << vertices.size() << " vertices: " << boundedSnippet(elem));
 
         string err;
         if (!S2Polyline::IsValid(vertices, &err))
             return BAD_VALUE("GeoJSON LineString is not valid: " << err << " "
-                                                                 << elem.toString(false));
+                                                                 << boundedSnippet(elem));
     }
     out->Init(vertices);
     return Status::OK();
@@ -805,17 +820,17 @@ Status GeoParser::parseGeometryCollection(const BSONObj& obj,
             return BAD_VALUE("Element " << i
                                         << " of \"geometries\" must be an object, instead got type "
                                         << typeName(geometries[i].type()) << ": "
-                                        << geometries[i].toString(false));
+                                        << boundedSnippet(geometries[i]));
 
         const BSONObj& geoObj = geometries[i].Obj();
         GeoJSONType type = parseGeoJSONType(geoObj);
 
         if (GEOJSON_UNKNOWN == type)
-            return BAD_VALUE("Unknown GeoJSON type: " << geometries[i].toString(false));
+            return BAD_VALUE("Unknown GeoJSON type: " << boundedSnippet(geometries[i]));
 
         if (GEOJSON_GEOMETRY_COLLECTION == type)
             return BAD_VALUE(
-                "GeometryCollections cannot be nested: " << geometries[i].toString(false));
+                "GeometryCollections cannot be nested: " << boundedSnippet(geometries[i]));
 
         Status status = Status::OK();
         if (GEOJSON_POINT == type) {

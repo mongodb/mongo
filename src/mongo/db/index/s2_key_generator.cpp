@@ -86,8 +86,9 @@ Status S2GetKeysForElement(const BSONElement& element,
     // Project the geometry into spherical space
     if (!geoContainer.supportsProject(SPHERE)) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "can't project geometry into spherical CRS: "
-                                    << element.toString(false));
+                      str::stream()
+                          << "can't project geometry from " << crsName(geoContainer.getNativeCRS())
+                          << " CRS into spherical CRS");
     }
     geoContainer.projectInto(SPHERE);
 
@@ -153,7 +154,9 @@ bool getS2GeoKeys(const BSONObj& document,
                 status.isOK());
 
         uassert(16756,
-                "Unable to generate keys for (likely malformed) geometry: " + document.toString(),
+                str::stream() << "Unable to generate keys for (likely malformed) geometry"
+                              << " for document with _id "
+                              << redact(document["_id"].toString(false)),
                 cells.size() > 0);
 
         // We'll be taking the cartesian product of cells and keysToAdd, make sure the output won't

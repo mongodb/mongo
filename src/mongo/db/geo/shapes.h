@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/clonable_ptr.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -262,6 +263,20 @@ enum CRS {
     SPHERE,        // WGS84
     STRICT_SPHERE  // WGS84 with strict winding order
 };
+
+inline StringData crsName(CRS crs) {
+    switch (crs) {
+        case UNSET:
+            return "UNSET"_sd;
+        case FLAT:
+            return "FLAT"_sd;
+        case SPHERE:
+            return "SPHERE"_sd;
+        case STRICT_SPHERE:
+            return "STRICT_SPHERE"_sd;
+    }
+    MONGO_UNREACHABLE;
+}
 
 // TODO: Make S2 less integral to these types - additional S2 shapes should be an optimization
 // when our CRS is not projected, i.e. SPHERE for now.

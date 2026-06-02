@@ -950,7 +950,14 @@ Status GeometryContainer::parseFromGeoJSON(bool skipValidation) {
     GeoParser::GeoJSONType type = GeoParser::parseGeoJSONType(obj);
 
     if (GeoParser::GEOJSON_UNKNOWN == type) {
-        return Status(ErrorCodes::BadValue, str::stream() << "unknown GeoJSON type: " << obj);
+        if (auto typeElem = obj["type"]; typeElem.type() == BSONType::string) {
+            // Legitimate types are at most 18 chars; cap so oversized inputs stay bounded.
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "unknown GeoJSON type '"
+                                        << typeElem.valueStringData().substr(0, 64) << "'");
+        }
+        return Status(ErrorCodes::BadValue,
+                      "unknown GeoJSON type (type field missing or not a string)");
     }
 
     Status status = Status::OK();
@@ -1143,7 +1150,8 @@ Status GeometryContainer::parseFromStorage(const BSONElement& elem,
                                            boost::optional<S2IndexVersion> indexVersion) {
     if (!elem.isABSONObj()) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "geo element must be an array or object: " << elem);
+                      str::stream() << "geo element must be an array or object, got "
+                                    << typeName(elem.type()));
     }
 
     _geoElm = elem;
