@@ -326,13 +326,6 @@ public:
                                                       std::string reason);
 
     /**
-     * Aborts all in progress index builds with the specified status.
-     *
-     * May throw if InterruptedDueToReplStateChange, but suppresses other exceptions.
-     */
-    void abortAllTwoPhaseIndexBuildsForStepUp(OperationContext* opCtx, Status abortStatus);
-
-    /**
      * Signals all of the index builds to abort and then waits until the index builds are no longer
      * running. The provided 'reason' will be used in the error message that the index builders
      * return to their callers.

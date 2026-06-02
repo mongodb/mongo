@@ -2016,56 +2016,6 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     });
 }
 
-void IndexBuildsCoordinator::abortAllTwoPhaseIndexBuildsForStepUp(OperationContext* opCtx,
-                                                                  Status abortStatus) {
-    // 'abortIndexBuildByBuildUUID' will register the necessary intents, so we only need to wait
-    // until we are primary (can register a Write intent).
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-    for (int retryAttempts = 0; !replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
-         ++retryAttempts) {
-        logAndBackoff(11166102,
-                      MONGO_LOGV2_DEFAULT_COMPONENT,
-                      logv2::LogSeverity::Debug(1),
-                      retryAttempts,
-                      "Waiting to declare Write intent for step-up abort");
-        opCtx->checkForInterrupt();
-    }
-
-    auto abortAllTwoPhaseIndexBuilds = [&](const std::shared_ptr<ReplIndexBuildState>& replState) {
-        if (replState->protocol == IndexBuildProtocol::kSinglePhase) {
-            return;
-        }
-
-        try {
-            if (!abortIndexBuildByBuildUUID(
-                    opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, abortStatus)) {
-                LOGV2(11166100,
-                      "Index build: failed to abort index build, this is expected if the build "
-                      "is already being committed or in the process of tearing down.",
-                      "buildUUID"_attr = replState->buildUUID,
-                      "database"_attr = replState->dbName,
-                      "collectionUUID"_attr = replState->collectionUUID);
-            }
-        } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
-            throw;
-        } catch (const DBException& ex) {
-            LOGV2_WARNING(
-                11166101,
-                "One or more in-progress index builds failed to abort during step-up. It "
-                "is recommended that the following indexes be dropped via the dropIndexes command",
-                "buildUUID"_attr = replState->buildUUID,
-                "indexNames"_attr = toIndexNames(replState->getIndexes()),
-                "status"_attr = ex.toStatus());
-        }
-    };
-
-    auto builds = activeIndexBuilds.getAllIndexBuilds();
-    forEachIndexBuild(
-        builds, "IndexBuildsCoordinator::_onStepUpAsyncTaskFn"_sd, abortAllTwoPhaseIndexBuilds);
-}
-
-
 void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
     const auto signalCommitQuorumAndRetrySkippedRecords = [this,
                                                            opCtx](const std::shared_ptr<
@@ -2170,10 +2120,34 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
     };
 
     try {
+        // If we step up quickly after stepping down, there may be old builds still tearing down
+        // from us having previously been primary.
+        stdx::unordered_set<UUID, UUID::Hash> pdibCollections;
+        for (auto& pdibState : activeIndexBuilds.filterIndexBuilds([](const auto& replState) {
+                 return replState.protocol == IndexBuildProtocol::kPrimaryDriven &&
+                     !replState.isCommitted();
+             })) {
+            pdibCollections.insert(pdibState->collectionUUID);
+        }
+        for (const auto& uuid : pdibCollections) {
+            activeIndexBuilds.awaitNoIndexBuildInProgressForCollection(
+                opCtx, uuid, IndexBuildProtocol::kPrimaryDriven);
+        }
+
         if (isPrimaryDrivenIndexBuildEnabled(VersionContext::getDecoration(opCtx))) {
-            abortAllTwoPhaseIndexBuildsForStepUp(opCtx,
-                                                 Status{ErrorCodes::InterruptedDueToReplStateChange,
-                                                        "aborting all two-phase index builds"});
+            // Must be fully primary before starting resumed builds.
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+            for (int retryAttempts = 0;
+                 !replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
+                 ++retryAttempts) {
+                logAndBackoff(12741703,
+                              MONGO_LOGV2_DEFAULT_COMPONENT,
+                              logv2::LogSeverity::Debug(1),
+                              retryAttempts,
+                              "Waiting to be primary before resuming PDIB builds");
+                opCtx->checkForInterrupt();
+            }
         }
 
         _resumePrimaryDrivenIndexBuildsOnStepUp(opCtx);
@@ -3236,6 +3210,18 @@ void IndexBuildsCoordinator::_cleanUpAfterFailure(OperationContext* opCtx,
         activeIndexBuilds.unregisterIndexBuild(
             &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
         return;
+    } else if (replState->protocol == IndexBuildProtocol::kPrimaryDriven &&
+               status.isA<ErrorCategory::NotPrimaryError>()) {
+        // Not primary: preserve catalog entry for resume on step-up.
+        LOGV2(12741700,
+              "Index build: skipping self-abort after stepdown for primary-driven index build",
+              "buildUUID"_attr = replState->buildUUID,
+              logAttrs(replState->dbName),
+              "collectionUUID"_attr = replState->collectionUUID,
+              "error"_attr = status);
+        activeIndexBuilds.unregisterIndexBuild(
+            &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
+        return;
     }
 
     if (!status.isA<ErrorCategory::ShutdownError>()) {
@@ -3326,29 +3312,6 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                 // our error without doing anything else, as the index build is already cleaned
                 // up, and the server will terminate otherwise.
             } else {
-                // Note for primary-driven index builds: because the IndexBuildsCoordinator threads
-                // are made interruptible by replica set state transitions, both primary stepdown
-                // and secondary stepup can reach here, in addition to other index build failures
-                // encountered by the primary during the index build.
-                auto allowSecondaryToFailInPrimaryDriven = [this, replState, status]() {
-                    LOGV2(11785200,
-                          "Index build: skipping self-abort after stepdown for primary-driven "
-                          "index build",
-                          "buildUUID"_attr = replState->buildUUID,
-                          logAttrs(replState->dbName),
-                          "collectionUUID"_attr = replState->collectionUUID,
-                          "error"_attr = status);
-                    // Since we are not primary any more, we cannot proceed with the self-abort and
-                    // must wait for external abort from primary.
-                    replState->requestAbortFromPrimary();
-                    // Reset the promise and wait for the new primary to coordinate the index build
-                    // and send the new signal/action.
-                    replState->resetNextActionPromise();
-                    // Unregister the build here since primary-driven index builds should not be
-                    // registered on secondaries.
-                    activeIndexBuilds.unregisterIndexBuild(
-                        &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
-                };
                 try {
                     // Take RSTL to observe and prevent replication state from changing.
                     auto autoGetcoll =
@@ -3360,7 +3323,16 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                     auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
                     if (!replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
                         if (indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven) {
-                            return allowSecondaryToFailInPrimaryDriven();
+                            LOGV2(12741701,
+                                  "Index build: no longer primary during self-abort for "
+                                  "primary-driven index build",
+                                  "buildUUID"_attr = replState->buildUUID,
+                                  logAttrs(replState->dbName),
+                                  "collectionUUID"_attr = replState->collectionUUID,
+                                  "error"_attr = status);
+                            activeIndexBuilds.unregisterIndexBuild(
+                                &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
+                            return;
                         }
 
                         // Index builds may not fail on secondaries. If a primary replicated an
@@ -3376,9 +3348,18 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                     AutoGetCollection indexBuildEntryColl(
                         abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
                     _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl);
-                } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
-                    if (indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven) {
-                        allowSecondaryToFailInPrimaryDriven();
+                } catch (const DBException& ex) {
+                    if (indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven &&
+                        ex.isA<ErrorCategory::NotPrimaryError>()) {
+                        LOGV2(12741702,
+                              "Index build: interrupted by stepdown during self-abort for "
+                              "primary-driven index build",
+                              "buildUUID"_attr = replState->buildUUID,
+                              logAttrs(replState->dbName),
+                              "collectionUUID"_attr = replState->collectionUUID,
+                              "error"_attr = status);
+                        activeIndexBuilds.unregisterIndexBuild(
+                            &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
                     } else {
                         throw;
                     }

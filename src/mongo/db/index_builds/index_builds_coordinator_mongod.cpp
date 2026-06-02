@@ -246,26 +246,6 @@ void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
         _stepUpThread.join();
     }
 
-    // TODO SERVER-109664: just filter by protocol == kPrimaryDriven
-    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const auto& vCtx = VersionContext::getDecoration(opCtx);
-    const bool usingPrimaryDrivenIndexBuilds = fcv.isVersionInitialized() &&
-        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(vCtx, fcv);
-
-    // Primary-driven index builds interrupted by stepdown have already exited
-    // _runIndexBuildInner(). If they are still pending here, they did not receive the external
-    // abort they are awaiting, and have to be unregistered now. Two-phase index builds on the other
-    // hand are all working inside _runIndexBuildInner() and will be interrupted by shutdown there.
-    if (usingPrimaryDrivenIndexBuilds) {
-        auto indexBuildFilter = [&](const auto& replState) {
-            return replState.isAwaitingPrimaryAbort();
-        };
-        for (const auto& replState : activeIndexBuilds.filterIndexBuilds(indexBuildFilter)) {
-            activeIndexBuilds.unregisterIndexBuild(
-                &_indexBuildsManager, replState, IndexBuildOutcome::kFailure);
-        }
-    }
-
     // Wait for all active builds to stop.
     activeIndexBuilds.waitForAllIndexBuildsToStopForShutdown();
 
