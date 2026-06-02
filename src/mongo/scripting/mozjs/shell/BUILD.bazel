@@ -62,6 +62,7 @@ mongo_cc_library(
         ],
     ) + [
         ":scripting_util_gen",
+        "//src/mongo/scripting:config_engine_gen",
     ],
     copts = select({
         "@platforms//os:windows": [

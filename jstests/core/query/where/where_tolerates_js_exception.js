@@ -5,8 +5,8 @@
  * @tags: [
  *   requires_non_retryable_commands,
  *   requires_scripting,
- *   # TODO(SERVER-116052): enable this test -- this test requires js stack traces.
- *   mozjs_wasm_unsupported
+ *   # TODO SERVER-116054: Add support for $where.
+ *   mozjs_wasm_unsupported,
  * ]
  */
 const collection = db.where_tolerates_js_exception;
@@ -24,10 +24,7 @@ const res = collection.runCommand("find", {
 });
 
 assert.commandFailedWithCode(res, ErrorCodes.JSInterpreterFailure);
-assert(
-    /ReferenceError|a\ is\ not\ defined/.test(res.errmsg),
-    () => "$where didn't fail with a ReferenceError: " + tojson(res),
-);
+assert(/ReferenceError/.test(res.errmsg), () => "$where didn't failed with a ReferenceError: " + tojson(res));
 assert(/myFunction@/.test(res.errmsg), () => "$where didn't return the JavaScript stacktrace: " + tojson(res));
 assert(!res.hasOwnProperty("stack"), () => "$where shouldn't return JavaScript stacktrace separately: " + tojson(res));
 assert(

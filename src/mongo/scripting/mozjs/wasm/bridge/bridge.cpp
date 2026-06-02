@@ -71,7 +71,7 @@ std::shared_ptr<WasmEngineContext> WasmEngineContext::createFromPrecompiled(cons
 }
 
 MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options opts)
-    : _javascriptProtection(opts.javascriptProtection), _ctx(std::move(ctx)) {
+    : _ctx(std::move(ctx)) {
     _store = wt::Store(_ctx->_engine);
 
     invariant(opts.linearMemoryLimitMB > 0);
@@ -79,13 +79,9 @@ MozJSWasmBridge::MozJSWasmBridge(std::shared_ptr<WasmEngineContext> ctx, Options
     // The JS heap lives inside WASM linear memory alongside SpiderMonkey's
     // runtime overhead (stack, GC metadata, self-hosted code, malloc arena).
     // The store limit must exceed the heap limit to leave room for that overhead.
-    //
-    // Resolve the effective limit: if a per-query override is set, take the
-    // minimum of it and the global limit (matching MozJSImplScope::MozRuntime
-    // semantics in the shell scripting engine). Otherwise use the global limit.
-    const uint32_t globalLimitMB = static_cast<uint32_t>(gJSHeapLimitMB.load());
+    // Use the configured heap limit, or the in-WASM default (100 MB) when not set.
     _jsHeapLimitMB =
-        opts.jsHeapLimitMB > 0 ? std::min(opts.jsHeapLimitMB, globalLimitMB) : globalLimitMB;
+        opts.jsHeapLimitMB > 0 ? opts.jsHeapLimitMB : static_cast<uint32_t>(gJSHeapLimitMB.load());
     uint32_t minOverheadMB = std::max(64u, _jsHeapLimitMB / 10);
     uint32_t minStoreMB = _jsHeapLimitMB + minOverheadMB;
 
@@ -186,8 +182,7 @@ bool MozJSWasmBridge::_callFuncNoArgs(wc::Func& func, wc::Val* results, size_t n
 bool MozJSWasmBridge::initialize() {
     wc::Val result(wc::WitResult::ok(std::nullopt));
     LOGV2_DEBUG(11542332, 2, "Wasm Bridge Initializing", "ok"_attr = isInitialized());
-    wc::Val optionsArg(wc::Record({{"heap-size-mb", wc::Val(_jsHeapLimitMB)},
-                                   {"javascript-protection", wc::Val(_javascriptProtection)}}));
+    wc::Val optionsArg(wc::Record({{"heap-size-mb", wc::Val(_jsHeapLimitMB)}}));
     _callFunc(*_initEngineFunc, &result, 1, std::move(optionsArg));
     if (_assertWitResult(result)) {
         _state.store(State::Initialized);

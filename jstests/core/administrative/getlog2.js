@@ -12,6 +12,8 @@
 //   requires_profiling,
 //   # Uses $where operation.
 //   requires_scripting,
+//   # TODO SERVER-116054: Add support for $where.
+//   mozjs_wasm_unsupported,
 // ]
 
 // We turn off gossiping the mongo shell's clusterTime because it causes the slow command log

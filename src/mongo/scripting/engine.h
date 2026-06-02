@@ -39,9 +39,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/scripting/config_engine_gen.h"
 #include "mongo/scripting/js_regex.h"
-#include "mongo/scripting/mozjs/common/jsfile.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
@@ -64,6 +62,11 @@ typedef std::map<std::string, ScriptingFunction> FunctionCacheMap;
 
 class DBClientBase;
 class OperationContext;
+
+struct MONGO_MOD_NEEDS_REPLACEMENT JSFile {
+    const char* name;
+    const StringData source;
+};
 
 class MONGO_MOD_OPEN Scope {
     Scope(const Scope&) = delete;

@@ -29,6 +29,8 @@
  *   requires_replication,
  *   uses_transactions,
  *   requires_scripting,
+ *   # TODO SERVER-116054: Add support for $where.
+ *   mozjs_wasm_unsupported,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

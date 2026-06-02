@@ -8,6 +8,8 @@
 //   # Primary-driven index builds must have batched writes enabled which config.image_collection
 //   # does not support.
 //   primary_driven_index_builds_incompatible_with_retryable_writes,
+//   # TODO SERVER-116054: Add support for $where.
+//   mozjs_wasm_unsupported,
 // ]
 
 // Ensures that find and modify will not apply an update to a document which, due to a concurrent

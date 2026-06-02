@@ -32,24 +32,8 @@ TYPES_SRCS = [
 ]
 
 mongo_cc_library(
-    name = "hex_md5",
-    srcs = [
-        "hex_md5.cpp",
-    ],
-    hdrs = [
-        "hex_md5.h",
-    ],
-    deps = [
-        "//src/mongo/util:md5",
-    ],
-)
-
-mongo_cc_library(
     name = "mozjs_common",
-    srcs = glob(
-        ["*.cpp"],
-        exclude = ["hex_md5.cpp"],
-    ) + TYPES_SRCS,
+    srcs = glob(["*.cpp"]) + TYPES_SRCS,
     copts = select({
         "@platforms//os:windows": [
             # The default MSVC preprocessor elides commas in some cases as a

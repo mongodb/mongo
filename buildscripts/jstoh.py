@@ -29,7 +29,7 @@ def jsToHeader(target, source):
 
     h = [
         '#include "mongo/base/string_data.h"',
-        '#include "mongo/scripting/mozjs/common/jsfile.h"',
+        '#include "mongo/scripting/engine.h"',
         "namespace mongo {",
         "namespace JSFiles{",
     ]

@@ -83,11 +83,6 @@ void WasmtimeImplScope::reset() {
     }
 
     _cachedFunctions.clear();
-    // Force loadStored() to reload system.js after the bridge is recreated above. The base class
-    // _loadedVersion is not cleared by the bridge teardown, so without this reset loadStored()
-    // would see _loadedVersion == _lastVersion and skip reloading — leaving the fresh bridge
-    // with no stored functions installed.
-    _loadedVersion = 0;
 
     init(nullptr);
     _emitCallback = nullptr;
@@ -105,7 +100,6 @@ void WasmtimeImplScope::init(const BSONObj* data) {
     }
     opts.linearMemoryLimitMB = gWasmtimeStoreMemoryLimitMB.load();
     _storeLinearMemBytes = static_cast<int64_t>(opts.linearMemoryLimitMB) * 1024 * 1024;
-    opts.javascriptProtection = gJavascriptProtection.load();
     _bridge = std::make_unique<wasm::MozJSWasmBridge>(_wasmEngineCtx, opts);
     bool initialized = _bridge->initialize();
     uassert(ErrorCodes::BadValue, "MozJS WASM bridge failed to initialize", initialized);
