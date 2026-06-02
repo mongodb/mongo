@@ -152,6 +152,10 @@ structs:
                     operation was initiated. Used to evaluate feature flags consistently throughout
                     the operation lifetime, even across FCV transitions (e.g. downgrades).
                 optional: true
+            primaryShardId:
+                type: shard_id
+                description: Primary shard id for the given namespace being resharded
+                optional: true
 
     AbortReason:
         description: "Not meant to be used directly. Only use internal fields."

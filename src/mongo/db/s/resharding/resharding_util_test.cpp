@@ -150,6 +150,10 @@ protected:
         validateIndexes(sourceIndexSpecs, recipientSpecs, code);
     }
 
+    ShardId primaryShardId() const {
+        return ShardId{"a"};
+    }
+
 private:
     const NamespaceString _nss = NamespaceString::createNamespaceString_forTest("test.foo");
     const std::string _shardKey = "x";
@@ -382,7 +386,7 @@ TEST_F(ReshardingUtilTest, SetNumSamplesPerChunkThroughConfigsvrReshardCollectio
 
 
     ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
-        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+        operationContext(), configsvrReshardCollection, collEntry, primaryShardId(), nss(), true);
     auto numSamplesPerChunkOptional = coordinatorDoc.getNumSamplesPerChunk();
     ASSERT_TRUE(numSamplesPerChunkOptional.has_value());
     ASSERT_EQ(*numSamplesPerChunkOptional, numSamplesPerChunk);
@@ -453,8 +457,13 @@ TEST_F(ReshardingUtilTest, CreateCoordinatorDocPerformVerification) {
                 configsvrReshardCollection.setDbName(nss().dbName());
                 configsvrReshardCollection.setPerformVerification(performVerification);
 
-                ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
-                    operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+                ReshardingCoordinatorDocument coordinatorDoc =
+                    createReshardingCoordinatorDoc(operationContext(),
+                                                   configsvrReshardCollection,
+                                                   collEntry,
+                                                   primaryShardId(),
+                                                   nss(),
+                                                   true);
 
                 auto actualPerformVerification = coordinatorDoc.getPerformVerification();
                 if (performVerification.has_value()) {
@@ -487,7 +496,7 @@ TEST_F(ReshardingUtilTest, CreateCoordinatorDocStoresForwardableOpMetadata) {
     ASSERT_FALSE(VersionContext::getDecoration(operationContext()).hasOperationFCV());
 
     ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
-        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+        operationContext(), configsvrReshardCollection, collEntry, primaryShardId(), nss(), true);
 
     ASSERT_TRUE(coordinatorDoc.getForwardableOpMetadata().has_value());
     ASSERT_TRUE(coordinatorDoc.getForwardableOpMetadata()->getVersionContext().has_value());
@@ -540,7 +549,7 @@ TEST_F(ReshardingUtilTest, ReshardingCoordinatorDocContainsTelemetryContextFromO
     telemetryCtxHolder.setTelemetryContext(telemetryCtx);
 
     ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
-        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+        operationContext(), configsvrReshardCollection, collEntry, primaryShardId(), nss(), true);
     ASSERT_TRUE(coordinatorDoc.getTelemetryContext().has_value());
     ASSERT_BSONOBJ_EQ(coordinatorDoc.getTelemetryContext().value(),
                       otel::traces::TelemetryContextSerializer::toBSON(telemetryCtx));
@@ -558,7 +567,7 @@ TEST_F(ReshardingUtilTest, ReshardingCoordinatorDocDoesNotContainTelemetryContex
     configsvrReshardCollection.setDbName(nss().dbName());
 
     ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
-        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+        operationContext(), configsvrReshardCollection, collEntry, primaryShardId(), nss(), true);
     ASSERT_FALSE(coordinatorDoc.getTelemetryContext().has_value());
 }
 
@@ -597,7 +606,7 @@ TEST_F(ReshardingUtilTest, SetDemoModeThroughConfigsvrReshardCollectionRequest) 
     configsvrReshardCollection.setProvenance(provenance);
 
     ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
-        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+        operationContext(), configsvrReshardCollection, collEntry, primaryShardId(), nss(), true);
     auto demoModeOpt = coordinatorDoc.getDemoMode();
     ASSERT_TRUE(demoModeOpt.has_value() && demoModeOpt);
 
@@ -626,7 +635,7 @@ TEST_F(ReshardingUtilTest, EmptyDemoModeReshardCollectionRequest) {
     configsvrReshardCollection.setProvenance(provenance);
 
     ReshardingCoordinatorDocument coordinatorDoc = createReshardingCoordinatorDoc(
-        operationContext(), configsvrReshardCollection, collEntry, nss(), true);
+        operationContext(), configsvrReshardCollection, collEntry, primaryShardId(), nss(), true);
     auto demoModeOpt = coordinatorDoc.getDemoMode();
     ASSERT_FALSE(demoModeOpt.has_value());
 

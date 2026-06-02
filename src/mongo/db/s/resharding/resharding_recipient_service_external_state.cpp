@@ -38,6 +38,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -100,9 +101,21 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
     MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         opCtx, metadata.getTempReshardingNss(), collOptionsAndIndexes);
 
-    auto scopedCsr =
-        CollectionShardingRuntime::acquireExclusive(opCtx, metadata.getTempReshardingNss());
-    scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+    if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
+            resharding::getVersionContextOrDefault(metadata.getForwardableOpMetadata()),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        tassert(12776700,
+                "Expected to have primary shard id given",
+                metadata.getPrimaryShardId().has_value());
+        shard_catalog_commit_for_resharding::commitCreateCollection(
+            opCtx,
+            metadata.getTempReshardingNss(),
+            metadata.getPrimaryShardId() == ShardingState::get(opCtx)->shardId());
+    } else {
+        auto scopedCsr =
+            CollectionShardingRuntime::acquireExclusive(opCtx, metadata.getTempReshardingNss());
+        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+    }
 }
 
 ShardId RecipientStateMachineExternalStateImpl::myShardId(ServiceContext* serviceContext) const {

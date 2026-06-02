@@ -560,6 +560,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     OperationContext* opCtx,
     const ConfigsvrReshardCollection& request,
     const CollectionType& collEntry,
+    const ShardId& dbPrimary,
     const NamespaceString& nss,
     const bool& setProvenance);
 

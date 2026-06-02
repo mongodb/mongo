@@ -610,6 +610,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
     OperationContext* opCtx,
     const ConfigsvrReshardCollection& request,
     const CollectionType& collEntry,
+    const ShardId& dbPrimary,
     const NamespaceString& nss,
     const bool& setProvenance) {
 
@@ -642,6 +643,7 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
                                                    std::move(existingUUID),
                                                    std::move(tempReshardingNss),
                                                    shardKeySpec);
+    commonMetadata.setPrimaryShardId(dbPrimary);
     commonMetadata.setStartTime(opCtx->fastClockSource().now());
     if (request.getUserReshardingUUID()) {
         commonMetadata.setUserReshardingUUID(*request.getUserReshardingUUID());
@@ -699,6 +701,19 @@ ReshardingCoordinatorDocument createReshardingCoordinatorDoc(
         auto telemetryCtxBSON = otel::traces::TelemetryContextSerializer::toBSON(telemetryContext);
         coordinatorDoc.setTelemetryContext(telemetryCtxBSON);
     }
+
+    if (const auto& vCtx = VersionContext::getDecoration(opCtx);
+        feature_flags::gAuthoritativeShardsDDL.isEnabled(vCtx, fcv)) {
+        tassert(ErrorCodes::IllegalOperation,
+                "Authoritative shards requires no shard refreshes to be executed",
+                resharding::gFeatureFlagReshardingCloneNoRefresh.isEnabled(vCtx, fcv) &&
+                    resharding::gFeatureFlagReshardingInitNoRefresh.isEnabled(vCtx, fcv) &&
+                    resharding::gFeatureFlagReshardingNoRefreshApplyingAndBlockingWrites.isEnabled(
+                        vCtx, fcv) &&
+                    resharding::gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable.isEnabled(
+                        vCtx, fcv));
+    }
+
     return coordinatorDoc;
 }
 

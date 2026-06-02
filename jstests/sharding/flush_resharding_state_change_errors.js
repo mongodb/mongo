@@ -221,6 +221,10 @@ function runTests() {
         featureFlagReshardingInitNoRefresh: false,
         featureFlagReshardingNoRefreshApplyingAndBlockingWrites: false,
         featureFlagReshardingSkipCloningAndApplyingIfApplicable: false,
+        // The test also has to disable the feature flags for authoritative shards DDLs since
+        // they depend on these feature flags to be enabled.
+        featureFlagAuthoritativeShardsCRUD: false,
+        featureFlagAuthoritativeShardsDDL: false,
     };
 
     const st = new ShardingTest({

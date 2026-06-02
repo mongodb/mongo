@@ -613,4 +613,14 @@ void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
 }
 
 }  // namespace shard_catalog_commit
+
+namespace shard_catalog_commit_for_resharding {
+void commitCreateCollection(OperationContext* opCtx,
+                            const NamespaceString& tempReshardingNss,
+                            bool isDbPrimaryShard) {
+    return shard_catalog_commit::commitCollectionMetadataLocally(
+        opCtx, tempReshardingNss, isDbPrimaryShard);
+}
+}  // namespace shard_catalog_commit_for_resharding
+
 }  // namespace mongo

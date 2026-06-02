@@ -34,9 +34,9 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/modules.h"
 
-MONGO_MOD_PARENT_PRIVATE;
 namespace mongo {
-namespace shard_catalog_commit {
+
+namespace MONGO_MOD_PARENT_PRIVATE shard_catalog_commit {
 
 
 /**
@@ -98,5 +98,17 @@ void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
                                           bool allowChunkOperations,
                                           const boost::optional<UUID>& uuid);
 
-}  // namespace shard_catalog_commit
+}  // namespace MONGO_MOD_PARENT_PRIVATE shard_catalog_commit
+
+/**
+ * The following family of methods are only meant to be used by the resharding module due to the way
+ * resharding doesn't compose with the existing coordinators. Instead it inlines the work done by
+ * coordinators into the ReshardingCoordinator, and as such has to access the necessary methods for
+ * authoritative shard catalog changes.
+ */
+namespace MONGO_MOD_PUBLIC shard_catalog_commit_for_resharding {
+void commitCreateCollection(OperationContext* opCtx,
+                            const NamespaceString& tempReshardingNss,
+                            bool isDbPrimaryShard);
+}
 }  // namespace mongo

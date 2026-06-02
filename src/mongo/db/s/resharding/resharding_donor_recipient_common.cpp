@@ -336,6 +336,10 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
                                  sourceUUID,
                                  reshardingFields.getDonorFields()->getTempReshardingNss(),
                                  reshardingFields.getDonorFields()->getReshardingKey().toBSON());
+    // This field is only used by the newer authoritative shards path. This branch is only executed
+    // by the legacy non-authoritative path.
+    commonMetadata.setPrimaryShardId(boost::none);
+
     commonMetadata.setStartTime(reshardingFields.getStartTime());
     commonMetadata.setProvenance(reshardingFields.getProvenance());
     resharding::validatePerformVerification(vCtx, reshardingFields.getPerformVerification());
@@ -376,6 +380,10 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
                                                    sourceUUID,
                                                    nss,
                                                    metadata.getShardKeyPattern().toBSON());
+    // This field is only used by the newer authoritative shards path. This branch is only executed
+    // by the legacy non-authoritative path.
+    commonMetadata.setPrimaryShardId(boost::none);
+
     commonMetadata.setStartTime(reshardingFields.getStartTime());
     commonMetadata.setProvenance(reshardingFields.getProvenance());
     resharding::validatePerformVerification(vCtx, reshardingFields.getPerformVerification());
