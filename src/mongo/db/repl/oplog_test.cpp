@@ -45,7 +45,6 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -121,7 +120,10 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
         oplogEntry.setNss(nss);
         oplogEntry.setObject(msgObj);
         oplogEntry.setWallClockTime(Date_t::now());
-        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+        auto acq = acquireCollection(opCtx.get(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx.get(), nss, AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opTime = logOp(opCtx.get(), &oplogEntry);
         ASSERT_FALSE(opTime.isNull());
@@ -263,7 +265,11 @@ TEST_F(OplogTest, ConcurrentLogOp) {
            unittest::Barrier* barrier) {
             return [=] {
                 auto opCtx = cc().makeOperationContext();
-                AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+                auto acq =
+                    acquireCollection(opCtx.get(),
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx.get(), nss, AcquisitionPrerequisites::kWrite),
+                                      MODE_X);
                 WriteUnitOfWork wunit(opCtx.get());
 
                 _logOpNoopWithMsg(opCtx.get(), mtx, opTimeNssMap, nss);
@@ -294,7 +300,11 @@ TEST_F(OplogTest, ConcurrentLogOpRevertFirstOplogEntry) {
            unittest::Barrier* barrier) {
             return [=] {
                 auto opCtx = cc().makeOperationContext();
-                AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+                auto acq =
+                    acquireCollection(opCtx.get(),
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx.get(), nss, AcquisitionPrerequisites::kWrite),
+                                      MODE_X);
                 WriteUnitOfWork wunit(opCtx.get());
 
                 auto opTime = _logOpNoopWithMsg(opCtx.get(), mtx, opTimeNssMap, nss);
@@ -340,7 +350,11 @@ TEST_F(OplogTest, ConcurrentLogOpRevertLastOplogEntry) {
            unittest::Barrier* barrier) {
             return [=] {
                 auto opCtx = cc().makeOperationContext();
-                AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+                auto acq =
+                    acquireCollection(opCtx.get(),
+                                      CollectionAcquisitionRequest::fromOpCtx(
+                                          opCtx.get(), nss, AcquisitionPrerequisites::kWrite),
+                                      MODE_X);
                 WriteUnitOfWork wunit(opCtx.get());
 
                 auto opTime = _logOpNoopWithMsg(opCtx.get(), mtx, opTimeNssMap, nss);
@@ -383,7 +397,10 @@ public:
         auto opCtx = cc().makeOperationContext();
 
         auto uuid = UUID::gen();
-        Lock::DBLock lock(opCtx.get(), _nss.dbName(), MODE_X);
+        auto acq = acquireCollection(opCtx.get(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
         ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
                                               _nss.dbName(),
                                               boost::none,
@@ -400,7 +417,10 @@ public:
 TEST_F(CreateIndexForApplyOpsTest, GeneratesNewIdentIfNone) {
     auto opCtx = cc().makeOperationContext();
     {
-        Lock::DBLock lock(opCtx.get(), _nss.dbName(), MODE_X);
+        auto acq = acquireCollection(opCtx.get(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
         createIndexForApplyOps(opCtx.get(),
                                BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
                                         << "a_1"),
@@ -425,7 +445,10 @@ TEST_F(CreateIndexForApplyOpsTest, UsesIdentIfSpecified) {
     const std::string ident = "index-test-ident";
     const std::string identUniqueTag = "test-ident";
     {
-        Lock::DBLock lock(opCtx.get(), _nss.dbName(), MODE_X);
+        auto acq = acquireCollection(opCtx.get(),
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                     MODE_X);
         createIndexForApplyOps(opCtx.get(),
                                BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
                                         << "a_1"),
@@ -447,7 +470,10 @@ TEST_F(CreateIndexForApplyOpsTest, UsesIdentIfSpecified) {
 
 TEST_F(CreateIndexForApplyOpsTest, MetadataValidation) {
     auto opCtx = cc().makeOperationContext();
-    Lock::DBLock lock(opCtx.get(), _nss.dbName(), MODE_X);
+    auto acq = acquireCollection(opCtx.get(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_X);
     auto spec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
                          << "a_1");
     ASSERT_THROWS_CODE(createIndexForApplyOps(
@@ -525,7 +551,10 @@ TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
     auto opCtx = cc().makeOperationContext();
     auto entry = unittest::assertGet(OplogEntry::parse(makeCreateOplogEntry(_nss, true)));
 
-    Lock::DBLock dbLock(opCtx.get(), _nss.dbName(), MODE_X);
+    auto acq = acquireCollection(opCtx.get(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_X);
     auto status = applyCommand_inlock(
         opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kApplyOpsCmd);
     ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
@@ -542,7 +571,10 @@ TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
 
     auto entry = unittest::assertGet(OplogEntry::parse(makeCreateOplogEntry(_nss, true)));
 
-    Lock::DBLock dbLock(opCtx.get(), _nss.dbName(), MODE_X);
+    auto acq = acquireCollection(opCtx.get(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_X);
     ASSERT_OK(applyCommand_inlock(
         opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kApplyOpsCmd));
 }
@@ -556,7 +588,10 @@ TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
     auto opCtx = cc().makeOperationContext();
     auto entry = unittest::assertGet(OplogEntry::parse(makeCreateOplogEntry(_nss, true)));
 
-    Lock::DBLock dbLock(opCtx.get(), _nss.dbName(), MODE_X);
+    auto acq = acquireCollection(opCtx.get(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_X);
     ASSERT_OK(applyCommand_inlock(
         opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kApplyOpsCmd));
 }
@@ -568,7 +603,10 @@ TEST_F(ApplyCreateWithRecordIdsReplicatedTest,
     auto opCtx = cc().makeOperationContext();
     auto entry = unittest::assertGet(OplogEntry::parse(makeCreateOplogEntry(_nss, true)));
 
-    Lock::DBLock dbLock(opCtx.get(), _nss.dbName(), MODE_X);
+    auto acq = acquireCollection(opCtx.get(),
+                                 CollectionAcquisitionRequest::fromOpCtx(
+                                     opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                 MODE_X);
     ASSERT_OK(applyCommand_inlock(
         opCtx.get(), ApplierOperation{&entry}, OplogApplication::Mode::kSecondary));
 }

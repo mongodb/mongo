@@ -53,11 +53,13 @@
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/platform/compiler.h"
@@ -141,8 +143,11 @@ void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options = generateOptionsWithUuid()) {
     writeConflictRetry(opCtx, "createCollection", nss, [&] {
-        AutoGetDb autodb(opCtx, nss.dbName(), MODE_X);
-        auto db = autodb.ensureDbExists(opCtx);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
         ASSERT_TRUE(db);
         mongo::WriteUnitOfWork wuow(opCtx);
         auto coll = db->createCollection(opCtx, nss, options);
@@ -156,11 +161,13 @@ void createCollection(OperationContext* opCtx,
  * collection after the given index is created.
  */
 int _createIndexOnEmptyCollection(OperationContext* opCtx, NamespaceString nss, BSONObj indexSpec) {
-    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_X);
-    AutoGetCollection coll(opCtx, nss, MODE_X);
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
 
     WriteUnitOfWork wunit(opCtx);
-    CollectionWriter writer{opCtx, coll};
+    CollectionWriter writer{opCtx, &coll};
 
     auto indexCatalog = writer.getWritableCollection(opCtx)->getIndexCatalog();
     ASSERT(indexCatalog);
@@ -467,10 +474,14 @@ TEST_F(StorageInterfaceImplTest,
     auto doc2 = BSON("_id" << 2);
     // Confirm that Collection::insertDocuments fails to insert the batch all at once.
     {
-        AutoGetCollection autoCollection(opCtx, nss, MODE_IX);
+        auto autoCollection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
         WriteUnitOfWork wunit(opCtx);
-        ASSERT_EQUALS(ErrorCodes::OperationCannotBeBatched,
-                      Helpers::insert(opCtx, *autoCollection, std::vector{doc1, doc2}));
+        ASSERT_EQUALS(
+            ErrorCodes::OperationCannotBeBatched,
+            Helpers::insert(opCtx, autoCollection.getCollectionPtr(), std::vector{doc1, doc2}));
     }
     ASSERT_OK(storage.insertDocuments(
         opCtx, nss, std::vector{InsertStatement{doc1}, InsertStatement{doc2}}));

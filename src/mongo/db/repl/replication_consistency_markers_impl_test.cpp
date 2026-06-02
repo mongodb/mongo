@@ -40,9 +40,9 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/idl/idl_parser.h"
@@ -71,8 +71,10 @@ NamespaceString kInitialSyncIdNss = NamespaceString::kDefaultInitialSyncIdNamesp
  */
 BSONObj getMinValidDocument(OperationContext* opCtx, const NamespaceString& minValidNss) {
     return writeConflictRetry(opCtx, "getMinValidDocument", minValidNss, [opCtx, minValidNss] {
-        Lock::DBLock dblk(opCtx, minValidNss.dbName(), MODE_IS);
-        Lock::CollectionLock lk(opCtx, minValidNss, MODE_IS);
+        auto acq = acquireCollection(opCtx,
+                                     CollectionAcquisitionRequest::fromOpCtx(
+                                         opCtx, minValidNss, AcquisitionPrerequisites::kRead),
+                                     MODE_IS);
         BSONObj mv;
         if (Helpers::getSingleton(opCtx, minValidNss, mv)) {
             return mv;

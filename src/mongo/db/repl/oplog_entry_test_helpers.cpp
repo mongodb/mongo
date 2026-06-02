@@ -34,8 +34,8 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/repl/container_oplog_entry_gen.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -594,12 +594,15 @@ void insertDocumentAtRecordId(OperationContext* opCtx,
                               const BSONObj& doc,
                               const RecordId& rid) {
     WriteUnitOfWork wuow(opCtx);
-    AutoGetCollection coll(opCtx, nss, MODE_IX);
-    ASSERT_TRUE(coll);
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    ASSERT_TRUE(coll.exists());
 
     InsertStatement stmt{doc};
     stmt.replicatedRecordId = rid;
-    ASSERT_OK(collection_internal::insertDocument(opCtx, *coll, stmt, nullptr /* opDebug */));
+    ASSERT_OK(collection_internal::insertDocument(opCtx, coll.getCollectionPtr(), stmt, nullptr));
 
     wuow.commit();
 }
@@ -607,11 +610,14 @@ void insertDocumentAtRecordId(OperationContext* opCtx,
 boost::optional<BSONObj> documentAtRecordId(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const RecordId& rid) {
-    AutoGetCollection coll(opCtx, nss, MODE_IS);
-    if (!coll) {
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
+        MODE_IS);
+    if (!coll.exists()) {
         return boost::none;
     }
-    auto cursor = coll->getCursor(opCtx);
+    auto cursor = coll.getCollectionPtr()->getCursor(opCtx);
     auto record = cursor->seekExact(rid);
     if (record.has_value()) {
         return record->data.getOwned().releaseToBson();

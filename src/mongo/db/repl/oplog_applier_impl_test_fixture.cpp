@@ -60,6 +60,7 @@
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/mdb_catalog.h"
@@ -600,10 +601,11 @@ void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options) {
     writeConflictRetry(opCtx, "createCollection", nss, [&] {
-        AutoGetDb autodb(opCtx, nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLk(opCtx, nss, MODE_X);
-
-        auto db = autodb.ensureDbExists(opCtx);
+        auto acq = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        auto db = DatabaseHolder::get(opCtx)->openDb(opCtx, nss.dbName());
         ASSERT_TRUE(db);
 
         mongo::WriteUnitOfWork wuow(opCtx);
@@ -655,8 +657,10 @@ void createIndex(OperationContext* opCtx,
                  const NamespaceString& nss,
                  const UUID collUUID,
                  const BSONObj& spec) {
-    Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
-    Lock::CollectionLock collLk(opCtx, nss, MODE_X);
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     // This fixture sets up some replication, but notably omits installing an OpObserverImpl. This
     // state causes collection creation to timestamp catalog writes, but secondary index creation

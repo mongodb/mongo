@@ -104,6 +104,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 #include "mongo/db/shard_role/shard_catalog/drop_database.h"
 #include "mongo/db/shard_role/shard_catalog/drop_indexes.h"
@@ -349,7 +350,6 @@ public:
             shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
                 RecoveryUnit::ReadSource::kNoTimestamp);
             shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
-            AutoGetDb autoDb(_opCtx, nss.dbName(), MODE_IX);
             auto coll1 = acquireCollection(_opCtx,
                                            CollectionAcquisitionRequest::fromOpCtx(
                                                _opCtx, nss, AcquisitionPrerequisites::kWrite),
@@ -362,7 +362,7 @@ public:
                                              CollectionAcquisitionRequest::fromOpCtx(
                                                  _opCtx, nss, AcquisitionPrerequisites::kWrite),
                                              MODE_IX);
-            auto db = autoDb.ensureDbExists(_opCtx);
+            auto db = DatabaseHolder::get(_opCtx)->openDb(_opCtx, nss.dbName());
             WriteUnitOfWork wunit(_opCtx);
             if (_opCtx->writesAreReplicated() &&
                 shard_role_details::getRecoveryUnit(_opCtx)->getCommitTimestamp().isNull()) {
@@ -604,14 +604,19 @@ public:
      * provided timestamp.
      */
     void assertNamespaceInIdents(NamespaceString nss, Timestamp ts, bool shouldExpect) {
-        OneOffRead oor(_opCtx, ts);
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);
+        auto acq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kRead),
+            LockMode::MODE_IS);
 
         // getCollectionIdent() returns the ident for the given namespace in the MDBCatalog.
         // getAllIdents() actually looks in the RecordStore for a list of all idents, and is thus
         // versioned by timestamp. We can expect a namespace to have a consistent ident across
         // timestamps, provided the collection does not get renamed.
-        auto expectedIdent = MDBCatalog::get(_opCtx)->getEntry(autoColl->getCatalogId()).ident;
+        auto expectedIdent =
+            MDBCatalog::get(_opCtx)->getEntry(acq.getCollectionPtr()->getCatalogId()).ident;
+
+        OneOffRead oor(_opCtx, ts);
         auto idents = MDBCatalog::get(_opCtx)->getAllIdents(_opCtx);
         auto found = std::find(idents.begin(), idents.end(), expectedIdent);
 
@@ -896,9 +901,8 @@ TEST_F(StorageTimestampTest, SecondaryInsertTimes) {
                                     BSON("ts" << firstInsertTime.addTicks(idx).asTimestamp() << "t"
                                               << 1LL << "v" << 2 << "op"
                                               << "i"
-                                              << "ns" << nss.ns_forTest() << "ui"
-                                              << collAcq.getCollectionPtr()->uuid() << "wall"
-                                              << Date_t() << "o" << BSON("_id" << idx))
+                                              << "ns" << nss.ns_forTest() << "ui" << collAcq.uuid()
+                                              << "wall" << Date_t() << "o" << BSON("_id" << idx))
                                     << BSON("ts" << firstInsertTime.addTicks(idx).asTimestamp()
                                                  << "t" << 1LL << "op"
                                                  << "c"
@@ -942,8 +946,8 @@ TEST_F(StorageTimestampTest, SecondaryArrayInsertTimes) {
             MODE_IX);
         oplogCommonBuilder << "v" << 2 << "op"
                            << "i"
-                           << "ns" << nss.ns_forTest() << "ui" << collAcq.getCollectionPtr()->uuid()
-                           << "wall" << Date_t();
+                           << "ns" << nss.ns_forTest() << "ui" << collAcq.uuid() << "wall"
+                           << Date_t();
     }
     auto oplogCommon = oplogCommonBuilder.done();
 
@@ -1019,9 +1023,8 @@ TEST_F(StorageTimestampTest, SecondaryDeleteTimes) {
                              {BSON("ts" << startDeleteTime.addTicks(num).asTimestamp() << "t" << 0LL
                                         << "v" << 2 << "op"
                                         << "d"
-                                        << "ns" << nss.ns_forTest() << "ui"
-                                        << collAcq.getCollectionPtr()->uuid() << "wall" << Date_t()
-                                        << "o" << BSON("_id" << num))})
+                                        << "ns" << nss.ns_forTest() << "ui" << collAcq.uuid()
+                                        << "wall" << Date_t() << "o" << BSON("_id" << num))})
                       .getStatus());
     }
 
@@ -1095,9 +1098,9 @@ TEST_F(StorageTimestampTest, SecondaryUpdateTimes) {
                              {BSON("ts" << firstUpdateTime.addTicks(idx).asTimestamp() << "t" << 0LL
                                         << "v" << 2 << "op"
                                         << "u"
-                                        << "ns" << nss.ns_forTest() << "ui"
-                                        << collAcq.getCollectionPtr()->uuid() << "wall" << Date_t()
-                                        << "o2" << BSON("_id" << 0) << "o" << updates[idx].first)})
+                                        << "ns" << nss.ns_forTest() << "ui" << collAcq.uuid()
+                                        << "wall" << Date_t() << "o2" << BSON("_id" << 0) << "o"
+                                        << updates[idx].first)})
                       .getStatus());
     }
 
@@ -1132,16 +1135,16 @@ TEST_F(StorageTimestampTest, SecondaryInsertToUpsert) {
     // on the same collection with `{_id: 0}`. It's expected for this second insert to be
     // turned into an upsert. The goal document does not contain `field: 0`.
     BSONObjBuilder resultBuilder;
-    auto result = unittest::assertGet(doApplyOps(
-        nss.dbName(),
-        {BSON("ts" << insertTime.asTimestamp() << "t" << 1LL << "op"
-                   << "i"
-                   << "ns" << nss.ns_forTest() << "ui" << collAcq.getCollectionPtr()->uuid()
-                   << "wall" << Date_t() << "o" << BSON("_id" << 0 << "field" << 0)),
-         BSON("ts" << insertTime.addTicks(1).asTimestamp() << "t" << 1LL << "op"
-                   << "i"
-                   << "ns" << nss.ns_forTest() << "ui" << collAcq.getCollectionPtr()->uuid()
-                   << "wall" << Date_t() << "o" << BSON("_id" << 0))}));
+    auto result = unittest::assertGet(
+        doApplyOps(nss.dbName(),
+                   {BSON("ts" << insertTime.asTimestamp() << "t" << 1LL << "op"
+                              << "i"
+                              << "ns" << nss.ns_forTest() << "ui" << collAcq.uuid() << "wall"
+                              << Date_t() << "o" << BSON("_id" << 0 << "field" << 0)),
+                    BSON("ts" << insertTime.addTicks(1).asTimestamp() << "t" << 1LL << "op"
+                              << "i"
+                              << "ns" << nss.ns_forTest() << "ui" << collAcq.uuid() << "wall"
+                              << Date_t() << "o" << BSON("_id" << 0))}));
 
     ASSERT_EQ(2, result.getIntField("applied"));
     ASSERT(result["results"].Array()[0].Bool());
@@ -1276,22 +1279,22 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
         ASSERT_FALSE(acquireCollForRead(_opCtx, nss2).exists());
 
         BSONObjBuilder resultBuilder;
-        auto swResult = doApplyOps(
-            DatabaseName::createDatabaseName_forTest(boost::none, dbName),
-            {
-                BSON("ts" << _presentTs << "t" << 1LL << "op"
-                          << "i"
-                          << "ns" << nss1.ns_forTest() << "ui" << collAcq.getCollectionPtr()->uuid()
-                          << "wall" << Date_t() << "o" << doc1),
-                BSON("ts" << _futureTs << "t" << 1LL << "op"
-                          << "c"
-                          << "ui" << uuid2 << "ns" << nss2.getCommandNS().ns_forTest() << "wall"
-                          << Date_t() << "o" << BSON("create" << nss2.coll())),
-                BSON("ts" << insert2Ts << "t" << 1LL << "op"
-                          << "i"
-                          << "ns" << nss2.ns_forTest() << "ui" << uuid2 << "wall" << Date_t() << "o"
-                          << doc2),
-            });
+        auto swResult =
+            doApplyOps(DatabaseName::createDatabaseName_forTest(boost::none, dbName),
+                       {
+                           BSON("ts" << _presentTs << "t" << 1LL << "op"
+                                     << "i"
+                                     << "ns" << nss1.ns_forTest() << "ui" << collAcq.uuid()
+                                     << "wall" << Date_t() << "o" << doc1),
+                           BSON("ts" << _futureTs << "t" << 1LL << "op"
+                                     << "c"
+                                     << "ui" << uuid2 << "ns" << nss2.getCommandNS().ns_forTest()
+                                     << "wall" << Date_t() << "o" << BSON("create" << nss2.coll())),
+                           BSON("ts" << insert2Ts << "t" << 1LL << "op"
+                                     << "i"
+                                     << "ns" << nss2.ns_forTest() << "ui" << uuid2 << "wall"
+                                     << Date_t() << "o" << doc2),
+                       });
         ASSERT_OK(swResult);
     }
 
@@ -1375,7 +1378,7 @@ TEST_F(StorageTimestampTest, SecondarySetIndexMultikeyOnInsert) {
             _opCtx,
             CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
             MODE_IX);
-        uuid = collAcq.getCollectionPtr()->uuid();
+        uuid = collAcq.uuid();
     }
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
@@ -1453,7 +1456,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
             _opCtx,
             CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
             MODE_IX);
-        return collAcq.getCollectionPtr()->uuid();
+        return collAcq.uuid();
     }();
 
     auto indexName = "a_1";
@@ -1549,7 +1552,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
             _opCtx,
             CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
             MODE_IX);
-        uuid = collAcq.getCollectionPtr()->uuid();
+        uuid = collAcq.uuid();
     }
     auto indexName = "a_1";
     auto indexSpec = BSON("name" << indexName << "key" << BSON("$**" << 1) << "v"
@@ -2526,9 +2529,12 @@ public:
 
         {
             // Drop/rename `kvDropDatabase`. `system.profile` does not get dropped/renamed.
-            AutoGetCollection coll(_opCtx, nss, LockMode::MODE_X);
+            auto coll = acquireCollection(_opCtx,
+                                          CollectionAcquisitionRequest::fromOpCtx(
+                                              _opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                          LockMode::MODE_X);
             WriteUnitOfWork wuow(_opCtx);
-            Database* db = coll.getDb();
+            Database* db = DatabaseHolder::get(_opCtx)->getDb(_opCtx, nss.dbName());
             ASSERT_OK(db->dropCollection(_opCtx, nss));
             wuow.commit();
         }
@@ -2606,10 +2612,13 @@ public:
             NamespaceString::createNamespaceString_forTest("unittests.timestampIndexBuilds");
         create(nss);
 
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-        CollectionWriter coll(_opCtx, autoColl);
+        auto acq = acquireCollection(
+            _opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
+            LockMode::MODE_X);
+        CollectionWriter coll(_opCtx, &acq);
 
-        RecordId catalogId = autoColl->getCatalogId();
+        RecordId catalogId = acq.getCollectionPtr()->getCatalogId();
 
         const LogicalTime insertTimestamp = _clock->tickClusterTime(1);
         {
@@ -2619,7 +2628,7 @@ public:
                                            insertTimestamp.asTimestamp(),
                                            _presentTerm));
             wuow.commit();
-            ASSERT_EQ(1, itCount(*autoColl));
+            ASSERT_EQ(1, itCount(acq.getCollectionPtr()));
         }
 
         const std::string indexIdent = "index-ident";
@@ -2648,13 +2657,13 @@ public:
                                                           << "key" << BSON("a" << 1)),
                                                  indexIdent,
                                                  *storageEngine);
-            auto swIndexInfoObj =
-                indexer.init(_opCtx,
-                             coll,
-                             {indexBuildInfo},
-                             MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, *autoColl),
-                             MultiIndexBlock::InitMode::SteadyState,
-                             boost::none);
+            auto swIndexInfoObj = indexer.init(
+                _opCtx,
+                coll,
+                {indexBuildInfo},
+                MultiIndexBlock::makeTimestampedIndexOnInitFn(_opCtx, acq.getCollectionPtr()),
+                MultiIndexBlock::InitMode::SteadyState,
+                boost::none);
             ASSERT_OK(swIndexInfoObj.getStatus());
             indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
@@ -2664,7 +2673,7 @@ public:
         // Inserting all the documents has the side-effect of setting internal state on the index
         // builder that the index is multikey.
         ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, nss));
-        ASSERT_OK(indexer.checkConstraints(_opCtx, *autoColl));
+        ASSERT_OK(indexer.checkConstraints(_opCtx, coll.get()));
 
         {
             WriteUnitOfWork wuow(_opCtx);
@@ -3445,7 +3454,7 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
             _opCtx,
             CollectionAcquisitionRequest::fromOpCtx(_opCtx, nss, AcquisitionPrerequisites::kWrite),
             MODE_IX);
-        collUUID = collAcq.getCollectionPtr()->uuid();
+        collUUID = collAcq.uuid();
         WriteUnitOfWork wuow(_opCtx);
         insertDocument(collAcq.getCollectionPtr(),
                        InsertStatement(doc, setupStart.asTimestamp(), _presentTerm));

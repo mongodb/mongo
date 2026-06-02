@@ -50,7 +50,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -107,11 +107,15 @@ void MockReplCoordServerFixture::setUp() {
 }
 
 void MockReplCoordServerFixture::insertOplogEntry(const repl::OplogEntry& entry) {
-    AutoGetCollection coll(opCtx(), NamespaceString::kRsOplogNamespace, MODE_IX);
-    ASSERT_TRUE(coll);
+    auto coll = acquireCollection(
+        opCtx(),
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx(), NamespaceString::kRsOplogNamespace, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    ASSERT_TRUE(coll.exists());
 
     WriteUnitOfWork wuow(opCtx());
-    auto status = Helpers::insert(opCtx(), *coll, entry.getEntry().toBSON());
+    auto status = Helpers::insert(opCtx(), coll.getCollectionPtr(), entry.getEntry().toBSON());
     ASSERT_OK(status);
     wuow.commit();
 }

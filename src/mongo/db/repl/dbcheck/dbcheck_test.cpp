@@ -32,6 +32,7 @@
 #include "mongo/db/repl/dbcheck/health_log.h"
 #include "mongo/db/repl/dbcheck/health_log_gen.h"
 #include "mongo/db/repl/dbcheck/health_log_interface.h"
+#include "mongo/db/shard_role/shard_role.h"
 
 #include <boost/optional/optional.hpp>
 
@@ -178,9 +179,12 @@ TEST_F(DbCheckTest, DbCheckDocumentWithInvalidUuid) {
 
 TEST_F(DbCheckClusteredCollectionTest, DbCheckIdRecordIdMismatch) {
     auto opCtx = operationContext();
-    const AutoGetCollection coll(opCtx, kNss, MODE_IX);
+    const auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     // The test fixture setUp() will make the collection a clustered collection.
-    const auto& collection = *coll;
+    const auto& collection = coll.getCollectionPtr();
     ASSERT_TRUE(collection->isClustered());
     auto doc = BSON("_id" << 1 << "a" << 1);
     auto docToGenerateWrongRecordId = BSON("_id" << 2);

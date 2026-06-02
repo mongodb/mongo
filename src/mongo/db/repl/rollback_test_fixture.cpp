@@ -50,7 +50,6 @@
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/session/session_catalog_mongod.h"
-#include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
@@ -239,7 +238,10 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCommandOpForApplyOps(boost::optio
 Collection* RollbackTest::_createCollection(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const CollectionOptions& options) {
-    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_X);
+    auto acq = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
     mongo::WriteUnitOfWork wuow(opCtx);
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->openDb(opCtx, nss.dbName());

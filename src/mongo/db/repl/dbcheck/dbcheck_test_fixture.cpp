@@ -43,7 +43,7 @@
 #include "mongo/db/repl/dbcheck/health_log_gen.h"
 #include "mongo/db/repl/dbcheck/health_log_interface.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/util/fail_point.h"
@@ -106,9 +106,12 @@ void DbCheckTest::insertDocs(OperationContext* opCtx,
         inserts.push_back(bsonBuilder.obj());
     }
 
-    AutoGetCollection coll(opCtx, kNss, MODE_IX);
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     WriteUnitOfWork wuow(opCtx);
-    ASSERT_OK(Helpers::insert(opCtx, *coll, inserts));
+    ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), inserts));
     wuow.commit();
 }
 
@@ -122,9 +125,12 @@ void DbCheckTest::insertInvalidUuid(OperationContext* opCtx,
     bsonBuilder << "invalid uuid" << BSONBinData(uuidBytes, 10, newUUID);
     const auto obj = bsonBuilder.obj();
 
-    AutoGetCollection coll(opCtx, kNss, MODE_IX);
+    auto coll = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
     WriteUnitOfWork wuow(opCtx);
-    ASSERT_OK(Helpers::insert(opCtx, *coll, obj));
+    ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), obj));
     wuow.commit();
 }
 
@@ -186,8 +192,11 @@ DbCheckCollectionInfo DbCheckTest::createDbCheckCollectionInfo(
  * Builds an index on kNss. 'indexKey' specifies the index key, e.g. {'a': 1};
  */
 void DbCheckTest::createIndex(OperationContext* opCtx, const BSONObj& indexKey) {
-    AutoGetCollection collection(opCtx, kNss, MODE_X);
-    ASSERT(collection);
+    auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kWrite),
+        MODE_X);
+    ASSERT(collection.exists());
 
     ASSERT_EQ(1, indexKey.nFields()) << kNss.toStringForErrorMsg() << "/" << indexKey;
     auto spec = BSON("v" << int(IndexConfig::kLatestIndexVersion) << "key" << indexKey << "name"
@@ -196,7 +205,7 @@ void DbCheckTest::createIndex(OperationContext* opCtx, const BSONObj& indexKey) 
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
     auto fromMigrate = false;
-    indexBuildsCoord->createIndex(opCtx, collection->uuid(), spec, indexConstraints, fromMigrate);
+    indexBuildsCoord->createIndex(opCtx, collection.uuid(), spec, indexConstraints, fromMigrate);
 }
 
 Status DbCheckTest::runHashForCollectionCheck(
