@@ -75,11 +75,11 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
                     predicate,
                 );
 
-                printjsononeline(predicate);
+                jsTest.log.info({predicate});
                 print(`actualDocuments: ${actualDocuments}; cardinalityEstimate: ${cardinalityEstimate}`);
 
                 if (Math.abs(actualDocuments - cardinalityEstimate) > 1) {
-                    printjsononeline(plan);
+                    jsTest.log.info({plan});
                     assert(
                         false,
                         `Got cardinalityEstimate = ${cardinalityEstimate} but actualDocuments = ${

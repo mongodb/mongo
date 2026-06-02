@@ -61,14 +61,6 @@ declare function isString(x: any): x is string;
 declare function printjson(x: any): void;
 
 /**
- * Print a value as single-line JSON to the console.
- * Useful for compact output in logs or when space is limited.
- *
- * @param x Value to print
- */
-declare function printjsononeline(x: any): void;
-
-/**
  * Convert a value to JSON string suitable for structured logging.
  *
  * The results of `toJsonForLog` and {@link tostrictjson} should be equal for BSON objects and arrays.

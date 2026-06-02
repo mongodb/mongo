@@ -122,7 +122,6 @@ const expectedGlobalVars = [
     "parseInt",
     "print",
     "printjson",
-    "printjsononeline",
     "sleep",
     "sortDoc",
     "tojson",
@@ -201,8 +200,8 @@ assert.eq(
         .find({
             $where:
                 "const global = function() { return this; }();\n" +
-                "printjsononeline(Object.getOwnPropertyNames(global));\n" +
-                `printjsononeline(${tojsononeline(expectedVarsInWhere)});\n` +
+                "print(tojsononeline(Object.getOwnPropertyNames(global)));\n" +
+                `print(tojsononeline(${tojsononeline(expectedVarsInWhere)}));\n` +
                 `const optional = ${tojsononeline(optionalGlobalVars)};\n` +
                 "const found = new Set(Object.getOwnPropertyNames(global)\n" +
                 "  .filter(varName => !optional.includes(varName)));\n" +

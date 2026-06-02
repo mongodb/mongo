@@ -777,13 +777,6 @@ printjson = function (x) {
     print(tojson(x));
 };
 
-/**
- * The printed value is not always a valid JSON string. See 'tojson()' function comment for details.
- */
-printjsononeline = function (x) {
-    print(tojsononeline(x));
-};
-
 isString = function (x) {
     return typeof x == "string";
 };

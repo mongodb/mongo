@@ -7,11 +7,11 @@ function placeCheck(num) {
 
 function printAll() {
     print("****************");
-    db.foo.find().forEach(printjsononeline);
+    jsTest.log.info("db.foo", {docs: db.foo.find().toArray()});
     print("++++++++++++++++++");
-    primary.foo.find().forEach(printjsononeline);
+    jsTest.log.info("primary.foo", {docs: primary.foo.find().toArray()});
     print("++++++++++++++++++");
-    secondary.foo.find().forEach(printjsononeline);
+    jsTest.log.info("secondary.foo", {docs: secondary.foo.find().toArray()});
     print("---------------------");
 }
 

@@ -26,14 +26,14 @@ export class PipelineWorkload extends Workload {
     runWorkload(dataset, _, db) {
         const coll = db.getCollection(this.collection());
         const pipeline = this.pipeline(dataset);
-        printjsononeline(pipeline);
+        jsTest.log.info({pipeline});
 
         if (!pipeline[0].hasOwnProperty("$documents")) {
             try {
                 coll.explain("allPlansExecution").aggregate(pipeline);
             } catch (error) {
                 /// Large explains() can not legitimately fit in a BSONObject
-                printjsononeline(error.codeName);
+                jsTest.log.info({codeName: error.codeName});
                 assert(error.code === ErrorCodes.BSONObjectTooLarge, error);
             }
         }

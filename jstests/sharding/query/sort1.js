@@ -31,7 +31,7 @@ s.adminCommand({
 assert.lte(3, findChunksUtil.findChunksByNs(s.config, "test.data").itcount(), "A1");
 
 let temp = findChunksUtil.findChunksByNs(s.config, "test.data").sort({min: 1}).toArray();
-temp.forEach(printjsononeline);
+jsTest.log.info({chunks: temp});
 
 let z = 0;
 for (; z < temp.length; z++) if (temp[z].min["sub.num"] <= 50 && temp[z].max["sub.num"] > 50) break;

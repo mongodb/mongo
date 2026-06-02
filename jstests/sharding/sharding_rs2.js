@@ -80,8 +80,9 @@ try {
 assert.soon(
     function () {
         try {
-            printjson(rs.getPrimary().getDB("admin").runCommand("hello"));
-            s.config.shards.find().forEach(printjsononeline);
+            const helloResponse = rs.getPrimary().getDB("admin").runCommand("hello");
+            const shards = s.config.shards.find().toArray();
+            jsTest.log.info("hello response", {helloResponse, shards});
             return countNodes() == 3;
         } catch (e) {
             print(e);
