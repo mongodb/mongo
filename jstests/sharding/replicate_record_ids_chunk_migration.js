@@ -153,16 +153,9 @@ function runMoveChunkReplicaRecordIDsTest(collName, keyDoc, useBounds, splitChun
     );
 }
 
-// TODO (SERVER-124153): Remove the failpoint.
-const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-const failpointSetParameter = isMultiversion
-    ? {}
-    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
 const st = new ShardingTest({
     mongos: 1,
     shards: 2,
-    rsOptions: {setParameter: failpointSetParameter},
 });
 const dbName = "test";
 

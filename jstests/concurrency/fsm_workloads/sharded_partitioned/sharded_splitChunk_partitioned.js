@@ -20,34 +20,6 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.data.partitionSize = 100; // number of shard key values
 
-    const originalSetup = $config.setup;
-
-    $config.setup = function setup(db, collName, cluster) {
-        originalSetup.call(this, db, collName, cluster);
-        // TODO (SERVER-124153): Remove the failpoint.
-        const isMultiversion =
-            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-        if (!isMultiversion) {
-            cluster.executeOnMongodNodes(function (adminDb) {
-                assert.commandWorked(
-                    adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"}),
-                );
-            });
-        }
-    };
-
-    $config.teardown = function teardown(db, collName, cluster) {
-        const isMultiversion =
-            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-        if (!isMultiversion) {
-            cluster.executeOnMongodNodes(function (adminDb) {
-                assert.commandWorked(
-                    adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "off"}),
-                );
-            });
-        }
-    };
-
     // Split a random chunk in this thread's partition, and verify that each node
     // in the cluster affected by the splitChunk operation sees the appropriate
     // after-state regardless of whether the operation succeeded or failed.

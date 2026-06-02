@@ -78,14 +78,7 @@ function createRangeDeletionTask(st, shardPrimary, toShardName, chunkToMove) {
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: chunkToMove, to: toShardName}));
 }
 
-// TODO (SERVER-124153): Remove the failpoint.
-const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-const failpointSetParameter = isMultiversion
-    ? {}
-    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
-
-const st = new ShardingTest({shards: 3, rsOptions: {setParameter: failpointSetParameter}});
+const st = new ShardingTest({shards: 3});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));

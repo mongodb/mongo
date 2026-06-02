@@ -3,8 +3,6 @@
  *
  * @tags: [
  *    requires_fcv_70,
- *    # TODO SERVER-124153: Revisit this tag.
- *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 

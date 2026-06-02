@@ -28,28 +28,6 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
     $config.setup = function (db, collName, cluster) {
         $super.setup.apply(this, arguments);
-        // TODO (SERVER-124153): Remove the failpoint.
-        const isMultiversion =
-            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-        if (!isMultiversion) {
-            cluster.executeOnMongodNodes(function (adminDb) {
-                assert.commandWorked(
-                    adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"}),
-                );
-            });
-        }
-    };
-
-    $config.teardown = function (db, collName, cluster) {
-        const isMultiversion =
-            Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-        if (!isMultiversion) {
-            cluster.executeOnMongodNodes(function (adminDb) {
-                assert.commandWorked(
-                    adminDb.runCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "off"}),
-                );
-            });
-        }
     };
 
     $config.data.setupAdditionalSplitPoints = function setupAdditionalSplitPoints(db, collName, partition) {

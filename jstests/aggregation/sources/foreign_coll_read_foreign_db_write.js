@@ -6,17 +6,6 @@
 //   # Serverless does not support $out
 //   command_not_supported_in_serverless,
 // ]
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-
-// TODO (SERVER-124153): Remove the failpoint.
-const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-if (!isMultiversion) {
-    FixtureHelpers.runCommandOnEachPrimary({
-        db: db.getSiblingDB("admin"),
-        cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
-    });
-}
 
 const localDB = db.getSiblingDB(`${jsTestName()}` + "_local_db");
 const outputDBName = `${jsTestName()}` + "_output_db";

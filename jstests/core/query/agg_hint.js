@@ -8,22 +8,9 @@
 //   directly_against_shardsvrs_incompatible,
 //   # Time series collections cannot be used as a source for `viewOn` or have view-like limitations in this context.
 //   exclude_from_timeseries_crud_passthrough,
-//   # TODO(SERVER-124153): Remove.
-//   featureFlagReplicatedFastCount_incompatible,
 // ]
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {getAggPlanStages, getPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-
-// TODO (SERVER-124153): Remove the failpoint.
-const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-if (!isMultiversion) {
-    FixtureHelpers.runCommandOnEachPrimary({
-        db: db.getSiblingDB("admin"),
-        cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
-    });
-}
 
 const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 

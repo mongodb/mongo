@@ -9,19 +9,6 @@ import {InternalTransactionChunkMigrationTest} from "jstests/sharding/internal_t
 
 const transactionTest = new InternalTransactionChunkMigrationTest();
 
-// TODO (SERVER-124153): Remove the failpoint.
-const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-if (!isMultiversion) {
-    for (let i = 0; i < 3; i++) {
-        assert.commandWorked(
-            transactionTest.st[`rs${i}`]
-                .getPrimary()
-                .adminCommand({configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"}),
-        );
-    }
-}
-
 transactionTest.runTestForFindAndModifyDuringChunkMigration(
     transactionTest.InternalTxnType.kRetryable,
     false /* abortOnInitialTry */,

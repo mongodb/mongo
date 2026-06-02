@@ -3,8 +3,6 @@
  * @tags: [
  *   uses_multi_shard_transaction,
  *   uses_transactions,
- *   # TODO(SERVER-124153): Remove.
- *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 
@@ -21,18 +19,11 @@ import {
     assertCanUpdatePrimitiveShardKey,
 } from "jstests/sharding/libs/update_shard_key_helpers.js";
 
-// TODO (SERVER-124153): Remove the failpoint.
-const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-const failpointSetParameter = isMultiversion
-    ? {}
-    : {"failpoint.useInMemoryReplicatedSizeCount": tojson({mode: "alwaysOn"})};
-
 const st = new ShardingTest({
     mongos: 1,
     shards: {rs0: {nodes: 3}, rs1: {nodes: 3}},
     rsOptions: {
-        setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS, ...failpointSetParameter},
+        setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS},
     },
 });
 

@@ -7,8 +7,6 @@
  *   # This test requires strict control over the tracking state of un/sharded collections.
  *   assumes_unsharded_collection,
  *   requires_fcv_70,
- *   # TODO(SERVER-124153): Remove.
- *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {
@@ -17,17 +15,6 @@ import {
     testExistingUnshardedCollection,
     testNonExistingCollection,
 } from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_common_tests.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-
-// TODO (SERVER-124153): Remove the failpoint.
-const isMultiversion =
-    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
-if (!isMultiversion) {
-    FixtureHelpers.runCommandOnAllShards({
-        db: db.getSiblingDB("admin"),
-        cmdObj: {configureFailPoint: "useInMemoryReplicatedSizeCount", mode: "alwaysOn"},
-    });
-}
 
 const shardNames = db.adminCommand({listShards: 1}).shards.map((shard) => shard._id);
 

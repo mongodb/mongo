@@ -6,8 +6,6 @@
  * @tags: [
  *   requires_fcv_71,
  *   resource_intensive,
- *   # TODO(SERVER-124153): Remove.
- *   featureFlagReplicatedFastCount_incompatible,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
