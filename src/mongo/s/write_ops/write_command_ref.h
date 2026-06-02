@@ -1441,6 +1441,11 @@ public:
     decltype(auto) getSort() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getSort(_index); });
     }
+    decltype(auto) getIncludeQueryStatsMetricsForOpIndex() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) {
+            return r.getIncludeQueryStatsMetricsForOpIndex(_index);
+        });
+    }
     decltype(auto) toBSON() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.toBSON(_index); });
     }
@@ -1570,6 +1575,11 @@ public:
     }
     decltype(auto) getSampleId() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getSampleId(_index); });
+    }
+    decltype(auto) getIncludeQueryStatsMetricsForOpIndex() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) {
+            return r.getIncludeQueryStatsMetricsForOpIndex(_index);
+        });
     }
 
     friend bool operator==(const DeleteOpRef& lhs, const DeleteOpRef& rhs) = default;

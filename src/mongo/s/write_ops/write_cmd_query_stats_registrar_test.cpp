@@ -69,8 +69,7 @@ public:
 
     ServiceContext::UniqueOperationContext opCtxHolder;
     OperationContext* opCtx;
-    // Enable collection of query stats for updates
-    RAIIServerParameterControllerForTest controller{"featureFlagQueryStatsUpdateCommand", true};
+    RAIIServerParameterControllerForTest deleteFlag{"featureFlagQueryStatsDelete", true};
 };
 
 /**
@@ -380,11 +379,171 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
     ASSERT_FALSE(opDebug.getQueryStatsInfo(42).keyHash);
 }
 
+TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequestMultiDelete) {
+    // TODO SERVER-122077 Replace true with 'GetParam()' to test registering query stats on
+    // mongos.
+    bool skipRegistration = true;
+
+    auto deleteCmd = fromjson(R"({
+        delete: "testColl",
+        deletes: [
+            { q: { x: {$eq: 3} }, limit: 0 },
+            { q: { y: {$gt: 10} }, limit: 1 }
+        ],
+        "$db": "testDB"
+    })"_sd);
+    auto deleteCommandRequest = write_ops::DeleteCommandRequest::parse(std::move(deleteCmd));
+    BatchedCommandRequest batchRequest(deleteCommandRequest);
+    WriteCommandRef cmdRef{batchRequest};
+
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+
+    const auto& opDebug = CurOp::get(opCtx)->debug();
+
+    // Multi-delete batch: no queryShapeHash on CurOp.
+    EXPECT_FALSE(opDebug.getQueryShapeHash());
+
+    if (skipRegistration) {
+        for (size_t opIndex = 0; opIndex < 2; opIndex++) {
+            EXPECT_FALSE(opDebug.hasQueryStatsInfo(opIndex));
+        }
+        return;
+    }
+
+    for (size_t opIndex = 0; opIndex < 2; opIndex++) {
+        ASSERT_TRUE(opDebug.hasQueryStatsInfo(opIndex));
+        ASSERT_TRUE(opDebug.getQueryStatsInfo(opIndex).key);
+    }
+}
+
+TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequestSingleDelete) {
+    // TODO SERVER-122077 Replace true with 'GetParam()' to test registering query stats on
+    // mongos.
+    bool skipRegistration = true;
+
+    auto deleteCmd = fromjson(R"({
+        delete: "testColl",
+        deletes: [
+            { q: { x: {$eq: 3} }, limit: 0 }
+        ],
+        "$db": "testDB"
+    })"_sd);
+    auto deleteCommandRequest = write_ops::DeleteCommandRequest::parse(std::move(deleteCmd));
+    BatchedCommandRequest batchRequest(deleteCommandRequest);
+    WriteCommandRef cmdRef{batchRequest};
+
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+
+    const auto& opDebug = CurOp::get(opCtx)->debug();
+
+    // Single delete: queryShapeHash should be set.
+    EXPECT_TRUE(opDebug.getQueryShapeHash());
+
+    if (skipRegistration) {
+        EXPECT_FALSE(opDebug.hasQueryStatsInfo(0));
+        return;
+    }
+
+    ASSERT_TRUE(opDebug.hasQueryStatsInfo(0));
+    ASSERT_TRUE(opDebug.getQueryStatsInfo(0).key);
+
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "queryShape": {
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "command": "delete",
+                "q": {
+                    "x": {
+                        "$eq": "?number"
+                    }
+                },
+                "limit": 0
+            },
+            "ordered": true,
+            "bypassDocumentValidation": false
+        })",
+        opDebug.getQueryStatsInfo(0).key->toBson(
+            opCtx, SerializationOptions::kDebugQueryShapeSerializeOptions, {}));
+}
+TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
+       RegisterRequestForShardsvrCoordinateDeleteForwardedFromRouter) {
+    // TODO SERVER-122077 Replace true with 'GetParam()' to test registering query stats on
+    // mongos.
+    bool skipRegistration = true;
+
+    opCtx->setCommandForwardedFromRouter();
+
+    auto deleteCmd = fromjson(R"({
+        delete: "testColl",
+        deletes: [
+            { q: { x: {$eq: 3} }, limit: 0 },
+            { q: { y: {$gt: 5} }, limit: 1, includeQueryStatsMetricsForOpIndex: 42 },
+            { q: { z: {$lt: 0} }, limit: 0 }
+        ],
+        "$db": "testDB"
+    })"_sd);
+    auto deleteCommandRequest = write_ops::DeleteCommandRequest::parse(std::move(deleteCmd));
+    BatchedCommandRequest batchRequest(deleteCommandRequest);
+    WriteCommandRef cmdRef{batchRequest};
+
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef, skipRegistration);
+
+    const auto& opDebug = CurOp::get(opCtx)->debug();
+    // No ops registered when forwarded from router.
+    for (size_t opIndex = 0; opIndex < 3; opIndex++) {
+        ASSERT_FALSE(opDebug.hasQueryStatsInfo(opIndex));
+    }
+    // Entry at index 42 is created (empty, for returning metrics to mongos).
+    ASSERT_TRUE(opDebug.hasQueryStatsInfo(42));
+    ASSERT_FALSE(opDebug.getQueryStatsInfo(42).key);
+    ASSERT_FALSE(opDebug.getQueryStatsInfo(42).keyHash);
+}
+
 INSTANTIATE_TEST_SUITE_P(RegisterRequestSuite,
                          WriteCmdQueryStatsRegistrarRegisterRequestFixture,
                          testing::Bool());
 
-TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedTest) {
+TEST_F(WriteCmdQueryStatsRegistrarTest, ParseAndRegisterRequestDeleteSkipsWhenFlagDisabled) {
+    // Disable the delete feature flag for this test.
+    RAIIServerParameterControllerForTest disabledFlag{"featureFlagQueryStatsDelete", false};
+
+    auto deleteCmd = fromjson(R"({
+        delete: "testColl",
+        deletes: [ { q: { x: {$eq: 3} }, limit: 0 } ],
+        "$db": "testDB"
+    })"_sd);
+    auto deleteCommandRequest = write_ops::DeleteCommandRequest::parse(std::move(deleteCmd));
+    BatchedCommandRequest batchRequest(deleteCommandRequest);
+    WriteCommandRef cmdRef{batchRequest};
+
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef);
+
+    const auto& opDebug = CurOp::get(opCtx)->debug();
+    EXPECT_FALSE(opDebug.hasQueryStatsInfo(0));
+}
+
+TEST_F(WriteCmdQueryStatsRegistrarTest, ParseAndRegisterRequestDeleteSkipsWhenEncrypted) {
+    auto deleteCmd = fromjson(R"({
+        delete: "testColl",
+        deletes: [ { q: { x: {$eq: 3} }, limit: 0 } ],
+        encryptionInformation: { type: 1, schema: {} },
+        "$db": "testDB"
+    })"_sd);
+    auto deleteCommandRequest = write_ops::DeleteCommandRequest::parse(std::move(deleteCmd));
+    BatchedCommandRequest batchRequest(deleteCommandRequest);
+    WriteCommandRef cmdRef{batchRequest};
+
+    WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(opCtx, cmdRef);
+
+    const auto& opDebug = CurOp::get(opCtx)->debug();
+    EXPECT_FALSE(opDebug.hasQueryStatsInfo(0));
+}
+
+TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
+       SetIncludeQueryStatsMetricsForUpdateIfRequestedTest) {
     WriteCmdQueryStatsRegistrar queryStatsRegistrar;
 
     auto registerMockKey = [&](OpDebug& opDebug, size_t opIndex) {
@@ -400,7 +559,9 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedTe
     {
         write_ops::UpdateOpEntry updateOpEntry;
         updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
-        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, 0, updateOpEntry);
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::UpdateOpEntry>(
+                opCtx, 0, updateOpEntry);
 
         ASSERT_FALSE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
     }
@@ -414,7 +575,9 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedTe
 
         write_ops::UpdateOpEntry updateOpEntry;
         updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
-        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, 1, updateOpEntry);
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::UpdateOpEntry>(
+                opCtx, 1, updateOpEntry);
 
         ASSERT_TRUE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
         ASSERT_EQ(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex(), 1);
@@ -429,7 +592,9 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedTe
 
         write_ops::UpdateOpEntry updateOpEntry;
         ASSERT_FALSE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
-        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, opIndex, updateOpEntry);
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::UpdateOpEntry>(
+                opCtx, opIndex, updateOpEntry);
 
         // Asserts that the field includeQueryStatsMetricsForOpIndex has been set with 'opIndex'.
         // When a shard server receives this 'updateOpEntry', it will append cursor metrics in
@@ -447,12 +612,15 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedTe
 
         write_ops::UpdateOpEntry updateOpEntry;
         ASSERT_FALSE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
-        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, opIndex, updateOpEntry);
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::UpdateOpEntry>(
+                opCtx, opIndex, updateOpEntry);
         ASSERT_FALSE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
     }
 }
 
-TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedForInsertTest) {
+TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
+       SetIncludeQueryStatsMetricsIfRequestedForInsertTest) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
 
     auto makeInsertRequest = [&]() {
@@ -483,7 +651,7 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedFo
         WriteCmdQueryStatsRegistrar queryStatsRegistrar;
         auto insertReq = makeInsertRequest();
         insertReq.setIncludeQueryStatsMetrics(true);
-        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequestedForInsert(localOpCtx, insertReq);
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(localOpCtx, insertReq);
         ASSERT_FALSE(insertReq.getIncludeQueryStatsMetrics());
     });
 
@@ -493,7 +661,7 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedFo
         WriteCmdQueryStatsRegistrar queryStatsRegistrar;
         auto insertReq = makeInsertRequest();
         ASSERT_FALSE(insertReq.getIncludeQueryStatsMetrics());
-        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequestedForInsert(localOpCtx, insertReq);
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(localOpCtx, insertReq);
         ASSERT_TRUE(insertReq.getIncludeQueryStatsMetrics());
     });
 
@@ -504,13 +672,14 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsIfRequestedFo
         WriteCmdQueryStatsRegistrar queryStatsRegistrar;
         auto insertReq = makeInsertRequest();
         insertReq.setIncludeQueryStatsMetrics(true);
-        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequestedForInsert(localOpCtx, insertReq);
+        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(localOpCtx, insertReq);
         // Pre-set value is left untouched since the function returns early.
         ASSERT_TRUE(insertReq.getIncludeQueryStatsMetrics());
     });
 }
 
-TEST_F(WriteCmdQueryStatsRegistrarTest, PassthroughMetricsOpIndexForCoordinateMultiUpdateTest) {
+TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
+       PassthroughMetricsOpIndexForCoordinateMultiUpdateTest) {
     // Setting this to simulate the scenario that a primary shard receives a dispatched update
     // command (_shardsvrCoordinateMultiUpdate) from the router and it has to act like a router.
     opCtx->setCommandForwardedFromRouter();
@@ -532,7 +701,9 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, PassthroughMetricsOpIndexForCoordinateMu
         write_ops::UpdateOpEntry updateOpEntry;
         updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
         ASSERT_TRUE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
-        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, 100, updateOpEntry);
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::UpdateOpEntry>(
+                opCtx, 100, updateOpEntry);
 
         // Asserts that the index in 'updateOpEntry' remain the same (42) and not be overwritten by
         // provided opIndex (100).
@@ -546,7 +717,9 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, PassthroughMetricsOpIndexForCoordinateMu
         write_ops::UpdateOpEntry updateOpEntry;
         updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
         ASSERT_TRUE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
-        queryStatsRegistrar.setIncludeQueryStatsMetricsIfRequested(opCtx, 200, updateOpEntry);
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::UpdateOpEntry>(
+                opCtx, 200, updateOpEntry);
 
         // Asserts that the index in 'updateOpEntry' remain the same and not be unset by the empty
         // QueryStatsInfo.
@@ -559,7 +732,8 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, PassthroughMetricsOpIndexForCoordinateMu
  * Show that we don't register writes for query stats collection when the write sample rate is zero,
  * even if the read path is configured for query stats collection.
  */
-TEST_F(WriteCmdQueryStatsRegistrarTest, RegisterRequestNotSampledWhenWriteRateIsZero) {
+TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
+       RegisterRequestNotSampledWhenWriteRateIsZero) {
     auto& writeLimiter =
         query_stats::QueryStatsStoreManager::getWriteCmdRateLimiter(getServiceContext());
     writeLimiter.configureSampleBased(0, 42);
@@ -589,6 +763,71 @@ TEST_F(WriteCmdQueryStatsRegistrarTest, RegisterRequestNotSampledWhenWriteRateIs
 
     runTest([&] { readLimiter.configureSampleBased(1000, 42); });
     runTest([&] { readLimiter.configureWindowBased(1000); });
+}
+
+TEST_F(WriteCmdQueryStatsRegistrarTest, SetIncludeQueryStatsMetricsForOpIndexIfRequestedDelete) {
+    WriteCmdQueryStatsRegistrar queryStatsRegistrar;
+
+    auto registerMockKey = [&](OpDebug& opDebug, size_t opIndex) {
+        OpDebug::QueryStatsInfo qsi;
+        qsi.key = std::make_unique<query_stats::MockKey>(opCtx);
+        qsi.keyHash = 42;
+        opDebug.setQueryStatsInfoAtOpIndex(opIndex, std::move(qsi));
+    };
+
+    // When no query stats key is registered for the op, the field is explicitly unset.
+    {
+        write_ops::DeleteOpEntry deleteOpEntry;
+        deleteOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::DeleteOpEntry>(
+                opCtx, 0, deleteOpEntry);
+
+        ASSERT_FALSE(deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+    }
+
+    // When a query stats key is registered, the field is set to the actual op index.
+    {
+        registerMockKey(CurOp::get(opCtx)->debug(), 1);
+
+        write_ops::DeleteOpEntry deleteOpEntry;
+        deleteOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::DeleteOpEntry>(
+                opCtx, 1, deleteOpEntry);
+
+        ASSERT_TRUE(deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+        ASSERT_EQ(*deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex(), 1);
+    }
+
+    // Asserts that we are allowed to request metrics for delete ops up to
+    // kMaxBatchOpsMetricsRequested.
+    for (size_t opIndex = 2;
+         opIndex < WriteCmdQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 1;
+         opIndex++) {
+        registerMockKey(CurOp::get(opCtx)->debug(), opIndex);
+
+        write_ops::DeleteOpEntry deleteOpEntry;
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::DeleteOpEntry>(
+                opCtx, opIndex, deleteOpEntry);
+        ASSERT_TRUE(deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+        ASSERT_EQ(*deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex(), opIndex);
+    }
+
+    // Asserts that after reaching the limit, we no longer request for metrics so as to prevent the
+    // response growing beyond the allowed object size limit.
+    for (size_t opIndex = WriteCmdQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 1;
+         opIndex < WriteCmdQueryStatsRegistrar::kMaxBatchOpsMetricsRequested + 10;
+         opIndex++) {
+        registerMockKey(CurOp::get(opCtx)->debug(), opIndex);
+
+        write_ops::DeleteOpEntry deleteOpEntry;
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::DeleteOpEntry>(
+                opCtx, opIndex, deleteOpEntry);
+        ASSERT_FALSE(deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+    }
 }
 
 }  // namespace

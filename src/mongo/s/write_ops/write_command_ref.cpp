@@ -28,9 +28,6 @@
  */
 
 #include "mongo/s/write_ops/write_command_ref.h"
-
-#include "mongo/s/write_ops/write_op_helper.h"
-
 namespace mongo {
 
 // This constant accounts for the null terminator in each field name and the BSONType byte for
@@ -292,9 +289,16 @@ OptionalBool BatchWriteCommandRefImpl::getUpsertSupplied(int index) const {
 
 boost::optional<std::int32_t> BatchWriteCommandRefImpl::getIncludeQueryStatsMetricsForOpIndex(
     int index) const {
-    return visitUpdateOpData(index, [&](const write_ops::UpdateOpEntry& updateOp) {
-        return updateOp.getIncludeQueryStatsMetricsForOpIndex();
-    });
+    using RetT = boost::optional<std::int32_t>;
+    return visitOpData(
+        index,
+        OverloadedVisitor{[&](const BSONObj&) -> RetT { return boost::none; },
+                          [&](const write_ops::UpdateOpEntry& updateOp) -> RetT {
+                              return updateOp.getIncludeQueryStatsMetricsForOpIndex();
+                          },
+                          [&](const write_ops::DeleteOpEntry& deleteOp) -> RetT {
+                              return deleteOp.getIncludeQueryStatsMetricsForOpIndex();
+                          }});
 }
 
 OptionalBool BatchWriteCommandRefImpl::getAllowShardKeyUpdatesWithoutFullShardKeyInQuery(

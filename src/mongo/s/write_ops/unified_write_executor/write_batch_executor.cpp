@@ -383,7 +383,7 @@ BatchedCommandRequest WriteBatchExecutor::buildBatchWriteRequest(
             // Request shard-side metrics if the router registered an insert query stats key.
             // All documents in a single insert command share one query stats entry (opIndex 0).
             query_stats::WriteCmdQueryStatsRegistrar registrar;
-            registrar.setIncludeQueryStatsMetricsIfRequestedForInsert(opCtx, insertRequest);
+            registrar.setIncludeQueryStatsMetricsIfRequested(opCtx, insertRequest);
 
             return std::move(insertRequest);
         } else if (batchType == BatchedCommandRequest::BatchType_Update) {
@@ -393,8 +393,9 @@ BatchedCommandRequest WriteBatchExecutor::buildBatchWriteRequest(
             query_stats::WriteCmdQueryStatsRegistrar registrar;
             for (auto& op : ops) {
                 auto updateOpEntry = write_op_helpers::getOrMakeUpdateOpEntry(op.getUpdateOp());
-                registrar.setIncludeQueryStatsMetricsIfRequested(
-                    opCtx, op.getIndex(), updateOpEntry);
+                registrar
+                    .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::UpdateOpEntry>(
+                        opCtx, op.getIndex(), updateOpEntry);
 
                 auto sampleIdIt = sampleIds.find(getWriteOpId(op));
                 updateOpEntry.setSampleId(sampleIdIt != sampleIds.end()

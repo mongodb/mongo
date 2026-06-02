@@ -102,8 +102,9 @@ BSONObj makeCommandForOp(OperationContext* opCtx,
     clientRequest.getNS().serializeCollectionName(&bob, getCommandNameForOp(op));
     if (op.getOpType() == BatchedCommandRequest::BatchType_Update) {
         auto updateOpEntry = write_op_helpers::getOrMakeUpdateOpEntry(op.getUpdateOp());
-        query_stats::WriteCmdQueryStatsRegistrar{}.setIncludeQueryStatsMetricsIfRequested(
-            opCtx, op.getIndex(), updateOpEntry);
+        query_stats::WriteCmdQueryStatsRegistrar{}
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::UpdateOpEntry>(
+                opCtx, op.getIndex(), updateOpEntry);
         bob.append(getOpsFieldNameForOp(op), BSON_ARRAY(updateOpEntry.toBSON()));
     } else {
         bob.append(getOpsFieldNameForOp(op), BSON_ARRAY(getOpAsBson(op)));

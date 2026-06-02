@@ -568,8 +568,9 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                 updates->emplace_back(
                     _clientRequest.getUpdateRequest().getUpdates().at(writeOpRef.first));
 
-                registrar.setIncludeQueryStatsMetricsIfRequested(
-                    _opCtx, writeOpRef.first, updates->back());
+                registrar
+                    .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::UpdateOpEntry>(
+                        _opCtx, writeOpRef.first, updates->back());
 
                 updates->back().setSampleId(targetedWrite->sampleId);
 
@@ -608,7 +609,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                 return BatchedCommandRequest([&] {
                     write_ops::InsertCommandRequest insertOp(targeter.getNS());
                     insertOp.setDocuments(std::move(*insertDocs));
-                    registrar.setIncludeQueryStatsMetricsIfRequestedForInsert(_opCtx, insertOp);
+                    registrar.setIncludeQueryStatsMetricsIfRequested(_opCtx, insertOp);
                     return insertOp;
                 }());
             case BatchedCommandRequest::BatchType_Update: {
