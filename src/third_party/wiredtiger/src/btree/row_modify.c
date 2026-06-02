@@ -226,6 +226,44 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
          */
         WT_PAGE_ALLOC_AND_SWAP(session, page, mod->mod_row_insert, ins_headp, page->entries + 1);
         ins_slot = F_ISSET(cbt, WT_CBT_SEARCH_SMALLEST) ? page->entries : cbt->slot;
+
+#ifdef HAVE_DIAGNOSTIC
+        /*
+         * The SMALLEST insert list catches keys that sort before the page's first on-disk key. On
+         * any non-leftmost child the page has a hard lower bound: the parent's separator key for
+         * this ref. A key smaller than that bound belongs on the left sibling and would be lost if
+         * grafted onto this page. The leftmost child has -infinity as its lower bound, so any key
+         * is valid.
+         *
+         * Skip the check when the page is not yet linked into its parent (home is NULL). A leaf
+         * being re-instantiated during an in-memory split or rewrite restores its saved updates
+         * before it is spliced into the tree, so there is no separator key to compare against and
+         * the slot lookup below would dereference a NULL home. Read home atomically; splits mutate
+         * it concurrently.
+         */
+        if (F_ISSET(cbt, WT_CBT_SEARCH_SMALLEST) &&
+          __wt_atomic_load_ptr_relaxed(&cbt->ref->home) != NULL) {
+            WT_PAGE_INDEX *pindex;
+            WT_ITEM ref_key;
+            uint32_t slot;
+            int cmp = 0;
+
+            /*
+             * Reading the parent's index requires the split generation: WT_INTL_INDEX_GET asserts
+             * the caller holds it, and accessing the parent's key cells through ref->home likewise
+             * needs the parent to be pinned against splits.
+             */
+            WT_ENTER_PAGE_INDEX(session);
+            __wt_ref_index_slot(session, cbt->ref, &pindex, &slot);
+            if (slot != 0) {
+                __wt_ref_key(cbt->ref->home, cbt->ref, &ref_key.data, &ref_key.size);
+                WT_IGNORE_RET(__wt_compare(session, S2BT(session)->collator, key, &ref_key, &cmp));
+                WT_ASSERT(session, cmp >= 0);
+            }
+            WT_LEAVE_PAGE_INDEX(session);
+        }
+#endif
+
         ins_headp = &mod->mod_row_insert[ins_slot];
 
         /* Allocate the WT_INSERT_HEAD structure as necessary. */

@@ -335,13 +335,81 @@ TEST_CASE_METHOD(kp_fixture, "set_key_provider version selects push mode", "[key
     /* version=0 (default): push flag stays clear. */
     REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=0") == 0);
     REQUIRE(!F_ISSET(conn_impl, WT_CONN_KEY_PROVIDER_PUSH));
+    REQUIRE(stub.set_key == nullptr);  /* No WT-supplied set_key in pull mode. */
     conn_impl->key_provider = nullptr; /* Allow reconfiguration. */
 
     /* version=1: push flag is set. */
     REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=1") == 0);
     REQUIRE(F_ISSET(conn_impl, WT_CONN_KEY_PROVIDER_PUSH));
+    REQUIRE(stub.set_key != nullptr); /* WiredTiger installs its set_key. */
 
     /* Cleanup so the fixture destructor doesn't see a stale provider. */
+    conn_impl->key_provider = nullptr;
+    F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
+}
+
+TEST_CASE_METHOD(kp_fixture, "set_key stores the pushed key as the active key", "[key_provider]")
+{
+    WT_CONNECTION *wt_conn = conn.get_wt_connection();
+    WT_CONNECTION_IMPL *conn_impl = conn.get_wt_connection_impl();
+    WT_KEY_PROVIDER stub = {};
+    REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=1") == 0);
+
+    REQUIRE(conn_impl->disaggregated_storage.active_crypt_key.size == 0);
+
+    const std::string key_bytes = "push-mode-test-key-0123456789";
+    WT_CRYPT_KEYS crypt = {};
+    crypt.keys.data = key_bytes.data();
+    crypt.keys.size = key_bytes.size();
+    REQUIRE(stub.set_key(&stub, session, &crypt) == 0);
+
+    WT_ITEM *active = &conn_impl->disaggregated_storage.active_crypt_key;
+    REQUIRE(active->size == key_bytes.size());
+    REQUIRE(memcmp(active->data, key_bytes.data(), key_bytes.size()) == 0);
+
+    conn_impl->key_provider = nullptr;
+    F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
+}
+
+TEST_CASE_METHOD(kp_fixture, "set_key overwrites a previously pushed key", "[key_provider]")
+{
+    WT_CONNECTION *wt_conn = conn.get_wt_connection();
+    WT_CONNECTION_IMPL *conn_impl = conn.get_wt_connection_impl();
+    WT_KEY_PROVIDER stub = {};
+    REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=1") == 0);
+
+    const std::string first = "first-key-0123456789";
+    const std::string second = "second-key-abcdef";
+    WT_CRYPT_KEYS crypt = {};
+
+    crypt.keys.data = first.data();
+    crypt.keys.size = first.size();
+    REQUIRE(stub.set_key(&stub, session, &crypt) == 0);
+
+    crypt.keys.data = second.data();
+    crypt.keys.size = second.size();
+    REQUIRE(stub.set_key(&stub, session, &crypt) == 0);
+
+    WT_ITEM *active = &conn_impl->disaggregated_storage.active_crypt_key;
+    REQUIRE(active->size == second.size());
+    REQUIRE(memcmp(active->data, second.data(), second.size()) == 0);
+
+    conn_impl->key_provider = nullptr;
+    F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
+}
+
+TEST_CASE_METHOD(kp_fixture, "set_key rejects empty input", "[key_provider]")
+{
+    WT_CONNECTION *wt_conn = conn.get_wt_connection();
+    WT_CONNECTION_IMPL *conn_impl = conn.get_wt_connection_impl();
+    WT_KEY_PROVIDER stub = {};
+    REQUIRE(wt_conn->set_key_provider(wt_conn, &stub, "version=1") == 0);
+
+    WT_CRYPT_KEYS crypt = {};
+    crypt.keys.data = nullptr;
+    crypt.keys.size = 0;
+    REQUIRE(stub.set_key(&stub, session, &crypt) == EINVAL);
+
     conn_impl->key_provider = nullptr;
     F_CLR(conn_impl, WT_CONN_KEY_PROVIDER_PUSH);
 }

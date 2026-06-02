@@ -161,6 +161,32 @@ kp_set_key(KEY_PROVIDER *kp, const WT_CRYPT_KEYS *crypt)
 }
 
 /*
+ * kp_push_active_key --
+ *     Push the module's current key into WiredTiger via set_key.
+ */
+static int
+kp_push_active_key(WT_KEY_PROVIDER *wtkp, WT_SESSION *session)
+{
+    KEY_PROVIDER *kp = (KEY_PROVIDER *)wtkp;
+    WT_CRYPT_KEYS local_crypt = {{0}, {0}, 0};
+    int ret;
+
+    if (wtkp->set_key == NULL) {
+        LOG_ERROR(kp, session, "%s", "set_key callback not installed in push mode");
+        return (EINVAL);
+    }
+
+    local_crypt.keys.data = kp->state.key_data;
+    local_crypt.keys.size = kp->state.key_size;
+    local_crypt.r.lsn = kp->state.lsn;
+
+    if ((ret = wtkp->set_key(wtkp, session, &local_crypt)) != 0)
+        LOG_ERROR(kp, session, "Failed to push loaded key: %d", ret);
+
+    return (ret);
+}
+
+/*
  * kp_load_key --
  *     Loads the current persisted key during checkpoint load. This is called by WiredTiger when
  *     loading a checkpoint to retrieve the key that was used when that checkpoint was created.
@@ -181,6 +207,10 @@ kp_load_key(WT_KEY_PROVIDER *wtkp, WT_SESSION *session, const WT_CRYPT_KEYS *cry
     /* Reset expiration if a valid key was loaded. */
     if (crypt->keys.data != NULL)
         KEY_RESET_EXPIRE(kp);
+
+    /* Push mode: initialize the WT-side active key during start up. */
+    if (kp->version == 1)
+        return (kp_push_active_key(wtkp, session));
 
     return (0);
 }
@@ -340,7 +370,8 @@ kp_on_key_update(WT_KEY_PROVIDER *wtkp, WT_SESSION *session, const WT_CRYPT_KEYS
       kp->state.lsn, kp->state.key_time, kp->state.key_size);
 
     assert(kp->state.key_data != NULL);
-    assert(kp->state.key_state == KEY_STATE_READ); /* Key must have been read */
+    /* Pull mode advances through KEY_STATE_READ via get_key; push mode does not. */
+    assert(kp->version == 1 || kp->state.key_state == KEY_STATE_READ);
 
     if (crypt->keys.size == 0) {
         /* Failure case - error is in keys->r.error */
@@ -413,7 +444,9 @@ kp_configure(KEY_PROVIDER *kp, WT_CONFIG_ARG *config)
 
     /* Parse configuration key-value pairs */
     while ((ret = config_parser->next(config_parser, &k, &v)) == 0) {
-        if (configure_int("verbose", &k, &v, &kp->verbose) == 0)
+        if (configure_int("version", &k, &v, &kp->version) == 0)
+            continue;
+        else if (configure_int("verbose", &k, &v, &kp->verbose) == 0)
             continue;
         else if (configure_int("key_expires", &k, &v, &kp->key_expires) == 0)
             continue;
@@ -481,22 +514,23 @@ key_provider_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
     if ((ret = kp_configure(kp, config)) != 0)
         goto err;
 
-    /* Initialize the key provider function table */
+    /* Initialize the key provider function table. */
     wtkp->load_key = kp_load_key;
     wtkp->get_key = kp_get_key;
     wtkp->on_key_update = kp_on_key_update;
     wtkp->terminate = kp_terminate;
 
-    /* Register the key provider with WiredTiger */
-    if ((ret = conn->set_key_provider(conn, wtkp, NULL)) != 0) {
+    /* Register the key provider with WiredTiger. In push mode pass version=1. */
+    const char *kp_config = (kp->version == 1) ? "version=1" : NULL;
+    if ((ret = conn->set_key_provider(conn, wtkp, kp_config)) != 0) {
         LOG_ERROR(kp, NULL, "WT_CONNECTION.set_key_provider: %d (%s)", ret,
           wtext->strerror(wtext, NULL, ret));
         goto err;
     }
 
     LOG_INFO(kp, NULL,
-      "Key provider initialized successfully; config: {verbose=%d, key_expires=%d}", kp->verbose,
-      kp->key_expires);
+      "Key provider initialized successfully; config: {version=%d, verbose=%d, key_expires=%d}",
+      kp->version, kp->verbose, kp->key_expires);
 
     /* One-shot key expiration: first get_key call always expires the key. */
     KEY_ONESHOT_EXPIRE(kp);

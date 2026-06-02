@@ -1791,8 +1791,8 @@ __rec_split_write_supd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK
      */
     next = chunk == r->cur_ptr ? r->prev_ptr : r->cur_ptr;
     page = r->page;
+    btree = S2BT(session);
     if (page->type == WT_PAGE_ROW_LEAF) {
-        btree = S2BT(session);
         WT_RET(__wt_scr_alloc(session, 0, &key));
 
         for (i = 0, supd = r->supd; i < r->supd_next; ++i, ++supd) {
@@ -1803,6 +1803,13 @@ __rec_split_write_supd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK
                 key->size = WT_INSERT_KEY_SIZE(supd->ins);
             }
             WT_ASSERT(session, next != NULL);
+            /*
+             * The next chunk's boundary key must be populated by the time we route a non-final
+             * chunk. An empty boundary key would silently leave entries unassigned until the final
+             * chunk, which is how a saved update belonging to chunk N can end up grafted onto a
+             * later chunk's restored leaf.
+             */
+            WT_ASSERT(session, next->key.size != 0);
             WT_ERR(__wt_compare(session, btree->collator, key, &next->key, &cmp));
             if (cmp >= 0)
                 break;
@@ -1813,6 +1820,28 @@ __rec_split_write_supd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK
                 break;
     if (i != 0) {
         WT_ERR(__rec_supd_move(session, multi, r->supd, i));
+
+#ifdef HAVE_DIAGNOSTIC
+        /*
+         * Cross-check the dispatch outcome: the smallest saved update routed to this chunk must
+         * sort at or above the chunk's lower-bound key. The saved-update list is kept in sorted
+         * order, so checking the first moved entry covers the rest.
+         *
+         * Skip when this is the first chunk written for the page. Its key was initialized as a
+         * suffix-compression anchor from the page's first on-disk key, not as a strict lower bound,
+         * and legitimate SMALLEST-insert keys may sort below it.
+         */
+        if (page->type == WT_PAGE_ROW_LEAF && r->multi_next > 1) {
+            if (multi->supd[0].ins == NULL)
+                WT_ERR(__wt_row_leaf_key(session, page, multi->supd[0].rip, key, false));
+            else {
+                key->data = WT_INSERT_KEY(multi->supd[0].ins);
+                key->size = WT_INSERT_KEY_SIZE(multi->supd[0].ins);
+            }
+            WT_ERR(__wt_compare(session, btree->collator, key, &chunk->key, &cmp));
+            WT_ASSERT(session, cmp >= 0);
+        }
+#endif
 
         /*
          * If there are updates that weren't moved to the block, shuffle them to the beginning of

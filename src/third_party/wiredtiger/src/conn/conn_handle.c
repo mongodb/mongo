@@ -113,6 +113,7 @@ __wti_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_spin_destroy(session, &conn->block_lock);
     __wt_spin_destroy(session, &conn->checkpoint_lock);
     __wt_spin_destroy(session, &conn->disaggregated_storage.shared_metadata_queue_lock);
+    __wt_buf_free(session, &conn->disaggregated_storage.active_crypt_key);
     __wt_rwlock_destroy(session, &conn->log_mgr.debug_log_retention_lock);
     __wt_rwlock_destroy(session, &conn->dhandle_lock);
     __wt_spin_destroy(session, &conn->fh_lock);

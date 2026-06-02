@@ -2939,8 +2939,11 @@ __conn_set_key_provider(WT_CONNECTION *wt_conn, WT_KEY_PROVIDER *key_provider, c
         WT_ERR_MSG(session, EINVAL, "key provider system must be configured with early_load set");
 
     WT_ERR(__wt_config_gets(session, cfg, "version", &cval));
-    if (cval.val == 1)
+    if (cval.val == 1) {
         F_SET(conn, WT_CONN_KEY_PROVIDER_PUSH);
+        /* Install the WT-implemented set_key for the module to call. */
+        key_provider->set_key = __wti_disagg_set_crypt_key;
+    }
 
     conn->key_provider = key_provider;
 

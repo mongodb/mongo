@@ -5763,7 +5763,8 @@ struct __wt_crypt_keys {
         uint64_t lsn; /* Returns checkpoint LSN upon success. */
         int error;    /* Returns error code on failure. */
     } r;
-    WT_ITEM keys;     /* Encrypted keys. */
+    WT_ITEM keys;       /* Encrypted keys. */
+    uint64_t timestamp; /* Timestamp associated with the keys. */
 };
 
 /*!
@@ -5817,6 +5818,29 @@ struct __wt_key_provider {
      * @param crypt the WT_CRYPT_KEYS information to confirm key persistence.
      */
     int (*on_key_update)(WT_KEY_PROVIDER *kp, WT_SESSION *session, const WT_CRYPT_KEYS *crypt);
+
+    /*!
+     * Set the key to be used for subsequent checkpoint writes.
+     *
+     * The module calls this to hand WiredTiger the next key, along with the
+     * timestamp the key is associated with. A checkpoint will include the most
+     * recent key with a timestamp less than or equal to the checkpoint's
+     * timestamp.
+     *
+     * WiredTiger copies the key data; the module may free its buffer on return.
+     *
+     * Returns an error if the timestamp is not greater than the global stable
+     * timestamp, or not greater than the timestamp of any previous set_key call.
+     *
+     * This call is not transactional: it completes independently of any
+     * surrounding transaction on the session.
+     *
+     * @param kp the WT_KEY_PROVIDER instance.
+     * @param session a session from the associated WT_CONNECTION; consecutive
+     *        calls need not use the same session.
+     * @param crypt the WT_CRYPT_KEYS holding the new key.
+     */
+    int (*set_key)(WT_KEY_PROVIDER *kp, WT_SESSION *session, const WT_CRYPT_KEYS *crypt);
 
     /*!
      * A callback performed when the key provider is closed and will no
