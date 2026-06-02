@@ -280,8 +280,17 @@ StatusWith<std::vector<DatabaseName>> ShardingCatalogManager::_getDBNamesListFro
 
 void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext* opCtx,
                                                                 bool deferShardingInitialization) {
+    // Note that we can check the feature flag here without a fixed FCV region because the caller
+    // is part of onStepUpComplete in which the primary is not yet writable, thus setFCV cannot run.
+    // TODO (SERVER-126212): Always generate a UUID for the config server.
+    const bool uniqueShardIdsEnabled = feature_flags::gFeatureFlagUniqueShardIdentifiers.isEnabled(
+        VersionContext::getDecoration(opCtx),
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     invariant(!ShardingState::get(opCtx)->enabled());
-    auto identity = topology_change_helpers::createShardIdentity(opCtx, ShardId::kConfigServerId);
+    auto identity = topology_change_helpers::createShardIdentity(
+        opCtx,
+        ShardId::kConfigServerId,
+        uniqueShardIdsEnabled ? boost::make_optional(UUID::gen()) : boost::none);
     if (deferShardingInitialization) {
         identity.setDeferShardingInitialization(true);
     }
