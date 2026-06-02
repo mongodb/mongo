@@ -145,7 +145,7 @@ public:
 
     bool isLoadBalancerPeer() const override;
 
-    void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override;
+    void setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) override;
 
     bool bindsToOperationState() const override {
         return isLoadBalancerPeer();

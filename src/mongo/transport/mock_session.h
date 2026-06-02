@@ -102,7 +102,7 @@ public:
         return Status::OK();
     }
 
-    void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) override {}
+    void setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) override {}
 
     bool bindsToOperationState() const override {
         return false;

@@ -194,7 +194,7 @@ public:
     /**
      * Signal the session that the client declared being from a load balancer.
      */
-    virtual void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) = 0;
+    virtual void setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) = 0;
 
     /**
      * Returns true if the connection is on the priority port or corresponding unix socket.

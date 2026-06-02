@@ -110,7 +110,7 @@ void GRPCSession::cancel(Status reason) {
     }
 }
 
-void GRPCSession::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {
+void GRPCSession::setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) {
     tassert(ErrorCodes::OperationFailed,
             "Unable to set loadBalancer option on GRPC connection",
             !helloHasLoadBalancedOption);

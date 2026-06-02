@@ -326,7 +326,7 @@ Status CommonAsioSession::validateProxyUnixSocketPeerPermissions() {
     MONGO_UNREACHABLE;
 }
 
-void CommonAsioSession::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {
+void CommonAsioSession::setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) {
     tassert(ErrorCodes::BadValue,
             "Client claimed to be from a loadBalancer, but is not on load balancer port",
             isConnectedToLoadBalancerPort() || !helloHasLoadBalancedOption);

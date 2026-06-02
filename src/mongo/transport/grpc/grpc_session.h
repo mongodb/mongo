@@ -165,7 +165,7 @@ public:
         return false;
     }
 
-    void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) final;
+    void setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) final;
 
     /**
      * The priority port is unavailable with grpc enabled.

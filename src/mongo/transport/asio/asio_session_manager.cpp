@@ -141,7 +141,7 @@ void AsioSessionManager::decrementPriorityConnections() {
  * In practice, we will never pass "isLoadBalancerPeer" on connect,
  * because the client hasn't performed a "hello: {loadBalancer: true} yet.
  *
- * This increment does happen in CommonAsioSession::setisLoadBalancerPeer()
+ * This increment does happen in CommonAsioSession::setIsLoadBalancerPeer()
  * in response to a hello command with a truthful loadBalancer option.
  * This increment will then be balanced in the destructor further below.
  *

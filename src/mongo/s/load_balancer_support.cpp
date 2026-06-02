@@ -75,7 +75,7 @@ public:
      * and whether it comes from a loadBalancerPort on the owning
      * session object.
      */
-    void setisLoadBalancerPeer(bool helloHasLoadBalancedOption);
+    void setIsLoadBalancerPeer(bool helloHasLoadBalancedOption);
 
     bool didHello() const {
         return _didHello;
@@ -118,9 +118,9 @@ bool PerClient::isConnectedToLoadBalancerPort() const {
     return session && session->isConnectedToLoadBalancerPort();
 }
 
-void PerClient::setisLoadBalancerPeer(bool helloHasLoadBalancedOption) {
+void PerClient::setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) {
     if (const auto& session = getPerClientState.owner(this)->session()) {
-        session->setisLoadBalancerPeer(helloHasLoadBalancedOption);
+        session->setIsLoadBalancerPeer(helloHasLoadBalancedOption);
     }
 }
 
@@ -143,7 +143,7 @@ void handleHello(OperationContext* opCtx, BSONObjBuilder* result, bool helloHasL
     if (perClient.didHello() || !perClient.isConnectedToLoadBalancerPort())
         return;
 
-    perClient.setisLoadBalancerPeer(helloHasLoadBalancedOption);
+    perClient.setIsLoadBalancerPeer(helloHasLoadBalancedOption);
 
     if (helloHasLoadBalancedOption) {
         result->append(HelloCommandReply::kServiceIdFieldName,
