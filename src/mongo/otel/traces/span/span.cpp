@@ -26,8 +26,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/otel/traces/span/span.h"
+#ifdef MONGO_CONFIG_OTEL
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -229,3 +229,4 @@ std::shared_ptr<TelemetryContext> Span::createTelemetryContext() {
 }  // namespace traces
 }  // namespace otel
 }  // namespace mongo
+#endif

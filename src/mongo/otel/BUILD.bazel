@@ -1,11 +1,7 @@
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//src/mongo/otel:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH")
 
 package(default_visibility = ["//visibility:public"])
-
-OTEL_TARGET_COMPATIBLE_WITH = select({
-    "//bazel/config:build_otel_enabled": [],
-    "//conditions:default": ["@platforms//:incompatible"],
-})
 
 exports_files(
     glob(["*.h"]) + glob(["*.cpp"]),

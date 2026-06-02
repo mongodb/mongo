@@ -1,8 +1,69 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+load("//src/mongo/otel:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
     glob([
         "*.h",
-        "*.cpp",
     ]),
+)
+
+mongo_cc_library(
+    name = "span_telemetry_context",
+    srcs = ["span_telemetry_context_impl.cpp"],
+    hdrs = ["span_telemetry_context_impl.h"],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/otel:otel_base",
+        "//src/mongo/otel/traces:tracing_utils",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "span_telemetry_context_impl_test",
+    srcs = ["span_telemetry_context_impl_test.cpp"],
+    tags = [
+        "mongo_unittest_second_group",
+        "tracing_test",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":span_telemetry_context",
+        "//src/mongo/otel/traces:tracing_utils",
+        "//src/third_party/opentelemetry-cpp/api",
+    ],
+)
+
+mongo_cc_library(
+    name = "span",
+    srcs = ["span.cpp"],
+    deps = [
+        ":span_telemetry_context",
+        "//src/mongo/base:system_error",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/otel:otel_base",
+    ] + select({
+        "@//bazel/config:build_otel_enabled": [
+            "//src/mongo/otel/traces:tracer_provider_service",
+            "//src/third_party/opentelemetry-cpp/api",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_unit_test(
+    name = "span_test",
+    srcs = ["span_test.cpp"],
+    tags = [
+        "mongo_unittest_seventh_group",
+        "tracing_test",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":span",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/otel/traces:tracing_test_util",
+    ],
 )

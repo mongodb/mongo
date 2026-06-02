@@ -1,4 +1,5 @@
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library", "mongo_cc_unit_test")
+load("//src/mongo/otel:otel_rules.bzl", "OTEL_TARGET_COMPATIBLE_WITH")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,11 +8,6 @@ exports_files(
         "*.h",
     ]),
 )
-
-OTEL_TARGET_COMPATIBLE_WITH = select({
-    "//bazel/config:build_otel_enabled": [],
-    "//conditions:default": ["@platforms//:incompatible"],
-})
 
 GRPC_TARGET_COMPATIBLE_WITH = select({
     "//bazel/config:build_grpc_enabled": [],
@@ -23,11 +19,38 @@ idl_generator(
     src = "trace_settings.idl",
 )
 
+mongo_cc_library(
+    name = "trace_settings",
+    srcs = [
+        ":trace_settings_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
 idl_generator(
     name = "tracing_feature_flag_gen",
     src = "tracing_feature_flag.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "tracer_provider_service",
+    srcs = [
+        "tracer_provider_service.cpp",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":trace_settings",
+        "//src/mongo/db:server_base",
+        "//src/mongo/otel:otel_base",
+        "//src/third_party/opentelemetry-cpp/api",
+        "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",
+        "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_http_exporter",
+        "//src/third_party/opentelemetry-cpp/sdk/src/trace",
     ],
 )
 
@@ -76,13 +99,11 @@ mongo_cc_library(
 
 mongo_cc_library(
     name = "tracing_initialization_base",
-    srcs = [
-        ":trace_settings_gen",
-    ],
     hdrs = [
         "trace_initialization.h",
     ],
     deps = [
+        ":trace_settings",
         "//src/mongo/db:server_base",
     ],
 )
@@ -91,35 +112,14 @@ mongo_cc_library(
     name = "tracing_initialization_impl",
     srcs = [
         "trace_initialization.cpp",
-        "tracer_provider_service.cpp",
-    ],
-    hdrs = [
-        "tracer_provider_service.h",
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
+        ":tracer_provider_service",
         ":tracing_initialization_base",
-        "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",
-        "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_http_exporter",
-        "//src/third_party/opentelemetry-cpp/sdk/src/trace",
         "//src/third_party/opentelemetry-proto:resource_proto_cc",
         "//src/third_party/opentelemetry-proto:trace_proto_cc",
         "@com_google_protobuf//:protobuf",
-    ],
-)
-
-mongo_cc_library(
-    name = "span_telemetry_context",
-    srcs = [
-        "//src/mongo/otel/traces/span:span_telemetry_context_impl.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/otel/traces/span:span_telemetry_context_impl.h",
-    ],
-    deps = [
-        ":tracing_utils",
-        "//src/mongo/db:server_base",
-        "//src/mongo/otel:otel_base",
     ],
 )
 
@@ -158,9 +158,9 @@ mongo_cc_library(
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
-        ":span_telemetry_context",
         ":telemetry_context_serialization_header",
         "//src/mongo/db:server_base",
+        "//src/mongo/otel/traces/span:span_telemetry_context",
         "//src/third_party/opentelemetry-cpp/api",
     ],
 )
@@ -175,31 +175,11 @@ mongo_cc_library(
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
-                ":tracing_internal",
+                "//src/mongo/otel/traces/span",
             ],
             "//conditions:default": [],
         },
     ),
-)
-
-# Private implementation for the tracing library. These files are only built
-# when OTEL is enabled and must only be included from regions where
-# MONGO_CONFIG_OTEL is defined.
-mongo_cc_library(
-    name = "tracing_internal",
-    srcs = [
-        "//src/mongo/otel/traces/span:span.cpp",
-    ],
-    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
-    deps = [
-        ":span_telemetry_context",
-        ":tracing_initialization",
-        "//src/mongo/base:system_error",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",
-        "//src/mongo/otel:otel_base",
-        "//src/third_party/opentelemetry-cpp/api",
-    ],
 )
 
 mongo_cc_library(
@@ -222,8 +202,6 @@ mongo_cc_unit_test(
         "bson_text_map_carrier_test.cpp",
         "telemetry_context_serialization_test.cpp",
         "trace_initialization_test.cpp",
-        "//src/mongo/otel/traces/span:span_telemetry_context_impl_test.cpp",
-        "//src/mongo/otel/traces/span:span_test.cpp",
     ],
     tags = [
         "mongo_unittest_fourth_group",
@@ -232,6 +210,7 @@ mongo_cc_unit_test(
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
         ":tracing",
+        ":tracing_initialization",
         ":tracing_test_util",
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/idl:server_parameter_test_util",
