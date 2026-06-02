@@ -93,13 +93,24 @@ const DEFAULT_SIDE_WRITES_COUNT = 8;
 // We always build three indexes in a single createIndexes call so that PdibPosition can pick
 // "first/middle/last" index for the per-phase fail points whose matchKey is `indexNames`.
 const DEFAULT_INDEX_COUNT = 3;
+// The document fields present in every seeded doc. Each is covered by exactly one index below:
+// `a` by the unique index, `b` by the wildcard, `c` by the standard index.
 const DEFAULT_INDEX_KEYS = ["a", "b", "c"];
-const DEFAULT_INDEX_SPECS = DEFAULT_INDEX_KEYS.map((k) => ({[k]: 1}));
-// Per-field key pad sizes (bytes). Different sizes mean the three sorters fill at different rates
-// and therefore spill at different scan iterations — more interesting coverage than three
-// identical sorters spilling in lock-step. With docCount=3000 and a 1 MB / index sorter budget,
-// the three indexes spill roughly 4 / 3 / 1 times respectively, at distinct iteration boundaries.
-const DEFAULT_PAD_BYTES = [1500, 1000, 500];
+// The three index specs built in one createIndexes call, in the fixed order that PdibPosition maps to
+// (beginning → [0], middle → [1], end → [2]; see indexNameForPosition). Each entry is a full
+// createIndexes spec minus `name` (the test assigns the name). We deliberately mix three index
+// types so a single resume exercises all of them:
+//   [0] unique   — {a:1}; `a` is a unique scalar key.
+//   [1] wildcard — {"$**":1} projected to `b`; multikey via the two-element array `b`
+//   [2] standard — {c:1}; multikey because `c` is array-valued
+const DEFAULT_INDEX_SPECS = [{key: {a: 1}, unique: true}, {key: {"$**": 1}, wildcardProjection: {b: 1}}, {key: {c: 1}}];
+// Per-field key pad sizes (bytes), applied to fields a/b/c in defaultDocTemplate. Different sizes
+// mean the sorters fill at different rates and spill at different points — richer coverage than
+// identical sorters spilling in lock-step. With docCount=3000 and a 1 MB / index sorter budget the
+// three indexes spill roughly 4 / 3 / 1 times. `b` is padded to 500 (half of the others' "natural"
+// size) because it holds two array elements, so the wildcard-on-`b` still indexes ~1 KB of key data
+// per document.
+const DEFAULT_PAD_BYTES = [1500, 500, 500];
 // `maxIndexBuildMemoryUsageMegabytes` is divided across all indexes in the build. With 3 indexes
 // we want each sorter to behave like the original single-index test (1 MB / index → ~10 spills
 // over 10 MB of keys), so the total is DEFAULT_INDEX_COUNT MB.
@@ -139,16 +150,25 @@ const EXPECTED_RESUME_PHASES = {
 };
 
 function defaultDocTemplate(i) {
-    // Each indexed field gets a string whose length is set by `DEFAULT_PAD_BYTES[idx]`. Varying
-    // sizes per field means the three sorters fill at different rates and therefore spill at
-    // different scan iterations, which exercises a more realistic mix of per-index resume-state
-    // checkpoint boundaries than three lock-step sorters would.
+    // Each field gets a string whose length is set by `DEFAULT_PAD_BYTES`. Varying sizes mean the
+    // sorters fill at different rates and spill at different points, exercising a more realistic mix
+    // of per-index resume-state checkpoint boundaries than lock-step sorters would. The field shapes
+    // also drive the index-type coverage in DEFAULT_INDEX_SPECS:
+    //   a — scalar, and unique (the zero-padded prefix makes it distinct per document).
+    //   b — two-element array. `b` is indexed only by the {"$**":1} wildcard (the middle-position
+    //       index), so making it multi-valued gives genuine multi-element multikey coverage without
+    //       perturbing the end-position index's per-document key count.
+    //   c — single-element array. Enough to mark the {c:1} index multikey while still emitting
+    //       exactly one key per document, so the LOAD/DRAIN end-position key-count math (which
+    //       assumes ~1 key per doc for index[2]) stays intact.
     const prefix = String(i).padStart(8, "0");
-    const doc = {_id: i};
-    DEFAULT_INDEX_KEYS.forEach((key, idx) => {
-        doc[key] = prefix + "x".repeat(DEFAULT_PAD_BYTES[idx]);
-    });
-    return doc;
+    const pad = (n, ch = "x") => prefix + ch.repeat(n);
+    return {
+        _id: i,
+        a: pad(DEFAULT_PAD_BYTES[0]),
+        b: [pad(DEFAULT_PAD_BYTES[1], "x"), pad(DEFAULT_PAD_BYTES[1], "y")],
+        c: [pad(DEFAULT_PAD_BYTES[2])],
+    };
 }
 
 function bulkInsert(coll, count, template, batchSize = 1000) {
@@ -256,8 +276,10 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      *     old primary after each step-up. See `PdibFailoverMode`.
      * @param {string} [options.dbName=jsTestName()]
      * @param {string} [options.collName="coll"]
-     * @param {Object[]} [options.indexSpecs=DEFAULT_INDEX_SPECS] - The three index specs to build
-     *     in a single `createIndexes` call. Must have length 3.
+     * @param {Object[]} [options.indexSpecs=DEFAULT_INDEX_SPECS] - The three index specs to build in
+     *     a single `createIndexes` call, in beginning/middle/end order. Each entry is a full
+     *     createIndexes index spec *without* `name` (the test assigns the name), e.g.
+     *     `{key: {a: 1}, unique: true}` or `{key: {"$**": 1}}`. Must have length 3.
      * @param {Function} [options.docTemplate=defaultDocTemplate] - `(i: number) => Object`
      *     producing the i-th document.
      * @param {number} [options.docCount=DEFAULT_DOC_COUNT]
@@ -351,8 +373,10 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
      *     old primary after each step-up. See `PdibFailoverMode`.
      * @param {string} [options.dbName=jsTestName()]
      * @param {string} [options.collName="coll"]
-     * @param {Object[]} [options.indexSpecs=DEFAULT_INDEX_SPECS] - The three index specs to build
-     *     in a single `createIndexes` call. Must have length 3.
+     * @param {Object[]} [options.indexSpecs=DEFAULT_INDEX_SPECS] - The three index specs to build in
+     *     a single `createIndexes` call, in beginning/middle/end order. Each entry is a full
+     *     createIndexes index spec *without* `name` (the test assigns the name), e.g.
+     *     `{key: {a: 1}, unique: true}` or `{key: {"$**": 1}}`. Must have length 3.
      * @param {Function} [options.docTemplate=defaultDocTemplate]
      * @param {number} [options.docCount=DEFAULT_DOC_COUNT]
      * @param {Object[]} [options.sideWrites] - Must contain at least one side write so that the
@@ -741,6 +765,9 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         const out = new Array(DEFAULT_SIDE_WRITES_COUNT);
         for (let i = 0; i < DEFAULT_SIDE_WRITES_COUNT; i++) {
             const v = docCount + 1 + i;
+            // Each side-write `a` value is distinct (docCount+1 .. docCount+DEFAULT_SIDE_WRITES_COUNT)
+            // and is a number, so it never collides with the unique {a:1} index's string keys from
+            // defaultDocTemplate — the unique constraint still holds as these drain.
             const doc = {_id: v};
             for (const key of DEFAULT_INDEX_KEYS) {
                 doc[key] = v;
@@ -1032,7 +1059,10 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         const primary = rst.getPrimary();
         const fp = configureFailPoint(primary, "hangBeforeBuildingIndex");
 
-        const indexesArg = indexSpecs.map((spec, i) => ({key: spec, name: indexNames[i]}));
+        // Each spec is a full createIndexes index doc minus `name` (e.g. {key: {a: 1}, unique: true}
+        // or {key: {"$**": 1}}); the test supplies the name. Spread it so per-index options such as
+        // `unique` (and any wildcard projection) flow through to the command.
+        const indexesArg = indexSpecs.map((spec, i) => ({...spec, name: indexNames[i]}));
 
         const awaitCreateIndexes = startParallelShell(
             funWithArgs(
