@@ -4,8 +4,6 @@
 //   # Time series collections (as views) have specific limitations on aggregation stages
 //   # (e.g. $merge, $out) or cursor options (e.g. noCursorTimeout, singleBatch).
 //   exclude_from_timeseries_crud_passthrough,
-//   # TODO SERVER-127093: Enable test on TSAN variant.
-//   incompatible_disaggregated_storage_tsan,
 // ]
 
 // Test subtleties of batchSize and limit.
@@ -173,11 +171,9 @@ while (bigStr.length < 1000000) {
 
 // Insert enough documents to exceed the 32 MB in-memory sort limit.
 const nDocs = 40 * FixtureHelpers.numberOfShardsForCollection(coll);
-docsToInsert = [];
 for (let i = 0; i < nDocs; i++) {
-    docsToInsert.push({x: 1, y: 1, z: i, big: bigStr});
+    assert.commandWorked(coll.insertOne({x: 1, y: 1, z: i, big: bigStr}));
 }
-assert.commandWorked(coll.insert(docsToInsert));
 
 // Two indices needed in order to trigger plan ranking. Neither index provides the sort order.
 assert.commandWorked(coll.createIndex({x: 1}));
