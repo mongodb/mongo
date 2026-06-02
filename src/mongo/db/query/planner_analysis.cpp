@@ -824,6 +824,29 @@ bool isIndexEligibleForRightSideOfLookupPushdown(const IndexEntry& index,
         !index.sparse;
 }
 
+// Returns true if 'index' can be used for the right side of a $lookup in the classic engine but
+// not in SBE. This applies to two cases:
+//   - Sparse or partial B-tree/hashed indexes on the foreign field: SBE does not support these
+//     and would fall back to a collection scan, so classic should be preferred.
+//   - Wildcard indexes that cover the foreign field: classic can leverage them but SBE cannot.
+bool isIndexEligibleForRightSideOfLookupOnlyInClassic(const IndexEntry& index,
+                                                      const std::string& foreignField) {
+    if ((index.type == INDEX_BTREE || index.type == INDEX_HASHED) &&
+        index.keyPattern.firstElement().fieldName() == foreignField &&
+        (index.sparse || index.filterExpr)) {
+        return true;
+    }
+    if (index.type == INDEX_WILDCARD) {
+        auto* wildcardProjection = index.indexPathProjection;
+        tassert(6408201,
+                "wildcardProjection must be non-null for Wildcard Indexes",
+                wildcardProjection);
+        return projection_executor_utils::applyProjectionToOneField(wildcardProjection->exec(),
+                                                                    foreignField);
+    }
+    return false;
+}
+
 // Determines whether 'index' has collation compatible with the collation used for the local
 // collection.
 bool isIndexCollationCompatible(const IndexEntry& index, const CollatorInterface* collator) {
@@ -953,7 +976,7 @@ std::tuple<boost::optional<IndexEntry>, bool> determineForeignIndexForRightSideO
 bool QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
     const std::string& foreignField, const std::vector<IndexEntry>& fullIndexList) {
 
-    bool hasOnlyClassicEligibleIndex = false;
+    bool foundClassicOnlyIndex = false;
 
     for (size_t i = 0; i < fullIndexList.size(); ++i) {
         const auto& index = fullIndexList[i];
@@ -961,28 +984,16 @@ bool QueryPlannerAnalysis::canUseIndexForRightSideOfLookupOnlyInClassic(
             6408200, 3, "Relevant index", "indexNumber"_attr = i, "index"_attr = index.toString());
 
         if (isIndexEligibleForRightSideOfLookupPushdown(index, foreignField)) {
-            // If the index has compatible collation then INLJ will be used.
-            // If the index has non-compatible collation and the query cannot spill DINLJ will be
-            // used. If the index has non-compatible collation and the query can spill HJ will be
-            // used.
+            // SBE can use this index (via INLJ, DINLJ, or HJ), so there is no reason to prefer
+            // classic.
             return false;
-        } else if (index.type == INDEX_WILDCARD) {
-            // Obtain the projection executor from the parent wildcard IndexEntry.
-            auto* wildcardProjection = index.indexPathProjection;
-            tassert(6408201,
-                    "wildcardProjection must be non-null for Wildcard Indexes",
-                    wildcardProjection);
+        }
 
-            if (projection_executor_utils::applyProjectionToOneField(wildcardProjection->exec(),
-                                                                     foreignField)) {
-                // The wildCardProjection part of the index does not exclude the field, so classic
-                // can potentially use it
-                hasOnlyClassicEligibleIndex = true;
-            }
+        if (isIndexEligibleForRightSideOfLookupOnlyInClassic(index, foreignField)) {
+            foundClassicOnlyIndex = true;
         }
     }
-
-    return hasOnlyClassicEligibleIndex;
+    return foundClassicOnlyIndex;
 }
 
 // static

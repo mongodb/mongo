@@ -11,8 +11,13 @@ import {
     getLookupStageIndexStrategy,
     hasRejectedPlans,
     planHasStage,
+    getEngine,
 } from "jstests/libs/query/analyze_plan.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeRestrictedOrFullyEnabled,
+    checkSbeRestricted,
+    checkSbeEqLookupUnwindEnabled,
+} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -31,6 +36,17 @@ const name = "lookup_pushdown";
 const foreignCollName = "foreign_lookup_pushdown";
 const viewName = "view_lookup_pushdown";
 
+let db = conn.getDB(name);
+const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
+const sbeRestricted = checkSbeRestricted(db);
+const sbeEqLookupUnwindEnabled = checkSbeEqLookupUnwindEnabled(db);
+
+if (!sbeEnabled) {
+    jsTest.log.info("Skipping test because SBE is disabled");
+    MongoRunner.stopMongod(conn);
+    quit();
+}
+
 /**
  * Helper function which verifies that at least one $lookup was lowered into SBE within
  * 'explain', and that the EqLookupNode at 'eqLookupNodeIndex' chose the appropriate strategy.
@@ -38,7 +54,9 @@ const viewName = "view_lookup_pushdown";
  * 'indexKeyPattern' was chosen. Otherwise, we verify that 'NestedLoopJoin' was chosen.
  */
 function verifyEqLookupNodeStrategy(explain, eqLookupNodeIndex, expectedStrategy, indexKeyPattern = {}) {
-    const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
+    // Collect both EQ_LOOKUP and EQ_LOOKUP_UNWIND nodes. The latter appears when
+    // featureFlagSbeEqLookupUnwind is enabled and $lookup absorbs a subsequent $unwind.
+    const eqLookupNodes = [...getAggPlanStages(explain, "EQ_LOOKUP"), ...getAggPlanStages(explain, "EQ_LOOKUP_UNWIND")];
     assert.gt(eqLookupNodes.length, 0, "expected at least one EQ_LOOKUP node; got " + tojson(explain));
 
     // Verify that we're selecting an EQ_LOOKUP node within range.
@@ -101,6 +119,11 @@ function runTest(
     if (expectedJoinAlgorithm === JoinAlgorithm.Classic) {
         assert.commandWorked(response);
         const explain = coll.explain("executionStats").aggregate(pipeline, aggOptions);
+
+        if (sbeRestricted) {
+            assert.eq(getEngine(explain), "classic");
+        }
+
         const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
 
         // In the classic case, verify that $lookup was not lowered into SBE. Note that we don't
@@ -123,15 +146,6 @@ function runTest(
             assert(hasRejectedPlans(explain), explain);
         }
     }
-}
-
-let db = conn.getDB(name);
-const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
-
-if (!sbeEnabled) {
-    jsTest.log.info("Skipping test because SBE is disabled");
-    MongoRunner.stopMongod(conn);
-    quit();
 }
 
 let coll = db[name];
@@ -281,14 +295,16 @@ function setLookupPushdownDisabled(value) {
         JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
     );
 
-    // $lookup that absorbs $unwind.
+    // $lookup that absorbs $unwind. When featureFlagSbeEqLookupUnwind is enabled, this is
+    // SBE-compatible even in restricted mode and will use hash join (small collection, no index).
     runTest(
         coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}, {$unwind: "$out"}],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        sbeEqLookupUnwindEnabled ? JoinAlgorithm.HJ : JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
     );
 
-    // $lookup that absorbs $match.
+    // $lookup that absorbs $match. When featureFlagSbeEqLookupUnwind is enabled, the absorbed
+    // $unwind makes this SBE-compatible even in restricted mode and will use hash join.
     runTest(
         coll,
         [
@@ -296,7 +312,7 @@ function setLookupPushdownDisabled(value) {
             {$unwind: "$out"},
             {$match: {out: {$gte: 0}}},
         ],
-        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+        sbeEqLookupUnwindEnabled ? JoinAlgorithm.HJ : JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
     );
 
     // $lookup that does not absorb $match.
@@ -340,14 +356,14 @@ function setLookupPushdownDisabled(value) {
     assert.commandWorked(foreignColl.dropIndexes());
 })();
 
-// Construct an index with a partial filter expression. In this case, we should NOT use INLJ.
+// Construct an index with a partial filter expression. In this case, we should use Classic.
 (function testPartialFilterExpressionIndexesAreIgnored() {
     assert.commandWorked(foreignColl.dropIndexes());
     assert.commandWorked(foreignColl.createIndex({b: 1}, {partialFilterExpression: {b: 1}}));
     runTest(
         coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
+        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
     );
 
     // If we add an index that is not a partial index, we should then use INLJ.
@@ -558,14 +574,23 @@ function setLookupPushdownDisabled(value) {
 })();
 
 // Build a sparse index on the foreign collection that matches the foreignField. In this case, we
-// should use regular nested loop join.
+// should use classic.
 (function testSparseIndexesNotUsedForPushDown() {
     assert.commandWorked(foreignColl.dropIndexes());
     assert.commandWorked(foreignColl.createIndex({b: 1}, {sparse: true}));
     runTest(
         coll,
         [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-        JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
+        JoinAlgorithm.Classic /* expectedJoinAlgorithm */,
+    );
+
+    // If we add an index that is not a sparse index, we should then use INLJ.
+    assert.commandWorked(foreignColl.createIndex({b: 1, a: 1}));
+    runTest(
+        coll,
+        [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
+        JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
+        {b: 1, a: 1} /* indexKeyPattern */,
     );
     assert.commandWorked(foreignColl.dropIndexes());
 })();
