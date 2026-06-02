@@ -176,11 +176,12 @@ StringData FeatureCompatibilityVersionParser::serializeVersionForFeatureFlags(FC
 }
 
 Status FeatureCompatibilityVersionParser::validatePreviousVersionField(FCV version) {
-    if (version == GenericFCV::kLatest) {
+    if (version == GenericFCV::kLatest || version == GenericFCV::kLastLTS ||
+        version == GenericFCV::kLastContinuous) {
         return Status::OK();
     }
-    return Status(ErrorCodes::Error(4926901),
-                  "when present, 'previousVersion' field must be the latest binary version");
+    return Status(ErrorCodes::Error(11948401),
+                  "when present, 'previousVersion' field must be a standard FCV version");
 }
 
 StatusWith<FCV> FeatureCompatibilityVersionParser::parse(
@@ -194,7 +195,7 @@ StatusWith<FCV> FeatureCompatibilityVersionParser::parse(
         // Downgrading FCV.
         if ((version == GenericFCV::kLastLTS || version == GenericFCV::kLastContinuous) &&
             version == targetVersion) {
-            // Downgrading FCV must have a "previousVersion" field.
+            // Downgrading FCV must have a "previousVersion" field equal to kLatest.
             if (!previousVersion) {
                 return Status(
                     ErrorCodes::Error(4926902),
@@ -207,26 +208,23 @@ StatusWith<FCV> FeatureCompatibilityVersionParser::parse(
                         << ": " << featureCompatibilityVersionDoc << ". See "
                         << feature_compatibility_version_documentation::compatibilityLink() << ".");
             }
+            if (previousVersion != GenericFCV::kLatest) {
+                return Status(
+                    ErrorCodes::Error(4926901),
+                    str::stream()
+                        << "When present in downgrading states, '"
+                        << FeatureCompatibilityVersionDocument::kPreviousVersionFieldName
+                        << "' field must be the latest binary version in "
+                        << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg()
+                        << ": " << featureCompatibilityVersionDoc << ". See "
+                        << feature_compatibility_version_documentation::compatibilityLink() << ".");
+            }
             if (version == GenericFCV::kLastLTS) {
                 // Downgrading to last-lts.
                 return GenericFCV::kDowngradingFromLatestToLastLTS;
             } else {
                 return GenericFCV::kDowngradingFromLatestToLastContinuous;
             }
-        }
-
-        // Non-downgrading FCV must not have a "previousVersion" field.
-        if (previousVersion) {
-            return Status(
-                ErrorCodes::Error(4926903),
-                str::stream()
-                    << "Unexpected field "
-                    << FeatureCompatibilityVersionDocument::kPreviousVersionFieldName
-                    << " in non-downgrading states for " << multiversion::kParameterName
-                    << " document in "
-                    << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg() << ": "
-                    << featureCompatibilityVersionDoc << ". See "
-                    << feature_compatibility_version_documentation::compatibilityLink() << ".");
         }
 
         // Upgrading FCV.
@@ -258,6 +256,20 @@ StatusWith<FCV> FeatureCompatibilityVersionParser::parse(
                         version == GenericFCV::kLastContinuous);
                 return GenericFCV::kUpgradingFromLastContinuousToLatest;
             }
+        }
+
+        // Steady-state FCV must not have a "previousVersion" field.
+        if (previousVersion) {
+            return Status(
+                ErrorCodes::Error(4926903),
+                str::stream()
+                    << "Unexpected field "
+                    << FeatureCompatibilityVersionDocument::kPreviousVersionFieldName
+                    << " in non-transitioning states for " << multiversion::kParameterName
+                    << " document in "
+                    << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg() << ": "
+                    << featureCompatibilityVersionDoc << ". See "
+                    << feature_compatibility_version_documentation::compatibilityLink() << ".");
         }
 
         // No "targetVersion" or "previousVersion" field.

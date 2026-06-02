@@ -52,8 +52,9 @@ structs:
                 optional: true
             previousVersion:
                 description: >-
-                    Previous featureCompatibilityVersion for downgrading states, will always be kLatest when
-                    present
+                    Previous featureCompatibilityVersion for upgrade/downgrade. Only set if version == targetVersion.
+                    For downgrades, this will always be kLatest. For upgrades, it's unset until the the effective FCV
+                    reaches the target version (phase >= kEnableTargetFeatures), then it is kLastLTS/kLastContinuous.
                 type: fcv_string
                 optional: true
                 validator:

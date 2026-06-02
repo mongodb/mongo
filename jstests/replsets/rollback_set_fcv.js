@@ -151,10 +151,17 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
         );
     }, "Failed waiting for server to unset the targetVersion or to set the FCV to " + fromFCV);
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
-    // The secondary should never have received the update to unset the targetVersion.
+    // With featureFlagSymmetricFCV, the kEnableTargetFeatures and kCommitAddedFeatures writes run
+    // before hangBeforeFinalizingFCV fires and are majority-committed to the secondary. Those writes
+    // set previousVersion = toFCV (the from-version) because phase > kComplete. For downgrades,
+    // previousVersion is always toFCV (encoded in the downgrade document template). Without
+    // symmetric FCV the phase writes are skipped, so previousVersion is not written for upgrades.
+    // TODO SERVER-127882 remove SymmetricFCV check once 9.0 becomes last LTS.
+    const expectedPreviousVersion =
+        fromFCV === lastLTSFCV || FeatureFlagUtil.isPresentAndEnabled(primary, "SymmetricFCV") ? toFCV : undefined;
     if (fromFCV == lastLTSFCV || FeatureFlagUtil.isPresentAndEnabled(primary, "UpgradingToDowngrading")) {
         // When downgrading, the secondary should still be in isCleaningServerMetadata.
-        checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
+        checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */, expectedPreviousVersion);
     } else {
         checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);
     }
@@ -175,8 +182,8 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     // The primary should have rolled back their FCV to contain the targetVersion.
     if (fromFCV == lastLTSFCV || FeatureFlagUtil.isPresentAndEnabled(primary, "UpgradingToDowngrading")) {
         // Rolling back from downgraded to isCleaningServerMetadata state.
-        checkFCV(primaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
-        checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
+        checkFCV(primaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */, expectedPreviousVersion);
+        checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */, expectedPreviousVersion);
     } else {
         checkFCV(primaryAdminDB, lastLTSFCV, fromFCV);
         checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);

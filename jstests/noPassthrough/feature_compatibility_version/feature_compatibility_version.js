@@ -36,7 +36,7 @@ for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     );
     checkFCV(adminDB, oldVersion, oldVersion);
 
-    // When present, "previousVersion" will always be the latestFCV.
+    // In downgrading states, "previousVersion" must be the latestFCV.
     assert.writeErrorWithCode(
         adminDB.system.version.update({_id: "featureCompatibilityVersion"}, {$set: {previousVersion: oldVersion}}),
         4926901,

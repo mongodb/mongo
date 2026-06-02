@@ -433,9 +433,10 @@ ResolvedFCVTransition FeatureCompatibilityVersion::validateSetFeatureCompatibili
             resolvedTransition.has_value());
 
     auto isCleaningServerMetadata = fcvDoc.getIsCleaningServerMetadata();
-    auto downgradeInProgress = fcvDoc.getPreviousVersion().has_value();
 
     if (isCleaningServerMetadata.is_initialized() && *isCleaningServerMetadata) {
+        bool downgradeInProgress =
+            fcvDoc.getTargetVersion() < fcvDoc.getPreviousVersion().value_or(fcvDoc.getVersion());
         uassert(
             10778001,
             "Cannot downgrade featureCompatibilityVersion if a previous FCV upgrade stopped in the "
@@ -533,6 +534,17 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
 
     newFCVDoc.setChangeTimestamp(changeTimestamp);
     newFCVDoc.setPhase(gFeatureFlagSymmetricFCV.isEnabled() ? phase : boost::none);
+
+    tassert(11948400,
+            "Transition beyond kComplete phase requires the symmetric FCV feature flag to be "
+            "enabled, but it is not",
+            !phase.has_value() || phase <= SetFCVPhaseEnum::kComplete ||
+                gFeatureFlagSymmetricFCV.isEnabled());
+
+    if (phase.has_value() && phase > SetFCVPhaseEnum::kComplete &&
+        ServerGlobalParams::FCVSnapshot::isUpgradingOrDowngrading(version)) {
+        newFCVDoc.setPreviousVersion(getTransitionFCVInfo(version).from);
+    }
 
     // The setIsCleaningServerMetadata parameter can either be true, false, or boost::none.
     // True indicates we want to set the isCleaningServerMetadata FCV document field to true.

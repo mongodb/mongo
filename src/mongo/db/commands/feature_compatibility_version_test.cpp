@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
+#include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -362,6 +363,62 @@ TEST_P(SetFeatureCompatibilityVersionParamTestFixture, ResolveResumeInterruptedU
     }
 }
 
+struct UpdateDocumentPreviousVersionTestParams {
+    SetFCVPhaseEnum phase;
+    bool expectPreviousVersion;
+    std::string label;
+};
+
+class UpdateDocumentPreviousVersionTestFixture
+    : public FeatureCompatibilityVersionTestFixture,
+      public testing::WithParamInterface<UpdateDocumentPreviousVersionTestParams> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    UpdateDocumentPreviousVersionTests,
+    UpdateDocumentPreviousVersionTestFixture,
+    testing::ValuesIn({
+        UpdateDocumentPreviousVersionTestParams{
+            SetFCVPhaseEnum::kEnableTargetFeatures,
+            true,
+            "writes_previous_version_at_enable_target_features"},
+        UpdateDocumentPreviousVersionTestParams{SetFCVPhaseEnum::kCommitAddedFeatures,
+                                                true,
+                                                "writes_previous_version_at_commit_added_features"},
+        UpdateDocumentPreviousVersionTestParams{
+            SetFCVPhaseEnum::kStart, false, "does_not_write_on_upgrade_previous_version_at_start"},
+    }),
+    [](const testing::TestParamInfo<UpdateDocumentPreviousVersionTestParams>& info) {
+        return info.param.label;
+    });
+
+TEST_P(UpdateDocumentPreviousVersionTestFixture, UpdateDocumentPreviousVersion) {
+    const auto& params = GetParam();
+    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", true};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+
+    const Timestamp ts =
+        VectorClockMutable::get(operationContext())->tickClusterTime(1).asTimestamp();
+    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+        operationContext(),
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+        params.phase,
+        ts,
+        boost::none /* setIsCleaningServerMetadata */);
+
+    auto docResult =
+        FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext());
+    ASSERT_OK(docResult);
+    auto parsedDoc = FeatureCompatibilityVersionDocument::parse(
+        docResult.getValue(), IDLParserContext("featureCompatibilityVersionDocument"));
+    if (params.expectPreviousVersion) {
+        ASSERT_TRUE(parsedDoc.getPreviousVersion().has_value());
+        ASSERT_EQ(*parsedDoc.getPreviousVersion(), multiversion::GenericFCV::kLastLTS);
+    } else {
+        ASSERT_FALSE(parsedDoc.getPreviousVersion().has_value());
+    }
+}
+
 TEST_F(FeatureCompatibilityVersionTestFixture, CanInitFCVWithIncompleteForegroundIndexBuild) {
     // Create an incomplete index build in the catalog for a collection in the admin database
     {
@@ -399,6 +456,51 @@ TEST_F(FeatureCompatibilityVersionTestFixture, CanInitFCVWithIncompleteForegroun
     storageEngine->loadMDBCatalog(operationContext(), StorageEngine::LastShutdownState::kClean);
     catalog::initializeCollectionCatalog(operationContext(), storageEngine);
     FeatureCompatibilityVersion::initializeForStartup(operationContext());
+}
+
+TEST_F(FeatureCompatibilityVersionTestFixture, UpdateDocumentClearsPreviousVersionOnFinalize) {
+    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", true};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+
+    const Timestamp ts =
+        VectorClockMutable::get(operationContext())->tickClusterTime(1).asTimestamp();
+    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+        operationContext(),
+        multiversion::GenericFCV::kLatest,
+        boost::none /* phase */,
+        ts,
+        boost::none /* setIsCleaningServerMetadata */);
+
+    auto docResult =
+        FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext());
+    ASSERT_OK(docResult);
+    auto parsedDoc = FeatureCompatibilityVersionDocument::parse(
+        docResult.getValue(), IDLParserContext("featureCompatibilityVersionDocument"));
+    ASSERT_FALSE(parsedDoc.getPreviousVersion().has_value());
+}
+
+TEST_F(FeatureCompatibilityVersionTestFixture,
+       UpdateDocumentDoesNotWritePreviousVersionWhenSymmetricFCVDisabled) {
+    RAIIServerParameterControllerForTest symmetricFCV{"featureFlagSymmetricFCV", false};
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+    doStartupFCVSequence(multiversion::GenericFCV::kLastLTS);
+
+    const Timestamp ts =
+        VectorClockMutable::get(operationContext())->tickClusterTime(1).asTimestamp();
+    FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+        operationContext(),
+        multiversion::GenericFCV::kUpgradingFromLastLTSToLatest,
+        SetFCVPhaseEnum::kPrepare,
+        ts,
+        boost::none /* setIsCleaningServerMetadata */);
+
+    auto docResult =
+        FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(operationContext());
+    ASSERT_OK(docResult);
+    auto parsedDoc = FeatureCompatibilityVersionDocument::parse(
+        docResult.getValue(), IDLParserContext("featureCompatibilityVersionDocument"));
+    ASSERT_FALSE(parsedDoc.getPreviousVersion().has_value());
 }
 
 TEST_F(FeatureCompatibilityVersionTestFixture,

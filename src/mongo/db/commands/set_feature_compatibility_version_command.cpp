@@ -793,8 +793,9 @@ public:
         if (gFeatureFlagSymmetricFCV.isEnabled()
                 ? resolvedTransition.shouldRun(SetFCVPhaseEnum::kCommitAddedFeatures)
                 : resolvedTransition.shouldRun(SetFCVPhaseEnum::kComplete)) {
-            hangBeforeFinalizingFCV.pauseWhileSet(opCtx);
             {
+                hangBeforeFinalizingFCV.pauseWhileSet(opCtx);
+
                 // Complete transition by updating the local FCV document to the fully upgraded or
                 // downgraded requestedVersion.
                 const auto fcvChangeRegion(
