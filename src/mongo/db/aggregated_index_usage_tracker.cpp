@@ -37,12 +37,19 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/metrics_updown_counter.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
 
 namespace mongo {
 namespace {
+using otel::metrics::MetricNames;
+using otel::metrics::MetricsService;
+using otel::metrics::MetricUnit;
+
 // List of index feature description strings.
 static const std::string k2d = "2d";
 static const std::string k2dSphere = "2dsphere";
@@ -64,6 +71,8 @@ static const std::string kWildcard = "wildcard";
 const auto getAggregatedIndexUsageTracker =
     ServiceContext::declareDecoration<AggregatedIndexUsageTracker>();
 
+auto& indexStatsCountMetric = MetricsService::instance().createInt64UpDownCounter(
+    MetricNames::kIndexCount, "The total number of indexes.", MetricUnit::kCount);
 
 template <class FuncPred>
 void _updateStatsForEachFeature(const IndexFeatures& features,
@@ -155,6 +164,7 @@ void AggregatedIndexUsageTracker::onRegister(const IndexFeatures& features) cons
             stats.count.fetchAndAdd(1);
         });
         _count.fetchAndAdd(1);
+        indexStatsCountMetric.add(1);
     }
 }
 
@@ -164,6 +174,7 @@ void AggregatedIndexUsageTracker::onUnregister(const IndexFeatures& features) co
             stats.count.fetchAndAdd(-1);
         });
         _count.fetchAndAdd(-1);
+        indexStatsCountMetric.add(-1);
     }
 }
 
