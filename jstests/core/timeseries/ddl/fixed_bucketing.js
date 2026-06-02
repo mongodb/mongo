@@ -26,14 +26,24 @@ const coll = testDB[collName];
 
 // Issues `createCollection` for the test's timeseries collection. The `fixedBucketing` field is
 // included in the request only when `fixedBucketing` is `true` or `false`; passing `undefined`
-// omits the field entirely (distinct from passing `false`). Returns the raw command result so the
-// caller can decide between `assert.commandWorked` and `assert.commandFailedWithCode`.
-function createWithFixedBucketing(fixedBucketing) {
+// omits the field entirely (distinct from passing `false`). The optional second argument inserts
+// `bucketMaxSpanSeconds` and `bucketRoundingSeconds` when provided. Returns the raw command result
+// so the caller can decide between `assert.commandWorked` and `assert.commandFailedWithCode`.
+function createWithFixedBucketing(fixedBucketing, {maxSpanSeconds, roundingSeconds} = {}) {
     const timeseries = {timeField: "t"};
-    if (fixedBucketing !== undefined) {
-        timeseries.fixedBucketing = fixedBucketing;
-    }
+    if (maxSpanSeconds !== undefined) timeseries.bucketMaxSpanSeconds = maxSpanSeconds;
+    if (roundingSeconds !== undefined) timeseries.bucketRoundingSeconds = roundingSeconds;
+    if (fixedBucketing !== undefined) timeseries.fixedBucketing = fixedBucketing;
     return testDB.createCollection(collName, {timeseries});
+}
+
+// Issues a `collMod` that sets `bucketMaxSpanSeconds` and `bucketRoundingSeconds`. Returns the raw
+// command result so the caller can decide how to assert.
+function collModBucketing({maxSpanSeconds, roundingSeconds}) {
+    return testDB.runCommand({
+        collMod: collName,
+        timeseries: {bucketMaxSpanSeconds: maxSpanSeconds, bucketRoundingSeconds: roundingSeconds},
+    });
 }
 
 // Reads the test's timeseries collection back via `listCollections` and returns its stored
@@ -111,4 +121,36 @@ describe("conflicting create with mismatched fixedBucketing", function () {
             assert.commandFailedWithCode(createWithFixedBucketing(retry), ErrorCodes.NamespaceExists);
         });
     }
+});
+
+describe("collMod fixedBucketing handling for bucketing changes", function () {
+    afterEach(function () {
+        coll.drop();
+    });
+
+    const cases = [
+        {initial: true, newSpan: 200, expected: false, desc: "true → false on bucketing change"},
+        {initial: false, newSpan: 200, expected: false, desc: "false stays false on bucketing change"},
+        {initial: undefined, newSpan: 200, expected: undefined, desc: "unset stays unset on bucketing change"},
+        {initial: true, newSpan: 100, expected: true, desc: "true stays true when bucketing unchanged"},
+        {initial: false, newSpan: 100, expected: false, desc: "false stays false when bucketing unchanged"},
+        {initial: undefined, newSpan: 100, expected: undefined, desc: "unset stays unset when bucketing unchanged"},
+    ];
+
+    for (const {initial, newSpan, expected, desc} of cases) {
+        it(desc, function () {
+            assert.commandWorked(createWithFixedBucketing(initial, {maxSpanSeconds: 100, roundingSeconds: 100}));
+            assert.commandWorked(collModBucketing({maxSpanSeconds: newSpan, roundingSeconds: newSpan}));
+            assert.eq(getStoredFixedBucketing(), expected);
+        });
+    }
+
+    // Granularity changes go through the same code path as explicit span/rounding changes.
+    // Only test the significant true → false case; the other cases (where fixedBucketing stays
+    // unchanged) are already covered by the parameterized loop above.
+    it("true → false on granularity change", function () {
+        assert.commandWorked(createWithFixedBucketing(true));
+        assert.commandWorked(testDB.runCommand({collMod: collName, timeseries: {granularity: "minutes"}}));
+        assert.eq(getStoredFixedBucketing(), false);
+    });
 });

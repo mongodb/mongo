@@ -85,7 +85,8 @@ protected:
         setupDatabase(kDbName, _shardName);
     }
 
-    void setupTimeseriesCollection(const NamespaceString& nss) {
+    void setupTimeseriesCollection(const NamespaceString& nss,
+                                   boost::optional<bool> fixedBucketing = boost::none) {
         const auto epoch = OID::gen();
         const auto collectionTimestamp = Timestamp{100, 0};
         const auto collectionUuid = UUID::gen();
@@ -113,6 +114,9 @@ protected:
             tsFields.setTimeField("time");
             tsFields.setMetaField(kShardKeyField);
             tsFields.setGranularity(BucketGranularityEnum::Seconds);
+            if (fixedBucketing.has_value()) {
+                tsFields.setFixedBucketing(*fixedBucketing);
+            }
             c.setTimeseriesFields(tsFields);
         };
 
@@ -190,7 +194,7 @@ TEST_F(ShardingCatalogManagerCollectionOperationTest, UpdateTimeseriesBucketingP
 
     /* Set rounding and max span works */
     {
-        const auto rounding = 12345678, maxSpan = 87654;
+        const auto rounding = 4000, maxSpan = 4000;
 
         ASSERT_TRUE(getOptionalGranularity());
         CollModTimeseries collModTs;
@@ -210,7 +214,7 @@ TEST_F(ShardingCatalogManagerCollectionOperationTest, UpdateTimeseriesBucketingP
     /* Set only granularity works */
     {
         CollModTimeseries collModTs;
-        collModTs.setGranularity(BucketGranularityEnum::Seconds);
+        collModTs.setGranularity(BucketGranularityEnum::Hours);
         CollModRequest collModReq;
         collModReq.setTimeseries(collModTs);
 
@@ -218,7 +222,7 @@ TEST_F(ShardingCatalogManagerCollectionOperationTest, UpdateTimeseriesBucketingP
 
         const auto optGranularity = getOptionalGranularity();
         ASSERT_TRUE(optGranularity.has_value());
-        ASSERT_EQ(*optGranularity, BucketGranularityEnum::Seconds);
+        ASSERT_EQ(*optGranularity, BucketGranularityEnum::Hours);
         const auto roundingAndMaxSpan = getOptionalRoundingAndMaxSpan();
         ASSERT_FALSE(roundingAndMaxSpan.first.has_value());
         ASSERT_TRUE(roundingAndMaxSpan.second.has_value());
@@ -226,7 +230,7 @@ TEST_F(ShardingCatalogManagerCollectionOperationTest, UpdateTimeseriesBucketingP
 
     /* Set multiple flags works: rounding, max span and mixed schema */
     {
-        const auto rounding = 12345678, maxSpan = 87654;
+        const auto rounding = 12345678, maxSpan = 12345678;
         ASSERT_FALSE(getMixedSchemaFlag());
         ASSERT_TRUE(getOptionalGranularity());
 
@@ -250,6 +254,38 @@ TEST_F(ShardingCatalogManagerCollectionOperationTest, UpdateTimeseriesBucketingP
     // was invoked
     const auto latestChunkVersion = getChunk().getVersion();
     ASSERT_EQ(latestChunkVersion.majorVersion(), expectedMajorVersion);
+}
+
+// Verifies that `updateTimeSeriesBucketingParameters` flips `fixedBucketing` from true to false
+// in the global catalog when the bucketing parameters actually change.
+TEST_F(ShardingCatalogManagerCollectionOperationTest,
+       UpdateTimeseriesBucketingParamsDisablesFixedBucketing) {
+    auto opCtx = operationContext();
+
+    const auto getFixedBucketing = [&]() -> boost::optional<bool> {
+        const auto& opt = getConfigCollectionEntry(kNss).getTimeseriesFields()->getFixedBucketing();
+        if (!opt.has_value()) {
+            return boost::none;
+        }
+        return static_cast<bool>(opt);
+    };
+
+    setupTimeseriesCollection(kNss, /*fixedBucketing=*/true);
+    ASSERT_EQ(getFixedBucketing(), boost::optional<bool>(true));
+
+    // collMod that actually changes bucketing parameters: fixedBucketing must be set to false.
+    // NOTE: by default, timeseries uses granularity=Seconds (effective span=3600), so target
+    // span/rounding must be equal and >= 3600 to be a valid transition.
+    CollModTimeseries collModTs;
+    collModTs.setBucketRoundingSeconds(7200);
+    collModTs.setBucketMaxSpanSeconds(7200);
+    CollModRequest collModReq;
+    collModReq.setTimeseries(collModTs);
+
+    ShardingCatalogManager::get(opCtx)->updateTimeSeriesBucketingParameters(
+        opCtx, kNss, collModReq);
+
+    ASSERT_EQ(getFixedBucketing(), boost::optional<bool>(false));
 }
 
 }  // namespace

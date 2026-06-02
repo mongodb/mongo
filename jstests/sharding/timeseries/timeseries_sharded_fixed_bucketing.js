@@ -1,7 +1,10 @@
 /**
- * Tests that `shardCollection` on a timeseries collection persists the `fixedBucketing` option
- * correctly in `config.collections` and rejects mismatched values when the existing collection
- * already has the field set.
+ * Tests `fixedBucketing` behavior on sharded timeseries collections:
+ *  - `shardCollection` persists the value in `config.collections`.
+ *  - Mismatched values across `createCollection` / `shardCollection` are rejected.
+ *  - `collMod` requests that modify bucketing parameters automatically set `fixedBucketing` to
+ *    `false` in both the global catalog (`config.collections`) and the durable catalog (visible
+ *    via `listCollections`).
  *
  * Only runs when both `featureFlagFixedBucketingCatalog` and
  * `featureFlagCreateViewlessTimeseriesCollections` are enabled.
@@ -54,6 +57,21 @@ function getListCollFixedBucketing() {
     assert.commandWorked(st.s.adminCommand({shardCollection: collNss, key: {"hostId": 1}}));
     assert.eq(getConfigFixedBucketing(), true);
     assert.eq(getListCollFixedBucketing(), true);
+    assert(sDB.ts.drop());
+})();
+
+// collMod that changes bucketing parameters on a sharded fixedBucketing: true collection must
+// set fixedBucketing to false in both the global catalog (`config.collections`) and the durable
+// catalog (visible via `listCollections`).
+(function collModBucketingChangeDisablesFixedBucketing() {
+    assert.commandWorked(st.s.adminCommand({shardCollection: collNss, key: {"hostId": 1}, timeseries: fbTimeseries}));
+    assert.eq(getConfigFixedBucketing(), true);
+    assert.eq(getListCollFixedBucketing(), true);
+
+    assert.commandWorked(sDB.runCommand({collMod: collName, timeseries: {granularity: "hours"}}));
+    assert.eq(getConfigFixedBucketing(), false);
+    assert.eq(getListCollFixedBucketing(), false);
+
     assert(sDB.ts.drop());
 })();
 

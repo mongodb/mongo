@@ -359,6 +359,91 @@ TEST(TimeseriesOptionsTest, OptionsAreEqualFixedBucketing) {
     EXPECT_FALSE(timeseries::optionsAreEqual(enabled, disabled));
 }
 
+// Verify `applyTimeseriesOptionsModifications`'s `fixedBucketing` handling across the matrix of
+// {unset, false, true} × {bucketing change, no change}: only `true + change` flips to false,
+// all other combinations leave the field unchanged. Spot-check the `true → false` case for
+// granularity changes at the end since they share the same code path.
+TEST(TimeseriesOptionsTest, FixedBucketingHandling) {
+    auto makeOptions = [](boost::optional<bool> fixedBucketing) {
+        TimeseriesOptions options{"time"};
+        options.setBucketMaxSpanSeconds(100);
+        options.setBucketRoundingSeconds(100);
+        if (fixedBucketing.has_value()) {
+            options.setFixedBucketing(*fixedBucketing);
+        }
+        return options;
+    };
+
+    CollModTimeseries changeMod;
+    changeMod.setBucketMaxSpanSeconds(200);
+    changeMod.setBucketRoundingSeconds(200);
+
+    // Same span/rounding values as the collection — no-op via numerical comparison.
+    CollModTimeseries sameValuesMod;
+    sameValuesMod.setBucketMaxSpanSeconds(100);
+    sameValuesMod.setBucketRoundingSeconds(100);
+
+    // unset + bucketing change → fixedBucketing stays unset.
+    {
+        auto res =
+            timeseries::applyTimeseriesOptionsModifications(makeOptions(boost::none), changeMod);
+        ASSERT_OK(res.getStatus());
+        auto [newOpts, updated] = res.getValue();
+        ASSERT_TRUE(updated);
+        ASSERT_FALSE(newOpts.getFixedBucketing().has_value());
+    }
+
+    // false + bucketing change → fixedBucketing stays false.
+    {
+        auto res = timeseries::applyTimeseriesOptionsModifications(makeOptions(false), changeMod);
+        ASSERT_OK(res.getStatus());
+        auto [newOpts, updated] = res.getValue();
+        ASSERT_TRUE(updated);
+        ASSERT_TRUE(newOpts.getFixedBucketing().has_value());
+        ASSERT_FALSE(newOpts.getFixedBucketing());
+    }
+
+    // true + bucketing change → fixedBucketing becomes false.
+    {
+        auto res = timeseries::applyTimeseriesOptionsModifications(makeOptions(true), changeMod);
+        ASSERT_OK(res.getStatus());
+        auto [newOpts, updated] = res.getValue();
+        ASSERT_TRUE(updated);
+        ASSERT_TRUE(newOpts.getFixedBucketing().has_value());
+        ASSERT_FALSE(newOpts.getFixedBucketing());
+    }
+
+    // true + same bucketing values → fixedBucketing untouched, no update.
+    {
+        auto res =
+            timeseries::applyTimeseriesOptionsModifications(makeOptions(true), sameValuesMod);
+        ASSERT_OK(res.getStatus());
+        auto [newOpts, updated] = res.getValue();
+        ASSERT_FALSE(updated);
+        ASSERT_TRUE(newOpts.getFixedBucketing().has_value());
+        ASSERT_TRUE(newOpts.getFixedBucketing());
+    }
+
+    // Granularity changes go through the same code path as explicit span/rounding changes. Only
+    // test the significant true → false case; the other cases (where fixedBucketing stays
+    // unchanged) are already covered by the sub-blocks above.
+    {
+        TimeseriesOptions opts{"time"};
+        opts.setGranularity(BucketGranularityEnum::Seconds);
+        opts.setFixedBucketing(true);
+
+        CollModTimeseries mod;
+        mod.setGranularity(BucketGranularityEnum::Minutes);
+
+        auto res = timeseries::applyTimeseriesOptionsModifications(opts, mod);
+        ASSERT_OK(res.getStatus());
+        auto [newOpts, updated] = res.getValue();
+        ASSERT_TRUE(updated);
+        ASSERT_TRUE(newOpts.getFixedBucketing().has_value());
+        ASSERT_FALSE(newOpts.getFixedBucketing());
+    }
+}
+
 TEST(TimeseriesOptionsTest, BSONColumnMemEstimationCalculations) {
     // The calculations for BSONColumn memory estimation in bson_validate.cpp rely on the defaults
     // for some server parameters. If these change, we also need to recalculate and potentially

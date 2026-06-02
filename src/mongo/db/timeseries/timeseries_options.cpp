@@ -281,17 +281,17 @@ int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity) {
 StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModifications(
     const TimeseriesOptions& currentOptions, const CollModTimeseries& mod) {
     TimeseriesOptions newOptions = currentOptions;
-    bool shouldUpdateOptions = true;
+    bool shouldUpdateBucketingOptions = true;
     bool updated = false;
     auto targetGranularity = mod.getGranularity();
 
-    auto isValidTransition =
-        isTimeseriesGranularityValidAndUnchanged(currentOptions, mod, &shouldUpdateOptions);
+    auto isValidTransition = isTimeseriesGranularityValidAndUnchanged(
+        currentOptions, mod, &shouldUpdateBucketingOptions);
     if (!isValidTransition.isOK()) {
         return isValidTransition;
     }
 
-    if (shouldUpdateOptions) {
+    if (shouldUpdateBucketingOptions) {
         int32_t targetMaxSpanSeconds = 0;
         boost::optional<int32_t> targetRoundingSeconds = boost::none;
 
@@ -307,6 +307,13 @@ StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModificatio
         newOptions.setBucketMaxSpanSeconds(targetMaxSpanSeconds);
         newOptions.setBucketRoundingSeconds(targetRoundingSeconds);
         updated = true;
+
+        // If bucketing parameters are changing, set fixedBucketing to false (if currently set
+        // to true). Leave unset and false unchanged, so legacy collections (where the field is
+        // never set to true) are unaffected.
+        if (currentOptions.getFixedBucketing()) {
+            newOptions.setFixedBucketing(false);
+        }
     }
 
     return std::make_pair(newOptions, updated);

@@ -180,100 +180,88 @@ CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const Namespac
         MODE_IS);
 }
 
-TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagTSBucketingParametersUnchanged", true);
+// When collMod changes bucketing parameters, fixedBucketing must be automatically set to false.
+TEST_F(CollModTest, CollModDisablesFixedBucketingOnBucketingParameterChange) {
+    RAIIServerParameterControllerForTest fixedBucketingFlagController(
+        "featureFlagFixedBucketingCatalog", true);
+    RAIIServerParameterControllerForTest viewlessFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
-
     auto opCtx = makeOpCtx();
-    auto tsOptions = TimeseriesOptions("t");
-    tsOptions.setBucketRoundingSeconds(100);
-    tsOptions.setBucketMaxSpanSeconds(100);
-    CreateCommand cmd = CreateCommand(curNss);
-    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
-    uassertStatusOK(createCollection(opCtx.get(), cmd));
-    auto tsNss = timeseries::test_util::resolveTimeseriesNss(curNss);
 
-    // Run collMod without changing the bucket span and validate that the
-    // timeseriesBucketingParametersHaveChanged() returns false.
-    CollMod collModCmd(curNss);
-    CollModRequest collModRequest;
-    std::variant<std::string, std::int64_t> expireAfterSeconds = 100;
-    collModRequest.setExpireAfterSeconds(expireAfterSeconds);
-    collModCmd.setCollModRequest(collModRequest);
-    BSONObjBuilder result;
-    uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
-        opCtx.get(), curNss, collModCmd, true, &result));
+    // Create a viewless timeseries collection with fixedBucketing: true.
+    TimeseriesOptions tsOptions("t");
+    tsOptions.setBucketMaxSpanSeconds(100);
+    tsOptions.setBucketRoundingSeconds(100);
+    tsOptions.setFixedBucketing(true);
+    CreateCommand createCmd(curNss);
+    createCmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    uassertStatusOK(createCollection(opCtx.get(), createCmd));
+
+    // Verify fixedBucketing was persisted as true.
+    auto tsNss = timeseries::test_util::resolveTimeseriesNss(curNss);
     {
-        const auto tsCollForRead = acquireCollForRead(opCtx.get(), tsNss);
-        // TODO(SERVER-101611): Set *timeseriesBucketingParametersHaveChanged to false on create
-        ASSERT_FALSE(tsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
+        const auto coll = acquireCollForRead(opCtx.get(), tsNss);
+        ASSERT_TRUE(
+            coll.getCollectionPtr()->getTimeseriesOptions()->getFixedBucketing().has_value());
+        ASSERT_TRUE(coll.getCollectionPtr()->getTimeseriesOptions()->getFixedBucketing());
     }
 
-    // Run collMod which changes the bucket span and validate that the
-    // timeseriesBucketingParametersHaveChanged() returns true.
+    // Run collMod that changes the bucketing parameters.
+    CollMod collModCmd(curNss);
     CollModTimeseries collModTs;
     collModTs.setBucketMaxSpanSeconds(200);
     collModTs.setBucketRoundingSeconds(200);
-    collModRequest.setTimeseries(std::move(collModTs));
-    collModCmd.setCollModRequest(std::move(collModRequest));
+    collModCmd.setTimeseries(std::move(collModTs));
+    BSONObjBuilder result;
     uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
         opCtx.get(), curNss, collModCmd, true, &result));
-    {
-        const auto tsCollForRead = acquireCollForRead(opCtx.get(), tsNss);
-        ASSERT_TRUE(tsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
-        ASSERT_TRUE(*tsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
-    }
 
-    // Test that the backwards compatible option has been properly set
-    auto coll =
-        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), tsNss);
-    auto catalogEntry = durable_catalog::getParsedCatalogEntry(
-        opCtx.get(), coll->getCatalogId(), MDBCatalog::get(opCtx.get()));
-    auto metadata = catalogEntry->metadata;
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    boost::optional<bool> optBackwardsCompatibleFlag = storageEngine->getFlagFromStorageOptions(
-        metadata->options.storageEngine,
-        backwards_compatible_collection_options::kTimeseriesBucketingParametersHaveChanged);
-    ASSERT_TRUE(optBackwardsCompatibleFlag);
-    ASSERT_TRUE(*optBackwardsCompatibleFlag);
+    // fixedBucketing must have been set to false because bucketing params changed.
+    {
+        const auto coll = acquireCollForRead(opCtx.get(), tsNss);
+        ASSERT_TRUE(
+            coll.getCollectionPtr()->getTimeseriesOptions()->getFixedBucketing().has_value());
+        ASSERT_FALSE(coll.getCollectionPtr()->getTimeseriesOptions()->getFixedBucketing());
+    }
 }
 
-TEST_F(CollModTest, TimeseriesBucketingParameterChanged) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagTSBucketingParametersUnchanged", true);
+// When collMod specifies the same bucketing parameter values as the current ones, fixedBucketing
+// must remain unchanged (no spurious disable).
+TEST_F(CollModTest, CollModFixedBucketingNoOpWhenBucketingParamsUnchanged) {
+    RAIIServerParameterControllerForTest fixedBucketingFlagController(
+        "featureFlagFixedBucketingCatalog", true);
+    RAIIServerParameterControllerForTest viewlessFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
 
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
-
     auto opCtx = makeOpCtx();
-    auto tsOptions = TimeseriesOptions("t");
-    tsOptions.setBucketRoundingSeconds(100);
+
+    // Create a viewless timeseries collection with fixedBucketing: true.
+    TimeseriesOptions tsOptions("t");
     tsOptions.setBucketMaxSpanSeconds(100);
-    CreateCommand cmd = CreateCommand(curNss);
-    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
-    uassertStatusOK(createCollection(opCtx.get(), cmd));
+    tsOptions.setBucketRoundingSeconds(100);
+    tsOptions.setFixedBucketing(true);
+    CreateCommand createCmd(curNss);
+    createCmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    uassertStatusOK(createCollection(opCtx.get(), createCmd));
+
+    // Run collMod with the same bucketing parameter values.
+    CollMod collModCmd(curNss);
+    CollModTimeseries collModTs;
+    collModTs.setBucketMaxSpanSeconds(100);
+    collModTs.setBucketRoundingSeconds(100);
+    collModCmd.setTimeseries(std::move(collModTs));
+    BSONObjBuilder result;
+    uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
+        opCtx.get(), curNss, collModCmd, true, &result));
+
+    // No parameter actually changed: fixedBucketing must remain true.
     auto tsNss = timeseries::test_util::resolveTimeseriesNss(curNss);
-
-    uassertStatusOK(
-        writeConflictRetry(opCtx.get(), "unitTestTimeseriesBucketingParameterChanged", tsNss, [&] {
-            WriteUnitOfWork wunit(opCtx.get());
-
-            auto collection =
-                acquireCollection(opCtx.get(),
-                                  CollectionAcquisitionRequest::fromOpCtx(
-                                      opCtx.get(), tsNss, AcquisitionPrerequisites::kWrite),
-                                  MODE_X);
-            CollectionWriter writer{opCtx.get(), &collection};
-            auto writableColl = writer.getWritableCollection(opCtx.get());
-            writableColl->setTimeseriesBucketingParametersChanged(opCtx.get(), boost::none);
-
-            wunit.commit();
-            return Status::OK();
-        }));
-
-    const auto tsCollForRead = acquireCollForRead(opCtx.get(), tsNss);
-    ASSERT_FALSE(tsCollForRead.getCollectionPtr()->timeseriesBucketingParametersHaveChanged());
+    const auto coll = acquireCollForRead(opCtx.get(), tsNss);
+    ASSERT_TRUE(coll.getCollectionPtr()->getTimeseriesOptions()->getFixedBucketing().has_value());
+    ASSERT_TRUE(coll.getCollectionPtr()->getTimeseriesOptions()->getFixedBucketing());
 }
 
 TEST_F(CollModTest, TimeseriesLegacyBucketingParameterChangedRemoval) {

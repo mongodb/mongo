@@ -560,17 +560,39 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
             "Cannot update timeseries fields on a collection that is not a timeseries",
             cm.isTimeseriesCollection());
 
+    // Check whether the bucketing parameters are actually changing, in order to decide whether
+    // they need to be written and whether the `fixedBucketing` option needs to be set to false,
+    // mirroring the behavior of `applyTimeseriesOptionsModifications` on the durable catalog side.
+    //
+    // NOTE: The CollModCoordinator already performed a similar check, but the result is not
+    // forwarded here.
+    bool shouldUpdateBucketingOptions = false;
+    if (timeseriesParameters.has_value()) {
+        const auto status = timeseries::isTimeseriesGranularityValidAndUnchanged(
+            cm.getTimeseriesFields()->getTimeseriesOptions(),
+            timeseriesParameters.get(),
+            &shouldUpdateBucketingOptions);
+        uassertStatusOK(status);
+    }
+
     withTransaction(
         opCtx,
         NamespaceString::kConfigsvrCollectionsNamespace,
-        [this, &nss, &timeseriesParameters, &bucketsMayHaveMixedSchemaData, &shardIds](
-            OperationContext* opCtx, TxnNumber txnNumber) {
+        [this,
+         &nss,
+         &timeseriesParameters,
+         &bucketsMayHaveMixedSchemaData,
+         &shardIds,
+         &cm,
+         shouldUpdateBucketingOptions](OperationContext* opCtx, TxnNumber txnNumber) {
             auto granularityFieldName = std::string{CollectionType::kTimeseriesFieldsFieldName} +
                 "." + std::string{TypeCollectionTimeseriesFields::kGranularityFieldName};
             auto bucketSpanFieldName = std::string{CollectionType::kTimeseriesFieldsFieldName} +
                 "." + std::string{TypeCollectionTimeseriesFields::kBucketMaxSpanSecondsFieldName};
             auto bucketRoundingFieldName = std::string{CollectionType::kTimeseriesFieldsFieldName} +
                 "." + std::string{TypeCollectionTimeseriesFields::kBucketRoundingSecondsFieldName};
+            auto fixedBucketingFieldName = std::string{CollectionType::kTimeseriesFieldsFieldName} +
+                "." + std::string{TypeCollectionTimeseriesFields::kFixedBucketingFieldName};
             auto mixedSchemaFieldName = std::string{CollectionType::kTimeseriesFieldsFieldName} +
                 "." +
                 std::string{TypeCollectionTimeseriesFields::
@@ -579,14 +601,15 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
             BSONObjBuilder updateBob;
 
             if (timeseriesParameters.has_value()) {
-                BSONObj bucketUp;
+                BSONObjBuilder bucketUpBob;
                 if (timeseriesParameters->getGranularity().has_value()) {
                     auto bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(
                         timeseriesParameters->getGranularity().get());
                     updateBob.append("$unset", BSON(bucketRoundingFieldName << ""));
-                    bucketUp = BSON(granularityFieldName
-                                    << idl::serialize(timeseriesParameters->getGranularity().get())
-                                    << bucketSpanFieldName << bucketSpan);
+                    bucketUpBob.append(
+                        granularityFieldName,
+                        idl::serialize(timeseriesParameters->getGranularity().get()));
+                    bucketUpBob.append(bucketSpanFieldName, bucketSpan);
                 } else {
                     tassert(
                         10533702,
@@ -594,12 +617,21 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
                         timeseriesParameters->getBucketMaxSpanSeconds().has_value() &&
                             timeseriesParameters->getBucketRoundingSeconds().has_value());
                     updateBob.append("$unset", BSON(granularityFieldName << ""));
-                    bucketUp = BSON(bucketSpanFieldName
-                                    << timeseriesParameters->getBucketMaxSpanSeconds().get()
-                                    << bucketRoundingFieldName
-                                    << timeseriesParameters->getBucketRoundingSeconds().get());
+                    bucketUpBob.append(bucketSpanFieldName,
+                                       timeseriesParameters->getBucketMaxSpanSeconds().get());
+                    bucketUpBob.append(bucketRoundingFieldName,
+                                       timeseriesParameters->getBucketRoundingSeconds().get());
                 }
-                updateBob.append("$set", bucketUp);
+
+                // If bucketing parameters are changing, set fixedBucketing to false (if currently
+                // set to true), mirroring the shard-side logic in
+                // `applyTimeseriesOptionsModifications`.
+                if (shouldUpdateBucketingOptions &&
+                    cm.getTimeseriesFields()->getTimeseriesOptions().getFixedBucketing()) {
+                    bucketUpBob.append(fixedBucketingFieldName, false);
+                }
+
+                updateBob.append("$set", bucketUpBob.obj());
             }
 
             // TODO SERVER-108908: once 9.0 branches out, remove `isViewLessTimeseries` check
