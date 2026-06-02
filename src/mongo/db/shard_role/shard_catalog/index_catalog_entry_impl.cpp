@@ -39,6 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/wildcard_metadata_key.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -62,6 +63,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/shard_catalog/set_multikey_metadata_oplog_helpers.h"
+#include "mongo/db/shard_role/shard_catalog/txn_wildcard_multikey_paths.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -352,6 +354,18 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
             insertWildcardMultikeyMetadataKeysIfNotEmpty();
         }
         _catalogSetMultikey(opCtx, collection, paths);
+    } else if (replicateMultikeyness && !multikeyMetadataKeys.empty()) {
+        // Side transaction succeeded. The metadata keys were committed on a side RU and are
+        // invisible to the parent RU's snapshot, so populate the per-snapshot RYOW cache. The
+        // fallback branch above writes directly to the parent RU and needs no cache entry.
+
+        // TODO (SERVER-128058): avoid path extraction from metadata keys, this was already
+        // performed upstream, pipe through.
+        TxnWildcardMultikeyPaths::get(opCtx).append(
+            collection->uuid(),
+            _descriptor.indexName(),
+            extractWildcardMultikeyPathsFromMetadataKeys(multikeyMetadataKeys,
+                                                         _descriptor.ordering()));
     }
 }
 
@@ -529,11 +543,6 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
         _catalogSetMultikey(opCtx, collection, multikeyPaths);
 
         wuow.commit();
-
-        if (replicateMultikeyness && !multikeyMetadataKeys.empty()) {
-            txnParticipant.setHasSideCommittedWildcardKeys();
-            opCtx->setHasSideCommittedWildcardKeys();
-        }
     });
 
     return Status::OK();

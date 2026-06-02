@@ -207,7 +207,8 @@ protected:
         const auto collection = acquireCollForRead(opCtx(), nss);
         auto indexEntry = getIndexCatalogEntry(collection.getCollectionPtr(), indexName);
         MultikeyMetadataAccessStats stats;
-        auto multikeyPathSet = getWildcardMultikeyPathSet(opCtx(), indexEntry, _fieldNames, &stats);
+        auto multikeyPathSet = getWildcardMultikeyPathSet(
+            opCtx(), collection.getCollectionPtr()->uuid(), indexEntry, _fieldNames, &stats);
 
         ASSERT(expectedFieldRefs == multikeyPathSet);
     }

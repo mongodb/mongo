@@ -111,8 +111,8 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                 }
             }
 
-            multikeyPathSet =
-                getWildcardMultikeyPathSet(opCtx, ice.get(), projectedFields, &mkAccessStats);
+            multikeyPathSet = getWildcardMultikeyPathSet(
+                opCtx, collection->uuid(), ice.get(), projectedFields, &mkAccessStats);
 
             LOGV2_DEBUG(20920,
                         2,

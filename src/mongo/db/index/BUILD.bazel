@@ -56,6 +56,7 @@ mongo_cc_library(
         "sort_key_generator.cpp",
         "wildcard_access_method.cpp",
         "wildcard_key_generator.cpp",
+        "wildcard_metadata_key.cpp",
         "wildcard_validation.cpp",
         "//src/mongo/db/shard_role/shard_catalog:index_descriptor.cpp",
     ],

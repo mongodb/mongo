@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,37 +29,29 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/stdx/unordered_set.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/modules.h"
 
 #include <set>
-#include <string>
-#include <vector>
 
 namespace mongo {
 
-struct IndexBounds;
-struct IndexKeyEntry;
-struct Interval;
-struct MultikeyMetadataAccessStats;
-class IndexCatalogEntry;
-class OperationContext;
+/**
+ * Decodes the single multikey path from one already-BSON-materialized wildcard metadata key.
+ * Skips leading MinKey placeholders, expects the sentinel integer 1, then reads the path string.
+ * Tasserts on any deviation from the documented metadata key format defined by
+ * `WildcardKeyGenerator::makeMultikeyMetadataKey`.
+ */
+FieldRef decodeWildcardMultikeyMetadataPath(const BSONObj& keyBson);
 
 /**
- * Returns an exact set or super-set of the bounds required to fetch the multikey metadata keys
- * relevant to 'field'.
+ * Decodes the set of multikey path FieldRefs from a `KeyStringSet` of wildcard index metadata
+ * keys. Each key follows the format documented for `makeMultikeyMetadataKey`.
  */
-std::vector<Interval> getMultikeyPathIndexIntervalsForField(FieldRef field);
-
-/**
- * Returns the intersection of 'fields' and the set of multikey metadata paths stored in the
- * wildcard index. Statistics reporting index seeks and keys examined are written to 'stats'.
- */
-std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
-                                              const UUID& collectionUuid,
-                                              const IndexCatalogEntry* entry,
-                                              const stdx::unordered_set<std::string>& fieldSet,
-                                              MultikeyMetadataAccessStats* stats);
+MONGO_MOD_PUBLIC std::set<FieldRef> extractWildcardMultikeyPathsFromMetadataKeys(
+    const KeyStringSet& metadataKeys, const Ordering& ordering);
 
 }  // namespace mongo

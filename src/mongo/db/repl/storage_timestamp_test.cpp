@@ -1514,7 +1514,8 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
         // WiredTiger transactions that can contain the data written by op1.
         OneOffRead oor(_opCtx, insertTime1.asTimestamp());
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(
+            _opCtx, collAcq.getCollectionPtr()->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -1528,7 +1529,8 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
         // it could produce incorrect results.
         OneOffRead oor(_opCtx, insertTime0.asTimestamp());
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(
+            _opCtx, collAcq.getCollectionPtr()->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -1609,7 +1611,8 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
         // WiredTiger transactions that can contain the data written by op1.
         OneOffRead oor(_opCtx, updateTime1.asTimestamp());
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(
+            _opCtx, collAcq.getCollectionPtr()->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -1623,7 +1626,8 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
         // it could produce incorrect results.
         OneOffRead oor(_opCtx, insertTime0.asTimestamp());
         MultikeyMetadataAccessStats stats;
-        std::set<FieldRef> paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        std::set<FieldRef> paths = getWildcardMultikeyPathSet(
+            _opCtx, collAcq.getCollectionPtr()->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -1852,7 +1856,7 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
     stdx::unordered_set<std::string> fieldSet = {"a"};
     {
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -1860,7 +1864,7 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
         // Before the transaction started, no metadata keys should be visible.
         OneOffRead oor(_opCtx, beforeTxnTs);
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(0, paths.size());
     }
 
@@ -1937,12 +1941,12 @@ TEST_F(StorageTimestampTest,
         // Before the transaction started, no metadata keys should be visible.
         OneOffRead oor(_opCtx, beforeTxnTs);
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(0, paths.size());
     }
     {
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(3, paths.size());
         std::set<std::string> pathStrings;
         for (const auto& p : paths) {
@@ -2035,7 +2039,7 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
     stdx::unordered_set<std::string> fieldSet = {"a"};
     {
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -2043,7 +2047,7 @@ TEST_F(StorageTimestampTest, PrimarySetsWildcardMultikeyInsideMultiDocumentTrans
         // Before the transaction started, no metadata keys should be visible.
         OneOffRead oor(_opCtx, beforeTxnTs);
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(0, paths.size());
     }
 }
@@ -2116,12 +2120,12 @@ TEST_F(StorageTimestampTest, PrimarySetsCompoundWildcardMultikeyInsideMultiDocum
         // Before the transaction started, no metadata keys should be visible.
         OneOffRead oor(_opCtx, beforeTxnTs);
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(0, paths.size());
     }
     {
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -2196,7 +2200,7 @@ TEST_F(StorageTimestampTest, SecondaryAppliesWildcardMultikeyMetadataFromTransac
         // At the apply timestamp, the regenerated metadata keys are visible.
         OneOffRead oor(_opCtx, applyTs);
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }
@@ -2204,7 +2208,7 @@ TEST_F(StorageTimestampTest, SecondaryAppliesWildcardMultikeyMetadataFromTransac
         // Before the transaction started, no metadata keys should be visible.
         OneOffRead oor(_opCtx, beforeTxnTs);
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(0, paths.size());
     }
 }
@@ -2260,7 +2264,7 @@ TEST_F(StorageTimestampTest, SecondaryAppliesWildcardMultikeyMetadataFromTransac
         // At the apply timestamp, all three regenerated metadata keys are visible.
         OneOffRead oor(_opCtx, applyTs);
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(3, paths.size());
         std::set<std::string> pathStrings;
         for (const auto& p : paths) {
@@ -2274,7 +2278,7 @@ TEST_F(StorageTimestampTest, SecondaryAppliesWildcardMultikeyMetadataFromTransac
         // Before the transaction started, no metadata keys should be visible.
         OneOffRead oor(_opCtx, beforeTxnTs);
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(0, paths.size());
     }
 }
@@ -2331,7 +2335,7 @@ TEST_F(StorageTimestampTest, SecondaryAppliesCompoundWildcardMultikeyMetadataFro
         // At the apply timestamp, the regenerated metadata key is visible.
         OneOffRead oor(_opCtx, applyTs);
         MultikeyMetadataAccessStats stats;
-        auto paths = getWildcardMultikeyPathSet(_opCtx, entry, fieldSet, &stats);
+        auto paths = getWildcardMultikeyPathSet(_opCtx, collPtr->uuid(), entry, fieldSet, &stats);
         ASSERT_EQUALS(1, paths.size());
         ASSERT_EQUALS("a", paths.begin()->dottedField());
     }

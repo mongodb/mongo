@@ -113,6 +113,7 @@ mongo_cc_library(
         "collection_catalog.cpp",
         "historical_catalogid_tracker.cpp",
         "server_parameters_gen",
+        "txn_wildcard_multikey_paths.cpp",
         "uncommitted_catalog_updates.cpp",
         "uncommitted_multikey.cpp",
         "views_for_database.cpp",
@@ -483,6 +484,7 @@ mongo_cc_unit_test(
         "index_signature_test.cpp",
         "rename_collection_test.cpp",
         "set_multikey_metadata_oplog_helpers_test.cpp",
+        "txn_wildcard_multikey_paths_test.cpp",
     ],
     tags = ["mongo_unittest_eighth_group"],
     deps = [

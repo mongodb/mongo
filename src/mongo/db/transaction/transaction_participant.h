@@ -876,19 +876,6 @@ public:
          */
         void setLastWriteOpTime(OperationContext* opCtx, const repl::OpTime& lastWriteOpTime);
 
-        /**
-         * Returns true if a side transaction has committed wildcard multikey metadata keys
-         * during this transaction. Used by the query planner to decide whether a fresh
-         * RecoveryUnit scan is needed to see side-committed metadata keys.
-         */
-        bool hasSideCommittedWildcardKeys() const {
-            return p().hasSideCommittedWildcardKeys;
-        }
-
-        void setHasSideCommittedWildcardKeys() {
-            p().hasSideCommittedWildcardKeys = true;
-        }
-
         //
         // Methods for use in C++ unit tests, only. Beware: these methods may not adhere to the
         // concurrency control rules.
@@ -1447,11 +1434,6 @@ private:
         // is the case when we have (or may have) written or replicated an oplog entry for the
         // transaction.
         bool needToWriteAbortEntry{false};
-
-        // Set to true when a side transaction commits wildcard multikey metadata keys into an
-        // index. This allows the query planner to skip creating a fresh RecoveryUnit to scan
-        // for side-committed metadata keys when no such keys exist.
-        bool hasSideCommittedWildcardKeys{false};
 
         // Caches the per-collection size and count deltas across a prepared transaction. Aligns
         // with the `sizeMetadata` persisted to the `config.transactions` entry once prepared.

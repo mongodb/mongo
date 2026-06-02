@@ -31,6 +31,9 @@ filters:
   - "wildcard_key_generator*":
     approvers:
       - 10gen/query-execution-write-exec
+  - "wildcard_metadata_key*":
+    approvers:
+      - 10gen/query-execution-write-exec
   - "expression_keys*":
     approvers:
       - 10gen/query-execution-write-exec

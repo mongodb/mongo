@@ -45,6 +45,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/index/multikey_metadata_access_stats.h"
 #include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/index/wildcard_metadata_key.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -58,6 +59,7 @@
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
+#include "mongo/db/shard_role/shard_catalog/txn_wildcard_multikey_paths.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -110,33 +112,7 @@ static FieldRef extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry) {
                         record_id_helpers::ReservationId::kWildcardMultikeyMetadataId,
                         KeyFormat::String));
 
-    // Validate that the first piece of the key is the integer 1.
-    BSONObjIterator iter(entry.key);
-    while (iter.more()) {
-        const auto elem = iter.next();
-        if (elem.type() != BSONType::minKey) {
-            tassert(7354603,
-                    "An int value must follow MinKey values in a metadata key of a wildcard "
-                    "index.",
-                    elem.isNumber());
-            tassert(7354604,
-                    "The int value '1' must follow MinKey values in a metadata key of a wildcard "
-                    "index.",
-                    elem.numberInt() == 1);
-            tassert(7354605,
-                    "A string value must follow an int value in a metadata key of a wildcard index",
-                    iter.more());
-            const auto nextElem = iter.next();
-            tassert(7354606,
-                    "A string value must follow an int value in a metadata key of a wildcard index",
-                    nextElem.type() == BSONType::string);
-            return FieldRef(nextElem.valueStringData());
-        }
-    }
-
-    tasserted(7354607,
-              str::stream() << "Unexpected format of a metadata key of a wildcard index: "
-                            << entry.key);
+    return decodeWildcardMultikeyMetadataPath(entry.key);
 }
 
 /**
@@ -225,6 +201,7 @@ static void scanWildcardMetadataKeys(OperationContext* opCtx,
  * 'indexBounds'. Returns the set of multikey paths represented by the keys.
  */
 static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opCtx,
+                                                           const UUID& collectionUuid,
                                                            const IndexCatalogEntry* index,
                                                            const IndexBounds& indexBounds,
                                                            MultikeyMetadataAccessStats* stats) {
@@ -239,30 +216,24 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
 
     std::set<FieldRef> multikeyPaths{};
 
-    // Always read from the parent transaction's RU first. This covers the fallback case
-    // where the side transaction was abandoned (because the index was created in the same
-    // transaction and is not visible to the side transaction's snapshot). In that case,
-    // metadata keys were written directly in the parent transaction and are only visible
-    // through the parent's RU — the fresh snapshot below cannot see uncommitted parent writes.
+    // Always read from the parent transaction's RU. This covers both the case where keys existed in
+    // the snapshot when the transaction started, and the fallback case where the side transaction
+    // was abandoned (because the index was created in the same transaction and is not visible to
+    // the side transaction's snapshot). In that case, metadata keys were written directly in the
+    // parent transaction and are not tracked in TxnWildcardMultikeyPaths.
     scanWildcardMetadataKeys(opCtx, wam, parentRu, indexBounds, keyPattern, &multikeyPaths, stats);
 
-    // In active multi-document transactions, also read from a fresh snapshot to see
-    // side-committed metadata keys — but only if a side transaction actually committed
-    // wildcard metadata keys during this transaction. The parent transaction's WT snapshot
-    // predates the side transaction's commit, so it can't see those keys. The union of both
-    // scans covers both code paths:
-    //   - Normal case (side txn succeeded): fresh RU sees the side-committed keys.
-    //   - Fallback case (side txn abandoned): parent RU sees its own uncommitted writes.
-    // Safe because multikey is monotonic — the union is always correct.
-    if (opCtx->inMultiDocumentTransaction() && parentRu.isActive() &&
-        opCtx->hasSideCommittedWildcardKeys()) {
-        // Cached on opCtx so a query touching multiple wildcard indexes (e.g. $or over two
-        // wildcard indexes) reads them through one consistent snapshot. The cache is reset
-        // by setHasSideCommittedWildcardKeys() so the next read after a new side commit
-        // opens a fresh snapshot that sees the just-committed keys (RYOW).
-        auto& freshRu = opCtx->getOrCreateWildcardMultikeyReadRecoveryUnit();
-        scanWildcardMetadataKeys(
-            opCtx, wam, freshRu, indexBounds, keyPattern, &multikeyPaths, stats);
+    // In active multi-document transactions, also union the in-process cache of multikey paths
+    // recorded by side-transaction writes earlier in this transaction. The parent transaction's
+    // WT snapshot was taken before those side commits, so the parent-RU scan above cannot see them.
+    // Without this union, the planner would under-report multikey paths and could produce incorrect
+    // query results.
+    //
+    // The cache lives as a RecoveryUnit::Snapshot decoration, so it survives statement boundaries
+    // via RU stash/unstash and dies automatically with the snapshot on abort or abandonment.
+    if (opCtx->inMultiDocumentTransaction() && parentRu.isActive()) {
+        TxnWildcardMultikeyPaths::get(opCtx).appendMatchingPaths(
+            collectionUuid, index->descriptor()->indexName(), &multikeyPaths);
     }
 
     return multikeyPaths;
@@ -392,6 +363,7 @@ static IndexBounds buildMetadataKeysIndexBounds(const BSONObj& keyPattern,
 }
 
 std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
+                                              const UUID& collectionUuid,
                                               const IndexCatalogEntry* entry,
                                               const stdx::unordered_set<std::string>& fieldSet,
                                               MultikeyMetadataAccessStats* stats) {
@@ -399,7 +371,7 @@ std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
 
     const auto& indexBounds =
         buildMetadataKeysIndexBounds(entry->descriptor()->keyPattern(), fieldSet);
-    return getWildcardMultikeyPathSetHelper(opCtx, entry, indexBounds, stats);
+    return getWildcardMultikeyPathSetHelper(opCtx, collectionUuid, entry, indexBounds, stats);
 }
 
 /**

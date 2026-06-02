@@ -92,13 +92,6 @@ OperationContext::~OperationContext() {
     releaseOperationKey();
 }
 
-RecoveryUnit& OperationContext::getOrCreateWildcardMultikeyReadRecoveryUnit() {
-    if (!_wildcardMultikeyReadRu) {
-        _wildcardMultikeyReadRu = getServiceContext()->getStorageEngine()->newRecoveryUnit();
-    }
-    return *_wildcardMultikeyReadRu;
-}
-
 void OperationContext::setDeadlineAndMaxTime(Date_t when,
                                              Microseconds maxTime,
                                              ErrorCodes::Error timeoutError) {
