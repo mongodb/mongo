@@ -1001,7 +1001,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.0.x",
-            idsExpectedToMatch: [0, 1, 2, 3, 4].concat(S64221),
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5].concat(S64221),
         });
     })();
 

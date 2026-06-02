@@ -21,6 +21,10 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/aggregation/sources/addFields/independence.js
+      ticket: SERVER-36681
+    - test_file: jstests/aggregation/sources/match/match.js
+      ticket: SERVER-36681
     - test_file: jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_with_maxkey_docs.js
       ticket: SERVER-121533
     - test_file: jstests/core/administrative/filemd5.js
@@ -35,8 +39,22 @@ last-continuous:
       ticket: SERVER-121132
     - test_file: jstests/core/index/not_index_tagging.js
       ticket: SERVER-125555
+    - test_file: jstests/core/query/all/all.js
+      ticket: SERVER-36681
+    - test_file: jstests/core/query/array/arrayfind5.js
+      ticket: SERVER-36681
+    - test_file: jstests/core/query/cover_null_queries.js
+      ticket: SERVER-36681
+    - test_file: jstests/core/query/dotted_path_in_null.js
+      ticket: SERVER-36681
     - test_file: jstests/core/query/group_sbe_accumulator_limit.js
       ticket: SERVER-118700
+    - test_file: jstests/core/query/ne/ne_null.js
+      ticket: SERVER-36681
+    - test_file: jstests/core/query/nin/nin_null.js
+      ticket: SERVER-36681
+    - test_file: jstests/core/query/null_query_semantics.js
+      ticket: SERVER-36681
     - test_file: jstests/core/query/sparse_index_supports_ne_null.js
       ticket: SERVER-125555
     - test_file: jstests/core/repro/dbcase2.js
@@ -104,10 +122,14 @@ last-lts:
       ticket: SERVER-90869
     - test_file: jstests/aggregation/sources/addFields/add_fields_adds_to_missing_fields.js
       ticket: SERVER-91784
+    - test_file: jstests/aggregation/sources/addFields/independence.js
+      ticket: SERVER-36681
     - test_file: jstests/aggregation/sources/foreign_coll_read_foreign_db_write.js
       ticket: SERVER-96197
     - test_file: jstests/aggregation/sources/lookup/lookup_absorb_match.js
       ticket: SERVER-99121
+    - test_file: jstests/aggregation/sources/match/match.js
+      ticket: SERVER-36681
     - test_file: jstests/aggregation/sources/redact/root_redact.js
       ticket: SERVER-91339
     - test_file: jstests/aggregation/sources/setWindowFields/partition_results.js
@@ -244,8 +266,12 @@ last-lts:
       ticket: SERVER-110906
     - test_file: jstests/core/index/not_index_tagging.js
       ticket: SERVER-125555
+    - test_file: jstests/core/query/all/all.js
+      ticket: SERVER-36681
     - test_file: jstests/core/query/and/and3.js
       ticket: SERVER-91616
+    - test_file: jstests/core/query/array/arrayfind5.js
+      ticket: SERVER-36681
     - test_file: jstests/core/query/boolean_simplifier_stress.js
       ticket: SERVER-114126
     - test_file: jstests/core/query/collation/collation.js
@@ -254,8 +280,12 @@ last-lts:
       ticket: SERVER-115810
     - test_file: jstests/core/query/collation/collation_mismatch_merge.js
       ticket: SERVER-115810
+    - test_file: jstests/core/query/cover_null_queries.js
+      ticket: SERVER-36681
     - test_file: jstests/core/query/doc_validation/json_schema_validate_empty_path.js
       ticket: SERVER-97254
+    - test_file: jstests/core/query/dotted_path_in_null.js
+      ticket: SERVER-36681
     - test_file: jstests/core/query/explain/explain1.js
       ticket: SERVER-29449
     - test_file: jstests/core/query/explain/explain4.js
@@ -284,8 +314,14 @@ last-lts:
       ticket: SERVER-107211
     - test_file: jstests/core/query/json_schema/json_schema.js
       ticket: SERVER-98676
+    - test_file: jstests/core/query/ne/ne_null.js
+      ticket: SERVER-36681
+    - test_file: jstests/core/query/nin/nin_null.js
+      ticket: SERVER-36681
     - test_file: jstests/core/query/notablescan_sbe_consistency.js
       ticket: SERVER-110058
+    - test_file: jstests/core/query/null_query_semantics.js
+      ticket: SERVER-36681
     - test_file: jstests/core/query/partial_index_pbt.js
       ticket: SERVER-102825
     - test_file: jstests/core/query/plan_cache/elem_match_index_diff_types.js

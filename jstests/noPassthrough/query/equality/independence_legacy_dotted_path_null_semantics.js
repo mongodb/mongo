@@ -1,5 +1,6 @@
 /**
- * Test how the semantics of $addFields interacts with a subsequent $match.
+ * Test how the semantics of $addFields interacts with a subsequent $match,
+ * with internalQueryLegacyDottedPathNullSemantics=true (SERVER-36681).
  *
  * Intuitively, the $match can be pushed down if it only touches parts of the
  * document that the $addFields left unchanged. However, the behavior is
@@ -7,11 +8,18 @@
  * correct only for some predicates.
  *
  * @tags: [
- *   # $documents is not allowed to be used within a $facet stage
- *   do_not_wrap_aggregations_in_facets,
  *   requires_fcv_81,
  * ]
  */
+
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
+
+const origDisableFix = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryLegacyDottedPathNullSemantics: 1}),
+).internalQueryLegacyDottedPathNullSemantics;
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryLegacyDottedPathNullSemantics: true}));
 
 /**
  * Runs the stages in both orders: [stage1, stage2] and [stage2, stage1].
@@ -150,16 +158,18 @@ function testNotEquivalent({inputDoc, correct, incorrect}) {
     testIndependent({stage1, stage2, inputDoc: {x: [{}]}});
 }
 
-// When the paths diverge but not in the first component, it was previously
-// possible for the $addFields to affect the result because of a bug in how
-// nulls were handled.  It should no longer be the case.
-testIndependent({
+// When the paths diverge but not in the first component, it's possible for the
+// $addFields to affect the $match result: it replaces some scalars with objects,
+// which makes the $match path visit some missing fields instead of skipping them,
+// which means an {$eq: null} predicate changes from false to true.
+// (With the fix disabled, this dependent behavior is exhibited.)
+testDependent({
     stage1: {$addFields: {"a.x": 5}},
     stage2: {$match: {"a.y": null}},
     inputDoc: {a: [0]},
 });
 // Similarly {$in: [... null ...]} is a null-accepting predicate.
-testIndependent({
+testDependent({
     stage1: {$addFields: {"a.x": 5}},
     stage2: {$match: {"a.y": {$in: [2, null]}}},
     inputDoc: {a: [0]},
@@ -248,3 +258,6 @@ testNotEquivalent({
     // 'a.b' can point to zero locations.
     testNotEquivalent({correct, incorrect, inputDoc: {a: [], x: 5}});
 }
+
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryLegacyDottedPathNullSemantics: origDisableFix}));
+MongoRunner.stopMongod(conn);

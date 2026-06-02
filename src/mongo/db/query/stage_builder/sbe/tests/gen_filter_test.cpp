@@ -540,4 +540,70 @@ TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArray
     }
 }
 
+TEST_F(GoldenSbeFilterBuilderArraynessTestFixture, TestNothingCheckWithPathArraynessDisabledFix) {
+    RAIIServerParameterControllerForTest disableFix{"internalQueryLegacyDottedPathNullSemantics",
+                                                    true};
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
+    // Reinitialize _state so it captures the knob value set above.
+    reinitState();
+
+    // With the fix disabled, an array containing scalars at an intermediate path does NOT match a
+    // null predicate on the dotted path. The pre-SERVER-36681 behavior only matches when the
+    // intermediate value is an object or array.
+    {
+        auto root = BSON("a" << BSON_ARRAY(42));
+        auto rootSlotId = _env->registerSlot("arrayScalarRoot"_sd,
+                                             sbe::value::TypeTags::bsonObject,
+                                             sbe::value::bitcastFrom<const char*>(root.objdata()),
+                                             false,
+                                             &_slotIdGenerator);
+        auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
+
+        EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
+        runTestWithPathArrayness(
+            &eqExpr,
+            rootSlot,
+            false /* expected: original behavior returns false for scalar in array */,
+            "DisabledFix_EqNull_ArrayWithScalarIntermediate"_sd);
+    }
+
+    // With the fix disabled, an empty array at an intermediate path does NOT match a null
+    // predicate on the dotted path.
+    {
+        auto root = BSON("a" << BSONArray());
+        auto rootSlotId = _env->registerSlot("emptyArrayRoot"_sd,
+                                             sbe::value::TypeTags::bsonObject,
+                                             sbe::value::bitcastFrom<const char*>(root.objdata()),
+                                             false,
+                                             &_slotIdGenerator);
+        auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
+
+        EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
+        runTestWithPathArrayness(
+            &eqExpr,
+            rootSlot,
+            false /* expected: original behavior returns false for empty array */,
+            "DisabledFix_EqNull_EmptyArrayIntermediate"_sd);
+    }
+
+    // With the fix disabled, a scalar (non-array) intermediate still returns true because the
+    // pre-fix code falls back to checking if the parent field exists.
+    {
+        auto root = BSON("a" << 42);
+        auto rootSlotId = _env->registerSlot("scalarRoot2"_sd,
+                                             sbe::value::TypeTags::bsonObject,
+                                             sbe::value::bitcastFrom<const char*>(root.objdata()),
+                                             false,
+                                             &_slotIdGenerator);
+        auto rootSlot = SbSlot{rootSlotId, TypeSignature::kObjectType};
+
+        EqualityMatchExpression eqExpr("a.b"_sd, Value(BSONNULL));
+        runTestWithPathArrayness(
+            &eqExpr,
+            rootSlot,
+            true /* expected: scalar intermediate still matches (exists check on parent) */,
+            "DisabledFix_EqNull_ScalarIntermediate"_sd);
+    }
+}
+
 }  // namespace mongo::stage_builder

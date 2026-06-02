@@ -20,7 +20,7 @@ function getIds(query) {
     return ids;
 }
 
-assert.eq([2, 4], getIds({"a.b": {$in: [null]}}), "Did not match the expected documents");
+assert.eq([2, 3, 4, 5], getIds({"a.b": {$in: [null]}}), "Did not match the expected documents");
 
 assert.commandWorked(coll.createIndex({"a.b": 1}));
-assert.eq([2, 4], getIds({"a.b": {$in: [null]}}), "Did not match the expected documents");
+assert.eq([2, 3, 4, 5], getIds({"a.b": {$in: [null]}}), "Did not match the expected documents");

@@ -1,4 +1,15 @@
-let t = db.jstests_all;
+// Tests $all queries with internalQueryLegacyDottedPathNullSemantics=true (SERVER-36681).
+
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
+
+const origDisableFix = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryLegacyDottedPathNullSemantics: 1}),
+).internalQueryLegacyDottedPathNullSemantics;
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryLegacyDottedPathNullSemantics: true}));
+
+let t = db.jstests_all_disable_fix;
 t.drop();
 
 let doTest = function () {
@@ -42,3 +53,6 @@ doTest();
 t.drop();
 t.createIndex({a: 1});
 doTest();
+
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryLegacyDottedPathNullSemantics: origDisableFix}));
+MongoRunner.stopMongod(conn);

@@ -1,7 +1,8 @@
 /**
- * Check $match pipeline stage.
+ * Check $match pipeline stage with internalQueryLegacyDottedPathNullSemantics=true
+ * (SERVER-36681).
  * - Filtering behavior equivalent to a mongo query.
- * - $where and geo operators are not allowed
+ * - unsupported operators are not tested here
  *
  * @tags: [
  *   # SERVER-101260 changed the behavior for SBE engine
@@ -11,22 +12,22 @@
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
-const coll = db.jstests_aggregation_match;
+const conn = MongoRunner.runMongod();
+assert.neq(null, conn, "mongod was unable to start up");
+const db = conn.getDB("test");
+
+const origDisableFix = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryLegacyDottedPathNullSemantics: 1}),
+).internalQueryLegacyDottedPathNullSemantics;
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryLegacyDottedPathNullSemantics: true}));
+
+const coll = db.jstests_aggregation_match_disable_fix;
 coll.drop();
 
 const identityProjection = {
     _id: "$_id",
     a: "$a",
 };
-
-/** Assert that an aggregation generated the expected error. */
-function assertError(expectedCode, matchSpec) {
-    const matchStage = {$match: matchSpec};
-    // Check where matching is folded in to DocumentSourceCursor.
-    assertErrorCode(coll, [matchStage], expectedCode);
-    // Check where matching is not folded in to DocumentSourceCursor.
-    assertErrorCode(coll, [{$project: identityProjection}, matchStage], expectedCode);
-}
 
 /** Assert that the contents of two arrays are equal, ignoring element ordering. */
 function assertEqualResultsUnordered(one, two) {
@@ -53,17 +54,6 @@ function assertResults(expectedResults, matchSpec) {
     // Check where matching is not folded in to DocumentSourceCursor.
     assertEqualResultsUnordered(findResults, coll.aggregate({$project: identityProjection}, matchStage).toArray());
 }
-
-// Invalid matcher syntax.
-assertError(2, {a: {$mod: [0 /* invalid */, 0]}});
-
-// $where not allowed.
-assertError(ErrorCodes.BadValue, {$where: "true"});
-
-// Geo not allowed.
-assertError(5626500, {a: {$near: [-1, 1]}});
-assertError(5626500, {a: {$nearSphere: [-10, 10]}});
-assertError(5626500, {a: {$geoNear: [-100, 100]}});
 
 function checkMatchResults(indexed) {
     // No results.
@@ -156,14 +146,9 @@ function checkMatchResults(indexed) {
         [{_id: 0}, {_id: 1, a: null}, {_id: 2, a: []}, {_id: 3, a: 0}, {_id: 4, a: [[]]}, {_id: 5, a: [2, 2, 2]}],
         {x: null},
     );
-    assertResults(
-        [{_id: 0}, {_id: 1, a: null}, {_id: 2, a: []}, {_id: 3, a: 0}, {_id: 4, a: [[]]}, {_id: 5, a: [2, 2, 2]}],
-        {"a.y": null},
-    );
-    assertResults(
-        [{_id: 0}, {_id: 1, a: null}, {_id: 2, a: []}, {_id: 3, a: 0}, {_id: 4, a: [[]]}, {_id: 5, a: [2, 2, 2]}],
-        {"a.y.z": null},
-    );
+    // With fix disabled, empty arrays and value arrays do not match a dotted-path null predicate.
+    assertResults([{_id: 0}, {_id: 1, a: null}, {_id: 3, a: 0}], {"a.y": null});
+    assertResults([{_id: 0}, {_id: 1, a: null}, {_id: 3, a: 0}], {"a.y.z": null});
 
     // $elemMatch
     coll.remove({});
@@ -276,3 +261,6 @@ checkMatchResults(true);
 coll.createIndex({"a.b": 1});
 coll.createIndex({"a.c": 1});
 checkMatchResults(true);
+
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryLegacyDottedPathNullSemantics: origDisableFix}));
+MongoRunner.stopMongod(conn);

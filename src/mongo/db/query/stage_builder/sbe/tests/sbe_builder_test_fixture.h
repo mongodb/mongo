@@ -185,6 +185,8 @@ public:
                  sbe::value::Value expectedVal,
                  StringData test);
 
+    void reinitState();
+
 protected:
     stage_builder::Environment _env;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
