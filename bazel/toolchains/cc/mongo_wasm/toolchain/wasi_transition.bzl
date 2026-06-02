@@ -16,6 +16,8 @@ def _impl(settings, attr):
         "//bazel/config:ubsan": False,
         "//bazel/config:gcov": False,
         "//bazel/config:coverage": False,
+        "//command_line_option:copt": [],
+        "//command_line_option:linkopt": [],
     }
 
 wasi_transition = transition(
@@ -37,5 +39,7 @@ wasi_transition = transition(
         "//bazel/config:ssl",
         "//bazel/config:gcov",
         "//bazel/config:coverage",
+        "//command_line_option:copt",
+        "//command_line_option:linkopt",
     ],
 )
