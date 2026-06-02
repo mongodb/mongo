@@ -2445,7 +2445,8 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
             }
             oplogEntry->setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
             const bool updateTxnTable =
-                oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
+                (oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations) ||
+                (oplogGroupingFormat == WriteUnitOfWork::kGroupForAtomicWrite && lastOp);
             return logApplyOps(opCtx,
                                oplogEntry,
                                /*txnState=*/boost::none,
