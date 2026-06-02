@@ -6,6 +6,3 @@ filters:
   - "clustered/*":
     approvers:
       - 10gen/server-collection-write-path
-  - "version_api*":
-    approvers:
-      - 10gen/query-optimization
