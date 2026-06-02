@@ -1315,7 +1315,7 @@ Status executeResolvedAggregate(const AggExState& aggExState,
         // Attach pipeline suffix to SBE executor for join-reordered prefix of the pipeline.
         execs = prepareExecutorsForPipeline(aggExState,
                                             aggCatalogState,
-                                            std::move(resForJoin.model.suffix),
+                                            resForJoin.model.releaseSuffix(),
                                             std::move(resForJoin.executor),
                                             attachExecutorCallback,
                                             {} /* additionalExecutors */,

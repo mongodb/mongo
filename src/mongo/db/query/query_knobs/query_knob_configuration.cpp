@@ -234,4 +234,9 @@ SamplingCEMethodEnum QueryKnobConfiguration::getInternalJoinOptimizationSampling
     return get(query_knobs::kJoinSamplingCEMethod);
 }
 
+bool QueryKnobConfiguration::getInferSingleTablePredicates() const {
+    return get(query_knobs::kInferSingleTablePredicates);
+}
+
+
 }  // namespace mongo

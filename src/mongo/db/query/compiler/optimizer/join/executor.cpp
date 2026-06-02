@@ -301,8 +301,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     }
 
     // Validate we have all the collection acquisitions we need here.
-    bool missingAcquisitions = std::any_of(swModel.getValue().prefix->getSources().begin(),
-                                           swModel.getValue().prefix->getSources().end(),
+    bool missingAcquisitions = std::any_of(swModel.getValue().getPrefix()->getSources().begin(),
+                                           swModel.getValue().getPrefix()->getSources().end(),
                                            [&](const auto& stage) {
                                                auto* lookup =
                                                    dynamic_cast<DocumentSourceLookUp*>(stage.get());
@@ -325,8 +325,9 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     // Select access plans for each table in the join.
     auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
-    SamplingEstimatorMap samplingEstimators = makeSamplingEstimators(mca, model.graph, yieldPolicy);
-    auto swAccessPlans = singleTableAccessPlans(opCtx, mca, model.graph, samplingEstimators);
+    SamplingEstimatorMap samplingEstimators =
+        makeSamplingEstimators(mca, model.getGraph(), yieldPolicy);
+    auto swAccessPlans = singleTableAccessPlans(opCtx, mca, model.getGraph(), samplingEstimators);
     if (!swAccessPlans.isOK()) {
         return swAccessPlans.getStatus();
     }
@@ -334,7 +335,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     // Retrieve a copy of the hint if present.
     boost::optional<EnumerationStrategy> hintedStrat;
-    if (auto hintStage = dynamic_cast<DocumentSourceInternalJoinHint*>(model.prefix->peekFront());
+    if (auto hintStage =
+            dynamic_cast<DocumentSourceInternalJoinHint*>(model.getPrefix()->peekFront());
         hintStage) {
         hintedStrat = hintStage->getStrategy();
     }
@@ -348,8 +350,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         uniqueFieldInfo = buildUniqueFieldInfo(indexesPerColl);
     }
 
-    JoinReorderingContext ctx{.joinGraph = model.graph,
-                              .resolvedPaths = model.resolvedPaths,
+    JoinReorderingContext ctx{.joinGraph = model.getGraph(),
+                              .resolvedPaths = model.getResolvedPaths(),
                               .singleTableAccess = std::move(singleTableAccess),
                               .perCollIdxs = std::move(indexesPerColl),
                               .catStats = createCatalogStats(opCtx, mca),
@@ -406,7 +408,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                             const QuerySolution& soln,
                                             const cost_based_ranker::EstimateMap* estimates,
                                             bool prepare) {
-            auto& baseCQ = *model.graph.accessPathAt(baseNode);
+            auto& baseCQ = *model.getGraph().accessPathAt(baseNode);
             auto baseNss = baseCQ.nss();
             auto sbeYieldPolicy = PlanYieldPolicySBE::make(opCtx, yieldPolicy, mca, baseNss);
             auto planStagesAndData = stage_builder::buildSlotBasedExecutableTree(
@@ -438,7 +440,7 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     // If there is a pipeline suffix, then that suffix will execute inside a PlanExecutorPipeline,
     // which expects to received owned BSON objects from the inner PlanExecutor.
     size_t plannerOptions = QueryPlannerParams::DEFAULT;
-    if (model.suffix && model.suffix->peekFront()) {
+    if (model.getSuffix() && model.getSuffix()->peekFront()) {
         plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
 

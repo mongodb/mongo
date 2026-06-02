@@ -34,6 +34,7 @@
 #include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_all_indices_stage.h"
+#include "mongo/db/exec/classic/subplanning_utils.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -102,7 +103,7 @@ public:
     static bool canUseSubplanning(const CanonicalQuery& query);
     static bool needsSubplanning(const CanonicalQuery& query) {
         return internalQueryPlanOrChildrenIndependently.load() &&
-            SubplanStage::canUseSubplanning(query);
+            SubPlanningUtils::canUseSubplanning(query);
     }
 
     bool isEOF() const final;

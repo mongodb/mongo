@@ -284,6 +284,7 @@ public:
                                                   PathId rightPathId) {
         return addEdge(leftNode, rightNode, {{JoinPredicate::Eq, leftPathId, rightPathId}});
     }
+
     boost::optional<EdgeId> addExprEqualityEdge(NodeId leftNode,
                                                 NodeId rightNode,
                                                 PathId leftPathId,
@@ -292,6 +293,14 @@ public:
     }
 
     const JoinNode& getNode(NodeId nodeId) const {
+        if constexpr (kDebugBuild) {
+            return _nodes.at(nodeId);
+        } else {
+            return _nodes[nodeId];
+        }
+    }
+
+    JoinNode& getNode(NodeId nodeId) {
         if constexpr (kDebugBuild) {
             return _nodes.at(nodeId);
         } else {

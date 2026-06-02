@@ -105,6 +105,9 @@ export function joinPlanToString(stage, indent = 0) {
             result += indentString(indent + 1) + "-> ";
             result += joinPlanToString(stage.inputStages[1], indent + 2);
             break;
+        case "EOF":
+            result += "EOF\n";
+            break;
         default:
             throw new Error(`Unknown stage: ${stage.stage} ${tojson(stage)}`);
     }

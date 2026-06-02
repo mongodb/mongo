@@ -647,6 +647,21 @@ server_parameters:
             query_knob:
                 wire_name: maxNumberNodesConsideredForImplicitEdges
 
+    # The current state of this code propagates STPs inside an $or/$nor. This represents a
+    # correctness issue and therefore it is unsafe to run this logic enabled by default.
+    # TODO SERVER-127878: make this knob disabled by default, so we run join opt with
+    # STP propagation by default.
+    internalInferSingleTablePredicates:
+        description: "Infer and propagate single table predicates across equivalence classes. This "
+        set_at: [startup, runtime]
+        cpp_varname: "internalInferSingleTablePredicates"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
+        annotations:
+            query_knob:
+                wire_name: inferSingleTablePredicates
+
     internalQueryMaxPipelineRewrites:
         description: "Maximum number of pipeline rewrite rules to apply"
         set_at: [startup, runtime]

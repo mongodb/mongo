@@ -78,41 +78,6 @@ SubplanStage::SubplanStage(ExpressionContext* expCtx,
             _query->getPrimaryMatchExpression()->numChildren());
 }
 
-bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
-    const FindCommandRequest& findCommand = query.getFindCommandRequest();
-    const MatchExpression* expr = query.getPrimaryMatchExpression();
-
-    // Hint provided
-    if (!findCommand.getHint().isEmpty()) {
-        return false;
-    }
-
-    // Min provided
-    // Min queries are a special case of hinted queries.
-    if (!findCommand.getMin().isEmpty()) {
-        return false;
-    }
-
-    // Max provided
-    // Similar to min, max queries are a special case of hinted queries.
-    if (!findCommand.getMax().isEmpty()) {
-        return false;
-    }
-
-    // Tailable cursors won't get cached, just turn into collscans.
-    if (findCommand.getTailable()) {
-        return false;
-    }
-
-    // Distinct-eligible queries cannot use subplanning.
-    if (query.getDistinct()) {
-        return false;
-    }
-
-    // We can only subplan rooted $or queries, and only if they have at least one clause.
-    return MatchExpression::OR == expr->matchType() && expr->numChildren() > 0;
-}
-
 Status SubplanStage::choosePlanWholeQuery(const QueryPlannerParams& plannerParams,
                                           PlanYieldPolicy* yieldPolicy,
                                           bool shouldConstructClassicExecutableTree) {

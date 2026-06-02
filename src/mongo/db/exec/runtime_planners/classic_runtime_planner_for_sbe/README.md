@@ -74,7 +74,7 @@ Subplanning is a process where each clause in a rooted
 $or query is planned separately.
 For example, in match expression `{$or: [{a: 1}, {b: 1}]}`parts`{a:
 1}`and`{b: 1}` will be planned independently. This is determined by
-[SubplanStage::canUseSubplanning()](https://github.com/mongodb/mongo/blob/59bfa0cc51bfbdaf0cde7184e63db77f5015c0a6/src/mongo/db/exec/subplan.cpp#L81)
+[SubPlanningUtils::canUseSubplanning()](https://github.com/mongodb/mongo/blob/59bfa0cc51bfbdaf0cde7184e63db77f5015c0a6/src/mongo/db/exec/subplan.cpp#L81)
 
 If subplanning can be used:
 

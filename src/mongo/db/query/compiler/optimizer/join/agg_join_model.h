@@ -34,10 +34,12 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
+
 /**
  * Defines size limits for graphs during build and extend operations.
  */
-struct AggModelBuildParams {
+class AggModelBuildParams {
+public:
     JoinGraphBuildParams joinGraphBuildParams;
     size_t maxNumberNodesConsideredForImplicitEdges;
 };
@@ -45,7 +47,8 @@ struct AggModelBuildParams {
 /** Represent an aggregation pipeline for join optimization. It takes a pipeline and parses a join
  * graph from it.
  */
-struct AggJoinModel {
+class AggJoinModel {
+public:
     /** Returns false if we are sure that the pipeline cannot be optimized with join reordering,
      * true if we should try.
      */
@@ -64,26 +67,58 @@ struct AggJoinModel {
     AggJoinModel(JoinGraph graph,
                  std::vector<ResolvedPath> resolvedPaths,
                  std::unique_ptr<Pipeline> prefix,
-                 std::unique_ptr<Pipeline> suffix)
+                 std::unique_ptr<Pipeline> suffix,
+                 std::vector<BSONObj> accessPathsBackingBson)
         : graph{std::move(graph)},
           resolvedPaths{std::move(resolvedPaths)},
           prefix{std::move(prefix)},
-          suffix{std::move(suffix)} {}
+          suffix{std::move(suffix)},
+          accessPathsBackingBson{std::move(accessPathsBackingBson)} {}
 
     AggJoinModel(AggJoinModel&& other)
         : graph{std::move(other.graph)},
           resolvedPaths{std::move(other.resolvedPaths)},
           prefix{std::move(other.prefix)},
-          suffix{std::move(other.suffix)} {}
+          suffix{std::move(other.suffix)},
+          accessPathsBackingBson{std::move(other.accessPathsBackingBson)} {}
 
     AggJoinModel& operator=(AggJoinModel&& other) {
         graph = std::move(other.graph);
         resolvedPaths = std::move(other.resolvedPaths);
         prefix = std::move(other.prefix);
         suffix = std::move(other.suffix);
+        accessPathsBackingBson = std::move(other.accessPathsBackingBson);
         return *this;
     }
 
+    /** Serializes the Aggregation Join Model to BSON. */
+    BSONObj toBSON() const;
+
+    /** Converts the Aggregation Join Model to a JSON string. */
+    std::string toString(bool pretty) const {
+        return toBSON().jsonString(/*format*/ ExtendedCanonicalV2_0_0, pretty);
+    }
+
+    const JoinGraph& getGraph() const {
+        return graph;
+    }
+    const std::vector<ResolvedPath>& getResolvedPaths() const {
+        return resolvedPaths;
+    }
+    Pipeline* getPrefix() const {
+        return prefix.get();
+    }
+    Pipeline* getSuffix() const {
+        return suffix.get();
+    }
+    std::unique_ptr<Pipeline> releaseSuffix() {
+        return std::move(suffix);
+    }
+    const std::vector<BSONObj>& getAccessPathsBackingBson() const {
+        return accessPathsBackingBson;
+    }
+
+private:
     JoinGraph graph;
 
     std::vector<ResolvedPath> resolvedPaths;
@@ -94,14 +129,7 @@ struct AggJoinModel {
     // Remaining stages not extracted for join optimization.
     std::unique_ptr<Pipeline> suffix;
 
-    /**Serializes the Aggregation Join Model to BSON.*/
-    BSONObj toBSON() const;
-
-    /** Converts the Aggregation Join Model to a JSON string. If 'pretty' is true the output JSON
-     * string is idented.
-     */
-    std::string toString(bool pretty) const {
-        return toBSON().jsonString(/*format*/ ExtendedCanonicalV2_0_0, pretty);
-    }
+    std::vector<BSONObj> accessPathsBackingBson;
 };
+
 }  // namespace mongo::join_ordering

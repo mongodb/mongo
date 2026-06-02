@@ -111,8 +111,8 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_OneImplictEdge) {
     markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"b"_sd}}, {"B", {"b"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_OneImplictEdge");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 3);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
 
 /**
@@ -132,8 +132,8 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_MultipleImplictEdges) {
     markFieldsAsScalar(*pipeline, {"a"_sd}, {{"A", {"a"_sd}}, {"B", {"b"_sd}}, {"C", {"c"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_MultipleImplictEdges");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 4);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 6);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 4);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 6);
 }
 
 /**
@@ -167,8 +167,8 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_TwoConnectedComponents) {
                         {"E", {"e"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_TwoConnectedComponents");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 6);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 9);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 6);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 9);
 }
 
 /**
@@ -199,8 +199,8 @@ TEST_F(AggJoinModelGoldenTest, addImplicitEdges_NoImplicitEdges) {
                         {"E", {"e"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addImplicitEdges_NoImplicitEdges");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 6);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 5);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 6);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 5);
 }
 
 /**
@@ -236,8 +236,8 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesAtEnd) {
 
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesAtEnd");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 8);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
 }
 
 TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesAtEndNonScalar) {
@@ -267,8 +267,8 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesAtEndNonScalar) {
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesAtEndNonScalar");
     ASSERT_OK(joinModel);
     // $match gets pushed up by optimization, then renders remaining suffix ineligible!
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 2);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 2);
 }
 
 /**
@@ -300,8 +300,8 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesInBetween) {
                         {"D", {"s4"_sd, "c"_sd, "d"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesInBetween");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 8);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
 }
 
 TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesInBetweenNonScalar) {
@@ -328,8 +328,8 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_predicatesInBetweenNonScalar) {
         runVariation(std::move(pipeline), "addEdgesFromExpr_predicatesInBetweenNonScalar");
     ASSERT_OK(joinModel);
     // $match moves up, disqualifying 2 nodes.
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 2);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 2);
 }
 
 /**
@@ -363,8 +363,8 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEnd) {
                         {"D", {"s4"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_earlyEnd");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 3);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
 
 TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEndNumeric) {
@@ -393,8 +393,8 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEndNumeric) {
          {"D", {"s4"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_earlyEndNumeric");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 3);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
 
 TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEndNonScalar) {
@@ -423,8 +423,8 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_earlyEndNonScalar) {
                         {"D", {"s4"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_earlyEndNonScalar");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 3);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 3);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 3);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 3);
 }
 /**
  * Combined test of $expr and implicit edges.
@@ -457,9 +457,9 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_addImplicitEdge) {
                         {"D", {"a"_sd, "d"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_addImplicitEdge");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 8);
-    ASSERT_EQ(numPredicates(joinModel.getValue().graph), 10);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
+    ASSERT_EQ(numPredicates(joinModel.getValue().getGraph()), 10);
 }
 
 TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_addImplicitEdgeNonScalar) {
@@ -485,10 +485,10 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_addImplicitEdgeNonScalar) {
                         {"D", {"d"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "addEdgesFromExpr_addImplicitEdgeNonScalar");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
     // Can't add potentially multikey edge "A.a" - "D.a".
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 7);
-    ASSERT_EQ(numPredicates(joinModel.getValue().graph), 8);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 7);
+    ASSERT_EQ(numPredicates(joinModel.getValue().getGraph()), 8);
 }
 
 /**
@@ -534,9 +534,9 @@ TEST_F(AggJoinModelGoldenTest, subPipelineEdge_addImplicitEdge) {
                         {"D", {"d"_sd, "a"_sd}}});
     auto joinModel = runVariation(std::move(pipeline), "subPipelineEdge_addImplicitEdge");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 5);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 8);
-    ASSERT_EQ(numPredicates(joinModel.getValue().graph), 10);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 5);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 8);
+    ASSERT_EQ(numPredicates(joinModel.getValue().getGraph()), 10);
 }
 
 /**
@@ -572,9 +572,9 @@ TEST_F(AggJoinModelGoldenTest, addEdgesFromExpr_subPipelineEdge_addImplicitEdge)
     auto joinModel =
         runVariation(std::move(pipeline), "addEdgesFromExpr_subPipelineEdge_addImplicitEdge");
     ASSERT_OK(joinModel);
-    ASSERT_EQ(joinModel.getValue().graph.numNodes(), 4);
-    ASSERT_EQ(joinModel.getValue().graph.numEdges(), 6);
-    ASSERT_EQ(numPredicates(joinModel.getValue().graph), 8);
+    ASSERT_EQ(joinModel.getValue().getGraph().numNodes(), 4);
+    ASSERT_EQ(joinModel.getValue().getGraph().numEdges(), 6);
+    ASSERT_EQ(numPredicates(joinModel.getValue().getGraph()), 8);
 }
 
 }  // namespace mongo::join_ordering

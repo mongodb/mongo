@@ -77,6 +77,9 @@
     KNOB(kMaxEdgesInJoinGraph,                                                            \
          kInternalMaxEdgesInJoinGraphName,                                                \
          internalMaxEdgesInJoinGraph)                                                     \
+    KNOB(kInferSingleTablePredicates,                                                     \
+         kInternalInferSingleTablePredicatesName,                                         \
+         internalInferSingleTablePredicates)                                              \
     KNOB(kMaxNumberNodesConsideredForImplicitEdges,                                       \
          kInternalMaxNumberNodesConsideredForImplicitEdgesName,                           \
          internalMaxNumberNodesConsideredForImplicitEdges)                                \

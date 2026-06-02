@@ -31,9 +31,10 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/classic/subplan.h"
+#include "mongo/db/exec/classic/subplanning_utils.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -41,17 +42,22 @@
 #include "mongo/db/pipeline/document_source_internal_join_hint.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/compiler/dependency_analysis/pipeline_dependency_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 #include "mongo/db/query/compiler/optimizer/join/predicate_extractor.h"
+#include "mongo/db/query/compiler/optimizer/join/predicate_inferer.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/util/disjoint_set.h"
 #include "mongo/util/assert_util.h"
 
+#include <ios>
 #include <memory>
 #include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::join_ordering {
 namespace {
@@ -69,27 +75,6 @@ std::unique_ptr<CanonicalQuery> makeFullScanCQ(boost::intrusive_ptr<ExpressionCo
     auto fcr = std::make_unique<FindCommandRequest>(expCtx->getNamespaceString());
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{.findCommand = std::move(fcr)}});
-}
-
-StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQueryFromSingleMatchExpression(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    NamespaceString nss,
-    std::unique_ptr<MatchExpression> expr) {
-    ExpressionContext::PlanCacheOptions oldPlanCache = expCtx->getPlanCache();
-    expCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kDisablePlanCache);
-    auto pfc = ParsedFindCommand::withExistingFilter(expCtx,
-                                                     nullptr,
-                                                     std::move(expr),
-                                                     std::make_unique<FindCommandRequest>(nss),
-                                                     ProjectionPolicies::findProjectionPolicies());
-    CanonicalQueryParams params{.expCtx = expCtx, .parsedFind = std::move(pfc.getValue())};
-    auto cq = CanonicalQuery::make(std::move(params));
-    expCtx->setPlanCache(oldPlanCache);
-    if (cq.isOK() && SubplanStage::canUseSubplanning(*cq.getValue())) {
-        return Status(ErrorCodes::QueryFeatureNotAllowed,
-                      "Encountered rooted $or, can't use subplanning together with join opt");
-    }
-    return cq;
 }
 
 struct Predicates {
@@ -211,47 +196,6 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
         dynamic_cast<DocumentSourceMatch*>(lookup.getResolvedIntrospectionPipeline().peekFront());
 }
 
-/**
- * Find and add implicit (transitive) edges within the graph.
- * `maxNodes` is the maximum number of nodes allowed in a connected component to be used for
- * implicit edge finding.
- * Example: two edges A.a = B.b and B.b = C.c form an implicit edge A.a = C.c.
- */
-void addImplicitEdges(MutableJoinGraph& graph,
-                      const std::vector<ResolvedPath>& resolvedPaths,
-                      size_t maxNodes) {
-    DisjointSet ds{resolvedPaths.size()};
-    for (const auto& edge : graph.edges()) {
-        for (const auto& pred : edge.predicates) {
-            if (pred.isEquality()) {
-                ds.unite(pred.left, pred.right);
-            }
-        }
-    }
-
-    stdx::unordered_map<size_t, absl::InlinedVector<PathId, 8>> pathSets{};
-    for (size_t i = 0; i < ds.size(); ++i) {
-        auto setId = ds.find(i);
-        tassert(11116502, "Unknown pathId", setId.has_value());
-        auto& pathSet = pathSets[setId.value()];
-        if (pathSet.size() < maxNodes) {
-            const PathId currentPathId = static_cast<PathId>(i);
-            const NodeId currentNodeId = resolvedPaths[currentPathId].nodeId;
-            for (PathId pathId : pathSet) {
-                const NodeId nodeId = resolvedPaths[pathId].nodeId;
-                // The join graph limits 'maxEdgesInJoin' or 'maxPredicatesInEdge' can be hit here
-                // and the predicate wouldn't be added. This is fine because it doesn't affect the
-                // correctness of the query, only the size of the graph and the number of possible
-                // join plans.
-                // Note: We always add implicit edges as equality edges, then enforce stricter $expr
-                // equality semantics during physical plan generation.
-                graph.addSimpleEqualityEdge(nodeId, currentNodeId, pathId, currentPathId);
-            }
-            pathSet.push_back(currentPathId);
-        }
-    }
-}
-
 // Insert the given join predicates into the given join graph.
 Status addExprJoinPredicates(MutableJoinGraph& graph,
                              const std::vector<JoinPredicateExpr>& joinPreds,
@@ -368,7 +312,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
         return swCQ.getStatus();
     }
 
-    if (SubplanStage::canUseSubplanning(*swCQ.getValue())) {
+    if (SubPlanningUtils::canUseSubplanning(*swCQ.getValue())) {
         return Status(ErrorCodes::QueryFeatureNotAllowed,
                       "Encountered rooted $or, can't use subplanning together with join opt");
     }
@@ -555,15 +499,22 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
         return Status(ErrorCodes::QueryFeatureNotAllowed, "Join reordering not allowed");
     }
 
-    addImplicitEdges(graph, resolvedPaths, buildParams.maxNumberNodesConsideredForImplicitEdges);
+    auto swVec = addImplicitEdgesAndInferPredicates(
+        graph, resolvedPaths, buildParams.maxNumberNodesConsideredForImplicitEdges, expCtx);
+    if (!swVec.isOK()) {
+        return swVec.getStatus();
+    }
 
     JoinGraph result = JoinGraph(std::move(graph));
     if (!result.isConnected()) {
         return Status(ErrorCodes::InternalErrorNotSupported,
                       "Join graph must be connected as cross-products are not yet supported");
     }
-    return AggJoinModel(
-        std::move(result), std::move(resolvedPaths), std::move(prefix), std::move(suffix));
+    return AggJoinModel(std::move(result),
+                        std::move(resolvedPaths),
+                        std::move(prefix),
+                        std::move(suffix),
+                        std::move(swVec.getValue()));
 }
 
 BSONObj AggJoinModel::toBSON() const {

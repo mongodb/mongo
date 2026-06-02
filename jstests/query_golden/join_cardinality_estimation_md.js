@@ -79,7 +79,15 @@ function withinFactorOfTwo(a, b) {
     const ratio = a / b;
     return ratio >= 0.5 && ratio <= 2;
 }
-function estimateNoSubpipeline(left, right, localField, foreignField, pipelineMatch = {}) {
+
+function estimateNoSubpipeline(
+    left,
+    right,
+    localField,
+    foreignField,
+    pipelineMatch = {},
+    turnOffInferringPredicates = false,
+) {
     estimatePipeline(left, [
         {$lookup: {from: right, localField: localField, foreignField: foreignField, as: "right"}},
         {$unwind: "$right"},
@@ -102,7 +110,7 @@ function estimateWithSubpipeline(left, right, localField, foreignField, pipeline
     ]);
 }
 
-function estimatePipeline(left, pipeline) {
+function estimatePipeline(left, pipeline, turnOffInferringPredicates = false) {
     print("```js");
     print(`db.${left}.aggregate(${JSON.stringify(pipeline)})`);
     print("```");
@@ -164,7 +172,6 @@ print("# Cross joins");
 estimateNoSubpipeline("many_rows", "many_rows", "c_idx", "c_idx");
 estimateWithSubpipeline("many_rows", "many_rows", "c_idx", "c_idx");
 
-// TODO SERVER-117385
 print("# Joins on a unique index");
 estimateNoSubpipeline("many_rows", "many_rows", "i_idx_unique", "d_idx");
 estimateNoSubpipeline("many_rows", "many_rows", "d_idx", "i_idx_unique");

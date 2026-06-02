@@ -36,6 +36,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/subplan.h"
+#include "mongo/db/exec/classic/subplanning_utils.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/index_builds/index_build_test_helpers.h"
@@ -413,14 +414,14 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
     {
         std::string findCmd = "{find: 'testns', filter: {$and:[{a:1}, {b:1}]}}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_FALSE(SubPlanningUtils::canUseSubplanning(*cq));
     }
 
     // Don't try and subplan if there is no filter.
     {
         std::string findCmd = "{find: 'testns'}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_FALSE(SubPlanningUtils::canUseSubplanning(*cq));
     }
 
     // We won't try and subplan two contained ORs.
@@ -429,7 +430,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
             "{find: 'testns',"
             "filter: {$or:[{a:1}, {b:1}], $or:[{c:1}, {d:1}], e:1}}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_FALSE(SubPlanningUtils::canUseSubplanning(*cq));
     }
 
     // Can't use subplanning if there is a hint.
@@ -439,7 +440,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
             "filter: {$or: [{a:1, b:1}, {c:1, d:1}]},"
             "hint: {a:1, b:1}}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_FALSE(SubPlanningUtils::canUseSubplanning(*cq));
     }
 
     // Can't use subplanning with min.
@@ -449,7 +450,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
             "filter: {$or: [{a:1, b:1}, {c:1, d:1}]},"
             "min: {a:1, b:1}}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_FALSE(SubPlanningUtils::canUseSubplanning(*cq));
     }
 
     // Can't use subplanning with max.
@@ -459,7 +460,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
             "filter: {$or: [{a:1, b:1}, {c:1, d:1}]},"
             "max: {a:2, b:2}}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_FALSE(SubPlanningUtils::canUseSubplanning(*cq));
     }
 
     // Can't use subplanning with tailable.
@@ -469,7 +470,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
             "filter: {$or: [{a:1, b:1}, {c:1, d:1}]},"
             "tailable: true}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_FALSE(SubPlanningUtils::canUseSubplanning(*cq));
     }
 
     // Can use subplanning for rooted $or.
@@ -478,13 +479,13 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
             "{find: 'testns',"
             "filter: {$or: [{a:1, b:1}, {c:1, d:1}]}}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_TRUE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_TRUE(SubPlanningUtils::canUseSubplanning(*cq));
 
         std::string findCmd2 =
             "{find: 'testns',"
             "filter: {$or: [{a:1}, {c:1}]}}";
         std::unique_ptr<CanonicalQuery> cq2 = cqFromFindCommand(findCmd2);
-        ASSERT_TRUE(SubplanStage::canUseSubplanning(*cq2));
+        ASSERT_TRUE(SubPlanningUtils::canUseSubplanning(*cq2));
     }
 
     // Can't use subplanning for a single contained $or.
@@ -493,7 +494,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
             "{find: 'testns',"
             "filter: {e: 1, $or: [{a:1, b:1}, {c:1, d:1}]}}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_FALSE(SubPlanningUtils::canUseSubplanning(*cq));
     }
 
     // Can't use subplanning if the contained $or query has a geo predicate.
@@ -503,7 +504,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
             "filter: {loc: {$geoWithin: {$centerSphere: [[0,0], 1]}},"
             "e: 1, $or: [{a:1, b:1}, {c:1, d:1}]}}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_FALSE(SubPlanningUtils::canUseSubplanning(*cq));
     }
 
     // Can't use subplanning if the contained $or query also has a $text predicate.
@@ -513,7 +514,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
             "filter: {$text: {$search: 'foo'},"
             "e: 1, $or: [{a:1, b:1}, {c:1, d:1}]}}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_FALSE(SubPlanningUtils::canUseSubplanning(*cq));
     }
 
     // Can't use subplanning if the contained $or query also has a $near predicate.
@@ -523,7 +524,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
             "filter: {loc: {$near: [0, 0]},"
             "e: 1, $or: [{a:1, b:1}, {c:1, d:1}]}}";
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
+        ASSERT_FALSE(SubPlanningUtils::canUseSubplanning(*cq));
     }
 }
 

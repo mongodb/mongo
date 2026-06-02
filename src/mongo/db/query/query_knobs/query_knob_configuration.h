@@ -101,6 +101,8 @@ public:
     size_t getInternalMaxAllPlansEnumerationSubsetLevel() const;
     bool getEnableJoinOptimizationUseIndexUniqueness() const;
     SamplingCEMethodEnum getInternalJoinOptimizationSamplingCEMethod() const;
+    bool getInferSingleTablePredicates() const;
+
 
     /**
      * Returns whether we can push down fully compatible stages to sbe. This is only true when the

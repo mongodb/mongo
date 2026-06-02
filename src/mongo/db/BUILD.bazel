@@ -942,6 +942,7 @@ mongo_cc_library(
         "server_base",
         "shard_filterer",
         "shared_request_handling",
+        "subplanning_utils",
         "working_set_common",
         "write_stage_common",
         ":curop_failpoint_helpers",
@@ -1088,6 +1089,16 @@ mongo_cc_library(
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/index:preallocated_container_pool",
         "//src/mongo/db/storage/key_string",
+    ],
+)
+
+mongo_cc_library(
+    name = "subplanning_utils",
+    srcs = ["//src/mongo/db/exec/classic:subplanning_utils.cpp"],
+    hdrs = ["//src/mongo/db/exec/classic:subplanning_utils.h"],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query:canonical_query_base",
     ],
 )
 

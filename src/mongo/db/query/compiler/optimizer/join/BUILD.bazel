@@ -24,9 +24,11 @@ mongo_cc_library(
         "join_graph.cpp",
         "path_resolver.cpp",
         "predicate_extractor.cpp",
+        "predicate_inferer.cpp",
     ],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db:subplanning_utils",
         "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
         "//src/mongo/db/query/util:query_util_bitset",
