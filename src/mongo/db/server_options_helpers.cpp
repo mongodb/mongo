@@ -66,37 +66,7 @@
 
 namespace mongo {
 
-/*
- * SERVER-11160 syslog.h does not define facilitynames under solaris.
- * syslog.h exports preprocessor macro INTERNAL_NOPRI if
- * facilitynames is provided. This will be used to determine
- * if facilitynames should be defined here.
- * These could also go into a syslog.h compatibility header.
- * We are using INTERNAL_NOPRI as the indicator macro for facilitynames
- * because it's defined alongside facilitynames in the syslog.h headers
- * that support SYSLOG_NAMES.
- */
-
 namespace {
-
-#if defined(SYSLOG_NAMES)
-#if !defined(INTERNAL_NOPRI)
-
-typedef struct _code {
-    const char* c_name;
-    int c_val;
-} CODE;
-
-CODE facilitynames[] = {{"auth", LOG_AUTH},     {"cron", LOG_CRON},     {"daemon", LOG_DAEMON},
-                        {"kern", LOG_KERN},     {"lpr", LOG_LPR},       {"mail", LOG_MAIL},
-                        {"news", LOG_NEWS},     {"security", LOG_AUTH}, /* DEPRECATED */
-                        {"syslog", LOG_SYSLOG}, {"user", LOG_USER},     {"uucp", LOG_UUCP},
-                        {"local0", LOG_LOCAL0}, {"local1", LOG_LOCAL1}, {"local2", LOG_LOCAL2},
-                        {"local3", LOG_LOCAL3}, {"local4", LOG_LOCAL4}, {"local5", LOG_LOCAL5},
-                        {"local6", LOG_LOCAL6}, {"local7", LOG_LOCAL7}, {nullptr, -1}};
-
-#endif  // !defined(INTERNAL_NOPRI)
-#endif  // defined(SYSLOG_NAMES)
 
 Status setArgvArray(const std::vector<std::string>& argv) {
     BSONArrayBuilder b;
