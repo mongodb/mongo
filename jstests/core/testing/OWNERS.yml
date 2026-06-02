@@ -6,3 +6,6 @@ filters:
   - "certs_are_generated.js":
     approvers:
       - 10gen/server-security
+  - "mixed_version_replica_set.js":
+    approvers:
+      - 10gen/server-replication-reviewers

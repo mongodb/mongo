@@ -4,7 +4,8 @@
  * @tags: [
  *   # The test runs commands that are not allowed with security token: replSetGetStatus.
  *   not_allowed_with_signed_security_token,
- *   multiversion_sanity_check
+ *   multiversion_sanity_check,
+ *   future_git_tag_incompatible
  * ]
  */
 
