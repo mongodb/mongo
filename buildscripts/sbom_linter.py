@@ -295,15 +295,15 @@ def main() -> int:
         ]
     )
     # the only files in this dir that are not third party libs
-    third_party_libs.remove("scripts")
+    third_party_libs.discard("scripts")
     # the only files in the sasl dir are BUILD files to setup the sasl library in Windows
-    third_party_libs.remove("sasl")
+    third_party_libs.discard("sasl")
     # This is not a real third party, its just the local ssl pretending to be boringssl
-    third_party_libs.remove("boringssl_replacement")
+    third_party_libs.discard("boringssl_replacement")
     # This is just a build file that gets inserted into a third party
-    third_party_libs.remove("wasmtime")
+    third_party_libs.discard("wasmtime")
     # Nothing in this directory is included in Community/EA
-    third_party_libs.remove("private")
+    third_party_libs.discard("private")
     error_manager = lint_sbom(input_file, output_file, third_party_libs, should_format)
     error_manager.print_errors()
 
