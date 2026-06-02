@@ -37,8 +37,10 @@
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/query/search/mongot_options.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -54,12 +56,37 @@ using boost::intrusive_ptr;
 using std::list;
 using std::vector;
 
+// One spec per internal-only field. Used by both the external-client rejection test and the
+// internal-client acceptance test so the two stay in lock-step as fields are added.
+static const std::vector<std::pair<std::string, std::string>> kInternalSearchMetaFieldCases = {
+    {"mongotQuery",
+     R"({$searchMeta: {mongotQuery: {index: "default", text: {query: "hello", path: "body"}}}})"},
+    {"mergingPipeline", R"({$searchMeta: {mergingPipeline: [{$merge: {into: "secret"}}]}})"},
+    {"metadataMergeProtocolVersion", R"({$searchMeta: {metadataMergeProtocolVersion: 1}})"},
+    {"requiresSearchSequenceToken", R"({$searchMeta: {requiresSearchSequenceToken: true}})"},
+    {"requiresSearchMetaCursor", R"({$searchMeta: {requiresSearchMetaCursor: true}})"},
+    {"limit", R"({$searchMeta: {limit: 5}})"},
+    {"sortSpec", R"({$searchMeta: {sortSpec: {score: -1}}})"},
+    {"mongotDocsRequested", R"({$searchMeta: {mongotDocsRequested: 10}})"},
+    {"docsNeededBounds",
+     R"({$searchMeta: {docsNeededBounds: {minBounds: {type: "unknown"}, maxBounds: {type: "unknown"}}}})"},
+};
+
 class SearchMetaTest : service_context_test::WithSetupTransportLayer,
                        public AggregationContextFixture {};
 
 struct MockMongoInterface final : public StubMongoProcessInterface {
     bool inShardedEnvironment(OperationContext* opCtx) const override {
         return false;
+    }
+};
+
+struct QueryExecutingMockMongoInterface final : public StubMongoProcessInterface {
+    bool inShardedEnvironment(OperationContext* opCtx) const override {
+        return false;
+    }
+    bool isExpectedToExecuteQueries() override {
+        return true;
     }
 };
 
@@ -83,6 +110,47 @@ TEST_F(SearchMetaTest, TestParsingOfSearchMeta) {
         DocumentSourceSearchMeta::createFromBson(specObj.firstElement(), getExpCtx()),
         AssertionException,
         ErrorCodes::FailedToParse);
+}
+
+// Each internal routing field must be individually rejected when supplied by an external client.
+TEST_F(SearchMetaTest, ExternalClientCannotSupplyInternalSearchMetaFields) {
+    // Bypass the mongot-host check so createFromBson reaches our internal-fields check.
+    globalMongotParams.host = "localhost:27027";
+    globalMongotParams.enabled = true;
+
+    auto session = transport::MockSession::create(nullptr);
+    auto externalClient = getServiceContext()->getService()->makeClient("externalClient", session);
+    auto externalOpCtx = externalClient->makeOperationContext();
+
+    auto expCtx = make_intrusive<ExpressionContextForTest>(externalOpCtx.get(),
+                                                           getExpCtx()->getNamespaceString());
+    expCtx->setMongoProcessInterface(std::make_unique<QueryExecutingMockMongoInterface>());
+
+    for (const auto& [fieldName, spec] : kInternalSearchMetaFieldCases) {
+        const auto specBson = fromjson(spec);
+        ASSERT_THROWS_CODE(
+            DocumentSourceSearchMeta::createFromBson(specBson.firstElement(), expCtx),
+            AssertionException,
+            5491300);
+    }
+}
+
+// Internal clients (no transport session) must still be able to supply internal routing fields.
+TEST_F(SearchMetaTest, InternalClientCanSupplyInternalSearchMetaFields) {
+    globalMongotParams.host = "localhost:27027";
+    globalMongotParams.enabled = true;
+
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<QueryExecutingMockMongoInterface>());
+
+    auto fromNs = NamespaceString::createNamespaceString_forTest("unittests.$cmd.aggregate");
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    for (const auto& [fieldName, spec] : kInternalSearchMetaFieldCases) {
+        const auto specBson = fromjson(spec);
+        ASSERT_DOES_NOT_THROW(
+            DocumentSourceSearchMeta::createFromBson(specBson.firstElement(), expCtx));
+    }
 }
 
 }  // namespace

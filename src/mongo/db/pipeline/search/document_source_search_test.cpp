@@ -33,9 +33,11 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/query/search/mongot_options.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -49,12 +51,38 @@ using boost::intrusive_ptr;
 using std::list;
 using std::vector;
 
+// One spec per internal-only field. Used by both the external-client rejection test and the
+// internal-client acceptance test so the two stay in lock-step as fields are added.
+static const std::vector<std::pair<std::string, std::string>> kInternalSearchFieldCases = {
+    {"mongotQuery",
+     R"({$search: {mongotQuery: {index: "default", text: {query: "hello", path: "body"}}}})"},
+    {"mergingPipeline",
+     R"({$search: {mergingPipeline: [{$lookup: {from: "secret", as: "leak", pipeline: []}}]}})"},
+    {"metadataMergeProtocolVersion", R"({$search: {metadataMergeProtocolVersion: 1}})"},
+    {"requiresSearchSequenceToken", R"({$search: {requiresSearchSequenceToken: true}})"},
+    {"requiresSearchMetaCursor", R"({$search: {requiresSearchMetaCursor: true}})"},
+    {"limit", R"({$search: {limit: 5}})"},
+    {"sortSpec", R"({$search: {sortSpec: {score: -1}}})"},
+    {"mongotDocsRequested", R"({$search: {mongotDocsRequested: 10}})"},
+    {"docsNeededBounds",
+     R"({$search: {docsNeededBounds: {minBounds: {type: "unknown"}, maxBounds: {type: "unknown"}}}})"},
+};
+
 class SearchTest : service_context_test::WithSetupTransportLayer,
                    public AggregationContextFixture {};
 
 struct MockMongoInterface final : public StubMongoProcessInterface {
     bool inShardedEnvironment(OperationContext* opCtx) const override {
         return false;
+    }
+};
+
+struct QueryExecutingMockMongoInterface final : public StubMongoProcessInterface {
+    bool inShardedEnvironment(OperationContext* opCtx) const override {
+        return false;
+    }
+    bool isExpectedToExecuteQueries() override {
+        return true;
     }
 };
 
@@ -99,6 +127,45 @@ TEST_F(SearchTest, ShouldFailToParseIfSpecIsNotObject) {
     ASSERT_THROWS_CODE(DocumentSourceSearch::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
                        ErrorCodes::FailedToParse);
+}
+
+// Each internal routing field must be individually rejected when supplied by an external client.
+TEST_F(SearchTest, ExternalClientCannotSupplyInternalSearchFields) {
+    // Bypass the mongot-host check so createFromBson reaches our internal-fields check.
+    globalMongotParams.host = "localhost:27027";
+    globalMongotParams.enabled = true;
+
+    auto session = transport::MockSession::create(nullptr);
+    auto externalClient = getServiceContext()->getService()->makeClient("externalClient", session);
+    auto externalOpCtx = externalClient->makeOperationContext();
+
+    auto expCtx = make_intrusive<ExpressionContextForTest>(externalOpCtx.get(),
+                                                           getExpCtx()->getNamespaceString());
+    expCtx->setMongoProcessInterface(std::make_unique<QueryExecutingMockMongoInterface>());
+
+    for (const auto& [fieldName, spec] : kInternalSearchFieldCases) {
+        const auto specBson = fromjson(spec);
+        ASSERT_THROWS_CODE(DocumentSourceSearch::createFromBson(specBson.firstElement(), expCtx),
+                           AssertionException,
+                           5491300);
+    }
+}
+
+// Internal clients (no transport session) must still be able to supply internal routing fields,
+// since they are set by the router during sharded search planning.
+TEST_F(SearchTest, InternalClientCanSupplyInternalSearchFields) {
+    globalMongotParams.host = "localhost:27027";
+    globalMongotParams.enabled = true;
+
+    // The default test client has no transport session and is treated as internal.
+    auto expCtx = getExpCtx();
+    expCtx->setMongoProcessInterface(std::make_unique<QueryExecutingMockMongoInterface>());
+
+    for (const auto& [fieldName, spec] : kInternalSearchFieldCases) {
+        const auto specBson = fromjson(spec);
+        ASSERT_DOES_NOT_THROW(
+            DocumentSourceSearch::createFromBson(specBson.firstElement(), expCtx));
+    }
 }
 
 }  // namespace

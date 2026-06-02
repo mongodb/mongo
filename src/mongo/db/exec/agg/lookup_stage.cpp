@@ -336,8 +336,11 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
             _fromNs);
 
     // Store the pipeline with resolved namespaces so that we only trigger this exception on the
-    // first input document.
-    _sharedState->resolvedPipeline = resolvedPipeline->serializeToBson();
+    // first input document. The stored serialization is later reparsed (e.g. by
+    // pipeline_factory::makePipeline below); use serializeForReparse so search stages emit user
+    // form and the re-parse doesn't trip the internal-field check.
+    SerializationOptions reparseOpts{.serializeForReparse = true};
+    _sharedState->resolvedPipeline = resolvedPipeline->serializeToBson(reparseOpts);
 
     LOGV2_DEBUG(3254800,
                 3,

@@ -421,7 +421,10 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         };
 
         BSONObj explainLocal = [&] {
-            auto serializedPipe = pipeCopy->serializeToBson();
+            // Pre-serialize with serializeForReparse so the catch path below can feed it into
+            // parsePipelineWithMaybeViewDefinition. Otherwise, the serialized pipe is discarded.
+            SerializationOptions serializeOptsForViewResolutionReparse{.serializeForReparse = true};
+            auto serializedPipe = pipeCopy->serializeToBson(serializeOptsForViewResolutionReparse);
             try {
                 return preparePipelineAndExplain(std::move(pipeCopy));
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {

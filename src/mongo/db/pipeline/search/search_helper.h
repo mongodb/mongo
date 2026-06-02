@@ -221,7 +221,18 @@ boost::optional<SearchQueryViewSpec> getViewFromExpCtx(
 
 boost::optional<SearchQueryViewSpec> getViewFromBSONObj(const BSONObj& spec);
 
-void validateViewNotSetByUser(boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& spec);
+/**
+ * Returns true if the new internal-field check should run on this expression context.
+ */
+bool shouldValidateInternalSearchFields(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+/**
+ * Asserts that an external (non-internal) client did not supply any internal $search/$searchMeta
+ * routing fields (e.g. 'mergingPipeline', 'view'). These are set only by the router during sharded
+ * search planning. No-op on query-stats reparse and on $rankFusion/$scoreFusion desugar reparses.
+ */
+void validateInternalSearchFieldsNotSetByUser(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              const BSONObj& spec);
 
 /**
  * Validates that search stages on views are only allowed when the respective feature flag

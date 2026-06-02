@@ -267,6 +267,12 @@ struct SerializationOptions {
     // If set to true, serializes each stage and expression as needed for pull modifier in updates.
     bool serializeForUpdatePullModifier = false;
 
+    // If true, the output will be re-parsed (e.g., view-resolution round-trip on the
+    // router). Stages that envelop user input into an internal IDL spec at parse time (e.g.
+    // $search, $searchMeta, $vectorSearch) must emit the original user form so re-parse is
+    // idempotent and does not trip internal-field validation.
+    bool serializeForReparse = false;
+
     // Serialization state check helpers.
     bool isDefaultSerialization() const;
     bool isKeepingLiteralsUnchanged() const;

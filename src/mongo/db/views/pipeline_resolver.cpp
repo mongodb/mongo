@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/views/resolved_view.h"
 
 namespace mongo {
@@ -134,7 +135,12 @@ buildResolvedPipelineForRegularView(OperationContext* opCtx,
     auto pipeline =
         Pipeline::parseFromLiteParsed(lpp, expCtx, nullptr, false, true /* useStubInterface */);
 
-    return {pipeline->serializeToBson(), std::move(lpp)};
+    // The serialized BSON will soon be re-parsed when we restart the agg path with the resolved
+    // pipeline. Set serializeForReparse so search stages emit user-form rather than the full IDL
+    // form — the latter would carry mongotQuery/mergingPipeline from a prior planShardedSearch and
+    // trip the internal-field check on re-parse.
+    SerializationOptions opts{.serializeForReparse = true};
+    return {pipeline->serializeToBson(opts), std::move(lpp)};
 }
 
 /**

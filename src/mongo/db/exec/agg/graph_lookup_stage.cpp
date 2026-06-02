@@ -609,8 +609,11 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
             _params.from);
 
         // Update '_fromPipeline' with the resolved view definition to avoid triggering this
-        // exception next time.
-        _fromPipeline = pipeline->serializeToBson();
+        // exception next time. The stored serialization is reparsed on subsequent iterations
+        // via pipeline_factory::makePipeline; use serializeForReparse so search stages emit
+        // user form to be safely re-parsed.
+        SerializationOptions reparseOpts{.serializeForReparse = true};
+        _fromPipeline = pipeline->serializeToBson(reparseOpts);
 
         // Update the expression context with any new namespaces the resolved pipeline has
         // introduced.

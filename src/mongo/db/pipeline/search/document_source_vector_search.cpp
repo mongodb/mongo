@@ -118,6 +118,14 @@ void DocumentSourceVectorSearch::initializeOpDebugVectorSearchMetrics() {
 }
 
 Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) const {
+    // For re-parseable output, strip the synthesized 'view' field — the internal-field check
+    // rejects it from non-internal clients, and it will be re-bound on re-parse.
+    if (opts.serializeForReparse) {
+        auto spec = _stageSpec.hasField(kViewFieldName) ? _stageSpec.removeField(kViewFieldName)
+                                                        : _stageSpec;
+        return Value(Document{{kStageName, std::move(spec)}});
+    }
+
     if (!opts.isKeepingLiteralsUnchanged()) {
         BSONObjBuilder builder;
 
@@ -191,7 +199,16 @@ intrusive_ptr<DocumentSource> DocumentSourceVectorSearch::createFromBson(
     // view.
     boost::optional<SearchQueryViewSpec> view = search_helpers::getViewFromBSONObj(spec);
     if (view) {
-        search_helpers::validateViewNotSetByUser(expCtx, spec);
+        // The 'view' field is set internally by the router during sharded query planning and
+        // must not be supplied by external clients. The guard mirrors
+        // validateInternalSearchFieldsNotSetByUser: $rankFusion/$scoreFusion desugar legitimately
+        // re-injects the view field when reparsing serialized inner pipelines, and those reparses
+        // must not false-positive; same with query-stats reparse.
+        if (search_helpers::shouldValidateInternalSearchFields(expCtx)) {
+            assertAllowedInternalIfRequired(expCtx->getOperationContext(),
+                                            search_helpers::kViewFieldName,
+                                            AllowedWithClientType::kInternal);
+        }
     } else if ((view = search_helpers::getViewFromExpCtx(expCtx))) {
         spec = spec.addField(BSON(kViewFieldName << view->toBSON()).firstElement());
     }

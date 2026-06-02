@@ -243,7 +243,7 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
     // view.
 
     // This flag's value is also used to gate an internal client error. See
-    // search_helper::validateViewNotSetByUser(...) for more details.
+    // search_helper::validateInternalSearchFieldsNotSetByUser(...) for more details.
     pExpCtx->setIsHybridSearch();
 
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
@@ -281,7 +281,11 @@ HybridSearchPipelineBuilder::constructDesugaredOutput(
             // to append it to the total desugared output. The input pipeline consists of the
             // same stages returned by 'buildInputPipelineDesugaringStages'.
             auto unionWithPipeline = Pipeline::create(initialStagesInInputPipeline, pExpCtx);
-            std::vector<BSONObj> bsonPipeline = unionWithPipeline->serializeToBson();
+            // The serialized pipeline is immediately reparsed below via
+            // DocumentSourceUnionWith::createFromBson. Use serializeForReparse so stages
+            // emit user form and doesn't trip on internal-field checks.
+            SerializationOptions reparseOpts{.serializeForReparse = true};
+            std::vector<BSONObj> bsonPipeline = unionWithPipeline->serializeToBson(reparseOpts);
 
             auto collName = pExpCtx->getUserNss().coll();
 

@@ -117,7 +117,14 @@ GetNextResult UnionWithStage::doGetNext() {
 
     if (_sharedState->_executionState ==
         UnionWithSharedState::ExecutionProgress::kStartingSubPipeline) {
-        auto serializedPipeline = _sharedState->_pipeline->serializeToBson();
+        // If prepareSubPipeline throws CommandOnShardedViewNotSupportedOnMongod, the serialized
+        // pipeline is fed back through parsePipelineWithMaybeViewDefinition which reparses. Use
+        // serializeForReparse so stages emit user form and the re-parse doesn't trip an
+        // internal-field check. If we don't throw, the serialized pipeline is consumed by
+        // prepareSubPipeline only for logging.
+        SerializationOptions serializeOptsForViewResolutionReparse{.serializeForReparse = true};
+        auto serializedPipeline =
+            _sharedState->_pipeline->serializeToBson(serializeOptsForViewResolutionReparse);
 
         // Prepare the sub pipeline. This is expected to fail if the command is not supported on a
         // sharded view.
@@ -133,8 +140,10 @@ GetNextResult UnionWithStage::doGetNext() {
                 _userNss);
             logShardedViewFound(e, *_sharedState->_pipeline);
 
-            // Serialize the new pipeline.
-            serializedPipeline = _sharedState->_pipeline->serializeToBson();
+            // Serialize the new pipeline. Use serializeForReparse for consistency with the
+            // first serialize above.
+            serializedPipeline =
+                _sharedState->_pipeline->serializeToBson(serializeOptsForViewResolutionReparse);
 
             // If this throws again, the exception will bubble up and will be caught by an outer
             // layer.

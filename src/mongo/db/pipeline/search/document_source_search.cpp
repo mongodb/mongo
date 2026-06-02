@@ -87,6 +87,12 @@ const char* DocumentSourceSearch::getSourceName() const {
 }
 
 Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {
+    // For re-parseable output, emit the user query — the full IDL form's internal routing
+    // fields would trip the internal-field check on re-parse.
+    if (opts.serializeForReparse) {
+        return Value(DOC(getSourceName() << opts.serializeLiteral(_spec.getMongotQuery())));
+    }
+
     // If we aren't serializing for query stats or explain, serialize the full spec.
     // If we are in a router, serialize the full spec.
     // Otherwise, just serialize the mongotQuery.
@@ -106,7 +112,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
             elem.type() == BSONType::object);
     auto specObj = elem.embeddedObject();
 
-    search_helpers::validateViewNotSetByUser(expCtx, specObj);
+    search_helpers::validateInternalSearchFieldsNotSetByUser(expCtx, specObj);
 
     // If kMongotQueryFieldName is present, this is the case that we re-create the
     // DocumentSource from a serialized DocumentSourceSearch that was originally parsed on a
