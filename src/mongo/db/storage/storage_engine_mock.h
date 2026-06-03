@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/spill_table.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/modules.h"
 
