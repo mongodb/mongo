@@ -111,6 +111,13 @@ public:
      */
     static BSONObj generateCollModCmd();
 
+    /**
+     * Wraps a batch-send function to stamp maxTimeMS at 90% of the logical session refresh interval
+     * on every outgoing command.  Only applied when logicalSessionCacheJobTimeoutEnabled is
+     * enabled, preventing a single slow reap/refresh batch from blocking the next job cycle.
+     */
+    static std::function<Status(BSONObj)> withRefreshTimeout(std::function<Status(BSONObj)> fn);
+
 protected:
     SessionsCollection();
 

@@ -689,6 +689,14 @@ public:
                 // stalled replicating because of an inability to acquire a read ticket.
                 admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
             }
+            // Critical collection reads from internal clients must make forward progress without
+            // blocking on ticket acquisition. Since this is for internal clients it does not
+            // include loopback requests through DBDirectClient.
+            if (!admissionPriority && isSystemCriticalNss &&
+                opCtx->getClient()->isInternalClient()) {
+                systemCriticalTaskType.reset();
+                admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
+            }
 
             // If this read represents a reverse oplog scan, we want to bypass oplog visibility
             // rules in the case of secondaries. We normally only read from these nodes at batch

@@ -89,3 +89,12 @@ server_parameters:
         cpp_varname: localLogicalSessionTimeoutMinutes
         default: 30
         redact: false
+
+    logicalSessionCacheJobTimeoutEnabled:
+        description: >-
+            When true, session cache refresh and reap jobs apply a deadline equal to 90% of logicalSessionRefreshMillis. This prevents a single slow job cycle from blocking the next one. Can be toggled at runtime via setParameter.
+        set_at: [startup, runtime]
+        cpp_vartype: bool
+        cpp_varname: logicalSessionCacheJobTimeoutEnabled
+        default: false
+        redact: false
