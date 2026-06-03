@@ -261,8 +261,8 @@ protected:
 
     virtual void _initialize(OperationContext* opCtx) = 0;
 
-    virtual void _checkCoordinatorPreconditions(OperationContext* opCtx,
-                                                bool afterAcquiringLocks) = 0;
+    virtual void _checkCoordinatorPreconditions(OperationContext* opCtx, bool afterAcquiringLocks) {
+    }
 
     virtual ExecutorFuture<void> _acquireLocksAsync(
         OperationContext* opCtx,

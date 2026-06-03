@@ -84,10 +84,6 @@ protected:
 private:
     void _initialize(OperationContext* opCtx) override {}
 
-    void _checkCoordinatorPreconditions(OperationContext* opCtx, bool afterAcquiringLocks) final {
-        this->_checkSetAllowChunkOperations(opCtx, nss());
-    }
-
     ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,
                                             std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                             const CancellationToken& token) override = 0;
