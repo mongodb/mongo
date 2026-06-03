@@ -34,7 +34,6 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/shard_role/lock_manager/fast_list_based_map.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"

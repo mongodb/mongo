@@ -93,7 +93,6 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "lock_manager_test",
     srcs = [
-        "fast_list_based_map_test.cpp",
         "fast_map_noalloc_test.cpp",
         "fill_locker_info_test.cpp",
         "lock_manager_test.cpp",
