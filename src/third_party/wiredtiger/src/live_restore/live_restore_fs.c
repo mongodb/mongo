@@ -155,8 +155,8 @@ __dest_has_stop_file(
 
     WT_ERR(__live_restore_create_stop_file_path(session, name, &path_marker));
 
-    lr_fs->os_file_system->fs_exist(
-      lr_fs->os_file_system, (WT_SESSION *)session, path_marker, existp);
+    WT_ERR(lr_fs->os_file_system->fs_exist(
+      lr_fs->os_file_system, (WT_SESSION *)session, path_marker, existp));
     __wt_verbose_debug2(
       session, WT_VERB_LIVE_RESTORE, "Stop file check for %s (Y/N)? %s", name, *existp ? "Y" : "N");
 
