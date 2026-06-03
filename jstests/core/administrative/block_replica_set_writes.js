@@ -19,7 +19,6 @@ function disableReplicaSetWriteBlock(adminDB) {
         const res = adminDB.runCommand({
             blockReplicaSetWrites: 1,
             enabled: false,
-            allowDeletions: false,
             reason: "InsufficientDiskSpace",
         });
         return res.ok;
@@ -41,21 +40,15 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
     });
 
     afterEach(function () {
-        // Clear replica set write block critical section document if it exists.
-        if (this.replicaSetPrimaryConfigDB.replica_set_writes_critical_section.findOne() !== null) {
-            disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB);
-        }
-
-        // Clear global user write block critical section document if it exists.
-        if (this.replicaSetPrimaryConfigDB.user_writes_critical_sections.findOne() !== null) {
-            assert.commandWorked(
-                this.replicaSetPrimaryAdminDB.runCommand({
-                    setUserWriteBlockMode: 1,
-                    global: false,
-                    reason: "DiskUseThresholdExceeded",
-                }),
-            );
-        }
+        // Disable replica set and global user write block (if not previously enabled the operation is a no-op).
+        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB);
+        assert.commandWorked(
+            this.replicaSetPrimaryAdminDB.runCommand({
+                setUserWriteBlockMode: 1,
+                global: false,
+                reason: "DiskUseThresholdExceeded",
+            }),
+        );
 
         // Remove collections and databases.
         this.replicaSetPrimaryAdminDB.getCollection(this.adminTestCollName).drop();
@@ -100,15 +93,15 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         awaitShell();
     });
 
-    it("Test that allowDeletions cannot be set to true when enabling replica set write block", function () {
+    it("Test that allowDeletions is required when enabling the block", function () {
         assert.commandFailedWithCode(
             this.replicaSetPrimaryAdminDB.runCommand({
                 blockReplicaSetWrites: 1,
                 enabled: true,
-                allowDeletions: true,
                 reason: "InsufficientDiskSpace",
             }),
             ErrorCodes.InvalidOptions,
+            "Expected InvalidOptions when enabling blockReplicaSetWrites without allowDeletions",
         );
     });
 
@@ -233,7 +226,43 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         assert.commandWorked(testDB.runCommand({profile: 0}));
     });
 
-    it("Test TTL deletions are blocked by replica set write block", function () {
+    it("Test user deletions are blocked when allowDeletions is false and allowed when allowDeletions is true", function () {
+        const testColl = this.replicaSetPrimary.getDB(this.testDbName).getCollection("testColl");
+
+        assert.commandWorked(testColl.insert({_id: 1}));
+        assert.commandWorked(testColl.insert({_id: 2}));
+
+        // Enable per-shard write blocking and check that user deletes are blocked.
+        assert.commandWorked(
+            this.replicaSetPrimaryAdminDB.runCommand({
+                blockReplicaSetWrites: 1,
+                enabled: true,
+                allowDeletions: false,
+                reason: "InsufficientDiskSpace",
+            }),
+        );
+        assert.commandFailedWithCode(testColl.remove({_id: 1}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.eq(2, testColl.count(), "Both documents should remain while deletions are blocked");
+
+        // Disable write block and and re-enable with allowDeletions: true to check that user deletes are allowed.
+        disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB);
+        assert.commandWorked(
+            this.replicaSetPrimaryAdminDB.runCommand({
+                blockReplicaSetWrites: 1,
+                enabled: true,
+                allowDeletions: true,
+                reason: "InsufficientDiskSpace",
+            }),
+        );
+        assert.commandWorked(testColl.remove({_id: 1}));
+        assert.eq(1, testColl.count(), "Document should have been deleted when allowDeletions is true");
+
+        // Inserts and updates should still be blocked when allowDeletions is true.
+        assert.commandFailedWithCode(testColl.insert({_id: 3}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.commandFailedWithCode(testColl.update({_id: 2}, {$set: {x: 1}}), ErrorCodes.ReplicaSetWritesBlocked);
+    });
+
+    it("Test TTL deletions are blocked when allowDeletions is false and allowed when allowDeletions is true", function () {
         const replicaSetPrimaryAdminDB = this.replicaSetPrimaryAdminDB;
         function runTTLMonitor() {
             const ttlPass = replicaSetPrimaryAdminDB.serverStatus().metrics.ttl.passes;
@@ -249,10 +278,9 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             );
         }
 
-        const testDB = this.replicaSetPrimary.getDB(this.testDbName);
-        const testColl = testDB.getCollection("testColl");
+        const testColl = this.replicaSetPrimary.getDB(this.testDbName).getCollection("testColl");
 
-        // Pause the TTL monitor so it doesn't run while we set up.
+        // Pause the TTL monitor so it doesn't run during setup.
         const pauseTtl = configureFailPoint(this.replicaSetPrimary, "hangTTLMonitorBetweenPasses");
         pauseTtl.wait();
 
@@ -260,7 +288,7 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
         assert.commandWorked(testColl.insert({_id: 1, createdAt: new Date(0)}));
         assert.commandWorked(testColl.createIndex({createdAt: 1}, {expireAfterSeconds: 0}));
 
-        // Enable the replica set write block and let TTL run again and verify the document is unreaped.
+        // Enable write block with allowDeletions: false and let TTL run — document should not be reaped.
         assert.commandWorked(
             this.replicaSetPrimaryAdminDB.runCommand({
                 blockReplicaSetWrites: 1,
@@ -270,12 +298,21 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             }),
         );
         runTTLMonitor();
-        assert.eq(1, testColl.count(), "TTL should not have reaped the document while writes are blocked");
+        assert.eq(1, testColl.count(), "TTL should not have reaped the document while deletions are blocked");
 
-        // Disable the replica set write and let TTL run again and verify the document is reaped.
+        // Disable write block and re-enable with allowDeletions: true — TTL should now reap the document.
         disableReplicaSetWriteBlock(this.replicaSetPrimaryAdminDB);
+        assert.commandWorked(
+            this.replicaSetPrimaryAdminDB.runCommand({
+                blockReplicaSetWrites: 1,
+                enabled: true,
+                allowDeletions: true,
+                reason: "InsufficientDiskSpace",
+            }),
+        );
         runTTLMonitor();
-        assert.eq(0, testColl.count(), "TTL should have reaped the document after disabling the block");
+        assert.eq(0, testColl.count(), "TTL should have reaped the document when allowDeletions is true");
+
         pauseTtl.off();
     });
 
@@ -438,7 +475,6 @@ describe("Test blockReplicaSetWrites command on replica set level", function () 
             this.replicaSetPrimaryAdminDB.runCommand({
                 blockReplicaSetWrites: 1,
                 enabled: false,
-                allowDeletions: false,
                 reason: "InsufficientDiskSpace",
             }),
         );

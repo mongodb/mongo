@@ -6577,7 +6577,6 @@ export const authCommandsLib = {
             command: {
                 blockReplicaSetWrites: 1,
                 enabled: false,
-                allowDeletions: false,
                 reason: "InsufficientDiskSpace",
             },
             skipTest: (conn) => {

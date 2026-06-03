@@ -43,8 +43,11 @@ structs:
                 description: "If true, disables writes. If false, enables."
                 type: bool
             allowDeletions:
-                description: "If true, allow deletions. If false, disables."
+                description:
+                    "If true, allow deletions. If false, disables. Required when enabling the
+                    block (enabled: true) and disallowed when disabling it (enabled: false)."
                 type: bool
+                optional: true
             reason:
                 description:
                     "The reason for which the writes are being blocked on the shard. Once writes

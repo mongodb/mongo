@@ -21,6 +21,22 @@ import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/m
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {checkLog} from "src/mongo/shell/check_log.js";
 
+function disableReplicaSetWriteBlock(adminDB) {
+    // Wait for replica set write block to be disabled. This is necessarry because the command can fail
+    // transiently with a lock contantion with previous operations. For example, when the range deleter
+    // background thread becomes active, it hits ReplicaSetWritesBlocked error and retries in a tight loop
+    // without releasing its collection lock, so when disableReplicaSetWriteBlock is called immediately after,
+    // it can transiently fail due to lock contention.
+    assert.soon(() => {
+        const res = adminDB.runCommand({
+            blockReplicaSetWrites: 1,
+            enabled: false,
+            reason: "InsufficientDiskSpace",
+        });
+        return res.ok;
+    }, "Failed to disable replica set write block");
+}
+
 describe("Test blockReplicaSetWrites command on shard replica sets in a sharded cluster", function () {
     before(function () {
         this.st = new ShardingTest({shards: 2, rs: {nodes: 2}});
@@ -42,27 +58,17 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
     });
 
     afterEach(function () {
-        if (this.shard0PrimaryConfigDB.replica_set_writes_critical_section.findOne() !== null) {
-            assert.commandWorked(
-                this.shard0PrimaryAdminDB.runCommand({
-                    blockReplicaSetWrites: 1,
-                    enabled: false,
-                    allowDeletions: false,
-                    reason: "InsufficientDiskSpace",
-                }),
-            );
-        }
+        // Disable replica set and global user write block (if not previously enabled the operation is a no-op).
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB);
+        assert.commandWorked(
+            this.st.s.adminCommand({
+                setUserWriteBlockMode: 1,
+                global: false,
+                reason: "DiskUseThresholdExceeded",
+            }),
+        );
 
-        if (this.shard0PrimaryConfigDB.user_writes_critical_sections.findOne() !== null) {
-            assert.commandWorked(
-                this.st.s.adminCommand({
-                    setUserWriteBlockMode: 1,
-                    global: false,
-                    reason: "DiskUseThresholdExceeded",
-                }),
-            );
-        }
-
+        // Drop test database.
         assert.commandWorked(this.testDB.dropDatabase());
     });
 
@@ -96,14 +102,7 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         );
 
         //Disable per-shard write blocking on shard0.
-        assert.commandWorked(
-            this.shard0PrimaryAdminDB.runCommand({
-                blockReplicaSetWrites: 1,
-                enabled: false,
-                allowDeletions: false,
-                reason: "InsufficientDiskSpace",
-            }),
-        );
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB);
 
         // Check replica set write block, reason, and command counter when blockReplicaSetWrites is disabled.
         replStatus = assert.commandWorked(this.shard0PrimaryAdminDB.serverStatus()).repl;
@@ -206,14 +205,7 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         );
 
         // Disable per-shard write blocking on shard0 and check that insert succeeds.
-        assert.commandWorked(
-            this.shard0PrimaryAdminDB.runCommand({
-                blockReplicaSetWrites: 1,
-                enabled: false,
-                allowDeletions: false,
-                reason: "InsufficientDiskSpace",
-            }),
-        );
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB);
         assert.commandWorked(this.testShardedColl.insert({x: 5}));
     });
 
@@ -259,7 +251,44 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         assert.eq(0, this.testShardedColl.find({x: 2}).itcount());
     });
 
-    it("Test range deletion on donor cannot complete while blockReplicaSetWrites is enabled", function () {
+    it("Test user deletions are blocked when allowDeletions is false and allowed when allowDeletions is true", function () {
+        const testColl = this.testDB.getCollection("userDeletionTestColl");
+
+        assert.commandWorked(testColl.insert({_id: 1}));
+        assert.commandWorked(testColl.insert({_id: 2}));
+
+        // Enable write block with allowDeletions: false — user deletes should be rejected.
+        assert.commandWorked(
+            this.shard0PrimaryAdminDB.runCommand({
+                blockReplicaSetWrites: 1,
+                enabled: true,
+                allowDeletions: false,
+                reason: "InsufficientDiskSpace",
+            }),
+        );
+        assert.commandFailedWithCode(testColl.remove({_id: 1}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.eq(2, testColl.count(), "Both documents should remain while deletions are blocked");
+
+        // Disable write block and re-enable with allowDeletions: true — user deletes should succeed.
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB);
+
+        assert.commandWorked(
+            this.shard0PrimaryAdminDB.runCommand({
+                blockReplicaSetWrites: 1,
+                enabled: true,
+                allowDeletions: true,
+                reason: "InsufficientDiskSpace",
+            }),
+        );
+        assert.commandWorked(testColl.remove({_id: 1}));
+        assert.eq(1, testColl.count(), "Document should have been deleted when allowDeletions is true");
+
+        // Inserts and updates should still be blocked when allowDeletions is true.
+        assert.commandFailedWithCode(testColl.insert({_id: 3}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.commandFailedWithCode(testColl.update({_id: 2}, {$set: {x: 1}}), ErrorCodes.ReplicaSetWritesBlocked);
+    });
+
+    it("Test range deletion on donor is blocked when allowDeletions is false and allowed when allowDeletions is true", function () {
         const shard0LocalColl = this.st.shard0.getDB(this.testDBName).getCollection(this.shardedCollName);
 
         // Shard the collection and insert some documents.
@@ -282,7 +311,7 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             "Expected donor shard to retain an orphaned copy until range deletion runs",
         );
 
-        // Enable per-shard write blocking on shard0.
+        // Enable per-shard write blocking on shard0 with allowDeletions set to false (i.e., all deletes blocked).
         assert.commandWorked(
             this.shard0PrimaryAdminDB.runCommand({
                 blockReplicaSetWrites: 1,
@@ -297,20 +326,28 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         suspendRangeDel.off();
         checkLog.containsJson(this.st.shard0, 6180602, {error: /ReplicaSetWritesBlocked/}, 60 * 1000);
 
-        // Disable per-shard write blocking on shard0.
+        // The orphan should still be present since range deletion was blocked.
+        assert.eq(
+            1,
+            shard0LocalColl.find({x: 1}).itcount(),
+            "Expected orphan to still be present after range deletion was blocked",
+        );
+
+        // Disable the write block, then re-enable with allowDeletions set to true (i.e., all deletes allowed).
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB);
         assert.commandWorked(
             this.shard0PrimaryAdminDB.runCommand({
                 blockReplicaSetWrites: 1,
-                enabled: false,
-                allowDeletions: false,
+                enabled: true,
+                allowDeletions: true,
                 reason: "InsufficientDiskSpace",
             }),
         );
 
-        // Check that the orphaned document is removed from shard0.
+        // Check that range deletion now completes since allowDeletions is true.
         assert.soon(
             () => shard0LocalColl.find({x: 1}).itcount() === 0,
-            "Expected donor orphan to be removed by range deleter after write block is disabled",
+            "Expected donor orphan to be removed by range deleter when allowDeletions is true",
             5 * 60 * 1000,
             200,
         );

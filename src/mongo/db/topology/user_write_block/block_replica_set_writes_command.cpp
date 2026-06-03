@@ -83,29 +83,31 @@ public:
 
             // Only one attempt to change whether writes are blocked may make progress at once
             std::lock_guard lock(_mutex);
-            {
-                if (MONGO_unlikely(hangInBlockReplicaSetWritesCommand.shouldFail())) {
-                    LOGV2(12096400, "hangInBlockReplicaSetWritesCommand failpoint enabled");
-                    hangInBlockReplicaSetWritesCommand.pauseWhileSet(opCtx);
-                }
-
-                uassert(ErrorCodes::InvalidOptions,
-                        str::stream() << Request::kCommandName
-                                      << " cannot be run with allowDeletions option set to true.",
-                        !request().getAllowDeletions());
+            if (MONGO_unlikely(hangInBlockReplicaSetWritesCommand.shouldFail())) {
+                LOGV2(12096400, "hangInBlockReplicaSetWritesCommand failpoint enabled");
+                hangInBlockReplicaSetWritesCommand.pauseWhileSet(opCtx);
             }
+
             if (request().getEnabled()) {
-                // Enable write blocking
+                // Enable write blocking. allowDeletions is required when enabling the block.
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'allowDeletions' is required when enabling "
+                                      << Request::kCommandName,
+                        request().getAllowDeletions().has_value());
                 UserWritesRecoverableCriticalSectionService::get(opCtx)
                     ->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
                         opCtx,
                         UserWritesRecoverableCriticalSectionService::
                             kBlockReplicaSetWritesNamespace,
-                        request().getAllowDeletions(),
+                        *request().getAllowDeletions(),
                         request().getReason());
 
             } else {
-                // Disable write blocking
+                // Disable write blocking.
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'allowDeletions' is not allowed when disabling "
+                                      << Request::kCommandName,
+                        !request().getAllowDeletions().has_value());
                 UserWritesRecoverableCriticalSectionService::get(opCtx)
                     ->releaseRecoverableCriticalSectionBlockingReplicaSetWrites(
                         opCtx,

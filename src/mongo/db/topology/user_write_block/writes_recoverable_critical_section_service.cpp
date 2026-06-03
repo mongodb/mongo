@@ -551,7 +551,7 @@ void UserWritesRecoverableCriticalSectionService::
                 "Acquiring replica set writes recoverable critical section",
                 logAttrs(nss),
                 "enabled"_attr = "true",
-                "allowDeletions"_attr = "false",
+                "allowDeletions"_attr = allowDeletions,
                 "reason"_attr = reasonText(reason));
 
     invariant(nss == kBlockReplicaSetWritesNamespace);
