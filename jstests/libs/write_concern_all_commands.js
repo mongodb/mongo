@@ -6066,8 +6066,8 @@ function runCommandTest(testCase, conn, coll, cluster, clusterType, preSetup, se
 }
 
 // TODO SERVER-97736 Modify `shouldSkipTestCase` to ensure these commands are not skipped once
-// they no longer hang until the majority of the shards involved in DDL are available and return
-// WCE on timing out.
+// they no longer hang until the majority of the shards involved in sharding coordinator operations
+// (like DDLs and chunk operations) are available and return WCE on timing out.
 const shardedDDLCommandsRequiringMajorityCommit = [
     "collMod",
     "convertToCapped",
@@ -6079,6 +6079,7 @@ const shardedDDLCommandsRequiringMajorityCommit = [
     "renameCollection",
     "setAllowMigrations",
     "shardCollection",
+    "moveRange",
 ];
 
 function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, writeWithoutSk, timeseries, coll) {
