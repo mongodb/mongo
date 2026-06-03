@@ -2,7 +2,7 @@
  * Verifies DocsNeededBounds propagation end-to-end for extension stages by observing the batchSize mongod
  * sends mongot on the initial $search request.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [featureFlagExtensionsAPI, featureFlagExtensionStubParsers]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
