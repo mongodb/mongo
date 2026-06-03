@@ -71,6 +71,7 @@
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 #include <initializer_list>
@@ -439,11 +440,15 @@ public:
     }
 
     void tearDown() override {
-        WaitForMajorityService::get(getServiceContext()).shutDown();
+        // Fail-fast any mock-network command issued during teardown so nothing parks on the
+        // mock network and deadlocks the executor-pool drain.
+        FailPointEnableBlock failSchedule("networkInterfaceMockFailToSchedule");
 
         // Interrupt any in-flight donor/recipient state machines started by a test so they exit
         // their AsyncTry retry loops.
         _primaryOnlyServiceRegistry->onStepDown();
+
+        WaitForMajorityService::get(getServiceContext()).shutDown();
 
         // Drain the executor pool (and its mock network) so any pending network responses are
         // delivered and the state machines' cleanup callbacks can complete.
