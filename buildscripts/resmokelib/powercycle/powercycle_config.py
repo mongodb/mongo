@@ -21,7 +21,13 @@ class PowercycleTaskConfig:
         self.write_concern = task_yaml.get("write_concern", "{}")
         self.read_concern_level = task_yaml.get("read_concern_level", None)
 
-        self.fcv = task_yaml.get("fcv", None)
+        raw_fcv = task_yaml.get("fcv", None)
+        if raw_fcv == "last_lts":
+            from buildscripts.resmokelib import multiversionconstants
+
+            self.fcv = multiversionconstants.LAST_LTS_FCV
+        else:
+            self.fcv = raw_fcv
         self.repl_set = task_yaml.get("repl_set", None)
         self.mongod_options = task_yaml.get(
             "mongod_options", powercycle_constants.DEFAULT_MONGOD_OPTIONS
