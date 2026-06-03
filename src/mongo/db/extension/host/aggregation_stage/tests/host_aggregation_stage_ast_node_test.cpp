@@ -30,6 +30,11 @@
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -37,16 +42,25 @@ namespace mongo::extension {
 
 namespace {
 
-class NoOpHostAstNode : public host::AggStageAstNode {
-public:
-    explicit NoOpHostAstNode(std::unique_ptr<mongo::LiteParsedDocumentSource> lp)
-        : host::AggStageAstNode(std::move(lp)) {}
+/**
+ * Helper that builds an IdLookupAstNode wrapping a $_internalSearchIdLookup LiteParsed.
+ */
+std::unique_ptr<host::AggStageAstNode> makeIdLookupAstNode() {
+    DocumentSourceIdLookupSpec spec;
+    return std::make_unique<host::IdLookupAstNode>(
+        std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec));
+}
 
-    static inline std::unique_ptr<host::AggStageAstNode> make(
-        std::unique_ptr<mongo::LiteParsedDocumentSource> lp) {
-        return std::make_unique<NoOpHostAstNode>(std::move(lp));
-    }
-};
+/**
+ * Helper that builds a DocumentResultsAndMetadataAstNode from a DRM stage BSON whose 'source' is an
+ * initial source stage ($collStats), so that it can be re-parsed/expanded.
+ */
+std::unique_ptr<host::AggStageAstNode> makeDRMAstNode() {
+    auto stageBson = BSON(DocumentSourceInternalDocumentResultsAndMetadata::kStageName
+                          << BSON("source" << BSON("$collStats" << BSONObj())))
+                         .getOwned();
+    return std::make_unique<host::DocumentResultsAndMetadataAstNode>(stageBson);
+}
 
 class NoOpExtensionAstNode : public sdk::AggStageAstNode {
 public:
@@ -66,30 +80,19 @@ public:
     }
 };
 
-TEST(HostAstNodeTest, GetSpec) {
-    DocumentSourceIdLookupSpec spec;
-    auto expectedBSON = spec.toBSON();
-    auto astNode =
-        host::AggStageAstNode{std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec)};
-    // getIdLookupSpec().toBSON() returns the inner spec, not the full stage BSON.
-    ASSERT_TRUE(astNode.getIdLookupSpec().toBSON().binaryEqual(expectedBSON));
+TEST(HostAstNodeTest, IdLookupGetName) {
+    auto astNode = makeIdLookupAstNode();
+    ASSERT_EQ(astNode->getName(), std::string(mongo::LiteParsedInternalSearchIdLookUp::kStageName));
+}
 
-    // Get BSON spec through handle.
-    DocumentSourceIdLookupSpec spec2;
-    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec2)));
-    auto handle = AggStageAstNodeHandle{noOpAstNode};
-    ASSERT_TRUE(static_cast<host::HostAggStageAstNodeAdapter*>(handle.get())
-                    ->getIdLookupSpec()
-                    .toBSON()
-                    .binaryEqual(expectedBSON));
+TEST(HostAstNodeTest, DRMGetName) {
+    auto astNode = makeDRMAstNode();
+    ASSERT_EQ(astNode->getName(),
+              std::string(DocumentSourceInternalDocumentResultsAndMetadata::kStageName));
 }
 
 TEST(HostAstNodeTest, IsHostAllocated) {
-    DocumentSourceIdLookupSpec spec;
-
-    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec)));
+    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
     auto handle = AggStageAstNodeHandle{noOpAstNode};
 
     ASSERT_TRUE(host::HostAggStageAstNodeAdapter::isHostAllocated(*handle.get()));
@@ -138,7 +141,7 @@ DEATH_TEST(HostAstNodeVTableTestDeathTest, InvalidAstNodeVTableFailsBindViewInfo
 }
 
 DEATH_TEST(HostAstNodeTestDeathTest, HostGetPropertiesUnimplemented, "11347801") {
-    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(NoOpHostAstNode::make({}));
+    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
     auto handle = AggStageAstNodeHandle{noOpAstNode};
 
     ::MongoExtensionByteBuf** buf = nullptr;
@@ -146,39 +149,35 @@ DEATH_TEST(HostAstNodeTestDeathTest, HostGetPropertiesUnimplemented, "11347801")
 }
 
 DEATH_TEST(HostAstNodeTestDeathTest, HostPromoteUnimplemented, "11133600") {
-    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(NoOpHostAstNode::make({}));
+    auto noOpAstNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
     auto handle = AggStageAstNodeHandle{noOpAstNode};
 
     ::MongoExtensionLogicalAggStage** bind = nullptr;
     handle.get()->vtable->promote(noOpAstNode, nullptr, bind);
 }
 
-TEST(HostAstNodeCloneTest, CloneHostAllocatedAstNodePreservesSpec) {
-    DocumentSourceIdLookupSpec spec;
-    auto expectedBSON = spec.toBSON();
+TEST(HostAstNodeCloneTest, CloneIdLookupPreservesNameAndType) {
+    auto astNode = makeIdLookupAstNode();
+    auto cloned = astNode->clone();
 
-    auto astNode = new host::HostAggStageAstNodeAdapter(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec)));
-    auto handle = AggStageAstNodeHandle{astNode};
+    // The clone is an independent IdLookupAstNode with the same name.
+    ASSERT_NE(astNode.get(), cloned.get());
+    ASSERT_TRUE(dynamic_cast<host::IdLookupAstNode*>(cloned.get()) != nullptr);
+    ASSERT_EQ(astNode->getName(), cloned->getName());
+}
 
-    // Clone the AST node.
-    auto clonedHandle = handle->clone();
+TEST(HostAstNodeCloneTest, CloneDRMPreservesNameAndType) {
+    auto astNode = makeDRMAstNode();
+    auto cloned = astNode->clone();
 
-    // Verify the clone has the same spec and name.
-    ASSERT_TRUE(host::HostAggStageAstNodeAdapter::isHostAllocated(*clonedHandle.get()));
-    // getIdLookupSpec().toBSON() returns the inner spec, not the full stage BSON.
-    ASSERT_TRUE(static_cast<host::HostAggStageAstNodeAdapter*>(clonedHandle.get())
-                    ->getIdLookupSpec()
-                    .toBSON()
-                    .binaryEqual(expectedBSON));
-    ASSERT_EQ(handle->getName(), clonedHandle->getName());
+    // The clone is an independent DocumentResultsAndMetadataAstNode with the same name.
+    ASSERT_NE(astNode.get(), cloned.get());
+    ASSERT_TRUE(dynamic_cast<host::DocumentResultsAndMetadataAstNode*>(cloned.get()) != nullptr);
+    ASSERT_EQ(astNode->getName(), cloned->getName());
 }
 
 TEST(HostAstNodeCloneTest, CloneHostAllocatedAstNodeIsIndependent) {
-    DocumentSourceIdLookupSpec spec;
-
-    auto astNode = new host::HostAggStageAstNodeAdapter(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec)));
+    auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
     auto handle = AggStageAstNodeHandle{astNode};
 
     // Clone the AST node.
@@ -193,36 +192,25 @@ TEST(HostAstNodeCloneTest, CloneHostAllocatedAstNodeIsIndependent) {
 }
 
 TEST(HostAstNodeCloneTest, ClonedAstNodeSurvivesOriginalDestruction) {
-    DocumentSourceIdLookupSpec referenceSpec;
-    auto expectedBSON = referenceSpec.toBSON();
     AggStageAstNodeHandle clonedHandle{nullptr};
 
     {
-        DocumentSourceIdLookupSpec spec;
-
-        auto astNode = new host::HostAggStageAstNodeAdapter(
-            NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec)));
+        auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
         auto handle = AggStageAstNodeHandle{astNode};
 
         // Clone before original goes out of scope.
         clonedHandle = handle->clone();
     }
 
-    // Cloned handle should still be valid and contain the correct spec.
+    // Cloned handle should still be valid and carry the correct name.
     ASSERT_TRUE(clonedHandle.isValid());
     ASSERT_TRUE(host::HostAggStageAstNodeAdapter::isHostAllocated(*clonedHandle.get()));
-    // getIdLookupSpec().toBSON() returns the inner spec, not the full stage BSON.
-    ASSERT_TRUE(static_cast<host::HostAggStageAstNodeAdapter*>(clonedHandle.get())
-                    ->getIdLookupSpec()
-                    .toBSON()
-                    .binaryEqual(expectedBSON));
+    ASSERT_EQ(clonedHandle->getName(),
+              std::string(mongo::LiteParsedInternalSearchIdLookUp::kStageName));
 }
 
 TEST(HostAstNodeCloneTest, MultipleCloneAreIndependent) {
-    DocumentSourceIdLookupSpec spec;
-
-    auto astNode = new host::HostAggStageAstNodeAdapter(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec)));
+    auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
     auto handle = AggStageAstNodeHandle{astNode};
 
     // Create multiple clones.
@@ -244,22 +232,57 @@ TEST(HostAstNodeCloneTest, MultipleCloneAreIndependent) {
     ASSERT_EQ(handle->getName(), clone3->getName());
 }
 
+TEST(HostAstNodeCloneTest, CloneDRMNodeViaAdapterPreservesName) {
+    auto astNode = new host::HostAggStageAstNodeAdapter(makeDRMAstNode());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    auto clonedHandle = handle->clone();
+
+    ASSERT_TRUE(host::HostAggStageAstNodeAdapter::isHostAllocated(*clonedHandle.get()));
+    ASSERT_NE(handle.get(), clonedHandle.get());
+    ASSERT_EQ(clonedHandle->getName(),
+              std::string(DocumentSourceInternalDocumentResultsAndMetadata::kStageName));
+}
+
+TEST(HostAstNodeExpandTest, DRMNodeExpandsToStageAfterClone) {
+    auto drm = makeDRMAstNode();
+    auto cloned = drm->clone();
+    auto* clonedDrm = dynamic_cast<host::DocumentResultsAndMetadataAstNode*>(cloned.get());
+    ASSERT_TRUE(clonedDrm != nullptr);
+
+    // The stored stage BSON is preserved on the clone: expanding it produces a DRM stage.
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto stages = clonedDrm->expandToDocumentSource(expCtx);
+    ASSERT_EQ(stages.size(), 1u);
+    ASSERT_EQ(stages.front()->getSourceName(),
+              DocumentSourceInternalDocumentResultsAndMetadata::kStageName);
+}
+
+TEST(HostAstNodeExpandTest, DRMNodeExpandsToLiteParsedAfterClone) {
+    auto drm = makeDRMAstNode();
+    auto cloned = drm->clone();
+    auto* clonedDrm = dynamic_cast<host::DocumentResultsAndMetadataAstNode*>(cloned.get());
+    ASSERT_TRUE(clonedDrm != nullptr);
+
+    // The stored stage BSON is preserved on the clone: re-parsing it with the real nss/options
+    // produces a DRM LiteParsedDocumentSource.
+    auto nss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    auto liteParsed = clonedDrm->expandToLiteParsed(nss, LiteParserOptions{});
+    ASSERT_TRUE(liteParsed != nullptr);
+    ASSERT_EQ(liteParsed->getParseTimeName(),
+              std::string(DocumentSourceInternalDocumentResultsAndMetadata::kStageName));
+}
+
 DEATH_TEST(HostAstNodeViewPolicyTest,
            HostAstNodeCannotGetFirstStageViewApplicationPolicy,
            "11507401") {
-    DocumentSourceIdLookupSpec spec;
-
-    auto astNode = new host::HostAggStageAstNodeAdapter(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec)));
+    auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
     auto handle = AggStageAstNodeHandle{astNode};
     handle->getFirstStageViewApplicationPolicy();
 }
 
 DEATH_TEST(HostAstNodeViewInfoTest, HostAstNodeCannotBindViewInfo, "11507501") {
-    DocumentSourceIdLookupSpec spec;
-
-    auto astNode = new host::HostAggStageAstNodeAdapter(
-        NoOpHostAstNode::make(std::make_unique<mongo::LiteParsedInternalSearchIdLookUp>(spec)));
+    auto astNode = new host::HostAggStageAstNodeAdapter(makeIdLookupAstNode());
     auto handle = AggStageAstNodeHandle{astNode};
 
     std::string dbName = "testDbName";

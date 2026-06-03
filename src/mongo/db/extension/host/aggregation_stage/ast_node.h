@@ -32,11 +32,23 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
-#include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <list>
 #include <memory>
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+namespace mongo {
+class DocumentSource;
+class ExpressionContext;
+class LiteParsedDocumentSource;
+class LiteParsedInternalSearchIdLookUp;
+struct LiteParserOptions;
+class NamespaceString;
+}  // namespace mongo
 
 /**
  * A host `AggStageAstNode` should be allocated for internal stages that we don't expect to
@@ -47,37 +59,86 @@ namespace mongo::extension::host {
 /**
  * Host-defined AST node.
  *
- * Wraps a LiteParsedDocumentSource and serves as a node that a host-defined parse node can expand
- * into. Currently only supports $_internalSearchIdLookup.
+ * Abstract base for nodes that a host-defined parse node can expand into. All behavior is
+ * type-specific; concrete subclasses know how to re-parse themselves into a
+ * LiteParsedDocumentSource (for privilege/namespace checking) and into executable
+ * DocumentSource(s).
  */
 class AggStageAstNode {
 public:
-    AggStageAstNode(std::unique_ptr<LiteParsedDocumentSource> lp) : _liteParsed(std::move(lp)) {}
-
-    ~AggStageAstNode() = default;
+    virtual ~AggStageAstNode() = default;
 
     /**
-     * Gets the spec of an $_internalSearchIdLookup stage.
+     * Gets the stage name.
      */
-    const DocumentSourceIdLookupSpec& getIdLookupSpec() const {
-        const auto* idLookup =
-            dynamic_cast<const LiteParsedInternalSearchIdLookUp*>(_liteParsed.get());
-        uassert(11160700,
-                str::stream() << "Expected $_internalSearchIdLookup stage, but got: "
-                              << _liteParsed->getParseTimeName(),
-                idLookup);
-        return idLookup->getSpec();
-    }
+    virtual const std::string& getName() const = 0;
 
     /**
-     * Gets the stage name from the underlying LiteParsedDocumentSource.
+     * Re-parses this node into an owned LiteParsedDocumentSource using the expansion-time nss and
+     * options.
      */
-    const std::string& getName() const {
-        return _liteParsed->getParseTimeName();
-    }
+    std::unique_ptr<LiteParsedDocumentSource> expandToLiteParsed(
+        const NamespaceString& nss, const LiteParserOptions& options) const;
+
+    /**
+     * Expands into executable DocumentSource(s).
+     */
+    std::list<boost::intrusive_ptr<DocumentSource>> expandToDocumentSource(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const;
+
+    /**
+     * Returns an independent copy of this node.
+     */
+    virtual std::unique_ptr<AggStageAstNode> clone() const = 0;
+
+protected:
+    /**
+     * Reconstructs the full stage BSON this node represents. Both expansion paths re-parse this
+     * BSON, so subclasses only need to supply it.
+     */
+    virtual BSONObj buildStageBson() const = 0;
+};
+
+/**
+ * idLookup-backed AST node. Wraps a $_internalSearchIdLookup LiteParsed and reconstructs the stage
+ * BSON from it on demand.
+ */
+class IdLookupAstNode final : public AggStageAstNode {
+public:
+    explicit IdLookupAstNode(std::unique_ptr<LiteParsedInternalSearchIdLookUp> lp);
+
+    const std::string& getName() const override;
+
+    std::unique_ptr<AggStageAstNode> clone() const override;
 
 private:
-    std::unique_ptr<LiteParsedDocumentSource> _liteParsed;
+    /**
+     * Reconstructs the full stage BSON from the underlying $_internalSearchIdLookup spec.
+     */
+    BSONObj buildStageBson() const override;
+
+    std::unique_ptr<LiteParsedInternalSearchIdLookUp> _liteParsed;
+};
+
+/**
+ * DRM ($_internalDocumentResultsAndMetadata) AST node. Stores the full stage BSONObj directly,
+ * without constructing a LiteParsedDocumentSource (which would require the nss and parsed pipelines
+ * not available at construction time). The stored BSON is re-parsed with the real nss/options at
+ * expansion time.
+ */
+class DocumentResultsAndMetadataAstNode final : public AggStageAstNode {
+public:
+    explicit DocumentResultsAndMetadataAstNode(BSONObj stageBson);
+
+    const std::string& getName() const override;
+
+    std::unique_ptr<AggStageAstNode> clone() const override;
+
+private:
+    BSONObj buildStageBson() const override;
+
+    std::string _stageName;
+    BSONObj _stageBson;
 };
 
 /**
@@ -104,12 +165,19 @@ public:
     ~HostAggStageAstNodeAdapter() = default;
 
     /**
-     * Gets the spec of the $_internalSearchIdLookup stage stored in the underlying
-     * AggStageAstNode. This will be extended to additional internal stage types in the
-     * future.
+     * Re-parses the underlying AST node into an owned LiteParsedDocumentSource.
      */
-    inline const DocumentSourceIdLookupSpec& getIdLookupSpec() const {
-        return _astNode->getIdLookupSpec();
+    inline std::unique_ptr<LiteParsedDocumentSource> expandToLiteParsed(
+        const NamespaceString& nss, const LiteParserOptions& options) const {
+        return _astNode->expandToLiteParsed(nss, options);
+    }
+
+    /**
+     * Expands the underlying AST node into executable DocumentSource(s).
+     */
+    inline std::list<boost::intrusive_ptr<DocumentSource>> expandToDocumentSource(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+        return _astNode->expandToDocumentSource(expCtx);
     }
 
     /**
@@ -181,16 +249,7 @@ private:
                                               ::MongoExtensionAggStageAstNode** output) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             auto* hostAstNode = static_cast<const HostAggStageAstNodeAdapter*>(astNode);
-
-            // Get the spec and stage name from the original.
-            auto spec = hostAstNode->getIdLookupSpec();
-
-            auto clonedLiteParsed =
-                std::make_unique<LiteParsedInternalSearchIdLookUp>(std::move(spec));
-            clonedLiteParsed->makeOwned();
-
-            auto clonedAstNode = std::make_unique<AggStageAstNode>(std::move(clonedLiteParsed));
-            *output = new HostAggStageAstNodeAdapter(std::move(clonedAstNode));
+            *output = new HostAggStageAstNodeAdapter(hostAstNode->getImpl().clone());
         });
     }
 

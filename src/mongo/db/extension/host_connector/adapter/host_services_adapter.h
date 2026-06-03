@@ -114,12 +114,16 @@ private:
     static ::MongoExtensionStatus* _extCreateIdLookup(
         ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept;
 
+    static ::MongoExtensionStatus* _extCreateDocumentResultsAndMetadata(
+        ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept;
+
     static constexpr ::MongoExtensionHostServicesVTable VTABLE = {
         .get_logger = &_extGetLogger,
         .user_asserted = &_extUserAsserted,
         .tripwire_asserted = &_extTripwireAsserted,
         .mark_idle_thread_block = &_extMarkIdleThreadBlock,
         .create_host_agg_stage_parse_node = &_extCreateHostAggStageParseNode,
-        .create_id_lookup = &_extCreateIdLookup};
+        .create_id_lookup = &_extCreateIdLookup,
+        .create_document_results_and_metadata = &_extCreateDocumentResultsAndMetadata};
 };
 }  // namespace mongo::extension::host_connector

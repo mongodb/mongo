@@ -58,7 +58,7 @@ structs:
             source:
                 description: >-
                     The source stage that emits both document results and metadata as two separate streams.
-                type: object
+                type: object_owned
                 stability: internal
                 query_shape: parameter
             metadata:

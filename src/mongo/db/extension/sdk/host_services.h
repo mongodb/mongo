@@ -132,6 +132,14 @@ public:
         return AggStageAstNodeHandle{result};
     }
 
+    AggStageAstNodeHandle createDocumentResultsAndMetadata(BSONObj spec) const {
+        ::MongoExtensionAggStageAstNode* result = nullptr;
+        invokeCAndConvertStatusToException([&] {
+            return _vtable().create_document_results_and_metadata(objAsByteView(spec), &result);
+        });
+        return AggStageAstNodeHandle{result};
+    }
+
     LoggerHandle getLogger() const {
         return LoggerHandle(_vtable().get_logger());
     }

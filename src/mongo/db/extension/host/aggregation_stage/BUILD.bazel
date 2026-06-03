@@ -10,7 +10,7 @@ exports_files(
 
 mongo_cc_library(
     name = "aggregation_stage",
-    srcs = [],
+    srcs = ["ast_node.cpp"],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/extension/public:api",

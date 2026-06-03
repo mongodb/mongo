@@ -32,7 +32,9 @@
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_shape_opts_adapter.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
+#include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/unittest/death_test.h"
@@ -296,6 +298,92 @@ TEST_F(HostServicesTest, NestedFilterParseNodeRejectsInvalidPredicate2) {
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
 
     ASSERT_THROWS_CODE(handle->getQueryShape(adapter), DBException, ErrorCodes::BadValue);
+}
+
+// Helper that assembles the full $_internalDocumentResultsAndMetadata stage BSON from an inner
+// source spec and an optional metadata variable name.
+BSONObj makeDrmStageSpec(BSONObj sourceSpec, StringData varName = StringData{}) {
+    BSONObjBuilder stageBuilder;
+    {
+        BSONObjBuilder innerBuilder(
+            stageBuilder.subobjStart(DocumentSourceInternalDocumentResultsAndMetadata::kStageName));
+        innerBuilder.append("source", sourceSpec);
+        if (!varName.empty()) {
+            innerBuilder.append("metadata", BSON("as" << varName));
+        }
+    }
+    return stageBuilder.obj();
+}
+
+TEST_F(HostServicesTest, CreateDocumentResultsAndMetadata_EmptySpecFails) {
+    BSONObj emptySpec;
+    ASSERT_THROWS_CODE(
+        extension::sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(emptySpec),
+        DBException,
+        12601501);
+}
+
+TEST_F(HostServicesTest, CreateDocumentResultsAndMetadata_WrongStageNameFails) {
+    BSONObj wrongStage = BSON("$_internalSearchIdLookup" << BSONObj());
+    ASSERT_THROWS_CODE(
+        extension::sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(
+            wrongStage),
+        DBException,
+        12601501);
+}
+
+TEST_F(HostServicesTest, CreateDocumentResultsAndMetadata_ValidSpecWithMetadata) {
+    BSONObj stageSpec = makeDrmStageSpec(BSON("$collStats" << BSONObj()), "SEARCH_META");
+    auto hostAstNode =
+        extension::sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(stageSpec);
+    ASSERT_EQ(hostAstNode->getName(),
+              std::string(DocumentSourceInternalDocumentResultsAndMetadata::kStageName));
+}
+
+TEST_F(HostServicesTest, CreateDocumentResultsAndMetadata_ValidSpecWithoutMetadata) {
+    BSONObj stageSpec = makeDrmStageSpec(BSON("$collStats" << BSONObj()));
+    auto hostAstNode =
+        extension::sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(stageSpec);
+    ASSERT_EQ(hostAstNode->getName(),
+              std::string(DocumentSourceInternalDocumentResultsAndMetadata::kStageName));
+}
+
+TEST_F(HostServicesTest, CreateDocumentResultsAndMetadata_NestedSourceSpecWithMetadata) {
+    // A non-trivial source spec with nested objects and arrays must flow through unchanged.
+    BSONObj sourceSpec =
+        BSON("$search" << BSON("index" << "default" << "text"
+                                       << BSON("query" << "foo" << "path" << BSON_ARRAY("a" << "b"))
+                                       << "returnStoredSource" << true));
+    BSONObj stageSpec = makeDrmStageSpec(sourceSpec, "SEARCH_META");
+    auto hostAstNode =
+        extension::sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(stageSpec);
+    ASSERT_EQ(hostAstNode->getName(),
+              std::string(DocumentSourceInternalDocumentResultsAndMetadata::kStageName));
+}
+
+TEST_F(HostServicesTest, CreateDocumentResultsAndMetadata_NestedSourceSpecWithoutMetadata) {
+    BSONObj sourceSpec =
+        BSON("$search" << BSON("index" << "default" << "text"
+                                       << BSON("query" << "foo" << "path" << BSON_ARRAY("a" << "b"))
+                                       << "returnStoredSource" << true));
+    BSONObj stageSpec = makeDrmStageSpec(sourceSpec);
+    auto hostAstNode =
+        extension::sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(stageSpec);
+    ASSERT_EQ(hostAstNode->getName(),
+              std::string(DocumentSourceInternalDocumentResultsAndMetadata::kStageName));
+}
+
+TEST_F(HostServicesTest, CreateDocumentResultsAndMetadata_NodeOutlivesStageSpecBuffer) {
+    // The node must remain valid after the caller's BSON is destroyed, exercising the owned copy of
+    // the stage BSON taken during construction.
+    extension::AggStageAstNodeHandle hostAstNode = [] {
+        BSONObj stageSpec = makeDrmStageSpec(
+            BSON("$collStats" << BSON("latencyStats" << BSONObj())), "SEARCH_META");
+        return extension::sdk::HostServicesAPI::getInstance()->createDocumentResultsAndMetadata(
+            stageSpec);
+    }();
+    ASSERT_EQ(hostAstNode->getName(),
+              std::string(DocumentSourceInternalDocumentResultsAndMetadata::kStageName));
 }
 
 }  // namespace

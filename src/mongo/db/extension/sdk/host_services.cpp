@@ -51,6 +51,9 @@ void HostServicesAPI::assertVTableConstraints(const VTable_t& vtable) {
                 vtable.create_host_agg_stage_parse_node != nullptr);
     sdk_tassert(
         11134201, "Host services' 'create_id_lookup' is null", vtable.create_id_lookup != nullptr);
+    sdk_tassert(12601500,
+                "Host services' 'create_document_results_and_metadata' is null",
+                vtable.create_document_results_and_metadata != nullptr);
 }
 
 }  // namespace mongo::extension::sdk

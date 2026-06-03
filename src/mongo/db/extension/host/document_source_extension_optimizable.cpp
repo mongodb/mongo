@@ -168,11 +168,7 @@ LiteParsedList DocumentSourceExtensionOptimizable::LiteParsedExpandable::expandI
             outExpanded.splice(outExpanded.end(), children);
         },
         [&](const HostAggStageAstNodeAdapter& hostAst) {
-            const auto& spec = hostAst.getIdLookupSpec();
-            auto fullStageBson = BSON(hostAst.getStageName() << spec.toBSON());
-            auto lpds = LiteParsedDocumentSource::parse(nss, fullStageBson, options);
-            lpds->makeOwned();
-            outExpanded.emplace_back(std::move(lpds));
+            outExpanded.emplace_back(hostAst.expandToLiteParsed(nss, options));
         },
         [&](AggStageAstNodeHandle handle) {
             outExpanded.emplace_back(std::make_unique<LiteParsedExpanded>(
@@ -538,9 +534,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionOptimizab
             outExpanded.splice(outExpanded.end(), children);
         },
         [&](const HostAggStageAstNodeAdapter& hostAst) {
-            const auto& spec = hostAst.getIdLookupSpec();
-            auto fullStageBson = BSON(hostAst.getStageName() << spec.toBSON());
-            outExpanded.splice(outExpanded.end(), DocumentSource::parse(expCtx, fullStageBson));
+            outExpanded.splice(outExpanded.end(), hostAst.expandToDocumentSource(expCtx));
         },
         [&](AggStageAstNodeHandle handle) {
             outExpanded.emplace_back(

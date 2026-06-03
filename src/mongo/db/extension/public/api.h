@@ -1511,6 +1511,17 @@ typedef struct MongoExtensionHostServicesVTable {
      */
     MongoExtensionStatus* (*create_id_lookup)(MongoExtensionByteView bsonSpec,
                                               MongoExtensionAggStageAstNode** node);
+
+    /**
+     * Creates a host-defined AST node for a $_internalDocumentResultsAndMetadata stage. If the
+     * provided bsonSpec does not specify a valid $_internalDocumentResultsAndMetadata stage, an
+     * error is returned. On success, 'node' is populated with the host's AST node.
+     *
+     * 'bsonSpec' is the full stage BSON, e.g.
+     *   {"$_internalDocumentResultsAndMetadata": {source: {...}, metadata: {as: "SEARCH_META"}}}.
+     */
+    MongoExtensionStatus* (*create_document_results_and_metadata)(
+        MongoExtensionByteView bsonSpec, MongoExtensionAggStageAstNode** node);
 } MongoExtensionHostServicesVTable;
 
 /**

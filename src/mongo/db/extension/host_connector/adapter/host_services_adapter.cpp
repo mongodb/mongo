@@ -33,9 +33,27 @@
 #include "mongo/db/extension/public/extension_error_types_gen.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
 
 namespace mongo::extension::host_connector {
+
+namespace {
+/**
+ * Throws with 'code' and 'message' unless 'specObj' is a well-formed single-stage spec of the form
+ * {<stageName>: {...}}.
+ */
+void uassertWellFormedStageSpec(const BSONObj& specObj,
+                                StringData stageName,
+                                int code,
+                                StringData message) {
+    uassert(code,
+            message,
+            specObj.nFields() == 1 && specObj.firstElementFieldNameStringData() == stageName &&
+                specObj.firstElementType() == BSONType::object);
+}
+}  // namespace
 
 ::MongoExtensionStatus* HostServicesAdapter::_extUserAsserted(
     ::MongoExtensionByteView structuredErrorMessage) {
@@ -85,12 +103,11 @@ namespace mongo::extension::host_connector {
         *node = nullptr;
         BSONObj specObj = bsonObjFromByteView(bsonSpec).getOwned();
 
-        uassert(11134200,
-                "create_id_lookup requires a well-formed $_internalSearchIdLookup",
-                specObj.nFields() == 1 &&
-                    specObj.firstElementFieldNameStringData() ==
-                        DocumentSourceInternalSearchIdLookUp::kStageName &&
-                    specObj.firstElementType() == BSONType::object);
+        uassertWellFormedStageSpec(
+            specObj,
+            DocumentSourceInternalSearchIdLookUp::kStageName,
+            11134200,
+            "create_id_lookup requires a well-formed $_internalSearchIdLookup");
 
         // Extract the inner spec object from the full stage BSON.
         auto innerSpec = specObj.firstElement().Obj().getOwned();
@@ -103,7 +120,26 @@ namespace mongo::extension::host_connector {
         liteParsed->makeOwned();
 
         *node = static_cast<::MongoExtensionAggStageAstNode*>(new host::HostAggStageAstNodeAdapter(
-            std::make_unique<host::AggStageAstNode>(std::move(liteParsed))));
+            std::make_unique<host::IdLookupAstNode>(std::move(liteParsed))));
+    });
+}
+
+::MongoExtensionStatus* HostServicesAdapter::_extCreateDocumentResultsAndMetadata(
+    ::MongoExtensionByteView bsonSpec, ::MongoExtensionAggStageAstNode** node) noexcept {
+    return wrapCXXAndConvertExceptionToStatus([&]() {
+        *node = nullptr;
+        // The DocumentResultsAndMetadataAstNode constructor takes its own owned copy, so the view
+        // here does not need to be owned.
+        BSONObj specObj = bsonObjFromByteView(bsonSpec);
+
+        uassertWellFormedStageSpec(specObj,
+                                   DocumentSourceInternalDocumentResultsAndMetadata::kStageName,
+                                   12601501,
+                                   "create_document_results_and_metadata requires a well-formed "
+                                   "$_internalDocumentResultsAndMetadata stage");
+
+        *node = static_cast<::MongoExtensionAggStageAstNode*>(new host::HostAggStageAstNodeAdapter(
+            std::make_unique<host::DocumentResultsAndMetadataAstNode>(std::move(specObj))));
     });
 }
 }  // namespace mongo::extension::host_connector

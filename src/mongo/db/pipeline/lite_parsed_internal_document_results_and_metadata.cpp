@@ -50,7 +50,7 @@ InternalDocumentResultsAndMetadataLiteParsed::parse(const NamespaceString& nss,
                           << typeName(spec.type()),
             spec.type() == BSONType::object);
 
-    auto parsedSpec = DocumentSourceResultsAndMetadataSpec::parse(
+    auto parsedSpec = DocumentSourceResultsAndMetadataSpec::parseOwned(
         spec.embeddedObject(), IDLParserContext("$_internalDocumentResultsAndMetadata"));
 
     auto sourceElem = spec.embeddedObject()["source"];
