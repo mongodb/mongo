@@ -128,6 +128,8 @@ public:
     void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsedTime);
     void onOplogLocalBatchApplied(Milliseconds elapsed);
 
+    void onSearchIndexAbort();
+
     template <typename T>
     void onStateTransition(boost::optional<T> before, boost::optional<T> after) {
         _stateTracker.onStateTransition(before, after);
@@ -228,6 +230,8 @@ private:
     AtomicWord<int64_t> _countSameKeySucceeded{0};
     AtomicWord<int64_t> _countSameKeyFailed{0};
     AtomicWord<int64_t> _countSameKeyCancelled{0};
+
+    AtomicWord<int64_t> _countSearchIndexAborts{0};
 
     std::set<UUID> _activeReshardingOperations;
     std::mutex _activeReshardingOperationsMutex;

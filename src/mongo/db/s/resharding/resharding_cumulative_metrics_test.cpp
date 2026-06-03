@@ -1044,6 +1044,17 @@ TEST_F(ReshardingCumulativeMetricsTest, OldestActiveContainsDiagnosticMetricDefa
     ASSERT_EQ(section.getField("recipientChangeStreamMonitorTotalTimeElapsedMillis").Long(), -1);
 }
 
+TEST_F(ReshardingCumulativeMetricsTest, ReportContainsSearchIndexAbortCount) {
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    ASSERT_EQ(getCumulativeMetricsReportForSection(kRoot).getIntField("countSearchIndexAborts"), 0);
+
+    _reshardingCumulativeMetrics->onSearchIndexAbort();
+
+    ASSERT_EQ(getCumulativeMetricsReportForSection(kRoot).getIntField("countSearchIndexAborts"), 1);
+}
+
 TEST_F(ReshardingCumulativeMetricsTest, OldestActiveContainsDiagnosticMetricsNoActiveOps) {
     // When _shouldReportMetrics is true but no observers registered for some roles,
     // those roles get defaults. Register a coordinator to trigger reporting.

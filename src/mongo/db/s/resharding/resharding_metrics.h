@@ -239,6 +239,7 @@ public:
     Seconds getOperationRunningTimeSecs() const;
 
     void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
+    void onSearchIndexAbort();
 
     ReshardingCumulativeMetrics::AnyState getState() const {
         return _state.load();

@@ -77,6 +77,7 @@ constexpr auto kCountSameKeyStarted = "countSameKeyStarted";
 constexpr auto kCountSameKeySucceeded = "countSameKeySucceeded";
 constexpr auto kCountSameKeyFailed = "countSameKeyFailed";
 constexpr auto kCountSameKeyCanceled = "countSameKeyCanceled";
+constexpr auto kCountSearchIndexAborts = "countSearchIndexAborts";
 
 constexpr auto kLastOpEndingChunkImbalance = "lastOpEndingChunkImbalance";
 constexpr auto kCoordinatorAllShardsLowestRemainingOperationTimeEstimatedMillis =

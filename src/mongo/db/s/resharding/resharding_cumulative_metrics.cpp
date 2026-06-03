@@ -263,6 +263,7 @@ void ReshardingCumulativeMetrics::reportForServerStatus(BSONObjBuilder* bob) con
     root.append(kCountFailed, _countFailed.load());
     root.append(kCountCanceled, _countCancelled.load());
     root.append(kLastOpEndingChunkImbalance, _lastOpEndingChunkImbalance.load());
+    root.append(kCountSearchIndexAborts, _countSearchIndexAborts.load());
 
     if (_rootSectionName == kResharding) {
         root.append(kCountSameKeyStarted, _countSameKeyStarted.load());
@@ -473,6 +474,10 @@ void ReshardingCumulativeMetrics::onWriteDuringCriticalSection() {
 
 void ReshardingCumulativeMetrics::onWriteToStashedCollections() {
     _writesToStashedCollections.fetchAndAdd(1);
+}
+
+void ReshardingCumulativeMetrics::onSearchIndexAbort() {
+    _countSearchIndexAborts.fetchAndAdd(1);
 }
 
 void ReshardingCumulativeMetrics::onCloningRemoteBatchRetrieval(Milliseconds elapsed) {

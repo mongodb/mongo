@@ -373,6 +373,10 @@ void ReshardingMetrics::setLastOpEndingChunkImbalance(int64_t imbalanceCount) {
     _cumulativeMetrics->setLastOpEndingChunkImbalance(imbalanceCount);
 }
 
+void ReshardingMetrics::onSearchIndexAbort() {
+    _cumulativeMetrics->onSearchIndexAbort();
+}
+
 void ReshardingMetrics::onInsertApplied() {
     _insertsApplied.fetchAndAdd(1);
     getCumulativeMetrics()->onInsertApplied();

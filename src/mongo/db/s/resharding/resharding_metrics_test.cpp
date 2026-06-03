@@ -2000,5 +2000,12 @@ TEST_F(ReshardingMetricsTest, DiagnosticMetricDefaultsMatchRealFields) {
     }
 }
 
+TEST_F(ReshardingMetricsTest, OnSearchIndexAbortIncrementsCumulativeMetrics) {
+    createMetricsAndAssertIncrementsCumulativeMetricsField(
+        [](auto metrics) { metrics->onSearchIndexAbort(); },
+        Section::kRoot,
+        "countSearchIndexAborts");
+}
+
 }  // namespace
 }  // namespace mongo

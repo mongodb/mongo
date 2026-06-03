@@ -1314,14 +1314,17 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
         // collection. There is a known race condition where a new search index could be created
         // after this check passes, in which case the index will be dropped when resharding commits.
         // TODO: SERVER-125557 (resolve the index-creation race)
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream()
-                    << "Cannot reshard collection "
-                    << _coordinatorDoc.getSourceNss().toStringForErrorMsg()
-                    << " because it has MongoDB Search indexes which would be dropped. If you "
-                       "still want to reshard the collection, drop the search indexes first.",
-                !_reshardingCoordinatorExternalState->searchIndexExistsForCollection(
-                    opCtx.get(), _coordinatorDoc.getSourceNss()));
+        if (_reshardingCoordinatorExternalState->searchIndexExistsForCollection(
+                opCtx.get(), _coordinatorDoc.getSourceNss())) {
+            _metrics->onSearchIndexAbort();
+            uasserted(ErrorCodes::IllegalOperation,
+                      str::stream()
+                          << "Cannot reshard collection "
+                          << _coordinatorDoc.getSourceNss().toStringForErrorMsg()
+                          << " because it has MongoDB Search indexes which would be dropped. If "
+                             "you still want to reshard the collection, drop the search indexes "
+                             "first.");
+        }
 
         auto isUnsplittable = _reshardingCoordinatorExternalState->getIsUnsplittable(
                                   opCtx.get(), _coordinatorDoc.getSourceNss()) ||
