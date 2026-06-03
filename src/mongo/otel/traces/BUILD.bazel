@@ -172,6 +172,7 @@ mongo_cc_library(
         "//src/mongo/base:system_error",
         "//src/mongo/db:server_base",
         "//src/mongo/otel:otel_base",
+        "//src/mongo/otel/traces/span:span_names",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [

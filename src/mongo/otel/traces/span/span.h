@@ -33,6 +33,7 @@
 #include "mongo/config.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/otel/telemetry_context.h"
+#include "mongo/otel/traces/span/span_names.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -71,7 +72,7 @@ public:
      * confirmed it is valid to send the Span to the Trace backend.
      */
     static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx,
-                      const std::string& name,
+                      SpanName name,
                       bool keepSpan = false);
 
     /**
@@ -80,12 +81,25 @@ public:
      * OperationContext is available so that the calling code does not have to manage its own
      * TelemetryContext.
      */
-    static Span start(OperationContext* opCtx, const std::string& name, bool keepSpan = false);
+    static Span start(OperationContext* opCtx, SpanName name, bool keepSpan = false);
 
     /**
      * Similar to `start`, but only starts and returns a Span if there is an existing Span in the
      * provided `opCtx`'s TelemetryContext. If there is no existing Span, a no-op Span is returned.
      */
+    static Span startIfExistingTraceParent(OperationContext* opCtx,
+                                           SpanName name,
+                                           bool keepSpan = false);
+
+    /**
+     * Overloads for starting a Span with a `const std::string&` name.
+     *
+     * TODO SERVER-127461: Remove these.
+     */
+    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                      const std::string& name,
+                      bool keepSpan = false);
+    static Span start(OperationContext* opCtx, const std::string& name, bool keepSpan = false);
     static Span startIfExistingTraceParent(OperationContext* opCtx,
                                            const std::string& name,
                                            bool keepSpan = false);
@@ -119,6 +133,26 @@ public:
     void setStatus(const Status& status);
 
 private:
+    /**
+     * Starts a new Span assuming we are in an environment where this is possible. `telemetryCtx`
+     * will be populated if it is currently nullptr. The span will have the "dropSpanAttribute" set
+     * to true only if both `keepSpan` and either no telemetryCtx is provided or its `keepsSpan` is
+     * false.
+     */
+    static Span startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                          StringData name,
+                          bool keepSpan);
+    /**
+     * Starts a new Span assuming we are in an environment where this is possible. When there is no
+     * TelemetryContext on `opCtx`, `createIfMissing` determines whether one is created or a noop
+     * span is returned. The span will have the "dropSpanAttribute" set to true only if both
+     * `keepSpan` and either no telemetryCtx exists on `opCtx` or its `keepsSpan` is false.
+     */
+    static Span startImpl(OperationContext* opCtx,
+                          StringData name,
+                          bool keepSpan,
+                          bool createIfMissing);
+
     std::unique_ptr<SpanImpl> _impl;
     /**
      * Construction of Spans should be done through Span::start(traceable, name).
@@ -139,15 +173,33 @@ private:
  */
 class Span {
 public:
+    static Span start(OperationContext* opCtx, SpanName, bool keepSpan = false) {
+        return Span{};
+    }
+    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                      SpanName name,
+                      bool keepSpan = false) {
+        return Span{};
+    }
+    static Span startIfExistingTraceParent(OperationContext* opCtx,
+                                           SpanName name,
+                                           bool keepSpan = false) {
+        return Span{};
+    }
+
+    /**
+     * Overloads for starting a Span with a `const std::string&` name.
+     *
+     * TODO SERVER-127461: Remove these.
+     */
     static Span start(OperationContext* opCtx, const std::string&, bool keepSpan = false) {
         return Span{};
     }
-    static Span start(std::shared_ptr<TelemetryContext> telemetryCtx,
+    static Span start(std::shared_ptr<TelemetryContext>& telemetryCtx,
                       const std::string& name,
                       bool keepSpan = false) {
         return Span{};
     }
-
     static Span startIfExistingTraceParent(OperationContext* opCtx,
                                            const std::string& name,
                                            bool keepSpan = false) {
@@ -162,7 +214,7 @@ public:
 
     void setAttribute(StringData, int) {}
     void setAttribute(StringData, StringData) {}
-    void setError(const Status&) {}
+    void setStatus(const Status&) {}
 };
 
 #endif

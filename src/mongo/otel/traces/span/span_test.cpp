@@ -31,148 +31,206 @@
 
 #include "mongo/otel/telemetry_context_holder.h"
 #include "mongo/otel/traces/otel_test_fixture.h"
+#include "mongo/otel/traces/span/span_names.h"
 
 namespace mongo {
 namespace otel {
 namespace traces {
 namespace {
 
-class SpanTest : public OtelTestFixture {};
+// Tag types selecting which Span::start overload to exercise.
+struct SpanNameApi {};
+struct StringApi {};
 
-TEST_F(SpanTest, NoOpCtxStartSpan) {
-    {
-        auto span = Span::start(nullptr, "firstSpan");
-        TRACING_SPAN_ATTR(span, "test", 1);
-        ASSERT_TRUE(isEmpty());
+template <typename T>
+struct SpanNameHelper;
+
+template <>
+struct SpanNameHelper<SpanNameApi> {
+    static SpanName name1() {
+        return SpanNames::kTest1;
     }
-    ASSERT_TRUE(isEmpty());
+    static SpanName name2() {
+        return SpanNames::kTest2;
+    }
+    static SpanName name3() {
+        return SpanNames::kTest3;
+    }
+    static std::string toString(SpanName n) {
+        return std::string(n.getName());
+    }
+};
+
+template <>
+struct SpanNameHelper<StringApi> {
+    static std::string name1() {
+        return std::string(SpanNames::kTest1.getName());
+    }
+    static std::string name2() {
+        return std::string(SpanNames::kTest2.getName());
+    }
+    static std::string name3() {
+        return std::string(SpanNames::kTest3.getName());
+    }
+    static std::string toString(const std::string& n) {
+        return n;
+    }
+};
+
+template <typename T>
+class SpanTest : public OtelTestFixture {
+protected:
+    auto name1() {
+        return SpanNameHelper<T>::name1();
+    }
+    auto name2() {
+        return SpanNameHelper<T>::name2();
+    }
+    auto name3() {
+        return SpanNameHelper<T>::name3();
+    }
+    std::string toString(auto n) {
+        return SpanNameHelper<T>::toString(n);
+    }
+};
+
+using SpanTestTypes = ::testing::Types<SpanNameApi, StringApi>;
+TYPED_TEST_SUITE(SpanTest, SpanTestTypes);
+
+TYPED_TEST(SpanTest, NoOpCtxStartSpan) {
+    {
+        auto span = Span::start(nullptr, this->name1());
+        TRACING_SPAN_ATTR(span, "test", 1);
+        ASSERT_TRUE(this->isEmpty());
+    }
+    ASSERT_TRUE(this->isEmpty());
 }
 
-TEST_F(SpanTest, NoTracerStartSpan) {
-    clearProvider();
+TYPED_TEST(SpanTest, NoTracerStartSpan) {
+    this->clearProvider();
     {
-        auto span = Span::start(nullptr, "secondSpan");
+        auto span = Span::start(nullptr, this->name2());
         TRACING_SPAN_ATTR(span, "test", 1);
     }
     // Note : this test checks that no crash happens if there's no trace provider. We can't call
     // `isEmpty` as this uses the trace provider to retrieve spans.
 }
 
-TEST_F(SpanTest, ExporterSingleSpan) {
-    auto opCtx = makeOperationContext();
+TYPED_TEST(SpanTest, ExporterSingleSpan) {
+    auto opCtx = this->makeOperationContext();
     {
-        auto span = Span::start(opCtx.get(), "firstSpan");
-        ASSERT_TRUE(isEmpty());
+        auto span = Span::start(opCtx.get(), this->name1());
+        ASSERT_TRUE(this->isEmpty());
     }
 
-    ASSERT_FALSE(isEmpty());
-    auto span = getSpan(0, "firstSpan");
+    ASSERT_FALSE(this->isEmpty());
+    auto span = this->getSpan(0, this->toString(this->name1()));
     ASSERT_EQ(span->parentId, opentelemetry::trace::SpanId());
 }
 
-TEST_F(SpanTest, ParentSpan) {
-    auto opCtx = makeOperationContext();
+TYPED_TEST(SpanTest, ParentSpan) {
+    auto opCtx = this->makeOperationContext();
     {
-        auto span = Span::start(opCtx.get(), "firstSpan");
-        auto secondSpan = Span::start(opCtx.get(), "secondSpan");
-        ASSERT_TRUE(isEmpty());
+        auto span = Span::start(opCtx.get(), this->name1());
+        auto secondSpan = Span::start(opCtx.get(), this->name2());
+        ASSERT_TRUE(this->isEmpty());
     }
-    ASSERT_FALSE(isEmpty());
+    ASSERT_FALSE(this->isEmpty());
 
     {
-        auto span = Span::start(opCtx.get(), "thirdSpan");
+        auto span = Span::start(opCtx.get(), this->name3());
     }
 
-    auto firstRecord = getSpan(1, "firstSpan");
+    auto firstRecord = this->getSpan(1, this->toString(this->name1()));
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
 
-    auto secondRecord = getSpan(0, "secondSpan");
+    auto secondRecord = this->getSpan(0, this->toString(this->name2()));
     ASSERT_EQ(secondRecord->parentId, firstRecord->context.span_id());
 
-    auto thirdRecord = getSpan(2, "thirdSpan");
+    auto thirdRecord = this->getSpan(2, this->toString(this->name3()));
     ASSERT_EQ(thirdRecord->parentId, opentelemetry::trace::SpanId());
 }
 
-TEST_F(SpanTest, SpanDepthThree) {
-    auto opCtx = makeOperationContext();
+TYPED_TEST(SpanTest, SpanDepthThree) {
+    auto opCtx = this->makeOperationContext();
     {
-        auto span = Span::start(opCtx.get(), "firstSpan");
-        auto secondSpan = Span::start(opCtx.get(), "secondSpan");
-        auto thirdSpan = Span::start(opCtx.get(), "thirdSpan");
+        auto span = Span::start(opCtx.get(), this->name1());
+        auto secondSpan = Span::start(opCtx.get(), this->name2());
+        auto thirdSpan = Span::start(opCtx.get(), this->name3());
 
-        ASSERT_TRUE(isEmpty());
+        ASSERT_TRUE(this->isEmpty());
     }
 
-    auto firstRecord = getSpan(2, "firstSpan");
+    auto firstRecord = this->getSpan(2, this->toString(this->name1()));
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
 
-    auto secondRecord = getSpan(1, "secondSpan");
+    auto secondRecord = this->getSpan(1, this->toString(this->name2()));
     ASSERT_NE(secondRecord->parentId, opentelemetry::trace::SpanId());
     ASSERT_EQ(secondRecord->parentId, firstRecord->context.span_id());
 
-    auto thirdRecord = getSpan(0, "thirdSpan");
+    auto thirdRecord = this->getSpan(0, this->toString(this->name3()));
     ASSERT_EQ(thirdRecord->parentId, secondRecord->context.span_id());
 }
 
-TEST_F(SpanTest, ParallelSpan) {
-    auto opCtx = makeOperationContext();
+TYPED_TEST(SpanTest, ParallelSpan) {
+    auto opCtx = this->makeOperationContext();
     {
-        auto span = Span::start(opCtx.get(), "firstSpan");
+        auto span = Span::start(opCtx.get(), this->name1());
 
         {
-            auto secondSpan = Span::start(opCtx.get(), "secondSpan");
+            auto secondSpan = Span::start(opCtx.get(), this->name2());
         }
         {
-            auto thirdSpan = Span::start(opCtx.get(), "thirdSpan");
+            auto thirdSpan = Span::start(opCtx.get(), this->name3());
         }
     }
 
-    auto firstRecord = getSpan(2, "firstSpan");
+    auto firstRecord = this->getSpan(2, this->toString(this->name1()));
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
 
-    auto secondRecord = getSpan(1, "thirdSpan");
+    auto secondRecord = this->getSpan(1, this->toString(this->name3()));
     ASSERT_EQ(secondRecord->parentId, firstRecord->context.span_id());
 
-    auto thirdRecord = getSpan(0, "secondSpan");
+    auto thirdRecord = this->getSpan(0, this->toString(this->name2()));
     ASSERT_EQ(thirdRecord->parentId, firstRecord->context.span_id());
 }
 
-TEST_F(SpanTest, AsyncSpan) {
-    auto opCtx = makeOperationContext();
+TYPED_TEST(SpanTest, AsyncSpan) {
+    auto opCtx = this->makeOperationContext();
+    auto n2 = this->name2();
     {
-        auto span = Span::start(opCtx.get(), "firstSpan");
+        auto span = Span::start(opCtx.get(), this->name1());
         auto future = Future<void>::makeReady().then(
-            [telemetryCtx = TelemetryContextHolder::getDecoration(opCtx.get())
-                                .getTelemetryContext()]() mutable {
-                auto span = Span::start(telemetryCtx, "secondSpan");
-            });
+            [telemetryCtx =
+                 TelemetryContextHolder::getDecoration(opCtx.get()).getTelemetryContext(),
+             n2]() mutable { auto span = Span::start(telemetryCtx, n2); });
         future.get();
-        auto thirdSpan = Span::start(opCtx.get(), "thirdSpan");
+        auto thirdSpan = Span::start(opCtx.get(), this->name3());
     }
 
-    auto firstRecord = getSpan(2, "firstSpan");
+    auto firstRecord = this->getSpan(2, this->toString(this->name1()));
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
 
-    auto secondRecord = getSpan(1, "thirdSpan");
+    auto secondRecord = this->getSpan(1, this->toString(this->name3()));
     ASSERT_EQ(secondRecord->parentId, firstRecord->context.span_id());
 
-    auto thirdRecord = getSpan(0, "secondSpan");
+    auto thirdRecord = this->getSpan(0, this->toString(n2));
     ASSERT_EQ(thirdRecord->parentId, firstRecord->context.span_id());
 }
 
-TEST_F(SpanTest, TestShouldDrop) {
-    auto opCtx = makeOperationContext();
+TYPED_TEST(SpanTest, TestShouldDrop) {
+    auto opCtx = this->makeOperationContext();
     {
-        auto span = Span::start(opCtx.get(), "firstSpan");
+        auto span = Span::start(opCtx.get(), this->name1());
 
-        auto secondSpan = Span::start(opCtx.get(), "secondSpan", true);
-        auto thirdSpan = Span::start(opCtx.get(), "thirdSpan");
+        auto secondSpan = Span::start(opCtx.get(), this->name2(), true);
+        auto thirdSpan = Span::start(opCtx.get(), this->name3());
 
-        ASSERT_TRUE(isEmpty());
+        ASSERT_TRUE(this->isEmpty());
     }
 
-    auto firstRecord = getSpan(2, "firstSpan");
-    ASSERT_EQ(firstRecord->attributes.size(), getBaseAttributesSize());
+    auto firstRecord = this->getSpan(2, this->toString(this->name1()));
+    ASSERT_EQ(firstRecord->attributes.size(), this->getBaseAttributesSize());
     {
         auto dropSpan = firstRecord->attributes.find("DROP_SPAN");
         ASSERT_NE(dropSpan, firstRecord->attributes.end());
@@ -180,8 +238,8 @@ TEST_F(SpanTest, TestShouldDrop) {
         ASSERT_TRUE(static_cast<int>(absl::get<bool>(dropSpan->second)));
     }
 
-    auto secondRecord = getSpan(1, "secondSpan");
-    ASSERT_EQ(secondRecord->attributes.size(), getBaseAttributesSize());
+    auto secondRecord = this->getSpan(1, this->toString(this->name2()));
+    ASSERT_EQ(secondRecord->attributes.size(), this->getBaseAttributesSize());
     {
         auto dropSpan = secondRecord->attributes.find("DROP_SPAN");
         ASSERT_NE(dropSpan, secondRecord->attributes.end());
@@ -189,8 +247,8 @@ TEST_F(SpanTest, TestShouldDrop) {
         ASSERT_FALSE(static_cast<int>(absl::get<bool>(dropSpan->second)));
     }
 
-    auto thirdRecord = getSpan(0, "thirdSpan");
-    ASSERT_EQ(thirdRecord->attributes.size(), getBaseAttributesSize());
+    auto thirdRecord = this->getSpan(0, this->toString(this->name3()));
+    ASSERT_EQ(thirdRecord->attributes.size(), this->getBaseAttributesSize());
     {
         auto dropSpan = thirdRecord->attributes.find("DROP_SPAN");
         ASSERT_NE(dropSpan, thirdRecord->attributes.end());
@@ -199,17 +257,17 @@ TEST_F(SpanTest, TestShouldDrop) {
     }
 }
 
-TEST_F(SpanTest, SetIntAttribute) {
-    auto opCtx = makeOperationContext();
+TYPED_TEST(SpanTest, SetIntAttribute) {
+    auto opCtx = this->makeOperationContext();
     {
-        auto span = Span::start(opCtx.get(), "firstSpan");
+        auto span = Span::start(opCtx.get(), this->name1());
         TRACING_SPAN_ATTR(span, "value1", 15);
         TRACING_SPAN_ATTR(span, "value2", 32);
     }
 
-    auto firstRecord = getSpan(0, "firstSpan");
+    auto firstRecord = this->getSpan(0, this->toString(this->name1()));
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
-    ASSERT_EQ(firstRecord->attributes.size(), getBaseAttributesSize() + 2);
+    ASSERT_EQ(firstRecord->attributes.size(), this->getBaseAttributesSize() + 2);
     ASSERT_EQ(firstRecord->status, opentelemetry::trace::StatusCode::kOk);
 
     auto value1 = firstRecord->attributes.find("value1");
@@ -223,16 +281,16 @@ TEST_F(SpanTest, SetIntAttribute) {
     ASSERT_EQ(static_cast<int>(absl::get<int32_t>(value2->second)), 32);
 }
 
-TEST_F(SpanTest, ErrorCode) {
-    auto opCtx = makeOperationContext();
+TYPED_TEST(SpanTest, ErrorCode) {
+    auto opCtx = this->makeOperationContext();
     {
-        auto span = Span::start(opCtx.get(), "firstSpan");
+        auto span = Span::start(opCtx.get(), this->name1());
         span.setStatus(Status{ErrorCodes::InternalError, "failed"});
     }
 
-    auto firstRecord = getSpan(0, "firstSpan");
+    auto firstRecord = this->getSpan(0, this->toString(this->name1()));
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
-    ASSERT_EQ(firstRecord->attributes.size(), getBaseAttributesSize() + 2);
+    ASSERT_EQ(firstRecord->attributes.size(), this->getBaseAttributesSize() + 2);
     ASSERT_EQ(firstRecord->status, opentelemetry::trace::StatusCode::kError);
 
     auto value1 = firstRecord->attributes.find("errorCode");
@@ -245,55 +303,55 @@ TEST_F(SpanTest, ErrorCode) {
     ASSERT_TRUE(absl::holds_alternative<std::basic_string_view<char>>(value2->second));
 }
 
-TEST_F(SpanTest, SpanDuringException) {
-    auto opCtx = makeOperationContext();
+TYPED_TEST(SpanTest, SpanDuringException) {
+    auto opCtx = this->makeOperationContext();
     try {
-        auto span = Span::start(opCtx.get(), "firstSpan");
+        auto span = Span::start(opCtx.get(), this->name1());
         throw std::runtime_error{"testing"};
     } catch (const std::exception&) {
     }
 
-    auto firstRecord = getSpan(0, "firstSpan");
+    auto firstRecord = this->getSpan(0, this->toString(this->name1()));
     ASSERT_EQ(firstRecord->parentId, opentelemetry::trace::SpanId());
-    ASSERT_EQ(firstRecord->attributes.size(), getBaseAttributesSize());
+    ASSERT_EQ(firstRecord->attributes.size(), this->getBaseAttributesSize());
     ASSERT_EQ(firstRecord->status, opentelemetry::trace::StatusCode::kError);
 }
 
-TEST_F(SpanTest, CreateTelemetryContext) {
+TYPED_TEST(SpanTest, CreateTelemetryContext) {
     auto telemetryCtx = Span::createTelemetryContext();
     ASSERT_EQ(telemetryCtx->type(), "SpanTelemetryContextImpl");
 }
 
-TEST_F(SpanTest, StartWithTelemetryContextDoesNotCrash) {
+TYPED_TEST(SpanTest, StartWithTelemetryContextDoesNotCrash) {
     // Using the base TelemetryContext class instead of SpanTelemetryContextImpl should not crash.
     auto telemetryCtx = std::make_shared<TelemetryContext>();
     {
-        auto span = Span::start(telemetryCtx, "firstSpan");
+        auto span = Span::start(telemetryCtx, this->name1());
         TRACING_SPAN_ATTR(span, "test", 1);
     }
-    ASSERT_TRUE(isEmpty());
+    ASSERT_TRUE(this->isEmpty());
 }
 
-TEST_F(SpanTest, StartIfExistingTraceParentNoTraceParent) {
-    auto opCtx = makeOperationContext();
+TYPED_TEST(SpanTest, StartIfExistingTraceParentNoTraceParent) {
+    auto opCtx = this->makeOperationContext();
     {
-        auto span = Span::startIfExistingTraceParent(opCtx.get(), "firstSpan");
+        auto span = Span::startIfExistingTraceParent(opCtx.get(), this->name1());
         TRACING_SPAN_ATTR(span, "test", 1);
-        ASSERT_TRUE(isEmpty());
+        ASSERT_TRUE(this->isEmpty());
     }
-    ASSERT_TRUE(isEmpty());
+    ASSERT_TRUE(this->isEmpty());
 }
 
-TEST_F(SpanTest, StartIfExistingTraceParentIfTraceParent) {
-    auto opCtx = makeOperationContext();
+TYPED_TEST(SpanTest, StartIfExistingTraceParentIfTraceParent) {
+    auto opCtx = this->makeOperationContext();
     auto& telemetryCtxHolder = TelemetryContextHolder::getDecoration(opCtx.get());
     telemetryCtxHolder.setTelemetryContext(Span::createTelemetryContext());
     {
-        auto span = Span::startIfExistingTraceParent(opCtx.get(), "firstSpan");
+        auto span = Span::startIfExistingTraceParent(opCtx.get(), this->name1());
         TRACING_SPAN_ATTR(span, "test", 1);
-        ASSERT_TRUE(isEmpty());
+        ASSERT_TRUE(this->isEmpty());
     }
-    ASSERT_FALSE(isEmpty());
+    ASSERT_FALSE(this->isEmpty());
 }
 
 }  // namespace

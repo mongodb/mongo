@@ -67,3 +67,9 @@ mongo_cc_unit_test(
         "//src/mongo/otel/traces:tracing_test_util",
     ],
 )
+
+mongo_cc_library(
+    name = "span_names",
+    hdrs = ["span_names.h"],
+    deps = ["//src/mongo:base"],
+)

@@ -139,48 +139,14 @@ void Span::setStatus(const Status& status) {
     }
 }
 
-Span Span::start(OperationContext* opCtx, const std::string& name, bool keepSpan) {
-    if (opCtx == nullptr) {
-        return Span{};
-    }
-
-    auto& telemetryCtxHolder = TelemetryContextHolder::getDecoration(opCtx);
-    auto telemetryCtx = telemetryCtxHolder.getTelemetryContext();
-
-    if (!telemetryCtx) {
-        telemetryCtx = std::make_shared<SpanTelemetryContextImpl>();
-        telemetryCtxHolder.setTelemetryContext(telemetryCtx);
-    }
-
-    return start(telemetryCtx, name, keepSpan);
-}
-
-Span Span::startIfExistingTraceParent(OperationContext* opCtx,
-                                      const std::string& name,
-                                      bool keepSpan) {
-    if (opCtx == nullptr) {
-        return Span{};
-    }
-
-    auto telemetryCtx = TelemetryContextHolder::getDecoration(opCtx).getTelemetryContext();
-
-    if (!telemetryCtx) {
-        return Span{};
-    }
-
-    return start(telemetryCtx, name, keepSpan);
-}
-
-Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx,
-                 const std::string& name,
-                 bool keepSpan) {
-    // Get ServiceContext from global context
+Span Span::startImpl(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                     StringData name,
+                     bool keepSpan) {
     ServiceContext* serviceContext = getGlobalServiceContext();
     if (!serviceContext) {
         return Span{};
     }
 
-    // Get the TracerProviderService from ServiceContext decoration
     auto tracerProviderService = TracerProviderService::get(serviceContext);
     if (!tracerProviderService || !tracerProviderService->isEnabled()) {
         return Span{};
@@ -215,11 +181,61 @@ Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx,
 
     auto keepSpanParent = spanCtx->shouldKeepSpan();
 
-    return Span(std::make_unique<Span::SpanImpl>(tracer->StartSpan(name, opts),
+    return Span(std::make_unique<Span::SpanImpl>(tracer->StartSpan(std::string{name}, opts),
                                                  std::move(parentSpan),
                                                  std::move(spanCtx),
                                                  keepSpanParent,
                                                  keepSpan));
+}
+
+Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx, SpanName name, bool keepSpan) {
+    return startImpl(telemetryCtx, name.getName(), keepSpan);
+}
+
+Span Span::startImpl(OperationContext* opCtx,
+                     StringData name,
+                     bool keepSpan,
+                     bool createIfMissing) {
+    if (opCtx == nullptr) {
+        return Span{};
+    }
+
+    auto& telemetryCtxHolder = TelemetryContextHolder::getDecoration(opCtx);
+    auto telemetryCtx = telemetryCtxHolder.getTelemetryContext();
+
+    if (!telemetryCtx) {
+        if (!createIfMissing) {
+            return Span{};
+        }
+        telemetryCtx = std::make_shared<SpanTelemetryContextImpl>();
+        telemetryCtxHolder.setTelemetryContext(telemetryCtx);
+    }
+
+    return startImpl(telemetryCtx, name, keepSpan);
+}
+
+Span Span::start(OperationContext* opCtx, SpanName name, bool keepSpan) {
+    return startImpl(opCtx, name.getName(), keepSpan, /*createIfMissing=*/true);
+}
+
+Span Span::startIfExistingTraceParent(OperationContext* opCtx, SpanName name, bool keepSpan) {
+    return startImpl(opCtx, name.getName(), keepSpan, /*createIfMissing=*/false);
+}
+
+Span Span::start(OperationContext* opCtx, const std::string& name, bool keepSpan) {
+    return startImpl(opCtx, name, keepSpan, /*createIfMissing=*/true);
+}
+
+Span Span::startIfExistingTraceParent(OperationContext* opCtx,
+                                      const std::string& name,
+                                      bool keepSpan) {
+    return startImpl(opCtx, name, keepSpan, /*createIfMissing=*/false);
+}
+
+Span Span::start(std::shared_ptr<TelemetryContext>& telemetryCtx,
+                 const std::string& name,
+                 bool keepSpan) {
+    return startImpl(telemetryCtx, name, keepSpan);
 }
 
 std::shared_ptr<TelemetryContext> Span::createTelemetryContext() {
