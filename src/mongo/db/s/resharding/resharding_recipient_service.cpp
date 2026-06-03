@@ -1343,9 +1343,6 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                                         : CommitQuorumOptions(
                                               CommitQuorumOptions::kVotingMembers))};
 
-                           // TODO(SERVER-107070): investigate if this is a valid place to generate
-                           // new idents or if we need to do something more complicated for catalog
-                           // consistency.
                            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
                            auto indexes =
                                toIndexBuildInfoVec(indexSpecs,
