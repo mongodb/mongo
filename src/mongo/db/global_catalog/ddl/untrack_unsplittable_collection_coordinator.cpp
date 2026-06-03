@@ -130,7 +130,9 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
     tassert(8631102, "There must be a collection stored in the document", _doc.getOptCollType());
-    const auto& coll = _doc.getOptCollType().get();
+    // Copy by value: the causality barrier / getNewSession() calls below reassign _doc, which
+    // would leave a reference into _doc dangling.
+    const auto coll = _doc.getOptCollType().get();
 
     if (!_firstExecution) {
         AllShardsAndConfigCausalityBarrier barrier{**executor, token};

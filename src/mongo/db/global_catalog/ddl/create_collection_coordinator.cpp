@@ -2184,10 +2184,13 @@ void CreateCollectionCoordinator::_notifyChangeStreamReadersOnPlacementChanged(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
     NamespacePlacementChanged notification(nss(), commitTime);
-    const auto& changeStreamsNotifierShardId = _doc.getOriginalDataShard().value();
     auto buildNewSessionFn = [this](OperationContext* opCtx) {
         return getNewSession(opCtx);
     };
+
+    // Copy by value: generatePlacementChangeNotificationOnShard() persists new sessions that
+    // reassign _doc, which would leave a reference into _doc dangling.
+    const auto changeStreamsNotifierShardId = _doc.getOriginalDataShard().value();
 
     sharding_ddl_util::generatePlacementChangeNotificationOnShard(
         opCtx, notification, changeStreamsNotifierShardId, buildNewSessionFn, executor, token);

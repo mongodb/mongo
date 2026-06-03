@@ -318,9 +318,11 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 tassert(10644515,
                         "Expected databaseVersion to be set on the coordinator document",
                         _doc.getDatabaseVersion());
-                const auto& preCommitDbVersion = *_doc.getDatabaseVersion();
+                // Copy by value: getNewSession() below persists a new session and reassigns _doc,
+                // which would leave a reference into _doc dangling.
+                const auto preCommitDbVersion = *_doc.getDatabaseVersion();
                 const auto thisShardId = ShardingState::get(opCtx)->shardId();
-                const auto& toShardId = _doc.getToShardId();
+                const auto toShardId = _doc.getToShardId();
 
                 // We need to stop the shard catalog cleanup task to ensure
                 // that the new primary's collection metadata doesn't get
@@ -433,9 +435,11 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             AllShardsAndConfigCausalityBarrier barrier{**executor, token};
             performCausalityBarrier(opCtx, barrier);
 
-            const auto& failedPhase = _doc.getPhase();
             const auto thisShardId = ShardingState::get(opCtx)->shardId();
-            const auto& toShardId = _doc.getToShardId();
+            // Copy by value: exitCriticalSectionOnRecipient() and getNewSession() below reassign
+            // _doc, which would leave a reference into _doc dangling.
+            const auto toShardId = _doc.getToShardId();
+            const auto failedPhase = _doc.getPhase();
 
             unblockReadsAndWrites(opCtx);
             try {
@@ -628,7 +632,9 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
     // Enable write blocking bypass to allow cloning of catalog data even if writes are disallowed.
     WriteBlockBypass::get(opCtx).set(true);
 
-    const auto& toShardId = _doc.getToShardId();
+    // Copy by value: getNewSession() below (evaluated before clonedCollections() runs) reassigns
+    // _doc, which would leave a reference into _doc dangling.
+    const auto toShardId = _doc.getToShardId();
 
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     const auto fromShard =
@@ -757,7 +763,9 @@ void MovePrimaryCoordinator::commitCollectionsMetadataToShards(
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
     const auto trackedColls =
         catalogClient->getCollections(opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
-    const auto& toShardId = _doc.getToShardId();
+    // Copy by value: getNewSession() below reassigns _doc, which would leave a reference into _doc
+    // dangling.
+    const auto toShardId = _doc.getToShardId();
 
     for (auto& coll : trackedColls) {
         std::set<ShardId> involvedShards;

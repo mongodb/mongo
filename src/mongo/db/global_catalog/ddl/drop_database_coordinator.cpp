@@ -534,7 +534,9 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     }());
                     _updateStateDocument(opCtx, std::move(newStateDoc));
 
-                    const auto& changeStreamsNotifier = *_doc.getCollChangeStreamsNotifier();
+                    // Copy by value: _dropTrackedCollection() persists new sessions that reassign
+                    // _doc, which would leave a reference into _doc dangling.
+                    const auto changeStreamsNotifier = *_doc.getCollChangeStreamsNotifier();
                     LOGV2_DEBUG(5494505,
                                 2,
                                 "Dropping tracked collection",
