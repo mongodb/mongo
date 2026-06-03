@@ -267,8 +267,8 @@ StringData String::caseFoldAndStripDiacritics(StackBufBuilder* buffer,
     return {buffer->buf(), size_t(buffer->len())};
 }
 
-bool String::substrMatch(const std::string& str,
-                         const std::string& find,
+bool String::substrMatch(StringData str,
+                         StringData find,
                          SubstrMatchOptions options,
                          CaseFoldMode cfMode) {
     if (cfMode == CaseFoldMode::kTurkish) {

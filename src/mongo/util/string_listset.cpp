@@ -49,8 +49,8 @@ std::array<uint8_t, 128> StringListSet::buildFastHash() {
     if (useFastHash()) {
         for (size_t idx = 0; idx < _strings.size(); ++idx) {
             auto& p = _strings[idx];
-            auto fastHash1 = computeFastHash1(p.data(), p.size());
-            auto fastHash2 = computeFastHash2(p.data(), p.size(), fastHash1);
+            auto fastHash1 = computeFastHash1(p);
+            auto fastHash2 = computeFastHash2(p, fastHash1);
             size_t encodedIdx = idx + 2;
 
             // Update 'fastHt[hash]' to store 'fieldIdx', or, in the case of a collision, '1'.
@@ -63,8 +63,8 @@ std::array<uint8_t, 128> StringListSet::buildFastHash() {
         auto& p = _strings[idx];
 
         if (useFastHash()) {
-            auto fastHash1 = computeFastHash1(p.data(), p.size());
-            auto fastHash2 = computeFastHash2(p.data(), p.size(), fastHash1);
+            auto fastHash1 = computeFastHash1(p);
+            auto fastHash2 = computeFastHash2(p, fastHash1);
             size_t encodedIdx = idx + 2;
 
             // If 'fastHt' can answer all queries about '_strings[idx]', then we don't need to

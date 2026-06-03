@@ -306,7 +306,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
         }
 
         try {
-            setElement(n.valueStringDataSafe().data(), v, o);
+            setElement(n.str().c_str(), v, o);
             thisTime.insert(n.str());
             _storedNames.insert(n.str());
         } catch (const DBException& setElemEx) {

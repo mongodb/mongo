@@ -232,9 +232,6 @@ inline StringData mapValue(StringData value) {
 inline StringData mapValue(std::string const& value) {
     return value;
 }
-inline StringData mapValue(std::string_view value) {  // NOLINT
-    return toStringDataForInterop(value);
-}
 inline StringData mapValue(char* value) {
     return value;
 }

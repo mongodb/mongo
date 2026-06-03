@@ -44,8 +44,6 @@ namespace mongo {
 
 namespace fts {
 
-using std::string;
-
 extern const double DEFAULT_WEIGHT;
 extern const double MAX_WEIGHT;
 
@@ -64,7 +62,7 @@ FTSElementIterator::FTSElementIterator(const FTSSpec& spec, const BSONObj& obj)
 
 namespace {
 /**  Check for exact match or path prefix match.  */
-inline bool _matchPrefix(const string& dottedName, const string& weight) {
+inline bool _matchPrefix(const std::string& dottedName, const std::string& weight) {
     if (weight == dottedName) {
         return true;
     }
@@ -108,7 +106,7 @@ bool FTSElementIterator::moreFrames() {
 FTSIteratorValue FTSElementIterator::advance() {
     while (moreFrames()) {
         BSONElement elem = _frame._it.next();
-        string fieldName = elem.fieldName();
+        std::string fieldName = elem.fieldName();
 
         // Skip "language" specifier fields if wildcard.
         if (_spec.wildcard() && _spec.languageOverrideField() == fieldName) {
@@ -116,7 +114,7 @@ FTSIteratorValue FTSElementIterator::advance() {
         }
 
         // SERVER-78238: fields whose name contains a dot or starts with a '$' are not indexable.
-        if (fieldName.find_first_of('.') != string::npos || fieldName.starts_with('$')) {
+        if (fieldName.find_first_of('.') != std::string::npos || fieldName.starts_with('$')) {
             continue;
         }
 
@@ -124,8 +122,8 @@ FTSIteratorValue FTSElementIterator::advance() {
         // 1. parent path empty (top level): use the current field name
         // 2. parent path non-empty and obj is an array: use the parent path
         // 3. parent path non-empty and obj is a sub-doc: append field name to parent path
-        string dottedName = (_frame._parentPath.empty() ? fieldName
-                                 : _frame._isArray      ? _frame._parentPath
+        std::string dottedName = (_frame._parentPath.empty() ? fieldName
+                                      : _frame._isArray      ? _frame._parentPath
                                                         : _frame._parentPath + '.' + fieldName);
 
         // Find lower bound of dottedName in _weights.  lower_bound leaves us at the first
@@ -159,8 +157,7 @@ FTSIteratorValue FTSElementIterator::advance() {
             case BSONType::string:
                 // Only index strings on exact match or wildcard.
                 if (exactMatch || _spec.wildcard()) {
-                    return FTSIteratorValue(
-                        elem.valueStringData().data(), _frame._language, weight);
+                    return FTSIteratorValue(elem.valueStringData(), _frame._language, weight);
                 }
                 break;
 

@@ -1134,9 +1134,11 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
 Status WiredTigerKVEngine::_rebuildIdent(WiredTigerSession& session, const char* uri) {
     invariant(_inRepairMode);
 
-    invariant(std::string(uri).find(WiredTigerUtil::kTableUriPrefix.data()) == 0);
+    StringData uriStr{uri};
+    invariant(uriStr.starts_with(WiredTigerUtil::kTableUriPrefix));
+    uriStr.remove_prefix(WiredTigerUtil::kTableUriPrefix.size());
 
-    const std::string identName(uri + WiredTigerUtil::kTableUriPrefix.size());
+    const std::string identName{uriStr};
     auto filePath = getDataFilePathForIdent(identName);
     if (filePath) {
         const boost::filesystem::path corruptFile(filePath->string() + ".corrupt");

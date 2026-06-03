@@ -125,7 +125,7 @@ private:
      * values and user-defined values.
      */
     static auto _wrapValue(StringData val) {
-        return toStdStringViewForInterop(val);
+        return val;
     }
 
     template <typename T>
@@ -174,8 +174,7 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     TextValueExtractor extractor;
     extractor.reserve(attrs.get().size());
     attrs.get().apply(extractor);
-    fmt::vformat_to(
-        std::back_inserter(buffer), toStdStringViewForInterop(message), extractor.args());
+    fmt::vformat_to(std::back_inserter(buffer), message, extractor.args());
 
     size_t attributeMaxSize = buffer.size();
     if (extract<LogTruncation>(attributes::truncation(), rec).get() == LogTruncation::Enabled) {

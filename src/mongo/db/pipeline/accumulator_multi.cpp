@@ -402,7 +402,7 @@ template <bool single>
 std::tuple<boost::intrusive_ptr<Expression>, BSONElement, boost::optional<BSONObj>>
 accumulatorNParseArgs(ExpressionContext* expCtx,
                       const BSONElement& elem,
-                      const char* name,
+                      StringData name,
                       bool needSortBy,
                       const VariablesParseState& vps) {
     uassert(5788001,
@@ -578,8 +578,7 @@ template <TopBottomSense sense, bool single>
 AccumulationExpression AccumulatorTopBottomN<sense, single>::parseTopBottomN(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
     auto name = AccumulatorTopBottomN<sense, single>::getName();
-    const auto [n, output, sortBy] =
-        accumulatorNParseArgs<single>(expCtx, elem, name.data(), true, vps);
+    const auto [n, output, sortBy] = accumulatorNParseArgs<single>(expCtx, elem, name, true, vps);
     auto [sortPattern, sortFieldsExp, hasMeta] =
         parseAccumulatorTopBottomNSortBy<sense>(expCtx, *sortBy);
 

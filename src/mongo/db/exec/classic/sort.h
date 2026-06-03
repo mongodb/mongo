@@ -59,7 +59,7 @@ namespace mongo {
  */
 class SortStage : public PlanStage {
 public:
-    static constexpr StringData kStageType = "SORT"_sd;
+    static constexpr const char* kStageType = "SORT";
 
     SortStage(boost::intrusive_ptr<ExpressionContext> expCtx,
               WorkingSet* ws,

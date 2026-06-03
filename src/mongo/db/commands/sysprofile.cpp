@@ -55,7 +55,7 @@ namespace {
 #ifdef __linux__
 enum class PerfMode : int { record = 0, counters };
 
-void runProfiler(StringData profile_name, PerfMode mode, StringData parentPid) {
+void runProfiler(const std::string& profileName, PerfMode mode, const std::string& parentPid) {
     const std::string perfBinary = "/usr/bin/perf";
     const std::string perfName = perfBinary.substr(perfBinary.find_last_of('/') + 1);
     // Clear the signal mask set from mongod so that perf can handle SIGINT properly.
@@ -72,9 +72,9 @@ void runProfiler(StringData profile_name, PerfMode mode, StringData parentPid) {
                             "record",
                             "-g",
                             "-o",
-                            profile_name.data(),
+                            profileName.c_str(),
                             "-p",
-                            parentPid.data(),
+                            parentPid.c_str(),
                             nullptr));
         } break;
         case PerfMode::counters: {
@@ -88,20 +88,18 @@ void runProfiler(StringData profile_name, PerfMode mode, StringData parentPid) {
                             "instructions,branch-misses,"
                             "dTLB-load-misses,dTLB-loads",
                             "-o",
-                            profile_name.data(),
+                            profileName.c_str(),
                             "-p",
-                            parentPid.data(),
+                            parentPid.c_str(),
                             nullptr));
         } break;
     }
 }
 
 pid_t spawn(StringData filename, PerfMode mode) {
-    std::stringstream pidStream;
-    pidStream << getpid();
-    auto pidString = pidStream.str();
-
-    auto profile_name = std::string{filename} + ((mode == PerfMode::record) ? ".data" : ".txt");
+    std::string pidString = std::to_string(getpid());
+    std::string profileName =
+        fmt::format("{}.{}", filename, mode == PerfMode::record ? "data" : "txt");
     pid_t pid = fork();
     switch (pid) {
         case -1:
@@ -109,7 +107,7 @@ pid_t spawn(StringData filename, PerfMode mode) {
             break;
         case 0:
             // Child process.
-            runProfiler(profile_name, mode, pidString.c_str());
+            runProfiler(profileName, mode, pidString);
             break;
         default:
             LOGV2(8387202, "A child process is forked for perf.", "pid"_attr = pid);

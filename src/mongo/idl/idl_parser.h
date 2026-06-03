@@ -592,16 +592,6 @@ private:
 };
 
 /**
- * Throw an error when BSON validation fails during parse.
- */
-template <typename T>
-void throwComparisonError(
-    IDLParserContext& ctxt, StringData fieldName, StringData op, T actualValue, T expectedValue) {
-    std::string path = ctxt.getElementPath(fieldName);
-    throwComparisonError(path, op, actualValue, expectedValue);
-}
-
-/**
  * Throw an error when a user calls a setter and it fails the comparison.
  */
 template <typename T>
@@ -614,6 +604,15 @@ MONGO_MOD_NEEDS_REPLACEMENT void throwComparisonError(StringData fieldName,
                             << expectedValue << ", actual value '" << actualValue << "'");
 }
 
+/**
+ * Throw an error when BSON validation fails during parse.
+ */
+template <typename T>
+void throwComparisonError(
+    IDLParserContext& ctxt, StringData fieldName, StringData op, T actualValue, T expectedValue) {
+    std::string path = ctxt.getElementPath(fieldName);
+    throwComparisonError(path, op, actualValue, expectedValue);
+}
 
 /**
  * Transform a vector of input type to a vector of output type.

@@ -253,7 +253,7 @@ void parseTLVVectors(StringData buffer,
             continue;
         }
 
-        std::string data(buffer.data(), length);
+        std::string data(buffer.substr(0, length));
         buffer = buffer.substr(length);
         tlvs.emplace_back(type, std::move(data));
     }

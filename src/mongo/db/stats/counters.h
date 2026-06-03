@@ -206,7 +206,7 @@ private:
         } egress;
         bool ingressAllowed = false;
     };
-    using MechanismMap = std::map<std::string, MechanismData>;
+    using MechanismMap = std::map<std::string, MechanismData, std::less<>>;
 
     AtomicWord<long long> _saslSupportedMechanismsReceived;
     AtomicWord<long long> _ingressAuthenticationCumulativeMicros;

@@ -383,13 +383,10 @@ TEST_F(IndexConsistencyTest, FailedKeygen) {
     KeyStringIndexConsistency ksic(opCtx, &state);
     ksic.traverseRecord(opCtx, *coll, xHashedIndex, RecordId(1), unhashableDoc, &results);
     const auto& errors = results.getErrors();
-    ASSERT_EQ(errors.size(), 1);
-    auto it = std::find_if(errors.begin(), errors.end(), [](StringData error) {
-        // Expect error relating to hashed indexes unsupported on array types
-        return error.contains("16766");
-    });
-    ASSERT_EQ(errors.begin(), it)
+    namespace m = unittest::match;
+    ASSERT_THAT(errors, m::ElementsAre(m::HasSubstr("16766")))
         << "Expected to find error 16766 relating to hashed indexes unsupported on array types";
+    auto it = errors.begin();
     LOGV2(11475700, "Error associated with validation run", "validationError"_attr = *it);
 }
 

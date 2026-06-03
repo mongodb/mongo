@@ -257,7 +257,7 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
             newRootExpression,
             (stageName == kStageName) ? "'newRoot' expression " : "'replacement document' ",
             expCtx->getSbeCompatibility()),
-        kStageName.data(),
+        kStageName,
         isIndependentOfAnyCollection);
 }
 
@@ -273,7 +273,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::create(
                                                     newRootExpression,
                                                     std::move(errMsgContextForNonObjects),
                                                     expCtx->getSbeCompatibility()),
-        kStageName.data(),
+        kStageName,
         isIndependentOfAnyCollection);
 }
 }  // namespace mongo

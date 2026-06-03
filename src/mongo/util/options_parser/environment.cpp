@@ -46,9 +46,6 @@
 namespace mongo {
 namespace optionenvironment {
 
-using std::string;
-using std::type_info;
-
 // Environment implementation
 
 Status Environment::addKeyConstraint(KeyConstraint* keyConstraint) {
@@ -62,9 +59,8 @@ Status Environment::addConstraint(Constraint* constraint) {
 
 /** Get the value at Key.  Note that we should not be able to add empty values to the
  *  environment, so we don't check for that here */
-Status Environment::get(const Key& get_key, Value* get_value) const {
-    typedef std::map<Key, Value>::const_iterator it_type;
-    it_type value = values.find(get_key);
+Status Environment::get(StringData get_key, Value* get_value) const {
+    auto value = values.find(get_key);
     if (value == values.end()) {
         value = default_values.find(get_key);
         if (value == default_values.end()) {
@@ -85,7 +81,7 @@ Status Environment::set(const Key& add_key, const Value& add_value) {
     }
 
     // 2. Save old values
-    std::map<Key, Value> old_values = values;
+    auto old_values = values;
 
     // 3. Add value to be added
     values[add_key] = add_value;
@@ -106,7 +102,7 @@ Status Environment::set(const Key& add_key, const Value& add_value) {
 /** Removes a Value from our Environment */
 Status Environment::remove(const Key& remove_key) {
     // 1. Save old values
-    std::map<Key, Value> old_values = values;
+    auto old_values = values;
 
     // 2. Remove value to be removed
     values.erase(remove_key);
@@ -147,13 +143,11 @@ Status Environment::setDefault(const Key& add_key, const Value& add_value) {
  *  values as the source Environment should not have been allowed to have any */
 Status Environment::setAll(const Environment& add_environment) {
     // 1. Save old values
-    std::map<Key, Value> old_values = values;
+    auto old_values = values;
 
     // 2. Add values to be added
-    std::map<Key, Value> add_values = add_environment.values;
-    for (std::map<Key, Value>::const_iterator iterator = add_values.begin();
-         iterator != add_values.end();
-         iterator++) {
+    auto add_values = add_environment.values;
+    for (auto iterator = add_values.begin(); iterator != add_values.end(); iterator++) {
         values[iterator->first] = iterator->second;
     }
 
@@ -206,7 +200,7 @@ Status Environment::validate(bool setValid) {
  *  boost::program_options::variables_map inherits the count function from std::map, which
  *  returns 1 if the value is set, and 0 if it is not set
  */
-bool Environment::count(const Key& key) const {
+bool Environment::count(StringData key) const {
     Value value;
     Status ret = get(key, &value);
     if (ret.isOK()) {
@@ -216,7 +210,7 @@ bool Environment::count(const Key& key) const {
     }
 }
 
-Value Environment::operator[](const Key& key) const {
+Value Environment::operator[](StringData key) const {
     Value value;
     Status ret = get(key, &value);
     if (!ret.isOK()) {
@@ -227,8 +221,7 @@ Value Environment::operator[](const Key& key) const {
 
 /* Debugging */
 void Environment::dump() const {
-    std::map<Key, Value>::const_iterator iter;
-    for (iter = values.begin(); iter != values.end(); ++iter) {
+    for (auto iter = values.begin(); iter != values.end(); ++iter) {
         std::cout << "Key: '" << iter->first << "', Value: '" << iter->second.toString() << "'"
                   << std::endl;
     }
@@ -239,10 +232,8 @@ namespace {
 // Converts a map of values with dotted key names to a BSONObj with sub objects.
 // 1. Check for dotted field names and call valueMapToBSON recursively.
 // 2. Append the actual value to our builder if we did not find a dot in our key name.
-Status valueMapToBSON(const std::map<Key, Value>& params,
-                      BSONObjBuilder* builder,
-                      const std::string& prefix = std::string()) {
-    for (std::map<Key, Value>::const_iterator it(params.begin()); it != params.end(); it++) {
+Status valueMapToBSON(const auto& params, BSONObjBuilder* builder, const std::string& prefix = {}) {
+    for (auto it = params.begin(); it != params.end(); it++) {
         Key key = it->first;
         Value value = it->second;
 
@@ -282,7 +273,7 @@ Status valueMapToBSON(const std::map<Key, Value>& params,
 
         // Check to see if this key name is dotted
         std::string::size_type dotOffset = key.find('.');
-        if (dotOffset != string::npos) {
+        if (dotOffset != std::string::npos) {
             // Get the name of the "section" that we are currently iterating.  This will be
             // the name of our sub object.
             std::string sectionName = key.substr(0, dotOffset);
@@ -293,7 +284,7 @@ Status valueMapToBSON(const std::map<Key, Value>& params,
 
             std::string beforeDot = key.substr(0, dotOffset);
             std::string afterDot = key.substr(dotOffset + 1, key.size() - dotOffset - 1);
-            std::map<Key, Value>::const_iterator it_next = it;
+            auto it_next = it;
 
             do {
                 // Here we know that the key at it_next has a dot and has the prefix we are
@@ -317,7 +308,7 @@ Status valueMapToBSON(const std::map<Key, Value>& params,
 
                 beforeDot = key.substr(0, dotOffset);
                 afterDot = key.substr(dotOffset + 1, key.size() - dotOffset - 1);
-            } while (dotOffset != string::npos && beforeDot == sectionName);
+            } while (dotOffset != std::string::npos && beforeDot == sectionName);
 
             // Use the section name in our object builder, and recursively call
             // valueMapToBSON with our sub map with keys that have the section name removed.
@@ -331,15 +322,15 @@ Status valueMapToBSON(const std::map<Key, Value>& params,
         }
 
         // 2. Append the actual value to our builder if we did not find a dot in our key name.
-        const type_info& type = value.type();
+        const std::type_info& type = value.type();
 
-        if (type == typeid(string)) {
-            if (value.as<string>().empty()) {
+        if (type == typeid(std::string)) {
+            if (value.as<std::string>().empty()) {
                 // boost po uses empty string for flags like --quiet
                 // TODO: Remove this when we remove boost::program_options
                 builder->appendBool(key, true);
             } else {
-                builder->append(key, value.as<string>());
+                builder->append(key, value.as<std::string>());
             }
         } else if (type == typeid(int))
             builder->append(key, value.as<int>());

@@ -127,8 +127,8 @@ public:
      * the search is case insensitive, non-Turkish case folding is used unless the
      * CaseFoldMode::Turkish is passed to mode.
      */
-    static bool substrMatch(const std::string& str,
-                            const std::string& find,
+    static bool substrMatch(StringData str,
+                            StringData find,
                             SubstrMatchOptions options,
                             CaseFoldMode mode = CaseFoldMode::kNormal);
 

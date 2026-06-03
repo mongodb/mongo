@@ -1247,18 +1247,14 @@ void BuilderBase<BufferT>::_appendBsonValue(const BSONElement& elem,
 template <class BufferT>
 void BuilderBase<BufferT>::_appendStringLike(StringData str, bool invert) {
     while (true) {
-        size_t firstNul = strnlen(str.data(), str.size());
-        // No NULs in string.
-        _appendBytes(str.data(), firstNul, invert);
-        if (firstNul == str.size() || firstNul == std::string::npos) {
-            _append(int8_t(0), invert);
+        StringData pre = str.substr(0, str.find('\0'));
+        _appendBytes(pre.data(), pre.size(), invert);
+        if (pre.size() == str.size())
             break;
-        }
-
-        // replace "\x00" with "\x00\xFF"
-        _appendBytes("\x00\xFF", 2, invert);
-        str = str.substr(firstNul + 1);  // skip over the NUL byte
+        _appendBytes("\x00\xFF", 2, invert);  // replace "\x00" with "\x00\xFF"
+        str.remove_prefix(pre.size() + 1);    // skip past the nul
     }
+    _append(int8_t(0), invert);  // final 0 termination.
 }
 
 template <class BufferT>

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/variables.h"
@@ -42,7 +43,7 @@ namespace mongo {
 /**
  * Returns true if 'opName' is one of $first/$firstN/$last/$lastN.
  */
-bool isPositionalAccumulator(const char* opName);
+bool isPositionalAccumulator(StringData opName);
 
 /**
  * Replaces AccumulationStatement 'stmt' with a custom accumulator for $bucketAuto.

@@ -456,17 +456,18 @@ TEST(FTSQueryImpl, CloneUnparsedQuery) {
 }
 
 TEST(FTSQueryImpl, CloneParsedQuery) {
+    using unittest::match::ElementsAre;
     FTSQueryImpl q;
     q.setQuery("Foo -bar \"baz\" -\"quux\"");
     q.setLanguage("english");
     q.setCaseSensitive(true);
     q.setDiacriticSensitive(true);
     ASSERT_OK(q.parse(TEXT_INDEX_VERSION_3));
-    ASSERT(std::set<std::string>({"Foo", "baz"}) == q.getPositiveTerms());
-    ASSERT(std::set<std::string>({"bar"}) == q.getNegatedTerms());
-    ASSERT(std::vector<std::string>({"baz"}) == q.getPositivePhr());
-    ASSERT(std::vector<std::string>({"quux"}) == q.getNegatedPhr());
-    ASSERT(std::set<std::string>({"foo", "baz"}) == q.getTermsForBounds());
+    ASSERT_THAT(q.getPositiveTerms(), ElementsAre("Foo", "baz"));
+    ASSERT_THAT(q.getNegatedTerms(), ElementsAre("bar"));
+    ASSERT_THAT(q.getPositivePhr(), ElementsAre("baz"));
+    ASSERT_THAT(q.getNegatedPhr(), ElementsAre("quux"));
+    ASSERT_THAT(q.getTermsForBounds(), ElementsAre("baz", "foo"));
 
     auto clone = q.clone();
     ASSERT_EQUALS(clone->getQuery(), q.getQuery());
