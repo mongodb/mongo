@@ -1588,8 +1588,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               }
 
               LOGV2(12309401,
-                    "Both replicated fast count idents stille exist on disk after drop attempts. "
-                    "They can be both be re-used");
+                    "Both replicated fast count idents still exist on disk after drop attempts. "
+                    "They can both be re-used");
               return Status::OK();
           }
 
