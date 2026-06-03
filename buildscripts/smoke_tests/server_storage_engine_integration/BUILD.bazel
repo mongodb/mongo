@@ -83,7 +83,7 @@ resmoke_suite_test(
         "//jstests/noPassthrough/shutdown:shutdown_while_fsync_locked.js",
         "//jstests/noPassthrough/shutdown:shutdown_with_fsync.js",
         "//jstests/noPassthrough/txns_cache_errors:temporarily_unavailable_error.js",
-        # "//jstests/noPassthrough/txns_cache_errors:transaction_aborted_under_cache_pressure.js",
+        "//jstests/noPassthrough/txns_cache_errors:transaction_aborted_under_cache_pressure.js",
         "//jstests/noPassthrough/txns_retryable_writes_sessions:skip_write_conflict_retries_failpoint.js",
         "//jstests/noPassthrough/wt_integration:block_compressor_options.js",
         "//jstests/noPassthrough/wt_integration:configure_with_type_lsm.js",
