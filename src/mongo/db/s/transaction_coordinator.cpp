@@ -611,6 +611,12 @@ void TransactionCoordinator::_done(Status status) {
         _logSlowTwoPhaseCommit(*_decision);
     }
 
+    // No concurrent writers exist here (_done runs after the 2PC chain completes and
+    // _scheduler is shut down), but snapshot under the lock to future-proof against
+    // refactors and satisfy static analyzers (Coverity/TSAN).
+    const auto stepSnapshot = _step;
+    const bool participantsDurableSnapshot = _participantsDurable;
+
     ul.unlock();
 
     if (!_decisionPromise.getFuture().isReady()) {
@@ -627,8 +633,8 @@ void TransactionCoordinator::_done(Status status) {
                           "TransactionCoordinator terminating with unexpected error",
                           "sessionId"_attr = _lsid,
                           "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter,
-                          "step"_attr = toString(_step),
-                          "participantsDurable"_attr = _participantsDurable,
+                          "step"_attr = toString(stepSnapshot),
+                          "participantsDurable"_attr = participantsDurableSnapshot,
                           "error"_attr = redact(status));
 
             // If _participantsDurable is true, the TransactionCoordinator may have already sent a
@@ -637,7 +643,7 @@ void TransactionCoordinator::_done(Status status) {
             // transaction stuck until the coordinator shuts down or steps down. In such cases, we
             // issue a fatal assertion to ensure the problem is loudly reported and allow another
             // coordinator to continue the commit path.
-            if (_participantsDurable) {
+            if (participantsDurableSnapshot) {
                 LOGV2_FATAL(11353000,
                             "TransactionCoordinator encountered an unexpected termination error.",
                             "sessionId"_attr = _lsid,
