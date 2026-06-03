@@ -90,6 +90,13 @@ public:
      */
     void shutdown(const Status& reason);
 
+    /**
+     * Notifies the checkpointer that oplog bytes have been written. The policy accumulates the
+     * bytes and wakes the checkpoint thread early when the volume threshold is first crossed in
+     * a cycle.
+     */
+    void notifyOplogWrite(int64_t bytes);
+
 private:
     // Protects the state below.
     std::mutex _mutex;

@@ -36,7 +36,7 @@ namespace mongo::rss {
 
 class AttachedServiceLifecycle : public ServiceLifecycle {
 public:
-    AttachedServiceLifecycle();
+    AttachedServiceLifecycle() = default;
 
     /**
      * Initializes flow control based on oplog write rate.
@@ -64,8 +64,6 @@ public:
      */
     void shutdownStateRequiredForStorageAccess(ServiceContext*, BSONObjBuilder*) override;
 
-    bool initializedUsingDefaultSyncDelay() const override;
-
     /**
      * There is no additional state required for offline validation.
      */
@@ -75,9 +73,6 @@ public:
      * There are no specific persistence threads that must outlive the storage engine.
      */
     bool shouldKeepThreadAliveUntilStorageEngineHasShutDown(StringData) const override;
-
-private:
-    const bool _initializedUsingDefaultSyncDelay;
 };
 
 }  // namespace mongo::rss

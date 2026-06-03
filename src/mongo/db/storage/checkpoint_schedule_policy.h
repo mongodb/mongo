@@ -55,6 +55,27 @@ public:
     virtual void waitUntilReady(std::unique_lock<std::mutex>& lock,
                                 stdx::condition_variable& cv,
                                 std::function<bool()> shouldWake) = 0;
+
+    /**
+     * Called by the Checkpointer immediately after each successful checkpoint. Allows the policy
+     * to reset per-cycle state (e.g., byte counters).
+     *
+     * Threading: called exclusively by the checkpoint thread, with no Checkpointer locks held.
+     * Any shared state reset here must be visible to concurrent accumulateOplogBytes() callers
+     * (e.g., via atomics or acquire/release ordering).
+     */
+    virtual void onCheckpointComplete() = 0;
+
+    /**
+     * Called by Checkpointer::notifyOplogWrite() on every oplog write. Returns true the first time
+     * accumulated bytes cross the volume threshold in a given checkpoint cycle, signalling that the
+     * Checkpointer should wake the checkpoint thread via notify_one(). Returns false on all
+     * subsequent calls in the same cycle.
+     *
+     * Threading: may be called concurrently from multiple oplog writer threads. Implementations
+     * must be lock-free or otherwise thread-safe. No Checkpointer locks are held at call time.
+     */
+    virtual bool accumulateOplogBytes(int64_t bytes) = 0;
 };
 
 /**
