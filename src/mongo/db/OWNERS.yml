@@ -77,9 +77,6 @@ filters:
   - "keys_collection*":
     approvers:
       - 10gen/server-cluster-scalability
-  - "max_time.*":
-    approvers:
-      - 10gen/server-networking-and-observability
   - "mongod.cpp":
     approvers:
       - 10gen/server-programmability

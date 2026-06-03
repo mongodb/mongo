@@ -686,7 +686,6 @@ networking.core:
     fully_marked: true
   files:
     - src/mongo/db/dbmessage*
-    - src/mongo/db/max_time.h
     - src/mongo/db/op_msg*
     - src/mongo/db/operation_id*
     - src/mongo/db/operation_key_manager*
