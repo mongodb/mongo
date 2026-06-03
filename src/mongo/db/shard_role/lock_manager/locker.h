@@ -37,7 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/cond_var_lock_grant_notification.h"
-#include "mongo/db/shard_role/lock_manager/fast_map_noalloc.h"
+#include "mongo/db/shard_role/lock_manager/fast_list_based_map.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/lock_manager/lock_stats.h"
 #include "mongo/platform/atomic_word.h"
@@ -104,6 +104,19 @@ public:
 
     std::string getDebugInfo() const;
     void setDebugInfo(std::string info);
+
+    /*
+     * Maximum amount of lock requests expected to be held simultaneously inside the Locker in
+     * non-multi-document operations (which is 5, being Global lock, multi-doc transaction barrier,
+     * RSTL, Database lock and Collection lock) with a small buffer. We need this constant to avoid
+     * allocations on the heap and keep them inside the inline underlying storage of the
+     * RecylcingListBasedMap. For LockRequests for multi-document operations, the amount would be
+     * exceeding this one, however, in that case the RecyclingListBasedMap would use overflow
+     * storage, that can expand upon filling.
+     */
+    static constexpr size_t kInlineLockRequestsStorageSize = 8;
+    using LockRequestsMap =
+        RecyclingListBasedMap<ResourceId, LockRequest, kInlineLockRequestsStorageSize>;
 
     /**
      * Returns the cumulative lock stats accrued so far. The returned stats are not a snapshot but a
@@ -344,7 +357,7 @@ public:
      * obtaining the necessary information and then discarded instead of reused.
      */
     struct LockerInfo {
-        // List of high-level locks held by this locker, sorted by ResourceId
+        // List of high-level locks held by this locker, sorted by acquisition order
         std::vector<OneLock> locks;
 
         // If isValid(), then what lock this particular locker is sleeping on
@@ -376,8 +389,7 @@ public:
         // The global lock is handled differently from all other locks.
         LockMode globalMode;
 
-        // The non-global locks held, sorted by granularity.  That is, locks[i] is
-        // coarser or as coarse as locks[i + 1].
+        // The non-global locks held, in their initial acquisition order
         std::vector<OneLock> locks;
     };
 
@@ -612,7 +624,7 @@ public:
         return _numResourcesToUnlockAtEndUnitOfWork;
     }
 
-    FastMapNoAlloc<ResourceId, LockRequest> getRequestsForTest() const {
+    LockRequestsMap getRequestsForTest() const {
         scoped_spinlock scopedLock(_lock);
         return _requests;
     }
@@ -629,8 +641,6 @@ public:
     }
 
 protected:
-    using LockRequestsMap = FastMapNoAlloc<ResourceId, LockRequest>;
-
     friend class UninterruptibleLockGuard;
     friend class InterruptibleLockGuard;
     friend class AllowLockAcquisitionOnTimestampedUnitOfWork;
@@ -696,6 +706,15 @@ protected:
      * inside a WUOW.
      */
     bool _unlockImpl(LockRequestsMap::Iterator* it);
+
+    /**
+     * Releases a lock previously acquired through a lock call. It is an error to try to
+     * release lock which has not been previously acquired (invariant violation).
+     *
+     * @return true if the lock was actually released; false if only the reference count was
+     *              decremented, but the lock is still held.
+     */
+    bool _unlockAndAdvance(LockRequestsMap::Iterator* it);
 
     /**
      * Releases the ticket for the Locker.

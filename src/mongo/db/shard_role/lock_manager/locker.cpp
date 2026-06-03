@@ -46,6 +46,8 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/testing_proctor.h"
 
+#include <iterator>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
@@ -325,8 +327,9 @@ void Locker::reacquireTicket(OperationContext* opCtx) {
     }
 
     do {
-        for (auto it = _requests.begin(); it; it.next()) {
-            invariant(it->mode == LockMode::MODE_IS || it->mode == LockMode::MODE_IX);
+        for (auto it = _requests.begin(); it != _requests.end(); ++it) {
+            invariant((it->value()).mode == LockMode::MODE_IS ||
+                      (it->value()).mode == LockMode::MODE_IX);
             // TODO SERVER-80206: Remove opCtx->checkForInterrupt().
             if (!opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
                 opCtx->checkForInterrupt();
@@ -342,8 +345,8 @@ void Locker::reacquireTicket(OperationContext* opCtx) {
                     fmt::format("Unable to acquire ticket with mode '{}' due to detected lock "
                                 "conflict for resource {}",
                                 fmt::underlying(_modeForTicket),
-                                it.key().toStringForErrorMessage()),
-                    !_lockManager->hasConflictingRequests(it.key(), it.objAddr()));
+                                (it->key()).toStringForErrorMessage()),
+                    !_lockManager->hasConflictingRequests(it->key(), &(it->value())));
         }
     } while (!_acquireTicket(opCtx, _modeForTicket, Date_t::now() + Milliseconds{100}));
 }
@@ -395,14 +398,14 @@ bool Locker::unlockGlobal() {
     invariant(!inAWriteUnitOfWork());
 
     LockRequestsMap::Iterator it = _requests.begin();
-    while (!it.finished()) {
+    while (it != _requests.end()) {
         // If we're here we should only have one reference to any lock. It is a programming
         // error for any lock used with multi-granularity locking to have more references than
         // the global lock, because every scope starts by calling lockGlobal.
-        const auto resType = it.key().getType();
+        const auto resType = (it->key()).getType();
         if (resType == RESOURCE_GLOBAL || resType == RESOURCE_MUTEX ||
             resType == RESOURCE_DDL_DATABASE || resType == RESOURCE_DDL_COLLECTION) {
-            it.next();
+            ++it;
         } else {
             invariant(_unlockImpl(&it));
         }
@@ -433,19 +436,19 @@ bool Locker::unlockRSTLforPrepare() {
     auto rstlRequest = _requests.find(resourceIdReplicationStateTransitionLock);
 
     // Don't attempt to unlock twice. This can happen when an interrupted global lock is destructed.
-    if (!rstlRequest)
+    if (rstlRequest == _requests.end())
         return false;
 
     // If the RSTL is 'unlockPending' and we are fully unlocking it, then we do not want to
     // attempt to unlock the RSTL when the WUOW ends, since it will already be unlocked.
-    if (rstlRequest->unlockPending) {
-        rstlRequest->unlockPending = 0;
+    if ((rstlRequest->value()).unlockPending) {
+        (rstlRequest->value()).unlockPending = 0;
         _numResourcesToUnlockAtEndUnitOfWork--;
     }
 
     // Reset the recursiveCount to 1 so that we fully unlock the RSTL. Since it will be fully
     // unlocked, any future unlocks will be noops anyways.
-    rstlRequest->recursiveCount = 1;
+    (rstlRequest->value()).recursiveCount = 1;
 
     return _unlockImpl(&rstlRequest);
 }
@@ -478,32 +481,8 @@ void Locker::lockComplete(OperationContext* opCtx,
 }
 
 bool Locker::unlock(ResourceId resId) {
-    LockRequestsMap::Iterator it = _requests.find(resId);
-
-    // Don't attempt to unlock twice. This can happen when an interrupted global lock is destructed.
-    if (it.finished())
-        return false;
-
-    if (inAWriteUnitOfWork() && _shouldDelayUnlock(it.key(), (it->mode))) {
-        // Only delay unlocking if the lock is not acquired more than once. Otherwise, we can simply
-        // call _unlockImpl to decrement recursiveCount instead of incrementing unlockPending. This
-        // is safe because the lock is still being held in the strongest mode necessary.
-        if (it->recursiveCount > 1) {
-            // Invariant that the lock is still being held.
-            invariant(!_unlockImpl(&it));
-            return false;
-        }
-        if (!it->unlockPending) {
-            _numResourcesToUnlockAtEndUnitOfWork++;
-        }
-        it->unlockPending++;
-        // unlockPending will be incremented if a lock is acquired in the same mode recursively, and
-        // unlock() is called multiple times on one ResourceId.
-        invariant(it->unlockPending <= it->recursiveCount);
-        return false;
-    }
-
-    return _unlockImpl(&it);
+    auto it = _requests.find(resId);
+    return _unlockAndAdvance(&it);
 }
 
 void Locker::beginWriteUnitOfWork() {
@@ -519,19 +498,28 @@ void Locker::endWriteUnitOfWork() {
     }
 
     LockRequestsMap::Iterator it = _requests.begin();
-    while (_numResourcesToUnlockAtEndUnitOfWork > 0) {
-        if (it->unlockPending) {
-            invariant(!it.finished());
+    while (_numResourcesToUnlockAtEndUnitOfWork > 0 && it != _requests.end()) {
+        if (!it->value().unlockPending) {
+            ++it;
+            continue;
+        }
+        if (it->value().unlockPending) {
+            invariant(it != _requests.end());
             _numResourcesToUnlockAtEndUnitOfWork--;
         }
-        while (it->unlockPending > 0) {
+        auto resId = it->key();
+        auto nextIt = std::next(it);
+        while (it->value().unlockPending > 0) {
             // If a lock is acquired recursively, unlock() may be called multiple times on a
             // resource within the same WriteUnitOfWork. All such unlock() requests must thus be
             // fulfilled here.
-            it->unlockPending--;
-            unlock(it.key());
+            (it->value()).unlockPending--;
+            // if the resource was successfully unlocked and the iterator dropped, break early
+            if (unlock(resId)) {
+                break;
+            }
         }
-        it.next();
+        it = nextIt;
     }
 }
 
@@ -553,18 +541,14 @@ void Locker::getLockerInfo(
     lockerInfo->waitingResource = ResourceId();
 
     _lock.lock();
-    LockRequestsMap::ConstIterator it = _requests.begin();
-    while (!it.finished()) {
+    for (auto it = _requests.cbegin(); it != _requests.cend(); ++it) {
         OneLock info;
-        info.resourceId = it.key();
-        info.mode = it->mode;
+        info.resourceId = it->key();
+        info.mode = it->value().mode;
 
         lockerInfo->locks.push_back(info);
-        it.next();
     }
     _lock.unlock();
-
-    std::sort(lockerInfo->locks.begin(), lockerInfo->locks.end());
 
     lockerInfo->waitingResource = getWaitingResource();
     lockerInfo->stats.set(_stats);
@@ -594,19 +578,19 @@ bool Locker::canSaveLockState() {
     // If we don't have a global lock, we do not yield.
     if (_modeForTicket == MODE_NONE) {
         auto globalRequest = _requests.find(resourceIdGlobal);
-        invariant(!globalRequest);
+        invariant(globalRequest == _requests.end());
 
         // If there's no global lock there isn't really anything to do. Check that.
-        for (auto it = _requests.begin(); !it.finished(); it.next()) {
-            const ResourceType resType = it.key().getType();
+        for (auto it = _requests.begin(); it != _requests.end(); ++it) {
+            const ResourceType resType = it->key().getType();
             invariant(resType == RESOURCE_MUTEX || resType == RESOURCE_DDL_DATABASE ||
                       resType == RESOURCE_DDL_COLLECTION);
         }
         return false;
     }
 
-    for (auto it = _requests.begin(); !it.finished(); it.next()) {
-        const ResourceId resId = it.key();
+    for (auto it = _requests.begin(); it != _requests.end(); ++it) {
+        const ResourceId resId = it->key();
         const ResourceType resType = resId.getType();
         if (resType == RESOURCE_MUTEX || resType == RESOURCE_DDL_DATABASE ||
             resType == RESOURCE_DDL_COLLECTION)
@@ -616,12 +600,12 @@ bool Locker::canSaveLockState() {
         // DBDirectClient call.  It's not safe to release and reacquire locks -- the context using
         // the DBDirectClient is probably not prepared for lock release. This logic applies to all
         // locks in the hierarchy.
-        if (it->recursiveCount > 1) {
+        if (it->value().recursiveCount > 1) {
             return false;
         }
 
         // We cannot yield any other lock in a strong lock mode.
-        if (it->mode == MODE_S || it->mode == MODE_X) {
+        if (it->value().mode == MODE_S || it->value().mode == MODE_X) {
             return false;
         }
     }
@@ -648,18 +632,22 @@ void Locker::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
     // First, we look at the global lock.  There is special handling for this so we store it
     // separately from the more pedestrian locks.
     auto globalRequest = _requests.find(resourceIdGlobal);
-    invariant(globalRequest);
+    invariant(globalRequest != _requests.end());
 
-    stateOut->globalMode = globalRequest->mode;
+    stateOut->globalMode = globalRequest->value().mode;
     invariant(unlock(resourceIdGlobal));
+    invariant(_requests.find(resourceIdGlobal) == _requests.end());
 
-    // Next, the non-global locks.
-    for (LockRequestsMap::Iterator it = _requests.begin(); !it.finished(); it.next()) {
-        const ResourceId resId = it.key();
+    // Next, the non-global locks, unlocking in the order they were taken.
+    for (auto it = _requests.begin(); it != _requests.end();
+         /* advancement of it happens inside _unlockAndAdvance */) {
+        const ResourceId resId = it->key();
         const ResourceType resType = resId.getType();
         if (resType == RESOURCE_MUTEX || resType == RESOURCE_DDL_DATABASE ||
-            resType == RESOURCE_DDL_COLLECTION)
+            resType == RESOURCE_DDL_COLLECTION) {
+            ++it;
             continue;
+        }
 
         // We should never have to save and restore metadata locks.
         invariant(RESOURCE_DATABASE == resType || RESOURCE_COLLECTION == resType ||
@@ -670,14 +658,11 @@ void Locker::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
         // And, stuff the info into the out parameter.
         OneLock info;
         info.resourceId = resId;
-        info.mode = it->mode;
+        info.mode = it->value().mode;
         stateOut->locks.push_back(info);
-        invariant(unlock(resId));
+        invariant(_unlockAndAdvance(&it));
     }
     invariant(!isLocked());
-
-    // Sort locks by ResourceId. They'll later be acquired in this canonical locking order.
-    std::sort(stateOut->locks.begin(), stateOut->locks.end());
 }
 
 void Locker::restoreLockState(OperationContext* opCtx, const Locker::LockSnapshot& state) {
@@ -686,28 +671,44 @@ void Locker::restoreLockState(OperationContext* opCtx, const Locker::LockSnapsho
     invariant(_modeForTicket == MODE_NONE);
     invariant(_clientState.load() == kInactive);
 
+
     getFlowControlTicket(opCtx, state.globalMode);
 
-    std::vector<OneLock>::const_iterator it = state.locks.begin();
+    // Since the locks are not ordered according to hierarchy semantics, we have to pre-scan
+    // the locks to check if MultiDocumentTransactionBarrier lock and RSTL locks
+    // were present, to lock them first
+    bool hasMultiDocumentBarrier = false, hasRSTL = false;
+    LockMode multiDocumentMode = MODE_NONE, RSTLMode = MODE_NONE;
+    for (const auto& it : state.locks) {
 
-    // If we locked the MultiDocumentTransactionsBarrier lock, it must be locked before the
-    // resourceIdReplicationStateTransitionLock and resourceIdGlobal resources.
-    if (it != state.locks.end() && it->resourceId == resourceIdMultiDocumentTransactionsBarrier) {
-        lock(opCtx, it->resourceId, it->mode);
-        it++;
+        if (it.resourceId == resourceIdMultiDocumentTransactionsBarrier) {
+            hasMultiDocumentBarrier = true;
+            multiDocumentMode = it.mode;
+        } else if (it.resourceId == resourceIdReplicationStateTransitionLock) {
+            hasRSTL = true;
+            RSTLMode = it.mode;
+        }
     }
 
-    // If we locked the RSTL, it must be locked before the resourceIdGlobal resource.
-    if (it != state.locks.end() && it->resourceId == resourceIdReplicationStateTransitionLock) {
-        lock(opCtx, it->resourceId, it->mode);
-        it++;
+    if (hasMultiDocumentBarrier) {
+        lock(opCtx, resourceIdMultiDocumentTransactionsBarrier, multiDocumentMode);
+    }
+    if (hasRSTL) {
+        lock(opCtx, resourceIdReplicationStateTransitionLock, RSTLMode);
     }
 
+    // Acquiring global lock
     lockGlobal(opCtx, state.globalMode);
-    for (; it != state.locks.end(); it++) {
+
+    // Snapshot contains locks in acquisition order
+    for (const auto& it : state.locks) {
         // Ensures we don't acquire locks out of order which can lead to deadlock.
-        invariant(it->resourceId.getType() != ResourceType::RESOURCE_GLOBAL);
-        lock(opCtx, it->resourceId, it->mode);
+        if (it.resourceId == resourceIdMultiDocumentTransactionsBarrier ||
+            it.resourceId == resourceIdReplicationStateTransitionLock) {
+            continue;
+        }
+        invariant(it.resourceId.getType() != ResourceType::RESOURCE_GLOBAL);
+        lock(opCtx, it.resourceId, it.mode);
     }
     invariant(_modeForTicket != MODE_NONE);
 }
@@ -721,9 +722,9 @@ void Locker::releaseWriteUnitOfWorkAndUnlock(LockSnapshot* stateOut) {
 
     // All locks should be pending to unlock.
     invariant(_requests.size() == _numResourcesToUnlockAtEndUnitOfWork);
-    for (auto it = _requests.begin(); it; it.next()) {
-        invariant(it->unlockPending == 1);
-        it->unlockPending--;
+    for (auto it = _requests.begin(); it != _requests.end(); ++it) {
+        invariant((it->value()).unlockPending == 1);
+        (it->value()).unlockPending--;
     }
     _numResourcesToUnlockAtEndUnitOfWork = 0;
 
@@ -737,10 +738,10 @@ void Locker::restoreWriteUnitOfWorkAndLock(OperationContext* opCtx,
     }
 
     invariant(_numResourcesToUnlockAtEndUnitOfWork == 0);
-    for (auto it = _requests.begin(); it; it.next()) {
-        invariant(_shouldDelayUnlock(it.key(), (it->mode)));
-        invariant(it->unlockPending == 0);
-        it->unlockPending++;
+    for (auto it = _requests.begin(); it != _requests.end(); ++it) {
+        invariant(_shouldDelayUnlock(it->key(), ((it->value()).mode)));
+        invariant((it->value()).unlockPending == 0);
+        (it->value()).unlockPending++;
     }
     _numResourcesToUnlockAtEndUnitOfWork = static_cast<unsigned>(_requests.size());
 
@@ -751,11 +752,11 @@ void Locker::releaseWriteUnitOfWork(WUOWLockSnapshot* stateOut) {
     stateOut->wuowNestingLevel = _wuowNestingLevel;
     _wuowNestingLevel = 0;
 
-    for (auto it = _requests.begin(); _numResourcesToUnlockAtEndUnitOfWork > 0; it.next()) {
-        if (it->unlockPending) {
-            while (it->unlockPending) {
-                it->unlockPending--;
-                stateOut->unlockPendingLocks.push_back({it.key(), it->mode});
+    for (auto it = _requests.begin(); _numResourcesToUnlockAtEndUnitOfWork > 0; ++it) {
+        if ((it->value()).unlockPending) {
+            while ((it->value()).unlockPending) {
+                (it->value()).unlockPending--;
+                stateOut->unlockPendingLocks.push_back({it->key(), (it->value()).mode});
             }
             _numResourcesToUnlockAtEndUnitOfWork--;
         }
@@ -768,14 +769,15 @@ void Locker::restoreWriteUnitOfWork(const WUOWLockSnapshot& stateToRestore) {
 
     for (auto& lock : stateToRestore.unlockPendingLocks) {
         auto it = _requests.begin();
-        while (it && !(it.key() == lock.resourceId && it->mode == lock.mode)) {
-            it.next();
+        while (it != _requests.end() &&
+               !(it->key() == lock.resourceId && (it->value()).mode == lock.mode)) {
+            ++it;
         }
-        invariant(!it.finished());
-        if (!it->unlockPending) {
+        invariant(it != _requests.end());
+        if (!((it->value()).unlockPending)) {
             _numResourcesToUnlockAtEndUnitOfWork++;
         }
-        it->unlockPending++;
+        (it->value()).unlockPending++;
     }
     // Equivalent to call beginWriteUnitOfWork() multiple times.
     _wuowNestingLevel = stateToRestore.wuowNestingLevel;
@@ -783,8 +785,9 @@ void Locker::restoreWriteUnitOfWork(const WUOWLockSnapshot& stateToRestore) {
 
 LockMode Locker::getLockMode(ResourceId resId) const {
     scoped_spinlock scopedLock(_lock);
-    if (auto it = _requests.find(resId))
-        return it->mode;
+    LockRequestsMap::ConstIterator it = _requests.find(resId);
+    if (it != _requests.cend())
+        return (it->value()).mode;
 
     return MODE_NONE;
 }
@@ -827,8 +830,8 @@ bool Locker::isCollectionLockedForMode(const NamespaceString& nss, LockMode mode
 }
 
 bool Locker::isGlobalLockedRecursively() const {
-    auto globalLockRequest = _requests.find(resourceIdGlobal);
-    return !globalLockRequest.finished() && globalLockRequest->recursiveCount > 1;
+    LockRequestsMap::ConstIterator globalLockRequest = _requests.find(resourceIdGlobal);
+    return globalLockRequest != _requests.cend() && (globalLockRequest->value()).recursiveCount > 1;
 }
 
 void Locker::setGlobalLockTakenInMode(LockMode mode) {
@@ -873,9 +876,12 @@ void Locker::dump() const {
 
     {
         scoped_spinlock lg(_lock);
-        for (auto it = _requests.begin(); !it.finished(); it.next())
-            entries.push_back(
-                {it.key(), it->status, it->mode, it->recursiveCount, it->unlockPending});
+        for (auto it = _requests.cbegin(); it != _requests.cend(); ++it)
+            entries.push_back({it->key(),
+                               it->value().status,
+                               it->value().mode,
+                               it->value().recursiveCount,
+                               it->value().unlockPending});
     }
     LOGV2(20523, "Locker status", "id"_attr = _id, "requests"_attr = entries);
 }
@@ -899,12 +905,12 @@ LockResult Locker::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMod
     LockRequest* request;
 
     LockRequestsMap::Iterator it = _requests.find(resId);
-    if (!it) {
+    if (it == _requests.end()) {
         scoped_spinlock lg(_lock);
-        LockRequestsMap::Iterator itNew = _requests.insert(resId);
-        itNew->initNew(this, &_notify);
+        LockRequestsMap::Iterator itNew = _requests.emplace(resId);
+        itNew->value().initNew(this, &_notify);
 
-        request = itNew.objAddr();
+        request = &(itNew->value());
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
         // We only do these checks for operations that don't release all locks in case of
@@ -925,13 +931,13 @@ LockResult Locker::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMod
             // Nothing to check here since we don't want to participate in lock ordering or the
             // operation cannot incur a deadlock as it has a timeout.
         } else {
-            for (auto it = _requests.begin(); it; it.next()) {
-                const auto& lockRequest = *it;
+            for (auto it = _requests.begin(); it != _requests.end(); ++it) {
+                const auto& lockRequest = it->value();
                 if (lockRequest.mode == MODE_NONE ||
                     lockRequest.status != LockRequest::STATUS_GRANTED) {
                     continue;
                 }
-                const auto& from = it.key();
+                const auto& from = it->key();
                 // If there is a lock ordering path it means there's a potential deadlock in the
                 // codebase. This is because if we have locked A before locking B, there should have
                 // been no other operation that locked B before A.
@@ -950,7 +956,7 @@ LockResult Locker::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMod
         }
 #endif
     } else {
-        request = it.objAddr();
+        request = &(it->value());
         invariant(isModeCovered(mode, request->mode), "Lock upgrade is disallowed");
 
         // If unlockPending is nonzero, that means a LockRequest already exists for this resource
@@ -989,8 +995,9 @@ LockResult Locker::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMod
         // before any other lock has been acquired and they must be in sync with the nesting.
         if (kDebugBuild) {
             const LockRequestsMap::Iterator itGlobal = _requests.find(resourceIdGlobal);
-            invariant(itGlobal->recursiveCount > 0);
-            invariant(itGlobal->mode != MODE_NONE);
+            invariant(itGlobal != _requests.end());
+            invariant((itGlobal->value()).recursiveCount > 0);
+            invariant((itGlobal->value()).mode != MODE_NONE);
         };
     }
 
@@ -1010,7 +1017,7 @@ LockResult Locker::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMod
         auto interruptStatus = opCtx->checkForInterruptNoAssert();
         if (!interruptStatus.isOK()) {
             auto unlockIt = _requests.find(resId);
-            invariant(unlockIt);
+            invariant(unlockIt != _requests.end());
             _unlockImpl(&unlockIt);
             uassertStatusOK(interruptStatus);
         }
@@ -1040,7 +1047,7 @@ void Locker::_lockComplete(OperationContext* opCtx,
     // Clean up the state on any failed lock attempts.
     ScopeGuard unlockOnErrorGuard([&] {
         LockRequestsMap::Iterator it = _requests.find(resId);
-        invariant(it);
+        invariant(it != _requests.end());
         _unlockImpl(&it);
         _setWaitingResource(ResourceId());
     });
@@ -1168,9 +1175,38 @@ bool Locker::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadl
     return true;
 }
 
+bool Locker::_unlockAndAdvance(LockRequestsMap::Iterator* it) {
+    auto& iter = *it;
+    // Don't attempt to unlock twice. This can happen when an interrupted global lock is destructed.
+    if (iter == _requests.end())
+        return false;
+
+    if (inAWriteUnitOfWork() && _shouldDelayUnlock(iter->key(), (iter->value().mode))) {
+        // Only delay unlocking if the lock is not acquired more than once. Otherwise, we can simply
+        // call _unlockImpl to decrement recursiveCount instead of incrementing unlockPending. This
+        // is safe because the lock is still being held in the strongest mode necessary.
+        if ((iter->value()).recursiveCount > 1) {
+            // Invariant that the lock is still being held.
+            invariant(!_unlockImpl(it));
+            return false;
+        }
+        if (!(iter->value()).unlockPending) {
+            _numResourcesToUnlockAtEndUnitOfWork++;
+        }
+        (iter->value()).unlockPending++;
+        // unlockPending will be incremented if a lock is acquired in the same mode recursively, and
+        // unlock() is called multiple times on one ResourceId.
+        invariant((iter->value()).unlockPending <= (iter->value()).recursiveCount);
+        return false;
+    }
+
+    return _unlockImpl(it);
+}
+
 bool Locker::_unlockImpl(LockRequestsMap::Iterator* it) {
-    if (_lockManager->unlock(it->objAddr())) {
-        if (it->key() == resourceIdGlobal) {
+    auto& iter = *it;
+    if (_lockManager->unlock(&(iter->value()))) {
+        if (iter->key() == resourceIdGlobal) {
             invariant(_modeForTicket != MODE_NONE);
 
             // We may have already released our ticket through a call to releaseTicket().
@@ -1182,7 +1218,7 @@ bool Locker::_unlockImpl(LockRequestsMap::Iterator* it) {
         }
 
         scoped_spinlock lg(_lock);
-        it->remove();
+        iter = _requests.erase(iter);
 
         return true;
     }

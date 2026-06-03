@@ -49,7 +49,20 @@ namespace mongo {
  *
  * Note: this custom data structure is necessary because we need: fast memory access; to maintain
  * all data pointer/reference validity when entries are added/removed; and to avoid costly and
- * repetitive entry mallocs and frees.
+ * repetitive entry mallocs and frees (although the mallocs do occur within the deque, powering the
+ * data structure).
+ *
+ * Asymptotics:
+ *   Time:
+ * - Insertion: avg O(N)
+ *   Since in case there is any element deleted from the data structure, we would first
+ *   iterate over all entries, in order to proceed with drop-in replacement
+ * - Lookup by key: avg O(N)
+ *   We are iterating over entire deque in search of the same key, no order is guaranteed
+ * - Remove (supported only by iterator): O(1)
+ *
+ *   Memory:
+ *   O(N), but due to drop-in replacement of elements, guaranteed to equal amount of active elements
  */
 template <class KeyType, class ValueType>
 class MONGO_MOD_PRIVATE FastMapNoAlloc {

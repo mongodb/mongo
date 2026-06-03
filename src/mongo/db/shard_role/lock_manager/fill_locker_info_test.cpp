@@ -92,21 +92,6 @@ TEST(FillLockerInfo, DoesReportLockStats) {
     ASSERT_EQ(infoObj["lockStats"].type(), BSONType::object);
 }
 
-DEATH_TEST(FillLockerInfoDeathTest,
-           ShouldFailIfLocksAreNotSortedAppropriately,
-           "Invariant failure") {
-    LockerInfo info;
-    // The global lock is supposed to come before the database lock.
-    info.locks = {
-        OneLock{ResourceId(RESOURCE_DATABASE,
-                           DatabaseName::createDatabaseName_forTest(boost::none, "TestDB")),
-                MODE_X},
-        OneLock{resourceIdGlobal, MODE_IX}};
-
-    BSONObjBuilder infoBuilder;
-    fillLockerInfo(info, infoBuilder);
-}
-
 TEST(FillLockerInfo, DoesReportLocksHeld) {
     const ResourceId dbId(RESOURCE_DATABASE,
                           DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"_sd));
