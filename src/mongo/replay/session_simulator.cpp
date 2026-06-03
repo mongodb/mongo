@@ -140,12 +140,6 @@ void SessionSimulator::run(mongo::stop_token stopToken) {
             continue;
         }
 
-        // TODO SERVER-105627: Until session start events are recorded, treat the first observed
-        // command as starting the session.
-        if (!_running) {
-            start();
-        }
-
         if (command.isSessionEnd()) {
             stop();
             stopEventSeen = true;

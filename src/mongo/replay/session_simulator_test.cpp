@@ -193,6 +193,7 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWait) {
 
     TestPackets packets;
 
+    packets += {0s, TestReaderPacket::sessionStart()};
     // Simulate a find command occurring 1 second into the recording.
     packets += {1s, TestReaderPacket::find(BSON("name" << "Alice"))};
 
@@ -201,9 +202,8 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWait) {
         TestSessionSimulator sessionSimulator{
             packets, replayStartTime, server.getConnectionString()};
 
-        // TODO SERVER-105627: First command will start session, and will call now() to
-        // delay until the correct time. SessionStart events will explicitly do this.
-        sessionSimulator.nowHook->ret(replayStartTime + 1s);
+        // SessionStart event will call now() to delay until the correct time.
+        sessionSimulator.nowHook->ret(replayStartTime);
 
         // Initially report "now" as the exact time the find request needs to be issued.
         sessionSimulator.nowHook->ret(replayStartTime + 1s);
@@ -220,6 +220,7 @@ TEST(SessionSimulatorTest, TestSimpleCommandWait) {
 
     TestPackets packets;
 
+    packets += {0s, TestReaderPacket::sessionStart()};
     // Simulate a find command occurring 2 second into the recording.
     packets += {2s, TestReaderPacket::find(BSON("name" << "Alice"))};
 
@@ -230,6 +231,9 @@ TEST(SessionSimulatorTest, TestSimpleCommandWait) {
     {
         TestSessionSimulator sessionSimulator{
             packets, replayStartTime, server.getConnectionString()};
+
+        // SessionStart event at offset 0 — "now" is also at start, so no sleep needed.
+        sessionSimulator.nowHook->ret(replayStartTime);
 
         // First find
 
@@ -255,17 +259,16 @@ TEST(SessionSimulatorTest, TestSimpleCommandNoWaitTimeInThePast) {
 
     TestPackets packets;
 
+    packets += {0s, TestReaderPacket::sessionStart()};
     // Simulate a find command occurring 1 second into the recording.
     packets += {1s, TestReaderPacket::find(BSON("name" << "Alice"))};
-
 
     // test simulator scoped in order to complete all the tasks.
     {
         TestSessionSimulator sessionSimulator{
             packets, replayStartTime, server.getConnectionString()};
 
-        // TODO SERVER-105627: First command will start session, and will call now() to
-        // delay until the correct time. SessionStart events will explicitly do this.
+        // SessionStart event at offset 0 — "now" is already past, so no sleep needed.
         sessionSimulator.nowHook->ret(replayStartTime + 10s);
 
         // Initially report "now" as _later than_ the command should have run.
