@@ -177,6 +177,11 @@ LAST_LTS_MONGO_BINARY = version_constants.build_last_lts_binary("mongo")
 LAST_LTS_MONGOD_BINARY = version_constants.build_last_lts_binary("mongod")
 LAST_LTS_MONGOS_BINARY = version_constants.build_last_lts_binary("mongos")
 
+# Last patch release info (e.g. version '8.3.1', FCV '8.3') is derived from
+# git tag history. Resolution is on-demand and memoized: callers reach it via
+# multiversion_service.get_last_patch_version() / .get_last_patch_fcv() to
+# keep import-time free of git work.
+
 REQUIRES_FCV_TAG_LATEST = version_constants.get_latest_tag()
 
 # Generate tags for all FCVS in (lastLTS, latest].

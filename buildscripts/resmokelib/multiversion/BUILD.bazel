@@ -2,10 +2,25 @@ load("@poetry//:dependencies.bzl", "dependency")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 py_library(
+    name = "previous_release_tag_cli",
+    srcs = ["previous_release_tag_cli.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":multiversion",
+        "//buildscripts/util",
+        dependency(
+            "gitpython",
+            group = "evergreen",
+        ),
+    ],
+)
+
+py_library(
     name = "multiversion",
     srcs = [
         "__init__.py",
         "multiversion_service.py",
+        "previous_release_tag.py",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -23,6 +38,10 @@ py_library(
         ),
         dependency(
             "pydantic",
+            group = "evergreen",
+        ),
+        dependency(
+            "gitpython",
             group = "evergreen",
         ),
     ],

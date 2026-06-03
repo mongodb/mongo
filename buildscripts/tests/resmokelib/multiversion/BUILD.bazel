@@ -11,3 +11,15 @@ py_test(
         "//buildscripts/resmokelib",
     ],
 )
+
+py_test(
+    name = "test_previous_release_tag",
+    srcs = [
+        "__init__.py",
+        "test_previous_release_tag.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)
