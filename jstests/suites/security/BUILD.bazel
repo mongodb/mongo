@@ -204,3 +204,133 @@ resmoke_suite_test(
         "//src/mongo/shell:mongo",
     ],
 )
+
+resmoke_suite_test(
+    name = "fle",
+    config = "//buildscripts/resmokeconfig:suites/fle.yml",
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "patch_build",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/modules/enterprise/src/fle:mongocryptd",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "fle2",
+    config = "//buildscripts/resmokeconfig:suites/fle2.yml",
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "patch_build",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "fle2_high_cardinality",
+    config = "//buildscripts/resmokeconfig:suites/fle2_high_cardinality.yml",
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "fle2_query_analysis",
+    config = "//buildscripts/resmokeconfig:suites/fle2_query_analysis.yml",
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "patch_build",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/db/modules/enterprise/src/fle:mongocryptd",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "fle2_sharding",
+    config = "//buildscripts/resmokeconfig:suites/fle2_sharding.yml",
+    shard_count = 4,
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+        "patch_build",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "fle2_sharding_high_cardinality",
+    config = "//buildscripts/resmokeconfig:suites/fle2_sharding_high_cardinality.yml",
+    shard_count = 4,
+    tags = [
+        "ci-release-critical",
+        "encrypt",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "sasl",
+    config = "//buildscripts/resmokeconfig:suites/sasl.yml",
+    tags = [
+        "ci-release-critical",
+        "patch_build",
+        "sasl",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_enterprise_disabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
