@@ -33,6 +33,7 @@ constraint_setting(name = "distro")
         "rhel10",
         "suse12",
         "suse15",
+        "suse16",
     ]
 ]
 

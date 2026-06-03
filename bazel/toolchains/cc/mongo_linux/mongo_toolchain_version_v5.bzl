@@ -92,6 +92,11 @@ TOOLCHAIN_MAP_V5 = {
         "sha": "2040c679283bf0572d38c28db5108b97b552fb06b15ba6788d494c066929e6d3",
         "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-suse15-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
     },
+    "suse16_x86_64": {
+        "platform_name": "suse16",
+        "sha": "66b6a09d4a19acc7c267849470ba4522ebe9cadbf4a8a84f4a78b48888001f09",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-suse16-fa0e79be138ffb56d1e8eb1c139fc49a7207c5f8.tar.gz",
+    },
     "ubuntu18_x86_64": {
         "platform_name": "ubuntu1804",
         "sha": "1d4282320a0066295fab70cfff0008094462792c83ea0245e85e71ae3ef6a25c",

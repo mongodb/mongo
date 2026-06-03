@@ -43,6 +43,37 @@ for config in [
         break
 
 
+def _toolchain_library_paths(tool_binary: str) -> list[str]:
+    """Return library paths that should travel with a mongo toolchain executable."""
+    binary_path = Path(tool_binary).resolve()
+    toolchain_root = None
+    for parent in binary_path.parents:
+        if (parent / "stow" / "gcc-v5").exists():
+            toolchain_root = parent
+            break
+    if toolchain_root is None:
+        return []
+
+    candidates = [
+        binary_path.parent.parent / "lib",
+        binary_path.parent.parent / "lib64",
+        toolchain_root / "stow" / "gcc-v5" / "lib64",
+        toolchain_root / "stow" / "gcc-v5" / "lib",
+    ]
+
+    seen = set()
+    library_paths = []
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        path = str(candidate)
+        if path in seen:
+            continue
+        seen.add(path)
+        library_paths.append(path)
+    return library_paths
+
+
 def _clang_tidy_executor(
     clang_tidy_filename: Path,
     clang_tidy_binary: str,
@@ -73,7 +104,15 @@ def _clang_tidy_executor(
         f"-config={json.dumps(clang_tidy_cfg)}",
         "--warnings-as-errors=*,-clang-diagnostic-builtin-macro-redefined",
     ]
-    proc = subprocess.run(clang_tidy_command, capture_output=True, check=False)
+    clang_tidy_env = os.environ.copy()
+    library_paths = _toolchain_library_paths(clang_tidy_binary)
+    if library_paths:
+        existing_library_path = clang_tidy_env.get("LD_LIBRARY_PATH")
+        if existing_library_path:
+            library_paths.append(existing_library_path)
+        clang_tidy_env["LD_LIBRARY_PATH"] = os.pathsep.join(library_paths)
+
+    proc = subprocess.run(clang_tidy_command, capture_output=True, check=False, env=clang_tidy_env)
     files_to_parse = None
     if proc.returncode != 0:
         output_filename_out = output_filename_base.with_suffix(".fail")

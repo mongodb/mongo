@@ -43,6 +43,7 @@ PLATFORM_NAME_MAP = {
     "rhel10_aarch64": "rhel10-arm64",
     "rhel10_x86_64": "rhel10",
     "suse15_x86_64": "suse15",
+    "suse16_x86_64": "suse16",
     "ubuntu18_x86_64": "ubuntu1804",
     "ubuntu20_aarch64": "ubuntu2004-arm64",
     "ubuntu20_x86_64": "ubuntu2004",

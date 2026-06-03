@@ -2722,6 +2722,7 @@ selects.config_setting_group(
         "//bazel/platforms:rhel9",
         "//bazel/platforms:suse12",
         "//bazel/platforms:suse15",
+        "//bazel/platforms:suse16",
     ],
 )
 

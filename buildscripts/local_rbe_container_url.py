@@ -19,6 +19,7 @@ _DISTRO_PATTERN_MAP = {
     "Red Hat Enterprise Linux 8*": "rhel8",
     "Red Hat Enterprise Linux 9*": "rhel9",
     "SLES 15*": "suse15",
+    "SLES 16*": "suse16",
 }
 
 

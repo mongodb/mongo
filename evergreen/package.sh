@@ -39,6 +39,7 @@ valid_mongocryptd_variants=(
     "enterprise-rhel-10-64-bit"
     "enterprise-rhel-10-arm64"
     "enterprise-suse15-64"
+    "enterprise-suse16-64"
     "enterprise-ubuntu2004-arm64"
     "enterprise-ubuntu2204-arm64"
     "enterprise-ubuntu2204-jepsen"

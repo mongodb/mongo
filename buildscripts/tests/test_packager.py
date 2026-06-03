@@ -99,6 +99,14 @@ class TestPackager(TestCase):
         """Test Debian build OS choices include Debian 13."""
         self.assertIn("debian13", Distro("debian").build_os("x86_64"))
 
+    def test_suse16_repo_os_version(self) -> None:
+        """Test SUSE 16 repository version."""
+        self.assertEqual("16", Distro("suse").repo_os_version("suse16"))
+
+    def test_suse_build_os_includes_suse16(self) -> None:
+        """Test SUSE build OS choices include SUSE 16."""
+        self.assertIn("suse16", Distro("suse").build_os("x86_64"))
+
 
 if __name__ == "__main__":
     unittest.main()

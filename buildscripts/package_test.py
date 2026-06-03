@@ -298,6 +298,12 @@ OS_DOCKER_LOOKUP = {
         frozenset(["python3", "wget", "pkg-config", "systemd", "procps", "file"]),
         "python3",
     ),
+    "suse16": (
+        "registry.suse.com/bci/bci-base:16.0",
+        "zypper",
+        frozenset(["python3", "wget", "pkg-config", "systemd", "procps", "file"]),
+        "python3",
+    ),
     # Has the same error as above
     "ubuntu1204": None,
     "ubuntu1404": None,

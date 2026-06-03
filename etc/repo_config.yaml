@@ -194,6 +194,13 @@ repos:
     repos:
       - zypper/suse/15/mongodb-org
 
+  - name: suse16
+    type: rpm
+    edition: org
+    bucket: repo.mongodb.org
+    repos:
+      - zypper/suse/16/mongodb-org
+
   - name: debian81
     type: deb
     code_name: "jessie"
@@ -515,6 +522,13 @@ repos:
     bucket: repo.mongodb.com
     repos:
       - zypper/suse/15/mongodb-enterprise
+
+  - name: suse16
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - zypper/suse/16/mongodb-enterprise
 
   - name: debian10
     type: deb

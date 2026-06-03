@@ -375,7 +375,7 @@ class Distro(object):
             raise Exception("BUG: unsupported architecture (%s)" % arch)
 
         if re.search("(suse)", self.dname):
-            return ["suse11", "suse12", "suse15"]
+            return ["suse11", "suse12", "suse15", "suse16"]
         elif re.search("(redhat|fedora|centos)", self.dname):
             return [
                 "rhel10",
@@ -958,7 +958,7 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
 
     # Versions of RPM after 4.4 ignore our BuildRoot tag so we need to
     # specify it on the command line args to rpmbuild
-    if (distro.name() == "suse" and distro.repo_os_version(build_os) == "15") or (
+    if (distro.name() == "suse" and distro.repo_os_version(build_os) in ("15", "16")) or (
         distro.name() == "redhat" and distro.repo_os_version(build_os) == "8"
     ):
         flags.extend(

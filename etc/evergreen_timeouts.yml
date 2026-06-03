@@ -189,7 +189,15 @@ overrides:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
 
+  enterprise-suse16-64:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
   suse15:
+    - task: aggregation_blockprocessing_fuzzer
+      exec_timeout: 600 # 10 hours
+
+  suse16:
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
 
