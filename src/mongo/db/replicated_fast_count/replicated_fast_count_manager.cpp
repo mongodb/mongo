@@ -607,8 +607,6 @@ void ReplicatedFastCountManager::_updateOneMetadata(OperationContext* opCtx,
                                                     const CollectionSizeCount& sizeCount,
                                                     const Timestamp& validAsOfTS,
                                                     const RecordId& recordId) {
-    // TODO SERVER-117886: Manually performing update without query system. This would be nice to
-    // avoid extra dependencies but might be too tricky to get right.
     CollectionUpdateArgs args(doc.value());
     // TODO SERVER-117654: When we also store timestamp we should be able to recover/combine data
     // from old doc to keep this accurate.
