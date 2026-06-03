@@ -177,6 +177,8 @@ last-continuous:
       ticket: SERVER-124376
     - test_file: jstests/core/ddl/coll_mod_cappedsize_on_view.js
       ticket: SERVER-124967
+    - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
+      ticket: SERVER-127661
   suites: null
 last-lts:
   all:
@@ -852,4 +854,6 @@ last-lts:
       ticket: SERVER-124376
     - test_file: jstests/core/ddl/coll_mod_cappedsize_on_view.js
       ticket: SERVER-124967
+    - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
+      ticket: SERVER-127661
   suites: null

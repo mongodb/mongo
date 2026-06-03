@@ -88,7 +88,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(
         uassert(50891,
                 "Invalid to set operation session info in a direct client",
                 !osi.getSessionId() && !osi.getTxnNumber() && !osi.getAutocommit() &&
-                    !osi.getStartTransaction());
+                    !osi.getStartTransaction() && !osi.getStartOrContinueTransaction());
     }
 
     if (!requiresAuth) {
@@ -195,13 +195,32 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(
         uassert(ErrorCodes::InvalidOptions,
                 "'startTransaction' field requires 'autocommit' field to also be specified",
                 !osi.getStartTransaction());
+        uassert(
+            ErrorCodes::InvalidOptions,
+            "'startOrContinueTransaction' field requires 'autocommit' field to also be specified",
+            !osi.getStartOrContinueTransaction());
     }
+
+    uassert(ErrorCodes::InvalidOptions,
+            "Cannot specify both 'startTransaction' and 'startOrContinueTransaction'",
+            !(osi.getStartTransaction() && osi.getStartOrContinueTransaction()));
 
     if (osi.getStartTransaction()) {
         invariant(osi.getAutocommit());
         uassert(ErrorCodes::InvalidOptions,
                 "Specifying startTransaction=false is not allowed.",
                 osi.getStartTransaction().value());
+    }
+
+    if (osi.getStartOrContinueTransaction()) {
+        invariant(osi.getAutocommit());
+        uassert(ErrorCodes::InvalidOptions,
+                "Specifying startOrContinueTransaction=false is not allowed.",
+                osi.getStartOrContinueTransaction().value());
+        uassert(ErrorCodes::Unauthorized,
+                "'startOrContinueTransaction' is only allowed for internal clients",
+                isAuthorizedForInternalClusterAction(
+                    opCtx, validatedTenantId, cachedIsAuthorizedForInternalClusterAction));
     }
 
     if (osi.getTxnNumber()) {
