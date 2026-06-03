@@ -44,28 +44,32 @@ def _bolt_optimize_impl(ctx):
     input_binary = ctx.files.binary_to_optimize[0]
     output_binary = ctx.actions.declare_file(ctx.label.name + "/" + input_binary.basename)
     functions_to_skip = ",".join(SKIP_FUNCTIONS)
+    arguments = [
+        input_binary.path,
+        "-o",
+        output_binary.path,
+        "-data",
+        ctx.files.perf_data[0].path,
+        "-reorder-blocks=ext-tsp",
+        "-reorder-functions=cdsort",
+        "-split-functions",
+        "-split-all-cold",
+        "-split-eh",
+        "-dyno-stats",
+        "--lite",
+        "--update-debug-sections",
+    ]
+    if ctx.attr.use_gnu_stack:
+        # objcopy will leave bad data like program headers in the .debug file without this
+        # However, enabling this flag causes "perf script" to take a much longer time, making
+        # some performance analysis too slow
+        arguments.append("--use-gnu-stack")
+    arguments.append("-skip-funcs=" + functions_to_skip)
     ctx.actions.run(
         inputs = [input_binary, ctx.files.perf_data[0]],
         outputs = [output_binary],
         executable = ctx.executable._bolt_binary,
-        arguments = [
-            input_binary.path,
-            "-o",
-            output_binary.path,
-            "-data",
-            ctx.files.perf_data[0].path,
-            "-reorder-blocks=ext-tsp",
-            "-reorder-functions=cdsort",
-            "-split-functions",
-            "-split-all-cold",
-            "-split-eh",
-            "-dyno-stats",
-            "--lite",
-            "--update-debug-sections",
-            # objcopy will leave bad data like program headers in the .debug file without this
-            "--use-gnu-stack",
-            "-skip-funcs=" + functions_to_skip,
-        ],
+        arguments = arguments,
         mnemonic = "BoltOptimize",
         execution_requirements = {
             "no-cache": "1",
@@ -90,6 +94,7 @@ bolt_optimize = rule(
     attrs = {
         "binary_to_optimize": attr.label(allow_files = True, providers = [CcInfo]),
         "perf_data": attr.label(allow_single_file = True),
+        "use_gnu_stack": attr.bool(default = True),
         "_bolt_binary": attr.label(allow_single_file = True, default = "@bolt_binaries//:bolt", executable = True, cfg = "exec"),
     },
     executable = True,

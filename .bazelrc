@@ -174,6 +174,7 @@ common --flag_alias=cspgo_profile_generate=//bazel/config:cspgo_profile_generate
 common --flag_alias=cspgo_profile_use=//bazel/config:cspgo_profile_use
 common --flag_alias=bolt_profile_generate=//bazel/config:bolt_profile_generate
 common --flag_alias=bolt_profile_use=//bazel/config:bolt_profile_use
+common --flag_alias=bolt_use_gnu_stack=//bazel/config:bolt_use_gnu_stack
 common --flag_alias=propeller_profile_generate=//bazel/config:propeller_profile_generate
 common --flag_alias=propeller_profile_use=//bazel/config:propeller_profile_use
 common --flag_alias=server_js=//bazel/config:server_js

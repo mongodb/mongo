@@ -728,6 +728,10 @@ def _mongo_cc_binary_and_test(
                 name = name + "_bolt",
                 binary_to_optimize = ":" + name + WITH_DEBUG_SUFFIX,
                 perf_data = bolt_profile,
+                use_gnu_stack = select({
+                    "//bazel/config:bolt_use_gnu_stack_disabled": False,
+                    "//conditions:default": True,
+                }),
                 target_compatible_with = select({
                     "//bazel/config:bolt_profile_use_enabled": [],
                     "//conditions:default": ["@platforms//:incompatible"],

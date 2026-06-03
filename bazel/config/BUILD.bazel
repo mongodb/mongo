@@ -2554,6 +2554,25 @@ config_setting(
 )
 
 # --------------------------------------
+# bolt_use_gnu_stack options
+# --------------------------------------
+
+# Controls whether the BOLT optimization step passes --use-gnu-stack. Defaults to
+# True to preserve existing behavior; set to False (e.g. for perf flamegraph
+# profiling) to omit the flag.
+bool_flag(
+    name = "bolt_use_gnu_stack",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "bolt_use_gnu_stack_disabled",
+    flag_values = {
+        "//bazel/config:bolt_use_gnu_stack": "False",
+    },
+)
+
+# --------------------------------------
 # propeller_profile_generate options
 # --------------------------------------
 
