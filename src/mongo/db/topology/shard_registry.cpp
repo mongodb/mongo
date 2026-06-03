@@ -451,46 +451,46 @@ std::shared_ptr<Shard> ShardRegistry::getConfigShard() const {
 }
 
 StatusWith<std::shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* opCtx,
-                                                           const ShardId& shardId) {
-    // First check if this is a non config shard lookup
-    // This call will may be blocking if there is an ongoing or a need of a cache rebuild
-    if (auto shard = _getData(opCtx)->findShard(shardId)) {
+                                                           const ShardId& shardId,
+                                                           bool allowNonShardIdIdentifiers) {
+    // First check if this is a non config shard lookup.
+    // This call may be blocking if there is an ongoing or a needed cache rebuild.
+    if (auto shard = _getData(opCtx)->findShard(shardId, allowNonShardIdIdentifiers)) {
         return shard;
     }
 
-    // then check if this is a config shard (this call is blocking in any case)
+    // Then check if this is a config shard (this call is blocking in any case).
     {
         std::lock_guard lk(_mutex);
-        if (auto shard = _configShardData.findShard(shardId)) {
+        if (auto shard = _configShardData.findShard(shardId, allowNonShardIdIdentifiers)) {
             return shard;
         }
     }
 
-    // Reload and try again if the shard was not in the registry
+    // Reload and try again if the shard was not in the registry.
     reload(opCtx);
-    if (auto shard = _getData(opCtx)->findShard(shardId)) {
+    if (auto shard = _getData(opCtx)->findShard(shardId, allowNonShardIdIdentifiers)) {
         return shard;
     }
 
     return {ErrorCodes::ShardNotFound, str::stream() << "Shard " << shardId << " not found"};
 }
 
-SemiFuture<std::shared_ptr<Shard>> ShardRegistry::getShard(ExecutorPtr executor,
-                                                           const ShardId& shardId) noexcept {
-
+SemiFuture<std::shared_ptr<Shard>> ShardRegistry::getShard(
+    ExecutorPtr executor, const ShardId& shardId, bool allowNonShardIdIdentifiers) noexcept {
     // Fetch the shard registry data associated to the latest known topology time
     return _getDataAsync()
         .thenRunOn(executor)
-        .then([this, executor, shardId](auto&& cachedData) {
-            // First check if this is a non config shard lookup
-            if (auto shard = cachedData->findShard(shardId)) {
+        .then([this, executor, shardId, allowNonShardIdIdentifiers](auto&& cachedData) {
+            // First check if this is a non config shard lookup.
+            if (auto shard = cachedData->findShard(shardId, allowNonShardIdIdentifiers)) {
                 return SemiFuture<std::shared_ptr<Shard>>::makeReady(std::move(shard));
             }
 
-            // then check if this is a config shard (this call is blocking in any case)
+            // Then check if this is a config shard (this call is blocking in any case).
             {
                 std::lock_guard lk(_mutex);
-                if (auto shard = _configShardData.findShard(shardId)) {
+                if (auto shard = _configShardData.findShard(shardId, allowNonShardIdIdentifiers)) {
                     return SemiFuture<std::shared_ptr<Shard>>::makeReady(std::move(shard));
                 }
             }
@@ -503,11 +503,11 @@ SemiFuture<std::shared_ptr<Shard>> ShardRegistry::getShard(ExecutorPtr executor,
             //    disk
             // 3. A new primary with a stale ShardRegistry is elected and read the set of shards
             //    from disk and calls ShardRegistry::getShard
-
             return _reloadAsync()
                 .thenRunOn(executor)
-                .then([this, executor, shardId](auto&& cachedData) -> std::shared_ptr<Shard> {
-                    auto shard = cachedData->findShard(shardId);
+                .then([shardId,
+                       allowNonShardIdIdentifiers](auto&& reloadedData) -> std::shared_ptr<Shard> {
+                    auto shard = reloadedData->findShard(shardId, allowNonShardIdIdentifiers);
                     uassert(ErrorCodes::ShardNotFound,
                             str::stream() << "Shard " << shardId << " not found",
                             shard);
@@ -516,6 +516,16 @@ SemiFuture<std::shared_ptr<Shard>> ShardRegistry::getShard(ExecutorPtr executor,
                 .semi();
         })
         .semi();
+}
+
+StatusWith<ShardId> ShardRegistry::resolveShardId(OperationContext* opCtx,
+                                                  const ShardId& shardIdentifier,
+                                                  bool allowNonShardIdIdentifiers) {
+    const auto swShard = getShard(opCtx, shardIdentifier, allowNonShardIdIdentifiers);
+    if (!swShard.isOK()) {
+        return swShard.getStatus();
+    }
+    return swShard.getValue()->getId();
 }
 
 std::vector<ShardId> ShardRegistry::getAllShardIds(OperationContext* opCtx) {
@@ -1027,21 +1037,22 @@ std::shared_ptr<Shard> ShardRegistryData::_findByShardId(const ShardId& shardId)
     return (i != _shardIdLookup.end()) ? i->second : nullptr;
 }
 
-std::shared_ptr<Shard> ShardRegistryData::findShard(const ShardId& shardId) const {
-    auto shard = _findByShardId(shardId);
-    if (shard) {
+std::shared_ptr<Shard> ShardRegistryData::findShard(const ShardId& shardId,
+                                                    bool allowNonShardIdIdentifiers) const {
+    if (auto shard = _findByShardId(shardId)) {
         return shard;
     }
 
-    shard = _findByConnectionString(shardId.toString());
-    if (shard) {
+    if (!allowNonShardIdIdentifiers) {
+        return nullptr;
+    }
+
+    if (auto shard = _findByConnectionString(shardId.toString())) {
         return shard;
     }
 
-    StatusWith<HostAndPort> swHostAndPort = HostAndPort::parse(shardId.toString());
-    if (swHostAndPort.isOK()) {
-        shard = findByHostAndPort(swHostAndPort.getValue());
-        if (shard) {
+    if (auto swHostAndPort = HostAndPort::parse(shardId.toString()); swHostAndPort.isOK()) {
+        if (auto shard = findByHostAndPort(swHostAndPort.getValue())) {
             return shard;
         }
     }
@@ -1072,7 +1083,7 @@ void ShardRegistryData::_addShard(std::shared_ptr<Shard> shard) {
     const ShardId shardId = shard->getId();
     const ConnectionString connString = shard->getConnString();
 
-    auto currentShard = findShard(shardId);
+    auto currentShard = _findByShardId(shardId);
     if (currentShard) {
         for (const auto& host : connString.getServers()) {
             _hostLookup.erase(host);

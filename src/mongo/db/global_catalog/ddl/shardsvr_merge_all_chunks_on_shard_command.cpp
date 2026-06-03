@@ -178,8 +178,27 @@ public:
             const auto& nss = ns();
             const auto& req = request();
 
+            // Resolve the shard identifier here so that both the coordinator and the legacy paths
+            // use the resolved identifier.
+            const auto resolvedShardId =
+                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
+                    opCtx, req.getShard(), true /* allowNonShardIdIdentifiers */));
+
+            // The coordinator uses the request document to check for conflicting operations, so we
+            // need to update it with the resolved identifier if the shardId was not used.
+            const auto& resolvedRequest = [&]() {
+                if (resolvedShardId == req.getShard()) {
+                    return req;
+                }
+                ShardSvrMergeAllChunksOnShard newRequest(nss);
+                newRequest.setShard(resolvedShardId.toString());
+                newRequest.setMaxNumberOfChunksToMerge(req.getMaxNumberOfChunksToMerge());
+                newRequest.setMaxTimeProcessingChunksMS(req.getMaxTimeProcessingChunksMS());
+                return newRequest;
+            }();
+
             MergeAllChunksOnShardResponse response;
-            if (tryRunMergeAllChunksCoordinator(opCtx, nss, req, &response)) {
+            if (tryRunMergeAllChunksCoordinator(opCtx, nss, resolvedRequest, &response)) {
                 return response;
             }
             // Legacy path: acquire a namespace-wide guard in the active migrations registry so
@@ -207,7 +226,7 @@ public:
             // Legacy path: forward directly to the config server.
             ConfigSvrCommitMergeAllChunksOnShard configSvrCommitMergeAllChunksOnShard(nss);
             configSvrCommitMergeAllChunksOnShard.setDbName(DatabaseName::kAdmin);
-            configSvrCommitMergeAllChunksOnShard.setShard(req.getShard());
+            configSvrCommitMergeAllChunksOnShard.setShard(resolvedShardId.toString());
             configSvrCommitMergeAllChunksOnShard.setMaxNumberOfChunksToMerge(
                 req.getMaxNumberOfChunksToMerge());
             configSvrCommitMergeAllChunksOnShard.setMaxTimeProcessingChunksMS(

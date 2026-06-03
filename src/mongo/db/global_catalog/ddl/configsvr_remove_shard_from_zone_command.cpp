@@ -45,6 +45,8 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/util/assert_util.h"
 
@@ -123,8 +125,13 @@ public:
         auto parsedRequest =
             uassertStatusOK(RemoveShardFromZoneRequest::parseFromConfigCommand(cmdObj));
 
+        const auto resolvedShardId =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
+                opCtx,
+                ShardId(parsedRequest.getShardName()),
+                false /* allowNonShardIdIdentifiers */));
         uassertStatusOK(ShardingCatalogManager::get(opCtx)->removeShardFromZone(
-            opCtx, parsedRequest.getShardName(), parsedRequest.getZoneName()));
+            opCtx, resolvedShardId.toString(), parsedRequest.getZoneName()));
 
         return true;
     }

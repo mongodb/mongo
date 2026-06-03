@@ -45,6 +45,8 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/sharding_environment/grid.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/util/assert_util.h"
 
@@ -77,8 +79,13 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
+            const auto resolvedShardId =
+                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
+                    opCtx,
+                    ShardId(std::string{getShard()}),
+                    false /* allowNonShardIdIdentifiers */));
             uassertStatusOK(ShardingCatalogManager::get(opCtx)->addShardToZone(
-                opCtx, std::string{getShard()}, std::string{request().getZone()}));
+                opCtx, resolvedShardId.toString(), std::string{request().getZone()}));
         }
 
     private:

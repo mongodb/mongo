@@ -118,13 +118,13 @@ public:
                                                 ShardFactory* shardFactory);
 
     /**
-     * Returns the shard with the given shard id, connection string, or host and port.
+     * Returns the shard matching the given identifier, or nullptr if no such shard.
      *
-     * Callers might pass in the connection string or HostAndPort rather than ShardId, so this
-     * method will first look for the shard by ShardId, then connection string, then HostAndPort
-     * stopping once it finds the shard.
+     * If 'allowNonShardIdIdentifiers' is false, only shard ids are considered. If true, the
+     * identifier may also be a connection string or host and port.
      */
-    std::shared_ptr<Shard> findShard(const ShardId& shardId) const;
+    std::shared_ptr<Shard> findShard(const ShardId& shardId,
+                                     bool allowNonShardIdIdentifiers = false) const;
 
     /**
      * Returns the shard with the given replica set name, or nullptr if no such shard.
@@ -195,12 +195,9 @@ private:
  * contains the connection string for that shard.
  *
  * Retrieving a shard from the registry returns a `Shard` object. Using that object, one can access
- * more information about a shard and run commands against that shard. A `Shard` object can be
- * retrieved from the registry by using any of:
- * - The shard's name
- * - The replica set's name
- * - The HostAndPort object
- * - The connection string
+ * more information about a shard and run commands against that shard. A `Shard` object is
+ * normally retrieved by shard id. When using getShard() with allowNonShardIdIdentifiers set to
+ * true, the identifier may also be a connection string or host and port.
  *
  * REFRESHES: The shard registry refreshes itself in these scenarios:
  * - Upon the node's start-up
@@ -295,16 +292,30 @@ public:
     std::shared_ptr<Shard> getConfigShard() const;
 
     /**
-     * Returns a shared pointer to the shard object with the given shard id, or ShardNotFound error
-     * otherwise.
+     * Returns a shared pointer to the shard object with the given identifier, or ShardNotFound
+     * error otherwise.
      *
-     * May refresh the shard registry if there's no cached information about the shard. The shardId
-     * parameter can actually be the shard name or the HostAndPort for any server in the shard.
+     * If 'allowNonShardIdIdentifiers' is false, only shard ids are considered. If true, the
+     * identifier may also be a connection string or host and port.
+     *
+     * May refresh the shard registry if there's no cached information about the shard.
      */
-    StatusWith<std::shared_ptr<Shard>> getShard(OperationContext* opCtx, const ShardId& shardId);
+    StatusWith<std::shared_ptr<Shard>> getShard(OperationContext* opCtx,
+                                                const ShardId& shardId,
+                                                bool allowNonShardIdIdentifiers = false);
 
     SemiFuture<std::shared_ptr<Shard>> getShard(ExecutorPtr executor,
-                                                const ShardId& shardId) noexcept;
+                                                const ShardId& shardId,
+                                                bool allowNonShardIdIdentifiers = false) noexcept;
+
+    /**
+     * Returns a ShardId based on the given shard identifier. The identifier may be a shard id,
+     * connection string, or host and port. Returns ShardNotFound if the shard identifier cannot be
+     * resolved.
+     */
+    StatusWith<ShardId> resolveShardId(OperationContext* opCtx,
+                                       const ShardId& shardIdentifier,
+                                       bool allowNonShardIdIdentifiers);
 
     /**
      * Returns a vector containing all known shard IDs.

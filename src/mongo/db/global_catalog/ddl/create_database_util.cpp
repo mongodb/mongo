@@ -74,11 +74,11 @@ boost::optional<DatabaseType> checkDbNameConstraints(const DatabaseName& dbName)
 boost::optional<ShardId> resolvePrimaryShard(OperationContext* opCtx,
                                              const boost::optional<ShardId>& optPrimaryShard) {
     if (optPrimaryShard) {
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         uassert(ErrorCodes::BadValue,
                 str::stream() << "invalid shard name: " << *optPrimaryShard,
                 optPrimaryShard->isValid());
-        return uassertStatusOK(shardRegistry->getShard(opCtx, *optPrimaryShard))->getId();
+        return uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
+            opCtx, *optPrimaryShard, true /* allowNonShardIdIdentifiers */));
     }
     return boost::none;
 }

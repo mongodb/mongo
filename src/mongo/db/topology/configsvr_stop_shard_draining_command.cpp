@@ -97,10 +97,8 @@ public:
             const auto requestShardId = request().getCommandParameter();
             boost::optional<ShardId> shardId;
 
-            auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, requestShardId);
-
-            const auto shard = uassertStatusOK(swShard);
-            shardId.emplace(shard->getId());
+            shardId.emplace(uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
+                opCtx, requestShardId, true /* allowNonShardIdIdentifiers */)));
 
             bool isTransitionToDedicatedCS =
                 request().getIsTransitionToDedicatedCS().value_or(false);

@@ -84,18 +84,15 @@ public:
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
 
             const auto requestShardId = request().getCommandParameter();
-            boost::optional<ShardId> shardId;
-
-            const auto shard =
-                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, requestShardId));
-            shardId.emplace(shard->getId());
+            const auto shardId = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
+                opCtx, requestShardId, true /* allowNonShardIdIdentifiers */));
 
             const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
             const auto isShardDraining =
-                shardingCatalogManager->isShardCurrentlyDraining(opCtx, *shardId);
+                shardingCatalogManager->isShardCurrentlyDraining(opCtx, shardId);
 
             uassert(ErrorCodes::IllegalOperation,
-                    fmt::format("The shard {} isn't draining", shardId->toString()),
+                    fmt::format("The shard {} isn't draining", shardId.toString()),
                     isShardDraining);
 
             bool isTransitionToDedicatedCS =
@@ -105,14 +102,14 @@ public:
                     "shardDrainingStatus when "
                     "transitioning to a dedicated config server. Please, use "
                     "getTransitionToDedicatedConfigServerStatus.",
-                    (isTransitionToDedicatedCS || *shardId != ShardId::kConfigServerId));
+                    (isTransitionToDedicatedCS || shardId != ShardId::kConfigServerId));
 
             const auto shardDrainingState =
-                shardingCatalogManager->checkDrainingProgress(opCtx, *shardId);
+                shardingCatalogManager->checkDrainingProgress(opCtx, shardId);
 
             BSONObjBuilder result;
             shardingCatalogManager->appendShardDrainingStatus(
-                opCtx, result, shardDrainingState, shardId ? *shardId : requestShardId);
+                opCtx, result, shardDrainingState, shardId.toString());
 
             Response res = Response::parse(result.obj(), IDLParserContext("removeShardResponse"));
             return res;

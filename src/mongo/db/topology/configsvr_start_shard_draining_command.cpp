@@ -94,7 +94,6 @@ public:
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
             const auto requestShardId = request().getCommandParameter();
-            boost::optional<ShardId> shardId;
 
             DDLLockManager::ScopedCollectionDDLLock ddlLock(
                 opCtx,
@@ -102,9 +101,8 @@ public:
                 "startShardDraining",
                 LockMode::MODE_X);
 
-            auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, requestShardId);
-            const auto shard = uassertStatusOK(swShard);
-            shardId.emplace(shard->getId());
+            const auto& shardId = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->resolveShardId(
+                opCtx, requestShardId, true /* allowNonShardIdIdentifiers */));
             bool isTransitionToDedicatedCS =
                 request().getIsTransitionToDedicatedCS().value_or(false);
             uassert(
@@ -112,10 +110,10 @@ public:
                 "Cannot start the transition to dedicated config server using "
                 "startShardDraining when transitioning to a dedicated config server. Please, use "
                 "startTransitionToDedicatedConfigServer.",
-                (isTransitionToDedicatedCS || *shardId != ShardId::kConfigServerId));
+                (isTransitionToDedicatedCS || shardId != ShardId::kConfigServerId));
 
             const auto& progress =
-                topology_change_helpers::startShardDraining(opCtx, *shardId, ddlLock);
+                topology_change_helpers::startShardDraining(opCtx, shardId, ddlLock);
 
             // The returned progress is empty if the shard is already in draining state, indicating
             // the transition to dedicated config server has already started

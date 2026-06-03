@@ -91,16 +91,21 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             const auto nss = ns();
-            const auto& req = request();
+            auto& req = request();
 
             // Set read concern level to local for reads into the config database
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            // Make sure that the `to` shard exists
-            uassertStatusOKWithContext(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, req.getToShard()),
-                "Could not find destination shard");
+            const auto resolvedToShard =
+                uassertStatusOKWithContext(Grid::get(opCtx)->shardRegistry()->resolveShardId(
+                                               opCtx,
+                                               req.getMoveRangeRequestBase().getToShard(),
+                                               true /* allowNonShardIdIdentifiers */),
+                                           "Could not find destination shard");
+
+            // Ensure we forward to the balancer the resolved shard id, not the original identifier.
+            req.setToShard(resolvedToShard);
 
             try {
                 Balancer::get(opCtx)->moveRange(opCtx, nss, req, true /* issuedByRemoteUser */);

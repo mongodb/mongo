@@ -107,15 +107,16 @@ public:
                 // where a shard with the same name, but with a different host, has been
                 // removed/re-added.
                 shardRegistry->reload(opCtx);
-                const auto toShard = uassertStatusOKWithContext(
-                    shardRegistry->getShard(opCtx, toShardId),
+                const auto resolvedToShardId = uassertStatusOKWithContext(
+                    shardRegistry->resolveShardId(
+                        opCtx, toShardId, true /* allowNonShardIdIdentifiers */),
                     fmt::format("requested primary shard {} does not exist", toShardId.toString()));
 
                 auto coordinatorDoc = [&] {
                     MovePrimaryCoordinatorDocument doc;
                     doc.setShardingCoordinatorMetadata(
                         {{dbNss, CoordinatorTypeEnum::kMovePrimary}});
-                    doc.setToShardId(toShard->getId());
+                    doc.setToShardId(resolvedToShardId);
                     return doc.toBSON();
                 }();
 

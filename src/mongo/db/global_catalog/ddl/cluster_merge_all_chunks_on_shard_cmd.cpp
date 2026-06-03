@@ -86,8 +86,11 @@ public:
             const auto& req = request();
             const auto& shardId = req.getShard();
 
-            auto shard =
-                uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+            // We allow resolving non-shardId identifiers here because the command allows the shard
+            // identifier to be a connection string or host and port and we need to be able to
+            // target the shard correctly.
+            auto targetShard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
+                opCtx, shardId, true /* allowNonShardIdIdentifiers */));
 
             ShardSvrMergeAllChunksOnShard shardSvrMergeAllChunksOnShard(nss);
             shardSvrMergeAllChunksOnShard.setDbName(DatabaseName::kAdmin);
@@ -98,11 +101,11 @@ public:
                 req.getMaxTimeProcessingChunksMS());
 
             auto swCommandResponse =
-                shard->runCommand(opCtx,
-                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                  DatabaseName::kAdmin,
-                                  shardSvrMergeAllChunksOnShard.toBSON(),
-                                  Shard::RetryPolicy::kIdempotent);
+                targetShard->runCommand(opCtx,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        DatabaseName::kAdmin,
+                                        shardSvrMergeAllChunksOnShard.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent);
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swCommandResponse));
 

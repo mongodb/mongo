@@ -143,26 +143,12 @@ public:
                     request().getFind() || request().getBounds());
 
 
-            std::string destination = std::string{request().getTo()};
-            const auto toStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, destination);
-
-            if (!toStatus.isOK()) {
-                LOGV2_OPTIONS(22755,
-                              {logv2::UserAssertAfterLog(ErrorCodes::ShardNotFound)},
-                              "moveChunk destination shard does not exist",
-                              "toShardId"_attr = destination,
-                              logAttrs(ns()));
-            }
-
-
-            const auto to = toStatus.getValue();
-
             const auto find = request().getFind();
             const auto bounds = request().getBounds();
 
             auto runMoveRange = [&](const Chunk& chunk) {
                 MoveRangeRequestBase moveRangeReq;
-                moveRangeReq.setToShard(to->getId());
+                moveRangeReq.setToShard(ShardId(std::string{request().getTo()}));
                 moveRangeReq.setMin(chunk.getMin());
                 moveRangeReq.setMax(chunk.getMax());
                 moveRangeReq.setWaitForDelete(request().getWaitForDelete().value_or(false) ||

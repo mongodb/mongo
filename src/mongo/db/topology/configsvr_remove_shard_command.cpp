@@ -144,12 +144,12 @@ public:
 
         const auto shardDrainingStatus = [&] {
             try {
-                auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdOrUrl);
-                if (swShard == ErrorCodes::ShardNotFound) {
+                auto swShardId = Grid::get(opCtx)->shardRegistry()->resolveShardId(
+                    opCtx, shardIdOrUrl, true /* allowNonShardIdIdentifiers */);
+                if (swShardId == ErrorCodes::ShardNotFound) {
                     return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
                 }
-                const auto shard = uassertStatusOK(swShard);
-                shardId.emplace(shard->getId());
+                shardId.emplace(uassertStatusOK(swShardId));
 
                 uassert(ErrorCodes::IllegalOperation,
                         "Cannot remove the config server as a shard using removeShard. To "

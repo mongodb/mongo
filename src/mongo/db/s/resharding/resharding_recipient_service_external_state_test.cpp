@@ -445,7 +445,7 @@ TEST_F(RecipientServiceExternalStateTest,
         expectRefreshReturnForOriginalColl(
             kOrigNss, kShardKey, kOrigUUID, kOrigEpoch, kOrigTimestamp);
         expectStaleDbVersionError(kOrigNss, "listCollections");
-        expectGetDatabase(kOrigNss, shards[1].getHost());
+        expectGetDatabase(kOrigNss, shards[1].getName());
         expectListCollections(
             kOrigNss,
             kOrigUUID,

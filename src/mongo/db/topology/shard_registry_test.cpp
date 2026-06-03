@@ -591,6 +591,107 @@ TEST_F(ShardRegistryTest, RemovedShardIsDroppedFromRegistry) {
     ASSERT(!data->findShard(ShardId("extraShard"))) << "Removed shard should not be in ID lookup";
 }
 
+TEST_F(ShardRegistryTest, UserShardInputResolutionSeparatesIdAndAlternateLookups) {
+    const ShardId shardId("shard0");
+    addShard(shardId, kAdvanceTopologyTime);
+
+    {
+        auto future = launchAsync([this] { getData(); });
+        expectCSRSLookup();
+        future.default_timed_get();
+    }
+
+    const auto shardType = shardIdToShardType(shardId);
+    const auto connString = uassertStatusOK(ConnectionString::parse(shardType.getHost()));
+    const auto hostAndPort = connString.getServers().front();
+    const ShardId connStringId(connString.toString());
+    const ShardId hostAndPortId(hostAndPort.toString());
+
+    auto data = getData();
+    ASSERT(data->findShard(shardId));
+    ASSERT(!data->findShard(connStringId));
+    ASSERT(!data->findShard(hostAndPortId));
+
+    ASSERT_EQ(shardId, data->findShard(shardId, true)->getId());
+    ASSERT_EQ(shardId, data->findShard(connStringId, true)->getId());
+    ASSERT_EQ(shardId, data->findShard(hostAndPortId, true)->getId());
+
+    auto* opCtx = operationContext();
+    ASSERT_EQ(shardId, unittest::assertGet(shardRegistry()->getShard(opCtx, shardId))->getId());
+    ASSERT_EQ(shardId,
+              unittest::assertGet(shardRegistry()->getShard(opCtx, shardId, true))->getId());
+    ASSERT_EQ(shardId,
+              unittest::assertGet(shardRegistry()->getShard(opCtx, connStringId, true))->getId());
+    ASSERT_EQ(shardId,
+              unittest::assertGet(shardRegistry()->getShard(opCtx, hostAndPortId, true))->getId());
+}
+
+TEST_F(ShardRegistryTest, GetShardIdAcceptsShardId) {
+    const ShardId shardId("shard0");
+    addShard(shardId, kAdvanceTopologyTime);
+    reloadAndWait();
+
+    auto* opCtx = operationContext();
+    ASSERT_EQ(shardId,
+              unittest::assertGet(shardRegistry()->resolveShardId(
+                  opCtx, shardId, false /* allowNonShardIdIdentifiers */)));
+    ASSERT_EQ(shardId,
+              unittest::assertGet(shardRegistry()->resolveShardId(
+                  opCtx, shardId, true /* allowNonShardIdIdentifiers */)));
+}
+
+TEST_F(ShardRegistryTest, GetShardIdRejectsUnknownIdentifier) {
+    const ShardId shardId("shard0");
+    addShard(shardId, kAdvanceTopologyTime);
+    reloadAndWait();
+
+    auto* opCtx = operationContext();
+    const ShardId unknownShard("unknown");
+
+    auto future = launchAsync([this, opCtx, unknownShard] {
+        ASSERT_EQ(ErrorCodes::ShardNotFound,
+                  shardRegistry()
+                      ->resolveShardId(opCtx, unknownShard, false /* allowNonShardIdIdentifiers */)
+                      .getStatus());
+    });
+    expectCSRSLookup();
+    future.default_timed_get();
+
+    future = launchAsync([this, opCtx, unknownShard] {
+        ASSERT_EQ(ErrorCodes::ShardNotFound,
+                  shardRegistry()
+                      ->resolveShardId(opCtx, unknownShard, true /* allowNonShardIdIdentifiers */)
+                      .getStatus());
+    });
+    expectCSRSLookup();
+    future.default_timed_get();
+}
+
+TEST_F(ShardRegistryTest, GetShardIdAllowsAlternateIdentifiers) {
+    const ShardId shardId("shard0");
+    addShard(shardId, kAdvanceTopologyTime);
+    reloadAndWait();
+
+    const auto shardType = shardIdToShardType(shardId);
+    const auto connString = uassertStatusOK(ConnectionString::parse(shardType.getHost()));
+    const auto hostAndPort = connString.getServers().front();
+    const ShardId hostAndPortId(hostAndPort.toString());
+
+    auto* opCtx = operationContext();
+    ASSERT_EQ(shardId,
+              unittest::assertGet(shardRegistry()->resolveShardId(
+                  opCtx, hostAndPortId, true /* allowNonShardIdIdentifiers */)));
+
+    auto future = launchAsync([this, opCtx, hostAndPortId] {
+        ASSERT_EQ(ErrorCodes::ShardNotFound,
+                  shardRegistry()
+                      ->resolveShardId(opCtx, hostAndPortId, false /* allowNonShardIdIdentifiers */)
+                      .getStatus());
+    });
+    expectCSRSLookup();
+    future.default_timed_get();
+}
+
 // When a shard is removed from config.shards, _tearDownRemovedShards should erase its RS from
 // _latestConnStrings. This applies to both regular shards and the config shard (kConfigServerId).
 TEST_F(ShardRegistryTest, RemovedShardErasesLatestConnString) {

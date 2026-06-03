@@ -98,11 +98,11 @@ function runTest(rst, validationTest, shardName) {
         jsTest.log(
             "Testing that the aggregation stage is supported on shardsvr mongod but not on" + " configsvr mongod",
         );
-        const {aggCmdObj} = makeAnalyzeShardKeyAggregateCmdObj(validationTest.collName, {id: 1}, st.shard0.name);
+        const {aggCmdObj} = makeAnalyzeShardKeyAggregateCmdObj(validationTest.collName, {id: 1}, st.shard0.shardName);
         assert.commandWorked(shard0Primary.getDB(validationTest.dbName).runCommand(aggCmdObj));
     }
 
-    runTest(st.rs0, validationTest, st.shard0.name);
+    runTest(st.rs0, validationTest, st.shard0.shardName);
 
     st.stop();
 }

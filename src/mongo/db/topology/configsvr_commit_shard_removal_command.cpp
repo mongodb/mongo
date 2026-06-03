@@ -115,16 +115,12 @@ public:
                         VersionContext::getDecoration(opCtx), (*fixedFCV)->acquireFCVSnapshot()));
 
             const auto requestShardId = request().getCommandParameter();
-            boost::optional<ShardId> shardId;
-
-            auto swShard = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, requestShardId);
-
-            if (swShard == ErrorCodes::ShardNotFound) {
+            auto swShardId = Grid::get(opCtx)->shardRegistry()->resolveShardId(
+                opCtx, requestShardId, true /* allowNonShardIdIdentifiers */);
+            if (swShardId == ErrorCodes::ShardNotFound) {
                 return;
             }
-
-            const auto shard = uassertStatusOK(swShard);
-            shardId.emplace(shard->getId());
+            const auto& shardId = uassertStatusOK(swShardId);
 
             bool isTransitionToDedicatedCS =
                 request().getIsTransitionToDedicatedCS().value_or(false);
@@ -133,15 +129,15 @@ public:
                     "transitioning to a dedicated config server. Please, use "
                     "commitTransitionToDedicatedConfigServer to complete the transition to "
                     "dedicated config server.",
-                    (isTransitionToDedicatedCS || *shardId != ShardId::kConfigServerId));
+                    (isTransitionToDedicatedCS || shardId != ShardId::kConfigServerId));
 
             const auto removeShardResult = topology_change_helpers::runCoordinatorRemoveShard(
-                opCtx, ddlLock, fixedFCV, *shardId);
+                opCtx, ddlLock, fixedFCV, shardId);
 
             uassert(ErrorCodes::IllegalOperation,
                     fmt::format("The shard {} isn't completely drained. Please use the {} command "
                                 "to check the draining status.",
-                                shardId->toString(),
+                                shardId.toString(),
                                 isTransitionToDedicatedCS
                                     ? "getTransitionToDedicatedConfigServerStatus"
                                     : "shardDrainingStatus"),
