@@ -160,19 +160,19 @@ describe("$changeStream", function () {
                     "version": TimeseriesTest.BucketVersion.kCompressedSorted,
                     "min": {
                         "_id": 10,
-                        "ts": ISODate("2024-05-01T00:00:00Z"),
+                        "ts": ISODate("2124-05-01T00:00:00Z"),
                         value: 3,
                     },
                     "max": {
                         "_id": 10,
-                        "ts": ISODate("2024-05-01T00:00:00Z"),
+                        "ts": ISODate("2124-05-01T00:00:00Z"),
                         value: 3,
                     },
                     "count": 1,
                 },
                 "meta": "0",
                 "data": {
-                    "ts": BinData(7, "CQAAcHMxjwEAAAA="),
+                    "ts": BinData(7, "CQAAQEHubQQAAAA="),
                     "_id": BinData(7, "AQAAAAAAAAAkQAA="),
                     "value": BinData(7, "AQAAAAAAAAAIQAA="),
                 },
@@ -186,19 +186,19 @@ describe("$changeStream", function () {
                     "version": TimeseriesTest.BucketVersion.kCompressedSorted,
                     "min": {
                         "_id": 11,
-                        "ts": ISODate("2024-05-01T00:01:00Z"),
+                        "ts": ISODate("2124-05-01T00:01:00Z"),
                         value: 4,
                     },
                     "max": {
                         "_id": 11,
-                        "ts": ISODate("2024-05-01T00:01:00Z"),
+                        "ts": ISODate("2124-05-01T00:01:00Z"),
                         value: 4,
                     },
                     "count": 1,
                 },
                 "meta": "1",
                 "data": {
-                    "ts": BinData(7, "CQBgWnQxjwEAAAA="),
+                    "ts": BinData(7, "CQBgKkLubQQAAAA="),
                     "_id": BinData(7, "AQAAAAAAAAAmQAA="),
                     "value": BinData(7, "AQAAAAAAAAAQQAA="),
                 },
@@ -212,19 +212,19 @@ describe("$changeStream", function () {
                     "version": TimeseriesTest.BucketVersion.kCompressedSorted,
                     "min": {
                         "_id": 12,
-                        "ts": ISODate("2024-05-01T00:02:00Z"),
+                        "ts": ISODate("2124-05-01T00:02:00Z"),
                         value: 5,
                     },
                     "max": {
                         "_id": 12,
-                        "ts": ISODate("2024-05-01T00:02:00Z"),
+                        "ts": ISODate("2124-05-01T00:02:00Z"),
                         value: 5,
                     },
                     "count": 1,
                 },
                 "meta": "2",
                 "data": {
-                    "ts": BinData(7, "CQDARHUxjwEAAAA="),
+                    "ts": BinData(7, "CQDAFEPubQQAAAA="),
                     "_id": BinData(7, "AQAAAAAAAAAoQAA="),
                     "value": BinData(7, "AQAAAAAAAAAUQAA="),
                 },
@@ -440,19 +440,19 @@ describe("$changeStream", function () {
                     "version": TimeseriesTest.BucketVersion.kCompressedSorted,
                     "min": {
                         "_id": 10,
-                        "ts": ISODate("2024-05-01T00:00:00Z"),
+                        "ts": ISODate("2124-05-01T00:00:00Z"),
                         value: 3,
                     },
                     "max": {
                         "_id": 10,
-                        "ts": ISODate("2024-05-01T00:00:00Z"),
+                        "ts": ISODate("2124-05-01T00:00:00Z"),
                         value: 3,
                     },
                     "count": 1,
                 },
                 "meta": "0",
                 "data": {
-                    "ts": BinData(7, "CQAAcHMxjwEAAAA="),
+                    "ts": BinData(7, "CQAAQEHubQQAAAA="),
                     "_id": BinData(7, "AQAAAAAAAAAkQAA="),
                     "value": BinData(7, "AQAAAAAAAAAIQAA="),
                 },
@@ -466,19 +466,19 @@ describe("$changeStream", function () {
                     "version": TimeseriesTest.BucketVersion.kCompressedSorted,
                     "min": {
                         "_id": 11,
-                        "ts": ISODate("2024-05-01T00:01:00Z"),
+                        "ts": ISODate("2124-05-01T00:01:00Z"),
                         value: 4,
                     },
                     "max": {
                         "_id": 11,
-                        "ts": ISODate("2024-05-01T00:01:00Z"),
+                        "ts": ISODate("2124-05-01T00:01:00Z"),
                         value: 4,
                     },
                     "count": 1,
                 },
                 "meta": "1",
                 "data": {
-                    "ts": BinData(7, "CQBgWnQxjwEAAAA="),
+                    "ts": BinData(7, "CQBgKkLubQQAAAA="),
                     "_id": BinData(7, "AQAAAAAAAAAmQAA="),
                     "value": BinData(7, "AQAAAAAAAAAQQAA="),
                 },
@@ -492,19 +492,19 @@ describe("$changeStream", function () {
                     "version": TimeseriesTest.BucketVersion.kCompressedSorted,
                     "min": {
                         "_id": 12,
-                        "ts": ISODate("2024-05-01T00:02:00Z"),
+                        "ts": ISODate("2124-05-01T00:02:00Z"),
                         value: 5,
                     },
                     "max": {
                         "_id": 12,
-                        "ts": ISODate("2024-05-01T00:02:00Z"),
+                        "ts": ISODate("2124-05-01T00:02:00Z"),
                         value: 5,
                     },
                     "count": 1,
                 },
                 "meta": "2",
                 "data": {
-                    "ts": BinData(7, "CQDARHUxjwEAAAA="),
+                    "ts": BinData(7, "CQDAFEPubQQAAAA="),
                     "_id": BinData(7, "AQAAAAAAAAAoQAA="),
                     "value": BinData(7, "AQAAAAAAAAAUQAA="),
                 },
@@ -576,7 +576,7 @@ describe("$changeStream", function () {
         const nMeasurements = 3;
         const docsToInsert = Array.from({length: nMeasurements}, (_, i) => ({
             _id: i + 10,
-            ts: ISODate(`2024-05-01T00:0${i}:00Z`),
+            ts: ISODate(`2124-05-01T00:0${i}:00Z`),
             meta: i.toString(),
             value: i + nMeasurements,
         }));
@@ -675,12 +675,23 @@ describe("$changeStream", function () {
                 // To ensure the failure indeed occurs, we issue a getMore command to ensure that the cursor
                 // will be attempted to be opened on the shard and will fail.
                 assert.eq(response._changeStreamVersion, "v2", "Change stream of version v1 should fail immediately");
-                response = db.runCommand({getMore: response.cursor.id, collection: collName});
+
+                // In a v2 change stream, the first getMore operation may return a future cluster time.
+                // Retry the getMore until the expected error is returned.
+                assert.soonNoExcept(() => {
+                    response = db.runCommand({getMore: response.cursor.id, collection: collName});
+                    assert.commandFailedWithCode(response, [
+                        ErrorCodes.CommandNotSupportedOnView,
+                        ErrorCodes.CommandNotSupported,
+                    ]);
+                    return true;
+                });
+            } else {
+                assert.commandFailedWithCode(response, [
+                    ErrorCodes.CommandNotSupportedOnView,
+                    ErrorCodes.CommandNotSupported,
+                ]);
             }
-            assert.commandFailedWithCode(response, [
-                ErrorCodes.CommandNotSupportedOnView,
-                ErrorCodes.CommandNotSupported,
-            ]);
             assertDropCollection(db, collName);
         });
 
