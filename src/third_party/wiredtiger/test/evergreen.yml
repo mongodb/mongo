@@ -1453,7 +1453,7 @@ functions:
         ${PREPARE_TEST_ENV}
         # Run format test with disagg leader mode for now, which can be extended later.
         echo "Running format test in ${format_binary_dir} to generate data files ..."
-        ./t -c ${workdir}/${format_config_dir}/CONFIG.disagg disagg.mode=leader runs.timer=1:1
+        ./t -c ${workdir}/${format_config_dir}/CONFIG.disagg disagg.mode=leader disagg.key_provider=1 runs.timer=2:2
 
   "verify wt datafiles with binary":
     command: shell.exec

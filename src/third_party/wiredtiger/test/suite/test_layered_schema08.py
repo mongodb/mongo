@@ -35,11 +35,12 @@
 #   prepare) remain deferred until the next checkpoint.
 
 import threading, time, wiredtiger, wttest
+from checkpoint_util import checkpoint_util
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 @disagg_test_class
-class test_layered_schema08(wttest.WiredTigerTestCase):
+class test_layered_schema08(checkpoint_util):
     uri_base = 'test_layered_schema08'
     conn_config = 'statistics=(all),disaggregated=(role="leader",lose_all_my_data=true)'
 
@@ -65,15 +66,6 @@ class test_layered_schema08(wttest.WiredTigerTestCase):
         if self.prefix == 'table:':
             uris += ['table:' + self.uri_base, 'colgroup:' + self.uri_base]
         return uris
-
-    def wait_for_checkpoint_start(self):
-        while True:
-            stat_cursor = self.session.open_cursor('statistics:')
-            state = stat_cursor[wiredtiger.stat.conn.checkpoint_state][2]
-            stat_cursor.close()
-            if state != 0:
-                break
-            time.sleep(0.1)
 
     def check_shared_metadata(self, expect_contains=None, expect_missing=None):
         cursor = self.session.open_cursor('file:WiredTigerShared.wt_stable', None, None)

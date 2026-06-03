@@ -758,7 +758,7 @@ __live_restore_fh_read(
      * result.
      */
     if (WTI_DEST_COMPLETE(lr_fh))
-        WT_RET(__live_restore_fh_read_destination(session, lr_fh->destination, offset, len, buf));
+        return (__live_restore_fh_read_destination(session, lr_fh->destination, offset, len, buf));
 
     __wt_readlock(session, &lr_fh->lock);
     wt_off_t hole_begin_off;

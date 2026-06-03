@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import threading, time, wiredtiger, wttest
+from checkpoint_util import checkpoint_util
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
@@ -44,7 +45,7 @@ from wtscenario import make_scenarios
 # change happened after the checkpoint started.
 #
 @disagg_test_class
-class test_layered_checkpoint06(wttest.WiredTigerTestCase):
+class test_layered_checkpoint06(checkpoint_util):
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'precise_checkpoint=true,'
@@ -56,16 +57,6 @@ class test_layered_checkpoint06(wttest.WiredTigerTestCase):
 
     disagg_storages = gen_disagg_storages('test_layered_checkpoint06', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
-
-    # Wait for a checkpoint to start running
-    def wait_for_checkpoint_start(self):
-        while True:
-            stat_cursor = self.session.open_cursor('statistics:')
-            state = stat_cursor[wiredtiger.stat.conn.checkpoint_state][2]
-            stat_cursor.close()
-            if state != 0:
-                break
-            time.sleep(0.1)
 
     # Test stepping up concurrently with a checkpoint.
     def test_layered_checkpoint06(self):

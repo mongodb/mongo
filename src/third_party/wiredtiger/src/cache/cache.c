@@ -18,6 +18,7 @@ __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
     WT_CACHE *cache;
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
     bool now_shared, was_shared;
 
     conn = S2C(session);
@@ -33,7 +34,7 @@ __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
     if (reconfig && was_shared && !now_shared) {
         F_SET_ATOMIC_32(conn, WT_CONN_RECONFIGURING_CACHE_POOL);
         /* Remove ourselves from the pool if necessary */
-        WT_RET(__wt_cache_pool_destroy(session));
+        WT_ERR(__wt_cache_pool_destroy(session));
     } else if (reconfig && !was_shared && now_shared)
         /*
          * Cache size will now be managed by the cache pool - the start size always needs to be zero
@@ -46,15 +47,16 @@ __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
      * All other settings are independent of whether we are using a shared cache or not.
      */
     if (!now_shared) {
-        WT_RET(__wt_config_gets(session, cfg, "cache_size", &cval));
+        WT_ERR(__wt_config_gets(session, cfg, "cache_size", &cval));
         conn->cache_size = (uint64_t)cval.val;
     }
     /* Set config values as percentages. */
-    WT_RET(__wt_config_gets(session, cfg, "cache_overhead", &cval));
+    WT_ERR(__wt_config_gets(session, cfg, "cache_overhead", &cval));
     cache->overhead_pct = (u_int)cval.val;
 
+err:
     F_CLR_ATOMIC_32(conn, WT_CONN_RECONFIGURING_CACHE_POOL);
-    return (0);
+    return (ret);
 }
 
 /*

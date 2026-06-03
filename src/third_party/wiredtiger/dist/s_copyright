@@ -3,6 +3,7 @@
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 setup_trap
 cd_top
+check_fast_mode_flag
 
 # Check the copyrights.
 

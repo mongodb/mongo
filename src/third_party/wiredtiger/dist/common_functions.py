@@ -41,18 +41,12 @@ import inspect, os, subprocess, sys
 
 
 def last_commit_from_dev():
-    # Find the commit from develop at which point the current branch diverged.
-    # rev-list will show all commits that are present on our current branch but not on develop, and
-    # the oldest of these is our first commit post-divergence. If this commit exists then
-    # we can take its parent. If no such commits exist then we're currently on a commit in the
-    # develop branch and can use HEAD instead
-
-    earliest_commit = subprocess.run( "git rev-list HEAD...develop | tail -n 1",
-        shell=True, capture_output=True, text=True).stdout
-
-    commit_on_dev = f"{earliest_commit}~" if earliest_commit else "HEAD"
-
-    return subprocess.run(f"git rev-parse {commit_on_dev}",
+    # Find the most recent common ancestor between the current branch and origin/develop.
+    # Using git merge-base correctly handles branches that have merged develop multiple
+    # times: it returns the latest develop commit reachable from HEAD, so that
+    # filter_if_fast only sees files changed by the author's own commits rather than
+    # every file touched by develop since the branch was first created.
+    return subprocess.run("git merge-base origin/develop HEAD",
         shell=True, capture_output=True, text=True).stdout.strip()
 
 

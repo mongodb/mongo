@@ -3,6 +3,15 @@
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 setup_trap
 cd_top
+check_fast_mode_flag
+
+# In fast mode, skip if no evergreen yml files were modified in our commits.
+if is_fast_mode; then
+    search=`git diff --name-only "$(last_commit_from_dev)" | grep -E 'evergreen.*\.yml$' || true`
+    if test -z "$search"; then
+        exit 0
+    fi
+fi
 
 error=0
 

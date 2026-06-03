@@ -27,13 +27,14 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import threading, time, wiredtiger, wttest
+from checkpoint_util import checkpoint_util
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
 
 # test_layered_checkpoint08.py
 #    Test dropping empty tables while a checkpoint is running.
 @disagg_test_class
-class test_layered_checkpoint08(wttest.WiredTigerTestCase):
+class test_layered_checkpoint08(checkpoint_util):
     conn_base_config = 'statistics=(all),' \
                      + 'statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'precise_checkpoint=true,' \
@@ -47,16 +48,6 @@ class test_layered_checkpoint08(wttest.WiredTigerTestCase):
 
     disagg_storages = gen_disagg_storages('test_layered_checkpoint08', disagg_only = True)
     scenarios = make_scenarios(disagg_storages)
-
-    # Wait for a checkpoint to start running
-    def wait_for_checkpoint_start(self):
-        while True:
-            stat_cursor = self.session.open_cursor('statistics:')
-            state = stat_cursor[wiredtiger.stat.conn.checkpoint_state][2]
-            stat_cursor.close()
-            if state != 0:
-                break
-            time.sleep(0.1)
 
     # Test dropping an empty table while a checkpoint is running.
     def test_layered_checkpoint08(self):
@@ -79,7 +70,11 @@ class test_layered_checkpoint08(wttest.WiredTigerTestCase):
 
         session2.close()
 
-        # Wait until the sweep has closed any idle handles
+        # Wait until the sweep has closed any idle handles. With close_scan_interval=1 and
+        # close_idle_time=1, a dead handle is closed within a couple of sweep cycles, so bound the
+        # wait to fail fast with a clear error rather than spin until the task timeout if the sweep
+        # never makes progress.
+        sweep_deadline = time.time() + 60
         while True:
             stat_cursor = self.session.open_cursor('statistics:', None, None)
             sweep_closes_after = stat_cursor[wiredtiger.stat.conn.dh_sweep_dead_close][2]
@@ -87,6 +82,8 @@ class test_layered_checkpoint08(wttest.WiredTigerTestCase):
             if sweep_closes_after - sweep_closes_before > 0:
                 self.pr(f"Dhandles closed by sweep: {sweep_closes_after - sweep_closes_before}")
                 break
+            self.assertLess(time.time(), sweep_deadline,
+                'sweep server did not close the idle table handle within 60 seconds')
             time.sleep(0.5)
 
         # Start a checkpoint in a separate thread
