@@ -150,16 +150,17 @@ function testNotEquivalent({inputDoc, correct, incorrect}) {
     testIndependent({stage1, stage2, inputDoc: {x: [{}]}});
 }
 
-// When the paths diverge but not in the first component, it was previously
-// possible for the $addFields to affect the result because of a bug in how
-// nulls were handled.  It should no longer be the case.
-testIndependent({
+// When the paths diverge but not in the first component, it's possible for the
+// $addFields to affect the $match result: it replaces some scalars with objects,
+// which makes the $match path visit some missing fields instead of skipping them,
+// which means an {$eq: null} predicate changes from false to true.
+testDependent({
     stage1: {$addFields: {"a.x": 5}},
     stage2: {$match: {"a.y": null}},
     inputDoc: {a: [0]},
 });
 // Similarly {$in: [... null ...]} is a null-accepting predicate.
-testIndependent({
+testDependent({
     stage1: {$addFields: {"a.x": 5}},
     stage2: {$match: {"a.y": {$in: [2, null]}}},
     inputDoc: {a: [0]},

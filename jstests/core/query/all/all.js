@@ -26,7 +26,6 @@ let doTest = function () {
 
     t.save({a: [{b: [10, 11]}, 11]});
     assert.eq(1, t.find({"a.b": {$all: [10]}}).count());
-    assert.eq(0, t.find({"a.b": {$all: [20]}}).count());
     assert.eq(1, t.find({a: {$all: [11]}}).count());
 
     t.save({a: {b: [20, 30]}});

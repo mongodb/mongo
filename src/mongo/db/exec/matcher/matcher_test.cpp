@@ -897,9 +897,9 @@ TEST(EqOp, MatchesNestedNull) {
     ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSONObj())), nullptr));
     ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << BSONNULL)), nullptr));
     // b does not exist as an element in array under a.
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSONArray()), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSONNULL)), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSONArray()), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(BSONNULL)), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON_ARRAY(1 << 2)), nullptr));
     // a.b exists but is not null.
     ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << 4)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&eq, BSON("a" << BSON("b" << BSONObj())), nullptr));
@@ -1162,7 +1162,7 @@ TEST(LteOp, MatchesDotNotationNull) {
         exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(BSON("b" << BSONNULL))), nullptr));
     ASSERT(exec::matcher::matchesBSON(
         &lte, BSON("a" << BSON_ARRAY(BSON("a" << 4) << BSON("b" << 4))), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(4)), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(4)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&lte, BSON("a" << BSON_ARRAY(BSON("b" << 4))), nullptr));
 }
 
@@ -1372,7 +1372,7 @@ TEST(GteOp, MatchesDotNotationNull) {
         exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(BSON("b" << BSONNULL))), nullptr));
     ASSERT(exec::matcher::matchesBSON(
         &gte, BSON("a" << BSON_ARRAY(BSON("a" << 4) << BSON("b" << 4))), nullptr));
-    ASSERT(exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(4)), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(4)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&gte, BSON("a" << BSON_ARRAY(BSON("b" << 4))), nullptr));
 }
 

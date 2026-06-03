@@ -308,9 +308,14 @@ SbExpr generateTraverseF(SbExpr inputExpr,
             lambdaFrameId, SbExpr::makeSeq(std::move(fieldExpr)), std::move(resultExpr));
     }
 
-    if (needsNothingCheck && state.legacyDottedPathNullSemantics) {
-        // When the predicate can match Nothing, we need to do some extra work for non-leaf fields.
+    // When the predicate can match Nothing, we need to do some extra work for non-leaf fields.
+    if (needsNothingCheck) {
+        // Add a check that will return false if the lambda's parameter is not an object. This
+        // effectively allows us to skip over cases where we would be calling getField() on a scalar
+        // value or an array and getting back Nothing. The subset of such cases where we should
+        // return true is handled by the previous level before execution would reach here.
         auto cond = b.makeFillEmptyFalse(b.makeFunction(sbe::EFn::kIsObject, lambdaParam.clone()));
+
         resultExpr = b.makeIf(std::move(cond), std::move(resultExpr), b.makeBoolConstant(false));
     }
 
@@ -334,36 +339,18 @@ SbExpr generateTraverseF(SbExpr inputExpr,
 
     // When the predicate can match Nothing, we need to do some extra work for non-leaf fields.
     if (needsNothingCheck) {
-        if (!state.legacyDottedPathNullSemantics) {
-            // If the result of getField() was Nothing or a scalar value, then don't bother
-            // traversing the remaining levels of the path and just decide now to return true for
-            // this value.
-            traverseFExpr = b.makeIf(b.makeFillEmptyFalse(b.makeFunction(
-                                         sbe::EFn::kTypeMatch,
-                                         fieldExpr.clone(),
-                                         b.makeInt32Constant(getBSONTypeMask(BSONType::array) |
-                                                             getBSONTypeMask(BSONType::object)))),
-                                     std::move(traverseFExpr),
-                                     b.makeBoolConstant(true));
-            // Since a non-existent document is considered equal to Null, an array with no values
-            // also matches. Check for this case and return true without entering traverseF.
-            traverseFExpr = b.makeIf(
-                b.makeFillEmptyFalse(b.makeFunction(sbe::EFn::kIsArrayEmpty, fieldExpr.clone())),
-                b.makeBoolConstant(true),
-                std::move(traverseFExpr));
-        } else {
-            // Pre-SERVER-36681 behavior: skip traversal for non-array/non-object fields,
-            // falling back to an existence check on the parent.
-            traverseFExpr =
-                b.makeIf(b.makeFillEmptyFalse(b.makeFunction(
-                             sbe::EFn::kTypeMatch,
-                             fieldExpr.clone(),
-                             b.makeInt32Constant(getBSONTypeMask(BSONType::array) |
-                                                 getBSONTypeMask(BSONType::object)))),
-                         std::move(traverseFExpr),
-                         !inputExpr.isNull() ? b.makeFunction(sbe::EFn::kExists, inputExpr.clone())
-                                             : b.makeBoolConstant(true));
-        }
+        // If the result of getField() was Nothing or a scalar value, then don't bother traversing
+        // the remaining levels of the path and just decide now if we should return true or false
+        // for this value.
+        traverseFExpr =
+            b.makeIf(b.makeFillEmptyFalse(
+                         b.makeFunction(sbe::EFn::kTypeMatch,
+                                        fieldExpr.clone(),
+                                        b.makeInt32Constant(getBSONTypeMask(BSONType::array) |
+                                                            getBSONTypeMask(BSONType::object)))),
+                     std::move(traverseFExpr),
+                     !inputExpr.isNull() ? b.makeFunction(sbe::EFn::kExists, inputExpr.clone())
+                                         : b.makeBoolConstant(true));
     }
 
     if (frameId) {

@@ -31,7 +31,6 @@
 
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/util/modules.h"
 
 #include <absl/container/flat_hash_map.h>
@@ -93,7 +92,6 @@ struct StageBuilderState {
           expCtx{expCtx},
           needsMerge{needsMerge},
           allowDiskUse{allowDiskUse},
-          legacyDottedPathNullSemantics{internalQueryLegacyDottedPathNullSemantics.loadRelaxed()},
           ifrContext(ifrContext) {}
 
     StageBuilderState(const StageBuilderState& other) = delete;
@@ -178,8 +176,6 @@ struct StageBuilderState {
 
     // A flag to indicate the user allows disk use for spilling.
     bool allowDiskUse;
-
-    bool legacyDottedPathNullSemantics;
 
     IncrementalFeatureRolloutContext& ifrContext;
 

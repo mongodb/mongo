@@ -963,30 +963,17 @@ assert.commandWorked(
 validateFindCmdOutputAndPlan({
     filter: {"a.b": null},
     projection: {_id: 1},
-    expectedOutput: [
-        {_id: 1},
-        {_id: 2},
-        {_id: 3},
-        {_id: 5},
-        {_id: 6},
-        {_id: 7},
-        {_id: 11},
-        {_id: 12},
-        {_id: 13},
-        {_id: 14},
-        {_id: 15},
-        {_id: 16},
-    ],
+    expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 5}, {_id: 6}, {_id: 7}, {_id: 11}, {_id: 13}, {_id: 15}],
     expectedStages: {"IXSCAN": 1, "PROJECTION_SIMPLE": 1, "FETCH": 1},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {"a.b": null},
-    expectedCount: 12,
+    expectedCount: 9,
     expectedStages: {"COUNT": 1, "IXSCAN": 1, "FETCH": 1},
 });
 validateGroupCountAggCmdOutputAndPlan({
     filter: {"a.b": null},
-    expectedCount: 12,
+    expectedCount: 9,
     expectedStages: {"IXSCAN": 1, "FETCH": 1},
 });
 
@@ -1041,55 +1028,18 @@ validateFindCmdOutputAndPlan({
         {_id: 7},
         {_id: 8},
         {_id: 11},
-        {_id: 12},
         {_id: 13},
-        {_id: 14},
         {_id: 15},
-        {_id: 16},
     ],
     expectedStages: {"IXSCAN": 1, "PROJECTION_SIMPLE": 1, "FETCH": 1},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {"a.b": {$in: [null, []]}},
-    expectedCount: 13,
+    expectedCount: 10,
     expectedStages: {"IXSCAN": 1, "FETCH": 1},
 });
 validateGroupCountAggCmdOutputAndPlan({
     filter: {"a.b": {$in: [null, []]}},
-    expectedCount: 13,
+    expectedCount: 10,
     expectedStages: {"IXSCAN": 1, "FETCH": 1},
-});
-
-// Check array index path
-validateFindCmdOutputAndPlan({
-    filter: {"a.b.0": {$eq: null}},
-    projection: {_id: 1},
-    expectedOutput: [
-        {_id: 1},
-        {_id: 2},
-        {_id: 3},
-        {_id: 4},
-        {_id: 5},
-        {_id: 6},
-        {_id: 7},
-        {_id: 8},
-        {_id: 10},
-        {_id: 11},
-        {_id: 12},
-        {_id: 13},
-        {_id: 14},
-        {_id: 15},
-        {_id: 16},
-    ],
-    expectedStages: {"COLLSCAN": 1, "PROJECTION_SIMPLE": 1},
-});
-validateSimpleCountCmdOutputAndPlan({
-    filter: {"a.b.0": {$eq: null}},
-    expectedCount: 15,
-    expectedStages: {"COLLSCAN": 1, "COUNT": 1},
-});
-validateGroupCountAggCmdOutputAndPlan({
-    filter: {"a.b.0": {$eq: null}},
-    expectedCount: 15,
-    expectedStages: {"COLLSCAN": 1},
 });
