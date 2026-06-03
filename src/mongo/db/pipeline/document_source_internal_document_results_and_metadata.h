@@ -107,6 +107,9 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
+    DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
+                                                 DocumentSourceContainer* container);
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic(
         const DistributedPlanContext* ctx) final {
         // TODO: SERVER-126255

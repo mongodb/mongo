@@ -33,8 +33,12 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata_gen.h"
+#include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -123,9 +127,10 @@ DocumentSourceContainer DocumentSourceInternalDocumentResultsAndMetadata::create
     boost::optional<MetadataBindSpec> metadata;
     if (auto metaSpec = spec.getMetadata()) {
         tassert(12615005,
-                str::stream() << kStageName << " 'metadata.as' must be a known built-in pipeline "
-                              << "variable, got '" << metaSpec->getAs() << "'",
-                Variables::isBuiltin(metaSpec->getAs()));
+                str::stream() << kStageName << " 'metadata.as' must be '"
+                              << Variables::kSearchMetaName << "', got '" << metaSpec->getAs()
+                              << "'",
+                metaSpec->getAs() == Variables::kSearchMetaName);
         metadata = std::move(metaSpec);
     }
 
@@ -150,6 +155,30 @@ Value DocumentSourceInternalDocumentResultsAndMetadata::serialize(
     spec.setMetadata(_metadata);
     spec.setReturnCursor(_returnCursor);
     return Value(Document{{getSourceName(), spec.toBSON(opts)}});
+}
+
+DocumentSourceContainer::iterator DocumentSourceInternalDocumentResultsAndMetadata::optimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
+    tassert(12615007, "Expecting DocumentSource iterator pointing to this stage.", *itr == this);
+    // Shards only see their local pipeline view, so $$SEARCH_META refs in the merge
+    // pipeline are invisible to them. Only the router runs metadata elision.
+    if (getExpCtx()->getNeedsMerge() || !_metadata) {
+        return std::next(itr);
+    }
+
+    const bool referencesSearchMeta =
+        std::any_of(std::next(itr), container->end(), [](const auto& stage) {
+            return search_helpers::hasReferenceToSearchMeta(*stage);
+        });
+    if (!referencesSearchMeta) {
+        LOGV2_DEBUG(12615008,
+                    4,
+                    "Eliding metadata stream as no downstream stage references $$SEARCH_META.");
+        _metadata = boost::none;
+        // TODO: SERVER-126183 invoke _sourceStage->skipStream(kMetadataResult) once
+        // skip_stream is added to MongoExtensionLogicalAggStageVTable in api.h.
+    }
+    return std::next(itr);
 }
 
 }  // namespace mongo

@@ -104,6 +104,13 @@ DEATH_TEST_F(DocumentSourceInternalDocumentResultsAndMetadataDeathTest,
                                            << BSON("as" << "UNKNOWN_VARIABLE"))));
 }
 
+DEATH_TEST_F(DocumentSourceInternalDocumentResultsAndMetadataDeathTest,
+             RejectsVariableNameWhenNotSearchMeta,
+             "12615005") {
+    parse(BSON(kStageName << BSON("source" << BSON("$collStats" << BSONObj()) << "metadata"
+                                           << BSON("as" << "NOW"))));
+}
+
 TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest, RejectsMissingSource) {
     ASSERT_THROWS_CODE(parse(BSON(kStageName << BSON("metadata" << BSON("as" << "SEARCH_META")))),
                        AssertionException,
@@ -188,6 +195,108 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     ASSERT_EQ(constraints.facetRequirement, StageConstraints::FacetRequirement::kNotAllowed);
     ASSERT_EQ(constraints.transactionRequirement,
               StageConstraints::TransactionRequirement::kNotAllowed);
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       OptimizeElidesMetadataWhenNoSearchMetaRef) {
+    auto sourceStage = DocumentSource::parse(getExpCtx(), BSON("$collStats" << BSONObj())).front();
+    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
+    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
+    ASSERT(ds);
+    ASSERT(ds->getMetadata().has_value());
+
+    // Downstream $project does not reference $$SEARCH_META.
+    auto downstreamStage =
+        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
+    DocumentSourceContainer pipeline;
+    pipeline.push_back(stage);
+    pipeline.push_back(downstreamStage);
+    ds->optimizeAt(pipeline.begin(), &pipeline);
+
+    ASSERT_FALSE(ds->getMetadata().has_value());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       OptimizeRetainsMetadataWhenNeedsMergeTrue) {
+    // Simulate shard context: needsMerge = true.
+    getExpCtx()->setNeedsMerge(true);
+    auto sourceStage = DocumentSource::parse(getExpCtx(), BSON("$collStats" << BSONObj())).front();
+    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
+    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
+    ASSERT(ds);
+
+    // Downstream $project does not reference $$SEARCH_META but elision must be suppressed on
+    // shards.
+    auto downstreamStage =
+        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
+    DocumentSourceContainer pipeline;
+    pipeline.push_back(stage);
+    pipeline.push_back(downstreamStage);
+    ds->optimizeAt(pipeline.begin(), &pipeline);
+
+    ASSERT_TRUE(ds->getMetadata().has_value());
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       OptimizeSerializesWithoutMetadataAfterElision) {
+    auto sourceStage = DocumentSource::parse(getExpCtx(), BSON("$collStats" << BSONObj())).front();
+    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
+    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
+    ASSERT(ds);
+    ASSERT(ds->getMetadata().has_value());
+
+    auto downstreamStage =
+        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
+    DocumentSourceContainer pipeline;
+    pipeline.push_back(stage);
+    pipeline.push_back(downstreamStage);
+    ds->optimizeAt(pipeline.begin(), &pipeline);
+
+    auto serialized = ds->serialize(SerializationOptions{});
+    auto bson = serialized.getDocument().toBson();
+    auto inner = bson.getObjectField(kStageName);
+    ASSERT_FALSE(inner.hasField("metadata"));
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       OptimizeNoOpWhenMetadataAlreadyAbsent) {
+    auto* ds = parse(BSON(kStageName << kSourceOnly));
+    ASSERT_FALSE(ds->getMetadata().has_value());
+
+    auto downstreamStage =
+        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
+    DocumentSourceContainer pipeline;
+    pipeline.push_back(ds);
+    pipeline.push_back(downstreamStage);
+    ds->optimizeAt(pipeline.begin(), &pipeline);
+
+    ASSERT_FALSE(ds->getMetadata().has_value());
+    ASSERT_EQ(pipeline.size(), 2u);
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       OptimizeRetainsMetadataWhenDownstreamStageReferencesSearchMeta) {
+    auto sourceStage = DocumentSource::parse(getExpCtx(), BSON("$collStats" << BSONObj())).front();
+    auto stage = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        getExpCtx(), std::move(sourceStage), MetadataBindSpec("SEARCH_META"));
+    auto* ds = dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(stage.get());
+    ASSERT(ds);
+
+    auto middleStage =
+        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("x" << 1))).front();
+    auto downstreamStage =
+        DocumentSource::parse(getExpCtx(), BSON("$project" << BSON("meta" << "$$SEARCH_META")))
+            .front();
+    DocumentSourceContainer pipeline;
+    pipeline.push_back(stage);
+    pipeline.push_back(middleStage);
+    pipeline.push_back(downstreamStage);
+    ds->optimizeAt(pipeline.begin(), &pipeline);
+
+    ASSERT_TRUE(ds->getMetadata().has_value());
 }
 
 }  // namespace

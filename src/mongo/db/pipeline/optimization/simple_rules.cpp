@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/document_source_redact.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
@@ -84,4 +85,6 @@ REGISTER_RULES(DocumentSourceRedact,
                },
                OPTIMIZE_AT_RULE(DocumentSourceRedact),
                OPTIMIZE_IN_PLACE_RULE(DocumentSourceRedact));
+REGISTER_RULES(DocumentSourceInternalDocumentResultsAndMetadata,
+               OPTIMIZE_AT_RULE(DocumentSourceInternalDocumentResultsAndMetadata));
 }  // namespace mongo::rule_based_rewrites::pipeline
