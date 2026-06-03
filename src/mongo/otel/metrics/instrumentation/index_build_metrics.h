@@ -27,20 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/otel/metrics/instrumentation/metrics_installer.h"
+#pragma once
 
-#include "mongo/otel/metrics/instrumentation/disk_metrics.h"
-#include "mongo/otel/metrics/instrumentation/global_lock_metrics.h"
-#include "mongo/otel/metrics/instrumentation/index_build_metrics.h"
-#include "mongo/otel/metrics/instrumentation/system_mount_metrics.h"
+#include "mongo/util/modules.h"
+
+#include <memory>
 
 namespace mongo {
 
-void installOtelMetrics(ServiceContext* svcCtx) {
-    installSystemMountOtelMetrics(svcCtx);
-    installDiskOtelMetrics(svcCtx);
-    installGlobalLockOtelMetrics(svcCtx);
-    installIndexBuildOtelMetrics(svcCtx);
-}
+class ServiceContext;
+struct IndexBulkBuilderMetricsSnapshot;
+
+/**
+ * Owns the OpenTelemetry instruments that track index build metrics.
+ */
+class IndexBuildOtelMetrics {
+public:
+    IndexBuildOtelMetrics();
+    ~IndexBuildOtelMetrics();
+
+    void update(const IndexBulkBuilderMetricsSnapshot& snapshot);
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> _impl;
+};
+
+/**
+ * Starts a periodic job (1 Hz) that samples the snapshots and updates OpenTelemetry metrics for
+ * index build operations. Intended to be called once at startup from mongod_main.
+ */
+MONGO_MOD_PUBLIC void installIndexBuildOtelMetrics(ServiceContext* svcCtx);
 
 }  // namespace mongo

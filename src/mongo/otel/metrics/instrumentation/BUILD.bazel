@@ -97,12 +97,36 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
+    name = "index_build_metrics",
+    srcs = ["index_build_metrics.cpp"],
+    hdrs = ["index_build_metrics.h"],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/index:index_bulk_builder_metrics",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+        "//src/mongo/util:periodic_runner",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "index_build_metrics_test",
+    srcs = ["index_build_metrics_test.cpp"],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":index_build_metrics",
+        "//src/mongo/db/index:index_bulk_builder_metrics",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_library(
     name = "metrics_installer",
     srcs = ["metrics_installer.cpp"],
     hdrs = ["metrics_installer.h"],
     deps = [
         ":disk_metrics",
         ":global_lock_metrics",
+        ":index_build_metrics",
         ":system_mount_metrics",
     ],
 )

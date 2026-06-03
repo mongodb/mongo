@@ -34,13 +34,13 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/collection_crud/container_write.h"
-#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/index/hash_access_method.h"
+#include "mongo/db/index/index_bulk_builder_metrics.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/s2_bucket_access_method.h"
@@ -142,68 +142,6 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
 }
 
 namespace {
-
-/**
- * Metrics for index bulk builder operations. Intended to support index build diagnostics
- * during the following scenarios:
- * - createIndex commands;
- * - collection cloning during initial sync; and
- * - resuming index builds at startup.
- *
- * Also includes statistics for disk usage (by the external sorter) for index builds that
- * do not fit in memory.
- */
-class IndexBulkBuilderSSS : public ServerStatusSection {
-public:
-    using ServerStatusSection::ServerStatusSection;
-
-    bool includeByDefault() const final {
-        return true;
-    }
-
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
-        BSONObjBuilder builder;
-        builder.append("count", count.loadRelaxed());
-        builder.append("resumed", resumed.loadRelaxed());
-        builder.append("filesOpenedForExternalSort", sorterFileStats.opened.loadRelaxed());
-        builder.append("filesClosedForExternalSort", sorterFileStats.closed.loadRelaxed());
-        builder.append("spilledRanges", sorterTracker.spilledRanges.loadRelaxed());
-        builder.append("mergedSpills", sorterTracker.mergedSpills.loadRelaxed());
-        builder.append("bytesSpilledUncompressed",
-                       sorterTracker.bytesSpilledUncompressed.loadRelaxed());
-        builder.append("bytesSpilled", sorterTracker.bytesSpilled.loadRelaxed());
-        builder.append("numSorted", sorterTracker.numSorted.loadRelaxed());
-        builder.append("bytesSorted", sorterTracker.bytesSorted.loadRelaxed());
-        builder.append("memUsage", sorterTracker.memUsage.loadRelaxed());
-        return builder.obj();
-    }
-
-    // Number of instances of the bulk builder created.
-    AtomicWord<long long> count;
-
-    // Number of times the bulk builder was created for a resumable index build.
-    // This value should not exceed 'count'.
-    AtomicWord<long long> resumed;
-
-    // Sorter statistics that are aggregate of all sorters.
-    SorterTracker sorterTracker;
-
-    // Number of times a file-based external sorter opens/closes a file handle to spill data to
-    // disk. This pair of counters in aggregate indicate the number of open file handles used by the
-    // external sorter and may be useful in diagnosing situations where the process is close to
-    // exhausting this finite resource.
-    SorterFileStats sorterFileStats{&sorterTracker};
-
-    // Tracks the number of bytes of uncompressed data spilled from a external sorter with a
-    // container as the underlying storage. This is the only metric tracked as we only open one
-    // container per sorter instance and we don't handle compression in the sorter for a
-    // container-based sorter.
-    SorterContainerStats sorterContainerStats{&sorterTracker};
-};
-
-auto& indexBulkBuilderSSS =
-    *ServerStatusSectionBuilder<IndexBulkBuilderSSS>("indexBulkBuilder").forShard();
-
 auto& keysInsertedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildKeysInsertedFromScan,
     "Total number of keys inserted to indexes from collection scan",
@@ -224,7 +162,7 @@ SortOptions makeSortOptions(size_t maxMemoryUsageBytes) {
     return SortOptions()
         .MaxMemoryUsageBytes(maxMemoryUsageBytes)
         .UseMemoryPool(true)
-        .Tracker(&indexBulkBuilderSSS.sorterTracker);
+        .Tracker(&indexBulkBuilderMetrics().sorterTracker);
 }
 
 MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPathsVec) {
@@ -914,12 +852,12 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
 }
 
 void IndexAccessMethod::BulkBuilder::countNewBuildInStats() {
-    indexBulkBuilderSSS.count.addAndFetch(1);
+    indexBulkBuilderMetrics().count.addAndFetch(1);
 }
 
 void IndexAccessMethod::BulkBuilder::countResumedBuildInStats() {
-    indexBulkBuilderSSS.count.addAndFetch(1);
-    indexBulkBuilderSSS.resumed.addAndFetch(1);
+    indexBulkBuilderMetrics().count.addAndFetch(1);
+    indexBulkBuilderMetrics().resumed.addAndFetch(1);
 }
 
 namespace {
@@ -1504,11 +1442,11 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::ini
 }
 
 SorterFileStats& SortedDataIndexAccessMethod::getSorterFileStats() {
-    return indexBulkBuilderSSS.sorterFileStats;
+    return indexBulkBuilderMetrics().sorterFileStats;
 }
 
 SorterContainerStats& SortedDataIndexAccessMethod::getSorterContainerStats() {
-    return indexBulkBuilderSSS.sorterContainerStats;
+    return indexBulkBuilderMetrics().sorterContainerStats;
 }
 
 void SortedDataIndexAccessMethod::getKeys(

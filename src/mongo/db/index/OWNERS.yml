@@ -7,6 +7,9 @@ filters:
   - "*access_method*":
     approvers:
       - 10gen/server-index-builds
+  - "index_bulk_builder_metrics*":
+    approvers:
+      - 10gen/server-index-builds
   - "index_constants.h":
     approvers:
       - 10gen/server-index-builds

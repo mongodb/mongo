@@ -41,6 +41,31 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "index_bulk_builder_metrics",
+    srcs = [
+        "index_bulk_builder_metrics.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands/server_status:server_status_core",
+        "//src/mongo/db/sorter:sorter_stats",
+        "//src/mongo/otel/metrics:otel_metrics_service",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "index_bulk_builder_metrics_test",
+    srcs = [
+        "index_bulk_builder_metrics_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":index_bulk_builder_metrics",
+        "//src/mongo/otel/metrics:metrics_test_util",
+    ],
+)
+
+mongo_cc_library(
     name = "index_access_method",
     srcs = [
         "2d_access_method.cpp",
@@ -62,6 +87,7 @@ mongo_cc_library(
     ],
     deps = [
         ":expression_params",
+        ":index_bulk_builder_metrics",
         ":multikey_paths",
         "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/db:mongohasher",
@@ -97,6 +123,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:write_unit_of_work",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/util:progress_meter",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/third_party/s2",
