@@ -160,6 +160,21 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
+    name = "shapifying_insert_bm",
+    srcs = [
+        "shapifying_insert_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":insert_key",
+        "//src/mongo/db/query:query_bm_constants",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/query_shape:insert_cmd_shape",
+    ],
+)
+
+mongo_cc_benchmark(
     name = "shapifying_update_bm",
     srcs = [
         "shapifying_update_bm.cpp",

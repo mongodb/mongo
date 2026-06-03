@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -79,6 +80,8 @@ extern const UpdateSpec kPipelineUpdateSimple;
 extern const UpdateSpec kPipelineUpdateWithConstants;
 extern const UpdateSpec kPipelineUpdateWithMultipleStages;
 extern const UpdateSpec kPipelineUpdateWithMultipleStagesAndExpressions;
+
+constexpr auto kCollectionType = query_shape::CollectionType::kCollection;
 
 }  // namespace query_benchmark_constants
 }  // namespace mongo

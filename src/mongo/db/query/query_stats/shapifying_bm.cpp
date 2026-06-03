@@ -46,11 +46,6 @@
 namespace mongo {
 namespace {
 
-static const NamespaceStringOrUUID kDefaultTestNss =
-    NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("test.coll")};
-
-static constexpr auto kCollectionType = query_shape::CollectionType::kCollection;
-
 /**
  * Builds a sort specification with 'count' fields, like {field_0: 1, field_1: -1, field_2: 1, ...}.
  */
@@ -68,7 +63,7 @@ auto makeFindKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
         expCtx,
         *parsedFind.findCommandRequest,
         std::make_unique<query_shape::FindCmdShape>(parsedFind, expCtx),
-        kCollectionType);
+        query_benchmark_constants::kCollectionType);
 }
 
 int shapifyAndHashRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,

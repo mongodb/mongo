@@ -47,11 +47,6 @@
 namespace mongo {
 namespace {
 
-static const NamespaceStringOrUUID kDefaultTestNss =
-    NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("test.coll")};
-
-static constexpr auto kCollectionType = query_shape::CollectionType::kCollection;
-
 // Different types of shapifying update benchmarks.
 // We have separate benchmark: One for computing QSH and another that computes the UpdateKey
 // We will compute QSH all the time on the hot path, while $queryStats is sampling only.
@@ -65,7 +60,7 @@ int shapifyAndGenerateKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
         updateCommandRequest,
         boost::none /* hint */,
         std::make_unique<query_shape::UpdateCmdShape>(updateCommandRequest, parsedUpdate, expCtx),
-        kCollectionType);
+        query_benchmark_constants::kCollectionType);
 
     [[maybe_unused]] auto hash = absl::HashOf(key);
     return 0;
@@ -135,7 +130,7 @@ void runBenchmark(BSONObj predicate,
                     shapifyAndSHA256Hash(expCtx, parsedUpdate, updateCommandRequest));
                 break;
             default:
-                MONGO_UNREACHABLE_TASSERT(1140062);
+                MONGO_UNREACHABLE_TASSERT(11400602);
         }
     }
 }

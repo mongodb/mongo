@@ -33,6 +33,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/query_bm_constants.h"
 #include "mongo/db/query/query_shape/delete_cmd_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
@@ -46,10 +47,8 @@ namespace {
 
 using write_ops::DeleteCommandRequest;
 
-static const NamespaceString kDefaultTestNss =
+const NamespaceString kDefaultTestNss =
     NamespaceString::createNamespaceString_forTest("testDB.testColl");
-
-static constexpr auto kCollectionType = query_shape::CollectionType::kCollection;
 
 class DeleteKeyTest : public ServiceContextTest {
 public:
@@ -87,7 +86,7 @@ public:
                                                        dcr,
                                                        parsedDelete.getRequest()->getHint(),
                                                        std::move(shape),
-                                                       kCollectionType));
+                                                       query_benchmark_constants::kCollectionType));
         }
         return keys;
     }

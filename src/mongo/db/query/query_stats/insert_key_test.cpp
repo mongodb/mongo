@@ -30,6 +30,7 @@
 #include "mongo/db/query/query_stats/insert_key.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/query/query_bm_constants.h"
 #include "mongo/db/query/query_shape/insert_cmd_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -39,11 +40,6 @@ namespace mongo::query_stats {
 namespace {
 
 using write_ops::InsertCommandRequest;
-
-static const NamespaceString kDefaultTestNss =
-    NamespaceString::createNamespaceString_forTest("testDB.testColl");
-
-static constexpr auto kCollectionType = query_shape::CollectionType::kCollection;
 
 class InsertKeyTest : public ServiceContextTest {
 public:
@@ -58,7 +54,8 @@ public:
     std::unique_ptr<InsertKey> makeInsertKey(StringData cmd) {
         auto icr = InsertCommandRequest::parseOwned(fromjson(cmd));
         auto shape = std::make_unique<query_shape::InsertCmdShape>(icr);
-        return std::make_unique<InsertKey>(opCtx(), icr, std::move(shape), kCollectionType);
+        return std::make_unique<InsertKey>(
+            opCtx(), icr, std::move(shape), query_benchmark_constants::kCollectionType);
     }
 
 private:
