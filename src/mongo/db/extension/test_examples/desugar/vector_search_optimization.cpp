@@ -75,6 +75,18 @@ public:
         return BSON("vectorSearchScore" << BSON("$meta" << "vectorSearchScore"));
     }
 
+    boost::optional<sdk::DistributedPlanLogic> getDistributedPlanLogic() const override {
+        if (!_arguments.getField("shardedDPL").booleanSafe()) {
+            return boost::none;
+        }
+        std::vector<extension::VariantDPLHandle> shards;
+        shards.emplace_back(
+            extension::LogicalAggStageHandle{new sdk::ExtensionLogicalAggStageAdapter(clone())});
+        return sdk::DistributedPlanLogic(sdk::DPLArrayContainer(std::move(shards)),
+                                         sdk::DPLArrayContainer({}),
+                                         getSortPattern());
+    }
+
     mongo::BSONObj serialize() const override {
         BSONObjBuilder spec;
         spec.append("limit", _buildLimitSpec());
