@@ -158,13 +158,12 @@ void MigrationBlockingOperationCoordinator::_recoverIfNecessary(WithLock lk,
     // before finishing, so it's ok to continue.
     if (isBeginOperation || !allowMigrations) {
         try {
-            // TODO (SERVER-127440): take AuthoritativeMetadataAccessLevelEnum from _doc.
             _getExternalState()->allowMigrations(
                 opCtx,
                 nss(),
                 false,
                 [&] { return getNewSession(opCtx); },
-                AuthoritativeMetadataAccessLevelEnum::kNone);
+                _doc.getAuthoritativeMetadataAccessLevel());
             _needsRecovery = false;
             return;
         } catch (const DBException& e) {
@@ -218,13 +217,12 @@ void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opC
         ScopeGuard removeStateDocumentGuard(
             [&] { ensureFulfilledPromise(lock, _beginCleanupPromise); });
         hangBeforeBlockingMigrations.pauseWhileSet();
-        // TODO (SERVER-127440): take AuthoritativeMetadataAccessLevelEnum from _doc.
         _getExternalState()->allowMigrations(
             opCtx,
             nss(),
             false,
             [&] { return getNewSession(opCtx); },
-            AuthoritativeMetadataAccessLevelEnum::kNone);
+            _doc.getAuthoritativeMetadataAccessLevel());
         removeStateDocumentGuard.dismiss();
     }
 
@@ -259,13 +257,12 @@ void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx
 
     if (_operations.empty()) {
         hangBeforeAllowingMigrations.pauseWhileSet();
-        // TODO (SERVER-127440): take AuthoritativeMetadataAccessLevelEnum from _doc.
         _getExternalState()->allowMigrations(
             opCtx,
             nss(),
             true,
             [&] { return getNewSession(opCtx); },
-            AuthoritativeMetadataAccessLevelEnum::kNone);
+            _doc.getAuthoritativeMetadataAccessLevel());
 
         hangBeforeFulfillingPromise.pauseWhileSet();
         ensureFulfilledPromise(lock, _beginCleanupPromise);

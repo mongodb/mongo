@@ -318,5 +318,15 @@ export function runCommandDuringTransferMods(
 export function migrationsAreAllowed(db, collName) {
     const configDB = db.getSiblingDB("config");
     const nss = `${db.getName()}.${collName}`;
-    return configDB.collections.countDocuments({_id: nss, allowMigrations: {$ne: false}}) > 0;
+    // Migrations can be blocked through two independent mechanisms: the legacy `allowMigrations`
+    // flag and, when authoritative DDL is enabled, the `allowChunkOperations` flag (setAllowMigrations
+    // V2). Both default to true when absent, so this mirrors the server-side
+    // checkAllowMigrationsOnConfigServer() which requires both to be not-false.
+    return (
+        configDB.collections.countDocuments({
+            _id: nss,
+            allowMigrations: {$ne: false},
+            allowChunkOperations: {$ne: false},
+        }) > 0
+    );
 }
