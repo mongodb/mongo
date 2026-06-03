@@ -1042,8 +1042,10 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
                 // For viewless timeseries collections, fetch the raw indexes instead of
                 // user-visible ones. (Note that for all other collection types, this parameter has
                 // no effect.) This is hardcoded, since all current callers of this function expect
-                // raw indexes.
-                if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+                // raw indexes. If isRawDataOperation is set, the caller already decided to use
+                // rawData, so follow that decision instead of checking over a new FCV snapshot.
+                if (isRawDataOperation(opCtx) ||
+                    gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
                         VersionContext::getDecoration(opCtx),
                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     listIndexesCmd.setRawData(true);

@@ -171,15 +171,24 @@ void OutStage::retrieveOriginalOutCollInfo() {
         }
 
         if (!originalOptions.isEmpty()) {
-            // When rawData operations are not supported (FCV < 8.2), getIndexSpecs cannot
-            // resolve timeseries indexes through the user-facing namespace, so we must
-            // explicitly target the underlying system.buckets collection.
-            auto outputNsForFetchingIndexes = originalOptions.hasField("timeseries") &&
-                    !gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
-                        VersionContext::getDecoration(pExpCtx->getOperationContext()),
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
-                ? _outputNs.makeTimeseriesBucketsNamespace()
-                : _outputNs;
+            const bool isRawData = isRawDataOperation(pExpCtx->getOperationContext());
+            ON_BLOCK_EXIT([&] { isRawDataOperation(pExpCtx->getOperationContext()) = isRawData; });
+
+            auto outputNsForFetchingIndexes = _outputNs;
+            if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+                    VersionContext::getDecoration(pExpCtx->getOperationContext()),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                // Set isRawDataOperation to ensure getIndexSpecs always propagates rawData:true
+                // even though we are targeting the main namespace.
+                // TODO(SERVER-111600): Remove once AllBinariesSupportRawDataOperations is last LTS
+                isRawDataOperation(pExpCtx->getOperationContext()) = true;
+            } else if (originalOptions.hasField("timeseries")) {
+                // When rawData operations are not supported (FCV < 8.2), getIndexSpecs cannot
+                // resolve timeseries indexes through the user-facing namespace, so we must
+                // explicitly target the underlying system.buckets collection.
+                outputNsForFetchingIndexes = _outputNs.makeTimeseriesBucketsNamespace();
+            }
+
             auto originalIndexes =
                 pExpCtx->getMongoProcessInterface()->getIndexSpecs(pExpCtx->getOperationContext(),
                                                                    outputNsForFetchingIndexes,
