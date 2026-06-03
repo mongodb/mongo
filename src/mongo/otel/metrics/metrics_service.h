@@ -558,7 +558,7 @@ ImplT& MetricsService::_createMetric(MetricName name,
                                      AddObservableRef<ImplT> addObservable) {
     // Validate otel and serverStatus metric names.
     uassertStatusOK(validateOtelMetricName(name.getName()));
-    if (options.serverStatusOptions) {
+    if (options.serverStatusOptions && !options.serverStatusOptions->skipPathValidation) {
         uassertStatusOK(validateServerStatusMetricPath(options.serverStatusOptions->dottedPath));
     }
 

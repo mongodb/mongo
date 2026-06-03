@@ -327,6 +327,18 @@ TYPED_TEST(MetricCreationTest, CreateRejectsInvalidServerStatusPath) {
                        ErrorCodes::InvalidOptions);
 }
 
+TYPED_TEST(MetricCreationTest, CreateAcceptsInvalidServerStatusPathWhenSkipPathValidationIsSet) {
+    // skipPathValidation=true allows paths that violate the naming rules (e.g. for backward
+    // compatibility with pre-existing metrics).
+    MetricOptions<TypeParam> options{.serverStatusOptions = ServerStatusOptions{
+                                         .dottedPath = "network.open_connections",
+                                         .role = ClusterRole{},
+                                         .skipPathValidation = true,
+                                     }};
+    ASSERT_DOES_NOT_THROW(MetricCreator<TypeParam>::create(
+        &this->metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds, options));
+}
+
 TYPED_TEST(MetricCreationTest, SameMetricReturnedOnSameCreate) {
     auto& metric1 = MetricCreator<TypeParam>::create(
         &this->metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds);
