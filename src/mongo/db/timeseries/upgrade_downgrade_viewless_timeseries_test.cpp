@@ -29,6 +29,7 @@
 
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
@@ -48,7 +49,12 @@ protected:
 
     void createTimeseriesCollection(const NamespaceString& nss) {
         CreateCommand cmd = CreateCommand(nss);
-        cmd.getCreateCollectionRequest().setTimeseries(TimeseriesOptions("timestamp"));
+        TimeseriesOptions tsOpts("timestamp");
+        // TODO(SERVER-126823): Remove once fixedBucketing is set by default for new collections.
+        if (gFeatureFlagFixedBucketingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
+            tsOpts.setFixedBucketing(true);
+        }
+        cmd.getCreateCollectionRequest().setTimeseries(tsOpts);
         ASSERT_OK(createCollection(operationContext(), cmd));
     }
 
@@ -529,6 +535,38 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithConflictingB
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
     ASSERT_EQ(canDowngradeFromViewlessTimeseries(operationContext(), nss1).code(),
               ErrorCodes::NamespaceExists);
+}
+
+/**
+ * A viewless collection with fixedBucketing=true must have that field stripped after downgrade.
+ */
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeStripsFixedBucketing) {
+    RAIIServerParameterControllerForTest fixedBucketingFlag("featureFlagFixedBucketingCatalog",
+                                                            true);
+    auto uuid = createViewlessTimeseriesCollection(nss1);
+
+    auto* opCtx = operationContext();
+    // Check that the created collection has the `fixedBucketing` field set
+    // NOTE: The exact value doesn't matter; we only need the field present to confirm that the
+    // downgrade strip is exercised.
+    ASSERT(CollectionCatalog::get(opCtx)
+               ->lookupCollectionByNamespace(opCtx, nss1)
+               ->getTimeseriesOptions()
+               ->getFixedBucketing()
+               .has_value());
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    downgradeFromViewlessTimeseries(opCtx, nss1);
+
+    // assertIsViewfulTimeseries also checks the buckets collection exists with timeseries options.
+    assertIsViewfulTimeseries(nss1, uuid);
+
+    const auto bucketsNss = nss1.makeTimeseriesBucketsNamespace();
+    auto bucketsColl =
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, bucketsNss);
+    ASSERT_FALSE(bucketsColl->getTimeseriesOptions()->getFixedBucketing().has_value())
+        << "fixedBucketing must be stripped on downgrade";
 }
 
 }  // namespace

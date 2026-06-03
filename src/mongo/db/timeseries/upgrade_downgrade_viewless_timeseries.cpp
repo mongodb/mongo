@@ -421,6 +421,12 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                 timeseries::generateTimeseriesValidator(bucketVersion, timeField),
                 boost::none /* validationLevel */,
                 boost::none /* validatorAction */));
+
+            // Strip the viewless-only 'fixedBucketing' option from the timeseries collection;
+            // the viewful (legacy) format does not carry it.
+            auto strippedOptions = *mainColl->getTimeseriesOptions();
+            strippedOptions.setFixedBucketing(OptionalBool{});
+            writableColl->setTimeseriesOptions(opCtx, strippedOptions);
         }
 
         // Log a oplog entry giving a single, atomic timestamp to all operations done above.

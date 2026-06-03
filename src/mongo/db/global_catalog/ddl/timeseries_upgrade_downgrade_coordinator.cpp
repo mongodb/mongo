@@ -447,6 +447,7 @@ ExecutorFuture<void> TimeseriesUpgradeDowngradeCoordinator::_runImpl(
                     // On downgrade: remove viewless-only fields from the entry,
                     // since legacy format does not include them.
                     updatedTsFields.setTimeseriesBucketsMayHaveMixedSchemaData(boost::none);
+                    updatedTsFields.setFixedBucketing(OptionalBool{});
                 }
                 newCollType.setTimeseriesFields(updatedTsFields);
 

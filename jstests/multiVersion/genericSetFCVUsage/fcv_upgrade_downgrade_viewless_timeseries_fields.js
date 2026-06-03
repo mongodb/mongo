@@ -1,6 +1,9 @@
 /**
- * Tests that config.collections timeseries fields timeseriesBucketsMayHaveMixedSchemaData is
- * correctly populated during FCV upgrade and removed during FCV downgrade.
+ * Tests that config.collections timeseries fields timeseriesBucketsMayHaveMixedSchemaData and
+ * fixedBucketing are correctly populated during FCV upgrade and removed during FCV downgrade.
+ *
+ * TODO(SERVER-128095): populating fixedBucketing on FCV upgrade is not yet implemented; this test
+ * currently only covers stripping it on downgrade.
  *
  * TODO (SERVER-116499): Remove this file once 9.0 becomes last LTS.
  *
@@ -11,6 +14,7 @@
  */
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 if (lastLTSFCV != "8.0") {
@@ -34,12 +38,12 @@ function getConfigEntry(collName) {
     return entry;
 }
 
-function createShardedTimeseries(collName) {
+function createShardedTimeseries(collName, extraTsOpts = {}) {
     assert.commandWorked(
         st.s.adminCommand({
             shardCollection: dbName + "." + collName,
             key: {m: 1},
-            timeseries: {timeField: "t", metaField: "m"},
+            timeseries: {timeField: "t", metaField: "m", ...extraTsOpts},
         }),
     );
 }
@@ -51,12 +55,17 @@ function testFCVTransition(startFCV, targetFCV) {
 
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: startFCV, confirm: true}));
 
-    // Create two sharded timeseries collections.
     const collNameNoMixed = "ts_no_mixed_" + direction;
     const collNameMixed = "ts_mixed_" + direction;
 
-    createShardedTimeseries(collNameNoMixed);
-    createShardedTimeseries(collNameMixed);
+    // Create two sharded timeseries collections. When fixedBucketing is enabled, give one
+    // fixedBucketing=false and the other fixedBucketing=true so the downgrade strip is exercised
+    // for both values.
+    // NOTE: featureFlagFixedBucketingCatalog is FCV-gated, so this is only enabled at the latest FCV,
+    // i.e. effectively only in the downgrade run, where collections are created before downgrading.
+    const fixedBucketingEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "FixedBucketingCatalog");
+    createShardedTimeseries(collNameNoMixed, fixedBucketingEnabled ? {fixedBucketing: false} : {});
+    createShardedTimeseries(collNameMixed, fixedBucketingEnabled ? {fixedBucketing: true} : {});
 
     // Set mixed-schema flag to true on one collection via collMod.
     assert.commandWorked(db.runCommand({collMod: collNameMixed, timeseriesBucketsMayHaveMixedSchemaData: true}));
@@ -64,6 +73,7 @@ function testFCVTransition(startFCV, targetFCV) {
     // Verify config.collections state before conversion.
     if (isUpgrade) {
         // Legacy format: config.collections should NOT have timeseriesBucketsMayHaveMixedSchemaData.
+        // TODO(SERVER-128095): also assert fixedBucketing is absent here once it is populated on upgrade.
         for (const name of [collNameNoMixed, collNameMixed]) {
             const entry = getConfigEntry(name);
             assert(!entry.timeseriesFields.hasOwnProperty("timeseriesBucketsMayHaveMixedSchemaData"));
@@ -75,6 +85,11 @@ function testFCVTransition(startFCV, targetFCV) {
 
         const entryMixed = getConfigEntry(collNameMixed);
         assert.eq(true, entryMixed.timeseriesFields.timeseriesBucketsMayHaveMixedSchemaData);
+
+        if (fixedBucketingEnabled) {
+            assert.eq(false, entryNoMixed.timeseriesFields.fixedBucketing);
+            assert.eq(true, entryMixed.timeseriesFields.fixedBucketing);
+        }
     }
 
     // Read shard-local metadata to confirm collMod took effect.
@@ -95,11 +110,16 @@ function testFCVTransition(startFCV, targetFCV) {
         // collMixed should have field=true, mirroring the shard-local state set by collMod.
         const entryMixed = getConfigEntry(collNameMixed);
         assert.eq(true, entryMixed.timeseriesFields.timeseriesBucketsMayHaveMixedSchemaData);
+
+        // TODO(SERVER-128095): once fixedBucketing is populated on upgrade, assert it here too.
     } else {
-        // After downgrade to legacy: config.collections should not have timeseriesBucketsMayHaveMixedSchemaData.
+        // After downgrade to legacy: viewless-only fields must be stripped from config.collections.
         for (const name of [collNameNoMixed, collNameMixed]) {
             const entry = getConfigEntry(name);
             assert(!entry.timeseriesFields.hasOwnProperty("timeseriesBucketsMayHaveMixedSchemaData"));
+            if (fixedBucketingEnabled) {
+                assert(!entry.timeseriesFields.hasOwnProperty("fixedBucketing"));
+            }
         }
     }
 
