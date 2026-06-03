@@ -40,7 +40,8 @@ if [ "$SEORDER" == "1" ]; then
 fi
 
 # install packages needed by check_has_tag.py
-PYTHON=/opt/mongodbtoolchain/v5/bin/python3.13
+# Keep this in sync with jstests/libs/python.js getPython3Binary().
+PYTHON=/opt/mongodbtoolchain/v4/bin/python3
 if [[ (-f "$PYTHON" || -L "$PYTHON") && -x "$PYTHON" ]]; then
   echo "==== Found python3 in $PYTHON"
   $PYTHON -m pip install pyyaml
