@@ -372,6 +372,7 @@ StatusWith<std::shared_ptr<SaslClientSession>> _speculateSaslStart(
     saslStart.append("mechanism", mechStr);
     saslStart.appendBinData("payload", int(payload.size()), BinDataGeneral, payload.c_str());
     saslStart.append("db", authDB);
+    saslStart.append("options", BSON(saslCommandOptionSkipEmptyExchange << true));
     helloRequestBuilder->append(kSpeculativeAuthenticate, saslStart.obj());
 
     return session;

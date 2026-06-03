@@ -189,6 +189,29 @@ test(
 );
 assertStats((s) => expectN(s, "SCRAM-SHA-256", 8, 4, 1, 1));
 
+// SERVER-126148: Speculative SCRAM authentication (including the default keyfile-based
+// internal cluster auth path) must include skipEmptyExchange in the saslStart options.
+// Otherwise every internal connection pays an extra round-trip on the empty 3rd saslContinue.
+// Verify that speculative cluster auth completes in 2 steps, not 3.
+assert.soon(
+    () =>
+        checkLog.checkContainsWithCountJson(
+            admin,
+            5286306,
+            {
+                "isSpeculative": true,
+                "isClusterMember": true,
+                "mechanism": "SCRAM-SHA-256",
+                "user": "__system",
+                "metrics": {"conversation_duration": {"summary": [{"step_total": 2}, {"step_total": 2}]}},
+            },
+            1,
+            null,
+            true,
+        ),
+    "Did not observe a successful speculative cluster auth with step_total: 2",
+);
+
 test("mongodb://__system:hunter2@localhost:" + mongod.port + "/admin" + "?authMechanism=SCRAM-SHA-256", false);
 assertStats((s) => expectN(s, "SCRAM-SHA-256", 9, 4, 3, 1));
 assertSpecLog("I", speculativeClusterAuthFailedAttrs, 1);

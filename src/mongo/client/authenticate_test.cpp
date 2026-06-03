@@ -30,7 +30,15 @@
 #include "mongo/client/authenticate.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/internal_auth.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/sasl_client_session.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -39,6 +47,7 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/password_digest.h"
 
+#include <memory>
 #include <queue>
 #include <utility>
 
@@ -166,5 +175,111 @@ TEST_F(AuthClientTest, asyncX509) {
                   .getNoThrow());
 }
 #endif
+
+// Returns the "speculativeAuthenticate" sub-object from a "hello" request body built by one of the
+// speculative auth helpers.
+BSONObj getSpeculativeAuthenticate(const BSONObj& helloRequest) {
+    auto elem = helloRequest[auth::kSpeculativeAuthenticate];
+    ASSERT_EQ(elem.type(), BSONType::object)
+        << "missing speculativeAuthenticate field in " << helloRequest;
+    return elem.Obj().getOwned();
+}
+
+// Asserts that a saslStart payload produced by the speculative SASL path requests the
+// skipEmptyExchange option. This is the behavior added in SERVER-126148 and is what allows
+// speculative SCRAM auth to complete in two steps rather than three.
+void assertSaslStartSkipsEmptyExchange(const BSONObj& specAuth, StringData expectedMechanism) {
+    ASSERT_EQ(specAuth["saslStart"].numberInt(), 1) << specAuth;
+    ASSERT_EQ(specAuth["mechanism"].str(), expectedMechanism) << specAuth;
+
+    auto optionsElem = specAuth["options"];
+    ASSERT_EQ(optionsElem.type(), BSONType::object)
+        << "speculative saslStart is missing the options field: " << specAuth;
+    auto options = optionsElem.Obj();
+    auto skipElem = options[saslCommandOptionSkipEmptyExchange];
+    ASSERT_EQ(skipElem.type(), BSONType::boolean)
+        << "speculative saslStart options missing skipEmptyExchange: " << specAuth;
+    ASSERT_TRUE(skipElem.boolean()) << specAuth;
+}
+
+TEST_F(AuthClientTest, SpeculateAuthScramRequestsSkipEmptyExchange) {
+    auto swURI = MongoURI::parse("mongodb://a:b@localhost:27017/admin?authMechanism=SCRAM-SHA-256");
+    ASSERT_OK(swURI.getStatus());
+
+    BSONObjBuilder helloRequestBuilder;
+    std::shared_ptr<SaslClientSession> session;
+    auto specType = auth::speculateAuth(&helloRequestBuilder, swURI.getValue(), &session);
+
+    ASSERT_TRUE(specType == auth::SpeculativeAuthType::kSaslStart);
+    ASSERT(session);
+
+    auto specAuth = getSpeculativeAuthenticate(helloRequestBuilder.obj());
+    assertSaslStartSkipsEmptyExchange(specAuth, auth::kMechanismScramSha256);
+    ASSERT_EQ(specAuth["db"].str(), "admin") << specAuth;
+}
+
+TEST_F(AuthClientTest, SpeculateAuthWithoutCredentialsReturnsNone) {
+    // No username/password supplied, so there is nothing to speculate with.
+    auto swURI = MongoURI::parse("mongodb://localhost:27017/admin?authMechanism=SCRAM-SHA-256");
+    ASSERT_OK(swURI.getStatus());
+
+    BSONObjBuilder helloRequestBuilder;
+    std::shared_ptr<SaslClientSession> session;
+    auto specType = auth::speculateAuth(&helloRequestBuilder, swURI.getValue(), &session);
+
+    ASSERT_TRUE(specType == auth::SpeculativeAuthType::kNone);
+    ASSERT_FALSE(session);
+    ASSERT_FALSE(helloRequestBuilder.obj().hasField(auth::kSpeculativeAuthenticate));
+}
+
+#ifdef MONGO_CONFIG_SSL
+TEST_F(AuthClientTest, SpeculateAuthX509UsesAuthenticate) {
+    auto swURI = MongoURI::parse("mongodb://localhost:27017/?authMechanism=MONGODB-X509");
+    ASSERT_OK(swURI.getStatus());
+
+    BSONObjBuilder helloRequestBuilder;
+    std::shared_ptr<SaslClientSession> session;
+    auto specType = auth::speculateAuth(&helloRequestBuilder, swURI.getValue(), &session);
+
+    ASSERT_TRUE(specType == auth::SpeculativeAuthType::kAuthenticate);
+    // The X509 path does not run a SASL conversation.
+    ASSERT_FALSE(session);
+
+    auto specAuth = getSpeculativeAuthenticate(helloRequestBuilder.obj());
+    ASSERT_EQ(specAuth[saslCommandMechanismFieldName].str(), auth::kMechanismMongoX509) << specAuth;
+    ASSERT_EQ(specAuth[saslCommandUserDBFieldName].str(), "$external") << specAuth;
+    // The authenticate path must not emit a saslStart payload or skipEmptyExchange option.
+    ASSERT_FALSE(specAuth.hasField("saslStart")) << specAuth;
+    ASSERT_FALSE(specAuth.hasField("options")) << specAuth;
+}
+#endif
+
+class SpeculativeInternalAuthTest : public AuthClientTest {
+public:
+    void setUp() override {
+        // speculateInternalAuth() reads the __system user's name to build SASL parameters.
+        std::unique_ptr<UserRequest> systemLocal =
+            std::make_unique<UserRequestGeneral>(UserName("__system"_sd, "local"_sd), boost::none);
+        internalSecurity.setUser(std::make_shared<UserHandle>(User(std::move(systemLocal))));
+    }
+};
+
+TEST_F(SpeculativeInternalAuthTest, SpeculateInternalAuthScramRequestsSkipEmptyExchange) {
+    auth::setInternalAuthKeys({"hunter2"});
+
+    // saslConfigureSession dasserts that the hostname is non-empty (SERVER-59876), so use a real
+    // host rather than the default-constructed _mockHost.
+    BSONObjBuilder helloRequestBuilder;
+    std::shared_ptr<SaslClientSession> session;
+    auto specType = auth::speculateInternalAuth(
+        HostAndPort("localhost", 27017), &helloRequestBuilder, &session);
+
+    ASSERT_TRUE(specType == auth::SpeculativeAuthType::kSaslStart);
+    ASSERT(session);
+
+    auto specAuth = getSpeculativeAuthenticate(helloRequestBuilder.obj());
+    assertSaslStartSkipsEmptyExchange(specAuth, auth::kMechanismScramSha256);
+    ASSERT_EQ(specAuth["db"].str(), "local") << specAuth;
+}
 
 }  // namespace
