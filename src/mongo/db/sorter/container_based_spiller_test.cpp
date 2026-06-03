@@ -582,6 +582,88 @@ TEST_F(SortedContainerWriterTest, GetBufferSizeReflectsAverageEntrySize) {
     EXPECT_EQ(this->sorterTracker.bytesSpilled.load(), 16);
 }
 
+TEST_F(SortedContainerWriterTest, StatsUpdatedOnCommit) {
+    auto opCtx = makeOperationContext();
+    auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(opCtx.get()));
+    ASSERT(replCoordMock);
+    replCoordMock->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container;
+    container.setIdent(std::make_shared<Ident>("sorted_container_writer_stats_commit_test"));
+    SorterContainerStats stats{&this->sorterTracker};
+    SortOptions opts;
+    SortedContainerWriter<IntWrapper, IntWrapper> writer{
+        *opCtx,
+        *shard_role_details::getRecoveryUnit(opCtx.get()),
+        container,
+        stats,
+        opts,
+        /*nextKey=*/1,
+        sorter::kLatestChecksumVersion,
+        SortedContainerWriter<IntWrapper, IntWrapper>::Settings{}};
+
+    {
+        WriteUnitOfWork wuow{opCtx.get()};
+        writer.addAlreadySorted(IntWrapper{1}, IntWrapper{2});
+        writer.addAlreadySorted(IntWrapper{3}, IntWrapper{4});
+
+        // Writes are not yet committed: stats must still be zero.
+        EXPECT_EQ(stats.bytesSpilled(), 0);
+        EXPECT_EQ(stats.bytesSpilledUncompressed(), 0);
+        EXPECT_EQ(stats.numSpilledEntries(), 0);
+
+        wuow.commit();
+    }
+
+    // After commit, the stats reflect the committed writes.
+    EXPECT_EQ(stats.bytesSpilled(), sizeof(IntWrapper) * 4);
+    EXPECT_EQ(stats.bytesSpilledUncompressed(), sizeof(IntWrapper) * 4);
+    EXPECT_EQ(stats.numSpilledEntries(), 2);
+    EXPECT_EQ(sorterTracker.bytesSpilled.load(), stats.bytesSpilled());
+    EXPECT_EQ(sorterTracker.bytesSpilledUncompressed.load(), stats.bytesSpilledUncompressed());
+}
+
+TEST_F(SortedContainerWriterTest, StatsNotUpdatedOnAbort) {
+    auto opCtx = makeOperationContext();
+    auto* replCoordMock = dynamic_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(opCtx.get()));
+    ASSERT(replCoordMock);
+    replCoordMock->alwaysAllowWrites(true);
+
+    ViewableIntegerKeyedContainer container;
+    container.setIdent(std::make_shared<Ident>("sorted_container_writer_stats_abort_test"));
+    SorterContainerStats stats{&this->sorterTracker};
+    SortOptions opts;
+    SortedContainerWriter<IntWrapper, IntWrapper> writer{
+        *opCtx,
+        *shard_role_details::getRecoveryUnit(opCtx.get()),
+        container,
+        stats,
+        opts,
+        /*nextKey=*/1,
+        sorter::kLatestChecksumVersion,
+        SortedContainerWriter<IntWrapper, IntWrapper>::Settings{}};
+
+    {
+        WriteUnitOfWork wuow{opCtx.get()};
+        writer.addAlreadySorted(IntWrapper{1}, IntWrapper{2});
+        writer.addAlreadySorted(IntWrapper{3}, IntWrapper{4});
+
+        // Writes are not yet committed: stats must still be zero.
+        EXPECT_EQ(stats.bytesSpilled(), 0);
+        EXPECT_EQ(stats.bytesSpilledUncompressed(), 0);
+        EXPECT_EQ(stats.numSpilledEntries(), 0);
+    }
+
+    // After abort, the stats reflect none of the rolled-back writes.
+    EXPECT_EQ(stats.bytesSpilled(), 0);
+    EXPECT_EQ(stats.bytesSpilledUncompressed(), 0);
+    EXPECT_EQ(stats.numSpilledEntries(), 0);
+    EXPECT_EQ(sorterTracker.bytesSpilled.load(), 0);
+    EXPECT_EQ(sorterTracker.bytesSpilledUncompressed.load(), 0);
+}
+
 TEST_F(SortedContainerWriterTest, GetBufferSizeEdgeCases) {
     auto opCtx = makeOperationContext();
     auto* replCoord = repl::ReplicationCoordinator::get(opCtx.get());

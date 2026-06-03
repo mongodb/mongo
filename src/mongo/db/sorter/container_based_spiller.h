@@ -272,6 +272,13 @@ public:
             size == 0 ? std::span<const char>{} : std::span<const char>(buffer.buf(), size);
 
         WriteUnitOfWork wuow(&_opCtx);
+        _ru.onCommit([this, size](OperationContext*, boost::optional<Timestamp>) {
+            // The container-based sorter does not compress in the sorter layer, so report the same
+            // value for compressed and uncompressed bytes.
+            _containerStats.addSpilledDataSize(size);
+            _containerStats.addSpilledDataSizeUncompressed(size);
+            _containerStats.incrementNumSpilledEntries();
+        });
         _ru.onRollback([this](OperationContext*) { --_nextKey; });
         uassertStatusOK(container_write::insert(&_opCtx,
                                                 _ru,
@@ -295,11 +302,6 @@ public:
         }
         wuow.commit();
 
-        // The container-based sorter does not compress in the sorter layer, so report the
-        // same value for compressed and uncompressed bytes.
-        _containerStats.addSpilledDataSize(size);
-        _containerStats.addSpilledDataSizeUncompressed(size);
-        _containerStats.incrementNumSpilledEntries();
         _lastAddedSize = size;
     }
 
