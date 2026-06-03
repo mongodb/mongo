@@ -29,30 +29,21 @@
 
 #pragma once
 
-#include "mongo/db/fts/fts_phrase_matcher.h"
-#include "mongo/util/modules.h"
-
-#include <string>
+#if defined(_WIN32)
 
 namespace mongo {
-namespace fts {
-
-/**
- * A phrase matcher that looks for exact substring matches with optional ASCII-aware case
- * insensitivity. This phrase matcher does not implement the kDiacriticSensitive match option. All
- * operations are inherently diacritic sensitive.
- */
-class BasicFTSPhraseMatcher final : public FTSPhraseMatcher {
-    BasicFTSPhraseMatcher(const BasicFTSPhraseMatcher&) = delete;
-    BasicFTSPhraseMatcher& operator=(const BasicFTSPhraseMatcher&) = delete;
-
-public:
-    BasicFTSPhraseMatcher() = default;
-
-    bool phraseMatches(const std::string& phrase,
-                       const std::string& haystack,
-                       Options options) const override;
-};
-
-}  // namespace fts
+namespace pal {
+const char* strcasestr(const char* haystack, const char* needle);
+}
+using mongo::pal::strcasestr;
 }  // namespace mongo
+
+#else
+
+#include <cstring>
+
+namespace mongo {
+using ::strcasestr;
+}
+
+#endif

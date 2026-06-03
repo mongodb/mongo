@@ -35,7 +35,7 @@ namespace agg {
 
 
 Stage::Stage(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pCtx)
-    : pSource(nullptr), pExpCtx(pCtx), _commonStats(stageName) {
+    : pSource(nullptr), pExpCtx(pCtx), _commonStats(stageName.data()) {
     if (pExpCtx->shouldCollectDocumentSourceExecStats()) {
         if (pExpCtx->getQueryKnobConfiguration().getMeasureQueryExecutionTimeInNanoseconds()) {
             _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;

@@ -49,17 +49,14 @@ class FTSTokenizer;
 
 class FTSQueryImpl final : public FTSQuery {
 public:
-    // Uses `std::less<>` to allow heterogeneous lookup
-    using StringSet = std::set<std::string, std::less<>>;
-
     Status parse(TextIndexVersion textIndexVersion) final;
 
     std::unique_ptr<FTSQuery> clone() const final;
 
-    const StringSet& getPositiveTerms() const {
+    const std::set<std::string>& getPositiveTerms() const {
         return _positiveTerms;
     }
-    const StringSet& getNegatedTerms() const {
+    const std::set<std::string>& getNegatedTerms() const {
         return _negatedTerms;
     }
     const std::vector<std::string>& getPositivePhr() const {
@@ -69,7 +66,7 @@ public:
         return _negatedPhrases;
     }
 
-    const StringSet& getTermsForBounds() const {
+    const std::set<std::string>& getTermsForBounds() const {
         return _termsForBounds;
     }
 
@@ -89,11 +86,11 @@ public:
 private:
     void _addTerms(FTSTokenizer* tokenizer, const std::string& tokens, bool negated);
 
-    StringSet _positiveTerms;
-    StringSet _negatedTerms;
+    std::set<std::string> _positiveTerms;
+    std::set<std::string> _negatedTerms;
     std::vector<std::string> _positivePhrases;
     std::vector<std::string> _negatedPhrases;
-    StringSet _termsForBounds;
+    std::set<std::string> _termsForBounds;
 };
 }  // namespace fts
 }  // namespace mongo

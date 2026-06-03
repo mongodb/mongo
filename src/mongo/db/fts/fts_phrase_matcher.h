@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
@@ -65,7 +64,9 @@ public:
     /**
      * Does the string 'phrase' occur in the string 'haystack'?
      */
-    virtual bool phraseMatches(StringData phrase, StringData haystack, Options options) const = 0;
+    virtual bool phraseMatches(const std::string& phrase,
+                               const std::string& haystack,
+                               Options options) const = 0;
 };
 
 }  // namespace fts

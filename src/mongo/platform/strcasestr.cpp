@@ -27,32 +27,42 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/strcasestr.h"
 
-#include "mongo/db/fts/fts_phrase_matcher.h"
-#include "mongo/util/modules.h"
+#if defined(_WIN32)
 
+#include <algorithm>
+#include <cstring>
 #include <string>
 
+#define STRCASESTR_EMULATION_NAME strcasestr
+
+#include "mongo/util/ctype.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
-namespace fts {
+namespace pal {
 
 /**
- * A phrase matcher that looks for exact substring matches with optional ASCII-aware case
- * insensitivity. This phrase matcher does not implement the kDiacriticSensitive match option. All
- * operations are inherently diacritic sensitive.
+ * strcasestr -- case-insensitive search for a substring within another string.
+ *
+ * @param haystack      ptr to C-string to search
+ * @param needle        ptr to C-string to try to find within 'haystack'
+ * @return              ptr to start of 'needle' within 'haystack' if found, NULL otherwise
  */
-class BasicFTSPhraseMatcher final : public FTSPhraseMatcher {
-    BasicFTSPhraseMatcher(const BasicFTSPhraseMatcher&) = delete;
-    BasicFTSPhraseMatcher& operator=(const BasicFTSPhraseMatcher&) = delete;
+const char* STRCASESTR_EMULATION_NAME(const char* haystack, const char* needle) {
+    StringData hay(haystack);
+    StringData pat(needle);
+    auto caseEq = [](char a, char b) {
+        return ctype::toLower(a) == ctype::toLower(b);
+    };
+    auto pos = std::search(hay.begin(), hay.end(), pat.begin(), pat.end(), caseEq);
+    if (pos == hay.end())
+        return nullptr;
+    return haystack + (pos - hay.begin());
+}
 
-public:
-    BasicFTSPhraseMatcher() = default;
-
-    bool phraseMatches(const std::string& phrase,
-                       const std::string& haystack,
-                       Options options) const override;
-};
-
-}  // namespace fts
+}  // namespace pal
 }  // namespace mongo
+
+#endif  // #if defined(_WIN32)

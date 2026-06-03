@@ -130,7 +130,7 @@ void printCppTrace(StackTraceSink* sink) {
             .symbols(cpptrace::formatter::symbol_mode::pretty)
             .transform([](cpptrace::stacktrace_frame f) {
                 // Strip off bazel prefix to make filenames clickable.
-                constexpr auto prefix = "./"_sd;
+                constexpr auto prefix = toStdStringViewForInterop("./"_sd);
                 if (f.filename.starts_with(prefix)) {
                     f.filename.erase(0, prefix.size());
                 }

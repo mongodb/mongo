@@ -726,7 +726,8 @@ public:
 
     template <typename H>
     friend H AbslHashValue(H h, const NamespaceString& nss) {
-        return H::combine(std::move(h), StringData{nss._data.data(), nss._data.size()});
+        return H::combine(std::move(h),
+                          toStdStringViewForInterop({nss._data.data(), nss._data.size()}));
     }
 
     friend auto logAttrs(const NamespaceString& nss) {
@@ -992,7 +993,7 @@ constexpr auto makeNsData(const char* db, const char* coll) {
 #define X(id, dbname, coll)           \
     constexpr inline auto id##_data = \
         makeNsData<dbname.size(), coll.size()>(dbname.db(OmitTenant{}).data(), coll.data());
-EXPAND_NSS_CONSTANT_TABLE(X) /* NOLINT(bugprone-suspicious-stringview-data-usage) */
+EXPAND_NSS_CONSTANT_TABLE(X)
 #undef X
 }  // namespace namespace_string_data
 

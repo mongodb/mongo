@@ -27,32 +27,19 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/base/string_data.h"
 
-#include "mongo/db/fts/fts_phrase_matcher.h"
-#include "mongo/util/modules.h"
+#include <ostream>
 
-#include <string>
+#include <boost/container_hash/hash.hpp>
 
 namespace mongo {
-namespace fts {
+std::ostream& operator<<(std::ostream& stream, StringData value) {
+    return stream << toStdStringViewForInterop(value);
+}
 
-/**
- * A phrase matcher that looks for exact substring matches with optional ASCII-aware case
- * insensitivity. This phrase matcher does not implement the kDiacriticSensitive match option. All
- * operations are inherently diacritic sensitive.
- */
-class BasicFTSPhraseMatcher final : public FTSPhraseMatcher {
-    BasicFTSPhraseMatcher(const BasicFTSPhraseMatcher&) = delete;
-    BasicFTSPhraseMatcher& operator=(const BasicFTSPhraseMatcher&) = delete;
+size_t hash_value(StringData sd) {
+    return boost::hash<std::string_view>{}(toStdStringViewForInterop(sd));
+}
 
-public:
-    BasicFTSPhraseMatcher() = default;
-
-    bool phraseMatches(const std::string& phrase,
-                       const std::string& haystack,
-                       Options options) const override;
-};
-
-}  // namespace fts
 }  // namespace mongo

@@ -36,6 +36,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -44,7 +45,6 @@
 #include <utility>
 
 #include <boost/filesystem/operations.hpp>
-#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -65,7 +65,8 @@ RemoveSaver::RemoveSaver(const std::string& a,
     MONGO_verify(a.size() || b.size());
 
     _file = _root;
-    _file /= fmt::format("{}.{}.{}.bson", why, terseCurrentTimeForFilename(), NUM++);
+    _file /= str::stream() << why << "." << terseCurrentTimeForFilename() << "." << NUM++
+                           << ".bson";
 
     auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
     if (encryptionHooks->enabled()) {
@@ -136,9 +137,8 @@ Status RemoveSaver::goingToDelete(const BSONObj& o) {
 
         if (_out->fail()) {
             auto ec = lastSystemError();
-            std::string msg = fmt::format("couldn't create file: {} for remove saving: {}",
-                                          _file.string(),
-                                          redact(errorMessage(ec)));
+            std::string msg = str::stream() << "couldn't create file: " << _file.string()
+                                            << " for remove saving: " << redact(errorMessage(ec));
             LOGV2_ERROR(23734,
                         "Failed to create file for remove saving",
                         "file"_attr = _file.generic_string(),
@@ -175,8 +175,8 @@ Status RemoveSaver::goingToDelete(const BSONObj& o) {
 
     if (_out->fail()) {
         auto errorStr = redact(errorMessage(lastSystemError()));
-        std::string msg = fmt::format(
-            "couldn't write document to file: {} for remove saving: {}", _file.string(), errorStr);
+        std::string msg = str::stream() << "couldn't write document to file: " << _file.string()
+                                        << " for remove saving: " << errorStr;
         LOGV2_ERROR(23735,
                     "Couldn't write document to file for remove saving",
                     "file"_attr = _file.generic_string(),

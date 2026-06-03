@@ -459,8 +459,8 @@ public:
     static constexpr StringData kStageSpec = "mongodb";
 
     SimpleSerializationLogicalStage()
-        : sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage>(kStageName,
-                                                                                BSONObj()) {}
+        : sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage>(
+              toStdStringViewForInterop(kStageName), BSONObj()) {}
 
     BSONObj serialize() const override {
         return BSON(kStageName << kStageSpec);
@@ -559,7 +559,7 @@ public:
     static constexpr StringData kStageName = "$simpleQueryShape";
     static constexpr StringData kStageSpec = "mongodb";
 
-    SimpleQueryShapeParseNode() : sdk::AggStageParseNode(kStageName) {}
+    SimpleQueryShapeParseNode() : sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
 
     size_t getExpandedSize() const override {
         return 0;
@@ -601,7 +601,8 @@ public:
     static constexpr StringData kIndexFieldName = "index";
     static constexpr StringData kIndexValue = "identifier";
 
-    IdentifierQueryShapeParseNode() : sdk::AggStageParseNode(kStageName) {}
+    IdentifierQueryShapeParseNode()
+        : sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
 
     size_t getExpandedSize() const override {
         return 0;
@@ -696,7 +697,8 @@ public:
     static constexpr StringData kSingleFieldPath = "simpleField";
     static constexpr StringData kNestedFieldPath = "nested.Field.Path";
 
-    FieldPathQueryShapeParseNode() : sdk::AggStageParseNode(kStageName) {}
+    FieldPathQueryShapeParseNode()
+        : sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
 
     size_t getExpandedSize() const override {
         return 0;
@@ -786,7 +788,7 @@ public:
     static constexpr StringData kDateField = "date";
     static const Date_t kDateValue;
 
-    LiteralQueryShapeParseNode() : sdk::AggStageParseNode(kStageName) {}
+    LiteralQueryShapeParseNode() : sdk::AggStageParseNode(toStdStringViewForInterop(kStageName)) {}
 
     size_t getExpandedSize() const override {
         return 0;

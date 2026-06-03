@@ -75,15 +75,15 @@ TEST(FTSElementIterator, Test1) {
 
     ASSERT(it.more());
     FTSIteratorValue val = it.next();
-    ASSERT_EQUALS("walking", string(val.text()));
-    ASSERT_EQUALS("english", val.language()->str());
-    ASSERT_EQUALS(10, val.weight());
+    ASSERT_EQUALS("walking", string(val._text));
+    ASSERT_EQUALS("english", val._language->str());
+    ASSERT_EQUALS(10, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("walker", string(val.text()));
-    ASSERT_EQUALS("english", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("walker", string(val._text));
+    ASSERT_EQUALS("english", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 }
 
 // Multi-language : test
@@ -107,27 +107,27 @@ TEST(FTSElementIterator, Test2) {
 
     ASSERT(it.more());
     FTSIteratorValue val = it.next();
-    ASSERT_EQUALS("walked", string(val.text()));
-    ASSERT_EQUALS("english", val.language()->str());
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("walked", string(val._text));
+    ASSERT_EQUALS("english", val._language->str());
+    ASSERT_EQUALS(1, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("camminato", string(val.text()));
-    ASSERT_EQUALS("italian", val.language()->str());
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("camminato", string(val._text));
+    ASSERT_EQUALS("italian", val._language->str());
+    ASSERT_EQUALS(1, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("ging", string(val.text()));
-    ASSERT_EQUALS("german", val.language()->str());
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("ging", string(val._text));
+    ASSERT_EQUALS("german", val._language->str());
+    ASSERT_EQUALS(1, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("Feliz Año Nuevo!", string(val.text()));
-    ASSERT_EQUALS("spanish", val.language()->str());
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("Feliz Año Nuevo!", string(val._text));
+    ASSERT_EQUALS("spanish", val._language->str());
+    ASSERT_EQUALS(1, val._weight);
 }
 
 // Multi-language : test nested stemming per sub-document
@@ -160,21 +160,21 @@ TEST(FTSElementIterator, Test3) {
 
     ASSERT(it.more());
     FTSIteratorValue val = it.next();
-    ASSERT_EQUALS("foredrag", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("foredrag", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("foredragsholder", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("foredragsholder", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("lector", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("lector", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 }
 
 // Multi-language : test nested arrays
@@ -197,21 +197,21 @@ TEST(FTSElementIterator, Test4) {
 
     ASSERT(it.more());
     FTSIteratorValue val = it.next();
-    ASSERT_EQUALS("foredrag", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("foredrag", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("foredragsholder", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("foredragsholder", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("lector", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("lector", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 }
 
 // Multi-language : test wildcard spec
@@ -237,27 +237,27 @@ TEST(FTSElementIterator, Test5) {
 
     ASSERT(it.more());
     FTSIteratorValue val = it.next();
-    ASSERT_EQUALS("these boots were made for walking", string(val.text()));
-    ASSERT_EQUALS("english", val.language()->str());
-    ASSERT_EQUALS(20, val.weight());
+    ASSERT_EQUALS("these boots were made for walking", string(val._text));
+    ASSERT_EQUALS("english", val._language->str());
+    ASSERT_EQUALS(20, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("foredrag", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("foredrag", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("foredragsholder", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("foredragsholder", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("lector", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("lector", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 }
 
 // Multi-language : test wildcard spec
@@ -283,27 +283,27 @@ TEST(FTSElementIterator, Test6) {
 
     ASSERT(it.more());
     FTSIteratorValue val = it.next();
-    ASSERT_EQUALS("these boots were made for walking", string(val.text()));
-    ASSERT_EQUALS("english", val.language()->str());
-    ASSERT_EQUALS(20, val.weight());
+    ASSERT_EQUALS("these boots were made for walking", string(val._text));
+    ASSERT_EQUALS("english", val._language->str());
+    ASSERT_EQUALS(20, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("foredrag", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("foredrag", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("foredragsholder", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("foredragsholder", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("lector", string(val.text()));
-    ASSERT_EQUALS("danish", val.language()->str());
-    ASSERT_EQUALS(5, val.weight());
+    ASSERT_EQUALS("lector", string(val._text));
+    ASSERT_EQUALS("danish", val._language->str());
+    ASSERT_EQUALS(5, val._weight);
 }
 
 // Multi-language : Test Version 2 Language Override
@@ -328,31 +328,31 @@ TEST(FTSElementIterator, LanguageOverrideV2) {
 
     ASSERT(it.more());
     FTSIteratorValue val = it.next();
-    ASSERT_EQUALS("walked", string(val.text()));
-    ASSERT_EQUALS("english", val.language()->str());
-    ASSERT_EQUALS(val.language(), &FTSLanguage::make(val.language()->str(), TEXT_INDEX_VERSION_2));
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("walked", string(val._text));
+    ASSERT_EQUALS("english", val._language->str());
+    ASSERT_EQUALS(val._language, &FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("camminato", string(val.text()));
-    ASSERT_EQUALS("italian", val.language()->str());
-    ASSERT_EQUALS(val.language(), &FTSLanguage::make(val.language()->str(), TEXT_INDEX_VERSION_2));
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("camminato", string(val._text));
+    ASSERT_EQUALS("italian", val._language->str());
+    ASSERT_EQUALS(val._language, &FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("ging", string(val.text()));
-    ASSERT_EQUALS("german", val.language()->str());
-    ASSERT_EQUALS(val.language(), &FTSLanguage::make(val.language()->str(), TEXT_INDEX_VERSION_2));
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("ging", string(val._text));
+    ASSERT_EQUALS("german", val._language->str());
+    ASSERT_EQUALS(val._language, &FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("Feliz Año Nuevo!", string(val.text()));
-    ASSERT_EQUALS("spanish", val.language()->str());
-    ASSERT_EQUALS(val.language(), &FTSLanguage::make(val.language()->str(), TEXT_INDEX_VERSION_2));
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("Feliz Año Nuevo!", string(val._text));
+    ASSERT_EQUALS("spanish", val._language->str());
+    ASSERT_EQUALS(val._language, &FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_2));
+    ASSERT_EQUALS(1, val._weight);
 }
 
 // Multi-language : Test Version 3 Language Override
@@ -377,31 +377,31 @@ TEST(FTSElementIterator, LanguageOverrideV3) {
 
     ASSERT(it.more());
     FTSIteratorValue val = it.next();
-    ASSERT_EQUALS("walked", string(val.text()));
-    ASSERT_EQUALS("english", val.language()->str());
-    ASSERT_EQUALS(val.language(), &FTSLanguage::make(val.language()->str(), TEXT_INDEX_VERSION_3));
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("walked", string(val._text));
+    ASSERT_EQUALS("english", val._language->str());
+    ASSERT_EQUALS(val._language, &FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("camminato", string(val.text()));
-    ASSERT_EQUALS("italian", val.language()->str());
-    ASSERT_EQUALS(val.language(), &FTSLanguage::make(val.language()->str(), TEXT_INDEX_VERSION_3));
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("camminato", string(val._text));
+    ASSERT_EQUALS("italian", val._language->str());
+    ASSERT_EQUALS(val._language, &FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("ging", string(val.text()));
-    ASSERT_EQUALS("german", val.language()->str());
-    ASSERT_EQUALS(val.language(), &FTSLanguage::make(val.language()->str(), TEXT_INDEX_VERSION_3));
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("ging", string(val._text));
+    ASSERT_EQUALS("german", val._language->str());
+    ASSERT_EQUALS(val._language, &FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
 
     ASSERT(it.more());
     val = it.next();
-    ASSERT_EQUALS("Feliz Año Nuevo!", string(val.text()));
-    ASSERT_EQUALS("spanish", val.language()->str());
-    ASSERT_EQUALS(val.language(), &FTSLanguage::make(val.language()->str(), TEXT_INDEX_VERSION_3));
-    ASSERT_EQUALS(1, val.weight());
+    ASSERT_EQUALS("Feliz Año Nuevo!", string(val._text));
+    ASSERT_EQUALS("spanish", val._language->str());
+    ASSERT_EQUALS(val._language, &FTSLanguage::make(val._language->str(), TEXT_INDEX_VERSION_3));
+    ASSERT_EQUALS(1, val._weight);
 }
 
 }  // namespace fts

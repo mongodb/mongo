@@ -795,8 +795,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     f"std::enable_if_t<std::is_convertible_v<T, {storage_type}>, int> = 0"
                 )
             with self._block(f"void {memfn}(const T& value) {{", "}"):
-                # The lambda eliminates explicit conversions.
-                self._writer.write_line(f"{memfn}([&]() -> {storage_type} {{ return value; }}());")
+                self._writer.write_line(f"{memfn}({storage_type}{{value}});")
 
     def gen_constexpr_getters(self):
         # type: () -> None

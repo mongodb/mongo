@@ -1874,7 +1874,7 @@ private:
      */
     ParsedPath internPath(PathRef path) {
         ParsedPath vec;
-        for (auto s : absl::StrSplit(path, absl::ByChar('.'))) {
+        for (auto s : absl::StrSplit(toStdStringViewForInterop(path), absl::ByChar('.'))) {
             vec.push_back(_strings.intern({s.begin(), s.end()}));
         }
         return vec;
@@ -1887,7 +1887,7 @@ private:
     ParsedPath parsePath(PathRef path) const {
         ParsedPath vec;
 
-        for (auto s : absl::StrSplit(path, absl::ByChar('.'))) {
+        for (auto s : absl::StrSplit(toStdStringViewForInterop(path), absl::ByChar('.'))) {
             auto id = _strings.lookup({s.begin(), s.end()});
             vec.push_back(id);
         }

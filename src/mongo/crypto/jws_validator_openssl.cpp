@@ -261,7 +261,7 @@ public:
         // Obtain the public key from the X and Y coordinates in EVP_PKEY format so that we can use
         // it for signature validation in EVP_DigestVerifyFinal
         EVP_PKEY* pkey = createECKeyFromCurveAndCoordinates(
-            std::string{ECKey.getCurve()}.c_str(), ECKey.getXcoordinate(), ECKey.getYcoordinate());
+            ECKey.getCurve().data(), ECKey.getXcoordinate(), ECKey.getYcoordinate());
         uassertOpenSSL("Failed to create EC EVP_PKEY from user data", pkey != nullptr);
         _key.reset(pkey);
         uassertOpenSSL("Failed to create EC EVP_PKEY from user data", _key != nullptr);
@@ -484,7 +484,7 @@ StatusWith<std::unique_ptr<JWSValidator>> JWSValidator::create(StringData algori
         return std::make_unique<JWSValidatorOpenSSLEC>(algorithm, key);
     }
     uasserted(ErrorCodes::UnsupportedFormat,
-              fmt::format("Unknown signature algorithm {}", algorithm));
+              "Unknown signature algorithm" + std::string(algorithm.data()));
 } catch (const DBException& e) {
     return e.toStatus();
 }

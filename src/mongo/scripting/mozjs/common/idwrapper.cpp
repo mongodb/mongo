@@ -97,7 +97,7 @@ bool IdWrapper::equalsAscii(StringData sd) const {
         }
 
         bool matched;
-        if (!JS_StringEqualsAscii(_context, str, std::string{sd}.c_str(), &matched)) {
+        if (!JS_StringEqualsAscii(_context, str, sd.data(), &matched)) {
             uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_StringEqualsAscii");
         }
 

@@ -29,25 +29,23 @@
 
 #include "mongo/db/fts/fts_basic_phrase_matcher.h"
 
-#include "mongo/util/ctype.h"
+#include "mongo/platform/strcasestr.h"
 
-#include <algorithm>
 #include <cstring>
 
 namespace mongo {
 namespace fts {
 
-bool BasicFTSPhraseMatcher::phraseMatches(StringData phrase,
-                                          StringData haystack,
+using std::string;
+
+bool BasicFTSPhraseMatcher::phraseMatches(const string& phrase,
+                                          const string& haystack,
                                           Options options) const {
     if (options & kCaseSensitive) {
-        return haystack.find(phrase) != std::string::npos;
+        return haystack.find(phrase) != string::npos;
     }
 
-    return std::search(
-               haystack.begin(), haystack.end(), phrase.begin(), phrase.end(), [](char a, char b) {
-                   return ctype::toLower(a) == ctype::toLower(b);
-               }) != haystack.end();
+    return strcasestr(haystack.c_str(), phrase.c_str()) != nullptr;
 }
 
 }  // namespace fts

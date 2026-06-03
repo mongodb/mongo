@@ -616,7 +616,8 @@ TEST_F(MetricsServiceTest, MeterIsInitialized) {
         opentelemetry::metrics::Provider::GetMeterProvider();
     ASSERT_TRUE(meterProvider);
 
-    auto* meter = meterProvider->GetMeter(MetricsService::kMeterName).get();
+    auto* meter =
+        meterProvider->GetMeter(toStdStringViewForInterop(MetricsService::kMeterName)).get();
     auto* sdkMeter = dynamic_cast<opentelemetry::sdk::metrics::Meter*>(meter);
     ASSERT_TRUE(sdkMeter);
 
@@ -630,7 +631,8 @@ TEST_F(MetricsServiceTest, NoOpMeterProviderBeforeInit) {
     std::shared_ptr<opentelemetry::metrics::MeterProvider> meterProvider =
         opentelemetry::metrics::Provider::GetMeterProvider();
     ASSERT(meterProvider != nullptr);
-    EXPECT_TRUE(isNoopMeter(meterProvider->GetMeter(MetricsService::kMeterName).get()));
+    EXPECT_TRUE(isNoopMeter(
+        meterProvider->GetMeter(toStdStringViewForInterop(MetricsService::kMeterName)).get()));
 }
 #endif  // MONGO_CONFIG_OTEL
 

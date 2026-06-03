@@ -112,7 +112,7 @@ class UpdateStage : public RequiresWritableCollectionStage {
     UpdateStage& operator=(const UpdateStage&) = delete;
 
 public:
-    static constexpr const char* kStageType = "UPDATE";
+    static constexpr StringData kStageType = "UPDATE"_sd;
 
     UpdateStage(ExpressionContext* expCtx,
                 const UpdateStageParams& params,

@@ -112,9 +112,20 @@ TEST(Construction, Constexpr) {
     ASSERT_EQUALS(c, '2');
     constexpr StringData nully{nullptr, 0};
     ASSERT_EQUALS(nully, ""_sd);
+    static_assert(!std::is_constructible_v<StringData, std::nullptr_t>);
     constexpr StringData ptr{lit.data() + 1, 3};
     ASSERT_EQUALS(ptr, "234"_sd);
 }
+
+class StringDataDeathTest : public unittest::Test {};
+
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+DEATH_TEST(StringDataDeathTest,
+           InvariantNullRequiresEmpty,
+           "StringData(nullptr,len) requires len==0") {
+    [[maybe_unused]] StringData bad{nullptr, 1};
+}
+#endif
 
 TEST(Comparison, BothEmpty) {
     StringData empty("");
@@ -472,12 +483,29 @@ TEST(StringData, PlusEq) {
     ASSERT_EQ(&ret, &str);
 }
 
+TEST(StringData, ConversionToStdStringViewForInterop) {
+    static constexpr StringData in = "abc";
+    static constexpr auto out = toStdStringViewForInterop(in);
+    static_assert(std::is_same_v<decltype(out), const std::string_view>);
+    ASSERT_EQ(out.data(), in.data());
+    ASSERT_EQ(out.size(), in.size());
+}
+
+TEST(StringData, ConversionToStringDataForInterop) {
+    static constexpr std::string_view in = "abc";
+    static constexpr auto out = toStringDataForInterop(in);
+    static_assert(std::is_same_v<decltype(out), const StringData>);
+    ASSERT_EQ(out.data(), in.data());
+    ASSERT_EQ(out.size(), in.size());
+}
+
 TEST(StringData, GtestPrintTo) {
     std::string s(256, '\0');
     StringData sd{s};
     std::iota(s.begin(), s.end(), '\0');
     for (auto m = s.begin(); m != s.end(); std::rotate(s.begin(), m++, s.end()))
-        ASSERT_EQ(testing::PrintToString(sd), testing::PrintToString(sd));
+        ASSERT_EQ(testing::PrintToString(sd),
+                  testing::PrintToString(toStdStringViewForInterop(sd)));
 }
 
 }  // namespace

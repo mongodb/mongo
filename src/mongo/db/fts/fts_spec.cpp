@@ -188,8 +188,8 @@ void FTSSpec::scoreDocument(const BSONObj& obj, TermFrequencyMap* term_freqs) co
 
     while (it.more()) {
         FTSIteratorValue val = it.next();
-        std::unique_ptr<FTSTokenizer> tokenizer(val.language()->createTokenizer());
-        _scoreStringV2(tokenizer.get(), val.text(), term_freqs, val.weight());
+        std::unique_ptr<FTSTokenizer> tokenizer(val._language->createTokenizer());
+        _scoreStringV2(tokenizer.get(), val._text, term_freqs, val._weight);
     }
 }
 
@@ -201,7 +201,7 @@ void FTSSpec::_scoreStringV2(FTSTokenizer* tokenizer,
 
     unsigned numTokens = 0;
 
-    tokenizer->reset(raw, FTSTokenizer::kFilterStopWords);
+    tokenizer->reset(raw.data(), FTSTokenizer::kFilterStopWords);
 
     while (tokenizer->moveNext()) {
         StringData term = tokenizer->get();

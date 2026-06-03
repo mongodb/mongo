@@ -786,7 +786,7 @@ std::string DebuggerObject::setVariable(SetVariableRequest request) {
 }
 
 Status DebuggerObject::compileJSCodeBlock(JSFile jsfile, JS::MutableHandleValue out) {
-    std::string code{jsfile.source};
+    auto code = std::string(toStdStringViewForInterop(jsfile.source));
     auto name = jsfile.name;
     return DebuggerObject::compileJSCodeBlock(code.c_str(), name, out);
 }

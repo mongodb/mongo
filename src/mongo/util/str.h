@@ -91,13 +91,6 @@ public:
         return ss.stringData();
     }
 
-    // Explicit ostream operator to resolve ambiguity: with StringData = std::string_view,
-    // both operator std::string() and operator StringData() (= operator std::string_view())
-    // would compete for operator<<(ostream, ...), causing an ambiguous overload error.
-    friend std::ostream& operator<<(std::ostream& os, const stream& s) {
-        return os << s.ss.stringData();
-    }
-
     /**
      * Fail to compile if passed an unevaluated function, rather than allow it to decay and invoke
      * the bool overload. This catches both passing std::hex (which isn't supported by this type)
@@ -380,7 +373,7 @@ Iterator UTF8SafeTruncation(Iterator begin, Iterator end, std::size_t maximum) {
 
 inline StringData UTF8SafeTruncation(StringData input, std::size_t maximum) {
     auto truncatedEnd = UTF8SafeTruncation(input.begin(), input.end(), maximum);
-    return input.substr(0, truncatedEnd - input.begin());
+    return StringData(input.data(), truncatedEnd - input.begin());
 }
 
 inline int caseInsensitiveCompare(const char* s1, const char* s2) {

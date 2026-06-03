@@ -183,44 +183,38 @@ NetworkCounter& globalNetworkCounter() {
     return *instance;
 }
 
+const std::vector<std::string> kAllMechanisms{std::string(auth::kMechanismMongoX509),
+                                              std::string(auth::kMechanismSaslPlain),
+                                              std::string(auth::kMechanismGSSAPI),
+                                              std::string(auth::kMechanismScramSha1),
+                                              std::string(auth::kMechanismScramSha256),
+                                              std::string(auth::kMechanismMongoAWS),
+                                              std::string(auth::kMechanismMongoOIDC)};
+
 void AuthCounter::initializeMechanismMap(const std::vector<std::string>& ingressMechanisms) {
     invariant(_mechanisms.empty());
 
-    for (const auto& mech : {
-             auth::kMechanismMongoX509,
-             auth::kMechanismSaslPlain,
-             auth::kMechanismGSSAPI,
-             auth::kMechanismScramSha1,
-             auth::kMechanismScramSha256,
-             auth::kMechanismMongoAWS,
-             auth::kMechanismMongoOIDC,
-         }) {
-        _mechanisms.emplace(std::piecewise_construct, std::tuple{mech}, std::tuple{});
-    }
-
-    for (const auto& mech : {
-             // When clusterAuthMode == `x509` or `sendX509`, we'll use MONGODB-X509 for
-             // intra-cluster auth even if it's not explicitly enabled by authenticationMechanisms.
-             // Ensure it's always counted for ingress.
-             auth::kMechanismMongoX509,
-
-             // It's possible for intracluster auth to use a default fallback mechanism of
-             // SCRAM-SHA-256 even if it's not configured to do so. Explicitly add this to the map
-             // for now so that they can be incremented if this happens.
-             auth::kMechanismScramSha256,
-         }) {
-        auto it = _mechanisms.find(mech);
-        invariant(it != _mechanisms.end());
-        it->second.ingressAllowed = true;
+    for (const auto& mech : kAllMechanisms) {
+        _mechanisms.emplace(
+            std::piecewise_construct, std::forward_as_tuple(mech), std::forward_as_tuple());
     }
 
     for (const auto& mech : ingressMechanisms) {
-        auto it = _mechanisms.find(mech);
         uassert(12125800,
                 fmt::format("Unknown mechanism {} present in authenticationMechanisms", mech),
-                it != _mechanisms.end());
-        it->second.ingressAllowed = true;
+                _mechanisms.contains(mech));
+        _mechanisms[mech].ingressAllowed = true;
     }
+
+    // When clusterAuthMode == `x509` or `sendX509`, we'll use MONGODB-X509 for intra-cluster auth
+    // even if it's not explicitly enabled by authenticationMechanisms.
+    // Ensure it's always counted for ingress.
+    _mechanisms[std::string(auth::kMechanismMongoX509)].ingressAllowed = true;
+
+    // It's possible for intracluster auth to use a default fallback mechanism of SCRAM-SHA-256
+    // even if it's not configured to do so.
+    // Explicitly add this to the map for now so that they can be incremented if this happens.
+    _mechanisms[std::string(auth::kMechanismScramSha256)].ingressAllowed = true;
 }
 
 void AuthCounter::incSaslSupportedMechanismsReceived() {
@@ -277,7 +271,7 @@ void AuthCounter::EgressMechanismCounterHandle::incEgressAuthenticateSuccessful(
 }
 
 auto AuthCounter::getEgressMechanismCounter(StringData mechanism) -> EgressMechanismCounterHandle {
-    auto it = _mechanisms.find(mechanism);
+    auto it = _mechanisms.find(mechanism.data());
     uassert(ErrorCodes::MechanismUnavailable,
             fmt::format("Egress authentication using mechanism {} which is not known", mechanism),
             it != _mechanisms.end());
@@ -288,7 +282,7 @@ auto AuthCounter::getEgressMechanismCounter(StringData mechanism) -> EgressMecha
 
 auto AuthCounter::getIngressMechanismCounter(StringData mechanism)
     -> IngressMechanismCounterHandle {
-    auto it = _mechanisms.find(mechanism);
+    auto it = _mechanisms.find(mechanism.data());
     uassert(ErrorCodes::MechanismUnavailable,
             fmt::format("Received authentication for mechanism {} which is not known", mechanism),
             it != _mechanisms.end());

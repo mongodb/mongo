@@ -330,7 +330,7 @@ namespace mongo {
  * https://google.github.io/googletest/advanced.html#teaching-googletest-how-to-print-your-values
  */
 inline void PrintTo(StringData s, std::ostream* os) {
-    unittest::universalPrint(s, *os);
+    unittest::universalPrint(toStdStringViewForInterop(s), *os);
 }
 
 inline void PrintTo(const Status& s, std::ostream* os) {

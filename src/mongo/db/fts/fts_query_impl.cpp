@@ -44,6 +44,11 @@ namespace mongo {
 
 namespace fts {
 
+using std::set;
+using std::string;
+using std::stringstream;
+using std::vector;
+
 Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
     const FTSLanguage* ftsLanguage;
     try {
@@ -53,8 +58,8 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
     }
 
     // Build a space delimited list of words to have the FtsTokenizer tokenize
-    std::string positiveTermSentence;
-    std::string negativeTermSentence;
+    string positiveTermSentence;
+    string negativeTermSentence;
 
     bool inNegation = false;
     bool inPhrase = false;
@@ -66,7 +71,7 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
         QueryToken t = i.next();
 
         if (t.type == QueryToken::TEXT) {
-            std::string s{t.data};
+            string s = std::string{t.data};
 
             if (inPhrase && inNegation) {
                 // don't add term
@@ -149,7 +154,7 @@ std::unique_ptr<FTSQuery> FTSQueryImpl::clone() const {
     return std::move(clonedQuery);
 }
 
-void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const std::string& sentence, bool negated) {
+void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bool negated) {
     tokenizer->reset(sentence.c_str(), FTSTokenizer::kFilterStopWords);
 
     auto& activeTerms = negated ? _negatedTerms : _positiveTerms;
@@ -158,7 +163,7 @@ void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const std::string& sentenc
     // If we are case-insensitive, we can also used this for positive, and negative terms
     // Some terms may be expanded into multiple words in some non-English languages
     while (tokenizer->moveNext()) {
-        std::string word{tokenizer->get()};
+        string word = std::string{tokenizer->get()};
 
         if (!negated) {
             _termsForBounds.insert(word);
@@ -189,20 +194,18 @@ void FTSQueryImpl::_addTerms(FTSTokenizer* tokenizer, const std::string& sentenc
 
     // If we want case-sensitivity or diacritic sensitivity, get the correct token.
     while (tokenizer->moveNext()) {
-        std::string word{tokenizer->get()};
+        string word = std::string{tokenizer->get()};
+
         activeTerms.insert(word);
     }
 }
 
 BSONObj FTSQueryImpl::toBSON() const {
     BSONObjBuilder bob;
-    auto appendRange = [&](StringData name, const auto& seq) {
-        bob.append(name, seq.begin(), seq.end());
-    };
-    appendRange("terms", getPositiveTerms());
-    appendRange("negatedTerms", getNegatedTerms());
-    appendRange("phrases", getPositivePhr());
-    appendRange("negatedPhrases", getNegatedPhr());
+    bob.append("terms", getPositiveTerms());
+    bob.append("negatedTerms", getNegatedTerms());
+    bob.append("phrases", getPositivePhr());
+    bob.append("negatedPhrases", getNegatedPhr());
     return bob.obj();
 }
 
@@ -215,7 +218,7 @@ size_t FTSQueryImpl::getApproximateSize() const {
         return size;
     };
 
-    auto computeSetSize = [](auto&& s) {
+    auto computeSetSize = [](const std::set<std::string>& s) {
         size_t size = 0;
         for (const auto& str : s) {
             size += sizeof(std::string) + str.size() + 1;

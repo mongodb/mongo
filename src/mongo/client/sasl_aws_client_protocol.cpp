@@ -168,7 +168,7 @@ std::string generateClientSecond(StringData serverFirstBase64,
         kms_request_set_region(request.get(), getRegionFromHost(serverFirst.getStsHost()).c_str()));
 
     // sts is always the name of the service
-    uassertKmsRequest(kms_request_set_service(request.get(), std::string{kAwsServiceName}.c_str()));
+    uassertKmsRequest(kms_request_set_service(request.get(), kAwsServiceName.data()));
 
     uassertKmsRequest(kms_request_add_header_field(
         request.get(), "Host", std::string{serverFirst.getStsHost()}.c_str()));
@@ -176,12 +176,11 @@ std::string generateClientSecond(StringData serverFirstBase64,
     auto serverNonce = serverFirst.getServerNonce();
     uassertKmsRequest(kms_request_add_header_field(
         request.get(),
-        std::string{kMongoServerNonceHeader}.c_str(),
+        kMongoServerNonceHeader.data(),
         base64::encode(StringData(serverNonce.data(), serverNonce.length())).c_str()));
 
-    uassertKmsRequest(kms_request_add_header_field(request.get(),
-                                                   std::string{kMongoGS2CBHeader}.c_str(),
-                                                   std::string{kMongoDefaultGS2CBFlag}.c_str()));
+    uassertKmsRequest(kms_request_add_header_field(
+        request.get(), kMongoGS2CBHeader.data(), kMongoDefaultGS2CBFlag.data()));
 
     uassertKmsRequest(
         kms_request_set_access_key_id(request.get(), credentials.accessKeyId.c_str()));
@@ -202,8 +201,7 @@ std::string generateClientSecond(StringData serverFirstBase64,
     UniqueKmsCharBuffer kmsSignature(kms_request_get_signature(request.get()));
     second.setAuthHeader(kmsSignature.get());
 
-    second.setXAmzDate(
-        kms_request_get_canonical_header(request.get(), std::string{kXAmzDateHeader}.c_str()));
+    second.setXAmzDate(kms_request_get_canonical_header(request.get(), kXAmzDateHeader.data()));
 
     return convertToByteString(second);
 }

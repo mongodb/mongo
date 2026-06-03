@@ -62,7 +62,8 @@ public:
                std::shared_ptr<std::set<FieldPath>> mergeOnFields,
                bool mergeOnFieldsIncludesId,
                std::shared_ptr<MergeProcessor> mergeProcessor)
-        : WriterStage<MongoProcessInterface::BatchObject>(stageName, pExpCtx, std::move(outputNs)),
+        : WriterStage<MongoProcessInterface::BatchObject>(
+              stageName.data(), pExpCtx, std::move(outputNs)),
           _mergeOnFields(std::move(mergeOnFields)),
           _mergeOnFieldsIncludesId(mergeOnFieldsIncludesId),
           _mergeProcessor(std::move(mergeProcessor)) {};

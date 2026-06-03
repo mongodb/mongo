@@ -88,7 +88,7 @@ public:
  */
 class DocumentSourceWriter : public DocumentSource {
 public:
-    DocumentSourceWriter(StringData stageName,
+    DocumentSourceWriter(const char* stageName,
                          NamespaceString outputNs,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(stageName, expCtx), _outputNs(std::move(outputNs)) {}

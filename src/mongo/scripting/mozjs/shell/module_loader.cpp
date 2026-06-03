@@ -741,10 +741,10 @@ JSObject* ModuleLoader::createScriptPrivateInfo(JSContext* cx,
     }
 
     if (source) {
-        const char* ptr = source->data();
         size_t len = source->size();
         JS::UniqueTwoByteChars ucbuf(
-            JS::LossyUTF8CharsToNewTwoByteCharsZ(cx, JS::UTF8Chars(ptr, len), &len, js::MallocArena)
+            JS::LossyUTF8CharsToNewTwoByteCharsZ(
+                cx, JS::UTF8Chars(source->data(), len), &len, js::MallocArena)
                 .get());
         if (!ucbuf) {
             uasserted(ErrorCodes::JSInterpreterFailure, "Failed to create ucbuf");

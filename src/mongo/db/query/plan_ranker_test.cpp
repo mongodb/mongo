@@ -47,21 +47,26 @@
 #include <utility>
 #include <vector>
 
-namespace mongo {
+using namespace mongo;
+
 namespace {
 
-std::unique_ptr<CanonicalQuery> makeCanonicalQuery() {
+using std::make_unique;
+using std::string;
+using std::unique_ptr;
+
+unique_ptr<CanonicalQuery> makeCanonicalQuery() {
     auto expCtx = new ExpressionContextForTest();
     auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString());
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 }
 
-std::unique_ptr<PlanStageStats> makeStats(StringData name,
-                                          StageType type,
-                                          std::unique_ptr<SpecificStats> specific,
-                                          size_t works = 1,
-                                          size_t advances = 1) {
+unique_ptr<PlanStageStats> makeStats(StringData name,
+                                     StageType type,
+                                     unique_ptr<SpecificStats> specific,
+                                     size_t works = 1,
+                                     size_t advances = 1) {
     auto stats = make_unique<PlanStageStats>(name, type);
     stats->common.works = works;
     stats->common.advanced = advances;
@@ -74,16 +79,16 @@ TEST(PlanRankerTest, NoFetchBonus) {
     // score. Note there is no projection involved: before SERVER-39241 was fixed we would give
     // these two plans the same score.
 
-    auto goodPlan = makeStats(
-        "SHARDING_FILTER", STAGE_SHARDING_FILTER, std::make_unique<ShardingFilterStats>());
+    auto goodPlan =
+        makeStats("SHARDING_FILTER", STAGE_SHARDING_FILTER, make_unique<ShardingFilterStats>());
     goodPlan->children.emplace_back(
-        makeStats("IXSCAN", STAGE_IXSCAN, std::make_unique<IndexScanStats>()));
+        makeStats("IXSCAN", STAGE_IXSCAN, make_unique<IndexScanStats>()));
 
-    auto badPlan = makeStats(
-        "SHARDING_FILTER", STAGE_SHARDING_FILTER, std::make_unique<ShardingFilterStats>());
-    badPlan->children.emplace_back(makeStats("FETCH", STAGE_FETCH, std::make_unique<FetchStats>()));
+    auto badPlan =
+        makeStats("SHARDING_FILTER", STAGE_SHARDING_FILTER, make_unique<ShardingFilterStats>());
+    badPlan->children.emplace_back(makeStats("FETCH", STAGE_FETCH, make_unique<FetchStats>()));
     badPlan->children[0]->children.emplace_back(
-        makeStats("IXSCAN", STAGE_IXSCAN, std::make_unique<IndexScanStats>()));
+        makeStats("IXSCAN", STAGE_IXSCAN, make_unique<IndexScanStats>()));
 
     auto cq = makeCanonicalQuery();
     auto scorer = plan_ranker::makePlanScorer();
@@ -99,16 +104,16 @@ TEST(PlanRankerTest, DistinctBonus) {
 
     // Two plans: both fetch, one is a DISTINCT_SCAN, other is an IXSCAN.
     // DISTINCT_SCAN does 2 advances / 10 works.
-    auto dsStats = std::make_unique<DistinctScanStats>();
+    auto dsStats = make_unique<DistinctScanStats>();
     dsStats->isFetching = true;
     dsStats->isShardFilteringDistinctScanEnabled = true;
     auto distinctScanPlan =
         makeStats("DISTINCT_SCAN", STAGE_DISTINCT_SCAN, std::move(dsStats), 10, 2);
 
     // IXSCAN plan does 2 advances / 10 works.
-    auto ixscanPlan = makeStats("FETCH", STAGE_FETCH, std::make_unique<FetchStats>(), 10, 2);
+    auto ixscanPlan = makeStats("FETCH", STAGE_FETCH, make_unique<FetchStats>(), 10, 2);
     ixscanPlan->children.emplace_back(
-        makeStats("IXSCAN", STAGE_IXSCAN, std::make_unique<IndexScanStats>(), 10, 2));
+        makeStats("IXSCAN", STAGE_IXSCAN, make_unique<IndexScanStats>(), 10, 2));
 
     auto cq = makeCanonicalQuery();
     cq->setDistinct(CanonicalDistinct("someKey"));
@@ -146,5 +151,4 @@ TEST(PlanRankerTest, DistinctBonus) {
     ASSERT_GT(ixscanScore, distinctScore);
 }
 
-}  // namespace
-}  // namespace mongo
+};  // namespace

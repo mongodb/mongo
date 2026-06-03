@@ -105,13 +105,13 @@ private:
      * Returns whether the string 'raw' contains any positive terms from the query.
      * 'language' specifies the language for 'raw'.
      */
-    bool _hasPositiveTerm_string(const FTSLanguage* language, StringData raw) const;
+    bool _hasPositiveTerm_string(const FTSLanguage* language, const std::string& raw) const;
 
     /**
      * Returns whether the string 'raw' contains any negative terms from the query.
      * 'language' specifies the language for 'raw'.
      */
-    bool _hasNegativeTerm_string(const FTSLanguage* language, StringData raw) const;
+    bool _hasNegativeTerm_string(const FTSLanguage* language, const std::string& raw) const;
 
     /**
      * Returns whether 'obj' contains the exact string 'phrase' in any indexed fields.

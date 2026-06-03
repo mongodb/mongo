@@ -147,10 +147,9 @@ TimeUnit parseTimeUnit(const Value& value, StringData expressionName) {
             str::stream() << expressionName << " requires 'unit' to be a string, but got "
                           << typeName(value.getType()),
             BSONType::string == value.getType());
-    return addContextToAssertionException(
-        [&]() { return mongo::parseTimeUnit(value.getStringData()); },
-        expressionName,
-        " parameter 'unit' value parsing failed"_sd);
+    return addContextToAssertionException([&]() { return parseTimeUnit(value.getStringData()); },
+                                          expressionName,
+                                          " parameter 'unit' value parsing failed"_sd);
 }
 
 DayOfWeek parseDayOfWeek(const Value& value, StringData expressionName, StringData parameterName) {
@@ -163,7 +162,7 @@ DayOfWeek parseDayOfWeek(const Value& value, StringData expressionName, StringDa
                           << "' value cannot be recognized as a day of a week: "
                           << value.getStringData(),
             isValidDayOfWeek(value.getStringData()));
-    return mongo::parseDayOfWeek(value.getStringData());
+    return parseDayOfWeek(value.getStringData());
 }
 
 boost::optional<TimeZone> makeTimeZone(const TimeZoneDatabase* tzdb,

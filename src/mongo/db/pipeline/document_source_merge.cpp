@@ -239,7 +239,7 @@ DocumentSourceMerge::DocumentSourceMerge(
     boost::optional<ChunkVersion> collectionPlacementVersion,
     bool allowMergeOnNullishValues,
     MergeProcessor::AllowInsertWithUpdateBackupStrategies allowInsertWithUpdateBackupStrategies)
-    : DocumentSourceWriter(kStageName, std::move(outputNs), expCtx),
+    : DocumentSourceWriter(kStageName.data(), std::move(outputNs), expCtx),
       _mergeOnFields(std::make_shared<std::set<FieldPath>>(std::move(mergeOnFields))),
       _mergeOnFieldsIncludesId(_mergeOnFields->count("_id") == 1),
       _mergeProcessor(std::make_shared<MergeProcessor>(expCtx,

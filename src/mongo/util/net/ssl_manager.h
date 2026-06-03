@@ -511,8 +511,8 @@ StatusWith<SSLX509Name> parseDN(StringData str);
  *
  * The x509ShortNameToOid returns boost::none if no mapping exists for that oid.
  */
-std::string x509OidToShortName(const std::string& name);
-boost::optional<std::string> x509ShortNameToOid(const std::string& name);
+std::string x509OidToShortName(StringData name);
+boost::optional<std::string> x509ShortNameToOid(StringData name);
 
 /**
  * Platform neutral TLS version enum

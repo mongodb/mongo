@@ -56,26 +56,25 @@ private:
         return val & ((1u << n) - 1u);
     }
 
-    inline static size_t computeFastHash1(StringData s) {
-        size_t len = s.size();
+    inline static size_t computeFastHash1(const char* str, size_t len) {
         if (MONGO_unlikely(len == 0)) {
             return 126;
         }
         // The lowest 5 bits of 'str[len - 1]' and the lowest 2 bits of 'len' are decent sources
         // of entropy. Combine them to generate a pseudo-random number 'h' where 0 <= h <= 127.
-        size_t h = getLowestNBits(size_t(s[len - 1]) + (len << 5u), 7);
+        size_t h = getLowestNBits(size_t(str[len - 1]) + (len << 5u), 7);
         return h;
     }
 
-    inline static size_t computeFastHash2(StringData s, size_t fastHash1) {
-        if (MONGO_unlikely(s.empty())) {
+    inline static size_t computeFastHash2(const char* str, size_t len, size_t fastHash1) {
+        if (MONGO_unlikely(len == 0)) {
             return 38;
         }
         // The lowest 5 bits of 'str[0]' are a decent source of entropy. Using 'str[0]' and
         // 'fastHash1', generate a pseudo-random number 'h' where 0 <= h <= 127 and where
         // h != fastHash1.
-        size_t b0 = s[0];
-        size_t h = getLowestNBits(fastHash1 + b0 + getLowestNBits(~b0 >> 4u, 1), 7);
+        size_t h = getLowestNBits(
+            fastHash1 + size_t(str[0]) + getLowestNBits(~size_t(str[0]) >> 4u, 1), 7);
         return h;
     }
 
@@ -141,7 +140,7 @@ public:
 
     inline size_t findPos(StringData str) const {
         size_t len = str.size();
-        size_t fastHash = computeFastHash1(str);
+        size_t fastHash = computeFastHash1(str.data(), len);
         size_t encodedIdx = 0;
 
         if (useFastHash()) {
@@ -176,7 +175,7 @@ public:
                 }
 
                 // If this was our first attempt, try again using computeFastHash2().
-                fastHash = computeFastHash2(str, fastHash);
+                fastHash = computeFastHash2(str.data(), len, fastHash);
             }
         }
 

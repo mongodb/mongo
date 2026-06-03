@@ -120,6 +120,12 @@ StringData BaseGenerator::generate<StringData>() {
 }
 
 template <>
+absl::string_view BaseGenerator::generate<absl::string_view>() {
+    StringData sd = generateStringData(generate<uint32_t>());
+    return absl::string_view(sd.data(), sd.size());
+}
+
+template <>
 std::string BaseGenerator::generate<std::string>() {
     return std::string{generate<StringData>()};
 }

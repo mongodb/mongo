@@ -44,8 +44,8 @@ UnicodeFTSPhraseMatcher::UnicodeFTSPhraseMatcher(const string& language) {
     }
 }
 
-bool UnicodeFTSPhraseMatcher::phraseMatches(StringData phrase,
-                                            StringData haystack,
+bool UnicodeFTSPhraseMatcher::phraseMatches(const string& phrase,
+                                            const string& haystack,
                                             Options options) const {
     unicode::String::SubstrMatchOptions matchOptions = unicode::String::kNone;
 

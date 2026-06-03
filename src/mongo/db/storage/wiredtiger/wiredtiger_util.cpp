@@ -57,8 +57,10 @@ namespace {
 
 // Key names for the logging subsystem setting in configuration string.
 // These are used to look up keys with the WiredTigerConfigParser.
-constexpr const char* kLogKeyName = "log";
-constexpr const char* kLogEnabledKeyName = "enabled";
+// Since these StringData values are created from c-strings, it is ok to use data() to get a
+// null-terminated c-string for the WiredTiger API.
+auto kLogKeyName = "log"_sd;
+auto kLogEnabledKeyName = "enabled"_sd;
 
 auto& cancelledCacheMetric = *MetricBuilder<Counter64>("storage.cancelledCacheEvictions");
 
@@ -314,9 +316,9 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
     StringSet errors;
     ErrorAccumulator eventHandler(&errors);
 
-    std::string config = configElem.str();
+    StringData config = configElem.valueStringData();
     // Do NOT allow embedded null characters
-    if (config.find('\0') != std::string::npos) {
+    if (config.size() != strlen(config.data())) {
         return {ErrorCodes::FailedToParse, "malformed 'configString' value."};
     }
 
@@ -334,7 +336,7 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
     }
 
     Status status = wtRCToStatus(
-        wiredtiger_config_validate(nullptr, &eventHandler, "WT_SESSION.create", config.c_str()),
+        wiredtiger_config_validate(nullptr, &eventHandler, "WT_SESSION.create", config.data()),
         nullptr);
     if (!status.isOK()) {
         StringBuilder errorMsg;
@@ -1431,7 +1433,7 @@ std::string WiredTigerUtil::concatConfigs(const std::string& configA, const std:
 
 boost::optional<bool> WiredTigerConfigParser::isTableLoggingEnabled() const {
     WT_CONFIG_ITEM value;
-    if (auto retCode = get(kLogKeyName, &value); retCode != 0) {
+    if (auto retCode = get(kLogKeyName.data(), &value); retCode != 0) {
         invariant(
             retCode == WT_NOTFOUND,
             fmt::format("expected WT_NOTFOUND from WT_CONFIG_PARSER::get() but got {} instead",
@@ -1446,7 +1448,8 @@ boost::optional<bool> WiredTigerConfigParser::isTableLoggingEnabled() const {
     WiredTigerConfigParser logSettingParser(value);
     WT_CONFIG_ITEM enabledValue;
     // Not taking into consideration multiple "enabled" sub-keys within the "log" struct.
-    if (auto retCode = logSettingParser.get(kLogEnabledKeyName, &enabledValue); retCode != 0) {
+    if (auto retCode = logSettingParser.get(kLogEnabledKeyName.data(), &enabledValue);
+        retCode != 0) {
         invariant(retCode == WT_NOTFOUND,
                   fmt::format("expected WT_NOTFOUND from WT_CONFIG_PARSER::get() but got {} "
                               "instead. Log key value: {}",

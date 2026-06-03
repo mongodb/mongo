@@ -737,7 +737,9 @@ makeObservableInstrument<ObservableCounter<int64_t>>(
     std::string description,
     MetricUnit unit) {
     return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateInt64ObservableCounter(name, description, toString(unit));
+        ->CreateInt64ObservableCounter(toStdStringViewForInterop(name),
+                                       description,
+                                       toStdStringViewForInterop(toString(unit)));
 }
 
 template <>
@@ -747,7 +749,9 @@ makeObservableInstrument<ObservableCounter<double>>(opentelemetry::metrics::Mete
                                                     std::string description,
                                                     MetricUnit unit) {
     return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateDoubleObservableCounter(name, description, toString(unit));
+        ->CreateDoubleObservableCounter(toStdStringViewForInterop(name),
+                                        description,
+                                        toStdStringViewForInterop(toString(unit)));
 }
 
 template <>
@@ -758,7 +762,9 @@ makeObservableInstrument<ObservableUpDownCounter<int64_t>>(
     std::string description,
     MetricUnit unit) {
     return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateInt64ObservableUpDownCounter(name, description, toString(unit));
+        ->CreateInt64ObservableUpDownCounter(toStdStringViewForInterop(name),
+                                             description,
+                                             toStdStringViewForInterop(toString(unit)));
 }
 
 template <>
@@ -769,7 +775,9 @@ makeObservableInstrument<ObservableUpDownCounter<double>>(
     std::string description,
     MetricUnit unit) {
     return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateDoubleObservableUpDownCounter(name, description, toString(unit));
+        ->CreateDoubleObservableUpDownCounter(toStdStringViewForInterop(name),
+                                              description,
+                                              toStdStringViewForInterop(toString(unit)));
 }
 
 template <>
@@ -779,7 +787,9 @@ makeObservableInstrument<ObservableGauge<int64_t>>(opentelemetry::metrics::Meter
                                                    std::string description,
                                                    MetricUnit unit) {
     return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateInt64ObservableGauge(name, description, toString(unit));
+        ->CreateInt64ObservableGauge(toStdStringViewForInterop(name),
+                                     description,
+                                     toStdStringViewForInterop(toString(unit)));
 }
 
 template <>
@@ -789,7 +799,9 @@ makeObservableInstrument<ObservableGauge<double>>(opentelemetry::metrics::MeterP
                                                   std::string description,
                                                   MetricUnit unit) {
     return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateDoubleObservableGauge(name, description, toString(unit));
+        ->CreateDoubleObservableGauge(toStdStringViewForInterop(name),
+                                      description,
+                                      toStdStringViewForInterop(toString(unit)));
 }
 
 template <>
@@ -800,7 +812,9 @@ makeObservableInstrument<ObservableMinGauge<int64_t>>(
     std::string description,
     MetricUnit unit) {
     return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateInt64ObservableGauge(name, description, toString(unit));
+        ->CreateInt64ObservableGauge(toStdStringViewForInterop(name),
+                                     description,
+                                     toStdStringViewForInterop(toString(unit)));
 }
 
 template <>
@@ -811,7 +825,9 @@ makeObservableInstrument<ObservableMinGauge<double>>(
     std::string description,
     MetricUnit unit) {
     return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateDoubleObservableGauge(name, description, toString(unit));
+        ->CreateDoubleObservableGauge(toStdStringViewForInterop(name),
+                                      description,
+                                      toStdStringViewForInterop(toString(unit)));
 }
 
 template <>
@@ -822,7 +838,9 @@ makeObservableInstrument<ObservableMaxGauge<int64_t>>(
     std::string description,
     MetricUnit unit) {
     return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateInt64ObservableGauge(name, description, toString(unit));
+        ->CreateInt64ObservableGauge(toStdStringViewForInterop(name),
+                                     description,
+                                     toStdStringViewForInterop(toString(unit)));
 }
 
 template <>
@@ -833,7 +851,9 @@ makeObservableInstrument<ObservableMaxGauge<double>>(
     std::string description,
     MetricUnit unit) {
     return provider.GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateDoubleObservableGauge(name, description, toString(unit));
+        ->CreateDoubleObservableGauge(toStdStringViewForInterop(name),
+                                      description,
+                                      toStdStringViewForInterop(toString(unit)));
 }
 }  // namespace metrics_service_detail
 

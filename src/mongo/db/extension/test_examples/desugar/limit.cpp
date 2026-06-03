@@ -40,7 +40,7 @@ public:
         : sdk::TestExecStage(stageName, stageBson),
           _nReturned(0),
           _limit(stageBson.getOwned()
-                     .getField(stageName)
+                     .getField(mongo::toStringDataForInterop(stageName))
                      .parseIntegerElementToNonNegativeLong()
                      .getValue()) {}
 

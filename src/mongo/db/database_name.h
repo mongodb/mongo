@@ -307,7 +307,9 @@ public:
     template <typename H>
     friend H AbslHashValue(H h, const DatabaseName& obj) {
         //  _data might contain a collection : only hash the discriminator, tenant and database.
-        return H::combine(std::move(h), obj.view().substr(0, obj.sizeWithTenant() + kDataOffset));
+        return H::combine(
+            std::move(h),
+            toStdStringViewForInterop(obj.view().substr(0, obj.sizeWithTenant() + kDataOffset)));
     }
 
     // Adds support for boost::Hash.
@@ -793,7 +795,7 @@ constexpr auto makeDbData(const char* db) {
     return result;
 }
 #define X(id, db) constexpr inline auto id##_data = makeDbData<db.size()>(db.data());
-EXPAND_DBNAME_CONSTANT_TABLE(X)  // NOLINT(bugprone-suspicious-stringview-data-usage)
+EXPAND_DBNAME_CONSTANT_TABLE(X)
 #undef X
 }  // namespace dbname_detail::constexpr_data
 

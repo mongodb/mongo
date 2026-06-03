@@ -75,7 +75,7 @@ bool FTSMatcher::hasPositiveTerm(const BSONObj& obj) const {
 
     while (it.more()) {
         FTSIteratorValue val = it.next();
-        if (_hasPositiveTerm_string(val.language(), val.text())) {
+        if (_hasPositiveTerm_string(val._language, val._text)) {
             return true;
         }
     }
@@ -83,9 +83,9 @@ bool FTSMatcher::hasPositiveTerm(const BSONObj& obj) const {
     return false;
 }
 
-bool FTSMatcher::_hasPositiveTerm_string(const FTSLanguage* language, StringData raw) const {
+bool FTSMatcher::_hasPositiveTerm_string(const FTSLanguage* language, const string& raw) const {
     std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
-    tokenizer->reset(raw, _getTokenizerOptions());
+    tokenizer->reset(raw.c_str(), _getTokenizerOptions());
 
     while (tokenizer->moveNext()) {
         string word = std::string{tokenizer->get()};
@@ -105,7 +105,7 @@ bool FTSMatcher::hasNegativeTerm(const BSONObj& obj) const {
 
     while (it.more()) {
         FTSIteratorValue val = it.next();
-        if (_hasNegativeTerm_string(val.language(), val.text())) {
+        if (_hasNegativeTerm_string(val._language, val._text)) {
             return true;
         }
     }
@@ -113,12 +113,13 @@ bool FTSMatcher::hasNegativeTerm(const BSONObj& obj) const {
     return false;
 }
 
-bool FTSMatcher::_hasNegativeTerm_string(const FTSLanguage* language, StringData raw) const {
+bool FTSMatcher::_hasNegativeTerm_string(const FTSLanguage* language, const string& raw) const {
     std::unique_ptr<FTSTokenizer> tokenizer(language->createTokenizer());
-    tokenizer->reset(raw, _getTokenizerOptions());
+    tokenizer->reset(raw.c_str(), _getTokenizerOptions());
 
     while (tokenizer->moveNext()) {
-        if (_query.getNegatedTerms().count(tokenizer->get())) {
+        string word = std::string{tokenizer->get()};
+        if (_query.getNegatedTerms().count(word) > 0) {
             return true;
         }
     }
@@ -167,7 +168,7 @@ bool FTSMatcher::_phraseMatch(const string& phrase, const BSONObj& obj) const {
             matcherOptions |= FTSPhraseMatcher::kDiacriticSensitive;
         }
 
-        if (val.language()->getPhraseMatcher().phraseMatches(phrase, val.text(), matcherOptions)) {
+        if (val._language->getPhraseMatcher().phraseMatches(phrase, val._text, matcherOptions)) {
             return true;
         }
     }

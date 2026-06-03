@@ -102,7 +102,7 @@ void WiredTigerSession::_openCursor(WT_SESSION* session,
                                     WT_CURSOR** cursorOut) {
 
     // TODO: SERVER-110391 Add an invariant here to catch stale sessions.
-    int ret = session->open_cursor(session, std::string{uri}.c_str(), nullptr, config, cursorOut);
+    int ret = session->open_cursor(session, uri.data(), nullptr, config, cursorOut);
     if (ret == 0) {
         return;
     }

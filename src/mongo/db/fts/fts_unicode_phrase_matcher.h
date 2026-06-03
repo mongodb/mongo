@@ -56,7 +56,9 @@ class UnicodeFTSPhraseMatcher final : public FTSPhraseMatcher {
 public:
     UnicodeFTSPhraseMatcher(const std::string& language);
 
-    bool phraseMatches(StringData phrase, StringData haystack, Options options) const override;
+    bool phraseMatches(const std::string& phrase,
+                       const std::string& haystack,
+                       Options options) const override;
 
 private:
     unicode::CaseFoldMode _caseFoldMode;

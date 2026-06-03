@@ -5574,7 +5574,7 @@ Value ExpressionEncStrNormalizedEq::evaluate(const Document& root, Variables* va
 auto ExpressionVectorSimilarity::_parseInternal(ExpressionContext* const expCtx,
                                                 BSONElement expr,
                                                 const VariablesParseState& vps,
-                                                StringData similarityName) {
+                                                const std::string& similarityName) {
 
     struct {
         bool score{false};
@@ -5651,7 +5651,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityDotProduct,
 intrusive_ptr<Expression> ExpressionSimilarityDotProduct::parse(ExpressionContext* const expCtx,
                                                                 BSONElement expr,
                                                                 const VariablesParseState& vps) {
-    auto [score, children] = _parseInternal(expCtx, expr, vps, kName);
+    auto [score, children] = _parseInternal(expCtx, expr, vps, kName.data());
     return new ExpressionSimilarityDotProduct(expCtx, score, std::move(children));
 }
 
@@ -5671,7 +5671,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityCosine,
 intrusive_ptr<Expression> ExpressionSimilarityCosine::parse(ExpressionContext* const expCtx,
                                                             BSONElement expr,
                                                             const VariablesParseState& vps) {
-    auto [score, children] = _parseInternal(expCtx, expr, vps, kName);
+    auto [score, children] = _parseInternal(expCtx, expr, vps, kName.data());
     return new ExpressionSimilarityCosine(expCtx, score, std::move(children));
 }
 
@@ -5689,7 +5689,7 @@ REGISTER_EXPRESSION_WITH_FEATURE_FLAG(similarityEuclidean,
 intrusive_ptr<Expression> ExpressionSimilarityEuclidean::parse(ExpressionContext* const expCtx,
                                                                BSONElement expr,
                                                                const VariablesParseState& vps) {
-    auto [score, children] = _parseInternal(expCtx, expr, vps, kName);
+    auto [score, children] = _parseInternal(expCtx, expr, vps, kName.data());
     return new ExpressionSimilarityEuclidean(expCtx, score, std::move(children));
 }
 

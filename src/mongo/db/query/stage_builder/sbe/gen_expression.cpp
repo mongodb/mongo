@@ -2221,7 +2221,7 @@ public:
     }
 
     void visit(const ExpressionInternalRawSortKey* expr) final {
-        unsupportedExpression(ExpressionInternalRawSortKey::kName);
+        unsupportedExpression(ExpressionInternalRawSortKey::kName.data());
     }
     void visit(const ExpressionMap* expr) final {
         unsupportedExpression("$map");
@@ -4350,7 +4350,7 @@ private:
                             std::move(dateAddExpr)));
     }
 
-    void unsupportedExpression(StringData op) const {
+    void unsupportedExpression(const char* op) const {
         // We're guaranteed to not fire this assertion by implementing a mechanism in the upper
         // layer which directs the query to the classic engine when an unsupported expression
         // appears.

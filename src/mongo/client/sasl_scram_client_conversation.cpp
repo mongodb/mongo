@@ -122,7 +122,8 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
     if (inputData.starts_with("m=")) {
         return Status(ErrorCodes::BadValue, "SCRAM required extensions not supported");
     }
-    const std::vector<std::string> input = absl::StrSplit(inputData, ",", absl::SkipEmpty());
+    const std::vector<std::string> input =
+        absl::StrSplit(toStdStringViewForInterop(inputData), ",", absl::SkipEmpty());
 
     if (input.size() < 3) {
         return Status(ErrorCodes::BadValue,
@@ -186,7 +187,8 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
  **/
 StatusWith<bool> SaslSCRAMClientConversation::_thirdStep(StringData inputData,
                                                          std::string* outputData) {
-    const std::vector<std::string> input = absl::StrSplit(inputData, ",", absl::SkipEmpty());
+    const std::vector<std::string> input =
+        absl::StrSplit(toStdStringViewForInterop(inputData), ",", absl::SkipEmpty());
 
     if (input.empty()) {
         return Status(

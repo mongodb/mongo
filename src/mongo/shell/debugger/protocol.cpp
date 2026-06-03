@@ -46,7 +46,7 @@ std::shared_ptr<Request> Request::fromJSON(std::string line) {
     BSONObj obj = fromjson(line);
 
     auto seq = obj.getIntField("seq");
-    std::string command{obj.getStringField("command")};
+    auto command = std::string(toStdStringViewForInterop(obj.getStringField("command")));
     auto args = obj.getObjectField("arguments").getOwned();
 
     auto partial = PartialRequest(seq, args, command);
@@ -96,7 +96,7 @@ SetBreakpointsRequest::SetBreakpointsRequest(const PartialRequest& partial)
     : VisitableRequest(partial) {
     // Get source from arguments
     auto sourceField = arguments.getObjectField("source");
-    source = std::string(sourceField.getStringField("path"));
+    source = std::string(toStdStringViewForInterop(sourceField.getStringField("path")));
 
     // Get lines array from arguments and extract line numbers
     std::vector<BSONElement> bpArr = arguments.getField("breakpoints").Array();
@@ -276,7 +276,7 @@ BSONObj Variable::toBSON() const {
  */
 
 EvaluateRequest::EvaluateRequest(const PartialRequest& partial) : VisitableRequest(partial) {
-    expression = std::string(arguments.getStringField("expression"));
+    expression = std::string(toStdStringViewForInterop(arguments.getStringField("expression")));
 }
 
 Response EvaluateRequest::response(std::string result) {
@@ -296,8 +296,8 @@ Response EvaluateRequest::response(std::string result) {
  * SetVariableRequest
  */
 SetVariableRequest::SetVariableRequest(const PartialRequest& partial) : VisitableRequest(partial) {
-    name = std::string(arguments.getStringField("name"));
-    value = std::string(arguments.getStringField("value"));
+    name = std::string(toStdStringViewForInterop(arguments.getStringField("name")));
+    value = std::string(toStdStringViewForInterop(arguments.getStringField("value")));
 }
 
 Response SetVariableRequest::response(std::string value) {

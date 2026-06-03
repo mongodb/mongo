@@ -144,7 +144,7 @@ protected:
     }
 
 public:
-    virtual ~PlanStage() = default;
+    virtual ~PlanStage() {}
 
     using Children = absl::InlinedVector<std::unique_ptr<PlanStage>, 4>;
 

@@ -46,34 +46,20 @@ namespace fts {
 /**
  *  Encapsulates data fields returned by FTSElementIterator
  */
-class FTSIteratorValue {
-public:
-    FTSIteratorValue(StringData text, const FTSLanguage* language, double weight)
+struct FTSIteratorValue {
+    FTSIteratorValue(const char* text, const FTSLanguage* language, double weight)
         : _text(text), _language(language), _weight(weight), _valid(true) {}
 
-    FTSIteratorValue() = default;
+    FTSIteratorValue() : _text(nullptr), _language(), _weight(0.0), _valid(false) {}
 
     bool valid() const {
         return _valid;
     }
 
-    StringData text() const {
-        return _text;
-    }
-
-    const FTSLanguage* language() const {
-        return _language;
-    }
-
-    double weight() const {
-        return _weight;
-    }
-
-private:
-    StringData _text;
-    const FTSLanguage* _language = nullptr;
-    double _weight = 0.0;
-    bool _valid = false;
+    const char* _text;
+    const FTSLanguage* _language;
+    double _weight;
+    bool _valid;
 };
 
 /**
