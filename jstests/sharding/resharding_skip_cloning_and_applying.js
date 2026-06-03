@@ -262,6 +262,9 @@ const testCases = [
         setParameters: {
             featureFlagReshardingSkipCloningAndApplyingIfApplicable: false,
             featureFlagReshardingSkipCloningIfApplicable: false,
+            // AuthoritativeShardsDDL requires all resharding no-refresh flags to be enabled.
+            featureFlagAuthoritativeShardsCRUD: false,
+            featureFlagAuthoritativeShardsDDL: false,
         },
         shouldBufferCollectionExistsInNoChunkRecipient: true,
     },
@@ -269,6 +272,9 @@ const testCases = [
         setParameters: {
             featureFlagReshardingSkipCloningAndApplyingIfApplicable: false,
             featureFlagReshardingSkipCloningIfApplicable: true,
+            // AuthoritativeShardsDDL requires all resharding no-refresh flags to be enabled.
+            featureFlagAuthoritativeShardsCRUD: false,
+            featureFlagAuthoritativeShardsDDL: false,
         },
         shouldBufferCollectionExistsInNoChunkRecipient: true,
     },
