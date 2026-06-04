@@ -245,6 +245,24 @@ public:
 
     // Replication Team Metrics
     static constexpr MetricName kOplogApplyBytes = MetricNameMaker::make("oplog.apply.bytes");
+    static constexpr MetricName kOplogApplyBufferCount =
+        MetricNameMaker::make("serverStatus.metrics.repl.buffer.apply.count");
+    static constexpr MetricName kOplogApplyBufferSize =
+        MetricNameMaker::make("serverStatus.metrics.repl.buffer.apply.size");
+    static constexpr MetricName kOplogWriteBufferCount =
+        MetricNameMaker::make("serverStatus.metrics.repl.buffer.write.count");
+    static constexpr MetricName kOplogWriteBufferSize =
+        MetricNameMaker::make("serverStatus.metrics.repl.buffer.write.size");
+    static constexpr MetricName kApplyBatchesNum =
+        MetricNameMaker::make("serverStatus.metrics.repl.apply.batches.num");
+    static constexpr MetricName kApplyBatchesTotalMillis =
+        MetricNameMaker::make("serverStatus.metrics.repl.apply.batches.totalMillis");
+    static constexpr MetricName kInitialSyncFailedAttempts =
+        MetricNameMaker::make("serverStatus.metrics.repl.initialSync.failedAttempts");
+    static constexpr MetricName kInitialSyncFailures =
+        MetricNameMaker::make("serverStatus.metrics.repl.initialSync.failures");
+    static constexpr MetricName kInitialSyncCompleted =
+        MetricNameMaker::make("serverStatus.metrics.repl.initialSync.completed");
 
     // Query Integration Team Metrics
 
