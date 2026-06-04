@@ -15,9 +15,6 @@
  *    step-up from occurring.
  *
  * @tags: [
- *   # This test passes for the wrong reason. The new primary aborts the index build on step up,
- *   # without trying to resume, which is expected to fail with a CannotIndexParallelArrays error.
- *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]
