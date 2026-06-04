@@ -799,6 +799,19 @@ TEST_F(RateLimiterWithMockClockTest, DeferredTokenMoveSemantics) {
     ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 1);
 }
 
+TEST_F(RateLimiterWithMockClockTest, TokensAcquiredMetric) {
+    RateLimiter rateLimiter = makeRateLimiter("TokensAcquiredMetric",
+                                              /*refreshRate=*/100.0,
+                                              /*burstCapacitySecs=*/3.0);
+    auto opCtx = makeOperationContext();
+
+    ASSERT_OK(rateLimiter.acquireToken(opCtx.get(), 1.0));
+    ASSERT_EQ(rateLimiter.stats().tokensAcquired.loadRelaxed(), 1.0);
+
+    ASSERT_OK(rateLimiter.acquireToken(opCtx.get(), 2.0));
+    ASSERT_EQ(rateLimiter.stats().tokensAcquired.loadRelaxed(), 3.0);
+}
+
 TEST_F(RateLimiterWithMockClockTest, ReturnTokens) {
     RateLimiter rateLimiter = makeRateLimiter("RateLimiterReturnTokens",
                                               /*refreshRate=*/100,

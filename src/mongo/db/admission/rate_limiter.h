@@ -156,6 +156,11 @@ public:
          * and excluding interrupted calls.
          */
         MovingAverage averageTimeQueuedMicros{0.2};
+        /**
+         * tokensAcquired is the cumulative sum of tokens consumed across all successful
+         * acquireToken calls.
+         */
+        Atomic<double> tokensAcquired;
     };
 
     /**

@@ -212,6 +212,7 @@ Status RateLimiter::DeferredToken::get(OperationContext* opCtx) && {
         std::max(Milliseconds{0}, (_timeEnqueued + _napTime) - impl->nowInMillis());
     if (adjustedNapTime == Milliseconds{0}) {
         impl->stats.successfulAdmissions.incrementRelaxed();
+        impl->stats.tokensAcquired.fetchAndAddRelaxed(_numTokens);
         impl->stats.averageTimeQueuedMicros.addSample(
             static_cast<double>(durationCount<Microseconds>(_napTime)));
         return Status::OK();
@@ -238,6 +239,7 @@ Status RateLimiter::DeferredToken::get(OperationContext* opCtx) && {
     }
 
     impl->stats.successfulAdmissions.incrementRelaxed();
+    impl->stats.tokensAcquired.fetchAndAddRelaxed(_numTokens);
     impl->stats.averageTimeQueuedMicros.addSample(
         static_cast<double>(durationCount<Microseconds>(_napTime)));
     return Status::OK();
@@ -307,6 +309,7 @@ StatusWith<RateLimiter::DeferredToken> RateLimiter::acquireToken(double numToken
 
     // Token immediately available.
     _impl->stats.successfulAdmissions.incrementRelaxed();
+    _impl->stats.tokensAcquired.fetchAndAddRelaxed(numTokensToConsume);
     _impl->stats.averageTimeQueuedMicros.addSample(0);
     return DeferredToken(_impl.get(), numTokensToConsume, Milliseconds{0}, Milliseconds{0});
 }
@@ -329,6 +332,7 @@ Status RateLimiter::tryAcquireToken(double numTokensToConsume) {
     }
 
     _impl->stats.successfulAdmissions.incrementRelaxed();
+    _impl->stats.tokensAcquired.fetchAndAddRelaxed(numTokensToConsume);
     return Status::OK();
 }
 
@@ -371,6 +375,9 @@ void RateLimiter::appendStats(BSONObjBuilder* bob) const {
     if (const auto avg = stats().averageTimeQueuedMicros.get()) {
         bob->append("averageTimeQueuedMicros", *avg);
     }
+
+    bob->append("tokensAcquired", stats().tokensAcquired.loadRelaxed());
+    bob->append("currentQueueDepth", stats().addedToQueue.get() - stats().removedFromQueue.get());
 
     // FTDC consumers may not handle infinity, and so we append INT64_MAX instead.
     bob->append("totalAvailableTokens",
