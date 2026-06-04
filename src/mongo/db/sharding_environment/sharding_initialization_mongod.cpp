@@ -51,6 +51,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/ddl/drop_agg_temp_collections.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/index_on_config.h"
 #include "mongo/db/global_catalog/metadata_consistency_validation/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
@@ -802,6 +803,20 @@ void ShardingInitializationMongoD::onStepUpComplete(OperationContext* opCtx, lon
                 indexStatus.withContext("Failed to create index on config.rangeDeletions on "
                                         "shard's first transition to primary"));
         }
+
+        // Create shard catalog collections and indexes if they do not yet exist.
+        auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        if (feature_flags::gAuthoritativeShardsDDL.isEnabled(VersionContext::getDecoration(opCtx),
+                                                             fcvSnapshot)) {
+            auto status = ensureShardLocalCatalogIndexes(opCtx);
+            if (!status.isOK()) {
+                if (ErrorCodes::isShutdownError(status.code()) ||
+                    ErrorCodes::isNotPrimaryError(status.code())) {
+                    return;
+                }
+                fassertFailedWithStatus(11961000, status);
+            }
+        }
     }
 
     _setClusterTimeSigningEnabled(opCtx, true);
@@ -1083,6 +1098,25 @@ boost::optional<ShardIdentity> ShardingInitializationMongoD::getShardIdentityDoc
 
         return boost::none;
     }
+}
+
+Status ensureShardLocalCatalogIndexes(OperationContext* opCtx) {
+    /* Creating _id is a no-op but ensures the collection is created if it doesn't exist. */
+    Status result = sharding_util::createIndexOnCollection(
+        opCtx,
+        NamespaceString::kConfigShardCatalogCollectionsNamespace,
+        BSON("_id" << 1),
+        true /* unique */);
+    if (!result.isOK()) {
+        return result.withContext(
+            str::stream()
+            << "couldn't create _id index on "
+            << NamespaceString::kConfigShardCatalogCollectionsNamespace.toStringForErrorMsg());
+    }
+
+    /* The shard catalog chunks collection and its indexes. */
+    return ensureCollectionIndexes(
+        opCtx, NamespaceString::kConfigShardCatalogChunksNamespace, getChunkCollectionIndexSpecs());
 }
 
 }  // namespace mongo

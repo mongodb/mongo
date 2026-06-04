@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_change_notifier.h"
@@ -157,5 +158,10 @@ MONGO_MOD_NEEDS_REPLACEMENT void initializeShardingAwarenessAndLoadGlobalSetting
     OperationContext* opCtx,
     const ShardIdentity& shardIdentity,
     BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
+
+/**
+ * Ensures that the shard-local catalog collections exist with the correct indexes.
+ */
+Status ensureShardLocalCatalogIndexes(OperationContext* opCtx);
 
 }  // namespace mongo
