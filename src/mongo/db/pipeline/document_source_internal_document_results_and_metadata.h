@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_internal_document_results_and_metadata_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_internal_document_results_and_metadata.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 
@@ -131,6 +132,22 @@ public:
         return _returnCursor;
     }
 
+    void stashAdditionalCursorPipeline(std::unique_ptr<Pipeline> pipeline) {
+        tassert(12615009, "Additional cursor already stashed", !_additionalCursorPipeline);
+        _additionalCursorPipeline = std::move(pipeline);
+    }
+
+    // The additional cursor pipeline is stashed by the exec translation function when
+    // returnCursor is true. run_aggregate.cpp takes it once via takeAdditionalCursorPipeline()
+    // to register as a secondary SearchMetaResult executor. After taking, it becomes null.
+    bool hasAdditionalCursorPipeline() const {
+        return _additionalCursorPipeline != nullptr;
+    }
+
+    std::unique_ptr<Pipeline> takeAdditionalCursorPipeline() {
+        return std::move(_additionalCursorPipeline);
+    }
+
     DocumentSourceInternalDocumentResultsAndMetadata(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::intrusive_ptr<DocumentSource> sourceStage,
@@ -141,6 +158,9 @@ private:
     boost::intrusive_ptr<DocumentSource> _sourceStage;
     boost::optional<MetadataBindSpec> _metadata;
     bool _returnCursor;
+    // Stashed by the exec translation function when returnCursor is true. run_aggregate.cpp takes
+    // it via takeAdditionalCursorPipeline() to register as a secondary SearchMetaResult executor.
+    std::unique_ptr<Pipeline> _additionalCursorPipeline;
 };
 
 }  // namespace mongo

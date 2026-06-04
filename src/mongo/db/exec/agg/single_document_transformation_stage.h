@@ -58,6 +58,15 @@ private:
 
     void doDispose() final;
 
+    // CommonStats::stageTypeStr is a non-owning StringData. For most exec stages the source name
+    // is a static constexpr so the pointer is always valid. SingleDocumentTransformationStage is
+    // different because the DocumentSource it is built from (e.g. $replaceRoot, $addFields,
+    // $project) stores the name in a std::string member, and getSourceName() returns
+    // _name.c_str(). If the DocumentSource is destroyed before the exec stage, as happens in 1:N
+    // translation functions that create throwaway DocumentSources to feed buildStage(),
+    // stageTypeStr becomes a dangling pointer. Owning a copy here keeps the name valid for the
+    // lifetime of the stage.
+    std::string _ownedStageName;
     std::shared_ptr<SingleDocumentTransformationProcessor> _transformationProcessor;
 };
 }  // namespace agg

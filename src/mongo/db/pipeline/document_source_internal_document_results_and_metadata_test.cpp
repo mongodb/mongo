@@ -31,10 +31,20 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/exchange_stage.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/document_source_queue.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/unittest/death_test.h"
@@ -297,6 +307,90 @@ TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
     ds->optimizeAt(pipeline.begin(), &pipeline);
 
     ASSERT_TRUE(ds->getMetadata().has_value());
+}
+
+// Translation tests — verify REGISTER_AGG_STAGES_MAPPING expansion via buildPipeline.
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       TranslateNoMetadataYieldsTwoExecStages) {
+    // Exchange (1 consumer) + $replaceRoot only when there is no metadata.
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, /*metadata=*/boost::none, /*returnCursor=*/false);
+    auto sourcePipeline = Pipeline::create({ds}, expCtx);
+    auto execPipeline = exec::agg::buildPipeline(sourcePipeline->freeze());
+
+    const auto& stages = execPipeline->getStages();
+    ASSERT_EQ(stages.size(), 2u);
+    ASSERT_EQ(StringData(stages[0]->getCommonStats().stageTypeStr),
+              DocumentSourceExchange::kStageName);
+    ASSERT_EQ(StringData(stages[1]->getCommonStats().stageTypeStr), "$replaceRoot"_sd);
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       TranslateWithMetadataYieldsThreeExecStages) {
+    // Standalone path: Exchange (2 consumers) + $replaceRoot + $setVar.
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    MetadataBindSpec meta{"SEARCH_META"};
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/false);
+    auto sourcePipeline = Pipeline::create({ds}, expCtx);
+    auto execPipeline = exec::agg::buildPipeline(sourcePipeline->freeze());
+
+    const auto& stages = execPipeline->getStages();
+    ASSERT_EQ(stages.size(), 3u);
+    ASSERT_EQ(StringData(stages[0]->getCommonStats().stageTypeStr),
+              DocumentSourceExchange::kStageName);
+    ASSERT_EQ(StringData(stages[1]->getCommonStats().stageTypeStr), "$replaceRoot"_sd);
+    ASSERT_EQ(StringData(stages[2]->getCommonStats().stageTypeStr),
+              "$setVariableFromSubPipeline"_sd);
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       TranslateReturnCursorStashesMetaPipeline) {
+    // Sharded path: Exchange (2 consumers) + $replaceRoot and meta pipeline stashed on DS.
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    MetadataBindSpec meta{"SEARCH_META"};
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, meta, /*returnCursor=*/true);
+    boost::intrusive_ptr<DocumentSourceInternalDocumentResultsAndMetadata> dsRef = ds;
+    auto sourcePipeline = Pipeline::create({std::move(ds)}, expCtx);
+    auto execPipeline = exec::agg::buildPipeline(sourcePipeline->freeze());
+
+    const auto& stages = execPipeline->getStages();
+    ASSERT_EQ(stages.size(), 2u);
+    ASSERT_EQ(StringData(stages[0]->getCommonStats().stageTypeStr),
+              DocumentSourceExchange::kStageName);
+    ASSERT_EQ(StringData(stages[1]->getCommonStats().stageTypeStr), "$replaceRoot"_sd);
+
+    auto additionalCursorPipeline = dsRef->takeAdditionalCursorPipeline();
+    ASSERT_NE(additionalCursorPipeline, nullptr);
+    ASSERT_EQ(additionalCursorPipeline->pipelineType, CursorTypeEnum::SearchMetaResult);
+
+    // Verify the stashed meta pipeline has exactly 2 stages: Exchange consumer + replaceRoot.
+    const auto& metaStages = additionalCursorPipeline->getSources();
+    ASSERT_EQ(metaStages.size(), 2u);
+    auto stageIt = metaStages.begin();
+    ASSERT_EQ((*stageIt)->getSourceName(), DocumentSourceExchange::kStageName);
+    ++stageIt;
+    ASSERT_EQ(StringData((*stageIt)->getSourceName()), "$replaceRoot"_sd);
+}
+
+TEST_F(DocumentSourceInternalDocumentResultsAndMetadataTest,
+       TranslateNoMetadataReturnCursorIsNoop) {
+    auto expCtx = getExpCtx();
+    auto queueStage = DocumentSourceQueue::create(expCtx, {});
+    auto ds = DocumentSourceInternalDocumentResultsAndMetadata::create(
+        expCtx, queueStage, /*metadata=*/boost::none, /*returnCursor=*/true);
+    boost::intrusive_ptr<DocumentSourceInternalDocumentResultsAndMetadata> dsRef = ds;
+    auto sourcePipeline = Pipeline::create({std::move(ds)}, expCtx);
+    auto execPipeline = exec::agg::buildPipeline(sourcePipeline->freeze());
+
+    const auto& stages = execPipeline->getStages();
+    ASSERT_EQ(stages.size(), 2u);
+    ASSERT_FALSE(dsRef->hasAdditionalCursorPipeline());
 }
 
 }  // namespace

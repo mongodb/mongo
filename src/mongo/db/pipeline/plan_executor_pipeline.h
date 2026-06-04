@@ -145,6 +145,10 @@ public:
         _execPipeline->dispose();
     }
 
+    Pipeline* getPipeline() const override {
+        return _pipeline.get();
+    }
+
     void forceSpill(PlanYieldPolicy* yieldPolicy) override {
         tassert(10450600,
                 "Pipelines acquire locks internally, so yieldPolicy must be nullptr",

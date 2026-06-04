@@ -82,10 +82,27 @@ function testProperAuthorization(conn, t, testcase, r) {
                 testcase.runOnDb +
                 " with role " +
                 r.key;
-        } else if (res.ok == 0 && !testcase.expectFail && res.code != commandNotSupportedCode) {
+        } else if (
+            res.ok == 0 &&
+            !testcase.expectFail &&
+            !testcase.expectFailWithErrorCodes &&
+            res.code != commandNotSupportedCode
+        ) {
             // don't error if the test failed with code commandNotSupported since
             // some storage engines don't support some commands.
             out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb + " with role " + r.key;
+        } else if (res.ok == 0 && testcase.expectFailWithErrorCodes) {
+            if (!testcase.expectFailWithErrorCodes.includes(res.code)) {
+                out =
+                    "expected failure with code(s) " +
+                    tojson(testcase.expectFailWithErrorCodes) +
+                    " but got " +
+                    tojson(res) +
+                    " on db " +
+                    testcase.runOnDb +
+                    " with role " +
+                    r.key;
+            }
         }
     } else {
         // Don't error if the test failed with CommandNotFound rather than an authorization failure

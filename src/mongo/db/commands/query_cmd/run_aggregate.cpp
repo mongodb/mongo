@@ -61,6 +61,7 @@
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
+#include "mongo/db/pipeline/document_source_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/document_source_internal_join_hint.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
@@ -687,6 +688,33 @@ std::vector<std::unique_ptr<Pipeline>> createMongotMetadataPipelineIfNeeded(
     return pipelines;
 }
 
+// Only PlanExecutorPipeline exposes a pipeline, other executor types (e.g. PlanExecutorExpress)
+// mark getPipeline() as unreachable, so we must check before calling.
+DocumentSourceInternalDocumentResultsAndMetadata* getDocResultsAndMetadataStage(
+    const std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>& execs) {
+    if (execs.empty())
+        return nullptr;
+    auto* pipelineExec = dynamic_cast<PlanExecutorPipeline*>(execs.front().get());
+    auto* pipeline = pipelineExec ? pipelineExec->getPipeline() : nullptr;
+    return pipeline
+        ? dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(pipeline->peekFront())
+        : nullptr;
+}
+
+// Retrieve the metadata pipeline stashed by $_documentResultsAndMetadata's translation
+// function (returnCursor: true) and register it as a secondary SearchMetaResult executor.
+void addMetadataCursorExecutor(
+    std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>& execs,
+    DocumentSourceInternalDocumentResultsAndMetadata* docResultsAndMetadata) {
+    if (!docResultsAndMetadata->hasAdditionalCursorPipeline())
+        return;
+    auto metaPipeline = docResultsAndMetadata->takeAdditionalCursorPipeline();
+    auto metaExpCtx = metaPipeline->getContext();
+    execs.emplace_back(plan_executor_factory::make(std::move(metaExpCtx),
+                                                   std::move(metaPipeline),
+                                                   PlanExecutorPipeline::ResumableScanType::kNone));
+}
+
 std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutorsForPipeline(
     const AggExState& aggExState,
     AggCatalogState& aggCatalogState,
@@ -763,6 +791,10 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
             // pipeline stages.
             aggCatalogState.stashResources(sharedStasher.get());
         }
+    }
+
+    if (auto* docResultsAndMetadata = getDocResultsAndMetadataStage(execs)) {
+        addMetadataCursorExecutor(execs, docResultsAndMetadata);
     }
 
     for (auto& exec : additionalExecutors) {

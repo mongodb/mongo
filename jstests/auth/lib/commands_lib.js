@@ -40,7 +40,15 @@ array. This means that if the command is authorized, then you still expect
 it to fail with a non-auth related error. As always, for roles other than
 those in the "roles" array, an auth error is expected.
 
-2) expectAuthzFailure
+2) expectFailWithErrorCodes
+
+Like "expectFail", but instead of accepting any non-auth error, it only
+accepts the specified error codes. Pass an array of error codes, e.g.
+"expectFailWithErrorCodes: [40228]". Auth errors are never suppressed. If
+the command fails with an auth error, the test still fails regardless of
+this option.
+
+3) expectAuthzFailure
 
 Like "expectFailure", this option applies to an individual test case rather than
 than the full test object.  When this option is true, it means the test case is
@@ -48,30 +56,30 @@ than the full test object.  When this option is true, it means the test case is
 instead it makes it so it is testing that the given roles/privileges are *not* sufficient
 to be authorized to run the command.
 
-3) skipSharded
+4) skipSharded
 
 Add "skipSharded: true" if you want to run the test only ony in a non-sharded configuration.
 
-4) skipUnlessSharded
+5) skipUnlessSharded
 
 Add "skipUnlessSharded: true" if you want to run the test only in sharded
 configuration. The command in the test will be run on a mongos.
 
-5) skipUnlessReplicaSet
+6) skipUnlessReplicaSet
 Add "skipUnlessReplicaSet: true" if you want to run the test only when replica sets are in use.
 
-6) setup
+7) setup
 
 The setup function, if present, is called before testing whether a
 particular role authorizes a command for a particular database.
 
-7) teardown
+8) teardown
 
 The teardown function, if present, is called immediately after
 testing whether a particular role authorizes a command for a
 particular database.
 
-8) privileges
+9) privileges
 
 An array of privileges used when testing user-defined roles. The test case tests that a user with
 the specified privileges is authorized to run the command, and that having only a subset of the
@@ -79,12 +87,12 @@ privileges causes an authorization failure. If an individual privilege specifies
 "removeWhenTestingAuthzFailure: false", then that privilege will not be removed when testing for
 authorization failure.
 
-9) commandArgs
+10) commandArgs
 
 Set of options to be passed to your 'command' function. Can be used to send different versions of
 the command depending on the testcase being run.
 
-10) skipTest
+11) skipTest
 
 Add "skipTest: <function>" to not run the test for more complex reasons. The function is passed
 one argument, the connection object.
@@ -8649,7 +8657,9 @@ export const authCommandsLib = {
                         __system: 1,
                     },
                     privileges: [{resource: {db: firstDbName, collection: "foo"}, actions: ["collStats"]}],
-                    expectFail: true, // TODO SERVER-126343: exec stage translation not yet implemented.
+                    // $collStats does not produce the {_streamType, payload} transport format
+                    // that the translation function's $replaceRoot expects.
+                    expectFailWithErrorCodes: [40228],
                 },
                 {
                     runOnDb: secondDbName,
@@ -8665,7 +8675,9 @@ export const authCommandsLib = {
                         __system: 1,
                     },
                     privileges: [{resource: {db: secondDbName, collection: "foo"}, actions: ["collStats"]}],
-                    expectFail: true, // TODO SERVER-126343: exec stage translation not yet implemented.
+                    // $collStats does not produce the {_streamType, payload} transport format
+                    // that the translation function's $replaceRoot expects.
+                    expectFailWithErrorCodes: [40228],
                 },
             ],
         },

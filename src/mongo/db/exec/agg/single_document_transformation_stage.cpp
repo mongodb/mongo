@@ -67,7 +67,11 @@ SingleDocumentTransformationStage::SingleDocumentTransformationStage(
     StringData stageName,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     const std::shared_ptr<SingleDocumentTransformationProcessor>& transformationProcessor)
-    : Stage(stageName, pExpCtx), _transformationProcessor(transformationProcessor) {}
+    : Stage(stageName, pExpCtx),
+      _ownedStageName(stageName),
+      _transformationProcessor(transformationProcessor) {
+    _commonStats.stageTypeStr = _ownedStageName;
+}
 
 GetNextResult SingleDocumentTransformationStage::doGetNext() {
     if (!_transformationProcessor) {
