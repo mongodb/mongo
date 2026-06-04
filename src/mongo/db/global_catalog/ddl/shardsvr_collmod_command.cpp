@@ -46,12 +46,14 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/ddl/coll_mod_gen.h"
 #include "mongo/db/shard_role/ddl/coll_mod_reply_validation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
@@ -126,13 +128,25 @@ public:
             DatabaseProfileSettings::get(opCtx->getServiceContext())
                 .getDatabaseProfileLevel(cmd.getNamespace().dbName()));
 
+        FixedFCVRegion fixedFcvRegion(opCtx);
+
+        const auto& collModRequest = cmd.getCollModRequest();
+        if (collModRequest.getValidationLevel() == ValidationLevelEnum::constraint ||
+            collModRequest.getPrepareConstraintValidationLevel()) {
+            const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            uassert(ErrorCodes::InvalidOptions,
+                    "Validation level 'constraint' is not supported with current FCV",
+                    gFeatureFlagConstraintValidationLevel.isEnabledUseLastLTSFCVWhenUninitialized(
+                        VersionContext::getDecoration(opCtx), fcvSnapshot));
+        }
+
         auto coordinatorDoc = CollModCoordinatorDocument();
-        coordinatorDoc.setCollModRequest(cmd.getCollModRequest());
+        coordinatorDoc.setCollModRequest(collModRequest);
         coordinatorDoc.setShardingCoordinatorMetadata(
             {{cmd.getNamespace(), CoordinatorTypeEnum::kCollMod}});
         auto service = ShardingCoordinatorService::getService(opCtx);
         auto collModCoordinator = checked_pointer_cast<CollModCoordinator>(
-            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
+            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON(), fixedFcvRegion));
 
         result.appendElements(collModCoordinator->getResult(opCtx));
 

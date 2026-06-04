@@ -1,7 +1,7 @@
 /**
  * Tests for serverStatus metrics.commands.{create,collMod}.validationLevel stats.
  * Mirrors the validator counter tests in server_status_metric_validator_and_json_schema.js.
- * @tags: [requires_sharding]
+ * @tags: [requires_sharding, requires_fcv_90]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
@@ -171,7 +171,10 @@ function defineTests(getDb) {
             "expected create constraint counter to increment by 1",
         );
 
-        // TODO(SERVER-123713): add prepareConstraintValidationLevel: true once that PR lands.
+        // Downgrade to strict so we can do the prepare+upgrade cycle to test the collMod counter.
+        assert.commandWorked(db.runCommand({collMod: coll, validationLevel: "strict"}));
+        assert.commandWorked(db.runCommand({collMod: coll, prepareConstraintValidationLevel: true}));
+
         const snap2 = getMetrics(db);
         assert.commandWorked(db.runCommand({collMod: coll, validationLevel: "constraint"}));
         assert.eq(

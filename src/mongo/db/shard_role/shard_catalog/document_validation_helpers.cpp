@@ -34,7 +34,14 @@ namespace mongo {
 Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
                                        boost::optional<ValidationLevelEnum> newLevel,
                                        boost::optional<ValidationActionEnum> newAction,
-                                       boost::optional<Collection::Validator> newValidator) {
+                                       boost::optional<Collection::Validator> newValidator,
+                                       boost::optional<bool> newPrepareConstraintValidationLevel) {
+    if (newPrepareConstraintValidationLevel.value_or(false) &&
+        opts.validationLevel == ValidationLevelEnum::constraint) {
+        return Status(ErrorCodes::BadValue,
+                      "Cannot set prepareConstraintValidationLevel on a collection that is "
+                      "already at 'constraint' validationLevel");
+    }
 
     auto validationAction = validationActionOrCurrent(opts, newAction);
     auto validationLevel = validationLevelOrCurrent(opts, newLevel);
@@ -53,23 +60,35 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
                 "collections");
         }
     }
+    if (opts.uuid && opts.prepareConstraintValidationLevel && newValidator) {
+        return Status(
+            ErrorCodes::BadValue,
+            "Validator cannot be changed while prepareConstraintValidationLevel is set. "
+            "To make validator changes, first run: db.runCommand({collMod: \"<collection>\""
+            ", prepareConstraintValidationLevel: false})");
+    }
+
+    // Upgrade to 'constraint' restrictions:
+    // - validationAction must not be 'warn'
+    // - validationLevel must be 'strict'
+    // - cannot change validator in the upgrading collmod
+    // Restrictions when starting from constraint:
+    // - validator cannot be changed
+    // - validationAction cannot be set to 'warn'
     if (validationLevel == ValidationLevelEnum::constraint) {
         if (validationAction == ValidationActionEnum::warn) {
             return Status(
                 ErrorCodes::BadValue,
                 "Validation action of 'warn' is not allowed when Validation level is 'constraint'");
         }
-        // TODO SERVER-123713: enforce that validationAction is set to 'error' when upgrading
-        // validationLevel to 'constraint'.
+
         if (opts.uuid) {  // existing collection
             if (opts.validationLevel == ValidationLevelEnum::constraint && newValidator) {
                 return Status(ErrorCodes::BadValue,
-                              "Validator can not be changed when Validation level is 'constraint'");
+                              "Validator cannot be changed when Validation level is 'constraint'");
             }
             if (newLevel == ValidationLevelEnum::constraint) {
-                if (!opts.validationLevel ||
-                    (opts.validationLevel != ValidationLevelEnum::strict &&
-                     opts.validationLevel != ValidationLevelEnum::constraint)) {
+                if (!opts.validationLevel || opts.validationLevel != ValidationLevelEnum::strict) {
                     return Status(
                         ErrorCodes::BadValue,
                         "validationLevel can only be changed to 'constraint' from 'strict'");
@@ -78,6 +97,12 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
                     return Status(ErrorCodes::BadValue,
                                   "Cannot change the validator in the same collMod that upgrades "
                                   "validationLevel to 'constraint'");
+                }
+                if (!opts.prepareConstraintValidationLevel) {
+                    return Status(
+                        ErrorCodes::BadValue,
+                        "Cannot upgrade validationLevel to 'constraint' without first setting "
+                        "prepareConstraintValidationLevel to true");
                 }
             }
         }

@@ -742,6 +742,17 @@ private:
                                     collection->uuid().toString()),
                                 collection->getValidationLevel() !=
                                     ValidationLevelEnum::constraint);
+                        uassert(
+                            ErrorCodes::CannotDowngrade,
+                            fmt::format(
+                                "Cannot downgrade the cluster when there are collections with "
+                                "prepareConstraintValidationLevel set. Please unset the option or "
+                                "drop the collection(s) before downgrading. First detected "
+                                "collection with prepareConstraintValidationLevel set: {} "
+                                "(UUID: {}).",
+                                collection->ns().toStringForErrorMsg(),
+                                collection->uuid().toString()),
+                            !collection->getCollectionOptions().prepareConstraintValidationLevel);
                     }
 
                     if (storageTierDisabled) {

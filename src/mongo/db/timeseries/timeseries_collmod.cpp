@@ -151,6 +151,12 @@ Status processCollModCommandWithTimeSeriesTranslation(OperationContext* opCtx,
         return processCollModCommand(opCtx, cmd.getNamespace(), cmd, nullptr, result);
     }
 
+    if (cmd.getCollModRequest().getPrepareConstraintValidationLevel()) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "option not supported on a time-series collection: "
+                      "prepareConstraintValidationLevel");
+    }
+
     if (isLegacyTimeseries) {
         // If there the expected collection UUID is provided, always fail because the user-facing
         // time-series doesn't have a UUID.

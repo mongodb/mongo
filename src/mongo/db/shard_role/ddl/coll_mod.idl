@@ -190,6 +190,14 @@ structs:
                 optional: true
                 type: safeBool
                 stability: unstable
+            prepareConstraintValidationLevel:
+                description:
+                    "Sets a flag on the collection indicating it is being prepared for
+                    upgrade to 'constraint' validationLevel. Once set, bypassDocumentValidation
+                    and validator changes are disallowed, just as with 'constraint' itself."
+                optional: true
+                type: safeBool
+                stability: stable
             dryRun:
                 description:
                     "Runs the requested modification without modifying any database state.

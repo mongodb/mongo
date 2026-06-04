@@ -26,7 +26,16 @@ assert.commandFailedWithCode(
 
 assert.commandWorked(db.runCommand({collMod: "test", validationLevel: "strict"}));
 
-// After removing constraint validation level, we should eventually be able to downgrade
+// Setting prepareConstraintValidationLevel also blocks downgrade.
+assert.commandWorked(db.runCommand({collMod: "test", prepareConstraintValidationLevel: true}));
+assert.commandFailedWithCode(
+    rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
+    ErrorCodes.CannotDowngrade,
+);
+assert.commandWorked(db.runCommand({collMod: "test", prepareConstraintValidationLevel: false}));
+
+// After removing constraint validation level and prepareConstraintValidationLevel, we should
+// eventually be able to downgrade.
 assert.soon(() => {
     assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     return true;
