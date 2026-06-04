@@ -15,8 +15,6 @@
  *    stepdown by holding the RSTL in MODE_IX.
  *
  * @tags: [
- *   # This test may fail only because primary driven index builds are aborted when a new primary steps up.
- *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

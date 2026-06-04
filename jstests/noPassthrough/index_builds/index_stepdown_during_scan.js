@@ -2,8 +2,6 @@
  * Confirms that background index builds on a primary are not aborted when the node steps down during
  * the collection scan phase.
  * @tags: [
- *   # With primary driven index builds, the node will abort the in-progress index build on step up.
- *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   requires_replication,
  * ]
  */
