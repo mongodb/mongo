@@ -71,6 +71,16 @@ public:
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
 
+    void onStartIndexBuild(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           const UUID& collUUID,
+                           const UUID& indexBuildUUID,
+                           const std::vector<IndexBuildInfo>& indexes,
+                           bool fromMigrate,
+                           bool isTimeseries) final;
+
+    void onStartIndexBuildSinglePhase(OperationContext* opCtx, const NamespaceString& nss) final;
+
 private:
     bool _isReplSetAndCanAcceptWritesForNamespace(OperationContext* opCtx,
                                                   const NamespaceString& nss) const;

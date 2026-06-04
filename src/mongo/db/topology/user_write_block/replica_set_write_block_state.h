@@ -123,6 +123,21 @@ public:
      */
     void appendReplicaSetWriteBlockRejectionMetrics(BSONObjBuilder& bob) const;
 
+    // The current usage of the following two helpers is extremely short-lived. However,
+    // they have been introduced as an early groundwork for SERVER-128193.
+    /**
+     * Methods to enable/disable blocking new user index builds on this replica set.
+     */
+    void enableUserIndexBuildBlocking();
+    void disableUserIndexBuildBlocking();
+
+    /**
+     * Checks that an index build is allowed to start on the specified namespace. Returns
+     * ReplicaSetWritesBlocked if user index builds are disallowed, OK otherwise.
+     */
+    Status checkIfIndexBuildAllowedToStart(OperationContext* opCtx,
+                                           const NamespaceString& nss) const;
+
 private:
     struct WriteBlockInfo {
         bool blocked{false};
@@ -137,6 +152,7 @@ private:
     mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedInserts{0};
     mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedUpdates{0};
     mutable AtomicWord<std::uint64_t> _replicaSetWriteBlockRejectedDeletes{0};
+    Atomic<bool> _userIndexBuildsBlocked{false};
 };
 
 }  // namespace mongo
