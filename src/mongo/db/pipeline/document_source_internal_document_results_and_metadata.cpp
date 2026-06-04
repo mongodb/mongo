@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -80,7 +81,8 @@ exec::agg::StageExpansion documentSourceInternalDocumentResultsAndMetadataToStag
     auto expCtx = docResultsAndMeta.getExpCtx();
     const bool hasMeta = docResultsAndMeta.getMetadata().has_value();
 
-    // Create the copy before Exchange construction, Exchange ctor calls
+    // Following the pattern from createExchangePipelinesIfNeeded: each consumer gets a fresh
+    // ExpressionContext. Create the copy before Exchange construction, Exchange ctor calls
     // detachFromOperationContext() on its inner pipelines, which nulls expCtx->_operationContext,
     // and Pipeline::create for the meta pipeline needs a live opCtx.
     const auto metaExpCtx = hasMeta
@@ -186,11 +188,14 @@ DocumentSourceInternalDocumentResultsAndMetadata::create(
 DocumentSourceContainer DocumentSourceInternalDocumentResultsAndMetadata::createFromStageParams(
     const InternalDocumentResultsAndMetadataStageParams& params,
     const intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto& spec = params.getSpec();
-
-    auto sourceList = DocumentSource::parse(expCtx, spec.getSource());
+    // Build the inner source DocumentSource from its lite-parsed representation.
+    const auto& innerStages = params.getSourcePipeline()->getStages();
     tassert(12615003,
-            str::stream() << kStageName << " 'source' must parse to exactly one stage",
+            str::stream() << kStageName << " 'source' must lite-parse to exactly one stage",
+            innerStages.size() == 1);
+    auto sourceList = buildDocumentSource(*innerStages.front(), expCtx);
+    tassert(12615010,
+            str::stream() << kStageName << " 'source' must build exactly one DocumentSource",
             sourceList.size() == 1);
     auto sourceStage = std::move(sourceList.front());
     auto sourceConstraints = sourceStage->constraints();
@@ -203,17 +208,16 @@ DocumentSourceContainer DocumentSourceInternalDocumentResultsAndMetadata::create
                 !sourceConstraints.requiresInputDocSource);
 
     boost::optional<MetadataBindSpec> metadata;
-    if (auto metaSpec = spec.getMetadata()) {
+    if (const auto& metaSpec = params.getMetadata()) {
         tassert(12615005,
-                str::stream() << kStageName << " 'metadata.as' must be '"
-                              << Variables::kSearchMetaName << "', got '" << metaSpec->getAs()
-                              << "'",
+                str::stream() << kStageName << " 'metadata.as' must be '$$SEARCH_META', got '"
+                              << metaSpec->getAs() << "'",
                 metaSpec->getAs() == Variables::kSearchMetaName);
-        metadata = std::move(metaSpec);
+        metadata = metaSpec;
     }
 
     return {make_intrusive<DocumentSourceInternalDocumentResultsAndMetadata>(
-        expCtx, std::move(sourceStage), std::move(metadata), spec.getReturnCursor())};
+        expCtx, std::move(sourceStage), std::move(metadata), params.getReturnCursor())};
 }
 
 StageConstraints DocumentSourceInternalDocumentResultsAndMetadata::constraints(

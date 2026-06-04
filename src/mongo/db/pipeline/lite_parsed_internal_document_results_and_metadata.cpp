@@ -63,7 +63,8 @@ InternalDocumentResultsAndMetadataLiteParsed::parse(const NamespaceString& nss,
 
     return std::make_unique<InternalDocumentResultsAndMetadataLiteParsed>(
         spec,
-        std::move(parsedSpec),
+        parsedSpec.getMetadata(),
+        parsedSpec.getReturnCursor(),
         OwnedLiteParsedPipeline(nss, {sourceElem.embeddedObject()}, options));
 }
 

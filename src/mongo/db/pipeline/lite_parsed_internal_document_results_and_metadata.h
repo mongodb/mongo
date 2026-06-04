@@ -46,20 +46,34 @@ namespace mongo {
  */
 class InternalDocumentResultsAndMetadataStageParams : public StageParams {
 public:
-    InternalDocumentResultsAndMetadataStageParams(DocumentSourceResultsAndMetadataSpec spec)
-        : _spec(std::move(spec)) {}
+    InternalDocumentResultsAndMetadataStageParams(boost::optional<MetadataBindSpec> metadata,
+                                                  bool returnCursor,
+                                                  OwnedLiteParsedPipeline sourcePipeline)
+        : _metadata(std::move(metadata)),
+          _returnCursor(returnCursor),
+          _sourcePipeline(std::move(sourcePipeline)) {}
 
     static const Id& id;
     Id getId() const final {
         return id;
     }
 
-    const DocumentSourceResultsAndMetadataSpec& getSpec() const {
-        return _spec;
+    const boost::optional<MetadataBindSpec>& getMetadata() const {
+        return _metadata;
+    }
+
+    bool getReturnCursor() const {
+        return _returnCursor;
+    }
+
+    const OwnedLiteParsedPipeline& getSourcePipeline() const {
+        return _sourcePipeline;
     }
 
 private:
-    DocumentSourceResultsAndMetadataSpec _spec;
+    boost::optional<MetadataBindSpec> _metadata;
+    bool _returnCursor;
+    OwnedLiteParsedPipeline _sourcePipeline;
 };
 
 /**
@@ -72,11 +86,13 @@ public:
         const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options);
 
     InternalDocumentResultsAndMetadataLiteParsed(const BSONElement& spec,
-                                                 DocumentSourceResultsAndMetadataSpec parsedSpec,
+                                                 boost::optional<MetadataBindSpec> metadata,
+                                                 bool returnCursor,
                                                  OwnedLiteParsedPipeline sourcePipeline)
         : LiteParsedDocumentSourceNestedPipelines(
               spec, boost::none, std::vector<OwnedLiteParsedPipeline>{std::move(sourcePipeline)}),
-          _parsedSpec(std::move(parsedSpec)) {}
+          _metadata(std::move(metadata)),
+          _returnCursor(returnCursor) {}
 
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
         return requiredPrivilegesBasic(isMongos, bypassDocumentValidation);
@@ -87,11 +103,34 @@ public:
     }
 
     std::unique_ptr<StageParams> getStageParams() const final {
-        return std::make_unique<InternalDocumentResultsAndMetadataStageParams>(_parsedSpec);
+        // Clone the inner sub-pipeline so any view info bound onto it via bindViewInfo() travels
+        // with the StageParams to DocumentSource construction.
+        return std::make_unique<InternalDocumentResultsAndMetadataStageParams>(
+            _metadata, _returnCursor, OwnedLiteParsedPipeline(_pipelines.front()));
+    }
+
+    FirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy() const override {
+        // $_internalDocumentResultsAndMetadata is a source stage; the view (if any) must NOT be
+        // prepended in front of it. Any view application happens via bindViewInfo() below, which
+        // forwards the view info to the inner source stage this stage wraps.
+        return FirstStageViewApplicationPolicy::kDoNothing;
+    }
+
+    void bindViewInfo(const ViewInfo& viewInfo,
+                      const ResolvedNamespaceMap& resolvedNamespaces) override {
+        // Propagate the bound view info to the single source stage so the inner stage can apply the
+        // view itself. The constructor guarantees exactly one inner sub-pipeline.
+        tassert(12755800,
+                str::stream() << "$_internalDocumentResultsAndMetadata expected exactly one inner "
+                                 "source sub-pipeline, found "
+                              << _pipelines.size(),
+                _pipelines.size() == 1);
+        _pipelines.front()->bindViewInfoToStages(viewInfo, resolvedNamespaces);
     }
 
 private:
-    DocumentSourceResultsAndMetadataSpec _parsedSpec;
+    boost::optional<MetadataBindSpec> _metadata;
+    bool _returnCursor;
 };
 
 }  // namespace mongo

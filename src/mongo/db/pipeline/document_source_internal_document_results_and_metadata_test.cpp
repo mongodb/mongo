@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_queue.h"
+#include "mongo/db/pipeline/lite_parsed_internal_document_results_and_metadata.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -67,12 +68,18 @@ class DocumentSourceInternalDocumentResultsAndMetadataTest : public AggregationC
 protected:
     DocumentSourceInternalDocumentResultsAndMetadata* parse(const BSONObj& bson) {
         auto specElem = bson.firstElement();
-        auto specObj = specElem.embeddedObject().getOwned();
-        auto spec =
-            DocumentSourceResultsAndMetadataSpec::parse(specObj, IDLParserContext(kStageName));
-        InternalDocumentResultsAndMetadataStageParams params(std::move(spec));
+        // Route through the LiteParsed layer so the StageParams carry the inner lite-parsed
+        // sub-pipeline — same shape as production. makeOwned() so that callers can pass a
+        // temporary BSONObj without dangling the LP's BSONElement view.
+        _liteParsed = InternalDocumentResultsAndMetadataLiteParsed::parse(
+            getExpCtx()->getNamespaceString(), specElem, {});
+        _liteParsed->makeOwned();
+        auto params = _liteParsed->getStageParams();
+        auto* typedParams =
+            dynamic_cast<InternalDocumentResultsAndMetadataStageParams*>(params.get());
+        ASSERT(typedParams);
         _stages = DocumentSourceInternalDocumentResultsAndMetadata::createFromStageParams(
-            params, getExpCtx());
+            *typedParams, getExpCtx());
         ASSERT_EQ(_stages.size(), 1u);
         auto* docResultsAndMetadata =
             dynamic_cast<DocumentSourceInternalDocumentResultsAndMetadata*>(_stages.front().get());
@@ -81,6 +88,7 @@ protected:
     }
 
 private:
+    std::unique_ptr<InternalDocumentResultsAndMetadataLiteParsed> _liteParsed;
     DocumentSourceContainer _stages;
 };
 
