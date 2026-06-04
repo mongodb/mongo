@@ -29,28 +29,35 @@
 
 #pragma once
 
-#include <vector>
-
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/s/query/router_exec_stage.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
+
+struct RemoveAllMetadataFieldsPolicy {
+    static bool shouldRemove(StringData name) {
+        return Document::isMetadataFieldName(name);
+    }
+};
+
+struct RemoveSortKeyPolicy {
+    static bool shouldRemove(StringData name) {
+        return !name.empty() && name[0] == '$' && name == Document::metaFieldSortKey;
+    }
+};
 
 /**
  * Removes metadata fields from a BSON object.
  */
-class RouterStageRemoveMetadataFields final : public RouterExecStage {
+template <typename RemovePolicy>
+class RouterStageRemoveFields final : public RouterExecStage {
 public:
-    RouterStageRemoveMetadataFields(OperationContext* opCtx,
-                                    std::unique_ptr<RouterExecStage> child,
-                                    StringDataSet fieldsToRemove);
+    RouterStageRemoveFields(OperationContext* opCtx, std::unique_ptr<RouterExecStage> child);
 
     StatusWith<ClusterQueryResult> next() final;
-
-private:
-    // Use a StringMap so we can look up by StringData - avoiding a string allocation on each field
-    // in each object. The value here is meaningless.
-    StringDataSet _metaFields;
 };
+
+using RouterStageRemoveMetadataFields = RouterStageRemoveFields<RemoveAllMetadataFieldsPolicy>;
+using RouterStageRemoveSortKey = RouterStageRemoveFields<RemoveSortKeyPolicy>;
 
 }  // namespace mongo

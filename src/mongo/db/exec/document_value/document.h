@@ -31,13 +31,13 @@
 
 #include "mongo/db/exec/document_value/document_internal.h"
 
+#include <array>
 #include <boost/functional/hash.hpp>
 #include <boost/intrusive_ptr.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 class BSONObj;
@@ -104,12 +104,26 @@ public:
     static constexpr StringData metaFieldIndexKey = "$indexKey"_sd;
     static constexpr StringData metaFieldVectorSearchScore = "$vectorSearchScore"_sd;
     static constexpr StringData metaFieldSearchSequenceToken = "$searchSequenceToken"_sd;
+    static constexpr std::array kAllMetadataFields = {metaFieldTextScore,
+                                                      metaFieldRandVal,
+                                                      metaFieldSortKey,
+                                                      metaFieldGeoNearDistance,
+                                                      metaFieldGeoNearPoint,
+                                                      metaFieldSearchScore,
+                                                      metaFieldSearchHighlights,
+                                                      metaFieldSearchScoreDetails,
+                                                      metaFieldSearchSortValues,
+                                                      metaFieldIndexKey,
+                                                      metaFieldVectorSearchScore,
+                                                      metaFieldSearchSequenceToken};
 
-    static const StringDataSet allMetadataFieldNames;
+private:
+    static bool isMetadataFieldName_cold(StringData fieldName);
 
+public:
+    // Returns true iff 'fieldName' is one of the reserved '$'-prefixed metadata field names.
     static bool isMetadataFieldName(StringData fieldName) {
-        return !fieldName.empty() && fieldName[0] == '$' &&
-            allMetadataFieldNames.contains(fieldName);
+        return !fieldName.empty() && fieldName[0] == '$' && isMetadataFieldName_cold(fieldName);
     }
 
     static bool isMetadataFieldName(HashedFieldName fieldName) {

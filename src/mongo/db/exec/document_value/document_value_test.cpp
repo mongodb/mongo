@@ -873,6 +873,33 @@ TEST(DocumentTest, ToBsonSizeTraits) {
 
 namespace MetaFields {
 using mongo::Document;
+
+TEST(IsMetadataFieldName, AllMetadataFieldsRecognised) {
+    for (auto&& field : Document::kAllMetadataFields) {
+        ASSERT_TRUE(Document::isMetadataFieldName(field)) << field;
+    }
+}
+
+TEST(IsMetadataFieldName, UserFieldsRejected) {
+    // Non-'$' fields must never be considered metadata.
+    for (StringData field : {"a"_sd, "foo"_sd, "sortKey"_sd, ""_sd}) {
+        ASSERT_FALSE(Document::isMetadataFieldName(field)) << field;
+    }
+}
+
+TEST(IsMetadataFieldName, DollarMissesRejected) {
+    // '$'-prefixed fields that are not in the set must return false.
+    ASSERT_FALSE(Document::isMetadataFieldName("$notAMetadataField"_sd));
+    ASSERT_FALSE(Document::isMetadataFieldName("$sortkey"_sd));  // wrong case, same length
+    ASSERT_FALSE(Document::isMetadataFieldName("$"_sd));         // just a dollar sign
+}
+
+TEST(IsMetadataFieldName, LongerThanLongestMetadataField) {
+    // A '$'-prefixed field longer than any metadata field must be rejected quickly.
+    ASSERT_FALSE(
+        Document::isMetadataFieldName("$thisFieldNameIsDefinitelyLongerThanAnyMetadataField"_sd));
+}
+
 TEST(MetaFields, TextScoreBasics) {
     // Documents should not have a text score until it is set.
     ASSERT_FALSE(Document().metadata().hasTextScore());

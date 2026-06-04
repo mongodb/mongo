@@ -30,6 +30,7 @@
 #include "mongo/db/exec/document_value/document.h"
 
 #include <boost/functional/hash.hpp>
+#include <utility>
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/jsobj.h"
@@ -48,6 +49,17 @@ using std::string;
 using std::vector;
 
 namespace {
+
+template <const auto& Fields>
+bool isAnyOf(StringData s) {
+    return [&]<size_t... Is>(std::index_sequence<Is...>) {
+        return (false || ... ||
+                (s.size() == Fields[Is].size() &&
+                 std::memcmp(s.rawData(), Fields[Is].rawData(), Fields[Is].size()) == 0));
+    }
+    (std::make_index_sequence<Fields.size()>{});
+}
+
 /**
  * Assert that a given field path does not exceed the length limit.
  */
@@ -86,18 +98,9 @@ getNestedFieldHelperBSON(BSONElement elt, const FieldPath& fp, size_t level) {
 
 const DocumentStorage DocumentStorage::kEmptyDoc;
 
-const StringDataSet Document::allMetadataFieldNames{Document::metaFieldTextScore,
-                                                    Document::metaFieldRandVal,
-                                                    Document::metaFieldSortKey,
-                                                    Document::metaFieldGeoNearDistance,
-                                                    Document::metaFieldGeoNearPoint,
-                                                    Document::metaFieldSearchScore,
-                                                    Document::metaFieldSearchHighlights,
-                                                    Document::metaFieldSearchSortValues,
-                                                    Document::metaFieldIndexKey,
-                                                    Document::metaFieldSearchScoreDetails,
-                                                    Document::metaFieldVectorSearchScore,
-                                                    Document::metaFieldSearchSequenceToken};
+bool Document::isMetadataFieldName_cold(StringData s) {
+    return isAnyOf<kAllMetadataFields>(s);
+}
 
 DocumentStorageIterator::DocumentStorageIterator(DocumentStorage* storage, BSONObjIterator bsonIt)
     : _bsonIt(std::move(bsonIt)),
@@ -204,7 +207,7 @@ template Position DocumentStorage::findFieldInCache<HashedFieldName>(HashedField
 template <typename T>
 Position DocumentStorage::findField(T field, LookupPolicy policy) const {
     // Hide metadata-named fields so they are only accessible through the metadata API.
-    if (_bsonHasMetadata && Document::isMetadataFieldName(field)) {
+    if (MONGO_unlikely(_bsonHasMetadata && Document::isMetadataFieldName(field))) {
         return Position();
     }
 
@@ -603,18 +606,19 @@ void Document::toBsonStrippingMetadata(BSONObjBuilder* builder) const {
     };
     for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
         if (auto cached = it.cachedValue()) {
-            if (shouldStrip(cached->nameSD())) {
+            if (MONGO_unlikely(shouldStrip(cached->nameSD()))) {
                 warnStripped(cached->nameSD());
                 continue;
             }
             cached->val.addToBsonObj(builder, cached->nameSD(), recursionLevel);
         } else {
-            auto fieldName = (*it.bsonIter()).fieldNameStringData();
-            if (shouldStrip(fieldName)) {
+            auto&& bsonIt = *it.bsonIter();
+            auto fieldName = bsonIt.fieldNameStringData();
+            if (MONGO_unlikely(shouldStrip(fieldName))) {
                 warnStripped(fieldName);
                 continue;
             }
-            builder->append(*it.bsonIter());
+            builder->append(bsonIt);
         }
     }
 }

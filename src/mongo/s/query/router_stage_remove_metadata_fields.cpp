@@ -38,15 +38,13 @@
 
 namespace mongo {
 
-RouterStageRemoveMetadataFields::RouterStageRemoveMetadataFields(
-    OperationContext* opCtx, std::unique_ptr<RouterExecStage> child, StringDataSet metadataFields)
-    : RouterExecStage(opCtx, std::move(child)), _metaFields(std::move(metadataFields)) {
-    for (auto&& fieldName : _metaFields) {
-        invariant(fieldName[0] == '$');  // We use this information to optimize next().
-    }
-}
+template <typename RemovePolicy>
+RouterStageRemoveFields<RemovePolicy>::RouterStageRemoveFields(
+    OperationContext* opCtx, std::unique_ptr<RouterExecStage> child)
+    : RouterExecStage(opCtx, std::move(child)) {}
 
-StatusWith<ClusterQueryResult> RouterStageRemoveMetadataFields::next() {
+template <typename RemovePolicy>
+StatusWith<ClusterQueryResult> RouterStageRemoveFields<RemovePolicy>::next() {
     auto childResult = getChildStage()->next();
     if (!childResult.isOK() || !childResult.getValue().getResult()) {
         return childResult;
@@ -58,7 +56,7 @@ StatusWith<ClusterQueryResult> RouterStageRemoveMetadataFields::next() {
     for (; iterator.more(); ++iterator) {
         // To save some time, we ensure that the current field name starts with a $
         // before checking if it's actually a metadata field in the map.
-        if ((*iterator).fieldName()[0] == '$' && _metaFields.contains((*iterator).fieldName())) {
+        if (RemovePolicy::shouldRemove((*iterator).fieldNameStringData())) {
             break;
         }
     }
@@ -80,11 +78,14 @@ StatusWith<ClusterQueryResult> RouterStageRemoveMetadataFields::next() {
     // Copy any remaining fields that are not metadata. We expect metadata fields are likely to be
     // at the end of the document, so there is likely nothing else to copy.
     while ((++iterator).more()) {
-        if (!_metaFields.contains((*iterator).fieldNameStringData())) {
+        if (!RemovePolicy::shouldRemove((*iterator).fieldNameStringData())) {
             builder.append(*iterator);
         }
     }
     return ClusterQueryResult(builder.obj(), childResult.getValue().getShardId());
 }
+
+template class RouterStageRemoveFields<RemoveAllMetadataFieldsPolicy>;
+template class RouterStageRemoveFields<RemoveSortKeyPolicy>;
 
 }  // namespace mongo
