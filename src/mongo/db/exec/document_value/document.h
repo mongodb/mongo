@@ -45,8 +45,8 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
-#include "mongo/util/string_map.h"
 
+#include <array>
 #include <cstring>
 #include <initializer_list>
 #include <iosfwd>
@@ -131,11 +131,31 @@ public:
     static constexpr StringData metaFieldScoreDetails = "$scoreDetails"_sd;
     static constexpr StringData metaFieldStream = "$stream"_sd;
     static constexpr StringData metaFieldChangeStreamControlEvent = "$changeStreamControlEvent"_sd;
+    static constexpr std::array kAllMetadataFields = {metaFieldTextScore,
+                                                      metaFieldRandVal,
+                                                      metaFieldSortKey,
+                                                      metaFieldGeoNearDistance,
+                                                      metaFieldGeoNearPoint,
+                                                      metaFieldSearchScore,
+                                                      metaFieldSearchHighlights,
+                                                      metaFieldSearchScoreDetails,
+                                                      metaFieldSearchRootDocumentId,
+                                                      metaFieldSearchSortValues,
+                                                      metaFieldIndexKey,
+                                                      metaFieldVectorSearchScore,
+                                                      metaFieldSearchSequenceToken,
+                                                      metaFieldScore,
+                                                      metaFieldScoreDetails,
+                                                      metaFieldStream,
+                                                      metaFieldChangeStreamControlEvent};
 
-    static const StringDataSet allMetadataFieldNames;
+private:
+    static bool isMetadataFieldName_cold(StringData fieldName);
 
+public:
+    // Returns true iff 'fieldName' is one of the reserved '$'-prefixed metadata field names.
     static bool isMetadataFieldName(StringData fieldName) {
-        return fieldName.starts_with('$') && allMetadataFieldNames.contains(fieldName);
+        return fieldName.starts_with('$') && isMetadataFieldName_cold(fieldName);
     }
 
     static bool isMetadataFieldName(HashedFieldName fieldName) {

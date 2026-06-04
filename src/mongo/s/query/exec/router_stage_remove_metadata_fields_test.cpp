@@ -63,8 +63,8 @@ TEST(RouterStageRemoveMetadataFieldsTest, RemovesMetaDataFields) {
     mockStage->queueResult(BSON("$textScore" << 2));
     mockStage->queueResult(BSONObj());
 
-    auto sortKeyStage = std::make_unique<RouterStageRemoveMetadataFields>(
-        opCtx, std::move(mockStage), Document::allMetadataFieldNames);
+    auto sortKeyStage =
+        std::make_unique<RouterStageRemoveMetadataFields>(opCtx, std::move(mockStage));
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
@@ -111,8 +111,7 @@ TEST(RouterStageRemoveMetadataFieldsTest, PropagatesError) {
     mockStage->queueResult(BSON("$sortKey" << 1));
     mockStage->queueError(Status(ErrorCodes::BadValue, "bad thing happened"));
 
-    auto sortKeyStage = std::make_unique<RouterStageRemoveMetadataFields>(
-        opCtx, std::move(mockStage), StringDataSet{"$sortKey"_sd});
+    auto sortKeyStage = std::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
@@ -131,8 +130,7 @@ TEST(RouterStageRemoveMetadataFieldsTest, ToleratesMidStreamEOF) {
     mockStage->queueEOF();
     mockStage->queueResult(BSON("a" << 2 << "$sortKey" << 1 << "b" << 2));
 
-    auto sortKeyStage = std::make_unique<RouterStageRemoveMetadataFields>(
-        opCtx, std::move(mockStage), StringDataSet{"$sortKey"_sd});
+    auto sortKeyStage = std::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
 
     auto firstResult = sortKeyStage->next();
     ASSERT_OK(firstResult.getStatus());
@@ -159,8 +157,7 @@ TEST(RouterStageRemoveMetadataFieldsTest, RemotesExhausted) {
     mockStage->queueResult(BSON("a" << 2 << "$sortKey" << 1 << "b" << 2));
     mockStage->markRemotesExhausted();
 
-    auto sortKeyStage = std::make_unique<RouterStageRemoveMetadataFields>(
-        opCtx, std::move(mockStage), StringDataSet{"$sortKey"_sd});
+    auto sortKeyStage = std::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
     auto firstResult = sortKeyStage->next();
@@ -186,8 +183,7 @@ TEST(RouterStageRemoveMetadataFieldsTest, ForwardsAwaitDataTimeout) {
     auto mockStagePtr = mockStage.get();
     ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
 
-    auto sortKeyStage = std::make_unique<RouterStageRemoveMetadataFields>(
-        opCtx, std::move(mockStage), StringDataSet{"$sortKey"_sd});
+    auto sortKeyStage = std::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
     ASSERT_OK(sortKeyStage->setAwaitDataTimeout(Milliseconds(789)));
 
     auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();
@@ -211,8 +207,7 @@ TEST(RouterStageRemoveMetadataFieldsTest, AllowsNonMetaDataDollars) {
     mockStage->queueResult(BSON("a" << 2 << "$sortKey" << 1 << "$b" << 2));
     mockStage->markRemotesExhausted();
 
-    auto sortKeyStage = std::make_unique<RouterStageRemoveMetadataFields>(
-        opCtx, std::move(mockStage), StringDataSet{"$sortKey"_sd});
+    auto sortKeyStage = std::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(mockStage));
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
     verifyNextDocument(sortKeyStage.get(), BSON("$a" << 1 << "b" << 1));
@@ -227,15 +222,15 @@ TEST(RouterStageRemoveMetadataFieldsTest, AllowsNonMetaDataDollars) {
 // For every keyword, ensure it's removed if it's in the first, middle, or
 // last position, and that the remainder of the document is undisturbed.
 TEST(RouterStageRemoveMetadataFieldsTest, RemovesAllMetaDataDollars) {
-    for (auto& keyword : Document::allMetadataFieldNames) {
+    for (auto& keyword : Document::kAllMetadataFields) {
         auto mockStage = std::make_unique<RouterStageMock>(opCtx);
         mockStage->queueResult(BSON(keyword << 1 << "$a" << 1));
         mockStage->queueResult(BSON("$a" << 1 << keyword << 1));
         mockStage->queueResult(BSON("$a" << 1 << keyword << 1 << "$b" << 1));
         mockStage->markRemotesExhausted();
 
-        auto sortKeyStage = std::make_unique<RouterStageRemoveMetadataFields>(
-            opCtx, std::move(mockStage), Document::allMetadataFieldNames);
+        auto sortKeyStage =
+            std::make_unique<RouterStageRemoveMetadataFields>(opCtx, std::move(mockStage));
         ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
         verifyNextDocument(sortKeyStage.get(), BSON("$a" << 1));

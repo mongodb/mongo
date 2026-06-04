@@ -504,8 +504,8 @@ public:
                         std::move(params));
 
                     if (parsedInfoFromRequest.sort) {
-                        root = std::make_unique<RouterStageRemoveMetadataFields>(
-                            opCtx, std::move(root), Document::allMetadataFieldNames);
+                        root = std::make_unique<RouterStageRemoveMetadataFields>(opCtx,
+                                                                                 std::move(root));
                     }
 
                     if (auto nextResponse = uassertStatusOK(root->next()); !nextResponse.isEOF()) {

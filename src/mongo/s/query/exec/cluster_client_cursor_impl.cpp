@@ -47,7 +47,6 @@
 #include "mongo/s/query/exec/router_stage_skip.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/string_map.h"
 
 #include <memory>
 #include <utility>
@@ -374,8 +373,7 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     const bool hasSort = !params->sortToApplyOnRouter.isEmpty();
     if (hasSort) {
         // Strip out the sort key after sorting.
-        root = std::make_unique<RouterStageRemoveMetadataFields>(
-            opCtx, std::move(root), StringDataSet{AsyncResultsMerger::kSortKeyField});
+        root = std::make_unique<RouterStageRemoveSortKey>(opCtx, std::move(root));
     }
 
     return root;
