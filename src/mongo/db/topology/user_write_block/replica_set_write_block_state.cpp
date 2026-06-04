@@ -103,6 +103,19 @@ bool ReplicaSetWriteBlockState::isReplicaSetWriteBlockingEnabled() const {
     return _writeBlockInfo.load().blocked;
 }
 
+Status ReplicaSetWriteBlockState::checkIfCompactAllowedToStart(OperationContext* opCtx) const {
+    // Compact is gated by the allowDeletions flag: it is blocked only when replica set deletions
+    // are blocked, and is permitted when deletions are allowed.
+    if (_deletionsBlocked.load() && !ReplicaSetWriteBlockBypass::get(opCtx).isEnabled()) {
+        const auto info = _writeBlockInfo.load();
+        return Status(ErrorCodes::ReplicaSetWritesBlocked,
+                      fmt::format("Compact blocked because replica set deletions are blocked, "
+                                  "reason: {}",
+                                  idl::serialize(info.reason)));
+    }
+    return Status::OK();
+}
+
 void ReplicaSetWriteBlockState::enableReplicaSetDeletionsBlocking() {
     _deletionsBlocked.store(true);
 }

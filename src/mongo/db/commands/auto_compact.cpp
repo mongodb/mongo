@@ -39,6 +39,7 @@
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/logv2/log.h"
 
 #include <boost/cstdint.hpp>
@@ -75,6 +76,17 @@ Status autoCompact(OperationContext* opCtx,
         Date_t::max(),
         Lock::InterruptBehavior::kThrow,
         Lock::GlobalLockOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
+
+    // Reject enabling auto compaction while replica set deletions are blocked. Disabling
+    // autoCompact is always permitted.
+    if (enable) {
+        if (auto status =
+                ReplicaSetWriteBlockState::get(opCtx)->checkIfCompactAllowedToStart(opCtx);
+            !status.isOK()) {
+            return status;
+        }
+    }
+
     std::shared_ptr<const CollectionCatalog> catalog = CollectionCatalog::get(opCtx);
     std::vector<StringData> excludedIdents;
 

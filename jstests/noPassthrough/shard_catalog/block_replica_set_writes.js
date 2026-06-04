@@ -17,25 +17,11 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {disableReplicaSetWriteBlock, enableReplicaSetWriteBlock} from "jstests/libs/block_replica_set_writes_utils.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {checkLog} from "src/mongo/shell/check_log.js";
-
-function disableReplicaSetWriteBlock(adminDB) {
-    // Wait for replica set write block to be disabled. This is necessarry because the command can fail
-    // transiently with a lock contantion with previous operations. For example, when the range deleter
-    // background thread becomes active, it hits ReplicaSetWritesBlocked error and retries in a tight loop
-    // without releasing its collection lock, so when disableReplicaSetWriteBlock is called immediately after,
-    // it can transiently fail due to lock contention.
-    assert.soon(() => {
-        const res = adminDB.runCommand({
-            blockReplicaSetWrites: 1,
-            enabled: false,
-            reason: "InsufficientDiskSpace",
-        });
-        return res.ok;
-    }, "Failed to disable replica set write block");
-}
+import {PersistenceProviderUtil} from "jstests/libs/server-rss/persistence_provider_util.js";
 
 describe("Test blockReplicaSetWrites command on shard replica sets in a sharded cluster", function () {
     before(function () {
@@ -59,7 +45,7 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
 
     afterEach(function () {
         // Disable replica set and global user write block (if not previously enabled the operation is a no-op).
-        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB);
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
         assert.commandWorked(
             this.st.s.adminCommand({
                 setUserWriteBlockMode: 1,
@@ -78,13 +64,10 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
 
     it("Test blockReplicaSetWrites command counter increments on enable", function () {
         // Enable per-shard write blocking on shard0.
-        assert.commandWorked(
-            this.shard0PrimaryAdminDB.runCommand({
-                blockReplicaSetWrites: 1,
-                enabled: true,
-                allowDeletions: false,
-                reason: "InsufficientDiskSpace",
-            }),
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
         );
 
         // Check replica set write block, reason, and command counter metrics when blockReplicaSetWrites is enabled.
@@ -101,8 +84,8 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             "repl.replicaSetWritesBlockCounters counter for InsufficientDiskSpace should be 1",
         );
 
-        //Disable per-shard write blocking on shard0.
-        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB);
+        // Disable write blocking on shard0.
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
 
         // Check replica set write block, reason, and command counter when blockReplicaSetWrites is disabled.
         replStatus = assert.commandWorked(this.shard0PrimaryAdminDB.serverStatus()).repl;
@@ -122,13 +105,10 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         assert.commandWorked(this.testShardedColl.insert({x: 0}));
 
         // Enable per-shard write blocking on shard0.
-        assert.commandWorked(
-            this.shard0PrimaryAdminDB.runCommand({
-                blockReplicaSetWrites: 1,
-                enabled: true,
-                allowDeletions: false,
-                reason: "InsufficientDiskSpace",
-            }),
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
         );
 
         // Check blocked inserts, updates, and deletes are blocked and counters are incremented.
@@ -180,13 +160,10 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
 
         // Enable per-shard write blocking on shard0 and check that insert still fails with
         // UserWritesBlocked error.
-        assert.commandWorked(
-            this.shard0PrimaryAdminDB.runCommand({
-                blockReplicaSetWrites: 1,
-                enabled: true,
-                allowDeletions: false,
-                reason: "InsufficientDiskSpace",
-            }),
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
         );
         assert.commandFailedWithCode(this.testShardedColl.insert({x: 3}), ErrorCodes.UserWritesBlocked);
 
@@ -204,8 +181,8 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             "Expected ReplicaSetWritesBlocked error after cluster user write block is cleared",
         );
 
-        // Disable per-shard write blocking on shard0 and check that insert succeeds.
-        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB);
+        // Disable write blocking on shard0 and check that insert succeeds.
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
         assert.commandWorked(this.testShardedColl.insert({x: 5}));
     });
 
@@ -225,13 +202,10 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         assert.commandWorked(this.st.s.adminCommand({flushRouterConfig: this.testDBName}));
 
         // Enable per-shard write blocking on shard0.
-        assert.commandWorked(
-            this.shard0PrimaryAdminDB.runCommand({
-                blockReplicaSetWrites: 1,
-                enabled: true,
-                allowDeletions: false,
-                reason: "InsufficientDiskSpace",
-            }),
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
         );
 
         // Check that insert, update, and delete operations routed to shard0 fail with ReplicaSetWritesBlocked error.
@@ -258,27 +232,21 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         assert.commandWorked(testColl.insert({_id: 2}));
 
         // Enable write block with allowDeletions: false — user deletes should be rejected.
-        assert.commandWorked(
-            this.shard0PrimaryAdminDB.runCommand({
-                blockReplicaSetWrites: 1,
-                enabled: true,
-                allowDeletions: false,
-                reason: "InsufficientDiskSpace",
-            }),
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
         );
         assert.commandFailedWithCode(testColl.remove({_id: 1}), ErrorCodes.ReplicaSetWritesBlocked);
         assert.eq(2, testColl.count(), "Both documents should remain while deletions are blocked");
 
         // Disable write block and re-enable with allowDeletions: true — user deletes should succeed.
-        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB);
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
 
-        assert.commandWorked(
-            this.shard0PrimaryAdminDB.runCommand({
-                blockReplicaSetWrites: 1,
-                enabled: true,
-                allowDeletions: true,
-                reason: "InsufficientDiskSpace",
-            }),
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            true /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
         );
         assert.commandWorked(testColl.remove({_id: 1}));
         assert.eq(1, testColl.count(), "Document should have been deleted when allowDeletions is true");
@@ -312,13 +280,10 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
         );
 
         // Enable per-shard write blocking on shard0 with allowDeletions set to false (i.e., all deletes blocked).
-        assert.commandWorked(
-            this.shard0PrimaryAdminDB.runCommand({
-                blockReplicaSetWrites: 1,
-                enabled: true,
-                allowDeletions: false,
-                reason: "InsufficientDiskSpace",
-            }),
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
         );
 
         // Let the range deleter run while deletions are blocked and check that the range deleter
@@ -333,15 +298,13 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             "Expected orphan to still be present after range deletion was blocked",
         );
 
-        // Disable the write block, then re-enable with allowDeletions set to true (i.e., all deletes allowed).
-        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB);
-        assert.commandWorked(
-            this.shard0PrimaryAdminDB.runCommand({
-                blockReplicaSetWrites: 1,
-                enabled: true,
-                allowDeletions: true,
-                reason: "InsufficientDiskSpace",
-            }),
+        // Disable write block, then re-enable with allowDeletions set to true (i.e., all deletes allowed).
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            true /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
         );
 
         // Check that range deletion now completes since allowDeletions is true.
@@ -351,5 +314,84 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             5 * 60 * 1000,
             200,
         );
+    });
+
+    it("Test that compact on a shard is guarded by the allowDeletions flag of blockReplicaSetWrites", function () {
+        // Skip test function if the architecture does not support auto-compact operations.
+        if (
+            PersistenceProviderUtil.allNodesHavePropertyWithValue(this.shard0Primary, "supportsLocalCollections", false)
+        ) {
+            jsTest.log.info(
+                "Skipping 'Test that compact on a shard is guarded by the allowDeletions flag of blockReplicaSetWrites' test function because local collections are not supported",
+            );
+            return;
+        }
+        assert.commandWorked(this.testShardedColl.insert({x: 1}));
+        const shard0TestDB = this.shard0Primary.getDB(this.testDBName);
+
+        // Check that with allowDeletions:false, compact is rejected.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        assert.commandFailedWithCode(
+            shard0TestDB.runCommand({compact: this.shardedCollName, force: true}),
+            ErrorCodes.ReplicaSetWritesBlocked,
+        );
+
+        // Disable write blocking.
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+
+        // Check that with allowDeletions:true, compact is permitted.
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            true /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+        assert.commandWorked(shard0TestDB.runCommand({compact: this.shardedCollName, force: true}));
+
+        // Disable write blocking entirely and verify compact still succeeds.
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        assert.commandWorked(shard0TestDB.runCommand({compact: this.shardedCollName, force: true}));
+    });
+
+    it("Test that autoCompact on a shard is guarded by the allowDeletions flag while disabling is always allowed", function () {
+        // Skip test function if the architecture does not support auto-compact operations.
+        if (
+            PersistenceProviderUtil.allNodesHavePropertyWithValue(this.shard0Primary, "supportsLocalCollections", false)
+        ) {
+            jsTest.log.info(
+                "Skipping 'Test that autoCompact on a shard is guarded by the allowDeletions flag of blockReplicaSetWrites' test function because local collections are not supported",
+            );
+            return;
+        }
+
+        const shard0AdminDB = this.shard0PrimaryAdminDB;
+
+        // Check that with allowDeletions:false, auto-compact is rejected.
+        enableReplicaSetWriteBlock(shard0AdminDB, false /* allowDeletions */, "InsufficientDiskSpace" /* reason */);
+        assert.commandFailedWithCode(shard0AdminDB.runCommand({autoCompact: true}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.commandWorked(shard0AdminDB.runCommand({autoCompact: false}));
+
+        // Disable write blocking.
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+
+        // Check that with allowDeletions:true, auto-compact is permitted.
+        enableReplicaSetWriteBlock(shard0AdminDB, true /* allowDeletions */, "InsufficientDiskSpace" /* reason */);
+        assert.soon(() => {
+            const res = shard0AdminDB.runCommand({autoCompact: true});
+            if (res.code === ErrorCodes.ObjectIsBusy) return false;
+            assert.commandWorked(res);
+            return true;
+        }, "Timed out waiting to enable autoCompact");
+
+        // Leave background compaction off.
+        assert.soon(() => {
+            const res = shard0AdminDB.runCommand({autoCompact: false});
+            if (res.code === ErrorCodes.ObjectIsBusy) return false;
+            assert.commandWorked(res);
+            return true;
+        }, "Timed out waiting to disable autoCompact");
     });
 });

@@ -99,3 +99,6 @@ filters:
   - "*chunk*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "block_replica_set_writes_utils.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

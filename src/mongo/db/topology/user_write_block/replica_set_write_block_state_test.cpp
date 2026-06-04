@@ -367,5 +367,64 @@ TEST_F(ReplicaSetWriteBlockStateTest, BlockReplicaSetWritesCommandCountersIncrem
     ASSERT_EQ(sub["InsufficientDiskSpace"].safeNumberLong(), 2);
 }
 
+TEST_F(ReplicaSetWriteBlockStateTest, CompactAllowedWhenDeletionsBlockingDisabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->disableReplicaSetDeletionsBlocking();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    ASSERT_OK(state->checkIfCompactAllowedToStart(opCtx.get()));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, CompactAllowedWhenOnlyWritesBlockedButDeletionsAllowed) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    // blockReplicaSetWrites with allowDeletions = true blocks writes but not deletions. Compact is
+    // gated by the allowDeletions flag, so it remains allowed.
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    state->disableReplicaSetDeletionsBlocking();
+    ASSERT_OK(state->checkIfCompactAllowedToStart(opCtx.get()));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, CompactBlockedWhenDeletionsBlockingEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).set(false);
+
+    // blockReplicaSetWrites with allowDeletions = false blocks both writes and deletions, so
+    // compact is blocked.
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    state->enableReplicaSetDeletionsBlocking();
+    ASSERT_EQ(state->checkIfCompactAllowedToStart(opCtx.get()),
+              ErrorCodes::ReplicaSetWritesBlocked);
+
+    state->disableReplicaSetDeletionsBlocking();
+    ASSERT_OK(state->checkIfCompactAllowedToStart(opCtx.get()));
+}
+
+TEST_F(ReplicaSetWriteBlockStateTest, CompactAllowedWhenBypassEnabled) {
+    auto opCtx = cc().makeOperationContext();
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
+
+    auto* state = ReplicaSetWriteBlockState::get(opCtx.get());
+    state->enableReplicaSetWriteBlocking(ReplicaSetWritesBlockReasonEnum::kInsufficientDiskSpace);
+    state->enableReplicaSetDeletionsBlocking();
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    authSession->grantInternalAuthorization();
+    ReplicaSetWriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
+    ASSERT(ReplicaSetWriteBlockBypass::get(opCtx.get()).isEnabled());
+
+    ASSERT_OK(state->checkIfCompactAllowedToStart(opCtx.get()));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -51,6 +51,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/util/assert_util.h"
 
 #include <cstdint>
@@ -130,6 +131,13 @@ public:
                             Date_t::max(),
                             Lock::InterruptBehavior::kThrow,
                             {.skipFlowControlTicket = true, .skipRSTLLock = true});
+
+        // Check the pre-shard write blocking state. dryRun is estimation-only (no data is
+        // rewritten or deleted) so it is exempt from this restriction.
+        if (!params.getDryRun()) {
+            uassertStatusOK(
+                ReplicaSetWriteBlockState::get(opCtx)->checkIfCompactAllowedToStart(opCtx));
+        }
 
         // Hold reference to the catalog for collection lookup without locks to be safe.
         auto collectionCatalog = CollectionCatalog::get(opCtx);

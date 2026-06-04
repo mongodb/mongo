@@ -89,6 +89,13 @@ public:
     bool isReplicaSetWriteBlockingEnabled() const;
 
     /**
+     * Checks that a new compact operation is allowed to start on this replica set. Returns a
+     * Status with ErrorCodes::ReplicaSetWritesBlocked if compact is disallowed, Status::OK()
+     * otherwise.
+     */
+    Status checkIfCompactAllowedToStart(OperationContext* opCtx) const;
+
+    /**
      * Methods to control the replica set deletions blocking state.
      */
     void enableReplicaSetDeletionsBlocking();
