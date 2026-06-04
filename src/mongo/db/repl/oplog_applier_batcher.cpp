@@ -363,7 +363,7 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
         // Use the OplogBuffer to populate a local OplogBatch. Note that the buffer may be empty.
         OplogApplierBatch ops;
         try {
-            auto opCtx = cc().makeOperationContext();
+            auto opCtx = cc().getServiceContext()->makeKillOpsExemptOperationContext(&cc());
             ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
                 opCtx.get(), AdmissionContext::Priority::kExempt);
 

@@ -911,6 +911,8 @@ last-continuous:
     ticket: SERVER-109200
   - test_file: jstests/sharding/resharding_skip_cloning.js
     ticket: SERVER-111929
+  - test_file: jstests/noPassthrough/killOp_against_repl_threads.js
+    ticket: SERVER-112273
   - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
     ticket: SERVER-117009
   - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js
@@ -1912,6 +1914,8 @@ last-lts:
     ticket: SERVER-109200
   - test_file: jstests/sharding/resharding_skip_cloning.js
     ticket: SERVER-111929
+  - test_file: jstests/noPassthrough/killOp_against_repl_threads.js
+    ticket: SERVER-112273
   - test_file: jstests/core/cluster_parameters/cluster_parameter_commands.js
     ticket: SERVER-117009
   - test_file: jstests/noPassthrough/server_parameters/cluster_parameter_validate.js
