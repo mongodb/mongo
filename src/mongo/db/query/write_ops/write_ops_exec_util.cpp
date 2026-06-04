@@ -45,11 +45,23 @@ LastOpFixer::~LastOpFixer() {
         // If this operation has already generated a new lastOp, don't bother setting it
         // here. No-op updates will not generate a new lastOp, so we still need the
         // guard to fire in that case.
-        replClientInfo().setLastOpToSystemLastOpTimeIgnoringCtxInterrupted(_opCtx);
-        LOGV2_DEBUG(20888,
-                    5,
-                    "Set last op to system time",
-                    "timestamp"_attr = replClientInfo().getLastOp().getTimestamp());
+        //
+        // Exceptions must not escape a destructor. Swallowing errors here is safe because the
+        // write already completed successfully. Failing to advance lastOp only degrades
+        // writeConcern acknowledgement for this one operation, which is preferable to crashing
+        // the server. The primary case this guards against is transient resource exhaustion
+        // such as WiredTiger session_max being reached under high connection load.
+        try {
+            replClientInfo().setLastOpToSystemLastOpTimeIgnoringCtxInterrupted(_opCtx);
+            LOGV2_DEBUG(20888,
+                        5,
+                        "Set last op to system time",
+                        "timestamp"_attr = replClientInfo().getLastOp().getTimestamp());
+        } catch (const DBException& e) {
+            LOGV2_WARNING(12810300,
+                          "Failed to set last op to system time in LastOpFixer destructor",
+                          "error"_attr = e.toStatus());
+        }
     }
 }
 
