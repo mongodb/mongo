@@ -492,7 +492,7 @@ bool DurableOplogEntry::shouldPrepare() const {
 bool DurableOplogEntry::applyOpsIsLinkedTransactionally() const {
     // An applyOps with a prevWriteOpTime is part of a transaction, unless multiOpType is
     // kApplyOpsAppliedSeparately.
-    return bool(getPrevWriteOpTimeInTransaction()) &&
+    return static_cast<bool>(getPrevWriteOpTimeInTransaction()) &&
         getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType) !=
         MultiOplogEntryType::kApplyOpsAppliedSeparately;
 }
@@ -514,7 +514,12 @@ bool DurableOplogEntry::isInTransaction() const {
         return true;
     if (getCommandType() != CommandTypeEnum::kApplyOps)
         return false;
-    return applyOpsIsLinkedTransactionally();
+    // Only kLegacyMultiOpType applyOps entries are multi-document transactions. Retryable-write
+    // applyOps (kApplyOpsAppliedSeparately, kApplyOpsAppliedAtomically) carry prevOpTime for
+    // chain-walking on secondaries but are not transactions.
+    return static_cast<bool>(getPrevWriteOpTimeInTransaction()) &&
+        getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType) ==
+        MultiOplogEntryType::kLegacyMultiOpType;
 }
 
 bool DurableOplogEntry::isSingleOplogEntryTransaction() const {
@@ -524,9 +529,8 @@ bool DurableOplogEntry::isSingleOplogEntryTransaction() const {
     }
     auto prevOptimeOpt = getPrevWriteOpTimeInTransaction();
     if (!prevOptimeOpt ||
-        getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType) ==
-            MultiOplogEntryType::kApplyOpsAppliedSeparately) {
-        // If there is no prevWriteOptime, then this oplog entry is not a part of a transaction.
+        getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType) !=
+            MultiOplogEntryType::kLegacyMultiOpType) {
         return false;
     }
     return prevOptimeOpt->isNull();
@@ -545,11 +549,11 @@ bool DurableOplogEntry::isEndOfLargeTransaction() const {
     }
     // There should be a previous oplog entry in a multiple oplog entry transaction if this is
     // supposed to be the last one. The first oplog entry in a large transaction will have a null
-    // ts.  The end of a large transaction should not have a partialTxn field, nor should
-    // multiOpType be set to kApplyOpsAppliedSeparately
+    // ts.  The end of a large transaction should not have a partialTxn field, and only
+    // kLegacyMultiOpType entries are multi-document transactions.
     return !prevOptimeOpt->isNull() && !isPartialTransaction() &&
-        getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType) !=
-        MultiOplogEntryType::kApplyOpsAppliedSeparately;
+        getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType) ==
+        MultiOplogEntryType::kLegacyMultiOpType;
 }
 
 bool DurableOplogEntry::isSingleOplogEntryTransactionWithCommand() const {

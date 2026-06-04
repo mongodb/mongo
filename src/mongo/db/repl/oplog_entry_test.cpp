@@ -907,6 +907,60 @@ TEST_F(OplogEntryTest, ApplyOpsIsMarkedRetryableNonApplyOpsWithMultiOpTypeIsNotM
     EXPECT_FALSE(insertEntry.applyOpsIsMarkedRetryable());
 }
 
+TEST_F(OplogEntryTest, ApplyOpsAppliedAtomicallyIsNotTransaction) {
+    UUID uuid(UUID::gen());
+    auto sessionId = makeLogicalSessionIdForTest();
+    // Null prevOpTime (single entry).
+    {
+        const auto applyOpsBson = BSON(
+            "ts" << Timestamp(1, 1) << "t" << 1LL << "op"
+                 << "c"
+                 << "ns"
+                 << "admin.$cmd"
+                 << "wall" << Date_t() << "o"
+                 << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                            << "ns" << nss.ns_forTest() << "ui"
+                                                            << uuid << "o" << BSON("_id" << 1))))
+                 << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
+                 << StmtId(0) << "prevOpTime" << OpTime() << "multiOpType"
+                 << static_cast<int>(MultiOplogEntryType::kApplyOpsAppliedAtomically));
+        auto entry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+        ASSERT_TRUE(entry.isCommand());
+        ASSERT_FALSE(entry.isInTransaction());
+        ASSERT_TRUE(entry.isTerminalApplyOps());
+        ASSERT_FALSE(entry.isSingleOplogEntryTransaction());
+        ASSERT_FALSE(entry.isPartialTransaction());
+        ASSERT_FALSE(entry.isEndOfLargeTransaction());
+        ASSERT_TRUE(entry.applyOpsIsLinkedTransactionally());
+        EXPECT_TRUE(entry.applyOpsIsMarkedRetryable());
+    }
+
+    // Non-null prevOpTime (chained entry in an oversized batch).
+    {
+        const auto applyOpsBson = BSON(
+            "ts" << Timestamp(1, 2) << "t" << 1LL << "op"
+                 << "c"
+                 << "ns"
+                 << "admin.$cmd"
+                 << "wall" << Date_t() << "o"
+                 << BSON("applyOps" << BSON_ARRAY(BSON("op" << "i"
+                                                            << "ns" << nss.ns_forTest() << "ui"
+                                                            << uuid << "o" << BSON("_id" << 1))))
+                 << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
+                 << StmtId(0) << "prevOpTime" << OpTime(Timestamp(1, 1), 1) << "multiOpType"
+                 << static_cast<int>(MultiOplogEntryType::kApplyOpsAppliedAtomically));
+        auto entry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+        ASSERT_TRUE(entry.isCommand());
+        ASSERT_FALSE(entry.isInTransaction());
+        ASSERT_TRUE(entry.isTerminalApplyOps());
+        ASSERT_FALSE(entry.isSingleOplogEntryTransaction());
+        ASSERT_FALSE(entry.isPartialTransaction());
+        ASSERT_FALSE(entry.isEndOfLargeTransaction());
+        ASSERT_TRUE(entry.applyOpsIsLinkedTransactionally());
+        EXPECT_TRUE(entry.applyOpsIsMarkedRetryable());
+    }
+}
+
 TEST_F(OplogEntryTest, OpTimeBaseNonStrictParsing) {
     const BSONObj oplogEntryExtraField = BSON("ts" << Timestamp(0, 0) << "t" << 0LL << "op"
                                                    << "c"
