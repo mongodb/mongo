@@ -618,6 +618,9 @@ common:public-release-rbe --config=public-release
 
 common --@rules_rust//rust/toolchain/channel=nightly
 common --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_mangled_symbols=true
+# This keeps rust tools built in the middle of the build from using the toolchains libgcc
+# and then trying to use the local hosts libgcc when running
+common:linux --@rules_rust//rust/settings:extra_exec_rustc_flag=-Clink-arg=-static-libgcc
 
 common --@rules_python//python/config_settings:bootstrap_impl=script
 # https://github.com/bazel-contrib/rules_python/issues/2864
