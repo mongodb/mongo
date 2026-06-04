@@ -178,7 +178,7 @@ TEST_F(NoChunkFixture, IsValidKey) {
     ASSERT(!makeTrackedCollectionMetadata().isValidKey(BSON("c" << "abcde")));
 }
 
-TEST_F(NoChunkFixture, GetNextChunk) {
+TEST_F(NoChunkFixture, getNextChunk) {
     ChunkType nextChunk;
     ASSERT(!makeTrackedCollectionMetadata().getNextChunk(
         makeTrackedCollectionMetadata().getMinKey(), &nextChunk));
@@ -253,7 +253,7 @@ TEST_F(SingleChunkFixture, KeyBelongsToMe) {
     ASSERT(!makeTrackedCollectionMetadata().keyBelongsToMe(BSONObj()));
 }
 
-TEST_F(SingleChunkFixture, GetNextChunk) {
+TEST_F(SingleChunkFixture, getNextChunk) {
     ChunkType nextChunk;
     ASSERT(makeTrackedCollectionMetadata().getNextChunk(makeTrackedCollectionMetadata().getMinKey(),
                                                         &nextChunk));

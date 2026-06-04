@@ -28,12 +28,16 @@
  */
 
 #pragma once
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_metadata.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/util/modules.h"
+
+#include <vector>
 
 MONGO_MOD_PUBLIC;
 
@@ -67,6 +71,16 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
                                            const boost::optional<Timestamp>& expectedTimestamp,
                                            const CollectionPtr& collection,
                                            const CollectionShardingRuntime& csr);
+
+/**
+ * Validates the identity of an already-obtained CollectionMetadata against the expected
+ * epoch/timestamp.
+ */
+void checkCollectionIdentity(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             const boost::optional<OID>& expectedEpoch,
+                             const boost::optional<Timestamp>& expectedTimestamp,
+                             const CollectionMetadata& metadata);
 
 /**
  * Checks that the chunk range matches the shard key pattern in the metadata.
@@ -108,5 +122,18 @@ void checkRangeOwnership(OperationContext* opCtx,
                          const NamespaceString& nss,
                          const CollectionMetadata& metadata,
                          const ChunkRange& chunkRange);
+
+/**
+ * Validates that every entry in splitKeys is a valid split point for the given chunkRange:
+ *   - each split point lies strictly inside chunkRange (or equals its upper bound),
+ *   - split points are strictly increasing and not duplicated,
+ *   - each split point conforms to the collection's shard-key pattern,
+ *   - each split point is valid for BSON metadata storage.
+ */
+void validateSplitPoints(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         const CollectionMetadata& metadata,
+                         const ChunkRange& chunkRange,
+                         const std::vector<BSONObj>& splitKeys);
 
 }  // namespace mongo

@@ -47,6 +47,8 @@ public:
 protected:
     bool isInCriticalSection(Phase phase) const override;
 
+    bool _mustAlwaysMakeProgress() override;
+
 private:
     ExecutorFuture<void> _acquireLocksAsync(OperationContext* opCtx,
                                             std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -57,8 +59,21 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token,
+                                         const Status& status) noexcept override;
+
     const ShardsvrSplitChunkRequest _request;
     boost::optional<ScopedSplitMergeChunk> _scopedSplitMergeChunk;
+
+    // Reason document used to acquire and release the recoverable critical section.
+    const BSONObj _critSecReason;
+
+    // Set in kCheckPreconditions when every requested split point already sits on a chunk boundary
+    // on this shard — i.e. the split is a no-op replay of an earlier successful commit. When true
+    // the coordinator skips every subsequent phase (no critical section, no configsvr commit, no
+    // shard catalog rewrite) and completes cleanly.
+    bool _alreadyCommitted = false;
 };
 
 }  // namespace mongo

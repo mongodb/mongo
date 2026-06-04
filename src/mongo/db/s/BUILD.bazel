@@ -906,6 +906,7 @@ mongo_cc_unit_test(
         "active_migrations_registry_test.cpp",
         "analyze_shard_key_read_write_distribution_test.cpp",
         "auto_split_vector_test.cpp",
+        "chunk_operation_precondition_checks_test.cpp",
         "migration_batch_fetcher_test.cpp",
         "migration_chunk_cloner_source_test.cpp",
         "migration_destination_manager_test.cpp",

@@ -84,6 +84,15 @@ function assertCollectionOptionsMismatch(inconsistencies, expectedOptionsWithSha
     );
 }
 
+// Asserts every entry in `inconsistencies` has a type from `allowedTypes`.
+// Used to validate inconsistency lists by content rather than by exact count.
+function assertOnlyExpectedInconsistencyTypes(inconsistencies, allowedTypes) {
+    const allowed = new Set(allowedTypes);
+    inconsistencies.forEach((inc) => {
+        assert(allowed.has(inc.type), "Unexpected inconsistency type " + inc.type + " in " + tojson(inconsistencies));
+    });
+}
+
 function assertCollectionAuxiliaryMetadataMismatch(inconsistencies, expectedMetadataWithShards) {
     assert(
         inconsistencies.some((object) => {
@@ -624,12 +633,20 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assert.commandWorked(configDB.collections.update({_id: kNss}, {$set: {unsplittable: true}}));
 
     let inconsistencies_chunks = db.checkMetadataConsistency().toArray();
-    assert.eq(inconsistencies_chunks.length, 2);
+
+    // Direct edits to the `unsplittable` field on config.collections desync the global catalog
+    // from the per-shard catalog: the same divergence is reported once from the in-memory shard
+    // catalog and a second time from the durable shard catalog when authoritative shard CRUD is
+    // active. Validate by content, not by an exact count that depends on the feature flag set.
     assert.contains(
         "TrackedUnshardedCollectionHasMultipleChunks",
         inconsistencies_chunks.map((x) => x.type),
         tojson(inconsistencies_chunks),
     );
+    assertOnlyExpectedInconsistencyTypes(inconsistencies_chunks, [
+        "TrackedUnshardedCollectionHasMultipleChunks",
+        "InconsistentShardCatalogCollectionMetadata",
+    ]);
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();

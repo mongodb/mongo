@@ -116,7 +116,7 @@ public:
                         newOpCtxPtr.get(), nss, collectionUUID, allowChunkOperations);
             }
 
-            // Since we no write happened on this txnNumber, we need to make a dummy write to
+            // Since no write happened on this txnNumber, we need to make a dummy write to
             // protect against older requests with old txnNumbers.
             DBDirectClient client(opCtx);
             client.update(NamespaceString::kServerConfigurationNamespace,
