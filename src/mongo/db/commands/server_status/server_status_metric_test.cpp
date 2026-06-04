@@ -342,8 +342,7 @@ TEST_F(MetricTreeTest, MetricBuilderSetTreeSet) {
     ASSERT_BSONOBJ_EQ(serialize(trees()[ClusterRole::None]), mJson("{test:{m1:0}}"));
 }
 
-// GoogleTest requires death tests to use a separate fixture class from regular TEST_F tests.
-class MetricTreeDeathTest : public MetricTreeTest {};
+using MetricTreeDeathTest = MetricTreeTest;
 
 DEATH_TEST_F(MetricTreeDeathTest, FreezePreventsFurtherAdds, "Cannot add metric") {
     addCounter("before.freeze");
