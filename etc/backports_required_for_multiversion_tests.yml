@@ -702,6 +702,14 @@ last-lts:
       ticket: SERVER-93149
     - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries.js
       ticket: SERVER-93149
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_abort_command.js
+      ticket: SERVER-111411
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_abort_during_building_index.js
+      ticket: SERVER-111411
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_abort_in_preparing_to_donate.js
+      ticket: SERVER-111411
+    - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_abort_while_monitoring_to_commit.js
+      ticket: SERVER-111411
     - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_building_index_failover.js
       ticket: SERVER-126218
     - test_file: jstests/sharding/resharding_timeseries/reshard_timeseries_disallow_writes.js
