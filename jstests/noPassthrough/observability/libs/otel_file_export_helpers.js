@@ -1,4 +1,12 @@
 /**
+ * Returns true if this build was compiled with OpenTelemetry support.
+ * @returns {boolean}
+ */
+export function buildSupportsOtel() {
+    return !!getBuildInfo().opentelemetry;
+}
+
+/**
  * Finds metrics files in the given directory.
  * @param {string} directory - The directory path to search in.
  * @param {string} fileSuffix - The suffix of the metrics files to search for. Defaults to "-metrics.jsonl" (the suffix
