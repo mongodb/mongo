@@ -29,6 +29,7 @@
 
 #include "mongo/db/shard_role/shard_catalog/collection_cache_recoverer.h"
 
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/persistent_task_store.h"
@@ -179,6 +180,12 @@ CollectionCacheRecoverer::RecoveryRoundId CollectionCacheRecoverer::start(Operat
                 ThreadClient client{"CSR-Recovery", getGlobalServiceContext()->getService()};
                 auto opCtx =
                     CancelableOperationContext{client->makeOperationContext(), token, executor};
+
+                // Recovery of the filtering metadata is critical for queries, so mark this opCtx
+                // as NonDeprioritizable to avoid admission-control deprioritization.
+                admission::execution_control::ScopedTaskTypeNonDeprioritizable deprioGuard(
+                    opCtx.get());
+
                 LOGV2_INFO(12033903,
                            "Wait for stable timestamp finished, proceeding to read disk contents",
                            "collection"_attr = nss.toStringForErrorMsg());
