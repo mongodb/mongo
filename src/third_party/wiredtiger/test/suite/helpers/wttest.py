@@ -622,6 +622,7 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         dumped_error_log = False
         teardown_failed = False
         teardown_msg = None
+        verify_failed = False
         if not dueToRetry:
             for action in self.teardown_actions:
                 try:
@@ -641,7 +642,12 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         passed = not (self.failed() or teardown_failed)
 
         if passed and self.__module__.startswith("test_layered"):
-            self.verifyLayered()
+            try:
+                self.verifyLayered()
+            except Exception:
+                passed = False
+                dumped_error_log = True
+                verify_failed = True
 
         try:
             self.platform_api.tearDown(self)
@@ -716,6 +722,8 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
             print("[pid:{}]: {}: {:.2f} seconds".format(os.getpid(), str(self), elapsed))
         if teardown_failed:
             self.fail(f'Teardown of {self} failed with message: {teardown_msg}')
+        if verify_failed:
+            self.fail(f'Verification failed')
         if close_failed:
             self.fail(f'Closing the connection failed')
         if (not passed or teardown_failed) and (not self.skipped):

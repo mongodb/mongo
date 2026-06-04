@@ -73,6 +73,9 @@
  * form). Don't use when strict-suffix semantics are required. */
 #define WT_URI_IS_STABLE(uri) (strstr(uri, ".wt_stable") != NULL)
 
+/* Check whether a URI refers to the checkpoint-view form of a stable constituent. */
+#define WT_URI_IS_STABLE_CHECKPOINT(uri) (strstr(uri, ".wt_stable/") != NULL)
+
 /* Check whether a URI refers to the ingest constituent of a layered table. */
 #define WT_URI_IS_INGEST(uri) WT_SUFFIX_MATCH(uri, ".wt_ingest")
 

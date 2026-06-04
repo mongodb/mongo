@@ -14,6 +14,12 @@
       __wt_atomic_load_uint32_relaxed(&(dhandle)->references) == 0)
 
 /*
+ * Grace period before closing an outdated checkpoint handle so the next generation can reuse its
+ * shared disk image.
+ */
+#define WT_DISAGG_OUTDATED_GRACE_SECS 5
+
+/*
  * __sweep_file_dhandle_check_and_reset_tod --
  *     Check if the file dhandle exists for the table dhandle and resets its time-of-death if it
  *     does.
@@ -201,16 +207,26 @@ __sweep_expire(WT_SESSION_IMPL *session, uint64_t now)
         if (!F_ISSET(dhandle, WT_DHANDLE_OUTDATED) && !sweep_non_outdated_handle)
             continue;
         /*
-         * Close outdated btrees immediately, even if they are metadata. For trees not marked with
-         * outdated, wait until the idle time has elapsed since time of death.
+         * For outdated btrees, hold standby node checkpoint handles for a short grace period,
+         * otherwise close them immediately. For trees not marked with outdated, wait until the idle
+         * time has elapsed since time of death.
          */
+        uint64_t tod = __wt_atomic_load_uint64_relaxed(&dhandle->timeofdeath);
         if (F_ISSET(dhandle, WT_DHANDLE_OUTDATED)) {
             if (__wt_atomic_load_int32_relaxed(&dhandle->session_inuse) > 0)
                 continue;
+            if (__wt_conn_is_disagg(session) && !conn->layered_table_manager.leader &&
+              WT_URI_IS_STABLE_CHECKPOINT(dhandle->name)) {
+                if (tod == 0) {
+                    __wt_atomic_store_uint64_relaxed(&dhandle->timeofdeath, now);
+                    continue;
+                }
+                if (now - tod <= WT_DISAGG_OUTDATED_GRACE_SECS)
+                    continue;
+            }
         } else if (WT_IS_METADATA(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
-          __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) != 0 ||
-          __wt_tsan_suppress_load_uint64(&dhandle->timeofdeath) == 0 ||
-          now - dhandle->timeofdeath <= conn->sweep.idle_time)
+          __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) != 0 || tod == 0 ||
+          now - tod <= conn->sweep.idle_time)
             continue;
 
         /*

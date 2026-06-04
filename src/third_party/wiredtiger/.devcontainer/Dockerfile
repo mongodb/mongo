@@ -16,6 +16,6 @@ RUN python -m venv /home/wiredtiger/venv
 ENV PATH="/home/wiredtiger/venv/bin:$PATH"
 
 RUN pip install --no-cache-dir \
-    find_libpython==0.4.0 gcovr==5.0 psutil==5.9.4 ruff==0.4.5
+    find_libpython==0.4.0 gcovr==5.0 psutil==5.9.4 ruff==0.4.5 uv==0.11.18
 
 WORKDIR /workdir

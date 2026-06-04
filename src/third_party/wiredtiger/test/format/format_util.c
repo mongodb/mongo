@@ -245,6 +245,19 @@ lock_destroy(WT_SESSION *session, RWLOCK *lock)
     lock->lock_type = LOCK_NONE;
 }
 
+#ifdef HAVE_DIAGNOSTIC
+static sigjmp_buf dump_crash_jmp;
+
+/*
+ * dump_crash_handler --
+ *     Handle crash during page dump.
+ */
+static void __attribute__((noreturn)) dump_crash_handler(int sig)
+{
+    siglongjmp(dump_crash_jmp, sig);
+}
+#endif
+
 /*
  * cursor_dump_page --
  *     Dump a cursor page to a backing file.
@@ -254,7 +267,9 @@ cursor_dump_page(WT_CURSOR *cursor, const char *tag)
 {
 #ifdef HAVE_DIAGNOSTIC
     static int next;
+    struct sigaction new_sa, old_segv, old_bus;
     char buf[MAX_FORMAT_PATH];
+    int dump_ret, sig;
 
     testutil_snprintf(buf, sizeof(buf), "%s/FAIL.pagedump.%d", g.home, ++next);
 
@@ -266,12 +281,28 @@ cursor_dump_page(WT_CURSOR *cursor, const char *tag)
     trace_msg(CUR2S(cursor), "%s: dumping to %s", tag, buf);
 
     /*
-     * We are calling into the debug code directly which does not take locks, so it's possible we
-     * will simply drop core. Turn off core dumps, those core files aren't interesting.
+     * The debug code does not take locks and can crash on a stale ref (e.g. during disagg
+     * mode=switch). Catch SIGSEGV/SIGBUS so the caller can continue collecting diagnostics even if
+     * the dump crashes; the dump file uses line-buffered I/O so all complete lines survive.
      */
+    memset(&new_sa, 0, sizeof(new_sa));
+    new_sa.sa_handler = dump_crash_handler;
+    sigemptyset(&new_sa.sa_mask);
+    sigaction(SIGSEGV, &new_sa, &old_segv);
+    sigaction(SIGBUS, &new_sa, &old_bus);
+
     set_core(true);
-    testutil_check(__wt_debug_cursor_page(cursor, buf));
+    if ((sig = sigsetjmp(dump_crash_jmp, 1)) == 0) {
+        dump_ret = __wt_debug_cursor_page(cursor, buf);
+        if (dump_ret != 0)
+            fprintf(stderr, "%s: page dump to %s failed: %d\n", tag, buf, dump_ret);
+    } else
+        fprintf(stderr, "%s: page dump to %s crashed (signal %d), dump may be incomplete\n", tag,
+          buf, sig);
     set_core(false);
+
+    sigaction(SIGSEGV, &old_segv, NULL);
+    sigaction(SIGBUS, &old_bus, NULL);
 #endif
 
     WT_UNUSED(cursor);

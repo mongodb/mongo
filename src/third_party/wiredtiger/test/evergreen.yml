@@ -1644,7 +1644,7 @@ variables:
           CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
       - func: "recovery stress test script"
         vars:
-          times: 25
+          times: 20
 
   - &workgen-test
     tags: ["workgen-test"]

@@ -34,6 +34,7 @@
 #ifdef HAVE_SETRLIMIT
 #include <sys/resource.h>
 #endif
+#include <setjmp.h>
 #include <signal.h>
 #include <sys/socket.h>
 

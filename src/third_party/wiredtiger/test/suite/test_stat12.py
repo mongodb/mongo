@@ -127,3 +127,47 @@ class test_stat12(wttest.WiredTigerTestCase):
         # can be reached at once, while fill ratio stats are only incremented once if any application thread evicts a page
         self.assertGreaterEqual(eviction_trigger_count, fill_ratio_count, "Fill ratio stats should not exceed eviction trigger stats.")
 
+# Verify the fill ratio is bucketed by its actual value, not collapsed into the lowest
+# bucket. With every trigger placed above 50% of the cache, no hard-eviction request can
+# occur below 50% fill, so only the upper buckets may increment.
+class test_stat12_fill_ratio_bucketing(wttest.WiredTigerTestCase):
+    uri = 'table:test_stat12_bucketing'
+    create_params = 'key_format=i,value_format=S'
+
+    def conn_config(self):
+        return 'cache_size=1MB,statistics=(all),eviction=(threads_max=1),' \
+            'eviction_trigger=95,eviction_target=80,' \
+            'eviction_dirty_trigger=80,eviction_dirty_target=75,' \
+            'eviction_updates_trigger=60,eviction_updates_target=30'
+
+    def test_fill_ratio_buckets(self):
+        self.session.create(self.uri, self.create_params)
+
+        c = self.session.open_cursor(self.uri)
+        for i in range(5000):
+            c[i] = 'x' * 2000
+        c.close()
+        self.session.checkpoint()
+        for i in range(2000):
+            c = self.session.open_cursor(self.uri)
+            c[i] = 'y' * 1000
+            c.close()
+
+        for _ in range(20):
+            stat_cursor = self.session.open_cursor('statistics:', None, None)
+            lt_25 = stat_cursor[wiredtiger.stat.conn.cache_eviction_app_threads_fill_ratio_lt_25][2]
+            r_25_50 = stat_cursor[wiredtiger.stat.conn.cache_eviction_app_threads_fill_ratio_25_50][2]
+            r_50_75 = stat_cursor[wiredtiger.stat.conn.cache_eviction_app_threads_fill_ratio_50_75][2]
+            gt_75 = stat_cursor[wiredtiger.stat.conn.cache_eviction_app_threads_fill_ratio_gt_75][2]
+            stat_cursor.close()
+            if r_50_75 + gt_75 != 0:
+                break
+            time.sleep(1)
+
+        # A hard-eviction request was recorded in an upper bucket: the ratio is computed in
+        # floating point. Integer division would truncate every ratio below 100% to 0 and
+        # dump every request into the lt_25 bucket.
+        self.assertGreater(r_50_75 + gt_75, 0, "Expected fill ratio above 50% to be bucketed.")
+        self.assertEqual(lt_25, 0, "No hard-eviction request can occur below the configured triggers.")
+        self.assertEqual(r_25_50, 0, "No hard-eviction request can occur below the configured triggers.")
+

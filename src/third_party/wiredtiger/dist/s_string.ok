@@ -441,6 +441,8 @@ RuntimeError
 SCons
 SDK
 SIGABRT
+SIGBUS
+SIGSEGV
 SIMD
 SLS
 SLVG
@@ -995,6 +997,7 @@ exc
 exe
 execfn
 existp
+extendedp
 extern
 extlist
 extlists
