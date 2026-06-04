@@ -155,7 +155,7 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
             str::stream() << "Resharding session oplog application unexpectedly received a multi "
                              "apply ops entry: "
                           << redact(op.toBSONForLogging()),
-            op.getMultiOpType() != repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+            !op.applyOpsIsMarkedRetryable());
 
     auto txnNumber = *op.getTxnNumber();
     auto isRetryableWrite = op.isCrudOpType();

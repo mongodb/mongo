@@ -327,6 +327,27 @@ public:
         return {op.toBSON()};
     }
 
+    repl::OplogEntry makeApplyOpsOp(LogicalSessionId lsid,
+                                    TxnNumber txnNumber,
+                                    repl::MultiOplogEntryType multiOpType) {
+        repl::MutableOplogEntry op;
+        op.setOpType(repl::OpTypeEnum::kCommand);
+        op.setObject(BSON("applyOps" << BSONArray()));
+        op.setSessionId(std::move(lsid));
+        op.setTxnNumber(std::move(txnNumber));
+        op.setMultiOpType(multiOpType);
+        op.setOpTime({{}, {}});
+        op.set_id(Value{
+            Document{{ReshardingDonorOplogId::kClusterTimeFieldName, op.getOpTime().getTimestamp()},
+                     {ReshardingDonorOplogId::kTsFieldName, op.getOpTime().getTimestamp()}}});
+
+        // These are unused by ReshardingOplogSessionApplication but required by IDL parsing.
+        op.setNss({});
+        op.setWallClockTime({});
+
+        return {op.toBSON()};
+    }
+
     size_t getNumOplogEntries(OperationContext* opCtx) {
         PersistentTaskStore<repl::OplogEntryBase> store(NamespaceString::kRsOplogNamespace);
         return store.count(opCtx);
@@ -1448,6 +1469,30 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteWithDeadEndS
         auto opCtx = makeOperationContext();
         checkStatementExecutedAndFetchOplogEntry(opCtx.get(), lsid, txnNumber, postFetchStmtId);
     }
+}
+
+DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTestDeathTest,
+                   RejectsRawApplyOpsAppliedSeparately,
+                   "Tripwire assertion.*9572400") {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto oplogEntry =
+        makeApplyOpsOp(lsid, 100, repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+
+    auto opCtx = makeOperationContext();
+    ReshardingOplogSessionApplication applier{oplogBufferNss()};
+    applier.tryApplyOperation(opCtx.get(), oplogEntry);
+}
+
+DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTestDeathTest,
+                   RejectsRawApplyOpsAppliedAtomically,
+                   "Tripwire assertion.*9572400") {
+    auto lsid = makeLogicalSessionIdForTest();
+    auto oplogEntry =
+        makeApplyOpsOp(lsid, 100, repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+
+    auto opCtx = makeOperationContext();
+    ReshardingOplogSessionApplication applier{oplogBufferNss()};
+    applier.tryApplyOperation(opCtx.get(), oplogEntry);
 }
 
 }  // namespace
