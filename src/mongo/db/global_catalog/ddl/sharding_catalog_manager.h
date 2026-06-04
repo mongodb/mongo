@@ -861,7 +861,8 @@ private:
                                                            const std::string& shardName,
                                                            const ChunkType& origChunk,
                                                            const ChunkVersion& collPlacementVersion,
-                                                           const std::vector<BSONObj>& splitPoints);
+                                                           const std::vector<BSONObj>& splitPoints,
+                                                           const CollectionType& coll);
 
     /**
      * Updates the "hasTwoOrMoreShard" cluster cardinality parameter after an add or remove shard

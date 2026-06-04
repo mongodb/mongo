@@ -772,7 +772,8 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
                                                  const std::string& shardName,
                                                  const ChunkType& origChunk,
                                                  const ChunkVersion& collPlacementVersion,
-                                                 const std::vector<BSONObj>& splitPoints) {
+                                                 const std::vector<BSONObj>& splitPoints,
+                                                 const CollectionType& coll) {
 
     ShardingCatalogManager::SplitChunkInTransactionResult splitChunkResult;
     auto updateChunksFn = [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
@@ -808,6 +809,15 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
             // Chunks already existed. No need to re-log the chunks.
             splitChunkResult = {collPlacementVersion, {}};
         } else {
+            // Only after we have checked the request is not a retry check for
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    str::stream() << "Can't execute splitChunk because chunk operations for this "
+                                     "collection are disallowed. 'allowMigrations' flag is "
+                                  << coll.getAllowMigrations()
+                                  << "; 'allowChunkOperations' flag is "
+                                  << coll.getAllowChunkOperations(),
+                    coll.getAllowMigrations() && coll.getAllowChunkOperations());
+
             auto countObj = firstBatch.front();
             auto docCount = countObj.getIntField(ChunkType::collectionUUID.name());
             uassert(ErrorCodes::BadValue,
@@ -869,13 +879,6 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     const auto [coll, version] = std::move(swCollAndVersion.getValue());
     auto collPlacementVersion = version;
 
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Can't execute splitChunk because chunk operations for this "
-                             "collection are disallowed. 'allowMigrations' flag is "
-                          << coll.getAllowMigrations() << "; 'permitMigrations' flag is "
-                          << coll.getPermitMigrations(),
-            coll.getAllowMigrations() && coll.getPermitMigrations());
-
     if (coll.getUnsplittable()) {
         return {
             ErrorCodes::NamespaceNotSharded,
@@ -909,7 +912,8 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                                                      shardName,
                                                      origChunkStatus.getValue(),
                                                      collPlacementVersion,
-                                                     splitPoints);
+                                                     splitPoints,
+                                                     coll);
 
     // Release the _kChunkOpLock to avoid blocking other operations for longer than necessary
     lk.unlock();
@@ -1101,13 +1105,6 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
             (!epoch || collPlacementVersion.epoch() == epoch) &&
                 (!timestamp || collPlacementVersion.getTimestamp() == timestamp));
 
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Can't execute mergeChunks because chunk operations for this "
-                             "collection are disallowed. 'allowMigrations' flag is "
-                          << coll.getAllowMigrations() << "; 'permitMigrations' flag is "
-                          << coll.getPermitMigrations(),
-            coll.getAllowMigrations() && coll.getPermitMigrations());
-
     if (coll.getUuid() != requestCollectionUUID) {
         return {
             ErrorCodes::InvalidUUID,
@@ -1157,6 +1154,15 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
         return ShardAndCollectionPlacementVersions{currentShardPlacementVersion,
                                                    collPlacementVersion};
     }
+
+    // Only check for allowChunkOperations after we know that the operation is not a retry for
+    // idempotency.
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Can't execute mergeChunks because chunk operations for this "
+                             "collection are disallowed. 'allowMigrations' flag is "
+                          << coll.getAllowMigrations() << "; 'allowChunkOperations' flag is "
+                          << coll.getAllowChunkOperations(),
+            coll.getAllowMigrations() && coll.getAllowChunkOperations());
 
     // 3. Prepare the data for the merge
     //    and ensure that the retrieved list of chunks covers the whole range.
@@ -1469,9 +1475,9 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                     str::stream()
                         << "Can't execute mergeAllChunksOnShard because chunk operations for this "
                            "collection are disallowed. 'allowMigrations' flag is "
-                        << collUnderLock.getAllowMigrations() << "; 'permitMigrations' flag is "
-                        << collUnderLock.getPermitMigrations(),
-                    collUnderLock.getAllowMigrations() && collUnderLock.getPermitMigrations());
+                        << collUnderLock.getAllowMigrations() << "; 'allowChunkOperations' flag is "
+                        << collUnderLock.getAllowChunkOperations(),
+                    collUnderLock.getAllowMigrations() && collUnderLock.getAllowChunkOperations());
 
             // 4. Commit the new routing table changes to the sharding catalog.
             mergeAllChunksOnShardInTransaction(opCtx, collUuid, shardId, newChunks);
@@ -1566,7 +1572,8 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
     const CollectionType coll(findCollResponse.docs[0]);
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Can't execute moveChunk because migrations for this collection are disallowed",
-            coll.getAllowMigrations() && coll.getPermitMigrations());
+            coll.getAllowMigrations() && coll.getPermitMigrations() &&
+                coll.getAllowChunkOperations());
 
     if (coll.getUnsplittable()) {
         return {
