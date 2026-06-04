@@ -67,6 +67,8 @@ struct MONGO_MOD_NEEDS_REPLACEMENT CanonicalQueryParams {
     std::vector<boost::intrusive_ptr<DocumentSource>> pipeline = {};
     bool isCountLike = false;
     bool isSearchQuery = false;
+    // True if this query comes from an aggregation command with a non-empty pipeline.
+    bool aggWithNonEmptyPipeline = false;
 };
 
 class MONGO_MOD_NEEDS_REPLACEMENT CanonicalQuery {
@@ -389,12 +391,21 @@ public:
         return _findCommand->getForcedPlanSolutionHash();
     }
 
+    void setAggWithNonEmptyPipeline(bool aggWithNonEmptyPipeline) {
+        _aggWithNonEmptyPipeline = aggWithNonEmptyPipeline;
+    }
+
+    bool aggWithNonEmptyPipeline() const {
+        return _aggWithNonEmptyPipeline;
+    }
+
 private:
     void initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
                 std::unique_ptr<ParsedFindCommand> parsedFind,
                 std::vector<boost::intrusive_ptr<DocumentSource>> cqPipeline,
                 bool isCountLike,
                 bool isSearchQuery,
+                bool aggWithNonEmptyPipeline,
                 bool optimizeMatchExpression);
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
@@ -411,7 +422,14 @@ private:
     boost::optional<CanonicalDistinct> _distinct;
 
     // A query can include a post-processing pipeline here. Logically it is applied after all the
-    // other operations (filter, sort, project, skip, limit).
+    // other operations (filter, sort, project, skip, limit). Holds the SBE-eligible document
+    // sources.
+    //  - In the default get_executor path, this is populated before query optimization and all
+    //  stages
+    //    will be executed in SBE.
+    //  - In the deferred get_executor path, it's populated after QO (during engine selection) and
+    //  all
+    //    or some of the stages might be executed in SBE, depending on engine selection logic.
     std::vector<boost::intrusive_ptr<DocumentSource>> _cqPipeline;
 
     // True iff '_cqPipeline' contains all aggregation pipeline stages in the query. When
@@ -464,6 +482,9 @@ private:
     bool _isSearchQuery = false;
 
     bool _forSubPlanner = false;
+
+    // Value is true if this was an aggregate query with a non-empty pipeline.
+    bool _aggWithNonEmptyPipeline = false;
 };
 
 }  // namespace mongo

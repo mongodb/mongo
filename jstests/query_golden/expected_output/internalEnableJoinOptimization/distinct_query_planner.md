@@ -410,3 +410,73 @@ Execution Engine: sbe
 }
 ```
 
+## 3. DISTINCT_SCAN Preferred Over a Competing Predicate Index
+### Low-cardinality $group with a competing predicate index => DISTINCT_SCAN
+### Pipeline
+```json
+[
+	{
+		"$match" : {
+			"a" : {
+				"$gte" : 0
+			},
+			"b" : "x"
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$top" : {
+					"output" : "$b",
+					"sortBy" : {
+						"a" : -1
+					}
+				}
+			}
+		}
+	}
+]
+```
+### Winning plan
+```json
+[
+	{
+		"usedJoinOptimization" : false,
+		"stage" : "PROJECTION_COVERED",
+		"transformBy" : {
+			"a" : 1,
+			"b" : 1,
+			"_id" : 0
+		}
+	},
+	{
+		"usedJoinOptimization" : false,
+		"stage" : "DISTINCT_SCAN",
+		"keyPattern" : {
+			"a" : 1,
+			"b" : 1
+		},
+		"indexName" : "a_1_b_1",
+		"isMultiKey" : false,
+		"multiKeyPaths" : {
+			"a" : [ ],
+			"b" : [ ]
+		},
+		"isUnique" : false,
+		"isSparse" : false,
+		"isPartial" : false,
+		"isShardFiltering" : false,
+		"isFetching" : false,
+		"direction" : "backward",
+		"indexBounds" : {
+			"a" : [
+				"[inf, 0.0]"
+			],
+			"b" : [
+				"[\"x\", \"x\"]"
+			]
+		}
+	}
+]
+```

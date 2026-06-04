@@ -1064,7 +1064,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
         {.expCtx = expCtx,
          .parsedFind = std::move(parsedFind),
          .isCountLike = *shouldProduceEmptyDocs,
-         .isSearchQuery = PipelineD::isSearchPresentAndEligibleForSbe(pipeline)});
+         .isSearchQuery = PipelineD::isSearchPresentAndEligibleForSbe(pipeline),
+         .aggWithNonEmptyPipeline = !pipeline->empty()});
 
     if (!swCq.isOK()) {
         return swCq.getStatus();

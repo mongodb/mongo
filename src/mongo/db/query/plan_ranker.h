@@ -115,7 +115,7 @@ public:
         // Apply a large bonus to DISTINCT_SCAN plans in an aggregation context, as the
         // $groupByDistinct rewrite can reduce the amount of overall work the query needs to do.
         if (cq.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled() && cq.getDistinct() &&
-            !cq.cqPipeline().empty() && hasStage(STAGE_DISTINCT_SCAN, stats)) {
+            cq.aggWithNonEmptyPipeline() && hasStage(STAGE_DISTINCT_SCAN, stats)) {
             // Assume that every advance in a distinct scan is 5x as productive as the
             // equivalent index scan, up to the number of works actually done by the
             // distinct scan, in order to favor distinct scans. The maximum bonus is 0.8

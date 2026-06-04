@@ -8,7 +8,8 @@
  *   requires_fcv_82
  * ]
  */
-import {section, subSection} from "jstests/libs/query/pretty_md.js";
+import {code, section, subSection} from "jstests/libs/query/pretty_md.js";
+import {getWinningPlanFromExplain, normalizePlan} from "jstests/libs/query/analyze_plan.js";
 import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
 
 const coll = db[jsTestName()];
@@ -85,3 +86,25 @@ coll.insertMany([
     {a: 2, b: 3},
 ]);
 outputAggregationPlanAndResults(coll, [{$group: {_id: "$a"}}]);
+
+section("DISTINCT_SCAN Preferred Over a Competing Predicate Index");
+
+subSection("Low-cardinality $group with a competing predicate index => DISTINCT_SCAN");
+coll.drop();
+coll.createIndex({a: 1});
+coll.createIndex({b: 1});
+coll.createIndex({a: 1, b: 1});
+const docs = [];
+for (let a = 0; a < 110; a++) {
+    docs.push({a, b: "x"});
+    docs.push({a, b: "y"});
+}
+coll.insertMany(docs);
+const pipeline = [
+    {$match: {a: {$gte: 0}, b: "x"}},
+    {$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: -1}}}}},
+];
+subSection("Pipeline");
+code(tojson(pipeline));
+subSection("Winning plan");
+code(tojson(normalizePlan(getWinningPlanFromExplain(coll.explain().aggregate(pipeline)))));

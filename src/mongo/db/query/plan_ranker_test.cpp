@@ -102,53 +102,55 @@ TEST(PlanRankerTest, DistinctBonus) {
     RAIIServerParameterControllerForTest shardFilteringDistinct(
         "featureFlagShardFilteringDistinctScan", true);
 
-    // Two plans: both fetch, one is a DISTINCT_SCAN, other is an IXSCAN.
-    // DISTINCT_SCAN does 2 advances / 10 works.
-    auto dsStats = make_unique<DistinctScanStats>();
-    dsStats->isFetching = true;
-    dsStats->isShardFilteringDistinctScanEnabled = true;
-    auto distinctScanPlan =
-        makeStats("DISTINCT_SCAN", STAGE_DISTINCT_SCAN, std::move(dsStats), 10, 2);
+    for (bool deferredExecEnabled : {false, true}) {
+        RAIIServerParameterControllerForTest deferredEngineChoice(
+            "featureFlagGetExecutorDeferredEngineChoice", deferredExecEnabled);
+        // Two plans: both fetch, one is a DISTINCT_SCAN, other is an IXSCAN.
+        // DISTINCT_SCAN does 2 advances / 10 works.
+        auto dsStats = make_unique<DistinctScanStats>();
+        dsStats->isFetching = true;
+        dsStats->isShardFilteringDistinctScanEnabled = true;
+        auto distinctScanPlan =
+            makeStats("DISTINCT_SCAN", STAGE_DISTINCT_SCAN, std::move(dsStats), 10, 2);
 
-    // IXSCAN plan does 2 advances / 10 works.
-    auto ixscanPlan = makeStats("FETCH", STAGE_FETCH, make_unique<FetchStats>(), 10, 2);
-    ixscanPlan->children.emplace_back(
-        makeStats("IXSCAN", STAGE_IXSCAN, make_unique<IndexScanStats>(), 10, 2));
+        // IXSCAN plan does 2 advances / 10 works.
+        auto ixscanPlan = makeStats("FETCH", STAGE_FETCH, make_unique<FetchStats>(), 10, 2);
+        ixscanPlan->children.emplace_back(
+            makeStats("IXSCAN", STAGE_IXSCAN, make_unique<IndexScanStats>(), 10, 2));
 
-    auto cq = makeCanonicalQuery();
-    cq->setDistinct(CanonicalDistinct("someKey"));
-    auto scorer = plan_ranker::makePlanScorer();
-    auto distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
-    auto ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
+        auto cq = makeCanonicalQuery();
+        cq->setDistinct(CanonicalDistinct("someKey"));
+        auto scorer = plan_ranker::makePlanScorer();
+        auto distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
+        auto ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
 
-    // Both plans should tie now- a tie-breaker will be applied at a later stage.
-    ASSERT_EQ(distinctScore, ixscanScore);
+        // Both plans should tie now- a tie-breaker will be applied at a later stage.
+        ASSERT_EQ(distinctScore, ixscanScore);
 
-    // Now we change to an aggregation context (simulate $groupByDistinct rewrite case).
-    auto groupBson = BSON("$group" << BSON("_id" << "someKey"));
-    cq->setCqPipeline(
-        {DocumentSourceGroup::createFromBson(groupBson.firstElement(), cq->getExpCtx())}, true);
+        // Now we change to an aggregation context.
+        cq->setAggWithNonEmptyPipeline(true);
 
-    // When in a distinct() context, productivity is considered larger in a distinct, even if both
-    // plans have the same advances:work ratio. A DISTINCT_SCAN should now win by a large margin
-    // (tie breaker).
-    distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
-    ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
-    ASSERT_GT(distinctScore, ixscanScore);
+        // When in a distinct() context, productivity is considered larger in a distinct, even if
+        // both plans have the same advances:work ratio. A DISTINCT_SCAN should now win by a large
+        // margin (tie breaker).
+        distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
+        ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
+        ASSERT_GT(distinctScore, ixscanScore);
 
-    // If we make the IXSCAN 5x more productive, it will tie with the DISTINCT_SCAN.
-    ixscanPlan->children[0]->common.advanced = 10;
-    ixscanPlan->common.advanced = 10;
-    distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
-    ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
-    ASSERT_EQ(ixscanScore, distinctScore);
+        // If we make the IXSCAN 5x more productive, it will tie with the DISTINCT_SCAN.
+        ixscanPlan->children[0]->common.advanced = 10;
+        ixscanPlan->common.advanced = 10;
+        distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
+        ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
+        ASSERT_EQ(ixscanScore, distinctScore);
 
-    // If we make the IXSCAN 5.5x more productive, it will win!
-    ixscanPlan->children[0]->common.advanced = 11;
-    ixscanPlan->common.advanced = 11;
-    distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
-    ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
-    ASSERT_GT(ixscanScore, distinctScore);
+        // If we make the IXSCAN 5.5x more productive, it will win!
+        ixscanPlan->children[0]->common.advanced = 11;
+        ixscanPlan->common.advanced = 11;
+        distinctScore = scorer->calculateScore(distinctScanPlan.get(), *cq);
+        ixscanScore = scorer->calculateScore(ixscanPlan.get(), *cq);
+        ASSERT_GT(ixscanScore, distinctScore);
+    }
 }
 
 };  // namespace

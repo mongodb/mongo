@@ -109,6 +109,7 @@ CanonicalQuery::CanonicalQuery(CanonicalQueryParams&& params) {
            std::move(params.pipeline),
            params.isCountLike,
            params.isSearchQuery,
+           params.aggWithNonEmptyPipeline,
            true /*optimizeMatchExpression*/);
 }
 
@@ -146,6 +147,7 @@ CanonicalQuery::CanonicalQuery(OperationContext* opCtx, const CanonicalQuery& ba
            {} /* an empty cqPipeline */,
            false,  // The parent query countLike is independent from the subquery countLike.
            baseQuery.isSearchQuery(),
+           baseQuery.aggWithNonEmptyPipeline(),
            false /*optimizeMatchExpression*/);
 
     if (baseQuery.getDistinct().has_value()) {
@@ -158,6 +160,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
                             std::vector<boost::intrusive_ptr<DocumentSource>> cqPipeline,
                             bool isCountLike,
                             bool isSearchQuery,
+                            bool aggWithNonEmptyPipeline,
                             bool optimizeMatchExpression) {
     _expCtx = expCtx;
 
@@ -225,6 +228,7 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     setCqPipeline(std::move(cqPipeline), false /* containsEntirePipeline */);
     _isCountLike = isCountLike;
     _isSearchQuery = isSearchQuery;
+    _aggWithNonEmptyPipeline = aggWithNonEmptyPipeline;
 
     // Perform SBE auto-parameterization if there is not already a reason not to.
     _disablePlanCache = internalQueryDisablePlanCache.load() ||
