@@ -113,6 +113,10 @@ struct OpMsg {
         replaceFlags(message, flags(*message) & ~flag);
     }
 
+    // Size in bytes of the trailing CRC-32C checksum that follows the message body when the
+    // kChecksumPresent flag is set.
+    static constexpr size_t kCrc32Size = sizeof(uint32_t);
+
     /**
      * Retrieves the checksum stored at the end of the message.
      */

@@ -61,7 +61,7 @@ void FlowControlRateLimiter::acquireTicket(OperationContext* opCtx,
                                            FlowControlTicketholder::CurOp* curOp) {
     // TODO SERVER-126182: Use DeferredToken to avoid the tryAcquireToken/acquireToken
     // double-call and the resulting internal stats double-count.
-    if (_rateLimiter->tryAcquireToken().isOK()) {
+    if (_rateLimiter->tryAcquireToken()) {
         curOp->ticketsAcquired++;
         return;
     }

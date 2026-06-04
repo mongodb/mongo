@@ -30,6 +30,7 @@
 
 #include "mongo/transport/session_workflow.h"
 
+#include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -73,6 +74,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/session_manager.h"
+#include "mongo/transport/session_workflow_p.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/assert_util.h"
@@ -771,20 +773,14 @@ Status SessionWorkflow::Impl::_rateLimit() const {
     return admissionRateLimiter.admitRequest(client());
 }
 
-DbResponse makeDbResponseErrorForRateLimiting(const Message& message, const Status& status) {
-    invariant(!status.isOK());
-
-    // When the MoreToCome flag is set, return an empty response as this is a fire and forget
-    // request.
-    if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
-        return DbResponse{};
-    }
-
-    const auto replyBuilder = rpc::makeReplyBuilder(rpc::protocolForMessage(message));
+Message makeRateLimitErrorMessage(rpc::Protocol protocol,
+                                  const Status& status,
+                                  long long retryAfterMs) {
+    const auto replyBuilder = rpc::makeReplyBuilder(protocol);
     replyBuilder->setCommandReply(status, {});
 
-    // We need to add error labels manually as ErrorLabelBuilder requires an operation context and
-    // we are still before the creation of the operation context at this point.
+    // We need to mirror the getErrorLabels logic because we lack an operation context at this
+    // point. See error_labels.cpp for more details.
     if (MONGO_likely(status == ErrorCodes::IngressRequestRateLimitExceeded)) {
         auto commandBodyBob = replyBuilder->getBodyBuilder();
         {
@@ -795,9 +791,105 @@ DbResponse makeDbResponseErrorForRateLimiting(const Message& message, const Stat
             // deserializing it, so we just always append the NoWritesPerformed label.
             arrayBuilder.append(ErrorLabel::kNoWritesPerformed);
         }
+
+        if (retryAfterMs > 0) {
+            commandBodyBob.append(kRetryAfterMSFieldName, retryAfterMs);
+        }
     }
 
-    return DbResponse{.response = replyBuilder->done()};
+    return replyBuilder->done();
+}
+
+namespace {
+
+// A process-wide, immutable, pre-built OP_MSG rejection response for
+// IngressRequestRateLimitExceeded errors. The body is identical across all such rejections except
+// for two per-rejection fields: the wire-header responseTo, and (when present) the retryAfterMS
+// value. Callers obtain an owned copy via the static makeResponse() entry point, which
+// selects the appropriate cached variant and stamps the per-rejection fields.
+class RejectionResponseTemplate {
+public:
+    static Message makeResponse(int32_t requestId, long long retryAfterMs) {
+        return templateFor(retryAfterMs > 0).stamp(requestId, retryAfterMs);
+    }
+
+private:
+    explicit RejectionResponseTemplate(bool withRetryAfter) {
+        // The rejection fast path only ever serves OP_MSG requests, so assume kOpMsg.
+        Message responseMsg =
+            makeRateLimitErrorMessage(rpc::Protocol::kOpMsg,
+                                      admission::IngressRequestRateLimiter::rejectionStatus(),
+                                      withRetryAfter ? 1 : 0);
+
+        // Zero out responseTo; it is stamped per-rejection at send time.
+        responseMsg.header().setResponseToMsgId(0);
+
+        if (withRetryAfter) {
+            // retryAfterMS is the last field appended to the body (see makeRateLimitErrorMessage)
+            // and the template has no trailing bytes after the BSON document, so its 8-byte value
+            // occupies the bytes immediately before the document terminator.
+            _retryAfterValueOffset = static_cast<int>(responseMsg.size() - sizeof(long long) - 1);
+        }
+
+        _template = std::move(responseMsg);
+    }
+
+    // Returns the cached variant, built once on first use.
+    static const RejectionResponseTemplate& templateFor(bool withRetryAfter) {
+        static const RejectionResponseTemplate kNoRetry{/*withRetryAfter*/ false};
+        static const RejectionResponseTemplate kWithRetry{/*withRetryAfter*/ true};
+        return withRetryAfter ? kWithRetry : kNoRetry;
+    }
+
+    // Copies the template into a fresh owned buffer and stamps the per-rejection fields.
+    Message stamp(int32_t requestId, long long retryAfterMs) const {
+        // Pre-reserve the checksum's worth of slack so appendChecksum's realloc check finds enough
+        // room downstream and doesn't have to grow the buffer at all.
+        const size_t templateSize = _template.size();
+        auto buf = SharedBuffer::allocate(templateSize + OpMsg::kCrc32Size);
+        memcpy(buf.get(), _template.buf(), templateSize);
+
+        Message msg(std::move(buf));
+        msg.header().setResponseToMsgId(requestId);
+        if (_retryAfterValueOffset >= 0) {
+            DataView(msg.buf()).write<LittleEndian<long long>>(retryAfterMs,
+                                                               _retryAfterValueOffset);
+        }
+        return msg;
+    }
+
+    // The pre-built OP_MSG rejection response, used as an immutable template
+    Message _template;
+    // Byte offset within the template of the 8-byte little-endian retryAfterMS value, or -1 if this
+    // template has no retryAfterMS field.
+    int _retryAfterValueOffset = -1;
+};
+
+}  // namespace
+
+DbResponse makeDbResponseErrorForRateLimiting(const Message& message, const Status& status) {
+    invariant(!message.empty());
+    invariant(!status.isOK());
+
+    // When the MoreToCome flag is set, return an empty response as this is a fire and forget
+    // request.
+    if (OpMsg::isFlagSet(message, OpMsg::kMoreToCome)) {
+        return DbResponse{};
+    }
+
+    const long long retryAfterMs = getOverloadRetryAfterMS();
+
+    // Fast path for OP_MSG IngressRequestRateLimitExceeded rejections, which are the overwhelmingly
+    // common case when the ingress rate limiter is enabled.
+    if (MONGO_likely(status == ErrorCodes::IngressRequestRateLimitExceeded &&
+                     rpc::protocolForMessage(message) == rpc::Protocol::kOpMsg)) {
+        const int32_t requestId = MSGHEADER::ConstView(message.buf()).getRequestMsgId();
+        return DbResponse{.response =
+                              RejectionResponseTemplate::makeResponse(requestId, retryAfterMs)};
+    }
+
+    return DbResponse{.response = makeRateLimitErrorMessage(
+                          rpc::protocolForMessage(message), status, retryAfterMs)};
 }
 
 Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {

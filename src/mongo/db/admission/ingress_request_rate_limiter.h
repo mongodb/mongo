@@ -59,6 +59,13 @@ public:
     Status admitRequest(Client* client);
 
     /**
+     * Returns the canonical rejection Status that `admitRequest` returns when the rate limit is
+     * exceeded. Exposed so that response-bytes builders and unit tests can reference the same
+     * Status without duplicating its error code or message string.
+     */
+    static const Status& rejectionStatus();
+
+    /**
      * Waits for admission to be granted. If there is no deferred token then this is a no-op,
      * otherwise it resolves the deferred token.
      *

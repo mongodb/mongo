@@ -193,10 +193,10 @@ public:
     Status acquireToken(OperationContext* opCtx, double numTokensToConsume = 1.0);
 
     /**
-     * Attempts to acquire a token without queuing. Returns an error status if the rate limit
-     * and the burst size is exceeded.
+     * Attempts to acquire a token without queuing. Returns false if the rate limit and the burst
+     * size is exceeded.
      */
-    Status tryAcquireToken(double numTokensToConsume = 1.0);
+    bool tryAcquireToken(double numTokensToConsume = 1.0);
 
     /**
      * Returns tokens back to the bucket.

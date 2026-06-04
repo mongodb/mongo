@@ -313,12 +313,16 @@ BSONObj getErrorLabels(OperationContext* opCtx,
     responseBuilder.append(kErrorLabelsFieldName, labelArray.arr());
 
     if (labelBuilder.isSystemOverloadedError() && labelBuilder.isOperationIdempotent()) {
-        if (auto retry = gOverloadRetryAfterMS.load(); retry > 0) {
+        if (auto retry = getOverloadRetryAfterMS(); retry > 0) {
             responseBuilder.append(kRetryAfterMSFieldName, retry);
         }
     }
 
     return responseBuilder.obj();
+}
+
+long long getOverloadRetryAfterMS() {
+    return gOverloadRetryAfterMS.loadRelaxed();
 }
 
 bool isTransientTransactionError(ErrorCodes::Error code,

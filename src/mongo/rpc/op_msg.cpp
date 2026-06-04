@@ -82,8 +82,6 @@ enum class Section : uint8_t {
     kSecurityToken = 2,
 };
 
-constexpr int kCrc32Size = 4;
-
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
 // All fields including size, requestId, and responseTo must already be set. The size must
 // already include the final 4-byte checksum.
@@ -93,7 +91,8 @@ uint32_t calculateChecksum(const Message& message) {
     }
 
     invariant(OpMsg::isFlagSet(message, OpMsg::kChecksumPresent));
-    return wiredtiger_crc32c_func()(message.singleData().view2ptr(), message.size() - kCrc32Size);
+    return wiredtiger_crc32c_func()(message.singleData().view2ptr(),
+                                    message.size() - OpMsg::kCrc32Size);
 }
 #endif  // MONGO_CONFIG_WIREDTIGER_ENABLED
 }  // namespace

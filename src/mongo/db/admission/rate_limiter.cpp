@@ -66,6 +66,7 @@ public:
         : maxQueueDepth(m),
           queued(0),
           name(std::move(n)),
+          rejectedStatus(kRejectedErrorCode, fmt::format("Rate limiter '{}' rate exceeded", name)),
           _tickSource(clock),
           _tokenBucket{r, b, nowInSeconds() - b / r} {}
 
@@ -133,6 +134,10 @@ public:
     Atomic<int64_t> queued;
 
     std::string name;
+
+    // Cached rejection Status so the hot rejection path returns it without a per-call ErrorInfo
+    // allocation while still preserving the limiter name in diagnostics.
+    const Status rejectedStatus;
 
     ReadScopedTokenBucket readScopedTokenBucket() {
         return {_tokenBucket, _rwMutex};
@@ -276,8 +281,8 @@ StatusWith<RateLimiter::DeferredToken> RateLimiter::acquireToken(double numToken
     const auto maxQueueDepth = _impl->maxQueueDepth.loadRelaxed();
     if (!hangInLimiter && (maxQueueDepth <= 0 || _impl->queued.load() >= maxQueueDepth)) {
         // Queueing unavailable (disabled or currently full): use try-acquire semantics.
-        if (auto status = tryAcquireToken(numTokensToConsume); !status.isOK()) {
-            return status;
+        if (!tryAcquireToken(numTokensToConsume)) {
+            return _impl->rejectedStatus;
         }
         _impl->stats.averageTimeQueuedMicros.addSample(0);
         return DeferredToken(_impl.get(), numTokensToConsume, Milliseconds{0}, Milliseconds{0});
@@ -322,18 +327,16 @@ Status RateLimiter::acquireToken(OperationContext* opCtx, double numTokensToCons
     return std::move(tokenResult.getValue()).get(opCtx);
 }
 
-Status RateLimiter::tryAcquireToken(double numTokensToConsume) {
+bool RateLimiter::tryAcquireToken(double numTokensToConsume) {
     _impl->stats.attemptedAdmissions.incrementRelaxed();
 
     if (!_impl->readScopedTokenBucket().consume(numTokensToConsume, _impl->nowInSeconds())) {
         _impl->stats.rejectedAdmissions.incrementRelaxed();
-        return Status{kRejectedErrorCode,
-                      fmt::format("Rate limiter '{}' rate exceeded", _impl->name)};
+        return false;
     }
-
     _impl->stats.successfulAdmissions.incrementRelaxed();
     _impl->stats.tokensAcquired.fetchAndAddRelaxed(numTokensToConsume);
-    return Status::OK();
+    return true;
 }
 
 void RateLimiter::returnTokens(double numTokensToReturn) {

@@ -41,6 +41,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/admission/rate_limiter.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -49,6 +50,7 @@
 #include "mongo/db/client_strand.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/error_labels_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -62,6 +64,8 @@
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_compressed.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/op_msg_test.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/message_compressor_base.h"
@@ -73,6 +77,7 @@
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/session_manager_common_mock.h"
 #include "mongo/transport/session_workflow.h"
+#include "mongo/transport/session_workflow_p.h"
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
@@ -115,6 +120,19 @@ const Status kClosedSessionError{ErrorCodes::SocketException, "Session is closed
 const Status kNetworkError{ErrorCodes::HostUnreachable, "Someone is unreachable"};
 const Status kShutdownError{ErrorCodes::ShutdownInProgress, "Something is shutting down"};
 const Status kArbitraryError{ErrorCodes::InternalError, "Something happened"};
+
+// Returns true iff `body` carries all of `expectedLabels` in its errorLabels array.
+bool hasErrorLabels(const BSONObj& body, std::initializer_list<StringData> expectedLabels) {
+    if (!body.hasField(kErrorLabelsFieldName)) {
+        return false;
+    }
+    auto labels = body[kErrorLabelsFieldName].Array();
+    return std::all_of(expectedLabels.begin(), expectedLabels.end(), [&](StringData expected) {
+        return std::any_of(labels.begin(), labels.end(), [&](const BSONElement& e) {
+            return e.String() == expected;
+        });
+    });
+}
 
 template <typename F>
 struct FunctionTraits;
@@ -843,18 +861,6 @@ public:
         return uassertStatusOK(compressorManager.compressMessage(message, &cid));
     }
 
-    static bool hasErrorLabels(const BSONObj& body,
-                               std::initializer_list<StringData> expectedLabels) {
-        if (!body.hasField(kErrorLabelsFieldName))
-            return false;
-        auto labels = body[kErrorLabelsFieldName].Array();
-        return std::all_of(expectedLabels.begin(), expectedLabels.end(), [&](StringData expected) {
-            return std::any_of(labels.begin(), labels.end(), [&](const BSONElement& e) {
-                return e.String() == expected;
-            });
-        });
-    }
-
 private:
     double _convertBurstSizeToBurstCapacitySecs(double refreshRate, double burstSize) {
         // Rounding needed to ensure that the conversion back to burstSize won't be incorrect due
@@ -1057,6 +1063,190 @@ TEST_F(IngressRequestRateLimiterTest, QueueDepthExceededRejectionHasExpectedErro
     ASSERT_EQ(stats.successfulAdmissions, 1);
     ASSERT_EQ(stats.rejectedAdmissions, 1);
     ASSERT_EQ(stats.addedToQueue, 1);
+}
+
+class RateLimitRejectionResponseTest : public unittest::Test {
+protected:
+    /** Build a real OP_MSG input with a non-trivial body and the given requestId. */
+    static Message makeOpMsgInput(int32_t requestId) {
+        constexpr uint32_t kNoFlags = 0;
+        auto m = rpc::test::OpMsgBytes{kNoFlags,
+                                       rpc::test::kBodySection,
+                                       fromjson("{insert: 'c', '$db': 'd', documents: [{x: 1}]}")}
+                     .done();
+        m.header().setId(requestId);
+        return m;
+    }
+
+    /** Canonical rejection Status used by the ingress rate limiter. */
+    static Status ingressRateLimitStatus() {
+        return admission::IngressRequestRateLimiter::rejectionStatus();
+    }
+
+    /**
+     * Mask the per-call wire-header id fields so two rate-limit responses can be byte-compared
+     * on body content alone.
+     */
+    static void zeroHeaderIds(Message& m) {
+        DataView v(m.buf());
+        v.write<LittleEndian<int32_t>>(int32_t{0}, offsetof(MSGHEADER::Layout, requestID));
+        v.write<LittleEndian<int32_t>>(int32_t{0}, offsetof(MSGHEADER::Layout, responseTo));
+    }
+};
+
+TEST_F(RateLimitRejectionResponseTest, CachedFastPathMatchesSlowPath) {
+    constexpr int32_t kInputRequestId = 0xDECAFBAD;
+    auto inputMsg = makeOpMsgInput(kInputRequestId);
+    const auto rejectionStatus = ingressRateLimitStatus();
+
+    Message slow = makeRateLimitErrorMessage(
+        rpc::protocolForMessage(inputMsg), rejectionStatus, /*retryAfterMs=*/0);
+    Message fast = makeDbResponseErrorForRateLimiting(inputMsg, rejectionStatus).response;
+
+    // Sanity check that the fast path actually stamped the requestId into responseTo.
+    ASSERT_EQ(MSGHEADER::ConstView(fast.buf()).getResponseToMsgId(), kInputRequestId);
+
+    // Both paths must produce the same wire size for an equivalence check to be meaningful.
+    ASSERT_EQ(slow.size(), fast.size())
+        << "rate-limit rejection response size diverged: slow=" << slow.size()
+        << " fast=" << fast.size();
+
+    zeroHeaderIds(slow);
+    zeroHeaderIds(fast);
+
+    ASSERT_EQ(0, std::memcmp(slow.buf(), fast.buf(), slow.size()))
+        << "rate-limit rejection response bytes diverged between fast (cached template) and slow "
+           "(makeRateLimitErrorMessage) paths. If you intentionally added a per-request field to "
+           "makeRateLimitErrorMessage, you must rebuild rejectionResponseTemplate to match";
+
+    // Also sanity-check the response payload looks like a valid rejection (no protocol drift).
+    const auto slowBody = OpMsg::parse(slow).body;
+    ASSERT_EQ(getStatusFromCommandResult(slowBody).code(),
+              ErrorCodes::IngressRequestRateLimitExceeded);
+    ASSERT_TRUE(hasErrorLabels(slowBody,
+                               {ErrorLabel::kSystemOverloadedError,
+                                ErrorLabel::kRetryableError,
+                                ErrorLabel::kNoWritesPerformed}));
+
+    // With the default (disabled) overloadRetryAfterMS, neither path emits retryAfterMS.
+    ASSERT_EQ(gOverloadRetryAfterMS.load(), 0);
+    ASSERT_FALSE(slowBody.hasField(kRetryAfterMSFieldName));
+}
+
+/**
+ * When the overloadRetryAfterMS server parameter is positive, the fast path must stamp the live
+ * value into the cached `retryAfterMS` slot and stay byte-equivalent to the slow path.
+ */
+TEST_F(RateLimitRejectionResponseTest, RetryAfterMsStampedIntoFastPathWhenEnabled) {
+    constexpr long long kRetryAfterMs = 1500;
+    RAIIServerParameterControllerForTest retryGuard{"overloadRetryAfterMS", kRetryAfterMs};
+
+    constexpr int32_t kInputRequestId = 0x0BADCAFE;
+    auto inputMsg = makeOpMsgInput(kInputRequestId);
+    const auto rejectionStatus = ingressRateLimitStatus();
+
+    Message slow = makeRateLimitErrorMessage(
+        rpc::protocolForMessage(inputMsg), rejectionStatus, kRetryAfterMs);
+    Message fast = makeDbResponseErrorForRateLimiting(inputMsg, rejectionStatus).response;
+
+    // Fast path stamped both the per-call responseTo and the live retryAfterMS value.
+    ASSERT_EQ(MSGHEADER::ConstView(fast.buf()).getResponseToMsgId(), kInputRequestId);
+    const auto fastBody = OpMsg::parse(fast).body;
+    ASSERT_TRUE(fastBody.hasField(kRetryAfterMSFieldName));
+    ASSERT_EQ(fastBody[kRetryAfterMSFieldName].Long(), kRetryAfterMs);
+
+    // Fast and slow paths must agree byte-for-byte (modulo per-call header ids).
+    ASSERT_EQ(slow.size(), fast.size())
+        << "retryAfterMS response size diverged: slow=" << slow.size() << " fast=" << fast.size();
+    zeroHeaderIds(slow);
+    zeroHeaderIds(fast);
+    ASSERT_EQ(0, std::memcmp(slow.buf(), fast.buf(), slow.size()))
+        << "retryAfterMS fast-path (cached + stamped) bytes diverged from the slow path";
+}
+
+/**
+ * Two rejections at different live retryAfterMS values must each reflect the value in effect at
+ * the time of the call. The cached template only reserves space, it does not freeze the value.
+ */
+TEST_F(RateLimitRejectionResponseTest, RetryAfterMsReflectsLiveParameterValue) {
+    auto inputMsg = makeOpMsgInput(/*requestId=*/42);
+    const auto rejectionStatus = ingressRateLimitStatus();
+
+    {
+        RAIIServerParameterControllerForTest guard{"overloadRetryAfterMS", 100};
+        Message response = makeDbResponseErrorForRateLimiting(inputMsg, rejectionStatus).response;
+        const auto body = OpMsg::parse(response).body;
+        ASSERT_EQ(body[kRetryAfterMSFieldName].Long(), 100);
+    }
+    {
+        RAIIServerParameterControllerForTest guard{"overloadRetryAfterMS", 9999};
+        Message response = makeDbResponseErrorForRateLimiting(inputMsg, rejectionStatus).response;
+        const auto body = OpMsg::parse(response).body;
+        ASSERT_EQ(body[kRetryAfterMSFieldName].Long(), 9999);
+    }
+}
+
+// Each fast-path call allocates a fresh buffer, so two consecutive rejections must not share state.
+TEST_F(RateLimitRejectionResponseTest, IndependentBuffersForConsecutiveRejections) {
+    const auto rejectionStatus = ingressRateLimitStatus();
+
+    auto inputA = makeOpMsgInput(1001);
+    auto inputB = makeOpMsgInput(2002);
+
+    Message respA = makeDbResponseErrorForRateLimiting(inputA, rejectionStatus).response;
+    Message respB = makeDbResponseErrorForRateLimiting(inputB, rejectionStatus).response;
+
+    // Distinct buffers: mutating one must not affect the other.
+    ASSERT_NE(respA.buf(), respB.buf())
+        << "fast path returned aliased buffers for two consecutive rejections; rejection "
+           "responses must own their own SharedBuffer so that in-place mutations by "
+           "_acceptResponse (setId / setResponseToMsgId / appendChecksum) cannot leak between "
+           "iterations";
+    ASSERT_EQ(MSGHEADER::ConstView(respA.buf()).getResponseToMsgId(), 1001);
+    ASSERT_EQ(MSGHEADER::ConstView(respB.buf()).getResponseToMsgId(), 2002);
+
+    // Mutating respA's flags (mimicking what _acceptResponse does on a checksumed connection)
+    // must not be visible on respB.
+    OpMsg::setFlag(&respA, OpMsg::kChecksumPresent);
+    ASSERT_TRUE(OpMsg::isFlagSet(respA, OpMsg::kChecksumPresent));
+    ASSERT_FALSE(OpMsg::isFlagSet(respB, OpMsg::kChecksumPresent))
+        << "setFlag on respA leaked into respB, the two responses are aliasing memory";
+}
+
+// Test that the reserved slack is used (no realloc) and that the resulting checksum is valid.
+TEST_F(RateLimitRejectionResponseTest, AppendChecksumUsesReservedSlackAndIsValid) {
+    auto inputMsg = makeOpMsgInput(/*requestId=*/7);
+    const auto rejectionStatus = ingressRateLimitStatus();
+    Message resp = makeDbResponseErrorForRateLimiting(inputMsg, rejectionStatus).response;
+
+    const auto capacityBefore = resp.capacity();
+    const char* const bufBefore = resp.buf();
+
+    OpMsg::appendChecksum(&resp);
+
+    ASSERT_TRUE(OpMsg::isFlagSet(resp, OpMsg::kChecksumPresent));
+    ASSERT_EQ(resp.capacity(), capacityBefore)
+        << "appendChecksum reallocated the rejection response";
+    ASSERT_EQ(resp.buf(), bufBefore) << "rejection response buffer moved during appendChecksum";
+
+    // OpMsg::parse recomputes and validates the trailing checksum, so a successful parse proves the
+    // checksum written by appendChecksum is correct for the rejection response bytes.
+    OpMsg::parse(resp);
+}
+
+TEST_F(RateLimitRejectionResponseTest, SlowPathOmitsLabelsForOtherStatuses) {
+    auto inputMsg = makeOpMsgInput(/*requestId=*/0);
+
+    // RateLimitExceeded is the generic flow-control rate-limit code; sharing the same
+    // not-OK input as IngressRequestRateLimitExceeded but not eligible for the fast path.
+    const Status genericRateLimit{ErrorCodes::RateLimitExceeded, "generic rate limit exceeded"};
+    Message resp = makeDbResponseErrorForRateLimiting(inputMsg, genericRateLimit).response;
+
+    const auto body = OpMsg::parse(resp).body;
+    ASSERT_EQ(getStatusFromCommandResult(body).code(), ErrorCodes::RateLimitExceeded);
+    ASSERT_FALSE(body.hasField(kErrorLabelsFieldName))
+        << "non-IngressRequestRateLimitExceeded statuses should not carry the SystemOverloaded / "
+           "Retryable / NoWritesPerformed error labels";
 }
 
 class StepRunnerSessionWorkflowTest : public SessionWorkflowTest {

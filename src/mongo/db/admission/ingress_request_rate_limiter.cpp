@@ -50,6 +50,10 @@ namespace admission {
 
 namespace {
 
+const Status kIngressRequestRateLimitExceededError{
+    ErrorCodes::IngressRequestRateLimitExceeded,
+    "Request rejected: ingress request rate limit exceeded"};
+
 MONGO_FAIL_POINT_DEFINE(ingressRequestRateLimiterFractionalRateOverride);
 
 VersionedValue<CIDRList> ingressRequestRateLimiterIPExemptions;
@@ -192,6 +196,10 @@ IngressRequestRateLimiter& IngressRequestRateLimiter::get(ServiceContext* servic
     return *getIngressRequestRateLimiter(service);
 }
 
+const Status& IngressRequestRateLimiter::rejectionStatus() {
+    return kIngressRequestRateLimitExceededError;
+}
+
 Status IngressRequestRateLimiter::admitRequest(Client* client) {
     if (ClientAdmissionControlState::isExempted(client)) {
         _rateLimiter.recordExemption();
@@ -215,8 +223,7 @@ Status IngressRequestRateLimiter::admitRequest(Client* client) {
     }
 
     if (tokenResult.getStatus() == RateLimiter::kRejectedErrorCode) {
-        return Status{ErrorCodes::IngressRequestRateLimitExceeded,
-                      "Request rejected: ingress request rate limit exceeded"};
+        return kIngressRequestRateLimitExceededError;
     }
     return tokenResult.getStatus();
 }

@@ -152,4 +152,10 @@ bool isStreamProcessorUserError(ErrorCodes::Error code);
  */
 bool isSystemOverloadedError(ErrorCodes::Error code);
 
+/**
+ * Returns the configured `overloadRetryAfterMS` server parameter value in milliseconds, or 0 when
+ * disabled.
+ */
+long long getOverloadRetryAfterMS();
+
 }  // namespace mongo
