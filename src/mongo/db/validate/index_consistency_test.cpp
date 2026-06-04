@@ -30,6 +30,7 @@
 #include "mongo/db/validate/index_consistency.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/validate/collection_validation.h"
@@ -391,6 +392,102 @@ TEST_F(IndexConsistencyTest, FailedKeygen) {
     ASSERT_EQ(errors.begin(), it)
         << "Expected to find error 16766 relating to hashed indexes unsupported on array types";
     LOGV2(11475700, "Error associated with validation run", "validationError"_attr = *it);
+}
+
+TEST_F(IndexConsistencyTest, GeoKeygenFailureReportsStructuredError) {
+    // A real out-of-bounds GeoJSON point makes 2dsphere key generation throw
+    // GeoKeyExtractionFailureInfo. Validate reports a structured error naming the index, path, and
+    // code (not the per-document reason or _id, which stay in the log), and keeps validating.
+    auto opCtx = operationContext();
+    ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions()));
+
+    static constexpr auto geoIndexName{"loc_2dsphere"_sd};
+
+    AutoGetCollection coll(opCtx, kNss, MODE_X);
+    CollectionWriter writer(opCtx, coll);
+    const auto indexSpec =
+        BSON("v" << IndexDescriptor::IndexVersion::kV2 << "name" << geoIndexName << "key"
+                 << BSON("loc" << "2dsphere") << "2dsphereIndexVersion" << 3);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        auto collWriter = writer.getWritableCollection(opCtx);
+        ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx, collWriter, indexSpec));
+        ASSERT_OK(Helpers::insert(
+            opCtx, writer.get(), fromjson("{_id: 1, loc: {type: 'Point', coordinates: [0, 0]}}")));
+        wuow.commit();
+    }
+
+    CollectionValidation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
+
+    // Longitude 200 is out of bounds. We assert that neither the _id ('secret-id') nor the
+    // per-document reason ('out of bounds') reaches res.errors; both stay in the log.
+    const auto badGeoDoc =
+        fromjson("{_id: 'secret-id', loc: {type: 'Point', coordinates: [200, 0]}}");
+    const auto geoIndex = coll->getIndexCatalog()->findIndexByName(opCtx, geoIndexName);
+
+    ValidateResults results;
+    KeyStringIndexConsistency ksic(opCtx, &state);
+    ksic.traverseRecord(opCtx, *coll, geoIndex, RecordId(1), badGeoDoc, &results);
+
+    using testing::HasSubstr;
+    using testing::Not;
+
+    const auto& errors = results.getErrors();
+    ASSERT_EQ(errors.size(), 1);
+    const auto& error = *errors.begin();
+    EXPECT_THAT(error, HasSubstr("at path loc"));
+    EXPECT_THAT(error, HasSubstr("BadValue"));
+    EXPECT_THAT(error, Not(HasSubstr("out of bounds")));
+    EXPECT_THAT(error, Not(HasSubstr("secret-id")));
+    EXPECT_THAT(error, HasSubstr("12565600"));
+    EXPECT_TRUE(results.continueValidation());
+}
+
+TEST_F(IndexConsistencyTest, GeoKeygenFailuresCollapseAcrossDocuments) {
+    // res.errors keys on (index, path, code) with no per-document content, so documents failing on
+    // the same index and path collapse to a single error regardless of their values. This keeps
+    // res.errors bounded by the schema rather than by the number of bad documents.
+    auto opCtx = operationContext();
+    ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions()));
+
+    static constexpr auto geoIndexName{"loc_2dsphere"_sd};
+
+    AutoGetCollection coll(opCtx, kNss, MODE_X);
+    CollectionWriter writer(opCtx, coll);
+    const auto indexSpec =
+        BSON("v" << IndexDescriptor::IndexVersion::kV2 << "name" << geoIndexName << "key"
+                 << BSON("loc" << "2dsphere") << "2dsphereIndexVersion" << 3);
+    {
+        WriteUnitOfWork wuow(opCtx);
+        auto collWriter = writer.getWritableCollection(opCtx);
+        ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx, collWriter, indexSpec));
+        ASSERT_OK(Helpers::insert(
+            opCtx, writer.get(), fromjson("{_id: 1, loc: {type: 'Point', coordinates: [0, 0]}}")));
+        wuow.commit();
+    }
+
+    CollectionValidation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
+    const auto geoIndex = coll->getIndexCatalog()->findIndexByName(opCtx, geoIndexName);
+
+    ValidateResults results;
+    KeyStringIndexConsistency ksic(opCtx, &state);
+
+    // Four documents at distinct out-of-bounds longitudes, all on the same index and path.
+    const int badLongitudes[] = {200, 201, 202, 203};
+    int64_t recordId = 1;
+    for (int lng : badLongitudes) {
+        const auto doc =
+            BSON("loc" << BSON("type" << "Point" << "coordinates" << BSON_ARRAY(lng << 0)));
+        ksic.traverseRecord(opCtx, *coll, geoIndex, RecordId(recordId++), doc, &results);
+    }
+
+    using testing::HasSubstr;
+
+    const auto& errors = results.getErrors();
+    ASSERT_EQ(errors.size(), 1);
+    EXPECT_THAT(*errors.begin(), HasSubstr("at path loc"));
 }
 
 }  // namespace mongo

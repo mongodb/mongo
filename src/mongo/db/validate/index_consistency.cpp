@@ -48,6 +48,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/client.h"
+#include "mongo/db/index/geo_key_extraction_failure_info.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index_names.h"
@@ -842,6 +843,36 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
     return numKeys;
 }
 
+namespace {
+template <typename ExtraInfoT>
+void emitStructuredKeyExtractionError(ValidateResults* results,
+                                      const IndexDescriptor* descriptor,
+                                      const RecordId& recordId,
+                                      const BSONObj& recordBson,
+                                      const AssertionException& ex,
+                                      const ExtraInfoT& info) {
+    // List the short identifying fields before the bulky ones so the log line is easy to scan.
+    LOGV2(12565600,
+          "Could not build index key",
+          "indexName"_attr = descriptor->indexName(),
+          "recordId"_attr = recordId,
+          "failingPath"_attr = info.failingPath(),
+          "failingElement"_attr = redact(info.failingElement()),
+          "error"_attr = ex.toString(),
+          "record"_attr = redact(recordBson));
+    // Omit per-document content (the reason and _id) so failures on the same index and path
+    // collapse to one entry, keeping res.errors bounded by the schema rather than the number of
+    // bad documents.
+    results->addError(
+        fmt::format("Could not build key for index {} at path {}: {}; see log 12565600 "
+                    "for the failing document",
+                    descriptor->indexName(),
+                    info.failingPath(),
+                    ErrorCodes::errorString(info.underlyingStatus().code())),
+        /*stopValidation=*/false);
+}
+}  // namespace
+
 void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                                                const CollectionPtr& coll,
                                                const IndexCatalogEntry* index,
@@ -870,6 +901,22 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                      multikeyMetadataKeys.get(),
                      documentMultikeyPaths.get(),
                      recordId);
+    } catch (const ExceptionFor<ErrorCodes::GeoKeyExtractionFailed>& ex) {
+        emitStructuredKeyExtractionError(results,
+                                         descriptor,
+                                         recordId,
+                                         recordBson,
+                                         ex,
+                                         *ex.extraInfo<GeoKeyExtractionFailureInfo>());
+        return;
+    } catch (const ExceptionFor<ErrorCodes::GeoKeyExtractionFailedTimeseries>& ex) {
+        emitStructuredKeyExtractionError(results,
+                                         descriptor,
+                                         recordId,
+                                         recordBson,
+                                         ex,
+                                         *ex.extraInfo<GeoKeyExtractionFailureTimeseriesInfo>());
+        return;
     } catch (const AssertionException& ex) {
         LOGV2(8411400,
               "Could not build index key ",
