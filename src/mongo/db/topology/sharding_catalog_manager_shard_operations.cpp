@@ -68,6 +68,7 @@
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_join_migrations_request_gen.h"
+#include "mongo/db/global_catalog/index_on_config.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
@@ -277,6 +278,50 @@ StatusWith<std::vector<DatabaseName>> ShardingCatalogManager::_getDBNamesListFro
         return ex.toStatus();
     }
 }
+
+Status ShardingCatalogManager::createIndexForConfigShards(OperationContext* opCtx,
+                                                          bool checkPreconditions) {
+    const auto performCreation = [&]() {
+        if (!checkPreconditions) {
+            return true;
+        }
+
+        // TODO SERVER-128162 use the proper feature flag to perform the check.
+        const auto featureFlagEnabled =
+            feature_flags::gFeatureFlagUniqueShardIdentifiers
+                .isEnabledUseLatestFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        if (!featureFlagEnabled) {
+            return false;
+        }
+
+        // A regular index can only be created once the FCV upgrade has generated a UUID value for
+        // each existing document in the collection. This can be indirectly verified by inspecting
+        // the content of the config server's shard identity, which only receives a UUID value on a
+        // later stage.
+        PersistentTaskStore<ShardType> store(NamespaceString::kServerConfigurationNamespace);
+        return store.count(opCtx,
+                           BSON("_id" << ShardIdentityType::IdName
+                                      << ShardIdentityType::kUuidFieldName
+                                      << BSON("$exists" << true))) > 0;
+    }();
+
+    if (performCreation) {
+        const bool unique = true;
+        const auto result =
+            createIndexOnConfigCollection(opCtx,
+                                          NamespaceString::kConfigsvrShardsNamespace,
+                                          BSON(ShardType::uuid() << 1),
+                                          unique);
+        if (!result.isOK()) {
+            return result.withContext("couldn't create uuid_1 index on config.shards");
+        }
+    }
+
+    return Status::OK();
+}
+
 
 void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext* opCtx,
                                                                 bool deferShardingInitialization) {

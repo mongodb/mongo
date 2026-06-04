@@ -521,6 +521,12 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
         return result.withContext("couldn't create required indexes on config.placementHistory");
     }
 
+    result = createIndexForConfigShards(opCtx);
+
+    if (!result.isOK()) {
+        return result.withContext("couldn't create required indexes on config.shards");
+    }
+
     return Status::OK();
 }
 

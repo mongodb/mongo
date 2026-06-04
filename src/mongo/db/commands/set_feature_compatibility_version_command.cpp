@@ -263,6 +263,10 @@ void generateShardUUIDs(OperationContext* opCtx) {
                   "Successfully generated 'uuid' field for config server's shardIdentity document");
         }
     }
+
+    uassertStatusOK(ShardingCatalogManager::get(opCtx)->createIndexForConfigShards(
+        opCtx, /*checkPreconditions=*/false));
+
     Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
     const auto opTimeWithShards =
