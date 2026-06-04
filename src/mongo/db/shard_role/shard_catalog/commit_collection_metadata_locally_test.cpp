@@ -36,6 +36,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -365,6 +366,102 @@ TEST_F(CommitCollectionMetadataLocallyTest, RefineShardKeyChunklessPersistsColle
 
     auto collDocs = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
     ASSERT_BSONOBJ_EQ(collDocs[0].getObjectField("key"), newKeyPattern);
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest,
+       CommitChunklessUpdatesCatalogButPreservesExistingChunklessCSR) {
+    auto [collType1, _] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(collType1, {});
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, true);
+
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadata);
+        ASSERT_TRUE(metadata->hasRoutingTable());
+        ASSERT_FALSE(metadata->getShardPlacementVersion().isSet());
+    }
+
+    const OID epoch2 = OID::gen();
+    const Timestamp ts2 = collType1.getTimestamp() + 1;
+    const BSONObj newKeyPattern = BSON("_id" << 1 << "extra" << 1);
+    CollectionType collType2{
+        kTestNss, epoch2, ts2, Date_t::now(), collType1.getUuid(), newKeyPattern};
+    mockCatalogClient()->setCollectionMetadata(collType2, {});
+
+    shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto collDocs = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    ASSERT_EQ(collDocs.size(), 1u);
+    ASSERT_BSONOBJ_EQ(collDocs[0].getObjectField("key"), newKeyPattern);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->hasRoutingTable());
+    ASSERT_FALSE(metadata->getShardPlacementVersion().isSet());
+    ASSERT_BSONOBJ_EQ(metadata->getChunkManager()->getShardKeyPattern().getKeyPattern().toBSON(),
+                      kShardKeyPattern);
+    ASSERT_EQ(metadata->getChunkManager()->getVersion().epoch(), collType1.getEpoch());
+    ASSERT_EQ(metadata->getChunkManager()->getVersion().getTimestamp(), collType1.getTimestamp());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, CommitChunklessClearsUntrackedCSR) {
+    auto [collType, _] = makeCollectionMetadata(0);
+    mockCatalogClient()->setCollectionMetadata(collType, {});
+
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireExclusive(operationContext(), kTestNss);
+        scopedCsr->setFilteringMetadata_nonAuthoritative(operationContext(),
+                                                         CollectionMetadata::UNTRACKED());
+    }
+
+    shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto collDocs = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    ASSERT_EQ(collDocs.size(), 1u);
+    ASSERT_EQ(UUID::fromCDR(collDocs[0].getField("uuid").uuid()), collType.getUuid());
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    ASSERT_FALSE(scopedCsr->getCurrentMetadataIfKnown());
+}
+
+TEST_F(CommitCollectionMetadataLocallyTest, CommitChunklessPreservesCSRWithOwnedChunks) {
+    auto [collType1, chunks] = makeCollectionMetadata(2);
+    for (auto& chunk : chunks) {
+        chunk.setShard(ShardingState::get(operationContext())->shardId());
+    }
+    mockCatalogClient()->setCollectionMetadata(collType1, chunks);
+    shard_catalog_commit::commitCollectionMetadataLocally(operationContext(), kTestNss, false);
+
+    {
+        auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+        auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+        ASSERT_TRUE(metadata);
+        ASSERT_TRUE(metadata->getShardPlacementVersion().isSet());
+    }
+
+    const OID epoch2 = OID::gen();
+    const Timestamp ts2 = collType1.getTimestamp() + 1;
+    const BSONObj newKeyPattern = BSON("_id" << 1 << "extra" << 1);
+    CollectionType collType2{
+        kTestNss, epoch2, ts2, Date_t::now(), collType1.getUuid(), newKeyPattern};
+    mockCatalogClient()->setCollectionMetadata(collType2, {});
+
+    shard_catalog_commit::commitChunklessCollectionMetadataLocally(operationContext(), kTestNss);
+
+    auto collDocs = findLocalDocs(NamespaceString::kConfigShardCatalogCollectionsNamespace);
+    ASSERT_EQ(collDocs.size(), 1u);
+    ASSERT_BSONOBJ_EQ(collDocs[0].getObjectField("key"), newKeyPattern);
+
+    auto scopedCsr = CollectionShardingRuntime::acquireShared(operationContext(), kTestNss);
+    auto metadata = scopedCsr->getCurrentMetadataIfKnown();
+    ASSERT_TRUE(metadata);
+    ASSERT_TRUE(metadata->getShardPlacementVersion().isSet());
+    ASSERT_BSONOBJ_EQ(metadata->getChunkManager()->getShardKeyPattern().getKeyPattern().toBSON(),
+                      kShardKeyPattern);
+    ASSERT_EQ(metadata->getChunkManager()->getVersion().epoch(), collType1.getEpoch());
+    ASSERT_EQ(metadata->getChunkManager()->getVersion().getTimestamp(), collType1.getTimestamp());
 }
 
 TEST_F(CommitCollectionMetadataLocallyTest, RefineShardKeyRemovesStaleChunks) {

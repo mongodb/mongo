@@ -507,18 +507,24 @@ void commitCollectionMetadataLocally(OperationContext* opCtx,
 void commitChunklessCollectionMetadataLocally(OperationContext* opCtx, const NamespaceString& nss) {
     auto coll = fetchCollection(opCtx, nss);
 
+    // Upsert the collection entry into the shard catalog. A concurrent migration may issue the same
+    // upsert, but because it writes an identical document the two operations do not conflict.
     upsertCollectionEntryLocally(opCtx, nss, coll);
 
-    // Evict any stale UNTRACKED filtering metadata, the collection is now TRACKED, but a racing
-    // operation may have left stale state.
-    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
-
-    // Non-authoritative until all DDL operations are made shard-authoritative.
-    scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+    // Replicate an invalidation so that secondaries drop their cached filtering metadata for this
+    // collection, regardless of what they currently hold in memory.
     invalidateCollectionMetadataOnSecondaries(
         opCtx, nss, coll.getUuid(), false /* forDroppedCollection */, false /* authoritative */);
-}
 
+    // On the primary, only evict a stale leftover, for example an UNTRACKED entry left behind from
+    // before the collection became tracked. If the shard already holds tracked filtering metadata
+    // (e.g. because it is concurrently receiving a chunk migration for this collection), clearing
+    // it would abort that migration, so leave it untouched.
+    auto scopedCsr = CollectionShardingRuntime::acquireExclusive(opCtx, nss);
+    const auto currentMetadata = scopedCsr->getCurrentMetadataIfKnown();
+    if (currentMetadata && !currentMetadata->hasRoutingTable())
+        scopedCsr->clearFilteringMetadata_nonAuthoritative(opCtx);
+}
 
 void commitSetAllowChunkOperationsLocally(OperationContext* opCtx,
                                           const NamespaceString& nss,

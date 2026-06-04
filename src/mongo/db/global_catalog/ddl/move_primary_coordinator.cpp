@@ -768,16 +768,6 @@ void MovePrimaryCoordinator::commitCollectionsMetadataToShards(
     const auto toShardId = _doc.getToShardId();
 
     for (auto& coll : trackedColls) {
-        std::set<ShardId> involvedShards;
-        const auto& cm =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
-                opCtx, coll.getNss()));
-        cm.getAllShardIds(&involvedShards);
-
-        if (involvedShards.contains(toShardId)) {
-            continue;
-        }
-
         const auto session = getNewSession(opCtx);
         sharding_ddl_util::commitCreateCollectionChunklessMetadataToShardCatalog(
             opCtx, coll.getNss(), {toShardId}, session, executor, token);
