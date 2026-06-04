@@ -10,8 +10,6 @@
  * multiple times.
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 let fcvConstants = getFCVConstants();
 
 let latestFCV = fcvConstants.latest;
@@ -58,26 +56,43 @@ function checkFCV(adminDB, version, targetVersion, isCleaningServerMetadata, pre
     // Determine the expected value of previousVersion, preferring an explicit argument.
     const expectedPreviousVersion = previousVersion ?? (isDowngrading ? latestFCV : undefined);
     const isMongod = !adminDB.getMongo().isMongos();
-    // TODO: SERVER-120670 Remove the guard for isSymmetricFCV
-    const isSymmetricFCV = FeatureFlagUtil.isPresentAndEnabled(adminDB, "SymmetricFCV");
-    if (isMongod && !isSymmetricFCV) {
-        let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-        assert.commandWorked(res);
-        assert.eq(
-            res.featureCompatibilityVersion.version,
-            version,
-            "FCV server parameter 'version' field does not match: " + tojson(res),
-        );
-        assert.eq(
-            res.featureCompatibilityVersion.targetVersion,
-            targetVersion,
-            "FCV server parameter 'targetVersion' field does not match: " + tojson(res),
-        );
-        assert.eq(
-            res.featureCompatibilityVersion.previousVersion,
-            isDowngrading ? expectedPreviousVersion : undefined,
-            "FCV server parameter 'previousVersion' field does not match: " + tojson(res),
-        );
+    if (isMongod) {
+        // TODO: SERVER-120670 Remove the guard for isSymmetricFCV
+        const flagRes = adminDB.runCommand({getParameter: 1, featureFlagSymmetricFCV: 1});
+        let isSymmetricFCV = false;
+        if (flagRes.ok === 1) {
+            assert(
+                flagRes.hasOwnProperty("featureFlagSymmetricFCV"),
+                "getParameter response missing featureFlagSymmetricFCV: " + tojson(flagRes),
+            );
+            isSymmetricFCV = Boolean(flagRes.featureFlagSymmetricFCV.currentlyEnabled);
+        } else {
+            // Older versions may not have the parameter; tolerate only that specific error.
+            assert.eq(
+                flagRes.errmsg,
+                "no option found to get",
+                "Unexpected failure running getParameter for featureFlagSymmetricFCV: " + tojson(flagRes),
+            );
+        }
+        if (!isSymmetricFCV) {
+            let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+            assert.commandWorked(res);
+            assert.eq(
+                res.featureCompatibilityVersion.version,
+                version,
+                "FCV server parameter 'version' field does not match: " + tojson(res),
+            );
+            assert.eq(
+                res.featureCompatibilityVersion.targetVersion,
+                targetVersion,
+                "FCV server parameter 'targetVersion' field does not match: " + tojson(res),
+            );
+            assert.eq(
+                res.featureCompatibilityVersion.previousVersion,
+                isDowngrading ? expectedPreviousVersion : undefined,
+                "FCV server parameter 'previousVersion' field does not match: " + tojson(res),
+            );
+        }
     }
 
     // This query specifies an explicit readConcern because some FCV tests pass a connection that
