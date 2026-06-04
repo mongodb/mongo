@@ -901,6 +901,8 @@ last-continuous:
     ticket: SERVER-114666
   - test_file: jstests/core/compound_wildcard_index_validation.js
     ticket: SERVER-97229
+  - test_file: jstests/replsets/rollback_index_build_start_abort.js
+    ticket: SERVER-103955
   - test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
     ticket: SERVER-115594
   - test_file: jstests/change_streams/filter_excludes_resume_point.js
@@ -1900,6 +1902,8 @@ last-lts:
     ticket: SERVER-114666
   - test_file: jstests/core/compound_wildcard_index_validation.js
     ticket: SERVER-97229
+  - test_file: jstests/replsets/rollback_index_build_start_abort.js
+    ticket: SERVER-103955
   - test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
     ticket: SERVER-115594
   - test_file: jstests/change_streams/filter_excludes_resume_point.js
