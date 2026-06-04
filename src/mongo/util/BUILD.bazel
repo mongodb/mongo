@@ -688,6 +688,9 @@ generate_config_header(
     }) | select({
         "//bazel/config:build_enterprise_enabled": {"build_enterprise_enabled": "1"},
         "//conditions:default": {},
+    }) | select({
+        "//bazel/config:build_atlas_enabled": {"build_atlas_enabled": "1"},
+        "//conditions:default": {},
     }),
     logfile = "version_constants_gen.log",
     output = "version_impl.cpp",
@@ -714,6 +717,9 @@ generate_config_header(
         "//conditions:default": {"MONGO_ALLOCATOR": "system"},
     }) | select({
         "//bazel/config:build_enterprise_enabled": {"build_enterprise_enabled": "1"},
+        "//conditions:default": {},
+    }) | select({
+        "//bazel/config:build_atlas_enabled": {"build_atlas_enabled": "1"},
         "//conditions:default": {},
     }),
     logfile = "rc_constants_gen.log",
