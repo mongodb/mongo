@@ -45,6 +45,22 @@ mongo_cc_unit_test(
     ],
 )
 
+# Regression test for DEVPROD-27556: verifies that test_wrapper.sh captures coredumps from
+# child processes, not just the parent. The test forks a child that sleeps past the timeout
+# while the parent blocks in waitpid — mimicking how test frameworks isolate each test in a
+# child process. Both parent and child should be cored when the process group is signaled.
+#
+# Usage:
+#   bazel test --config=remote_test //buildscripts/bazel_testbuilds:ci_wrapper_child_timeout_test --run_under=//bazel:test_wrapper
+mongo_cc_unit_test(
+    name = "ci_wrapper_child_timeout_test",
+    srcs = ["ci_wrapper_child_timeout_test.cpp"],
+    tags = [
+        "ci_wrapper_integration_test",
+        "manual",
+    ],
+)
+
 resmoke_suite_test(
     name = "jstest_timeout",
     srcs = [
