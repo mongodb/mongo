@@ -110,7 +110,5 @@ namespace MONGO_MOD_PUBLIC shard_catalog_commit_for_resharding {
 void commitCreateCollection(OperationContext* opCtx,
                             const NamespaceString& tempReshardingNss,
                             bool isDbPrimaryShard);
-
-void commitDropCollection(OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid);
-}  // namespace MONGO_MOD_PUBLIC shard_catalog_commit_for_resharding
+}
 }  // namespace mongo

@@ -627,10 +627,6 @@ void commitCreateCollection(OperationContext* opCtx,
     return shard_catalog_commit::commitCollectionMetadataLocally(
         opCtx, tempReshardingNss, isDbPrimaryShard);
 }
-
-void commitDropCollection(OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid) {
-    return shard_catalog_commit::commitDropCollectionLocally(opCtx, nss, uuid);
-}
 }  // namespace shard_catalog_commit_for_resharding
 
 }  // namespace mongo

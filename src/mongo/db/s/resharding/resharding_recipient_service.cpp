@@ -80,7 +80,6 @@
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
-#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/list_indexes.h"
 #include "mongo/db/shard_role/shard_role.h"
@@ -1576,13 +1575,6 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
 
         resharding::data_copy::ensureCollectionDropped(
             opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
-
-        if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                resharding::getVersionContextOrDefault(_forwardableOpMetadata),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            shard_catalog_commit_for_resharding::commitDropCollection(
-                opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
-        }
     }
 
     resharding::data_copy::deleteRecipientResumeData(opCtx.get(), _metadata.getReshardingUUID());

@@ -70,7 +70,6 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
-#include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/shard_role/transaction_resources.h"
@@ -978,13 +977,6 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
 
         resharding::data_copy::ensureCollectionDropped(
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
-
-        if (feature_flags::gAuthoritativeShardsDDL.isEnabled(
-                resharding::getVersionContextOrDefault(_forwardableOpMetadata),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            shard_catalog_commit_for_resharding::commitDropCollection(
-                opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
-        }
     }
 
     _transitionToDone(factory);
