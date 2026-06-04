@@ -2019,4 +2019,223 @@ TEST_F(QueryPlannerWildcardTest, CanPushProjectionBeneathSortWithExistsPredicate
         "{$_path: [['a','a',true,true]], a: [[1,1,true,true]]}}}}}}}}}");
 }
 
+TEST_F(QueryPlannerWildcardTest, CWITightBoundsWithExtraUnindexedField) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, 'b.x': 1, c: {$gte: 5}, d: 'foo'}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {filter: {d: 'foo'}, node: "
+        "{ixscan: {pattern: {a:1,'$_path':1,'b.x':1,c:1}, "
+        "bounds: {a: [[3,3,true,true]], '$_path': [['b.x','b.x',true,true]], "
+        "'b.x': [[1,1,true,true]], c: [[5,Infinity,true,true]]}}}}}");
+    // WildcardKeyGenerator::generateKeys generates MinKey for CWI $_path when the document has a
+    // non-wildcard field and no wildcard fields. This means documents without b.* are also in the
+    // index, and we can use bounds MinKey + all strings with the CWI like below.
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CWITightBoundsWithMultipleExtraUnindexedFields) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, 'b.x': 1, c: 5, d: 'foo', e: 2}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a:1,'$_path':1,'b.x':1,c:1}, "
+        "bounds: {a: [[3,3,true,true]], '$_path': [['b.x','b.x',true,true]], "
+        "'b.x': [[1,1,true,true]], c: [[5,5,true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+// $not matches absent-field documents (absent b.x -> null, which satisfies $not:{$gt:3}).
+// But the sparse non-generic entry omits keys for missing fields, so it cannot be used.
+TEST_F(QueryPlannerWildcardTest, CWINotPredicateDoesNotUseNonGenericEntry) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, 'b.x': {$not: {$gt: 3}}, c: 5}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+// Null equality matches absent-field documents; the sparse non-generic entry would miss them.
+TEST_F(QueryPlannerWildcardTest, CWINullEqualityDoesNotUseNonGenericEntry) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, 'b.x': null, c: 5}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+// $in:[null,...] matches absent-field documents; the sparse non-generic entry would miss them.
+TEST_F(QueryPlannerWildcardTest, CWIInNullDoesNotUseNonGenericEntry) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, 'b.x': {$in: [null, 1]}, c: 5}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+// $ne:null matches absent-field documents; the sparse non-generic entry would miss them.
+TEST_F(QueryPlannerWildcardTest, CWINeNullUsesGenericEntryWithResiduals) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, 'b.x': {$ne: null}, c: 5, d: 'foo'}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CWITightBoundsNoExtraField) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, 'b.x': 1, c: 5}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {pattern: {a:1,'$_path':1,'b.x':1,c:1}, "
+        "bounds: {a: [[3,3,true,true]], '$_path': [['b.x','b.x',true,true]], "
+        "'b.x': [[1,1,true,true]], c: [[5,5,true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CWIPrefixOnlyQueryUsesGenericEntry) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, c: 5}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CWIPrefixOnlyQueryWithResidualUsesGenericEntry) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, c: 5, d: 'foo'}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+// $exists:false on the wildcard field cannot use a non-generic entry because the wildcard index
+// only indexes fields that exist. Only the generic (all-paths) entry is usable, with FETCH
+// re-evaluating $exists:false and the non-wildcard predicates.
+TEST_F(QueryPlannerWildcardTest, CWIExistsFalseUsesOnlyGenericEntry) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, 'b.c': {$exists: false}, c: {$lt: 3}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+// $or whose branches predicate on different wildcard paths cannot use non-generic entries for
+// either branch: the index scan would need to cover both paths, which requires the all-paths
+// generic entry. The $exists:false branch further enforces this. The entire $or (and the suffix
+// predicate c:5) lands in the FETCH filter; only the prefix a:1 has tight index bounds.
+TEST_F(QueryPlannerWildcardTest, CWIOrWithExistsFalseAndEqualityBranches) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 1, $or: [{'b.x': 1}, {'b.y': {$exists: false}}], c: 5}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[1,1,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+// $or whose branches predicate on different wildcard paths forces the generic entry even when
+// both branches would individually qualify for non-generic entries ($exists:true produces
+// non-generic in isolation; an equality also produces non-generic in isolation). The combined $or
+// requires scanning multiple paths so the all-paths generic entry is the only option.
+TEST_F(QueryPlannerWildcardTest, CWIOrWithExistsTrueAndEqualityBranches) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 1, $or: [{'b.x': 1}, {'b.y': {$exists: true}}], c: 5}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[1,1,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+// $exists:true bounds overlap the object type bracket. translateWildcardIndexBoundsAndTightness
+// widens the wildcard field bounds to [MinKey, MaxKey] and sets INEXACT_FETCH.
+// finalizeWildcardIndexScanConfiguration then adds subpath $_path bounds (["b.c.","b.c/"))
+// so that documents where b.c is an object are found. The non-generic entry is used with tight
+// c bounds; FETCH re-evaluates $exists:true.
+TEST_F(QueryPlannerWildcardTest, CWIExistsTrueUsesNonGenericEntryWithSubpathBounds) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, 'b.c': {$exists: true}, c: {$lt: 3}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a:1,'$_path':1,'b.c':1,c:1}, "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['b.c','b.c',true,true],['b.c.','b.c/',true,false]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CWIExistsTrueWithUnindexedResidualUsesNonGenericEntry) {
+    addWildcardIndex(BSON("a" << 1 << "b.$**" << 1 << "c" << 1));
+    runQuery(fromjson("{a: 3, 'b.c': {$exists: true}, c: {$lt: 3}, d: 'foo'}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a:1,'$_path':1,'b.c':1,c:1}, "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['b.c','b.c',true,true],['b.c.','b.c/',true,false]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[3,3,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CWITwoWildcardFieldsInAndQuery) {
+    addWildcardIndex(BSON("a" << 1 << "b" << 1 << "c.$**" << 1));
+    runQuery(fromjson("{a:1, b:2, 'c.d':1, 'c.e':1}"));
+
+    assertNumSolutions(3U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a:1,b:1,'$_path':1,'c.d':1}, "
+        "bounds: {a: [[1,1,true,true]], b: [[2,2,true,true]], "
+        "'$_path': [['c.d','c.d',true,true]], 'c.d': [[1,1,true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a:1,b:1,'$_path':1,'c.e':1}, "
+        "bounds: {a: [[1,1,true,true]], b: [[2,2,true,true]], "
+        "'$_path': [['c.e','c.e',true,true]], 'c.e': [[1,1,true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {name: 'indexName', "
+        "bounds: {a: [[1,1,true,true]], b: [[2,2,true,true]], "
+        "'$_path': [['MinKey','MinKey',true,true],['',{},true,false]]}}}}}");
+}
+
 }  // namespace mongo

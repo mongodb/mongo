@@ -61,9 +61,11 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
                               std::vector<IndexEntry>* out);
 
 /**
- * Determines if any of the expanded index entries in the input 'ixscanNodes' can satisfy a query on
- * a wildcard field with a FETCH (for e.g., it may only be able to answer a query on the prefix if
- * the wildcard field is being queried with an incompatible $not predicate).
+ * Always returns false: both non-generic CWI entries (concrete wildcard path, tight bounds)
+ * and the generic entry ("$_path", prefix scan) can satisfy queries with a FETCH stage
+ * handling residual predicates. Asserts that any non-generic entry reaching this point was
+ * assigned a wildcard predicate, as guaranteed by
+ * stripInvalidAssignmentsToCompoundWildcardIndexes.
  */
 bool canOnlyAnswerWildcardPrefixQuery(
     const std::vector<std::unique_ptr<QuerySolutionNode>>& ixscanNodes);
