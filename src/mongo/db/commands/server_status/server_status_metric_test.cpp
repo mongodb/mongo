@@ -34,6 +34,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/logv2/log.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <fmt/format.h>
@@ -338,6 +340,37 @@ TEST_F(MetricTreeTest, MetricTreeSet) {
 TEST_F(MetricTreeTest, MetricBuilderSetTreeSet) {
     *MetricBuilder<Counter64>{"test.m1"}.setTreeSet(&trees());
     ASSERT_BSONOBJ_EQ(serialize(trees()[ClusterRole::None]), mJson("{test:{m1:0}}"));
+}
+
+// GoogleTest requires death tests to use a separate fixture class from regular TEST_F tests.
+class MetricTreeDeathTest : public MetricTreeTest {};
+
+DEATH_TEST_F(MetricTreeDeathTest, FreezePreventsFurtherAdds, "Cannot add metric") {
+    addCounter("before.freeze");
+    trees().freeze();
+    addCounter("after.freeze");
+}
+
+DEATH_TEST_F(MetricTreeDeathTest, FreezeAppliesToNoneRole, "Cannot add metric") {
+    trees().freeze();
+    addCounter("m", ClusterRole::None);
+}
+
+DEATH_TEST_F(MetricTreeDeathTest, FreezeAppliesToShardRole, "Cannot add metric") {
+    trees().freeze();
+    addCounter("m", ClusterRole::ShardServer);
+}
+
+DEATH_TEST_F(MetricTreeDeathTest, FreezeAppliesToRouterRole, "Cannot add metric") {
+    trees().freeze();
+    addCounter("m", ClusterRole::RouterServer);
+}
+
+DEATH_TEST_F(MetricTreeDeathTest, AddFromNonMainThreadFails, "non-main thread") {
+    // Add once on the main thread first to ensure isMainThread() has captured the main thread's
+    // id, then adding from another thread must crash regardless of test execution order.
+    addCounter("on.main.thread");
+    stdx::thread([this] { addCounter("from.worker.thread"); }).join();
 }
 
 }  // namespace

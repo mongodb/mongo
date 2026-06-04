@@ -61,6 +61,7 @@
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status/server_status.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/commands/test_commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -748,10 +749,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     BackupCursorHooks::initialize(serviceContext);
 
-    // Since extensions modify the global parserMap, which is not thread-safe, they must be loaded
-    // prior to starting the FTDC background thread (which reads from the parserMap) to avoid a data
-    // race.
+    // Since extensions modify the global parserMap and register metrics, both of which are not
+    // thread-safe, they must be loaded prior to starting the FTDC background thread to avoid data
+    // races. Freeze the metric tree immediately after so that any post-freeze MetricTree::add()
+    // call crashes the server.
     fassert(126502, extension::host::loadExtensions(serverGlobalParams.extensions));
+    globalMetricTreeSet().freeze();
 
     startMongoDFTDC(serviceContext);
 
@@ -2114,6 +2117,12 @@ int mongod_main(int argc, char* argv[]) {
     // initialize_server_global_state::forkServerOrDie) and before the creation of any other threads
     startSignalProcessingThread();
 
+    // Initialize OTel metrics after allowMultiThreading() because the exporter's
+    // PeriodicExportingMetricReader spawns a background thread, which is only permitted once
+    // multithreading has been enabled. This call wires up the exporter and the
+    // already-constructed OTel instruments; it does not modify the MetricTreeSet (OTel instruments
+    // register their server-status adapters at static-initialization time), so its ordering
+    // relative to the MetricTreeSet freeze does not matter.
     uassertStatusOK(otel::metrics::initialize());
 
     auto* service = [] {

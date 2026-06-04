@@ -2626,6 +2626,7 @@ mongo_cc_library(
         "//src/mongo/db/ttl:ttl_collection_cache",
         "//src/mongo/db/ttl:ttl_d",
         "//src/mongo/db/update:update_driver",
+        "//src/mongo/db/commands/server_status:server_status_metric",
         "//src/mongo/otel/metrics:metrics_initialization",
         "//src/mongo/otel/traces:tracing_initialization",
         "update_index_data",
@@ -3427,7 +3428,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/repl:repl_coordinator_test_fixture",
         "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/repl:replmocks",
-        "//src/mongo/transport:service_entry_point_test_fixture",
     ],
 )
 

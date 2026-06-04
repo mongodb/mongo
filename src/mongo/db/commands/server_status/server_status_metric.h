@@ -203,6 +203,10 @@ public:
      */
     void removeForTests(StringData path);
 
+    void freeze() {
+        _frozen = true;
+    }
+
 private:
     void _add(StringData path, std::unique_ptr<ServerStatusMetric> metric);
 
@@ -215,9 +219,10 @@ private:
     void _removeForTests(StringData path);
 
     ChildMap _children;
+    bool _frozen = false;
 };
 
-class MetricTreeSet {
+class MONGO_MOD_PUBLIC MetricTreeSet {
 public:
     /**
      * Returns the metric tree for the specified ClusterRole.
@@ -225,13 +230,19 @@ public:
      */
     MetricTree& operator[](ClusterRole role);
 
+    /**
+     * Freezes all metric trees, preventing any further metric additions.
+     * Any subsequent call to MetricTree::add() on a frozen tree will result in an error.
+     */
+    void freeze();
+
 private:
     MetricTree _none;
     MetricTree _shard;
     MetricTree _router;
 };
 
-MetricTreeSet& globalMetricTreeSet();
+MONGO_MOD_PUBLIC MetricTreeSet& globalMetricTreeSet();
 
 
 /**

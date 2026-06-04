@@ -491,6 +491,7 @@ mongo_cc_library(
         "//src/mongo/executor:async_rpc_error_info",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_server_status",
         "//src/mongo/otel",
+        "//src/mongo/db/commands/server_status:server_status_metric",
         "//src/mongo/otel/metrics:metrics_initialization",
         "//src/mongo/otel/traces:tracing",
         "//src/mongo/logv2/log_metric_initializer",

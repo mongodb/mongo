@@ -52,6 +52,7 @@
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/extension/host/load_extension.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
@@ -830,13 +831,19 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     ResourceYielderFactory::set(*serviceContext->getService(),
                                 std::make_unique<RouterResourceYielderFactory>());
 
-    // Since extensions modify the global parserMap, which is not thread-safe, they must be loaded
-    // prior to sharding initialization to avoid a data race. Once sharding is initialized, the
-    // CatalogCacheLoader will issue internal aggregations that can concurrently read from the
-    // parserMap.
+    // Initialize command hooks before freezing the metric tree, since
+    // SystemBucketsMetricsCommandHooks registers metrics in its constructor.
+    initializeCommandHooks(serviceContext);
+
+    // Since extensions modify the global parserMap and register metrics, both of which are not
+    // thread-safe, they must be loaded prior to sharding initialization to avoid data races. Once
+    // sharding is initialized, the CatalogCacheLoader will issue internal aggregations that can
+    // concurrently read from the parserMap. Freeze the metric tree immediately after so that any
+    // post-freeze MetricTree::add() call crashes the server.
     if (!extension::host::loadExtensions(serverGlobalParams.extensions)) {
         return ExitCode::badOptions;
     }
+    globalMetricTreeSet().freeze();
 
     try {
         uassertStatusOK(
@@ -872,8 +879,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                       "Error loading read and write concern defaults at startup",
                       "error"_attr = redact(ex));
     }
-
-    initializeCommandHooks(serviceContext);
 
     // Must happen before FTDC, because Periodic Metadata Collustion calls getClusterParameter
     ClusterServerParameterRefresher::start(serviceContext, opCtx);
@@ -1076,6 +1081,11 @@ ExitCode mongos_main(int argc, char* argv[]) {
 
     startSignalProcessingThread();
 
+    // Initialize OTel metrics here, once multithreading has been enabled, because the exporter's
+    // PeriodicExportingMetricReader spawns a background thread. This call wires up the exporter and
+    // the already-constructed OTel instruments; it does not modify the MetricTreeSet (OTel
+    // instruments register their server-status adapters at static-initialization time), so its
+    // ordering relative to the MetricTreeSet freeze does not matter.
     uassertStatusOK(otel::metrics::initialize());
 
     try {

@@ -43,6 +43,7 @@
 #include <deque>
 #include <memory>
 #include <new>
+#include <thread>
 #include <vector>
 
 #include <absl/container/node_hash_set.h>
@@ -288,9 +289,26 @@ private:
     std::deque<Frame> _stack;
 };
 
+/**
+ * Returns true iff called on the process's main thread.
+ *
+ * The main thread's id is captured on the first call. For metric registration that first call
+ * always happens during single-threaded startup -- static MetricBuilder construction and
+ * MONGO_INITIALIZERs run on the main thread before any other thread is created -- so the captured
+ * id is the main thread's. This is correct on every platform, unlike a getpid()==gettid()
+ * comparison (on macOS and Windows the main thread's OS thread id never equals the process id).
+ */
+bool isMainThread() {
+    static const std::thread::id mainThreadId = std::this_thread::get_id();
+    return std::this_thread::get_id() == mainThreadId;
+}
+
 }  // namespace
 
 void MetricTree::add(StringData path, std::unique_ptr<ServerStatusMetric> metric) {
+    invariant(!_frozen,
+              fmt::format("Cannot add metric '{}' after the MetricTreeSet has been frozen", path));
+    invariant(isMainThread(), fmt::format("Cannot add metric '{}' from a non-main thread", path));
     // Never add metrics with empty names.
     // If there's a leading ".", strip it.
     // Otherwise, we're really adding with an implied "metrics." prefix.
@@ -346,6 +364,7 @@ void MetricTree::removeForTests(StringData path) {
     } else {
         _removeForTests(fmt::format("metrics.{}", path));
     }
+    _frozen = false;
 }
 
 void MetricTree::_removeForTests(StringData path) {
@@ -408,6 +427,12 @@ MetricTree& MetricTreeSet::operator[](ClusterRole role) {
     if (role.hasExclusively(ClusterRole::RouterServer))
         return _router;
     MONGO_UNREACHABLE;
+}
+
+void MetricTreeSet::freeze() {
+    _none.freeze();
+    _shard.freeze();
+    _router.freeze();
 }
 
 MetricTreeSet& globalMetricTreeSet() {

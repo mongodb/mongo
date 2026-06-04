@@ -1600,6 +1600,17 @@ private:
 
 CommandRegistry* getCommandRegistry(Service* service);
 
+/**
+ * Returns the command registry for the given ClusterRole. This overload does not require an
+ * active Service or ServiceContext, so it can pre-register the per-command server-status metrics
+ * during Service construction (see the prewarmCommandRegistryMetrics constructor action in
+ * commands.cpp), before the MetricTreeSet is frozen.
+ *
+ * The returned registry is identical to what getCommandRegistry(Service*) would return for a
+ * Service with the same role — they share the same underlying static singleton.
+ */
+CommandRegistry* getCommandRegistry(ClusterRole role);
+
 /** Convenience overload. */
 inline CommandRegistry* getCommandRegistry(OperationContext* opCtx) {
     return getCommandRegistry(opCtx->getService());
@@ -1656,13 +1667,23 @@ public:
      * will only be created for an `entry` if the `pred(entry)` passes.
      */
     void execute(CommandRegistry* registry,
-                 Service* service,
+                 ClusterRole role,
                  const std::function<bool(const Entry&)>& pred) const;
 
     /**
-     * Calls `execute` with a predicate that enables Commands appropriate for
-     * the specified `service`.
+     * Calls `execute` with a predicate that enables Commands appropriate for the given
+     * ClusterRole. Does not require a live Service or ServiceContext, so it can be used to
+     * pre-register per-command metrics during Service construction (see
+     * getCommandRegistry(ClusterRole)).
      */
+    void execute(CommandRegistry* registry, ClusterRole role) const;
+
+    /** Convenience overload — delegates to the ClusterRole overload. */
+    void execute(CommandRegistry* registry,
+                 Service* service,
+                 const std::function<bool(const Entry&)>& pred) const;
+
+    /** Convenience overload — delegates to the ClusterRole overload. */
     void execute(CommandRegistry* registry, Service* service) const;
 
 private:

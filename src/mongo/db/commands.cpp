@@ -46,6 +46,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/namespace_string_util.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/version_context.h"
@@ -1159,27 +1160,61 @@ bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,
 //////////////////////////////////////////////////////////////
 // CommandRegistry
 
-CommandRegistry* getCommandRegistry(Service* service) {
-    auto role = service->role();
-    static auto makeReg = [](Service* service) {
+CommandRegistry* getCommandRegistry(ClusterRole role) {
+    // Helper to build the registry for a given role. Called at most once per role, on the first
+    // getCommandRegistry() call for that role -- normally the prewarmCommandRegistryMetrics Service
+    // constructor action below, which runs during Service creation; otherwise the first command
+    // dispatch. The result is stored in a static singleton and reused thereafter.
+    static auto makeReg = [](ClusterRole role) {
         CommandRegistry reg;
-        // `reg` will be a singleton registry, so create a per-service unknowns
-        // counter for it.
-        auto unknowns = &*MetricBuilder<Counter64>{"commands.<UNKNOWN>"}.setRole(service->role());
+        // Create a per-role unknown-command counter.
+        auto unknowns = &*MetricBuilder<Counter64>{"commands.<UNKNOWN>"}.setRole(role);
         reg.setOnUnknownCommandCallback([unknowns] { unknowns->increment(); });
-        globalCommandConstructionPlan().execute(&reg, service);
+        globalCommandConstructionPlan().execute(&reg, role);
         return reg;
     };
     if (role.hasExclusively(ClusterRole::ShardServer)) {
-        static StaticImmortal obj = makeReg(service);
+        static StaticImmortal obj = makeReg(role);
         return &*obj;
     }
     if (role.hasExclusively(ClusterRole::RouterServer)) {
-        static StaticImmortal obj = makeReg(service);
+        static StaticImmortal obj = makeReg(role);
         return &*obj;
     }
-    MONGO_UNREACHABLE;  // Service role has to be exclusively Shard or Router.
+    MONGO_UNREACHABLE;  // ClusterRole must be exclusively Shard or Router.
 }
+
+CommandRegistry* getCommandRegistry(Service* service) {
+    return getCommandRegistry(service->role());
+}
+
+namespace {
+// Pre-warm the per-role command registry as soon as a Service is created. Building the registry
+// registers the `commands.<UNKNOWN>` counter and the per-command server-status metrics, which must
+// happen on the main thread and (in mongod/mongos) before the MetricTreeSet is frozen.
+//
+// Services are created during ServiceContext construction (ServiceSet), which runs on the main
+// thread at startup -- in mongod/mongos before the loadExtensions()/freeze() call during server
+// startup (_initAndListen in mongod, runMongosServer in mongos), and in unit-test fixtures during
+// setUp before any worker thread dispatches a command. Hooking here
+// guarantees the metrics are registered on the main thread, pre-freeze, in *every* binary that has
+// a command-dispatching Service: mongod, mongos, mongocryptd/mongotmock, and the unit-test
+// binaries. This replaces the per-binary RegisterCommandMetrics initializers, which only covered
+// mongod/mongos (missing mongod's router role and every other server-derived binary).
+//
+// Warming only the created Service's own role keeps this role-accurate: a binary never constructs
+// commands for a role it does not serve.
+const Service::ConstructorActionRegisterer prewarmCommandRegistryMetrics{
+    "PrewarmCommandRegistryMetrics", [](Service* service) {
+        // ServiceSet only ever creates ShardServer/RouterServer Services; guard defensively so an
+        // unexpected role cannot trip the MONGO_UNREACHABLE in getCommandRegistry(ClusterRole).
+        const auto role = service->role();
+        if (role.hasExclusively(ClusterRole::ShardServer) ||
+            role.hasExclusively(ClusterRole::RouterServer)) {
+            getCommandRegistry(role);
+        }
+    }};
+}  // namespace
 
 void CommandRegistry::registerCommand(Command* command) {
     StringData name = command->getName();
@@ -1225,7 +1260,7 @@ BSONObj toBSON(const CommandConstructionPlan::Entry& e) {
 }
 
 void CommandConstructionPlan::execute(CommandRegistry* registry,
-                                      Service* service,
+                                      ClusterRole role,
                                       const std::function<bool(const Entry&)>& pred) const {
     LOGV2_DEBUG(8043400, 3, "Constructing Command objects from specs");
     StringMap<boost::optional<SourceLocation>> dupCheck;
@@ -1251,13 +1286,13 @@ void CommandConstructionPlan::execute(CommandRegistry* registry,
                 LOGV2_FATAL(10205200,
                             "Duplicate command",
                             "name"_attr = name,
-                            "role"_attr = service->role(),
+                            "role"_attr = role,
                             "location"_attr = loc,
                             "dupLocation"_attr = dup->second);
             }
             dupCheck.insert({c->getName(), loc});
         }
-        c->initializeClusterRole(service ? service->role() : ClusterRole{});
+        c->initializeClusterRole(role);
         LOGV2_DEBUG(8043404, 3, "Created", "command"_attr = c->getName(), "entry"_attr = *entry);
         registry->registerCommand(&*c);
 
@@ -1269,11 +1304,21 @@ void CommandConstructionPlan::execute(CommandRegistry* registry,
     }
 }
 
-void CommandConstructionPlan::execute(CommandRegistry* registry, Service* service) const {
-    execute(registry, service, [r = service->role()](const auto& e) {
+void CommandConstructionPlan::execute(CommandRegistry* registry, ClusterRole role) const {
+    execute(registry, role, [role](const auto& e) {
         invariant(e.roles, "All commands must have a role.");
-        return e.roles->has(r);
+        return e.roles->has(role);
     });
+}
+
+void CommandConstructionPlan::execute(CommandRegistry* registry,
+                                      Service* service,
+                                      const std::function<bool(const Entry&)>& pred) const {
+    execute(registry, service ? service->role() : ClusterRole{}, pred);
+}
+
+void CommandConstructionPlan::execute(CommandRegistry* registry, Service* service) const {
+    execute(registry, service->role());
 }
 
 }  // namespace mongo
