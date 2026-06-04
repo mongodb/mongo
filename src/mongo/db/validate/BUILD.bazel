@@ -74,6 +74,7 @@ mongo_cc_library(
         "collection_validation.cpp",
         "index_consistency.cpp",
         "validate_adaptor.cpp",
+        "validate_timeseries.cpp",
     ],
     deps = [
         ":validate_results",
