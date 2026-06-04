@@ -2077,6 +2077,19 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
             // No statement IDs; don't set prevWriteOpTimeInTransaction.
             oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
         }
+    } else if (oplogGroupingFormat == WriteUnitOfWork::kGroupForAtomicWrite) {
+        // This mode is only used with retryable writes; the entry is tagged retryable
+        // (multiOpType) below, so it must carry session info (lsid + txnNumber).
+        invariant(opCtx->isRetryableWrite());
+        // The whole batch is one atomic, retryable unit. At most one operation carries a stmtId and
+        // it may sit in any entry, so most entries in the batch arrive with an empty
+        // stmtIdsWritten; set the session and multiOpType metadata manually rather than via
+        // appendOplogEntryChainInfo, which requires a non-empty stmtIdsWritten.
+        oplogEntry->setSessionId(opCtx->getLogicalSessionId());
+        oplogEntry->setTxnNumber(opCtx->getTxnNumber());
+        oplogEntry->setMultiOpType(repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
+        oplogEntry->setPrevWriteOpTimeInTransaction(
+            oplogEntry->getPrevWriteOpTimeInTransaction().value_or(repl::OpTime()));
     } else {
         if (!stmtIdsWritten.empty()) {
             invariant(isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId()));
