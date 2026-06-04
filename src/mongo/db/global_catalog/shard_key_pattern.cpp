@@ -106,13 +106,12 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
                               << patternEl.fieldNameStringData(),
                 numHashedFields == 1);
         } else {
-            uassert(
-                ErrorCodes::BadValue,
-                str::stream() << "Shard key " << keyPattern.toString()
-                              << "numerical fields must be set to a value of 1 (ascending). Failed "
-                                 "to parse field "
-                              << patternEl.fieldNameStringData(),
-                (patternEl.isNumber() && patternEl.safeNumberInt() == 1));
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Shard key " << keyPattern.toString()
+                                  << " is invalid. Non-hashed fields must be set to a value of 1 "
+                                     "(ascending). Failed to parse field "
+                                  << patternEl.fieldNameStringData(),
+                    (patternEl.isNumber() && patternEl.safeNumberInt() == 1));
         }
         parsedPaths.emplace_back(std::move(newFieldRef));
     }
