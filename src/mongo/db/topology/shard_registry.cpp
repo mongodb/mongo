@@ -86,6 +86,8 @@ const Seconds kRefreshPeriod(30);
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
+MONGO_FAIL_POINT_DEFINE(hangShardRegistryPeriodicPing);
+
 /**
  * Fetches shard documents from the catalog client without creating Shard instances.
  * Returns a map of shardId -> connectionString and the maximum topologyTime found.
@@ -377,6 +379,8 @@ void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
     AsyncTry([this] {
         ThreadClient tc("Periodic ShardRegistry pinger", getGlobalServiceContext()->getService());
         auto opCtx = cc().makeOperationContext();
+
+        hangShardRegistryPeriodicPing.pauseWhileSet(opCtx.get());
 
         LOGV2_DEBUG(9112100, 2, "Periodic ping to CSRS for ShardRegistry topology time update");
         uassertStatusOK(_pingForNewTopologyTime(opCtx.get()));

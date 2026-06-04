@@ -534,11 +534,8 @@ std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
 
     aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
 
-    if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        // Don't use a timeout on the config server to guarantee it can always refresh.
-        const Milliseconds maxTimeMS = std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeout);
-        aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
-    }
+    const Milliseconds maxTimeMS = std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeout);
+    aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
 
     // Run the aggregation
     const auto configShard = _getConfigShard(opCtx);

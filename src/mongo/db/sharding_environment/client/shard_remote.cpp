@@ -47,9 +47,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -326,11 +324,6 @@ RetryStrategy::Result<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCom
 
 Milliseconds getExhaustiveFindOnConfigMaxTimeMS(OperationContext* opCtx,
                                                 const NamespaceString& nss) {
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        // Don't use a timeout on the config server to guarantee it can always refresh.
-        return Milliseconds::max();
-    }
-
     return std::min(opCtx->getRemainingMaxTimeMillis(),
                     Shard::getConfiguredTimeoutForOperationOnNamespace(nss));
 }

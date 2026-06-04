@@ -685,6 +685,12 @@ private:
     bool _cannotRetry = false;
 
     boost::optional<Ticket> _admissionTicket;
+
+    // When a command with maxTimeMS is executed in a DBDirectClient context (nested operation),
+    // this guard pushes an artificial deadline that is min(parent_deadline, child_maxTimeMS). On
+    // destruction, the parent's original deadline is automatically restored. This allows child
+    // operations to time out independently while the parent resumes with its original deadline.
+    boost::optional<Interruptible::DeadlineGuard> _deadlineGuard;
 };
 
 class RunCommandImpl {
@@ -1812,23 +1818,44 @@ void ExecCommandDatabase::_initiateCommand() {
 
         if ((maxTimeMS > Milliseconds::zero() || maxTimeMSOpOnly > Milliseconds::zero()) &&
             command->getLogicalOp() != LogicalOp::opGetMore) {
-            uassert(40119,
-                    "Illegal attempt to set operation deadline within DBDirectClient",
-                    !opCtx->getClient()->isInDirectClient());
 
             // The "hello" command should not inherit the deadline from the user op it is operating
             // as a part of as that can interfere with replica set monitoring and host selection.
             const bool ignoreMaxTimeMSOpOnly = isHello();
 
-            if (!ignoreMaxTimeMSOpOnly && maxTimeMSOpOnly > Milliseconds::zero() &&
-                (maxTimeMS == Milliseconds::zero() || maxTimeMSOpOnly < maxTimeMS)) {
+            // maxTimeMSOpOnly takes precedence over maxTimeMS only when it is shorter (or when
+            // maxTimeMS is unset). When it takes precedence we also remember the original
+            // maxTimeMS so it can be re-applied to subsequent admissions of this operation.
+            const bool useMaxTimeMSOpOnly = !ignoreMaxTimeMSOpOnly &&
+                maxTimeMSOpOnly > Milliseconds::zero() &&
+                (maxTimeMS == Milliseconds::zero() || maxTimeMSOpOnly < maxTimeMS);
+
+            Date_t deadline = Date_t::max();
+            if (useMaxTimeMSOpOnly) {
                 opCtx->storeMaxTimeMS(maxTimeMS);
-                opCtx->setDeadlineByDate(_execContext.getStarted() + maxTimeMSOpOnly,
-                                         ErrorCodes::MaxTimeMSExpired);
+                deadline = _execContext.getStarted() + maxTimeMSOpOnly;
             } else if (maxTimeMS > Milliseconds::zero()) {
-                opCtx->setDeadlineByDate(_execContext.getStarted() + maxTimeMS,
-                                         ErrorCodes::MaxTimeMSExpired);
+                deadline = _execContext.getStarted() + maxTimeMS;
             }
+            if (deadline < Date_t::max()) {
+                if (opCtx->getClient()->isInDirectClient()) {
+                    // In a DBDirectClient context the opCtx is reused from the parent operation and
+                    // may already carry a deadline (and a corresponding timeout error code) owned
+                    // by that parent. We only want to nest the child's maxTimeMS when it actually
+                    // tightens the deadline.
+                    //
+                    // Skipping the push when the child does not tighten the deadline matches
+                    // remote-client semantics: when a parent's local deadline fires first, the
+                    // caller observes the parent's error code rather than the remote command's
+                    // error code.
+                    if (deadline < opCtx->getDeadline()) {
+                        _deadlineGuard.emplace(*opCtx, deadline, ErrorCodes::MaxTimeMSExpired);
+                    }
+                } else {
+                    opCtx->setDeadlineByDate(deadline, ErrorCodes::MaxTimeMSExpired);
+                }
+            }
+
             opCtx->setUsesDefaultMaxTimeMS(genericArgs.getUsesDefaultMaxTimeMS().value_or(false) ||
                                            usesDefaultMaxTimeMS);
         }

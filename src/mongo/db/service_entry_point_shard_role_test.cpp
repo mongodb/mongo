@@ -31,11 +31,13 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/admission/rate_limiter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -102,6 +104,18 @@ public:
     void testProcessInternalCommand();
     void testCommandFailsRunInvocationWithCloseConnectionError();
     void testCommandMaxTimeMSOpOnly();
+
+    struct NestedDeadline {
+        Date_t deadline;
+        ErrorCodes::Error timeoutError;
+    };
+    NestedDeadline runNestedDirectClientWithMaxTimeMS(OperationContext* opCtx,
+                                                      int subMaxTimeMSMillis);
+
+    void testNestedMaxTimeMSChildTightensParentDeadline();
+    void testNestedMaxTimeMSParentDeadlineTighterThanChild();
+    void testNestedMaxTimeMSWithNoParentDeadline();
+    void testNestedMaxTimeMSPreservesParentErrorCodeWhenParentTighter();
 
 protected:
     repl::ReplicationCoordinatorMock* _replCoordMock;
@@ -644,6 +658,158 @@ TEST_F(ServiceEntryPointReplicaSetTest, TelemetryContextNotSetWhenNotInRequest) 
     testTelemetryContextNotSetWhenNotInRequest();
 }
 #endif
+
+// Test command that returns the opCtx deadline in its response (used as the child command).
+class TestCmdReportDeadline : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testReportDeadline";
+    TestCmdReportDeadline() : TestCmdBase(kCommandName) {}
+
+    bool runWithBuilderOnly(BSONObjBuilder& result) override {
+        uassert(ErrorCodes::InternalError, "runWithBuilderOnly not implemented", false);
+    }
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj&,
+             BSONObjBuilder& result) override {
+        result.append("deadline", opCtx->getDeadline());
+        result.append("timeoutError", static_cast<int>(opCtx->getTimeoutError()));
+        return true;
+    }
+};
+
+// Test command that runs TestCmdReportDeadline via DBDirectClient with maxTimeMS,
+// and forwards the child's observed deadline in its own response.
+class TestCmdDirectClientWithMaxTimeMS : public TestCmdBase {
+public:
+    static constexpr auto kCommandName = "testDirectClientWithMaxTimeMS";
+    TestCmdDirectClientWithMaxTimeMS() : TestCmdBase(kCommandName) {}
+
+    bool runWithBuilderOnly(BSONObjBuilder& result) override {
+        uassert(ErrorCodes::InternalError, "runWithBuilderOnly not implemented", false);
+    }
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        auto subCmdBSON = BSON(TestCmdReportDeadline::kCommandName << 1 << "maxTimeMS"
+                                                                   << cmdObj["subMaxTimeMS"].Int());
+        BSONObj info;
+        DBDirectClient{opCtx}.runCommand(
+            DatabaseName::createDatabaseName_forTest(boost::none, "admin"), subCmdBSON, info);
+        result.append("childDeadline", info["deadline"].Date());
+        result.append("childTimeoutError", info["timeoutError"].Int());
+        return true;
+    }
+};
+
+MONGO_REGISTER_COMMAND(TestCmdDirectClientWithMaxTimeMS).testOnly().forShard();
+MONGO_REGISTER_COMMAND(TestCmdReportDeadline).testOnly().forShard();
+
+// Shared helper: run TestCmdDirectClientWithMaxTimeMS with the given child maxTimeMS and
+// return what the nested child command observed for its own deadline and timeout error
+// code while running inside the DBDirectClient context.
+ServiceEntryPointShardRoleTest::NestedDeadline
+ServiceEntryPointShardRoleTest::runNestedDirectClientWithMaxTimeMS(OperationContext* opCtx,
+                                                                   int subMaxTimeMSMillis) {
+    auto dbResponse = runCommandTestWithResponse(BSON(TestCmdDirectClientWithMaxTimeMS::kCommandName
+                                                      << 1 << "subMaxTimeMS" << subMaxTimeMSMillis),
+                                                 opCtx);
+    auto bson = dbResponseToBSON(dbResponse);
+    return {bson["childDeadline"].Date(),
+            static_cast<ErrorCodes::Error>(bson["childTimeoutError"].Int())};
+}
+
+// Child maxTimeMS (200ms) is shorter than parent deadline (5s): the nested child should
+// see the tighter child deadline. Before SERVER-117349, this case hit assertion 40119
+// because DBDirectClient refused to set a deadline when one already existed.
+void ServiceEntryPointShardRoleTest::testNestedMaxTimeMSChildTightensParentDeadline() {
+    auto opCtx = makeOperationContext();
+    auto now = getGlobalServiceContext()->getFastClockSource()->now();
+    opCtx->setDeadlineByDate(now + Milliseconds(5000), ErrorCodes::MaxTimeMSExpired);
+    const auto parentDeadline = opCtx->getDeadline();
+
+    auto obs = runNestedDirectClientWithMaxTimeMS(opCtx.get(), 200);
+
+    // Allow a small slack to absorb clock imprecision in the test runner.
+    ASSERT_LTE(obs.deadline, now + Milliseconds(200) + Milliseconds(100));
+    ASSERT_LT(obs.deadline, parentDeadline);
+    ASSERT_EQ(opCtx->getDeadline(), parentDeadline);
+}
+
+// Parent deadline (100ms) is tighter than child maxTimeMS (5s): the nested child should
+// see the parent's deadline, and the parent's deadline must be preserved unchanged after
+// the nested call returns.
+void ServiceEntryPointShardRoleTest::testNestedMaxTimeMSParentDeadlineTighterThanChild() {
+    auto opCtx = makeOperationContext();
+    auto now = getGlobalServiceContext()->getFastClockSource()->now();
+    opCtx->setDeadlineByDate(now + Milliseconds(100), ErrorCodes::MaxTimeMSExpired);
+    const auto parentDeadline = opCtx->getDeadline();
+
+    auto obs = runNestedDirectClientWithMaxTimeMS(opCtx.get(), 5000);
+
+    ASSERT_EQ(obs.deadline, parentDeadline);
+    ASSERT_EQ(opCtx->getDeadline(), parentDeadline);
+}
+
+// Parent has no deadline (Date_t::max()), child sets its own maxTimeMS.
+void ServiceEntryPointShardRoleTest::testNestedMaxTimeMSWithNoParentDeadline() {
+    auto opCtx = makeOperationContext();
+    auto now = getGlobalServiceContext()->getFastClockSource()->now();
+    ASSERT_EQ(opCtx->getDeadline(), Date_t::max());
+
+    auto obs = runNestedDirectClientWithMaxTimeMS(opCtx.get(), 200);
+
+    ASSERT_LTE(obs.deadline, now + Milliseconds(200) + Milliseconds(100));
+    ASSERT_GT(obs.deadline, now);
+    ASSERT_EQ(opCtx->getDeadline(), Date_t::max());
+}
+
+// Parent deadline is tighter than child maxTimeMS AND uses a non-MaxTimeMSExpired error
+// code: the nested child must observe the parent's original error code, not the child's
+// MaxTimeMSExpired.
+void ServiceEntryPointShardRoleTest::
+    testNestedMaxTimeMSPreservesParentErrorCodeWhenParentTighter() {
+    auto opCtx = makeOperationContext();
+    auto now = getGlobalServiceContext()->getFastClockSource()->now();
+    opCtx->setDeadlineByDate(now + Milliseconds(100), ErrorCodes::ExceededTimeLimit);
+    const auto parentDeadline = opCtx->getDeadline();
+
+    auto obs = runNestedDirectClientWithMaxTimeMS(opCtx.get(), 5000);
+
+    ASSERT_EQ(obs.deadline, parentDeadline);
+    ASSERT_EQ(obs.timeoutError, ErrorCodes::ExceededTimeLimit);
+    ASSERT_EQ(opCtx->getDeadline(), parentDeadline);
+    ASSERT_EQ(opCtx->getTimeoutError(), ErrorCodes::ExceededTimeLimit);
+}
+
+TEST_F(ServiceEntryPointShardServerTest, NestedMaxTimeMSChildTightensParentDeadline) {
+    testNestedMaxTimeMSChildTightensParentDeadline();
+}
+TEST_F(ServiceEntryPointShardServerTest, NestedMaxTimeMSParentDeadlineTighterThanChild) {
+    testNestedMaxTimeMSParentDeadlineTighterThanChild();
+}
+TEST_F(ServiceEntryPointShardServerTest, NestedMaxTimeMSWithNoParentDeadline) {
+    testNestedMaxTimeMSWithNoParentDeadline();
+}
+TEST_F(ServiceEntryPointShardServerTest, NestedMaxTimeMSPreservesParentErrorCodeWhenParentTighter) {
+    testNestedMaxTimeMSPreservesParentErrorCodeWhenParentTighter();
+}
+
+TEST_F(ServiceEntryPointReplicaSetTest, NestedMaxTimeMSChildTightensParentDeadline) {
+    testNestedMaxTimeMSChildTightensParentDeadline();
+}
+TEST_F(ServiceEntryPointReplicaSetTest, NestedMaxTimeMSParentDeadlineTighterThanChild) {
+    testNestedMaxTimeMSParentDeadlineTighterThanChild();
+}
+TEST_F(ServiceEntryPointReplicaSetTest, NestedMaxTimeMSWithNoParentDeadline) {
+    testNestedMaxTimeMSWithNoParentDeadline();
+}
+TEST_F(ServiceEntryPointReplicaSetTest, NestedMaxTimeMSPreservesParentErrorCodeWhenParentTighter) {
+    testNestedMaxTimeMSPreservesParentErrorCodeWhenParentTighter();
+}
 
 }  // namespace
 }  // namespace mongo::admission
