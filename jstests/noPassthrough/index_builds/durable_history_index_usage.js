@@ -2,8 +2,6 @@
  * Tests index usage with durable history across restarts.
  *
  * @tags: [
- *   # Primary driven index builds are aborted on step up by the new primary.
- *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   requires_persistence,
  *   requires_replication,
  * ]
@@ -108,21 +106,7 @@ replTest.start(
     true /* restart */,
 );
 
-const checkLogs = function () {
-    // Found index from unfinished build.
-    checkLog.containsJson(primary(), 22253, {
-        index: "a_1",
-        namespace: coll().getFullName(),
-    });
-
-    // Resetting unfinished index.
-    checkLog.containsJson(primary(), 6987700, {namespace: coll().getFullName(), index: "a_1"});
-
-    // Index build restarting.
-    checkLog.containsJson(primary(), 20660);
-};
-
-checkLogs();
+IndexBuildTest.waitForIndexBuildToStart(testDB(), jsTestName(), "a_1");
 
 // The index is being re-created.
 
@@ -164,8 +148,6 @@ replTest.start(
     },
     true /* restart */,
 );
-
-checkLogs();
 
 // Startup recovery will rebuild the index in the background. Wait for the index build to finish.
 checkLog.containsJson(primary(), 20663, {
