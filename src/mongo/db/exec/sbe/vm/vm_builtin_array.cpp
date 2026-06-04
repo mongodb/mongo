@@ -62,10 +62,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArray(ArityTy
     auto arr = value::getArrayView(val);
 
     if (arity) {
+        size_t currentMemoryBytes = 0;
+        const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
         arr->reserve(arity);
         for (ArityType idx = 0; idx < arity; ++idx) {
             auto [tag, val] = moveOwnedFromStack(idx);
             arr->push_back(tag, val);
+            currentMemoryBytes += value::getApproximateSize(tag, val);
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$array would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
         }
     }
 
@@ -232,6 +243,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(Ari
     value::ValueGuard resGuard{resTag, resVal};
     auto resView = value::getArrayView(resVal);
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (ArityType idx = 0; idx < arity; ++idx) {
         auto [_, tag, val] = getFromStack(idx);
         if (!value::isArray(tag)) {
@@ -241,6 +255,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(Ari
         value::arrayForEach(tag, val, [&](value::TypeTags elTag, value::Value elVal) {
             auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
             resView->push_back(copyTag, copyVal);
+            currentMemoryBytes += value::getApproximateSize(copyTag, copyVal);
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$concatArrays would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
         });
     }
 
@@ -305,6 +327,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinZipArrays(ArityT
     auto* resView = value::getArrayView(resVal);
     resView->reserve(outputLength);
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (size_t row = 0; row < outputLength; row++) {
         // Used to construct each array in the output, e.g. [1, 2, 3].
         auto [intermediateResTag, intermediateResVal] = value::makeNewArray();
@@ -328,6 +353,13 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinZipArrays(ArityT
                 // Add a null default value.
                 intermediateResView->push_back(value::TypeTags::Null, 0);
             }
+        }
+        currentMemoryBytes += value::getApproximateSize(intermediateResTag, intermediateResVal);
+        if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+            uasserted(ErrorCodes::ExceededMemoryLimit,
+                      str::stream() << "$zip would use too much memory (" << currentMemoryBytes
+                                    << " bytes) and cannot spill to disk. Memory limit: "
+                                    << maxMemoryBytes << " bytes");
         }
         intermediateResGuard.reset();
         resView->push_back(intermediateResTag, intermediateResVal);

@@ -147,4 +147,33 @@ assert.commandWorked(bulk.execute());
     assert.throwsWithCode(() => coll.aggregate([{$project: {a: {$range: [0, 100]}}}]), ErrorCodes.ExceededMemoryLimit);
 })();
 
+(function testInternalQueryMaxExpressionOutputBytesSetting() {
+    const largeObject = {};
+    const largeArrayOfArrays = [];
+    for (let i = 0; i < 20; ++i) {
+        // Add "$_id" to prevent constant folding
+        const largeRange = {$range: [{$add: ["$_id", i * 10]}, {$add: ["$_id", (i + 1) * 10]}]};
+        largeArrayOfArrays.push(largeRange);
+        largeObject["field" + i] = largeRange;
+    }
+
+    const pipelines = [
+        [{$project: {a: {$expr: largeObject}}}],
+        [{$project: {a: largeArrayOfArrays}}],
+        [{$project: {a: {$concatArrays: largeArrayOfArrays}}}],
+        [{$project: {a: {$setUnion: largeArrayOfArrays}}}],
+        [{$project: {a: {$zip: {inputs: largeArrayOfArrays}}}}],
+    ];
+
+    for (const pipeline of pipelines) {
+        assert.doesNotThrow(() => coll.aggregate(pipeline), [], tojson(pipeline));
+    }
+
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxExpressionOutputBytes: memLimitArray}));
+
+    for (const pipeline of pipelines) {
+        assert.throwsWithCode(() => coll.aggregate(pipeline), ErrorCodes.ExceededMemoryLimit, [], tojson(pipeline));
+    }
+})();
+
 MongoRunner.stopMongod(conn);

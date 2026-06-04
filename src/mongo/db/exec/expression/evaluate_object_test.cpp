@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
 #include <string>
@@ -118,6 +119,55 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissin
     auto objectWithNestedObject = ExpressionObject::create(&expCtx, {{"nested", object}});
     ASSERT_VALUE_EQ(Value(Document{{"nested", Document{}}}),
                     objectWithNestedObject->evaluate(Document(), &(expCtx.variables)));
+}
+
+namespace {
+std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> makeLargeValueFields(
+    ExpressionContextForTest* expCtx, int numFields, size_t valueSizeBytes) {
+    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> fields;
+    fields.reserve(numFields);
+    for (int i = 0; i < numFields; ++i) {
+        fields.emplace_back(
+            "f" + std::to_string(i),
+            ExpressionConstant::create(expCtx, Value(std::string(valueSizeBytes, 'a'))));
+    }
+    return fields;
+}
+}  // namespace
+
+TEST(ExpressionObjectEvaluate, LargeObjectExceedsMemoryLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    auto object = ExpressionObject::create(&expCtx, makeLargeValueFields(&expCtx, 10, 1024));
+
+    RAIIServerParameterControllerForTest limit("internalQueryMaxExpressionOutputBytes", 100);
+    ASSERT_THROWS_CODE(object->evaluate(Document(), &(expCtx.variables)),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST(ExpressionObjectEvaluate, LargeObjectWithinMemoryLimitSucceeds) {
+    auto expCtx = ExpressionContextForTest{};
+    auto object = ExpressionObject::create(&expCtx, makeLargeValueFields(&expCtx, 10, 1024));
+
+    Value result = object->evaluate(Document(), &(expCtx.variables));
+    ASSERT_TRUE(result.getType() == BSONType::object);
+    ASSERT_EQ(result.getDocument().computeSize(), 10u);
+}
+
+TEST(ExpressionObjectEvaluate, LongFieldNamesCountTowardMemoryLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    const std::string longKey(200, 'k');
+    std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> fields;
+    for (int i = 0; i < 10; ++i) {
+        fields.emplace_back(longKey + std::to_string(i),
+                            ExpressionConstant::create(&expCtx, Value(1)));
+    }
+    auto object = ExpressionObject::create(&expCtx, std::move(fields));
+
+    RAIIServerParameterControllerForTest limit("internalQueryMaxExpressionOutputBytes", 500);
+    ASSERT_THROWS_CODE(object->evaluate(Document(), &(expCtx.variables)),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
 }
 
 }  // namespace expression_evaluation_test

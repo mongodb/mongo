@@ -36,6 +36,7 @@
 #include "mongo/db/exec/expression/evaluate_test_helpers.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
 
@@ -811,6 +812,87 @@ TEST(ExpressionSetTest, ManyArgsEqual) {
 }
 
 }  // namespace set
+
+namespace memory_limits {
+
+namespace {
+BSONArray makeLargeBsonArray(int numElements, size_t valueSizeBytes) {
+    BSONArrayBuilder builder;
+    const std::string value(valueSizeBytes, 'a');
+    for (int i = 0; i < numElements; ++i) {
+        builder.append(value);
+    }
+    return builder.arr();
+}
+
+boost::intrusive_ptr<Expression> parse(ExpressionContextForTest* expCtx, const BSONObj& obj) {
+    return Expression::parseExpression(expCtx, obj, expCtx->variablesParseState);
+}
+}  // namespace
+
+TEST(ExpressionArrayMemoryLimit, ArrayExceedsLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    std::vector<boost::intrusive_ptr<Expression>> children;
+    for (int i = 0; i < 10; ++i) {
+        children.push_back(ExpressionConstant::create(&expCtx, Value(std::string(1024, 'a'))));
+    }
+    auto expr = ExpressionArray::create(&expCtx, std::move(children));
+
+    RAIIServerParameterControllerForTest limit("internalQueryMaxExpressionOutputBytes", 100);
+    ASSERT_THROWS_CODE(
+        expr->evaluate({}, &expCtx.variables), AssertionException, ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST(ExpressionArrayMemoryLimit, ArrayWithinLimitSucceeds) {
+    auto expCtx = ExpressionContextForTest{};
+    std::vector<boost::intrusive_ptr<Expression>> children;
+    for (int i = 0; i < 10; ++i) {
+        children.push_back(ExpressionConstant::create(&expCtx, Value(std::string(1024, 'a'))));
+    }
+    auto expr = ExpressionArray::create(&expCtx, std::move(children));
+
+    Value result = expr->evaluate({}, &expCtx.variables);
+    ASSERT_TRUE(result.isArray());
+    ASSERT_EQ(result.getArrayLength(), 10u);
+}
+
+TEST(ExpressionArrayMemoryLimit, ConcatArraysExceedsLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONArrayBuilder inputs;
+    inputs.append(makeLargeBsonArray(5, 1024));
+    inputs.append(makeLargeBsonArray(5, 1024));
+    auto expr = parse(&expCtx, BSON("$concatArrays" << inputs.arr()));
+
+    RAIIServerParameterControllerForTest limit("internalQueryMaxExpressionOutputBytes", 100);
+    ASSERT_THROWS_CODE(
+        expr->evaluate({}, &expCtx.variables), AssertionException, ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST(ExpressionArrayMemoryLimit, SetUnionExceedsLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONArrayBuilder inputs;
+    inputs.append(makeLargeBsonArray(10, 1024));
+    inputs.append(makeLargeBsonArray(10, 1024));
+    auto expr = parse(&expCtx, BSON("$setUnion" << inputs.arr()));
+
+    RAIIServerParameterControllerForTest limit("internalQueryMaxExpressionOutputBytes", 100);
+    ASSERT_THROWS_CODE(
+        expr->evaluate({}, &expCtx.variables), AssertionException, ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST(ExpressionArrayMemoryLimit, ZipExceedsLimit) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONArrayBuilder zipInputs;
+    zipInputs.append(makeLargeBsonArray(10, 1024));
+    zipInputs.append(makeLargeBsonArray(10, 1024));
+    auto expr = parse(&expCtx, BSON("$zip" << BSON("inputs" << zipInputs.arr())));
+
+    RAIIServerParameterControllerForTest limit("internalQueryMaxExpressionOutputBytes", 100);
+    ASSERT_THROWS_CODE(
+        expr->evaluate({}, &expCtx.variables), AssertionException, ErrorCodes::ExceededMemoryLimit);
+}
+
+}  // namespace memory_limits
 
 }  // namespace expression_evaluation_test
 }  // namespace mongo

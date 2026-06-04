@@ -190,12 +190,24 @@ FastTuple<bool, value::TypeTags, value::Value> setUnion(
     value::ValueGuard resGuard{resTag, resVal};
     auto resView = value::getArraySetView(resVal);
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (size_t idx = 0; idx < argVals.size(); ++idx) {
         auto argTag = argTags[idx];
         auto argVal = argVals[idx];
 
         value::arrayForEach(argTag, argVal, [&](value::TypeTags elTag, value::Value elVal) {
-            resView->push_back_clone(elTag, elVal);
+            if (resView->push_back_clone(elTag, elVal)) {
+                currentMemoryBytes += value::getApproximateSize(elTag, elVal);
+                if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                    uasserted(ErrorCodes::ExceededMemoryLimit,
+                              str::stream()
+                                  << "$setUnion would use too much memory (" << currentMemoryBytes
+                                  << " bytes) and cannot spill to disk. Memory limit: "
+                                  << maxMemoryBytes << " bytes");
+                }
+            }
         });
     }
     resGuard.reset();

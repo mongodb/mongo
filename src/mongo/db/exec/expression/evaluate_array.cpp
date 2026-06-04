@@ -61,8 +61,20 @@ Value evaluate(const ExpressionArray& expr, const Document& root, Variables* var
     auto& children = expr.getChildren();
     std::vector<Value> values;
     values.reserve(children.size());
+
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (auto&& child : children) {
         Value elemVal = child->evaluate(root, variables);
+        currentMemoryBytes += elemVal.getApproximateSize();
+        if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+            uasserted(ErrorCodes::ExceededMemoryLimit,
+                      str::stream() << "$array would use too much memory (" << currentMemoryBytes
+                                    << " bytes) and cannot spill to disk. Memory limit: "
+                                    << maxMemoryBytes << " bytes");
+        }
+
         values.push_back(elemVal.missing() ? Value(BSONNULL) : std::move(elemVal));
     }
     return Value(std::move(values));
@@ -259,6 +271,9 @@ Value evaluate(const ExpressionConcatArrays& expr, const Document& root, Variabl
     const size_t n = children.size();
     std::vector<Value> values;
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (size_t i = 0; i < n; ++i) {
         Value val = children[i]->evaluate(root, variables);
         if (val.nullish()) {
@@ -271,7 +286,17 @@ Value evaluate(const ExpressionConcatArrays& expr, const Document& root, Variabl
                 val.isArray());
 
         const auto& subValues = val.getArray();
-        values.insert(values.end(), subValues.begin(), subValues.end());
+        for (const auto& subValue : subValues) {
+            currentMemoryBytes += subValue.getApproximateSize();
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$concatArrays would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
+            values.push_back(subValue);
+        }
     }
     return Value(std::move(values));
 }
@@ -728,6 +753,10 @@ Value evaluate(const ExpressionSetUnion& expr, const Document& root, Variables* 
     ValueSet unionedSet = expr.getExpressionContext()->getValueComparator().makeOrderedValueSet();
     auto& children = expr.getChildren();
     const size_t n = children.size();
+
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (size_t i = 0; i < n; i++) {
         const Value newEntries = children[i]->evaluate(root, variables);
         if (newEntries.nullish()) {
@@ -738,7 +767,20 @@ Value evaluate(const ExpressionSetUnion& expr, const Document& root, Variables* 
                               << " is of type: " << typeName(newEntries.getType()),
                 newEntries.isArray());
 
-        unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
+
+        for (const auto& newEntry : newEntries.getArray()) {
+            const auto [it, inserted] = unionedSet.insert(newEntry);
+            if (inserted) {
+                currentMemoryBytes += it->getApproximateSize();
+                if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                    uasserted(ErrorCodes::ExceededMemoryLimit,
+                              str::stream()
+                                  << "$setUnion would use too much memory (" << currentMemoryBytes
+                                  << " bytes) and cannot spill to disk. Memory limit: "
+                                  << maxMemoryBytes << " bytes");
+                }
+            }
+        }
     }
     return Value(std::vector<Value>(unionedSet.begin(), unionedSet.end()));
 }
@@ -1066,6 +1108,9 @@ Value evaluate(const ExpressionZip& expr, const Document& root, Variables* varia
     output.reserve(outputLength);
     outputChild.reserve(inputs.size());
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (size_t row = 0; row < outputLength; row++) {
         outputChild.clear();
         for (size_t col = 0; col < inputs.size(); col++) {
@@ -1077,7 +1122,15 @@ Value evaluate(const ExpressionZip& expr, const Document& root, Variables* varia
                 outputChild.push_back(evaluatedDefaults[col]);
             }
         }
-        output.push_back(Value(outputChild));
+        Value rowValue(outputChild);
+        currentMemoryBytes += rowValue.getApproximateSize();
+        if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+            uasserted(ErrorCodes::ExceededMemoryLimit,
+                      str::stream() << "$zip would use too much memory (" << currentMemoryBytes
+                                    << " bytes) and cannot spill to disk. Memory limit: "
+                                    << maxMemoryBytes << " bytes");
+        }
+        output.push_back(std::move(rowValue));
     }
 
     return Value(std::move(output));

@@ -157,6 +157,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewObj(ArityType
     values.reserve(tmpVectorLen);
     names.reserve(tmpVectorLen);
 
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (ArityType idx = 0; idx < arity; idx += 2) {
         {
             auto [owned, tag, val] = getFromStack(idx);
@@ -169,6 +172,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewObj(ArityType
         }
         {
             auto [owned, tag, val] = getFromStack(idx + 1);
+            currentMemoryBytes += names.back().size() + value::getApproximateSize(tag, val);
+            if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+                uasserted(ErrorCodes::ExceededMemoryLimit,
+                          str::stream()
+                              << "$object would use too much memory (" << currentMemoryBytes
+                              << " bytes) and cannot spill to disk. Memory limit: "
+                              << maxMemoryBytes << " bytes");
+            }
             typeTags.push_back(tag);
             values.push_back(val);
         }

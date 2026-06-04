@@ -249,6 +249,19 @@ server_parameters:
             gt: 0
         redact: false
 
+    internalQueryMaxExpressionOutputBytes:
+        description: >-
+            Limits the size in bytes of an expression's materialized output (e.g. $array,
+            $concatArrays, $setUnion, $zip, object construction).
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMaxExpressionOutputBytes"
+        cpp_vartype: AtomicWord<int>
+        default:
+            expr: std::numeric_limits<int>::max()
+        validator:
+            gt: 0
+        redact: false
+
     internalQueryMaxAddToSetBytes:
         description: >-
             Limits the vector of values pushed into a single array while grouping with the

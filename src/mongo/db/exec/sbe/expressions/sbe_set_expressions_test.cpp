@@ -29,11 +29,14 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
@@ -329,5 +332,58 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIsSubset) {
     auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(1 << 2));
     slotAccessor2.reset(arrTag2, arrVal2);
     runAndAssertNothing(compiledExpr.get());
+}
+
+TEST_F(SBEBuiltinSetOpTest, SetUnionWithinLimitSucceeds) {
+    value::OwnedValueAccessor slotAccessor1, slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setUnionExpr = makeFunction("setUnion", makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto compiledExpr = compileExpression(*setUnionExpr);
+
+    const std::string largeStr(1024, 'a');
+    BSONArrayBuilder builder1;
+    BSONArrayBuilder builder2;
+    for (int i = 0; i < 5; ++i) {
+        builder1.append(largeStr + std::to_string(i));
+        builder2.append(largeStr + std::to_string(i + 5));
+    }
+    auto [arrTag1, arrVal1] = makeArray(builder1.arr());
+    slotAccessor1.reset(arrTag1, arrVal1);
+    auto [arrTag2, arrVal2] = makeArray(builder2.arr());
+    slotAccessor2.reset(arrTag2, arrVal2);
+
+    // 10 unique strings * ~1025 bytes = ~10KB; limit set well above that.
+    RAIIServerParameterControllerForTest limit("internalQueryMaxExpressionOutputBytes", 20 * 1024);
+    auto [resTag, resVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(resTag, resVal);
+
+    ASSERT(value::isArray(resTag));
+    ASSERT_EQUALS(value::getArraySize(resTag, resVal), 10u);
+}
+
+TEST_F(SBEBuiltinSetOpTest, SetUnionExceedsMemoryLimit) {
+    value::OwnedValueAccessor slotAccessor1, slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setUnionExpr = makeFunction("setUnion", makeVariable(arrSlot1), makeVariable(arrSlot2));
+    auto compiledExpr = compileExpression(*setUnionExpr);
+
+    const std::string largeStr(1024, 'a');
+    BSONArrayBuilder builder1;
+    BSONArrayBuilder builder2;
+    for (int i = 0; i < 5; ++i) {
+        builder1.append(largeStr + std::to_string(i));
+        builder2.append(largeStr + std::to_string(i + 5));
+    }
+    auto [arrTag1, arrVal1] = makeArray(builder1.arr());
+    slotAccessor1.reset(arrTag1, arrVal1);
+    auto [arrTag2, arrVal2] = makeArray(builder2.arr());
+    slotAccessor2.reset(arrTag2, arrVal2);
+
+    RAIIServerParameterControllerForTest limit("internalQueryMaxExpressionOutputBytes", 10 * 1024);
+    ASSERT_THROWS_CODE(runCompiledExpression(compiledExpr.get()),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
 }
 }  // namespace mongo::sbe

@@ -40,8 +40,20 @@ namespace exec::expression {
 Value evaluate(const ExpressionObject& expr, const Document& root, Variables* variables) {
     auto& expressions = expr.getChildExpressions();
     MutableDocument outputDoc(expressions.size());
+
+    size_t currentMemoryBytes = 0;
+    const size_t maxMemoryBytes = internalQueryMaxExpressionOutputBytes.loadRelaxed();
+
     for (auto&& pair : expressions) {
-        outputDoc.addField(pair.first, pair.second->evaluate(root, variables));
+        Value elemVal = pair.second->evaluate(root, variables);
+        currentMemoryBytes += pair.first.size() + elemVal.getApproximateSize();
+        if (MONGO_unlikely(currentMemoryBytes > maxMemoryBytes)) {
+            uasserted(ErrorCodes::ExceededMemoryLimit,
+                      str::stream() << "$object would use too much memory (" << currentMemoryBytes
+                                    << " bytes) and cannot spill to disk. Memory limit: "
+                                    << maxMemoryBytes << " bytes");
+        }
+        outputDoc.addField(pair.first, std::move(elemVal));
     }
     return outputDoc.freezeToValue();
 }
