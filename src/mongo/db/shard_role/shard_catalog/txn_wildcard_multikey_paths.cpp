@@ -34,16 +34,29 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/decorable.h"
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 namespace {
 
-const auto getTxnWildcardMultikeyPaths =
-    RecoveryUnit::Snapshot::declareDecoration<TxnWildcardMultikeyPaths>();
+const auto getTxnWildcardMultikeyPathsSlot =
+    RecoveryUnit::Snapshot::declareDecoration<boost::optional<TxnWildcardMultikeyPaths>>();
 
 }  // namespace
 
 TxnWildcardMultikeyPaths& TxnWildcardMultikeyPaths::get(OperationContext* opCtx) {
-    return getTxnWildcardMultikeyPaths(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
+    auto& slot =
+        getTxnWildcardMultikeyPathsSlot(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
+    if (!slot) {
+        slot.emplace();
+    }
+    return *slot;
+}
+
+const TxnWildcardMultikeyPaths* TxnWildcardMultikeyPaths::tryGet(OperationContext* opCtx) {
+    auto& slot =
+        getTxnWildcardMultikeyPathsSlot(shard_role_details::getRecoveryUnit(opCtx)->getSnapshot());
+    return slot ? &*slot : nullptr;
 }
 
 void TxnWildcardMultikeyPaths::append(const UUID& collectionUuid,

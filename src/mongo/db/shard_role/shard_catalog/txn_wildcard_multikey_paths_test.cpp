@@ -189,5 +189,25 @@ TEST_F(TxnWildcardMultikeyPathsTest, DiesWithSnapshotOnAbandon) {
     ASSERT_TRUE(cacheAfter.empty());
 }
 
+TEST_F(TxnWildcardMultikeyPathsTest, TryGetReturnsNullptrUntilGetIsCalled) {
+    ASSERT_EQ(TxnWildcardMultikeyPaths::tryGet(opCtx()), nullptr);
+
+    auto& cache = TxnWildcardMultikeyPaths::get(opCtx());
+    cache.append(testUuid, "wc", {FieldRef("a"_sd)});
+
+    const auto* tried = TxnWildcardMultikeyPaths::tryGet(opCtx());
+    ASSERT_NE(tried, nullptr);
+    ASSERT_FALSE(tried->empty());
+}
+
+TEST_F(TxnWildcardMultikeyPathsTest, TryGetIsNullptrAgainAfterAbandon) {
+    TxnWildcardMultikeyPaths::get(opCtx()).append(testUuid, "wc", {FieldRef("a"_sd)});
+    ASSERT_NE(TxnWildcardMultikeyPaths::tryGet(opCtx()), nullptr);
+
+    shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
+
+    ASSERT_EQ(TxnWildcardMultikeyPaths::tryGet(opCtx()), nullptr);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -55,18 +55,30 @@ namespace mongo {
  * The cache lives as a Snapshot decoration on the parent transaction's RecoveryUnit, so it:
  *   - Survives statement boundaries via TxnResources RU stash/unstash.
  *   - Is cleaned up when the parent RU is destroyed on transaction commit or abort.
+ *
+ * To keep the cost paid by hot non-wildcard read paths to a minimum, the decoration storage
+ * holds a `boost::optional<TxnWildcardMultikeyPaths>`. Snapshot construction therefore does not
+ * default-construct the underlying `absl::flat_hash_map`; only operations that actually need the
+ * cache (write path or wildcard-multikey reads in a multi-document transaction) pay the
+ * construction cost. See SERVER-128160.
  */
 class MONGO_MOD_PUBLIC TxnWildcardMultikeyPaths {
 public:
     /**
      * Returns the cache attached to the transaction's RecoveryUnit Snapshot for the given
-     * OperationContext. Lazily constructed via the Decoration mechanism — never null.
+     * OperationContext. Lazily constructs the cache on first call — never null.
      *
-     * Callers should generally check `opCtx->inMultiDocumentTransaction()` themselves before
-     * appending or reading, but the cache itself is safe to consult outside of a multi-doc
-     * transaction (it will simply be empty).
+     * Prefer `tryGet()` on hot read paths where the cache may not exist yet, to avoid paying the
+     * construction cost when there is nothing to read.
      */
     static TxnWildcardMultikeyPaths& get(OperationContext* opCtx);
+
+    /**
+     * Returns a pointer to the cache attached to the transaction's RecoveryUnit Snapshot, or
+     * nullptr if no caller has populated it yet. Does NOT construct the cache. Use on read paths
+     * that should be free when no side-committed wildcard multikey writes have happened.
+     */
+    static const TxnWildcardMultikeyPaths* tryGet(OperationContext* opCtx);
 
     /**
      * Record paths from a side-committed wildcard multikey write so subsequent reads on the

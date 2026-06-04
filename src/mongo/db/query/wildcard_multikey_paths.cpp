@@ -232,8 +232,10 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
     // The cache lives as a RecoveryUnit::Snapshot decoration, so it survives statement boundaries
     // via RU stash/unstash and dies automatically with the snapshot on abort or abandonment.
     if (opCtx->inMultiDocumentTransaction() && parentRu.isActive()) {
-        TxnWildcardMultikeyPaths::get(opCtx).appendMatchingPaths(
-            collectionUuid, index->descriptor()->indexName(), &multikeyPaths);
+        if (const auto* paths = TxnWildcardMultikeyPaths::tryGet(opCtx)) {
+            paths->appendMatchingPaths(
+                collectionUuid, index->descriptor()->indexName(), &multikeyPaths);
+        }
     }
 
     return multikeyPaths;
