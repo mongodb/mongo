@@ -453,7 +453,7 @@ feature_flags:
         cpp_varname: gFeatureFlagImprovedDepsAnalysis
         fcv_gated: false
         default: true
-        incremental_rollout_phase: released
+        incremental_rollout_phase: release
 
     featureFlagSbeTransformStages:
         description: "Feature flag to enable transform stages in SBE, including $addFields, $replaceRoot, $replaceWith, $project."

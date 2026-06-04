@@ -430,8 +430,8 @@ class FeatureFlagRolloutPhase(enum.Enum):
     IN_DEVELOPMENT = enum.auto()
     # Incremental rollout flag for feature that is ready to roll out; defaults to disabled.
     ROLLOUT = enum.auto()
-    # Incremental rollout flag for feature that is completely rolled out; defaults to enabled.
-    RELEASED = enum.auto()
+    # Incremental rollout flag for feature that is enabled by default.
+    RELEASE = enum.auto()
 
     @classmethod
     def bind(cls, string_value):
@@ -442,7 +442,7 @@ class FeatureFlagRolloutPhase(enum.Enum):
             "not_for_incremental_rollout": cls.NOT_FOR_INCREMENTAL_ROLLOUT,
             "in_development": cls.IN_DEVELOPMENT,
             "rollout": cls.ROLLOUT,
-            "released": cls.RELEASED,
+            "release": cls.RELEASE,
         }
         return bindings.get(string_value, None)
 
@@ -451,7 +451,7 @@ class FeatureFlagRolloutPhase(enum.Enum):
             FeatureFlagRolloutPhase.NOT_FOR_INCREMENTAL_ROLLOUT: "not_for_incremental_rollout",
             FeatureFlagRolloutPhase.IN_DEVELOPMENT: "in_development",
             FeatureFlagRolloutPhase.ROLLOUT: "rollout",
-            FeatureFlagRolloutPhase.RELEASED: "released",
+            FeatureFlagRolloutPhase.RELEASE: "release",
         }
         return bindings.get(self)
 
@@ -460,7 +460,7 @@ class FeatureFlagRolloutPhase(enum.Enum):
             FeatureFlagRolloutPhase.NOT_FOR_INCREMENTAL_ROLLOUT: "notForIncrementalRollout",
             FeatureFlagRolloutPhase.IN_DEVELOPMENT: "inDevelopment",
             FeatureFlagRolloutPhase.ROLLOUT: "rollout",
-            FeatureFlagRolloutPhase.RELEASED: "released",
+            FeatureFlagRolloutPhase.RELEASE: "release",
         }
         return bindings.get(self)
 

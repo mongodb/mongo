@@ -89,10 +89,10 @@ feature_flags:
       incremental_rollout_phase: in_development
       fcv_gated: false
 
-    featureFlagReleasedForTest:
-      description: "Incremental feature rollout flag in the 'released' phase"
-      cpp_varname: gFeatureFlagReleasedForTest
-      incremental_rollout_phase: released
+    featureFlagReleaseForTest:
+      description: "Incremental feature rollout flag in the 'release' phase"
+      cpp_varname: gFeatureFlagReleaseForTest
+      incremental_rollout_phase: release
       fcv_gated: false
 
     featureFlagSerializeForTest:

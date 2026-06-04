@@ -1932,7 +1932,7 @@ def is_unreleased_incremental_rollout_feature_flag(feature_flag):
 
 def is_incremental_feature_rollout_flag(feature_flag):
     """Determine if an idl.FeatureFlag is an Incremental Feature Rollout (IFR) flag
-    in any phase (in_development, rollout, or released) without validating its syntax.
+    in any phase (in_development, rollout, or release) without validating its syntax.
     """
     # type: (syntax.FeatureFlag) -> bool
 

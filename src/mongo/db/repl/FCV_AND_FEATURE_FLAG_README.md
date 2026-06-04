@@ -807,8 +807,8 @@ review.
   - Enable an IFR feature flag by changing the `incremental_rollout_phase` property in its
     specification from `in_development` to `rollout`, which will automatically make it enabled by
     default.
-    - After rollout completes, change this property to `released` on the master branch but not on
-      any release branches.
+    - After rollout completes, change this property to `release` on the master branch but not on any
+      release branches.
   - FCV-gated feature flags with default:true must have a specific release version associated in its
     definition.
   - **_We do not support disabling feature flags once they have been enabled via IDL in a release
@@ -903,19 +903,19 @@ A feature flag has the following properties:
   - See
     [Determining if a feature flag should be binary-compatible or FCV-gated](#determining-which-style-of-feature-flag-to-use)
     for guidelines on when each type of feature flag should be used.
-- incremental_rollout_phase: (`not_for_incremental_rollout`|`in_development`|`rollout`|`released`)
+- incremental_rollout_phase: (`not_for_incremental_rollout`|`in_development`|`rollout`|`release`)
   - Optional. Use the default value `not_for_incremental_rollout` for FCV-gated and
     binary-compatible feature flags.
   - To define an IFR flag, specify a value other than the default.
     - `in_development`: The flag will be disabled by default in testing and production.
     - `rollout`: The flag will be enabled by default at startup. In production, the incremental
       rollout procedure may temporarily disable the feature.
-    - `released`: The flag will be enabled by default in testing and production.
+    - `release`: The flag will be enabled by default in testing and production.
   - Only the default value `not_for_incremental_rollout` is valid when `fcv_gated` is true. A
     feature flag cannot be both an IFR flag and an FCV-gated flag.
   - The `default` property is optional for IFR feature flags. It is an error to specify a `default`
     value that does not match the rollout phase (`false` for `in_development` and `true` for
-    `rollout` or `released`).
+    `rollout` or `release`).
 - enable_on_transitional_fcv_UNSAFE: boolean
   - Optional. Can only be specified for FCV-gated feature flags (`fcv_gated: true`). Default value
     is `false`.
@@ -1319,7 +1319,7 @@ runtime. Test coverage for `in-development` IFR flags is included by the "all fe
 variants. Additionally, the "all non-rollback feature flags" and "roll back incremental feature
 flags" variants run tests with `rollout` IFR flags _disabled_ to ensure that it remains safe to turn
 features back off in the event that an IFR deployment needs to be rolled back. The former variant
-tests the server with all non-`rollout` flags turned on, and the latter only turns on released
+tests the server with all non-`rollout` flags turned on, and the latter only turns on release
 features (IFR flags in the `release` state and non-IFR flags with `default: true`). There is no test
 coverage for disabling IFR flags in the `release` state, because that is not a supported
 configuration.

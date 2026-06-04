@@ -2834,7 +2834,7 @@ class TestBinder(testcase.IDLTestcase):
                 featureFlagToaster:
                     description: "Make toast"
                     cpp_varname: gToaster
-                    incremental_rollout_phase: released
+                    incremental_rollout_phase: release
                     fcv_gated: false
             """)
         )
@@ -2846,7 +2846,7 @@ class TestBinder(testcase.IDLTestcase):
                 featureFlagToaster:
                     description: "Make toast"
                     cpp_varname: gToaster
-                    incremental_rollout_phase: released
+                    incremental_rollout_phase: release
                     default: true
                     fcv_gated: false
             """)
@@ -3058,7 +3058,7 @@ class TestBinder(testcase.IDLTestcase):
                 featureFlagToaster:
                     description: "Make toast"
                     cpp_varname: gToaster
-                    incremental_rollout_phase: released
+                    incremental_rollout_phase: release
                     default: true
                     fcv_gated: true
             """),

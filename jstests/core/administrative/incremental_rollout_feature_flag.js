@@ -1,6 +1,6 @@
 /**
- * Verifies the behavior of the "featureFlagInDevelopmentForTest" test Incremental Feature Rollout
- * (IFR) flag. Unlike regular feature flags, IFR flags can be toggled at runtime.
+ * Verifies the behavior of Incremental Feature Rollout (IFR) flags. Unlike regular feature flags,
+ * IFR flags can be toggled at runtime.
  * @tags: [
  *   # setParameter.
  *   command_not_supported_in_serverless,
@@ -11,8 +11,8 @@
  *   # Changes to the test feature flag by a simultaneous test would affect this test.
  *   incompatible_with_concurrency_simultaneous,
  *
- *   # Earlier versions of the server do not define the "featureFlagInDevelopmentForTest" server
- *   # parameter.
+ *   # Earlier versions of the server do not define the IFR test feature flag server
+ *   # parameters.
  *   requires_fcv_82,
  *   backport_required_multiversion,
  * ]
@@ -115,15 +115,15 @@ assert.eq(
     featureFlagInDevelopmentDetails,
 );
 
-// Check that the featureFlagInDevelopmentForTest "details" include the correct rollout phase.
-const featureFlagReleasedDetails = assert.commandWorked(
-    db.adminCommand({getParameter: {showDetails: true}, featureFlagReleasedForTest: 1}),
+// Check that the featureFlagReleaseForTest "details" include the correct rollout phase.
+const featureFlagReleaseDetails = assert.commandWorked(
+    db.adminCommand({getParameter: {showDetails: true}, featureFlagReleaseForTest: 1}),
 );
-assert("featureFlagReleasedForTest" in featureFlagReleasedDetails, featureFlagReleasedDetails);
+assert("featureFlagReleaseForTest" in featureFlagReleaseDetails, featureFlagReleaseDetails);
 assert.eq(
-    featureFlagReleasedDetails.featureFlagReleasedForTest.incrementalFeatureRolloutPhase,
-    "released",
-    featureFlagReleasedDetails,
+    featureFlagReleaseDetails.featureFlagReleaseForTest.incrementalFeatureRolloutPhase,
+    "release",
+    featureFlagReleaseDetails,
 );
 
 // Check that it's possible to query the list of IFR parameters.
@@ -154,4 +154,4 @@ assert(
 
 // Each of the "test" IFR flags should appear in the output.
 assert("featureFlagInDevelopmentForTest" in allIFRParams, allIFRParams);
-assert("featureFlagReleasedForTest" in allIFRParams, allIFRParams);
+assert("featureFlagReleaseForTest" in allIFRParams, allIFRParams);

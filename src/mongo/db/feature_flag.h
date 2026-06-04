@@ -353,7 +353,7 @@ enum class RolloutPhase {
     rollout,
 
     // The feature is enabled by default.
-    released,
+    release,
 };
 
 class MONGO_MOD_OPEN IncrementalRolloutFeatureFlag : public FeatureFlag {

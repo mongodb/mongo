@@ -336,8 +336,8 @@ void IncrementalRolloutFeatureFlag::appendFlagDetails(BSONObjBuilder& detailsBui
                 return "inDevelopment";
             case RolloutPhase::rollout:
                 return "rollout";
-            case RolloutPhase::released:
-                return "released";
+            case RolloutPhase::release:
+                return "release";
         }
         MONGO_UNREACHABLE_TASSERT(101023);
     }();

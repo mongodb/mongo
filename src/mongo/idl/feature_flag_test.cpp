@@ -468,26 +468,26 @@ TEST(IDLFeatureFlag, IncrementalRolloutFeatureFlag) {
     ASSERT_BSONOBJ_EQ_UNORDERED(firstFlagStats, secondFlagStats);
 }
 
-TEST(IDLFeatureFlag, ReleasedIncrementalRolloutFeatureFlag) {
-    // Because it is in the "released" state, "featureFlagReleasedForTest" should be enabled by
+TEST(IDLFeatureFlag, ReleaseIncrementalRolloutFeatureFlag) {
+    // Because it is in the "release" state, "featureFlagReleaseForTest" should be enabled by
     // default.
-    ASSERT(feature_flags::gFeatureFlagReleasedForTest.checkEnabled());
+    ASSERT(feature_flags::gFeatureFlagReleaseForTest.checkEnabled());
 
     // Verify that enabling the flag succeeds but has no effect.
-    auto* featureFlagReleasedForTest = getServerParameter("featureFlagReleasedForTest");
-    ASSERT_OK(featureFlagReleasedForTest->setFromString("true", boost::none));
-    ASSERT(feature_flags::gFeatureFlagReleasedForTest.checkEnabled());
+    auto* featureFlagReleaseForTest = getServerParameter("featureFlagReleaseForTest");
+    ASSERT_OK(featureFlagReleaseForTest->setFromString("true", boost::none));
+    ASSERT(feature_flags::gFeatureFlagReleaseForTest.checkEnabled());
 
     // Verify that disabling the flag succeeds.
-    ASSERT_OK(featureFlagReleasedForTest->setFromString("false", boost::none));
-    ASSERT(!feature_flags::gFeatureFlagReleasedForTest.checkEnabled());
+    ASSERT_OK(featureFlagReleaseForTest->setFromString("false", boost::none));
+    ASSERT(!feature_flags::gFeatureFlagReleaseForTest.checkEnabled());
 
     // Check the flag's stats, which should account for all three calls to 'checkEnabled()' but only
     // one "toggle," because the first call to 'setFromString()' does not change the flag's value.
-    auto firstFlagStats = readStatsFromFlag(feature_flags::gFeatureFlagReleasedForTest);
+    auto firstFlagStats = readStatsFromFlag(feature_flags::gFeatureFlagReleaseForTest);
     ASSERT_BSONOBJ_EQ_UNORDERED(firstFlagStats,
                                 BSONObjBuilder{}
-                                    .append("name", "featureFlagReleasedForTest")
+                                    .append("name", "featureFlagReleaseForTest")
                                     .append("value", false)
                                     .append("falseChecks", 1)
                                     .append("trueChecks", 2)
@@ -496,23 +496,23 @@ TEST(IDLFeatureFlag, ReleasedIncrementalRolloutFeatureFlag) {
 
     // Check the flag's stats again, to ensure that we did not alter their state by observing them.
     // (I.e, 'appendFlagStats()' should not change the 'falseChecks' and 'trueChecks' values.)
-    auto secondFlagStats = readStatsFromFlag(feature_flags::gFeatureFlagReleasedForTest);
+    auto secondFlagStats = readStatsFromFlag(feature_flags::gFeatureFlagReleaseForTest);
     ASSERT_BSONOBJ_EQ_UNORDERED(firstFlagStats, secondFlagStats);
 }
 
 TEST(IDLFeatureFlag, IncrementalFeatureRolloutContext) {
     // Initialize flags.
     feature_flags::gFeatureFlagInDevelopmentForTest.setForServerParameter(false);
-    feature_flags::gFeatureFlagReleasedForTest.setForServerParameter(true);
+    feature_flags::gFeatureFlagReleaseForTest.setForServerParameter(true);
 
     // Query an IFR flag using an IFR context.
     IncrementalFeatureRolloutContext ifrContext;
-    ASSERT(ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagReleasedForTest));
+    ASSERT(ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagReleaseForTest));
 
     // Querying the flag via the same IFR context should produce the same result, even if the flag
     // changed its value.
-    feature_flags::gFeatureFlagReleasedForTest.setForServerParameter(false);
-    ASSERT(ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagReleasedForTest));
+    feature_flags::gFeatureFlagReleaseForTest.setForServerParameter(false);
+    ASSERT(ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagReleaseForTest));
 
     // Query a second flag in order to save its value to the context as well.
     ASSERT_FALSE(ifrContext.getSavedFlagValue(feature_flags::gFeatureFlagInDevelopmentForTest));
@@ -532,18 +532,18 @@ TEST(IDLFeatureFlag, IncrementalFeatureRolloutContext) {
     }
 
     StringMap<bool> expectedValues = {{"featureFlagInDevelopmentForTest", false},
-                                      {"featureFlagReleasedForTest", true}};
+                                      {"featureFlagReleaseForTest", true}};
     ASSERT_EQ(observedValues, expectedValues) << savedFlagsArray;
 }
 
 TEST(IDLFeatureFlag, IFRContextDisableFlagPreviouslyTrue) {
-    auto& releasedFeatureFlag = feature_flags::gFeatureFlagReleasedForTest;
-    releasedFeatureFlag.setForServerParameter(true);
+    auto& releaseFeatureFlag = feature_flags::gFeatureFlagReleaseForTest;
+    releaseFeatureFlag.setForServerParameter(true);
     IncrementalFeatureRolloutContext ifrContext;
-    ASSERT(ifrContext.getSavedFlagValue(releasedFeatureFlag));
-    ifrContext.disableFlag(releasedFeatureFlag);
-    ASSERT_FALSE(ifrContext.getSavedFlagValue(releasedFeatureFlag));
-    ASSERT(releasedFeatureFlag.checkEnabled());
+    ASSERT(ifrContext.getSavedFlagValue(releaseFeatureFlag));
+    ifrContext.disableFlag(releaseFeatureFlag);
+    ASSERT_FALSE(ifrContext.getSavedFlagValue(releaseFeatureFlag));
+    ASSERT(releaseFeatureFlag.checkEnabled());
 }
 
 TEST(IDLFeatureFlag, IFRContextDisableFlagPreviouslyUnknown) {
@@ -565,7 +565,7 @@ TEST(IDLFeatureFlag, IFRContextDisableFlagPreviouslyFalse) {
 }
 
 TEST(IDLFeatureFlag, SerializeFlagValues) {
-    auto& releaseFeatureFlag = feature_flags::gFeatureFlagReleasedForTest;
+    auto& releaseFeatureFlag = feature_flags::gFeatureFlagReleaseForTest;
     releaseFeatureFlag.setForServerParameter(true);
 
     IncrementalFeatureRolloutContext ifrContext;
@@ -573,7 +573,7 @@ TEST(IDLFeatureFlag, SerializeFlagValues) {
     const auto& serializedResult = ifrContext.serializeFlagValues(
         std::vector<IncrementalRolloutFeatureFlag*>{&releaseFeatureFlag});
     ASSERT_EQ(serializedResult.size(), 1U);
-    ASSERT_EQ(serializedResult[0]["name"].String(), "featureFlagReleasedForTest");
+    ASSERT_EQ(serializedResult[0]["name"].String(), "featureFlagReleaseForTest");
     ASSERT_TRUE(serializedResult[0]["value"].Bool());
 }
 

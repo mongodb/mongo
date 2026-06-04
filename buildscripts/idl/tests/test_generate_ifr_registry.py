@@ -45,7 +45,7 @@ class TestGenerateIFRRegistry(unittest.TestCase):
         with open(path, "w", encoding="utf-8") as f:
             f.write(textwrap.dedent(content))
 
-    def test_collect_flags_picks_up_rollout_and_released(self):
+    def test_collect_flags_picks_up_rollout_and_release(self):
         with tempfile.TemporaryDirectory() as root:
             self._write(
                 os.path.join(root, "a.idl"),
@@ -62,12 +62,12 @@ class TestGenerateIFRRegistry(unittest.TestCase):
                 """
                 feature_flags:
                     featureFlagGamma:
-                        incremental_rollout_phase: released
+                        incremental_rollout_phase: release
                 """,
             )
-            rollout, released = generate_ifr_registry.collect_flags(root)
+            rollout, release = generate_ifr_registry.collect_flags(root)
         self.assertEqual(rollout, {"featureFlagAlpha"})
-        self.assertEqual(released, {"featureFlagGamma"})
+        self.assertEqual(release, {"featureFlagGamma"})
 
     def test_collect_flags_raises_on_overlap(self):
         # TODO SERVER-126893 delete this test.
@@ -85,7 +85,7 @@ class TestGenerateIFRRegistry(unittest.TestCase):
                 """
                 feature_flags:
                     featureFlagDup:
-                        incremental_rollout_phase: released
+                        incremental_rollout_phase: release
                 """,
             )
             with self.assertRaisesRegex(ValueError, "featureFlagDup"):
@@ -110,9 +110,9 @@ class TestGenerateIFRRegistry(unittest.TestCase):
                         incremental_rollout_phase: rollout
                 """,
             )
-            rollout, released = generate_ifr_registry.collect_flags(root)
+            rollout, release = generate_ifr_registry.collect_flags(root)
         self.assertEqual(rollout, set())
-        self.assertEqual(released, set())
+        self.assertEqual(release, set())
 
     def test_render_produces_stable_sorted_output(self):
         body = generate_ifr_registry.render_registry(
@@ -122,12 +122,12 @@ class TestGenerateIFRRegistry(unittest.TestCase):
         rollout_idx_a = body.index("featureFlagA")
         rollout_idx_b = body.index("featureFlagB")
         self.assertLess(rollout_idx_a, rollout_idx_b)
-        self.assertIn("released:\n  featureFlagC: {}", body)
+        self.assertIn("release:\n  featureFlagC: {}", body)
 
     def test_render_empty_sections_use_flow_style_empty_map(self):
         body = generate_ifr_registry.render_registry(set(), set())
         self.assertIn("rollout: {}", body)
-        self.assertIn("released: {}", body)
+        self.assertIn("release: {}", body)
 
     def test_collect_flags_ignores_unrelated_idl_content(self):
         """Adding non-flag content to an IDL file does not change the registry output."""
@@ -139,10 +139,10 @@ class TestGenerateIFRRegistry(unittest.TestCase):
                     featureFlagAlpha:
                         incremental_rollout_phase: rollout
                     featureFlagBeta:
-                        incremental_rollout_phase: released
+                        incremental_rollout_phase: release
                 """,
             )
-            rollout_before, released_before = generate_ifr_registry.collect_flags(root)
+            rollout_before, release_before = generate_ifr_registry.collect_flags(root)
 
             # Add unrelated content before, after, and between the flags.
             self._write(
@@ -159,16 +159,16 @@ class TestGenerateIFRRegistry(unittest.TestCase):
                     featureFlagUnrelated:
                         incremental_rollout_phase: in_development
                     featureFlagBeta:
-                        incremental_rollout_phase: released
+                        incremental_rollout_phase: release
                 commands:
                     someCommand:
                         description: "a command"
                 """,
             )
-            rollout_after, released_after = generate_ifr_registry.collect_flags(root)
+            rollout_after, release_after = generate_ifr_registry.collect_flags(root)
 
         self.assertEqual(rollout_before, rollout_after)
-        self.assertEqual(released_before, released_after)
+        self.assertEqual(release_before, release_after)
 
     def test_collect_flags_picks_up_new_flag_added_to_existing_idl(self):
         """Adding a new rollout flag to an IDL that already has flags registers it."""
@@ -212,8 +212,8 @@ class TestRegistryStaleness(unittest.TestCase):
         source_root = os.path.join(self._REPO_ROOT, generate_ifr_registry.DEFAULT_SOURCE_ROOT)
         registry_path = os.path.join(self._REPO_ROOT, generate_ifr_registry.DEFAULT_REGISTRY_PATH)
 
-        rollout, released = generate_ifr_registry.collect_flags(source_root)
-        expected = generate_ifr_registry.render_registry(rollout, released)
+        rollout, release = generate_ifr_registry.collect_flags(source_root)
+        expected = generate_ifr_registry.render_registry(rollout, release)
 
         self.assertTrue(
             os.path.exists(registry_path),
