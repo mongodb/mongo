@@ -29,36 +29,33 @@
 
 #include "mongo/otel/traces/trace_initialization.h"
 
-#include "mongo/config.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/otel/traces/trace_settings_gen.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
 #include "mongo/unittest/unittest.h"
 
+#include <gmock/gmock.h>
 #include <opentelemetry/trace/noop.h>
 #include <opentelemetry/trace/provider.h>
 
-namespace mongo {
+namespace mongo::otel::traces {
 namespace {
+
+constexpr auto kServiceName = "mongod";
 
 class TraceInitializationTest : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
         // Initialize TracerProviderService with no-op provider
-        auto tracerProviderService = otel::traces::TracerProviderService::create();
+        auto tracerProviderService = TracerProviderService::create();
         tracerProviderService->setTracerProvider_ForTest(
             std::make_shared<opentelemetry::trace::NoopTracerProvider>());
-        otel::traces::TracerProviderService::set(getServiceContext(),
-                                                 std::move(tracerProviderService));
-
-        otel::traces::gOpenTelemetryHttpEndpoint.clear();
-        otel::traces::gOpenTelemetryTraceDirectory.clear();
+        TracerProviderService::set(getServiceContext(), std::move(tracerProviderService));
     }
 
     void tearDown() override {
-        // Clear the TracerProviderService
-        otel::traces::TracerProviderService::set(getServiceContext(), nullptr);
+        TracerProviderService::set(getServiceContext(), nullptr);
         ServiceContextTest::tearDown();
     }
 };
@@ -68,61 +65,96 @@ bool isNoop(opentelemetry::trace::TracerProvider* provider) {
 }
 
 TEST_F(TraceInitializationTest, NoTraceProvider) {
-    ASSERT_OK(otel::traces::initialize(getServiceContext(), "mongod"));
+    ASSERT_OK(otel::traces::initialize(getServiceContext(), kServiceName));
 
-    auto tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    auto tracerProviderService = TracerProviderService::get(getServiceContext());
     ASSERT_TRUE(tracerProviderService);
-    ASSERT_FALSE(tracerProviderService->isEnabled());
+    EXPECT_FALSE(tracerProviderService->isEnabled());
 }
 
 TEST_F(TraceInitializationTest, Shutdown) {
-    otel::traces::shutdown(getServiceContext());
+    shutdown(getServiceContext());
 
-    auto tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    auto tracerProviderService = TracerProviderService::get(getServiceContext());
     ASSERT_TRUE(tracerProviderService);
-    ASSERT_FALSE(tracerProviderService->isEnabled());
+    EXPECT_FALSE(tracerProviderService->isEnabled());
 
-    otel::traces::gOpenTelemetryTraceDirectory = "/tmp/";
-    otel::traces::shutdown(getServiceContext());
+    RAIIServerParameterControllerForTest directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
+    shutdown(getServiceContext());
 
-    // After calling shutdown, the service should still exist but be disabled
-    tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    tracerProviderService = TracerProviderService::get(getServiceContext());
     ASSERT_TRUE(tracerProviderService);
-    ASSERT_FALSE(tracerProviderService->isEnabled());
+    EXPECT_FALSE(tracerProviderService->isEnabled());
 }
 
 TEST_F(TraceInitializationTest, FileTraceProvider) {
-    otel::traces::gOpenTelemetryTraceDirectory = "/tmp/";
-    ASSERT_OK(otel::traces::initialize(getServiceContext(), "mongod"));
+    RAIIServerParameterControllerForTest directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
+    ASSERT_OK(initialize(getServiceContext(), kServiceName));
 
-    auto tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    auto tracerProviderService = TracerProviderService::get(getServiceContext());
     ASSERT_TRUE(tracerProviderService);
-    ASSERT_TRUE(tracerProviderService->isEnabled());
-    ASSERT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
+    EXPECT_TRUE(tracerProviderService->isEnabled());
+    EXPECT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
 }
 
 TEST_F(TraceInitializationTest, HttpTraceProvider) {
-    otel::traces::gOpenTelemetryHttpEndpoint = "http://localhost:4318/v1/traces";
-    ASSERT_OK(otel::traces::initialize(getServiceContext(), "mongod"));
+    RAIIServerParameterControllerForTest endpointParam{"opentelemetryHttpEndpoint",
+                                                       "http://localhost:4318/v1/traces"};
+    ASSERT_OK(initialize(getServiceContext(), kServiceName));
 
-    auto tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    auto tracerProviderService = TracerProviderService::get(getServiceContext());
     ASSERT_TRUE(tracerProviderService);
-    ASSERT_TRUE(tracerProviderService->isEnabled());
-    ASSERT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
+    EXPECT_TRUE(tracerProviderService->isEnabled());
+    EXPECT_FALSE(isNoop(tracerProviderService->getTracerProvider().get()));
 }
 
-TEST_F(TraceInitializationTest, HttpAndDirectory) {
-    otel::traces::gOpenTelemetryHttpEndpoint = "http://localhost:4318/v1/traces";
-    otel::traces::gOpenTelemetryTraceDirectory = "/tmp/";
-    ASSERT_THROWS_CODE(otel::traces::initialize(getServiceContext(), "mongod"),
-                       DBException,
-                       ErrorCodes::InvalidOptions);
+TEST_F(TraceInitializationTest, HttpAndDirectorySetSimultaneouslyFails) {
+    RAIIServerParameterControllerForTest endpointParam{"opentelemetryHttpEndpoint",
+                                                       "http://localhost:4318/v1/traces"};
+    RAIIServerParameterControllerForTest directoryParam{"opentelemetryTraceDirectory", "/tmp/"};
+    ASSERT_THROWS_CODE(
+        initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
 
-    auto tracerProviderService = otel::traces::TracerProviderService::get(getServiceContext());
+    auto tracerProviderService = TracerProviderService::get(getServiceContext());
     ASSERT_TRUE(tracerProviderService);
-    ASSERT_TRUE(tracerProviderService->isEnabled());
-    ASSERT_TRUE(isNoop(tracerProviderService->getTracerProvider().get()));
+    EXPECT_TRUE(tracerProviderService->isEnabled());
+    EXPECT_TRUE(isNoop(tracerProviderService->getTracerProvider().get()));
+}
+
+TEST_F(TraceInitializationTest, InvalidCompressionFails) {
+    RAIIServerParameterControllerForTest compressionParam{"openTelemetryTracingCompression",
+                                                          "zstd"};
+    ASSERT_THROWS_CODE(
+        initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(TraceInitializationTest, GzipCompressionWithoutHttpEndpointFails) {
+    RAIIServerParameterControllerForTest compressionParam{"openTelemetryTracingCompression",
+                                                          "gzip"};
+    ASSERT_THROWS_CODE(
+        initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(TraceInitializationTest, GzipCompressionWithHttpEndpointSucceeds) {
+    RAIIServerParameterControllerForTest compressionParam{"openTelemetryTracingCompression",
+                                                          "gzip"};
+    RAIIServerParameterControllerForTest endpointParam{"opentelemetryHttpEndpoint",
+                                                       "http://localhost:4318/v1/traces"};
+    ASSERT_OK(initialize(getServiceContext(), kServiceName));
+}
+
+TEST_F(TraceInitializationTest, MaxBatchSizeExceedsMaxQueueSizeFails) {
+    RAIIServerParameterControllerForTest batchSizeParam{"openTelemetryTracingMaxBatchSize", 5000};
+    RAIIServerParameterControllerForTest queueSizeParam{"openTelemetryTracingMaxQueueSize", 100};
+    ASSERT_THROWS_CODE(
+        initialize(getServiceContext(), kServiceName), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(TraceInitializationTest, MaxBatchSizeEqualToMaxQueueSizeSucceeds) {
+    RAIIServerParameterControllerForTest batchSizeParam{"openTelemetryTracingMaxBatchSize", 512};
+    RAIIServerParameterControllerForTest queueSizeParam{"openTelemetryTracingMaxQueueSize", 512};
+    ASSERT_OK(initialize(getServiceContext(), kServiceName));
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::otel::traces

@@ -29,6 +29,7 @@
 
 #include "mongo/otel/traces/tracer_provider_service.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
@@ -48,10 +49,28 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo::otel::traces {
-
 namespace {
+
 const auto getTracerProviderService =
     ServiceContext::declareDecoration<std::unique_ptr<TracerProviderService>>();
+
+/** Populates BatchSpanProcessorOptions from the current tracing server parameters. */
+opentelemetry::sdk::trace::BatchSpanProcessorOptions makeBatchSpanProcessorOptions() {
+    opentelemetry::sdk::trace::BatchSpanProcessorOptions opts;
+    opts.max_queue_size = static_cast<size_t>(gOpenTelemetryTracingMaxQueueSize);
+    opts.max_export_batch_size = static_cast<size_t>(gOpenTelemetryTracingMaxBatchSize);
+    opts.schedule_delay_millis =
+        std::chrono::milliseconds(gOpenTelemetryTracingBatchExportIntervalMillis);
+    return opts;
+}
+
+/** Builds the OTel Resource with service identity attributes. */
+opentelemetry::sdk::resource::Resource makeResource(StringData name, StringData pid) {
+    opentelemetry::sdk::resource::ResourceAttributes attrs;
+    attrs["service.name"] = std::string(name);
+    attrs["service.instance.id"] = std::string(pid);
+    return opentelemetry::sdk::resource::Resource::Create(attrs);
+}
 }  // namespace
 
 TracerProviderService* TracerProviderService::get(ServiceContext* serviceContext) {
@@ -73,22 +92,18 @@ Status TracerProviderService::initializeHttp(std::string name, std::string endpo
           "name"_attr = name,
           "endpoint"_attr = endpoint);
 
-    auto pid = ProcessId::getCurrent().toString();
+    const auto pid = ProcessId::getCurrent().toString();
 
     opentelemetry::exporter::otlp::OtlpHttpExporterOptions opts;
-    opts.url = endpoint;
+    opts.url = std::move(endpoint);
+    opts.compression = gOpenTelemetryTracingCompression;
 
-    const opentelemetry::sdk::trace::BatchSpanProcessorOptions batchSpanProcessorOptions;
     auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(opts);
     auto processor = opentelemetry::sdk::trace::BatchSpanProcessorFactory::Create(
-        std::move(exporter), std::move(batchSpanProcessorOptions));
+        std::move(exporter), makeBatchSpanProcessorOptions());
 
-    auto resourceAttributes = opentelemetry::sdk::resource::ResourceAttributes{
-        {"service.name", name}, {"service.instance.id", pid}};
-    auto resource = opentelemetry::sdk::resource::Resource::Create(resourceAttributes);
-
-    _tracerProvider =
-        opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
+    _tracerProvider = opentelemetry::sdk::trace::TracerProviderFactory::Create(
+        std::move(processor), makeResource(name, pid));
     _enabled = true;
 
     return Status::OK();
@@ -100,24 +115,19 @@ Status TracerProviderService::initializeFile(std::string name, std::string direc
           "name"_attr = name,
           "directory"_attr = directory);
 
-    auto pid = ProcessId::getCurrent().toString();
+    const auto pid = ProcessId::getCurrent().toString();
 
     opentelemetry::exporter::otlp::OtlpFileExporterOptions opts;
     opentelemetry::exporter::otlp::OtlpFileClientFileSystemOptions sysOpts;
     sysOpts.file_pattern = fmt::format("{}/{}-{}-%Y%m%d-trace.jsonl", directory, name, pid);
-    opts.backend_options = sysOpts;
+    opts.backend_options = std::move(sysOpts);
 
-    const opentelemetry::sdk::trace::BatchSpanProcessorOptions batchSpanProcessorOptions;
     auto exporter = opentelemetry::exporter::otlp::OtlpFileExporterFactory::Create(opts);
     auto processor = opentelemetry::sdk::trace::BatchSpanProcessorFactory::Create(
-        std::move(exporter), std::move(batchSpanProcessorOptions));
+        std::move(exporter), makeBatchSpanProcessorOptions());
 
-    auto resourceAttributes = opentelemetry::sdk::resource::ResourceAttributes{
-        {"service.name", name}, {"service.instance.id", pid}};
-    auto resource = opentelemetry::sdk::resource::Resource::Create(resourceAttributes);
-
-    _tracerProvider =
-        opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
+    _tracerProvider = opentelemetry::sdk::trace::TracerProviderFactory::Create(
+        std::move(processor), makeResource(name, pid));
     _enabled = true;
 
     return Status::OK();

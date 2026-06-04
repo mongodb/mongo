@@ -33,8 +33,6 @@
 #include "mongo/otel/traces/trace_settings_gen.h"
 #include "mongo/otel/traces/tracer_provider_service.h"
 
-#include <chrono>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 namespace mongo {
@@ -73,19 +71,39 @@ void shutdownTracerProvider(ServiceContext* serviceContext) {
     }
 }
 
+/** Throws InvalidOptions if any combination of server parameters is logically inconsistent. */
+void validateOptions() {
+    uassert(
+        ErrorCodes::InvalidOptions,
+        "opentelemetryHttpEndpoint and opentelemetryTraceDirectory cannot be set simultaneously",
+        gOpenTelemetryHttpEndpoint.empty() || gOpenTelemetryTraceDirectory.empty());
+
+    uassert(ErrorCodes::InvalidOptions,
+            "openTelemetryTracingCompression must be `none` or `gzip`",
+            gOpenTelemetryTracingCompression == "none" ||
+                gOpenTelemetryTracingCompression == "gzip");
+
+    uassert(
+        ErrorCodes::InvalidOptions,
+        "openTelemetryTracingCompression must be `none` unless opentelemetryHttpEndpoint is set",
+        !gOpenTelemetryHttpEndpoint.empty() || gOpenTelemetryTracingCompression == "none");
+
+    uassert(ErrorCodes::InvalidOptions,
+            "openTelemetryTracingMaxBatchSize must be <= openTelemetryTracingMaxQueueSize",
+            gOpenTelemetryTracingMaxBatchSize <= gOpenTelemetryTracingMaxQueueSize);
+}
+
 }  // namespace
 
 Status initialize(ServiceContext* serviceContext, std::string name) {
-    uassert(
-        ErrorCodes::InvalidOptions,
-        "gOpenTelemetryHttpEndpoint and gOpenTelemetryTraceDirectory cannot be set simultaneously",
-        gOpenTelemetryHttpEndpoint.empty() || gOpenTelemetryTraceDirectory.empty());
-
     if (!serviceContext) {
         return Status(ErrorCodes::InternalError, "No global ServiceContext available");
     }
 
-    // Initialize the TracerProviderService if it doesn't exist
+    validateOptions();
+
+    // In production mongod this is always a fresh service; in tests, callers may pre-set a
+    // mock provider via TracerProviderService::set(), so only create one if absent.
     if (!TracerProviderService::get(serviceContext)) {
         TracerProviderService::set(serviceContext, TracerProviderService::create());
     }
@@ -105,7 +123,6 @@ void shutdown(ServiceContext* serviceContext) {
         shutdownTracerProvider(serviceContext);
     }
 }
-
 
 }  // namespace traces
 }  // namespace otel

@@ -46,3 +46,38 @@ server_parameters:
         cpp_varname: gOpenTelemetryHttpEndpoint
         cpp_vartype: std::string
         redact: false
+    openTelemetryTracingCompression:
+        description: >-
+            Compression type for exporting OTel traces. Valid options are ["none", "gzip"]. Default
+            is "none". Values other than "none" are only supported for the HTTP exporter.
+        set_at: startup
+        cpp_varname: gOpenTelemetryTracingCompression
+        cpp_vartype: std::string
+        redact: false
+        default: none
+    openTelemetryTracingBatchExportIntervalMillis:
+        description: The time interval in milliseconds between two consecutive batch span exports.
+        set_at: startup
+        cpp_varname: gOpenTelemetryTracingBatchExportIntervalMillis
+        cpp_vartype: int
+        redact: false
+        default: 1000
+        validator: {gte: 1}
+    openTelemetryTracingMaxBatchSize:
+        description: >-
+            The maximum number of spans to export in a single batch. Must be less than or equal to
+            openTelemetryTracingMaxQueueSize.
+        set_at: startup
+        cpp_varname: gOpenTelemetryTracingMaxBatchSize
+        cpp_vartype: int
+        redact: false
+        default: 512
+        validator: {gte: 1}
+    openTelemetryTracingMaxQueueSize:
+        description: The maximum number of spans that can be queued before spans are dropped.
+        set_at: startup
+        cpp_varname: gOpenTelemetryTracingMaxQueueSize
+        cpp_vartype: int
+        redact: false
+        default: 2048
+        validator: {gte: 1}
