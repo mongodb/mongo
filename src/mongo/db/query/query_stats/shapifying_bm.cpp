@@ -66,11 +66,10 @@ auto makeFindKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
         query_benchmark_constants::kCollectionType);
 }
 
-int shapifyAndHashRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const ParsedFindCommand& parsedFind) {
+auto shapifyAndHashRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           const ParsedFindCommand& parsedFind) {
     auto key = makeFindKey(expCtx, parsedFind);
-    [[maybe_unused]] auto hash = absl::HashOf(key);
-    return 0;
+    return absl::HashOf(key);
 }
 
 void runBenchmark(BSONObj predicate,

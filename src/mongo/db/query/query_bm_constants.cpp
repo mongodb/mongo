@@ -473,5 +473,62 @@ const UpdateSpec& getUpdateSpec(const ModifierUpdateComplexity& complexity, bool
     }
 }
 
+// Delete benchmark constants
+
+// Let delete specs: predicates using $expr with let variables.
+
+const DeleteSpec kDeleteWithSimpleLet = {
+    .deletes = {fromjson(R"({ "$expr": { "$gt": ["$price", "$$maxPrice"] } })")},
+    .let = fromjson(R"({ "maxPrice": 100 })")};
+
+const DeleteSpec kDeleteWithComplexLet = {.deletes = {fromjson(R"({
+        "$expr": { "$and": [
+            { "$gt": [{ "$multiply": ["$price", "$quantity"] }, "$$minTotal"] },
+            { "$or": [
+                { "$eq": ["$category", "$$primaryCategory"] },
+                { "$eq": ["$category", "$$secondaryCategory"] }
+            ]},
+            { "$gte": [
+                { "$size": { "$filter": {
+                    "input": "$orders",
+                    "cond": { "$eq": ["$$this.status", "completed"] }
+                }}},
+                "$$minCompletedOrders"
+            ]},
+            { "$lte": [{ "$subtract": ["$$endDate", "$createdAt"] }, "$$maxAge"] }
+        ]}
+    })")},
+                                          .let = fromjson(R"({
+        "minTotal": 500,
+        "primaryCategory": "electronics",
+        "secondaryCategory": "appliances",
+        "endDate": 1750000000,
+        "maxAge": 86400000,
+        "minCompletedOrders": 3
+    })")};
+
+const DeleteSpec& getDeleteWithLetSpec(const LetDeleteComplexity& complexity) {
+    switch (complexity) {
+        case LetDeleteComplexity::kSimple:
+            return kDeleteWithSimpleLet;
+        case LetDeleteComplexity::kComplex:
+            return kDeleteWithComplexLet;
+        default:
+            MONGO_UNREACHABLE_TASSERT(11400703);
+    }
+}
+
+// Multi-op delete specs: a realistic bulk-delete command with several independent operations,
+// each targeting a different class of documents to be purged.
+const DeleteSpec kMultiOpDeleteSpec = {{
+    {fromjson(R"({ "status": "inactive", "lastLogin": { "$lt": 1700000000 } })")},
+    {fromjson(
+        R"({ "region": "EU", "gdprDeleteRequested": true, "dataRetentionExpiry": { "$lt": 1700000000 } })")},
+    {fromjson(
+        R"({ "accountType": "trial", "trialExpiry": { "$lt": 1700000000 }, "upgraded": { "$ne": true } })")},
+    {fromjson(
+        R"({ "email": { "$regex": "@deleted\\.example\\.com$" }, "deletedAt": { "$exists": true }, "purged": false })")},
+}};
+
 }  // namespace query_benchmark_constants
 }  // namespace mongo

@@ -189,3 +189,17 @@ mongo_cc_benchmark(
         "//src/mongo/db/query/write_ops:parsed_update",
     ],
 )
+
+mongo_cc_benchmark(
+    name = "shapifying_delete_bm",
+    srcs = [
+        "shapifying_delete_bm.cpp",
+    ],
+    tags = ["query_bm"],
+    deps = [
+        ":delete_key",
+        "//src/mongo/db/query:query_bm_constants",
+        "//src/mongo/db/query:query_fcv_environment_for_test",
+        "//src/mongo/db/query:query_test_service_context",
+    ],
+)

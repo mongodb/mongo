@@ -24,6 +24,7 @@ selector:
     - bazel-bin/**/shapifying_bm*
     - bazel-bin/**/shapifying_insert_bm*
     - bazel-bin/**/shapifying_update_bm*
+    - bazel-bin/**/shapifying_delete_bm*
     - bazel-bin/**/sbe_builder_bm*
 
 executor:

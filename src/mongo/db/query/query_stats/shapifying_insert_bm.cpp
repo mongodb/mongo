@@ -46,24 +46,21 @@ namespace {
 // SHA-256 hash of InsertCmdShape. The InsertKey hash is on the hot path; SHA-256 is sampled only.
 enum class ShapifyInsertTestType : int { kGenerateInsertKey = 0, kSHA256Hash };
 
-int shapifyAndGenerateKey(OperationContext* opCtx,
-                          const write_ops::InsertCommandRequest& insertCommandRequest) {
+auto shapifyAndGenerateKey(OperationContext* opCtx,
+                           const write_ops::InsertCommandRequest& insertCommandRequest) {
     query_stats::InsertKey key(opCtx,
                                insertCommandRequest,
                                std::make_unique<query_shape::InsertCmdShape>(insertCommandRequest),
                                query_benchmark_constants::kCollectionType);
 
-    [[maybe_unused]] auto hash = absl::HashOf(key);
-    return 0;
+    return absl::HashOf(key);
 }
 
-int shapifyAndSHA256Hash(OperationContext* opCtx,
-                         const write_ops::InsertCommandRequest& insertCommandRequest) {
+auto shapifyAndSHA256Hash(OperationContext* opCtx,
+                          const write_ops::InsertCommandRequest& insertCommandRequest) {
     auto insertQueryShape = std::make_unique<query_shape::InsertCmdShape>(insertCommandRequest);
 
-    [[maybe_unused]] auto sha256hash =
-        insertQueryShape->sha256Hash(opCtx, SerializationContext::stateDefault());
-    return 0;
+    return insertQueryShape->sha256Hash(opCtx, SerializationContext::stateDefault());
 }
 
 void runBenchmark(int numDocuments,

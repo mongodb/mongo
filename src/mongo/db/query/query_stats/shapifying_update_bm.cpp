@@ -52,9 +52,9 @@ namespace {
 // We will compute QSH all the time on the hot path, while $queryStats is sampling only.
 enum class ShapifyUpdateTestType : int { kGenerateUpdateKey = 0, kSHA256Hash };
 
-int shapifyAndGenerateKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const ParsedUpdate& parsedUpdate,
-                          const write_ops::UpdateCommandRequest& updateCommandRequest) {
+auto shapifyAndGenerateKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           const ParsedUpdate& parsedUpdate,
+                           const write_ops::UpdateCommandRequest& updateCommandRequest) {
     query_stats::UpdateKey key(
         expCtx,
         updateCommandRequest,
@@ -62,19 +62,17 @@ int shapifyAndGenerateKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
         std::make_unique<query_shape::UpdateCmdShape>(updateCommandRequest, parsedUpdate, expCtx),
         query_benchmark_constants::kCollectionType);
 
-    [[maybe_unused]] auto hash = absl::HashOf(key);
-    return 0;
+    return absl::HashOf(key);
 }
 
-int shapifyAndSHA256Hash(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                         const ParsedUpdate& parsedUpdate,
-                         const write_ops::UpdateCommandRequest& updateCommandRequest) {
+auto shapifyAndSHA256Hash(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          const ParsedUpdate& parsedUpdate,
+                          const write_ops::UpdateCommandRequest& updateCommandRequest) {
     auto updateQueryShape =
         std::make_unique<query_shape::UpdateCmdShape>(updateCommandRequest, parsedUpdate, expCtx);
 
-    [[maybe_unused]] auto sha256hash = updateQueryShape->sha256Hash(
-        expCtx->getOperationContext(), SerializationContext::stateDefault());
-    return 0;
+    return updateQueryShape->sha256Hash(expCtx->getOperationContext(),
+                                        SerializationContext::stateDefault());
 }
 
 void runBenchmark(BSONObj predicate,

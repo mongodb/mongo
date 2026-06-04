@@ -33,6 +33,8 @@
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/util/modules.h"
 
+#include <vector>
+
 namespace mongo {
 namespace query_benchmark_constants {
 extern const BSONObj kMockMetadataWrapper;
@@ -80,6 +82,22 @@ extern const UpdateSpec kPipelineUpdateSimple;
 extern const UpdateSpec kPipelineUpdateWithConstants;
 extern const UpdateSpec kPipelineUpdateWithMultipleStages;
 extern const UpdateSpec kPipelineUpdateWithMultipleStagesAndExpressions;
+
+struct DeleteSpec {
+    std::vector<BSONObj> deletes;
+    boost::optional<BSONObj> let;
+};
+
+// Complexity of a delete predicate that uses $expr with let variables.
+enum class LetDeleteComplexity : int {
+    kSimple = 0,
+    kComplex,
+};
+
+const DeleteSpec& getDeleteWithLetSpec(const LetDeleteComplexity& complexity);
+
+// A set of delete specs representing a realistic bulk-delete command with multiple operations.
+extern const DeleteSpec kMultiOpDeleteSpec;
 
 constexpr auto kCollectionType = query_shape::CollectionType::kCollection;
 
