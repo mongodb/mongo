@@ -80,9 +80,9 @@ TEST_F(SBEBsonSizeTest, ComputesSizeForSbeObject) {
     auto [tagArg1, valArg1] = value::makeNewString("Test string element");
     auto [tagArg2, valArg2] = value::makeNewObject();
     auto obj = value::getObjectView(valArg2);
-    obj->push_back("name", tagArg1, valArg1);
-    obj->push_back("age", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(32));
-    obj->push_back("citizen", value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+    obj->push_back_raw("name", tagArg1, valArg1);
+    obj->push_back_raw("age", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(32));
+    obj->push_back_raw("citizen", value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
     value::ValueGuard argGuard(tagArg2, valArg2);
 
     slotAccessor.reset(value::TypeTags::Object, valArg2);
@@ -110,10 +110,10 @@ TEST_F(SBEBsonSizeTest, ComputesSizeForLargeSbeObject) {
     auto [tagStr4, valStr4] = value::makeNewString(std::string(longStringLength, 'D'));
     auto [tagObj, valObj] = value::makeNewObject();
     auto obj = value::getObjectView(valObj);
-    obj->push_back("a", tagStr1, valStr1);
-    obj->push_back("b", tagStr2, valStr2);
-    obj->push_back("c", tagStr3, valStr3);
-    obj->push_back("d", tagStr4, valStr4);
+    obj->push_back_raw("a", tagStr1, valStr1);
+    obj->push_back_raw("b", tagStr2, valStr2);
+    obj->push_back_raw("c", tagStr3, valStr3);
+    obj->push_back_raw("d", tagStr4, valStr4);
     value::ValueGuard argGuard(tagObj, valObj);
 
     slotAccessor.reset(value::TypeTags::Object, valObj);

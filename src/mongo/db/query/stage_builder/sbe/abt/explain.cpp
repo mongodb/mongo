@@ -617,7 +617,7 @@ private:
 
     void addField(const std::string& fieldName, sbe::value::TypeTags tag, sbe::value::Value val) {
         uassert(6624075, "Duplicate field name", _fieldNameSet.insert(fieldName).second);
-        sbe::value::getObjectView(_val)->push_back(fieldName, tag, val);
+        sbe::value::getObjectView(_val)->push_back_raw(fieldName, tag, val);
     }
 
     void reset() {

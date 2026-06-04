@@ -141,8 +141,8 @@ inline auto _carray(auto&&... elements) {
 
     auto [tag, val] = makeNewArray();
     auto arr = getArrayView(val);
-    (arr->push_back(copyValue(elements._n.template cast<Constant>()->get().tag,
-                              elements._n.template cast<Constant>()->get().value)),
+    (arr->push_back_raw(copyValue(elements._n.template cast<Constant>()->get().tag,
+                                  elements._n.template cast<Constant>()->get().value)),
      ...);
 
     return ExprHolder{make<Constant>(tag, val)};

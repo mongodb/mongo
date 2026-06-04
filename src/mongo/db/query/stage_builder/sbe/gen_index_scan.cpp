@@ -1004,12 +1004,12 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
         auto obj = sbe::value::getObjectView(val);
         sbe::value::ValueGuard guard{tag, val};
         obj->reserve(2);
-        obj->push_back("l"_sd,
-                       sbe::value::TypeTags::keyString,
-                       sbe::value::makeKeyString(std::move(lowKey)).second);
-        obj->push_back("h"_sd,
-                       sbe::value::TypeTags::keyString,
-                       sbe::value::makeKeyString(std::move(highKey)).second);
+        obj->push_back_raw("l"_sd,
+                           sbe::value::TypeTags::keyString,
+                           sbe::value::makeKeyString(std::move(lowKey)).second);
+        obj->push_back_raw("h"_sd,
+                           sbe::value::TypeTags::keyString,
+                           sbe::value::makeKeyString(std::move(highKey)).second);
         guard.reset();
         arr->push_back_raw(tag, val);
     }

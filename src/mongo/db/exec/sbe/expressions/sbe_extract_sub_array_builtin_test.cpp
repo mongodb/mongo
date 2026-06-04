@@ -250,7 +250,7 @@ TEST_F(SBEBuiltinExtractSubArrayTest, MemoryManagement) {
 
         const auto [fieldTag, fieldVal] = value::makeNewString("not so small string"_sd);
         ASSERT_EQ(value::TypeTags::StringBig, fieldTag);
-        obj->push_back("field"_sd, fieldTag, fieldVal);
+        obj->push_back_raw("field"_sd, fieldTag, fieldVal);
         const auto [arrTag, arrVal] = value::makeNewArray();
         auto arr = value::getArrayView(arrVal);
         arr->push_back_raw(objTag, objVal);

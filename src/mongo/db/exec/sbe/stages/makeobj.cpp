@@ -149,7 +149,7 @@ void MakeObjStageBase<O>::projectField(value::Object* obj, size_t idx) {
     auto [tag, val] = p.second->getViewOfValue();
     if (tag != value::TypeTags::Nothing) {
         auto [tagCopy, valCopy] = value::copyValue(tag, val);
-        obj->push_back(p.first, tagCopy, valCopy);
+        obj->push_back_raw(p.first, tagCopy, valCopy);
     }
 }
 
@@ -222,7 +222,7 @@ void MakeObjStageBase<MakeObjOutputType::Object>::produceObject() {
                         if (found == isInclusion) {
                             auto [fieldTag, fieldVal] = bson::convertToView(be, end, sv.size());
                             auto [copyTag, copyVal] = value::copyValue(fieldTag, fieldVal);
-                            obj->push_back(sv, copyTag, copyVal);
+                            obj->push_back_raw(sv, copyTag, copyVal);
                         }
 
                         numFieldsRemaining -= found;
@@ -254,7 +254,7 @@ void MakeObjStageBase<MakeObjOutputType::Object>::produceObject() {
 
                     auto [fieldTag, fieldVal] = bson::convertToView(be, end, sv.size());
                     auto [copyTag, copyVal] = value::copyValue(fieldTag, fieldVal);
-                    obj->push_back(sv, copyTag, copyVal);
+                    obj->push_back_raw(sv, copyTag, copyVal);
 
                     be = bson::advance(be, sv.size());
                 }
@@ -286,7 +286,7 @@ void MakeObjStageBase<MakeObjOutputType::Object>::produceObject() {
                         if (found == isInclusion) {
                             auto [fieldTag, fieldVal] = objRoot->getAt(idx);
                             auto [copyTag, copyVal] = value::copyValue(fieldTag, fieldVal);
-                            obj->push_back(sv, copyTag, copyVal);
+                            obj->push_back_raw(sv, copyTag, copyVal);
                         }
 
                         numFieldsRemaining -= found;
@@ -313,7 +313,7 @@ void MakeObjStageBase<MakeObjOutputType::Object>::produceObject() {
                     auto [fieldTag, fieldVal] = objRoot->getAt(idx);
                     auto [copyTag, copyVal] = value::copyValue(fieldTag, fieldVal);
 
-                    obj->push_back(sv, copyTag, copyVal);
+                    obj->push_back_raw(sv, copyTag, copyVal);
                 }
             }
         } else {

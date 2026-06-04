@@ -144,7 +144,7 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf,
                 arr->reserve(cnt);
                 for (size_t idx = 0; idx < cnt; ++idx) {
                     auto [tag, val] = deserializeValue(buf, collator);
-                    arr->push_back(tag, val);
+                    arr->push_back_raw(tag, val);
                 }
             }
             tag = arrTag;
@@ -161,7 +161,7 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf,
             if (cnt) {
                 for (size_t idx = 0; idx < cnt; ++idx) {
                     auto [tag, val] = deserializeValue(buf, collator);
-                    arr->push_back(tag, val);
+                    arr->push_back_raw(tag, val);
                 }
             }
             tag = arrTag;
@@ -177,7 +177,7 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf,
                 for (size_t idx = 0; idx < cnt; ++idx) {
                     auto fieldName = buf.readCStr();
                     auto [tag, val] = deserializeValue(buf, collator);
-                    obj->push_back(fieldName, tag, val);
+                    obj->push_back_raw(fieldName, tag, val);
                 }
             }
             tag = objTag;

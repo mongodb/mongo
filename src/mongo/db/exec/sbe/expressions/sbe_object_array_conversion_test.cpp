@@ -107,7 +107,7 @@ public:
 
         for (auto elem : obj) {
             auto [tag, val] = bson::convertToOwned(elem).releaseToRaw();
-            objView->push_back(elem.fieldNameStringData(), tag, val);
+            objView->push_back_raw(elem.fieldNameStringData(), tag, val);
         }
         return {objTag, objVal};
     }

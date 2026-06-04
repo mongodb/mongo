@@ -113,32 +113,32 @@ TEST(ValueSerializeForSorter, Serialize) {
     testData->push_back_raw(objectTag, objectVal);
 
     auto object = value::getObjectView(objectVal);
-    object->push_back("num", value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
+    object->push_back_raw("num", value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
 
     auto [arrayTag, arrayVal] = value::makeNewArray();
-    object->push_back("arr", arrayTag, arrayVal);
+    object->push_back_raw("arr", arrayTag, arrayVal);
 
     auto array = value::getArrayView(arrayVal);
     array->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
     array->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
 
     auto [arraySetTag, arraySetVal] = value::makeNewArraySet();
-    object->push_back("set", arraySetTag, arraySetVal);
+    object->push_back_raw("set", arraySetTag, arraySetVal);
 
     auto arraySet = value::getArraySetView(arraySetVal);
-    arraySet->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(4));
-    arraySet->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(5));
+    arraySet->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(4));
+    arraySet->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(5));
 
     auto [oidTag, oidVal] = value::makeCopyObjectId({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
     testData->push_back_raw(oidTag, oidVal);
 
     auto [arrayMultiSetTag, arrayMultiSetVal] = value::makeNewArrayMultiSet();
-    object->push_back("mset", arrayMultiSetTag, arrayMultiSetVal);
+    object->push_back_raw("mset", arrayMultiSetTag, arrayMultiSetVal);
 
     value::ArrayMultiSet* arrayMultiSet = value::getArrayMultiSetView(arrayMultiSetVal);
-    arrayMultiSet->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(6));
-    arrayMultiSet->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(6));
-    arrayMultiSet->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(7));
+    arrayMultiSet->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(6));
+    arrayMultiSet->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(6));
+    arrayMultiSet->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(7));
 
     auto [msetTag, msetVal] = value::makeCopyArrayMultiSet(*arrayMultiSet);
     testData->push_back_raw(msetTag, msetVal);
@@ -309,9 +309,9 @@ TEST_F(ValueSerializeForKeyString, ArraySet) {
     sbe::value::ValueGuard guard{tag, val};
     auto* arraySet = sbe::value::getArraySetView(val);
 
-    arraySet->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
-    arraySet->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
-    arraySet->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0));
+    arraySet->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    arraySet->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
+    arraySet->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0));
 
     runTest({{tag, val}});
 }
@@ -321,9 +321,9 @@ TEST_F(ValueSerializeForKeyString, ArrayMultiSet) {
     sbe::value::ValueGuard guard{tag, val};
     auto* arrayMultiSet = sbe::value::getArrayMultiSetView(val);
 
-    arrayMultiSet->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
-    arrayMultiSet->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
-    arrayMultiSet->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.0));
+    arrayMultiSet->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    arrayMultiSet->push_back_raw(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
+    arrayMultiSet->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.0));
 
     runTest({{tag, val}});
 }
@@ -412,9 +412,9 @@ TEST_F(ValueSerializeForKeyString, SbeObject) {
     sbe::value::ValueGuard testDataGuard{testDataTag, testDataVal};
     auto testData = sbe::value::getObjectView(testDataVal);
 
-    testData->push_back("A", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
-    testData->push_back("b", value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
-    testData->push_back("C", value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0));
+    testData->push_back_raw("A", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    testData->push_back_raw("b", value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
+    testData->push_back_raw("C", value::TypeTags::NumberDouble, value::bitcastFrom<double>(3.0));
 
     runTest({{testDataTag, testDataVal}});
 }

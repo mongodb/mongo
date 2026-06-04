@@ -205,12 +205,12 @@ protected:
         auto [stateTag, stateVal] = value::makeNewArray();
         auto state = value::getArrayView(stateVal);
 
-        state->push_back(value::makeNewArray() /* internalArr */);
-        state->push_back(makeInt64(0) /* StartIdx */);
-        state->push_back(makeInt64(maxSize) /* MaxSize */);
-        state->push_back(makeInt32(0) /* MemUsage */);
-        state->push_back(makeInt32(memLimit) /* MemLimit */);
-        state->push_back(makeBool(true) /* IsGroupAccum */);
+        state->push_back_raw(value::makeNewArray() /* internalArr */);
+        state->push_back_raw(makeInt64(0) /* StartIdx */);
+        state->push_back_raw(makeInt64(maxSize) /* MaxSize */);
+        state->push_back_raw(makeInt32(0) /* MemUsage */);
+        state->push_back_raw(makeInt32(memLimit) /* MemLimit */);
+        state->push_back_raw(makeBool(true) /* IsGroupAccum */);
 
         return {stateTag, stateVal};
     }

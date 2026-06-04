@@ -92,7 +92,7 @@ std::pair<value::TypeTags, value::Value> makeNestedObject(size_t depth,
     }
     auto [oTag, oVal] = value::makeNewObject();
     auto objV = value::getObjectView(obj);
-    objV->push_back(std::to_string(depth), oTag, oVal);
+    objV->push_back_raw(std::to_string(depth), oTag, oVal);
     return makeNestedObject(depth - 1, oVal, topObj);
 }
 
@@ -233,7 +233,7 @@ TEST(WriteValueToStream, BigArrayInObjectInArrayTest) {
 
     auto [iaTag, iaVal] = value::makeNewArray();
     auto objV = value::getObjectView(oVal);
-    objV->push_back("field", iaTag, iaVal);
+    objV->push_back_raw("field", iaTag, iaVal);
 
     auto testArr = value::getArrayView(iaVal);
     auto [sTag, sVal] = value::makeNewString("a");
@@ -254,7 +254,7 @@ TEST(WriteValueToStream, BigObjectInArrayInObjectTest) {
 
     auto objV = value::getObjectView(oVal);
     auto [aTag, aVal] = value::makeNewArray();
-    objV->push_back("field", aTag, aVal);
+    objV->push_back_raw("field", aTag, aVal);
 
     auto [ioTag, ioVal] = value::makeNewObject();
     auto arrV = value::getArrayView(aVal);
@@ -263,7 +263,7 @@ TEST(WriteValueToStream, BigObjectInArrayInObjectTest) {
     auto testObj = value::getObjectView(ioVal);
     auto [sTag, sVal] = value::makeNewString("a");
     for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
-        testObj->push_back(std::to_string(i), sTag, sVal);
+        testObj->push_back_raw(std::to_string(i), sTag, sVal);
     }
 
     std::ostringstream oss;
@@ -296,7 +296,7 @@ TEST(WriteValueToStream, BigObjTest) {
     value::ValueGuard sGuard{sTag, sVal};
     auto testObj = value::getObjectView(oVal);
     for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth + 1; ++i) {
-        testObj->push_back(std::to_string(i), sTag, sVal);
+        testObj->push_back_raw(std::to_string(i), sTag, sVal);
     }
     std::ostringstream oss;
     writeToStream(oss, {value::TypeTags::Object, oVal});
@@ -313,7 +313,7 @@ TEST(WriteValueToStream, SmallObjTest) {
     value::ValueGuard sGuard{sTag, sVal};
     auto testObj = value::getObjectView(oVal);
     for (size_t i = 0; i < PrintOptions::kDefaultArrayObjectOrNestingMaxDepth - 1; ++i) {
-        testObj->push_back(std::to_string(i), sTag, sVal);
+        testObj->push_back_raw(std::to_string(i), sTag, sVal);
     }
     std::ostringstream oss;
     writeToStream(oss, {value::TypeTags::Object, oVal});

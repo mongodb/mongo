@@ -104,7 +104,7 @@ value::Object convertToObject(value::TypeTags inputTag, value::Value inputVal) {
                 outVal = inVal;
             }
         }
-        ret.push_back(fieldName, outTag, outVal);
+        ret.push_back_raw(fieldName, outTag, outVal);
         return false;
     };
     objectForEach(inputTag, inputVal, callback);

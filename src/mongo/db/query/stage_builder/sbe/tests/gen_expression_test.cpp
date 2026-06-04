@@ -789,8 +789,8 @@ TEST_F(GoldenGenExpressionTest, TestExprArraySet) {
         ExpressionSetDifference setDiffExpr(_expCtx.get(), {fieldArr2Expr, fieldArr3Expr});
         auto [tag, val] = sbe::value::makeNewArraySet();
         sbe::value::ValueGuard valGuard{tag, val};
-        sbe::value::getArraySetView(val)->push_back(sbe::value::makeValue(Value(2.5)));
-        sbe::value::getArraySetView(val)->push_back(sbe::value::makeValue(Value("str"_sd)));
+        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value(2.5)));
+        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value("str"_sd)));
         runTest(&setDiffExpr, rootSlot, tag, val, "ExpressionSetDifference"_sd);
     }
     {
@@ -810,11 +810,11 @@ TEST_F(GoldenGenExpressionTest, TestExprArraySet) {
         ExpressionSetUnion setUnionExpr(_expCtx.get(), {fieldArr2Expr, fieldArr3Expr});
         auto [tag, val] = sbe::value::makeNewArraySet();
         sbe::value::ValueGuard valGuard{tag, val};
-        sbe::value::getArraySetView(val)->push_back(sbe::value::makeValue(Value(1)));
-        sbe::value::getArraySetView(val)->push_back(sbe::value::makeValue(Value(2.5)));
-        sbe::value::getArraySetView(val)->push_back(sbe::value::makeValue(Value("str"_sd)));
-        sbe::value::getArraySetView(val)->push_back(sbe::value::makeValue(Value(5)));
-        sbe::value::getArraySetView(val)->push_back(sbe::value::makeValue(Value("str2"_sd)));
+        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value(1)));
+        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value(2.5)));
+        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value("str"_sd)));
+        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value(5)));
+        sbe::value::getArraySetView(val)->push_back_raw(sbe::value::makeValue(Value("str2"_sd)));
         runTest(&setUnionExpr, rootSlot, tag, val, "ExpressionSetUnion"_sd);
     }
     {

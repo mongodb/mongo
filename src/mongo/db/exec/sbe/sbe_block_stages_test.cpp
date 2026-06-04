@@ -893,7 +893,7 @@ TEST_F(BlockStagesTest, BlockToRowNoValuesFilteredObjects) {
     for (auto i = 0; i < 6; ++i) {
         auto [tagArg2, valArg2] = value::makeNewObject();
         auto obj = value::getObjectView(valArg2);
-        obj->push_back("a", value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
+        obj->push_back_raw("a", value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
         out->push_back(value::TypeTags::Object, valArg2);
     }
 
@@ -904,7 +904,7 @@ TEST_F(BlockStagesTest, BlockToRowNoValuesFilteredObjects) {
     for (auto i = 0; i < 6; ++i) {
         auto [tagArg2, valArg2] = value::makeNewObject();
         auto obj = value::getObjectView(valArg2);
-        obj->push_back("a", value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
+        obj->push_back_raw("a", value::TypeTags::NumberInt32, value::bitcastFrom<int>(i));
         expected->push_back_raw(value::TypeTags::Object, valArg2);
     }
     value::ValueGuard expectedGuard(tagExpected, valExpected);

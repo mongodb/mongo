@@ -199,7 +199,7 @@ public:
                                                   value::TypeTags tag,
                                                   value::Value val) {
         auto [copyTag, copyVal] = value::copyValue(tag, val);
-        _obj->push_back(fieldName, copyTag, copyVal);
+        _obj->push_back_raw(fieldName, copyTag, copyVal);
     }
 
     MONGO_COMPILER_ALWAYS_INLINE ObjectWriter startObj(StringData) {
@@ -207,9 +207,9 @@ public:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE void finishObj(StringData fieldName, ObjectWriter nestedWriter) {
-        _obj->push_back(fieldName,
-                        value::TypeTags::Object,
-                        value::bitcastFrom<value::Object*>(nestedWriter._obj.release()));
+        _obj->push_back_raw(fieldName,
+                            value::TypeTags::Object,
+                            value::bitcastFrom<value::Object*>(nestedWriter._obj.release()));
     }
 
     MONGO_COMPILER_ALWAYS_INLINE ArrayWriter startArr(StringData) {
@@ -217,9 +217,9 @@ public:
     }
 
     MONGO_COMPILER_ALWAYS_INLINE void finishArr(StringData fieldName, ArrayWriter nestedWriter) {
-        _obj->push_back(fieldName,
-                        value::TypeTags::Array,
-                        value::bitcastFrom<value::Array*>(nestedWriter._arr.release()));
+        _obj->push_back_raw(fieldName,
+                            value::TypeTags::Array,
+                            value::bitcastFrom<value::Array*>(nestedWriter._arr.release()));
     }
 
     MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> done() {

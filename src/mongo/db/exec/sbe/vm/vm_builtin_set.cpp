@@ -55,8 +55,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToSet(ArityType arity) {
     auto arr = value::getArraySetView(valAgg);
 
     // Push back the value. Note that array will ignore Nothing.
-    guardField.reset();
-    arr->push_back(tagField, valField);
+    arr->push_back_clone(tagField, valField);
 
     guard.reset();
     return {ownAgg, tagAgg, valAgg};
@@ -109,8 +108,7 @@ value::TagValueMaybeOwned ByteCode::builtinCollAddToSet(ArityType arity) {
     auto arr = value::getArraySetView(valAgg);
 
     // Push back the value. Note that array will ignore Nothing.
-    guardField.reset();
-    arr->push_back(tagField, valField);
+    arr->push_back_clone(tagField, valField);
 
     guard.reset();
     return {ownAgg, tagAgg, valAgg};
@@ -533,7 +531,7 @@ value::TagValueMaybeOwned ByteCode::builtinSetToArray(ArityType arity) {
     auto resView = value::getArrayView(resVal);
 
     value::arrayForEach(input.tag(), input.value(), [&](value::TypeTags elTag, value::Value elVal) {
-        resView->push_back(value::copyValue(elTag, elVal));
+        resView->push_back_raw(value::copyValue(elTag, elVal));
     });
 
     resGuard.reset();

@@ -115,7 +115,7 @@ value::TagValueMaybeOwned ByteCode::concatArraysAccumImpl(
         // The order is important! The accumulated array should be at index
         // AggArrayWithSize::kValues, and the size should be at index
         // AggArrayWithSize::kSizeOfValues.
-        accumulatorState->push_back(value::makeNewArray());
+        accumulatorState->push_back_raw(value::makeNewArray());
         accumulatorState->push_back_raw(value::TypeTags::NumberInt64,
                                         value::bitcastFrom<int64_t>(0));
     }
@@ -231,8 +231,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggSetUnion(ArityType arity) {
 
     value::arrayForEach(
         newSet.tag(), newSet.value(), [&](value::TypeTags elTag, value::Value elVal) {
-            auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
-            acc->push_back(copyTag, copyVal);
+            acc->push_back_clone(elTag, elVal);
         });
 
     return accTagVal;
@@ -269,8 +268,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggCollSetUnion(ArityType arity) {
 
     value::arrayForEach(
         newSet.tag(), newSet.value(), [&](value::TypeTags elTag, value::Value elVal) {
-            auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
-            acc->push_back(copyTag, copyVal);
+            acc->push_back_clone(elTag, elVal);
         });
 
     return accTagVal;
@@ -3062,7 +3060,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableAddToSetAdd(ArityType ari
                     value::TypeTags::NumberInt32,
                     value::bitcastFrom<int32_t>(accMultiSetSize + newElSize));
     auto [newElTag, newElVal] = newEl.releaseToRaw();
-    accMultiSet->push_back(newElTag, newElVal);
+    accMultiSet->push_back_raw(newElTag, newElVal);
     return state;
 }
 
@@ -3094,8 +3092,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableSetCommonFinalize(ArityTy
         value::TagValueOwned::fromRaw(value::makeNewArraySet(accMultiSet->getCollator()));
     auto accSet = value::getArraySetView(accSetTagValue.value());
     for (const auto& p : accMultiSet->values()) {
-        auto [cTag, cVal] = copyValue(p.first, p.second);
-        accSet->push_back(cTag, cVal);
+        accSet->push_back_clone(p.first, p.second);
     }
     return accSetTagValue;
 }
@@ -3146,7 +3143,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableSetUnionAdd(ArityType ari
             }
 
             // Update the state
-            accMultiSet->push_back(elemTag, elemVal);
+            accMultiSet->push_back_raw(elemTag, elemVal);
             accMultiSetSize += elemSize;
         });
 
@@ -3318,7 +3315,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableMinMaxNAdd(ArityType arit
                            static_cast<size_t>(AggAccumulatorNElems::kMemUsage));
 
     auto [newElTag, newElVal] = newEl.releaseToRaw();
-    accMultiSet->push_back(newElTag, newElVal);
+    accMultiSet->push_back_raw(newElTag, newElVal);
 
     return state;
 }
@@ -3370,13 +3367,13 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableMinMaxNFinalize(ArityType
         for (auto it = accMultiSet->values().cbegin();
              it != accMultiSet->values().cend() && resultArray->size() < n;
              ++it) {
-            resultArray->push_back(value::copyValue(it->first, it->second));
+            resultArray->push_back_raw(value::copyValue(it->first, it->second));
         }
     } else {
         for (auto it = accMultiSet->values().crbegin();
              it != accMultiSet->values().crend() && resultArray->size() < n;
              ++it) {
-            resultArray->push_back(value::copyValue(it->first, it->second));
+            resultArray->push_back_raw(value::copyValue(it->first, it->second));
         }
     }
 

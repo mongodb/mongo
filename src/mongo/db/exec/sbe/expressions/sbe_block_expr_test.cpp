@@ -3400,9 +3400,9 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberArrayTestNumeric) {
 
     auto [arrayTag, arrayVal] = value::makeNewArray();
     auto array = value::getArrayView(arrayVal);
-    array->push_back(makeInt32(1));
-    array->push_back(makeInt32(5));
-    array->push_back(makeInt32(10));
+    array->push_back_raw(makeInt32(1));
+    array->push_back_raw(makeInt32(5));
+    array->push_back_raw(makeInt32(10));
 
     auto expr = makeE<sbe::EFunction>(
         EFn::kValueBlockIsMember,
@@ -3432,9 +3432,9 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberArrayTestString) {
 
     auto [arrayTag, arrayVal] = value::makeNewArray();
     auto array = value::getArrayView(arrayVal);
-    array->push_back(value::makeBigString("teststring1"));
-    array->push_back(value::makeBigString("teststring5"));
-    array->push_back(value::makeBigString("teststring10"));
+    array->push_back_raw(value::makeBigString("teststring1"));
+    array->push_back_raw(value::makeBigString("teststring5"));
+    array->push_back_raw(value::makeBigString("teststring10"));
 
     auto expr = makeE<sbe::EFunction>(
         EFn::kValueBlockIsMember,
@@ -3493,9 +3493,9 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberWithArraySet) {
 
     auto [arraySetTag, arraySetVal] = value::makeNewArraySet();
     auto arraySet = value::getArraySetView(arraySetVal);
-    arraySet->push_back(makeInt32(1));
-    arraySet->push_back(makeInt32(5));
-    arraySet->push_back(makeInt32(10));
+    arraySet->push_back_raw(makeInt32(1));
+    arraySet->push_back_raw(makeInt32(5));
+    arraySet->push_back_raw(makeInt32(10));
 
     auto expr = makeE<sbe::EFunction>(
         EFn::kValueBlockIsMember,
@@ -4554,9 +4554,9 @@ TEST_F(SBEBlockExpressionTest, BlockGetSortKey) {
             auto [arrTag, arrVal] = value::makeNewArray();
             auto arr = value::getArrayView(arrVal);
 
-            arr->push_back(makeInt32(i));
-            arr->push_back(makeInt32(i + 1));
-            arr->push_back(makeInt32(i + 2));
+            arr->push_back_raw(makeInt32(i));
+            arr->push_back_raw(makeInt32(i + 1));
+            arr->push_back_raw(makeInt32(i + 2));
 
             block->push_back(arrTag, arrVal);
         }

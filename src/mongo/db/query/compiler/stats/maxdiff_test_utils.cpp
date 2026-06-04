@@ -59,7 +59,7 @@ static std::vector<BSONObj> convertToBSON(const std::vector<SBEValue>& input) {
         // Copy the value because objVal owns its value, and the ValueGuard releases not only
         // objVal, but also its Value (in the case below - copyVal).
         const auto [copyTag, copyVal] = sbe::value::copyValue(tag, val);
-        sbe::value::getObjectView(objVal)->push_back("a", copyTag, copyVal);
+        sbe::value::getObjectView(objVal)->push_back_raw("a", copyTag, copyVal);
 
         std::ostringstream os;
         os << std::make_pair(objTag, objVal);

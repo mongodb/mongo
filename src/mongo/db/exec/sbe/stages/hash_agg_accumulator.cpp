@@ -334,7 +334,7 @@ void ArithmeticAverageHashAggAccumulatorPartial::finalizePartialAggregate(
     value::Array* partialAggregateArray = reinterpret_cast<value::Array*>(partialAggregate.value());
 
     auto [tagCount, valCount] = partialAggregateArray->getAt(1);
-    resultObject->push_back(mongo::stage_builder::countName, tagCount, valCount);
+    resultObject->push_back_raw(mongo::stage_builder::countName, tagCount, valCount);
 
     auto [tagPartialSum, valPartialSum] = partialAggregateArray->getAt(0);
     auto [ownedFinalizedSum, tagFinalizedSum, valFinalizedSum] =
@@ -343,7 +343,8 @@ void ArithmeticAverageHashAggAccumulatorPartial::finalizePartialAggregate(
     tassert(12084100,
             "Expected builtinDoubleDoublePartialSumFinalizeImpl to return owned value",
             ownedFinalizedSum);
-    resultObject->push_back(mongo::stage_builder::partialSumName, tagFinalizedSum, valFinalizedSum);
+    resultObject->push_back_raw(
+        mongo::stage_builder::partialSumName, tagFinalizedSum, valFinalizedSum);
 
     result.reset(std::move(resultObj));
 }

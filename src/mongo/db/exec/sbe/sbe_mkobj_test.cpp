@@ -71,7 +71,7 @@ public:
             auto [tag, val] = bson::convertToOwned(be, end, sv.size()).releaseToRaw();
             be = bson::advance(be, sv.size());
 
-            objView->push_back(sv, tag, val);
+            objView->push_back_raw(sv, tag, val);
         }
         arr->push_back_raw(objTag, objVal);
     }

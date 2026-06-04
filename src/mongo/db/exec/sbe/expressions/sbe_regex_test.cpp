@@ -96,9 +96,9 @@ protected:
 
         auto [matchStrTag, matchStrVal] = value::makeNewString(matchStr);
         auto [capturesTag, capturesVal] = value::makeNewArray();
-        obj->push_back("match", matchStrTag, matchStrVal);
-        obj->push_back("idx", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(idx));
-        obj->push_back("captures", capturesTag, capturesVal);
+        obj->push_back_raw("match", matchStrTag, matchStrVal);
+        obj->push_back_raw("idx", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(idx));
+        obj->push_back_raw("captures", capturesTag, capturesVal);
         objGuard.reset();
         arrayPtr->push_back_raw(objTag, objVal);
     }

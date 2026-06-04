@@ -979,7 +979,7 @@ public:
 
                 auto [regexSetTag, regexSetVal] =
                     sbe::value::makeNewBsonRegex(r->getString(), r->getFlags());
-                regexArrSet->push_back(regexSetTag, regexSetVal);
+                regexArrSet->push_back_raw(regexSetTag, regexSetVal);
             }
         }
 

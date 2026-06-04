@@ -179,8 +179,7 @@ static std::pair<value::TypeTags, value::Value> makeArraySetWithCollator(
         auto [tag, val] = enumerator.getViewOfValue();
         enumerator.advance();
 
-        auto [copyTag, copyVal] = value::copyValue(tag, val);
-        arrView->push_back(copyTag, copyVal);
+        arrView->push_back_clone(tag, val);
     }
     guard.reset();
 
@@ -202,8 +201,7 @@ static std::pair<value::TypeTags, value::Value> makeArraySet(const BSONArray& ar
         auto [tag, val] = enumerator.getViewOfValue();
         enumerator.advance();
 
-        auto [copyTag, copyVal] = value::copyValue(tag, val);
-        arrView->push_back(copyTag, copyVal);
+        arrView->push_back_clone(tag, val);
     }
     guard.reset();
 
@@ -247,7 +245,7 @@ static std::pair<value::TypeTags, value::Value> makeObject(const BSONObj& obj) {
     while (!enumerator.atEnd()) {
         auto [tag, val] = enumerator.getViewOfValue();
         auto [copyTag, copyVal] = value::copyValue(tag, val);
-        objView->push_back(enumerator.getFieldName(), copyTag, copyVal);
+        objView->push_back_raw(enumerator.getFieldName(), copyTag, copyVal);
         enumerator.advance();
     }
     guard.reset();
@@ -292,12 +290,12 @@ static std::pair<value::TypeTags, value::Value> makeEmptyState(
     auto [stateTag, stateVal] = value::makeNewArray();
     auto state = value::getArrayView(stateVal);
 
-    state->push_back(value::makeNewArray() /* internalArr */);
-    state->push_back(makeInt64(0) /* StartIdx */);
-    state->push_back(makeInt64(maxSize) /* MaxSize */);
-    state->push_back(makeInt32(0) /* MemUsage */);
-    state->push_back(makeInt32(memLimit) /* MemLimit */);
-    state->push_back(makeBool(true) /* IsGroupAccum */);
+    state->push_back_raw(value::makeNewArray() /* internalArr */);
+    state->push_back_raw(makeInt64(0) /* StartIdx */);
+    state->push_back_raw(makeInt64(maxSize) /* MaxSize */);
+    state->push_back_raw(makeInt32(0) /* MemUsage */);
+    state->push_back_raw(makeInt32(memLimit) /* MemLimit */);
+    state->push_back_raw(makeBool(true) /* IsGroupAccum */);
 
     return {stateTag, stateVal};
 }

@@ -663,10 +663,10 @@ int addNewPair(value::Array* mergeArr,
     pairArr->reserve(2);
 
     // Update the sortKey with a copy.
-    pairArr->push_back(value::copyValue(keyTag, keyVal));
+    pairArr->push_back_raw(value::copyValue(keyTag, keyVal));
 
     // Add a coppy of the output value to the SBE pair array.
-    pairArr->push_back(value::copyValue(outTag, outVal));
+    pairArr->push_back_raw(value::copyValue(outTag, outVal));
 
     // The caller of this function will take ownership of the pair array.
     pairArrGuard.reset();

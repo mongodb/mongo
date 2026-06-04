@@ -274,13 +274,13 @@ value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
     value::ValueGuard guard{dateObjTag, dateObjVal};
     auto dateObj = value::getObjectView(dateObjVal);
     dateObj->reserve(7);
-    dateObj->push_back("year", value::TypeTags::NumberInt32, dateParts.year);
-    dateObj->push_back("month", value::TypeTags::NumberInt32, dateParts.month);
-    dateObj->push_back("day", value::TypeTags::NumberInt32, dateParts.dayOfMonth);
-    dateObj->push_back("hour", value::TypeTags::NumberInt32, dateParts.hour);
-    dateObj->push_back("minute", value::TypeTags::NumberInt32, dateParts.minute);
-    dateObj->push_back("second", value::TypeTags::NumberInt32, dateParts.second);
-    dateObj->push_back("millisecond", value::TypeTags::NumberInt32, dateParts.millisecond);
+    dateObj->push_back_raw("year", value::TypeTags::NumberInt32, dateParts.year);
+    dateObj->push_back_raw("month", value::TypeTags::NumberInt32, dateParts.month);
+    dateObj->push_back_raw("day", value::TypeTags::NumberInt32, dateParts.dayOfMonth);
+    dateObj->push_back_raw("hour", value::TypeTags::NumberInt32, dateParts.hour);
+    dateObj->push_back_raw("minute", value::TypeTags::NumberInt32, dateParts.minute);
+    dateObj->push_back_raw("second", value::TypeTags::NumberInt32, dateParts.second);
+    dateObj->push_back_raw("millisecond", value::TypeTags::NumberInt32, dateParts.millisecond);
     guard.reset();
     return {true, dateObjTag, dateObjVal};
 }
@@ -316,13 +316,13 @@ value::TagValueMaybeOwned ByteCode::builtinIsoDateToParts(ArityType arity) {
     value::ValueGuard guard{dateObjTag, dateObjVal};
     auto dateObj = value::getObjectView(dateObjVal);
     dateObj->reserve(7);
-    dateObj->push_back("isoWeekYear", value::TypeTags::NumberInt32, dateParts.year);
-    dateObj->push_back("isoWeek", value::TypeTags::NumberInt32, dateParts.weekOfYear);
-    dateObj->push_back("isoDayOfWeek", value::TypeTags::NumberInt32, dateParts.dayOfWeek);
-    dateObj->push_back("hour", value::TypeTags::NumberInt32, dateParts.hour);
-    dateObj->push_back("minute", value::TypeTags::NumberInt32, dateParts.minute);
-    dateObj->push_back("second", value::TypeTags::NumberInt32, dateParts.second);
-    dateObj->push_back("millisecond", value::TypeTags::NumberInt32, dateParts.millisecond);
+    dateObj->push_back_raw("isoWeekYear", value::TypeTags::NumberInt32, dateParts.year);
+    dateObj->push_back_raw("isoWeek", value::TypeTags::NumberInt32, dateParts.weekOfYear);
+    dateObj->push_back_raw("isoDayOfWeek", value::TypeTags::NumberInt32, dateParts.dayOfWeek);
+    dateObj->push_back_raw("hour", value::TypeTags::NumberInt32, dateParts.hour);
+    dateObj->push_back_raw("minute", value::TypeTags::NumberInt32, dateParts.minute);
+    dateObj->push_back_raw("second", value::TypeTags::NumberInt32, dateParts.second);
+    dateObj->push_back_raw("millisecond", value::TypeTags::NumberInt32, dateParts.millisecond);
     guard.reset();
     return {true, dateObjTag, dateObjVal};
 }

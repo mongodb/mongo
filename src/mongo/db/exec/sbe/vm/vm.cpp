@@ -450,7 +450,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
 
                     if (sv != fieldName) {
                         auto [tag, val] = bson::convertToOwned(be, end, sv.size()).releaseToRaw();
-                        objOutput->push_back(sv, tag, val);
+                        objOutput->push_back_raw(sv, tag, val);
                     }
 
                     be = bson::advance(be, sv.size());
@@ -463,7 +463,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
                     if (sv != fieldName) {
                         auto [tag, val] = objRoot->getAt(idx);
                         auto [copyTag, copyVal] = value::copyValue(tag, val);
-                        objOutput->push_back(sv, copyTag, copyVal);
+                        objOutput->push_back_raw(sv, copyTag, copyVal);
                     }
                 }
             }
@@ -491,7 +491,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
 
                 if (sv != fieldName) {
                     auto [tag, val] = bson::convertToOwned(be, end, sv.size()).releaseToRaw();
-                    objOutput->push_back(sv, tag, val);
+                    objOutput->push_back_raw(sv, tag, val);
                 }
 
                 be = bson::advance(be, sv.size());
@@ -504,7 +504,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
                 if (sv != fieldName) {
                     auto [tag, val] = objRoot->getAt(idx);
                     auto [copyTag, copyVal] = value::copyValue(tag, val);
-                    objOutput->push_back(sv, copyTag, copyVal);
+                    objOutput->push_back_raw(sv, copyTag, copyVal);
                 }
             }
         }
@@ -514,7 +514,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
             newTag = copyTag;
             newVal = copyVal;
         }
-        objOutput->push_back(fieldName, newTag, newVal);
+        objOutput->push_back_raw(fieldName, newTag, newVal);
 
         guard.reset();
         return {true, tagOutput, valOutput};
@@ -769,7 +769,7 @@ value::TagValueMaybeOwned ByteCode::addToSetCappedImpl(value::TagValueOwned accu
 
         // Insert the new value. Note that array will ignore Nothing.
         if (newElem.owned()) {
-            accSet->push_back(newElem.releaseToOwnedRaw());
+            accSet->push_back_raw(newElem.releaseToOwnedRaw());
         } else {
             accSet->push_back_clone(newElem.tag(), newElem.value());
         }
@@ -848,7 +848,7 @@ value::TagValueMaybeOwned ByteCode::setUnionAccumImpl(value::TagValueOwned accum
                         currentSize < static_cast<int64_t>(sizeCap));
 
                 guardNewElem.reset();
-                accSet->push_back(tagNewElem, valNewElem);
+                accSet->push_back_raw(tagNewElem, valNewElem);
             });
     }
 

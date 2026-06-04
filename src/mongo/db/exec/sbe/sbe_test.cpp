@@ -70,7 +70,7 @@ TEST(SBEValues, Basic) {
         auto obj = value::getObjectView(val);
 
         const auto [fieldTag, fieldVal] = value::makeNewString("not so small string"_sd);
-        obj->push_back("field"_sd, fieldTag, fieldVal);
+        obj->push_back_raw("field"_sd, fieldTag, fieldVal);
 
         ASSERT_EQUALS(obj->size(), 1);
         const auto [checkTag, checkVal] = obj->getField("field"_sd);
@@ -231,15 +231,18 @@ TEST(SBEValues, HashCompound) {
     {
         auto [tag1, val1] = value::makeNewObject();
         auto obj1 = value::getObjectView(val1);
-        obj1->push_back("a"_sd, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
-        obj1->push_back("b"_sd, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
-        obj1->push_back("c"_sd, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
+        obj1->push_back_raw("a"_sd, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
+        obj1->push_back_raw("b"_sd, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
+        obj1->push_back_raw("c"_sd, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
 
         auto [tag2, val2] = value::makeNewObject();
         auto obj2 = value::getObjectView(val2);
-        obj2->push_back("a"_sd, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
-        obj2->push_back("b"_sd, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
-        obj2->push_back("c"_sd, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
+        obj2->push_back_raw(
+            "a"_sd, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
+        obj2->push_back_raw(
+            "b"_sd, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
+        obj2->push_back_raw(
+            "c"_sd, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
 
         ASSERT_EQUALS(value::hashValue(tag1, val1), value::hashValue(tag2, val2));
 
@@ -250,15 +253,15 @@ TEST(SBEValues, HashCompound) {
     {
         auto [tag1, val1] = value::makeNewArraySet();
         auto set1 = value::getArraySetView(val1);
-        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
-        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
-        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
+        set1->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
+        set1->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
+        set1->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
 
         auto [tag2, val2] = value::makeNewArraySet();
         auto set2 = value::getArraySetView(val2);
-        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
-        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
-        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
+        set2->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
+        set2->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
+        set2->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
 
 
         ASSERT_EQUALS(value::hashValue(tag1, val1), value::hashValue(tag2, val2));
@@ -270,17 +273,17 @@ TEST(SBEValues, HashCompound) {
     {
         auto [tag1, val1] = value::makeNewArrayMultiSet();
         auto set1 = value::getArrayMultiSetView(val1);
-        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
-        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
-        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
-        set1->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
+        set1->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
+        set1->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
+        set1->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
+        set1->push_back_raw(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
 
         auto [tag2, val2] = value::makeNewArrayMultiSet();
         auto set2 = value::getArrayMultiSetView(val2);
-        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
-        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
-        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
-        set2->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
+        set2->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
+        set2->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
+        set2->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
+        set2->push_back_raw(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
 
         ASSERT_EQUALS(value::hashValue(tag1, val1), value::hashValue(tag2, val2));
 

@@ -71,17 +71,15 @@ value::TagValueMaybeOwned pcreNextMatch(pcre::Regex* pcre,
 
     // Create the result object {"match" : .., "idx" : ..., "captures" : ...}
     // from the pcre::MatchData.
-    auto [matchedTag, matchedVal] = value::makeNewString(m[0]);
-    value::ValueGuard matchedGuard{matchedTag, matchedVal};
+    auto matched = value::TagValueOwned::fromRaw(value::makeNewString(m[0]));
 
     StringData precedesMatch = m.input().substr(m.startPos());
     precedesMatch = precedesMatch.substr(0, m[0].data() - precedesMatch.data());
     codePointPos += str::lengthInUTF8CodePoints(precedesMatch);
     startBytePos += precedesMatch.size();
 
-    auto [arrTag, arrVal] = value::makeNewArray();
-    value::ValueGuard arrGuard{arrTag, arrVal};
-    auto arrayView = value::getArrayView(arrVal);
+    auto arr = value::TagValueOwned::fromRaw(value::makeNewArray());
+    auto arrayView = value::getArrayView(arr.value());
     arrayView->reserve(m.captureCount());
     for (size_t i = 0; i < m.captureCount(); ++i) {
         StringData cap = m[i + 1];
@@ -93,17 +91,16 @@ value::TagValueMaybeOwned pcreNextMatch(pcre::Regex* pcre,
         }
     }
 
-    auto [resTag, resVal] = value::makeNewObject();
-    value::ValueGuard resGuard{resTag, resVal};
-    auto resObjectView = value::getObjectView(resVal);
+    auto res = value::TagValueOwned::fromRaw(value::makeNewObject());
+    auto resObjectView = value::getObjectView(res.value());
     resObjectView->reserve(3);
-    matchedGuard.reset();
-    resObjectView->push_back("match", matchedTag, matchedVal);
-    resObjectView->push_back(
+    auto [matchedTag, matchedVal] = matched.releaseToRaw();
+    resObjectView->push_back_raw("match", matchedTag, matchedVal);
+    resObjectView->push_back_raw(
         "idx", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(codePointPos));
-    arrGuard.reset();
-    resObjectView->push_back("captures", arrTag, arrVal);
-    resGuard.reset();
+    auto [arrTag, arrVal] = arr.releaseToRaw();
+    resObjectView->push_back_raw("captures", arrTag, arrVal);
+    auto [resTag, resVal] = res.releaseToRaw();
     return {true, resTag, resVal};
 }
 

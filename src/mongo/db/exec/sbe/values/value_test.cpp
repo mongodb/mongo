@@ -113,23 +113,23 @@ TEST_F(SbeValueTest, CompareTwoArraySets) {
 
     auto addShortStringFn = [](value::ArraySet* set) {
         auto [rhsItemTag, rhsItemVal] = value::makeSmallString("abc"_sd);
-        set->push_back(rhsItemTag, rhsItemVal);
+        set->push_back_raw(rhsItemTag, rhsItemVal);
     };
     auto addLongStringFn = [](value::ArraySet* set) {
         auto [rhsItemTag, rhsItemVal] = value::makeNewString("a long enough string"_sd);
-        set->push_back(rhsItemTag, rhsItemVal);
+        set->push_back_raw(rhsItemTag, rhsItemVal);
     };
     auto addArrayFn = [](value::ArraySet* set) {
         auto bsonArr = BSON_ARRAY(1 << 2 << 3);
         auto [rhsItemTag, rhsItemVal] = value::copyValue(
             value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bsonArr.objdata()));
-        set->push_back(rhsItemTag, rhsItemVal);
+        set->push_back_raw(rhsItemTag, rhsItemVal);
     };
     auto addObjectFn = [](value::ArraySet* set) {
         auto bsonObj = BSON("c" << 1);
         auto [rhsItemTag, rhsItemVal] = value::copyValue(
             value::TypeTags::bsonObject, value::bitcastFrom<const char*>(bsonObj.objdata()));
-        set->push_back(rhsItemTag, rhsItemVal);
+        set->push_back_raw(rhsItemTag, rhsItemVal);
     };
     auto addLongStringMultipleTimesFn = [&](value::ArraySet* set) {
         auto initSize = set->size();
@@ -142,11 +142,11 @@ TEST_F(SbeValueTest, CompareTwoArraySets) {
     auto addMultipleDecimalFn = [](value::ArraySet* set) {
         auto initSize = set->size();
         auto [rhsItemTag1, rhsItemVal1] = value::makeCopyDecimal(Decimal128{"3.14"});
-        set->push_back(rhsItemTag1, rhsItemVal1);
+        set->push_back_raw(rhsItemTag1, rhsItemVal1);
         auto [rhsItemTag2, rhsItemVal2] = value::makeCopyDecimal(Decimal128{"2.71"});
-        set->push_back(rhsItemTag2, rhsItemVal2);
+        set->push_back_raw(rhsItemTag2, rhsItemVal2);
         auto [rhsItemTag3, rhsItemVal3] = value::makeCopyDecimal(Decimal128{"3.14"});
-        set->push_back(rhsItemTag3, rhsItemVal3);
+        set->push_back_raw(rhsItemTag3, rhsItemVal3);
         ASSERT(set->size() == initSize + 2)
             << "set: " << set << " should be of size " << initSize + 2;
     };
@@ -377,7 +377,7 @@ TEST_F(SbeValueTest, ArraySetForEachMoveIsDestructive) {
 
     auto pushStr = [](value::ArraySet* arr, StringData str) {
         auto [t, v] = value::makeBigString(str);
-        arr->push_back(t, v);
+        arr->push_back_raw(t, v);
     };
 
     pushStr(&arr1, "foo");
@@ -387,8 +387,9 @@ TEST_F(SbeValueTest, ArraySetForEachMoveIsDestructive) {
 
     value::ArraySet arr2;
     // Move elements from arr1 into arr2.
-    value::arrayForEach<true>(
-        tag, val, [&](value::TypeTags elTag, value::Value elVal) { arr2.push_back(elTag, elVal); });
+    value::arrayForEach<true>(tag, val, [&](value::TypeTags elTag, value::Value elVal) {
+        arr2.push_back_raw(elTag, elVal);
+    });
 
     ASSERT_EQ(arr1.size(), 0);
     ASSERT_EQ(arr2.size(), 2);

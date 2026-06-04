@@ -1285,7 +1285,7 @@ public:
         }
     }
 
-    void push_back(StringData name, TypeTags tag, Value val) {
+    void push_back_raw(StringData name, TypeTags tag, Value val) {
         if (tag != TypeTags::Nothing) {
             ValueGuard guard{tag, val};
             // Reserve space in all vectors, they are the same size. We arbitrarily picked _typeTags
@@ -1518,10 +1518,10 @@ public:
      * Returns true if the value was newly inserted, otherwise returns false to indicate that an
      * equal value was already present in the set.
      */
-    bool push_back(TypeTags tag, Value val);
+    bool push_back_raw(TypeTags tag, Value val);
 
-    bool push_back(std::pair<TypeTags, Value> val) {
-        return push_back(val.first, val.second);
+    bool push_back_raw(std::pair<TypeTags, Value> val) {
+        return push_back_raw(val.first, val.second);
     }
 
     /**
@@ -1591,7 +1591,7 @@ public:
     /**
      * Adds the given SBE value to the multiset. Assumes ownership of the given value.
      */
-    void push_back(TypeTags tag, Value val) {
+    void push_back_raw(TypeTags tag, Value val) {
         if (tag != TypeTags::Nothing) {
             ValueGuard guard{tag, val};
             _values.insert({tag, val});
@@ -1599,8 +1599,8 @@ public:
         }
     }
 
-    void push_back(std::pair<TypeTags, Value> val) {
-        push_back(val.first, val.second);
+    void push_back_raw(std::pair<TypeTags, Value> val) {
+        push_back_raw(val.first, val.second);
     }
 
     /**

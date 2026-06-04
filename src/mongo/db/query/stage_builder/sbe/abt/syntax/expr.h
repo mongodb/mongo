@@ -77,7 +77,7 @@ public:
         auto [tag, val] = makeNewArray();
         auto arr = getArrayView(val);
         // Add each {tag, val} pair to the array.
-        (arr->push_back(std::forward<decltype(elements)>(elements)), ...);
+        (arr->push_back_raw(std::forward<decltype(elements)>(elements)), ...);
         return make<Constant>(tag, val);
     }
 

@@ -754,7 +754,7 @@ bool isInfinity(TypeTags tag, Value val) noexcept {
         (tag == TypeTags::NumberDecimal && bitcastTo<Decimal128>(val).isInfinite());
 }
 
-bool ArraySet::push_back(TypeTags tag, Value val) {
+bool ArraySet::push_back_raw(TypeTags tag, Value val) {
     if (tag != TypeTags::Nothing) {
         ValueGuard guard{tag, val};
         auto [it, inserted] = _values.insert({tag, val});
@@ -948,7 +948,7 @@ std::pair<TypeTags, Value> arrayToSet(TypeTags tag, Value val, CollatorInterface
     while (!arrIter.atEnd()) {
         auto [elTag, elVal] = arrIter.getViewOfValue();
         auto [copyTag, copyVal] = copyValue(elTag, elVal);
-        setView->push_back(copyTag, copyVal);
+        setView->push_back_raw(copyTag, copyVal);
         arrIter.advance();
     }
     guard.reset();

@@ -62,7 +62,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewArray(ArityType arity) {
     if (arity) {
         arr->reserve(arity);
         for (ArityType idx = 0; idx < arity; ++idx) {
-            arr->push_back(moveOwnedFromStack(idx));
+            arr->push_back_raw(moveOwnedFromStack(idx));
         }
     }
 
@@ -132,7 +132,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToArray(ArityType arity) {
     auto arr = value::getArrayView(agg.value());
 
     // Push back the value. Note that array will ignore Nothing.
-    arr->push_back(field.releaseToRaw());
+    arr->push_back_raw(field.releaseToRaw());
 
     return agg;
 }
@@ -152,7 +152,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToArrayCappedImpl(
         // The order is important! The accumulated array should be at index
         // AggArrayWithSize::kValues, and the size should be at index
         // AggArrayWithSize::kSizeOfValues.
-        accumulatorState->push_back(value::makeNewArray());
+        accumulatorState->push_back_raw(value::makeNewArray());
         accumulatorState->push_back_raw(value::TypeTags::NumberInt64,
                                         value::bitcastFrom<int64_t>(0));
     }
@@ -195,7 +195,7 @@ value::TagValueMaybeOwned ByteCode::builtinAddToArrayCappedImpl(
                             value::bitcastFrom<int64_t>(newSize));
 
     // Add an owned copy of the element to the array.
-    accArray->push_back(newElem.releaseToOwnedRaw());
+    accArray->push_back_raw(newElem.releaseToOwnedRaw());
 
     return accumulatorStateTagVal;
 }
@@ -228,7 +228,7 @@ value::TagValueMaybeOwned ByteCode::builtinConcatArrays(ArityType arity) {
         }
 
         value::arrayForEach(elem.tag, elem.value, [&](value::TypeTags elTag, value::Value elVal) {
-            resView->push_back(value::copyValue(elTag, elVal));
+            resView->push_back_raw(value::copyValue(elTag, elVal));
         });
     }
 
@@ -300,19 +300,20 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
             if (!input.atEnd()) {
                 // Add the value from the appropriate input array.
                 auto inputElem = input.getViewOfValue();
-                intermediateResView->push_back(value::copyValue(inputElem.tag, inputElem.value));
+                intermediateResView->push_back_raw(
+                    value::copyValue(inputElem.tag, inputElem.value));
                 input.advance();
             } else if (col < defaultSize) {
                 // Add the specified default value.
                 auto defaultElem = viewFromStack(localVariables + inputSize + col);
-                intermediateResView->push_back(
+                intermediateResView->push_back_raw(
                     value::copyValue(defaultElem.tag, defaultElem.value));
             } else {
                 // Add a null default value.
                 intermediateResView->push_back_raw(value::TypeTags::Null, 0);
             }
         }
-        resView->push_back(intermediateRes.releaseToRaw());
+        resView->push_back_raw(intermediateRes.releaseToRaw());
     }
 
     return result;
@@ -481,7 +482,7 @@ value::TagValueMaybeOwned ByteCode::builtinExtractSubArray(ArityType arity) {
 
             for (size_t i = convertedStart; i < end; i++) {
                 auto elem = inputView->getAt(i);
-                resultView->push_back(value::copyValue(elem.tag, elem.value));
+                resultView->push_back_raw(value::copyValue(elem.tag, elem.value));
             }
         }
     } else {
@@ -512,7 +513,7 @@ value::TagValueMaybeOwned ByteCode::builtinExtractSubArray(ArityType arity) {
         size_t i = 0;
         while (i < length && !startEnumerator.atEnd()) {
             auto elem = startEnumerator.getViewOfValue();
-            resultView->push_back(value::copyValue(elem.tag, elem.value));
+            resultView->push_back_raw(value::copyValue(elem.tag, elem.value));
 
             i++;
             startEnumerator.advance();
@@ -561,7 +562,7 @@ value::TagValueMaybeOwned ByteCode::builtinReverseArray(ArityType arity) {
             resultView->reserve(inputSize);
             for (size_t i = 0; i < inputSize; i++) {
                 auto orig = inputView->getAt(inputSize - 1 - i);
-                resultView->push_back(copyValue(orig.tag, orig.value));
+                resultView->push_back_raw(copyValue(orig.tag, orig.value));
             }
         }
 
@@ -586,7 +587,7 @@ value::TagValueMaybeOwned ByteCode::builtinReverseArray(ArityType arity) {
 
             // Run through the array backwards and copy into the result array.
             for (auto it = inputContents.rbegin(); it != inputContents.rend(); ++it) {
-                resultView->push_back(copyValue(it->tag, it->value));
+                resultView->push_back_raw(copyValue(it->tag, it->value));
             }
         }
 
@@ -643,7 +644,7 @@ value::TagValueMaybeOwned ByteCode::builtinSortArray(ArityType arity) {
             std::sort(sortVector.begin(), sortVector.end(), cmp);
 
             for (auto elem : sortVector) {
-                resultView->push_back(copyValue(elem.tag, elem.value));
+                resultView->push_back_raw(copyValue(elem.tag, elem.value));
             }
         }
 
@@ -672,7 +673,7 @@ value::TagValueMaybeOwned ByteCode::builtinSortArray(ArityType arity) {
             resultView->reserve(inputContents.size());
 
             for (auto elem : inputContents) {
-                resultView->push_back(copyValue(elem.tag, elem.value));
+                resultView->push_back_raw(copyValue(elem.tag, elem.value));
             }
         }
 
@@ -1024,7 +1025,7 @@ value::TagValueMaybeOwned ByteCode::builtinArrayToObject(ArityType arity) {
             } else {
                 keyMap[keyStringData] = object->size();
                 auto [copyTag, copyVal] = valueCopy.releaseToRaw();
-                object->push_back(keyStringData, copyTag, copyVal);
+                object->push_back_raw(keyStringData, copyTag, copyVal);
             }
         } else {
             uassert(5153208,
@@ -1080,7 +1081,7 @@ value::TagValueMaybeOwned ByteCode::builtinArrayToObject(ArityType arity) {
             } else {
                 keyMap[keyStringData] = object->size();
                 auto [copyTag, copyVal] = valueCopy.releaseToRaw();
-                object->push_back(keyStringData, copyTag, copyVal);
+                object->push_back_raw(keyStringData, copyTag, copyVal);
             }
         }
         arrayEnumerator.advance();
@@ -1111,11 +1112,11 @@ value::TagValueMaybeOwned ByteCode::builtinUnwindArray(ArityType arity) {
             value::ArrayEnumerator subArrayEnumerator(elem.tag, elem.value);
             while (!subArrayEnumerator.atEnd()) {
                 auto subElem = subArrayEnumerator.getViewOfValue();
-                resultView->push_back(value::copyValue(subElem.tag, subElem.value));
+                resultView->push_back_raw(value::copyValue(subElem.tag, subElem.value));
                 subArrayEnumerator.advance();
             }
         } else {
-            resultView->push_back(value::copyValue(elem.tag, elem.value));
+            resultView->push_back_raw(value::copyValue(elem.tag, elem.value));
         }
         arrayEnumerator.advance();
     }
@@ -1141,7 +1142,7 @@ value::TagValueMaybeOwned ByteCode::builtinArrayToSet(ArityType arity) {
     value::ArrayEnumerator arrayEnumerator(arr.tag, arr.value);
     while (!arrayEnumerator.atEnd()) {
         auto elem = arrayEnumerator.getViewOfValue();
-        arrSet->push_back(value::copyValue(elem.tag, elem.value));
+        arrSet->push_back_clone(elem.tag, elem.value);
         arrayEnumerator.advance();
     }
 
@@ -1173,7 +1174,7 @@ value::TagValueMaybeOwned ByteCode::builtinCollArrayToSet(ArityType arity) {
     value::ArrayEnumerator arrayEnumerator(arr.tag, arr.value);
     while (!arrayEnumerator.atEnd()) {
         auto elem = arrayEnumerator.getViewOfValue();
-        arrSet->push_back(value::copyValue(elem.tag, elem.value));
+        arrSet->push_back_clone(elem.tag, elem.value);
         arrayEnumerator.advance();
     }
 

@@ -182,7 +182,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
                 auto sv = bson::fieldNameAndLength(be);
 
                 auto [tag, val] = convertFrom<false>(be, end, sv.size());
-                obj->push_back(sv, tag, val);
+                obj->push_back_raw(sv, tag, val);
 
                 be = advance(be, sv.size());
             }

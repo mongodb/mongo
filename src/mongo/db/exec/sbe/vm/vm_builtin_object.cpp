@@ -68,7 +68,7 @@ value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
 
             if (restrictFieldsSet.count(sv) == 0) {
                 auto [tag, val] = bson::convertToOwned(be, end, sv.size()).releaseToRaw();
-                obj->push_back(sv, tag, val);
+                obj->push_back_raw(sv, tag, val);
             }
 
             be = bson::advance(be, sv.size());
@@ -82,7 +82,7 @@ value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
 
                 auto [tag, val] = objRoot->getAt(idx);
                 auto [copyTag, copyVal] = value::copyValue(tag, val);
-                obj->push_back(sv, copyTag, copyVal);
+                obj->push_back_raw(sv, copyTag, copyVal);
             }
         }
     }
@@ -126,7 +126,7 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
             if (keepFieldsSet.count(sv) == 1) {
                 auto [tag, val] = bson::convertToView(be, end, sv.size());
                 auto [copyTag, copyVal] = value::copyValue(tag, val);
-                obj->push_back(sv, copyTag, copyVal);
+                obj->push_back_raw(sv, copyTag, copyVal);
             }
 
             be = bson::advance(be, sv.size());
@@ -139,7 +139,7 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
             if (keepFieldsSet.count(sv) == 1) {
                 auto [tag, val] = objRoot->getAt(idx);
                 auto [copyTag, copyVal] = value::copyValue(tag, val);
-                obj->push_back(sv, copyTag, copyVal);
+                obj->push_back_raw(sv, copyTag, copyVal);
             }
         }
     }
@@ -183,7 +183,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
         obj->reserve(typeTags.size());
         for (size_t idx = 0; idx < typeTags.size(); ++idx) {
             auto [tagCopy, valCopy] = value::copyValue(typeTags[idx], values[idx]);
-            obj->push_back(names[idx], tagCopy, valCopy);
+            obj->push_back_raw(names[idx], tagCopy, valCopy);
         }
     }
 
@@ -265,7 +265,7 @@ value::TagValueMaybeOwned ByteCode::builtinMergeObjects(ArityType arity) {
         if (it != currObjMap.end()) {
             auto [currObjTag, currObjVal] = it->second;
             auto [currObjTagCopy, currObjValCopy] = value::copyValue(currObjTag, currObjVal);
-            obj->push_back(currObjEnum.getFieldName(), currObjTagCopy, currObjValCopy);
+            obj->push_back_raw(currObjEnum.getFieldName(), currObjTagCopy, currObjValCopy);
         }
     }
 
@@ -319,9 +319,9 @@ value::TagValueMaybeOwned ByteCode::builtinObjectToArray(ArityType arity) {
         auto elemObj = value::getObjectView(elemVal);
 
         // insert key and value to the object
-        elemObj->push_back("k"_sd, keyTag, keyVal);
+        elemObj->push_back_raw("k"_sd, keyTag, keyVal);
         keyGuard.reset();
-        elemObj->push_back("v"_sd, valueCopyTag, valueCopyVal);
+        elemObj->push_back_raw("v"_sd, valueCopyTag, valueCopyVal);
 
         // insert the object to array
         array->push_back_raw(elemTag, elemVal);
