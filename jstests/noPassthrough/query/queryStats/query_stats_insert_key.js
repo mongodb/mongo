@@ -143,9 +143,6 @@ runInsertKeyTests(
     (fixture) => MongoRunner.stopMongod(fixture),
 );
 
-// TODO SERVER-122076: Enable the Sharded variant once query stats collection for inserts is wired
-// through mongos and the sharded write path. The current branch only supports standalone.
-/*
 runInsertKeyTests(
     "Sharded",
     () => {
@@ -161,4 +158,3 @@ runInsertKeyTests(
     },
     (st) => st.stop(),
 );
-*/
