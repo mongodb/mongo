@@ -280,6 +280,7 @@ void BSONInfo::Functions::bsonObjToArray::call(JSContext* cx, JS::CallArgs args)
     uassert(ErrorCodes::BadValue, "argument must be an object", args.get(0).isObject());
 
     auto obj = ValueWriter(cx, args.get(0)).toBSON();
+    obj.makeOwned();
     ValueReader(cx, args.rval()).fromBSONArray(obj, nullptr, false);
 }
 
