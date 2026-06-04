@@ -4,6 +4,8 @@
  * completed when the node is started back up.
  *
  * @tags: [
+ *   # TODO(SERVER-128117): Remove rhel10 tag once the test uses metric(s) for resume state.
+ *   incompatible_with_rhel10,
  *   requires_index_build_resumability,
  *   requires_majority_read_concern,
  *   requires_persistence,
