@@ -133,7 +133,7 @@ class ThrowListener : public testing::EmptyTestEventListener {
             (std::current_exception() &&
              (msg.starts_with("C++ exception with description") ||
               msg.starts_with("Unknown C++ exception")) &&
-             msg.contains(" thrown in "));
+             msg.find(" thrown in ") != StringData::npos);
         if (!unexpectedException)
             throw testing::AssertionException(result);
     }

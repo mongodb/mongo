@@ -941,11 +941,11 @@ public:
     }
 
     inline bool doesNotAliasFieldNameHeap(StringData s) const {
-        return !inFieldNameHeap(s.data());
+        return !inFieldNameHeap(s.data());  // NOLINT(bugprone-suspicious-stringview-data-usage)
     }
 
     inline bool doesNotAliasLeafBuilder(StringData s) const {
-        return !inLeafBuilder(s.data());
+        return !inLeafBuilder(s.data());  // NOLINT(bugprone-suspicious-stringview-data-usage)
     }
 
     inline bool doesNotAlias(const BSONElement& e) const {

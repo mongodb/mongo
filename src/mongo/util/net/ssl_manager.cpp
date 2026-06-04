@@ -486,15 +486,15 @@ StatusWith<SSLX509Name> parseDN(StringData sd) try {
 }
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 // OpenSSL has a more complete library of OID to SN mappings.
-std::string x509OidToShortName(StringData name) {
-    const auto nid = OBJ_txt2nid(name.data());
+std::string x509OidToShortName(const std::string& name) {
+    const auto nid = OBJ_txt2nid(name.c_str());
     if (nid == 0) {
-        return std::string{name};
+        return name;
     }
 
     const auto* sn = OBJ_nid2sn(nid);
     if (!sn) {
-        return std::string{name};
+        return name;
     }
 
     return sn;
@@ -503,9 +503,9 @@ std::string x509OidToShortName(StringData name) {
 using UniqueASN1Object =
     std::unique_ptr<ASN1_OBJECT, OpenSSLDeleter<decltype(ASN1_OBJECT_free), ASN1_OBJECT_free>>;
 
-boost::optional<std::string> x509ShortNameToOid(StringData name) {
+boost::optional<std::string> x509ShortNameToOid(const std::string& name) {
     // Converts the OID to an ASN1_OBJECT
-    UniqueASN1Object obj(OBJ_txt2obj(name.data(), 0));
+    UniqueASN1Object obj(OBJ_txt2obj(name.c_str(), 0));
     if (!obj) {
         return boost::none;
     }
@@ -596,19 +596,19 @@ static const std::initializer_list<std::pair<StringData, StringData>> kX509OidTo
         {"2.5.4.72"_sd, "role"_sd},
 };
 
-std::string x509OidToShortName(StringData oid) {
+std::string x509OidToShortName(const std::string& oid) {
     auto it = std::find_if(
         kX509OidToShortNameMappings.begin(),
         kX509OidToShortNameMappings.end(),
         [&](const std::pair<StringData, StringData>& entry) { return entry.first == oid; });
 
     if (it == kX509OidToShortNameMappings.end()) {
-        return std::string{oid};
+        return oid;
     }
     return std::string{it->second};
 }
 
-boost::optional<std::string> x509ShortNameToOid(StringData name) {
+boost::optional<std::string> x509ShortNameToOid(const std::string& name) {
     auto it = std::find_if(
         kX509OidToShortNameMappings.begin(),
         kX509OidToShortNameMappings.end(),
@@ -620,7 +620,7 @@ boost::optional<std::string> x509ShortNameToOid(StringData name) {
                          kX509OidToShortNameMappings.end(),
                          [&](const auto& entry) { return entry.first == name; }) !=
             kX509OidToShortNameMappings.end()) {
-            return std::string{name};
+            return name;
         }
         return boost::none;
     }

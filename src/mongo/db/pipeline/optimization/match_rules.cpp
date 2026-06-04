@@ -251,7 +251,7 @@ bool matchContainsTestingField(PipelineRewriteContext& ctx) {
     auto& match = checked_cast<DocumentSourceMatch&>(ctx.current());
     auto me = match.getMatchExpression();
 
-    if (!me->path().contains("test")) {
+    if (me->path().find("test") == StringData::npos) {
         return false;
     }
 

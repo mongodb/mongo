@@ -120,8 +120,7 @@ public:
     static constexpr StringData kStageName = "$testCompile";
     static constexpr StringData kStageSpec = "mongodb";
 
-    TestLogicalStageCompile()
-        : TestLogicalStage(toStdStringViewForInterop(kStageName), BSON(kStageSpec << "")) {}
+    TestLogicalStageCompile() : TestLogicalStage(kStageName, BSON(kStageSpec << "")) {}
 
     std::unique_ptr<extension::sdk::LogicalAggStage> clone() const override {
         return make();

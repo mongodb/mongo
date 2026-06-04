@@ -189,7 +189,7 @@ private:
     DocumentSourceOut(NamespaceString outputNs,
                       boost::optional<TimeseriesOptions> timeseries,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceWriter(kStageName.data(), std::move(outputNs), expCtx) {
+        : DocumentSourceWriter(kStageName, std::move(outputNs), expCtx) {
         if (timeseries) {
             _timeseries = std::make_shared<TimeseriesOptions>(*timeseries);
         }

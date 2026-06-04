@@ -358,7 +358,7 @@ void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
     UnstructuredValueExtractor extractor;
     extractor.reserve(attrs.size());
     attrs.apply(extractor);
-    auto formatted = fmt::vformat(toStdStringViewForInterop(message), extractor.args());
+    auto formatted = fmt::vformat(message, extractor.args());
 
     doLogImpl(0, severity, options, formatted, TypeErasedAttributeStorage());
 }

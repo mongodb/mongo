@@ -44,13 +44,13 @@ T toOtelAttributeValue(const T& value) noexcept {
     return value;
 }
 std::string_view toOtelAttributeValue(StringData value) noexcept {
-    return toStdStringViewForInterop(value);
+    return value;
 }
 std::vector<std::string_view> toOtelAttributeValue(const std::span<StringData>& value) noexcept {
     std::vector<std::string_view> stringViews;
     stringViews.reserve(value.size());
     for (const StringData& s : value) {
-        stringViews.push_back(toStdStringViewForInterop(s));
+        stringViews.push_back(s);
     }
     return stringViews;
 }
@@ -67,7 +67,7 @@ bool AttributesKeyValueIterable::ForEachKeyValue(
                 // to convert StringData and std::span<StringData> before calling the callback,
                 // and create a temporary vector to hold the values converted from
                 // std::span<StringData> until the callback is done.
-                return callback(toStdStringViewForInterop(attr.name), toOtelAttributeValue(v));
+                return callback(attr.name, toOtelAttributeValue(v));
             },
             attr.value);
     });

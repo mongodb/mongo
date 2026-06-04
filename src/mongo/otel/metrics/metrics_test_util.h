@@ -311,8 +311,7 @@ DataType getMetricData(opentelemetry::exporter::memory::SimpleAggregateInMemoryM
 
     const opentelemetry::exporter::memory::SimpleAggregateInMemoryMetricData::AttributeToPoint&
         attributeToPoint =
-            metrics.Get(std::string(toStdStringViewForInterop(MetricsService::kMeterName)),
-                        std::string(toStdStringViewForInterop(name.getName())));
+            metrics.Get(std::string(MetricsService::kMeterName), std::string(name.getName()));
 
     opentelemetry::sdk::common::OrderedAttributeMap attrMap =
         buildAttrMap(metricsService, name, attributes);

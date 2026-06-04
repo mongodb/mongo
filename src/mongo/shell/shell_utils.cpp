@@ -771,14 +771,13 @@ BSONObj _closeGoldenData(const BSONObj& input, void*) {
 }
 
 void closeMochaStyleTestContext(Scope& scope) {
-    const StringData code =
-        "if (typeof globalThis.__mochalite_closer === 'function') { await __mochalite_closer(); }"_sd;
-    scope.exec(code.data(),
-               "" /* name */,
-               true /* printResult */,
-               true /* reportError*/,
-               true /* assertOnError*/,
-               0 /*timeoutMs*/);
+    scope.exec(
+        "if (typeof globalThis.__mochalite_closer === 'function') { await __mochalite_closer(); }",
+        "" /* name */,
+        true /* printResult */,
+        true /* reportError*/,
+        true /* assertOnError*/,
+        0 /*timeoutMs*/);
 }
 
 /**

@@ -82,10 +82,6 @@
 
 namespace mongo {
 
-using std::ifstream;
-using std::string;
-using std::stringstream;
-
 /**
  * These utilities are thread safe but do not provide mutually exclusive access to resources
  * identified by the caller.  Dependent filesystem paths should not be accessed by different
@@ -102,11 +98,11 @@ BSONObj listFiles(const BSONObj& _args, void* data) {
 
     BSONArrayBuilder lst;
 
-    string rootname = args.firstElement().str();
+    std::string rootname = args.firstElement().str();
     boost::filesystem::path root(rootname);
-    stringstream ss;
+    std::stringstream ss;
     ss << "listFiles: no such directory: " << rootname;
-    string msg = ss.str();
+    std::string msg = ss.str();
     uassert(12581,
             msg.c_str(),
             boost::filesystem::exists(root) && boost::filesystem::is_directory(root));
@@ -188,7 +184,7 @@ BSONObj cat(const BSONObj& args, void* data) {
             mode |= std::ios::binary;
     }
 
-    ifstream f(filePath.valueStringDataSafe().data(), mode);
+    std::ifstream f(filePath.str(), mode);
     uassert(CANT_OPEN_FILE, fmt::format("couldn't open file {}", filePath.str()), f.is_open());
     std::streamsize fileSize = 0;
     // will throw on filesystem error
@@ -270,8 +266,8 @@ BSONObj copyFileRange(const BSONObj& args, void* data) {
 
 BSONObj md5sumFile(const BSONObj& args, void* data) {
     BSONElement e = singleArg(args);
-    stringstream ss;
-    FILE* f = fopen(e.valueStringDataSafe().data(), "rb");
+    std::stringstream ss;
+    FILE* f = fopen(e.str().c_str(), "rb");
     uassert(CANT_OPEN_FILE, str::stream() << "couldn't open file " << e.str(), f);
     ON_BLOCK_EXIT([&] { fclose(f); });
 
@@ -499,8 +495,8 @@ BSONObj getFileMode(const BSONObj& a, void* data) {
     uassert(50975,
             "getFileMode() takes one argument, the absolute path to a file",
             a.nFields() == 1 && a.firstElementType() == BSONType::string);
-    auto pathStr = a.firstElement().checkAndGetStringData();
-    boost::filesystem::path path(pathStr.data());
+    std::string pathStr = a.firstElement().str();
+    boost::filesystem::path path(pathStr);
     boost::system::error_code ec;
     auto fileStatus = boost::filesystem::status(path, ec);
     if (ec) {
@@ -854,7 +850,7 @@ BSONObj ls(const BSONObj& args, void* data) {
     if (!o.isEmpty()) {
         for (auto&& elem : o.firstElement().Obj()) {
             BSONObj f = elem.Obj();
-            string name = f["name"].String();
+            std::string name = f["name"].String();
             if (f["isDirectory"].trueValue()) {
                 name += '/';
             }

@@ -396,8 +396,7 @@ void IndexUpdateIdentifier::determineAffectedIndexes(const FieldRef& path,
 
             // Converting to std::string_view here to avoid heap allocations for temporary
             // std::string lookup values.
-            if (auto foundPathComponent =
-                    _pathComponentsToIndexSets.find(toStdStringViewForInterop(part));
+            if (auto foundPathComponent = _pathComponentsToIndexSets.find(part);
                 foundPathComponent != _pathComponentsToIndexSets.end()) {
                 // Path component found. Now add the index positions to the IndexSet.
                 dassert(indexesToUpdate.size() == foundPathComponent->second.size());

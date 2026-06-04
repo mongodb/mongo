@@ -38,6 +38,8 @@
 #include <span>
 #include <string>
 
+#include <fmt/format.h>
+
 namespace MONGO_MOD_PUBLIC mongo {
 
 class Status;

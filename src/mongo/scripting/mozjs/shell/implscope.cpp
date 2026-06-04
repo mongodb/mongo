@@ -138,9 +138,9 @@ const int kStackChunkSize = 8192;
  */
 constexpr size_t kMaxErrorStringSize = logv2::constants::kDefaultMaxAttributeOutputSizeKB * 1024;
 
-const StringData kTestDataFieldName = "TestData";
-const StringData kLogFormatFieldName = "logFormat";
-const StringData kExtraAttrFieldName = "extraAttr";
+constexpr const char* kTestDataFieldName = "TestData";
+constexpr const char* kExtraAttrFieldName = "extraAttr";
+constexpr StringData kLogFormatFieldName = "logFormat";
 
 /**
  * Runtime's can race on first creation (on some function statics), so we just
@@ -186,7 +186,7 @@ bool isLogFormatJson(MozJSScriptEngine* engine,
                      const JS::HandleObject& global) {
     return (engine->executionEnvironment() == ExecutionEnvironment::TestRunner &&
             ObjectWrapper(context, global)
-                    .getObject(kTestDataFieldName.data())
+                    .getObject(kTestDataFieldName)
                     .getStringField(kLogFormatFieldName) == "json");
 }
 
@@ -228,11 +228,11 @@ void logStatus(const Status& status, bool plainShell) {
                 attrs.add("extra", extraInfo->extraAttr);
             }
         }
-        if (status.reason().starts_with(ErrorMessage::kUncaughtException.data())) {
+        if (status.reason().starts_with(ErrorMessage::kUncaughtException)) {
             LOGV2_ERROR(10004100, "uncaught exception", attrs);
-        } else if (status.reason().starts_with(ErrorMessage::kOutOfMemory.data())) {
+        } else if (status.reason().starts_with(ErrorMessage::kOutOfMemory)) {
             LOGV2_ERROR(10004101, "out of memory exception", attrs);
-        } else if (status.reason().starts_with(ErrorMessage::kUnknownError.data())) {
+        } else if (status.reason().starts_with(ErrorMessage::kUnknownError)) {
             LOGV2_ERROR(10004102, "unknown error", attrs);
         } else {
             LOGV2_ERROR(10004103, "mongo exception", attrs);
@@ -1362,7 +1362,7 @@ Status MozJSImplScope::_checkForPendingException() {
             stackStr = str::stream() << "@" << fnameStr << ":" << lineNum << ":" << colNum << "\n";
         }
         // Extract 'extraAttr' object property that might be present in case of an assertion error.
-        auto extraAttrObj = errorObj.getObject(kExtraAttrFieldName.data());
+        auto extraAttrObj = errorObj.getObject(kExtraAttrFieldName);
         return Status(JSExceptionInfo(std::move(stackStr), status, std::move(extraAttrObj)), ss);
     }
 

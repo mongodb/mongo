@@ -571,15 +571,15 @@ void AccumulatorConcatArraysForBucketAuto::addToMap(long long inputPosition, Val
 }
 
 
-bool isPositionalAccumulator(const char* opName) {
-    return factoryFnMap.find(opName) != factoryFnMap.cend();
+bool isPositionalAccumulator(StringData opName) {
+    return factoryFnMap.contains(opName);
 }
 
 AccumulationStatement replaceAccumulationStatementForBucketAuto(ExpressionContext* const expCtx,
                                                                 AccumulationStatement&& stmt) {
 
     auto accName = stmt.expr.name;
-    if (!isPositionalAccumulator(accName.data())) {
+    if (!isPositionalAccumulator(accName)) {
         return std::move(stmt);
     }
     if (!accName.ends_with("N")) {

@@ -71,15 +71,6 @@ struct CanStringExplicit {
     }
 };
 
-struct CanStringOrStringData {
-    operator StringData() const {
-        return "bad choice"_sd;
-    }
-    operator std::string() const {
-        return "good choice";
-    }
-};
-
 struct CanStringRef {
     operator const std::string&() const {
         return kReasonString;
@@ -97,7 +88,6 @@ TEST(Status, ReasonStrings) {
     checkReason(std::string{kReason});
     checkReason(StringData{kReason});
     checkReason(str::stream{} << kReason);
-    checkReason(CanStringOrStringData{}, "good choice");
     checkReason(CanStringRef{});
 
     ASSERT((usableStatusArgs<ErrorCodes::Error, std::string>));
@@ -111,7 +101,6 @@ TEST(Status, ReasonStrings) {
     ASSERT((!usableStatusArgs<ErrorCodes::Error, boost::optional<std::string>>));
     ASSERT((usableStatusArgs<ErrorCodes::Error, CanString>));
     ASSERT((usableStatusArgs<ErrorCodes::Error, CanStringExplicit>));
-    ASSERT((usableStatusArgs<ErrorCodes::Error, CanStringOrStringData>));
     ASSERT((usableStatusArgs<ErrorCodes::Error, CanStringRef>));
     ASSERT((usableStatusArgs<ErrorCodes::Error, std::reference_wrapper<std::string>>));
     ASSERT((usableStatusArgs<ErrorCodes::Error, std::reference_wrapper<const std::string>>));
@@ -366,7 +355,6 @@ TEST(ErrorExtraInfo, StatusCtorExtraAndReason) {
     ASSERT((!usableStatusArgs<Extra, boost::optional<std::string>>));
     ASSERT((usableStatusArgs<Extra, CanString>));
     ASSERT((usableStatusArgs<Extra, CanStringExplicit>));
-    ASSERT((usableStatusArgs<Extra, CanStringOrStringData>));
     ASSERT((usableStatusArgs<Extra, CanStringRef>));
     ASSERT((usableStatusArgs<Extra, std::reference_wrapper<std::string>>));
     ASSERT((usableStatusArgs<Extra, std::reference_wrapper<const std::string>>));

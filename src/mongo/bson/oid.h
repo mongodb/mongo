@@ -209,7 +209,7 @@ public:
     template <typename H>
     friend H AbslHashValue(H h, const OID& oid) {
         const auto& d = oid._data;
-        return H::combine(std::move(h), toStdStringViewForInterop({d, sizeof(d)}));
+        return H::combine(std::move(h), StringData{d, sizeof(d)});
     }
 
     /** call this after a fork to update the process id */

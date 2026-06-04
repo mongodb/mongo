@@ -3554,11 +3554,12 @@ public:
     }
 
 protected:
-    bool _score;
     static auto _parseInternal(ExpressionContext* expCtx,
                                BSONElement expr,
                                const VariablesParseState& vps,
-                               const std::string& similarityName);
+                               StringData similarityName);
+
+    bool _score;
 };
 
 class ExpressionSimilarityDotProduct final : public ExpressionVectorSimilarity {

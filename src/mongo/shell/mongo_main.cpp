@@ -894,11 +894,12 @@ int mongo_main(int argc, char* argv[]) {
                 //
                 // TestData.ignoreChildProcessErrorCode is set to false by default.
                 bool ignoreChildProcessErrorCode = false;
-                StringData code =
+                shellMainScope->invokeSafe(
                     "function() { return typeof TestData === 'object' && TestData !== null && "
                     "TestData.hasOwnProperty('ignoreChildProcessErrorCode') && "
-                    "TestData.ignoreChildProcessErrorCode === true; }"_sd;
-                shellMainScope->invokeSafe(code.data(), nullptr, nullptr);
+                    "TestData.ignoreChildProcessErrorCode === true; }",
+                    nullptr,
+                    nullptr);
                 ignoreChildProcessErrorCode = shellMainScope->getBoolean("__returnValue");
                 auto childProcessErrorCode = mongo::shell_utils::KillMongoProgramInstances();
 
@@ -928,11 +929,12 @@ int mongo_main(int argc, char* argv[]) {
                 //
                 // TestData.ignoreUnterminatedProcesses is set to false by default.
                 bool ignoreUnterminatedProcesses = false;
-                code =
+                shellMainScope->invokeSafe(
                     "function() { return typeof TestData === 'object' && TestData !== null && "
                     "TestData.hasOwnProperty('ignoreUnterminatedProcesses') && "
-                    "TestData.ignoreUnterminatedProcesses === true; }"_sd;
-                shellMainScope->invokeSafe(code.data(), nullptr, nullptr);
+                    "TestData.ignoreUnterminatedProcesses === true; }",
+                    nullptr,
+                    nullptr);
                 ignoreUnterminatedProcesses = shellMainScope->getBoolean("__returnValue");
 
                 if (!ignoreUnterminatedProcesses) {
@@ -976,11 +978,12 @@ int mongo_main(int argc, char* argv[]) {
             }
 
             if (!coreDumpsFound.empty()) {
-                auto code =
+                shellMainScope->invokeSafe(
                     "function() { return typeof TestData === 'object' && TestData !== null && "
                     "TestData.hasOwnProperty('cleanUpCoreDumpsFromExpectedCrash') && "
-                    "TestData.cleanUpCoreDumpsFromExpectedCrash === true; }"_sd;
-                shellMainScope->invokeSafe(code.data(), nullptr, nullptr);
+                    "TestData.cleanUpCoreDumpsFromExpectedCrash === true; }",
+                    nullptr,
+                    nullptr);
                 bool cleanUpCoreDumpsFromExpectedCrash =
                     shellMainScope->getBoolean("__returnValue");
 
@@ -1006,8 +1009,7 @@ int mongo_main(int argc, char* argv[]) {
         }
 
         {
-            const StringData parallelShellCode = "uncheckedParallelShellPidsString();"_sd;
-            shellMainScope->invokeSafe(parallelShellCode.data(), nullptr, nullptr);
+            shellMainScope->invokeSafe("uncheckedParallelShellPidsString();", nullptr, nullptr);
             std::string ret = shellMainScope->getString("__returnValue");
             if (!ret.empty()) {
                 std::cout << "exiting due to parallel shells with unchecked return values. "

@@ -154,13 +154,13 @@ public:
      *  status if the value was found, or an error status if the value was not found.
      *  Leaves the Value unchanged on error.
      */
-    Status get(const Key& key, Value* value) const;
+    Status get(StringData key, Value* value) const;
 
     /** Same as the above get interface, but supports directly getting C++ types without the
      *  intermediate Value and has the added failure case of the value being the wrong type
      */
     template <typename T>
-    Status get(const Key& key, T* value_contents) const;
+    Status get(StringData key, T* value_contents) const;
 
     /** Runs all registered Constraints and returns the result.  If "setValid" is true and
      * validation succeeds, marks this as a valid Environment so that any modifications will
@@ -177,16 +177,14 @@ public:
      *  boost::program_options::variables_map during the transition period
      */
 
-    /**
-     *  @return 1 if the given Key has a Value set in this Environment and 0 if not
-     */
-    bool count(const Key& key) const;
+    /** Returns true if the given Key exists in this Environment. */
+    bool count(StringData key) const;
 
     /**
      *  @return the Value for the given Key in this Environment.  Returns an empty Value if
      *  Key is not set.
      */
-    Value operator[](const Key& key) const;
+    Value operator[](StringData key) const;
 
     /**
      * Gets the BSON representation of this Environment.  This will collapse dotted fields
@@ -231,13 +229,13 @@ public:
 protected:
     std::vector<Constraint*> constraints;
     std::vector<KeyConstraint*> keyConstraints;
-    std::map<Key, Value> values;
-    std::map<Key, Value> default_values;
+    std::map<Key, Value, std::less<>> values;
+    std::map<Key, Value, std::less<>> default_values;
     bool valid;
 };
 
 template <typename T>
-Status Environment::get(const Key& get_key, T* get_value) const {
+Status Environment::get(StringData get_key, T* get_value) const {
     Value value;
     Status ret = get(get_key, &value);
     if (!ret.isOK()) {

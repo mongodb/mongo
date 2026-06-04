@@ -62,7 +62,7 @@ public:
              NamespaceString outputNs,
              const std::shared_ptr<TimeseriesOptions>& timeseries,
              boost::optional<ShardId> mergeShardId)
-        : WriterStage<BSONObj>(stageName.data(), pExpCtx, std::move(outputNs)),
+        : WriterStage<BSONObj>(stageName, pExpCtx, std::move(outputNs)),
           _writeConcern(pExpCtx->getOperationContext()->getWriteConcern()),
           _timeseries(timeseries),
           _mergeShardId(std::move(mergeShardId)) {}

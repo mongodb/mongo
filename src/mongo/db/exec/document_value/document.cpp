@@ -56,9 +56,7 @@ namespace {
 template <const auto& Fields>
 bool isAnyOf(StringData s) {
     return [&]<size_t... Is>(std::index_sequence<Is...>) {
-        return (false || ... ||
-                (s.size() == Fields[Is].size() &&
-                 std::memcmp(s.data(), Fields[Is].data(), Fields[Is].size()) == 0));
+        return (... || (s == Fields[Is]));
     }(std::make_index_sequence<Fields.size()>{});
 }
 

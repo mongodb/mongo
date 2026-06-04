@@ -55,13 +55,13 @@ namespace mongo {
  */
 class ReturnKeyStage final : public PlanStage {
 public:
-    static constexpr StringData kStageName = "RETURN_KEY"_sd;
+    static constexpr const char* kStageName = "RETURN_KEY";
 
     ReturnKeyStage(ExpressionContext* expCtx,
                    std::vector<FieldPath> sortKeyMetaFields,
                    WorkingSet* ws,
                    std::unique_ptr<PlanStage> child)
-        : PlanStage(expCtx, std::move(child), kStageName.data()),
+        : PlanStage(expCtx, std::move(child), kStageName),
           _ws(*ws),
           _sortKeyMetaFields(std::move(sortKeyMetaFields)) {}
 
