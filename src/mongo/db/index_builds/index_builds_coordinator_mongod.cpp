@@ -65,7 +65,6 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
-#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -328,10 +327,9 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                     replCoord->canAcceptWritesFor(opCtx, nssOrUuid));
         }
 
-        // Reject index builds blocked by write-blocking mechanisms before waiting for throttling.
+        // The checks here catch empty index builds and also allow us to stop index
+        // builds before waiting for throttling.
         uassertStatusOK(writeBlockState->checkIfIndexBuildAllowedToStart(opCtx, nss));
-        uassertStatusOK(
-            ReplicaSetWriteBlockState::get(opCtx)->checkIfIndexBuildAllowedToStart(opCtx, nss));
 
         std::unique_lock<std::mutex> lk(_throttlingMutex);
         bool messageLogged = false;
@@ -441,11 +439,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
         if (opCtx->getClient()->isFromUserConnection()) {
             auto buildBlockedStatus = writeBlockState->checkIfIndexBuildAllowedToStart(opCtx, nss);
-            if (buildBlockedStatus.isOK()) {
-                buildBlockedStatus =
-                    ReplicaSetWriteBlockState::get(opCtx)->checkIfIndexBuildAllowedToStart(opCtx,
-                                                                                           nss);
-            }
             if (!buildBlockedStatus.isOK()) {
                 LOGV2(6511603,
                       "Aborted index build due to user index builds being blocked",

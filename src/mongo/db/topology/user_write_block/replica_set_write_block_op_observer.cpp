@@ -31,7 +31,6 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_operation_source.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -173,32 +172,6 @@ void ReplicaSetWriteBlockOpObserver::onDelete(OperationContext* opCtx,
                 replicaSetWriteBlockState->disableReplicaSetDeletionsBlocking();
             });
     }
-}
-
-
-void ReplicaSetWriteBlockOpObserver::onStartIndexBuild(OperationContext* opCtx,
-                                                       const NamespaceString& nss,
-                                                       const UUID& collUUID,
-                                                       const UUID& indexBuildUUID,
-                                                       const std::vector<IndexBuildInfo>& indexes,
-                                                       bool fromMigrate,
-                                                       bool isTimeseries) {
-    const auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collUUID);
-    if (coll && coll->numRecords(opCtx) == 0) {
-        return;
-    }
-    _checkReplicaSetWriteAllowed(
-        opCtx, nss, fromMigrate, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
-}
-
-void ReplicaSetWriteBlockOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx,
-                                                                  const NamespaceString& nss) {
-    const auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-    if (coll && coll->numRecords(opCtx) == 0) {
-        return;
-    }
-    _checkReplicaSetWriteAllowed(
-        opCtx, nss, false /* fromMigrate */, ReplicaSetWriteBlockRejectedWriteOp::kInsert);
 }
 
 }  // namespace mongo

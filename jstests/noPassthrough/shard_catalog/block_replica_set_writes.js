@@ -7,6 +7,7 @@
  * @tags: [
  *   requires_sharding,
  *   requires_persistence,
+ *   uses_parallel_shell,
  *   does_not_support_stepdowns,
  *   assumes_balancer_off,
  *   assumes_read_concern_unchanged,
