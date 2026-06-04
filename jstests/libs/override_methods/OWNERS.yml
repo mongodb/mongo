@@ -37,6 +37,9 @@ filters:
   - "txn_passthrough_cmd_massage.js":
     approvers:
       - 10gen/server-transactions
+  - "implicitly_retry_transactions_on_write_conflicts.js":
+    approvers:
+      - 10gen/server-transactions
   - "implicitly_retry_on_fcv_upgrade_downgrade.js":
     approvers:
       - 10gen/query-execution-query-settings

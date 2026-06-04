@@ -8,6 +8,7 @@ overrides:
   - "primary_driven_index_builds.enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongos"
   - "primary_driven_index_builds.all_no_passthrough_index_builds_tests_selector"
   - "primary_driven_index_builds.enable_spurious_write_conflicts_startup_parameters"
+  - "primary_driven_index_builds.implicitly_retry_transactions_on_write_conflicts"
 
 excludes:
   - "primary_driven_index_builds.exclude_primary_driven_index_builds_incompatible_tag"

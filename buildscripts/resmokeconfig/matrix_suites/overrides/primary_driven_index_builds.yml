@@ -112,6 +112,13 @@
                 "failpoint.WTWriteConflictExceptionForReads":
                   mode:
                     activationProbability: 0
+- name: implicitly_retry_transactions_on_write_conflicts
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            await import('jstests/libs/override_methods/implicitly_retry_transactions_on_write_conflicts.js');
 - name: all_no_passthrough_index_builds_tests_selector
   value:
     selector:
