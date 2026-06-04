@@ -305,6 +305,22 @@ newStatus = getServerStatus(testDB);
 verifyServerStatusChange(serverStatus, newStatus, "snapshot", 1, {atClusterTime: true});
 serverStatus = newStatus;
 
+// Partial readConcern (afterClusterTime only, no level) without any CWRC configured: the
+// server backfills the implicit local default, which is recorded under
+// noneInfo.implicitDefault. Must run before any CWRC is set because there's no documented
+// way to unset a CWRC once configured.
+{
+    jsTestLog("Testing afterClusterTime-only read with no CWRC configured");
+    const ts = assert.commandWorked(
+        testDB.runCommand({insert: "atClusterTime", documents: [{}], writeConcern: {w: "majority"}}),
+    ).operationTime;
+    serverStatus = getServerStatus(testDB);
+    assert.commandWorked(testDB.runCommand({find: "atClusterTime", readConcern: {afterClusterTime: ts}}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, ["none", "noneInfo.implicitDefault.local"], 1);
+    serverStatus = newStatus;
+}
+
 // Transaction reads.
 for (let level of ["none", "local", "snapshot", "majority"]) {
     jsTestLog("Testing transaction reads with readConcern " + level);
@@ -403,6 +419,29 @@ for (let level of ["local", "available", "majority"]) {
     assert.commandWorked(testDB.runCommand({getMore: res.cursor.id, collection: collName}));
     newStatus = getServerStatus(testDB);
     verifyServerStatusChange(serverStatus, newStatus, ["none", "noneInfo.CWRC." + level], 0);
+}
+
+// Non-transaction reads with a partial readConcern (afterClusterTime only, no level) must
+// inherit the CWRC level and count under noneInfo.CWRC, not under explicitLevelCount or
+// implicitDefault. Skips "available" because afterClusterTime requires
+// majority/local/snapshot. Uses a separate collection so subsequent tests' count
+// invariants on `collName` are preserved.
+const afterClusterTimeColl = "after_cluster_time_metrics";
+for (let level of ["local", "majority"]) {
+    jsTestLog("Testing afterClusterTime-only read with CWRC readConcern " + level);
+    assert.commandWorked(primary.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: level}}));
+
+    // Get a current operationTime via a majority-committed write so the read does not block.
+    const insertRes = assert.commandWorked(
+        testDB.runCommand({insert: afterClusterTimeColl, documents: [{}], writeConcern: {w: "majority"}}),
+    );
+    const ts = insertRes.operationTime;
+    serverStatus = getServerStatus(testDB);
+
+    assert.commandWorked(testDB.runCommand({find: afterClusterTimeColl, readConcern: {afterClusterTime: ts}}));
+    newStatus = getServerStatus(testDB);
+    verifyServerStatusChange(serverStatus, newStatus, ["none", "noneInfo.CWRC." + level], 1);
+    serverStatus = newStatus;
 }
 
 // Transaction CWRC reads.

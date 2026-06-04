@@ -517,9 +517,14 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
             seenWriteConcern = true;
         }
         if (!output.hasField(name)) {
-            // If mongos selected atClusterTime, forward it to the shard.
+            // Forward opCtx's RC to the shard when mongos selected atClusterTime, or when the
+            // wire RC carries no level (the dispatcher merged any CWRC default into opCtx in
+            // that case; the partial wire RC would otherwise reach the shard without the merge).
+            // TODO(SERVER-127620): unconditionally source RC from opCtx once every caller routes
+            // RC there.
             if (name == repl::ReadConcernArgs::kReadConcernFieldName &&
-                readConcernArgs.wasAtClusterTimeSelected()) {
+                (readConcernArgs.wasAtClusterTimeSelected() ||
+                 !elem.Obj().hasField(repl::ReadConcernArgs::kLevelFieldName))) {
                 output.appendElements(readConcernArgs.toBSON());
             } else {
                 output.append(elem);

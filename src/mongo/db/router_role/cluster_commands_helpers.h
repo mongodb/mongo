@@ -293,7 +293,12 @@ void setReadWriteConcern(OperationContext* opCtx, CommandType& cmd, bool setRC, 
     }
 
     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    if (readConcernArgs.wasAtClusterTimeSelected() || (setRC && !cmd.getReadConcern()))
+    // Forward opCtx's RC when mongos selected atClusterTime, or when the cmd's RC carries no
+    // level — the dispatcher merged any CWRC default into opCtx, so a partial wire RC (e.g.
+    // {afterClusterTime: T}) would otherwise reach the shard without the merge.
+    // TODO(SERVER-127620): unconditionally source RC from opCtx once every caller routes RC there.
+    if (readConcernArgs.wasAtClusterTimeSelected() ||
+        (setRC && (!cmd.getReadConcern() || !cmd.getReadConcern()->hasLevel())))
         cmd.setReadConcern(readConcernArgs);
     if (setWC && !cmd.getWriteConcern())
         cmd.setWriteConcern(opCtx->getWriteConcern());

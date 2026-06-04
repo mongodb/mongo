@@ -1485,19 +1485,26 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
     if (auto& rc = _invocation->getGenericArguments().getReadConcern()) {
         readConcernArgs = *rc;
     }
-    bool clientSuppliedReadConcern = !readConcernArgs.isEmpty();
+    // True only when the client set a level. Partial RCs (e.g. {afterClusterTime: T}) get the
+    // level filled in below, so provenance resolves to customDefault / implicitDefault.
+    bool clientSuppliedReadConcern = readConcernArgs.hasLevel();
     bool customDefaultWasApplied = false;
     auto readConcernSupport = _invocation->supportsReadConcern(readConcernArgs.getLevel(),
                                                                readConcernArgs.isImplicitDefault());
 
-    auto applyDefaultReadConcern = [&](const repl::ReadConcernArgs rcDefault) -> void {
+    auto applyReadConcernDefault = [&](repl::ReadConcernArgs rcDefault) {
         LOGV2_DEBUG(21955,
                     2,
                     "Applying default readConcern on command",
                     "readConcernDefault"_attr = rcDefault,
+                    "providedReadConcern"_attr = readConcernArgs,
+                    "isImplicit"_attr = !readConcernSupport.defaultReadConcernPermit.isOK(),
                     "command"_attr = _invocation->definition()->getName());
-        readConcernArgs = std::move(rcDefault);
-        // Update the readConcernSupport, since the default RC was applied.
+        if (readConcernArgs.isEmpty()) {
+            readConcernArgs = std::move(rcDefault);
+        } else {
+            readConcernArgs.setLevel(rcDefault.getLevel());
+        }
         readConcernSupport =
             _invocation->supportsReadConcern(readConcernArgs.getLevel(), !customDefaultWasApplied);
     };
@@ -1526,11 +1533,9 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
                 //       "command"_attr = _invocation->definition()->getName());
             }
 
-            // A member in a regular replica set.  Since these servers receive client queries, in
-            // this context empty RC (ie. readConcern: {}) means the same as if absent/unspecified,
-            // which is to apply the CWRWC defaults if present.  This means we just test isEmpty(),
-            // since this covers both isSpecified() && !isSpecified()
-            if (readConcernArgs.isEmpty()) {
+            // Apply the CWRC default when the client did not set a level. Empty RC: replace
+            // whole; partial RC: merge level only to preserve afterClusterTime / opTime.
+            if (!readConcernArgs.hasLevel()) {
                 const auto rwcDefaults = ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx);
                 const auto rcDefault = rwcDefaults.getDefaultReadConcern();
                 if (rcDefault) {
@@ -1538,20 +1543,19 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
                     customDefaultWasApplied =
                         (readConcernSource &&
                          readConcernSource.value() == DefaultReadConcernSourceEnum::kGlobal);
-
-                    applyDefaultReadConcern(*rcDefault);
+                    applyReadConcernDefault(*rcDefault);
                 }
             }
         }
     }
 
-    // Apply the implicit default read concern even if the command does not support a cluster wide
-    // read concern.
+    // Apply the implicit default RC when the command does not support CWRC and the client did
+    // not set a level.
     if (!readConcernSupport.defaultReadConcernPermit.isOK() &&
         readConcernSupport.implicitDefaultReadConcernPermit.isOK() && shouldApplyDefaults &&
-        !_isInternalClient() && readConcernArgs.isEmpty()) {
-        auto rcDefault = ReadWriteConcernDefaults::get(opCtx).getImplicitDefaultReadConcern();
-        applyDefaultReadConcern(rcDefault);
+        !_isInternalClient() && !readConcernArgs.hasLevel()) {
+        applyReadConcernDefault(
+            ReadWriteConcernDefaults::get(opCtx).getImplicitDefaultReadConcern());
     }
 
     // It's fine for clients to provide any provenance value to mongod. But if they haven't, then an

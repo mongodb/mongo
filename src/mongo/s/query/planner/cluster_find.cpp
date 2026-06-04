@@ -180,9 +180,12 @@ BSONObj makeFindCommandForShards(OperationContext* opCtx,
     findCommand.setMaxTimeMS(args.getMaxTimeMS());
     findCommand.setReadConcern(std::move(args.getReadConcern()));
 
+    // Forward opCtx's RC when either mongos selected atClusterTime, or the wire RC has no level
+    // (so the dispatcher's CWRC-merged RC reaches the shard).
+    // TODO(SERVER-127620): unconditionally source RC from opCtx once every caller routes RC there.
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    if (readConcernArgs.wasAtClusterTimeSelected()) {
-        // If mongos selected atClusterTime or received it from client, transmit it to shard.
+    if (readConcernArgs.wasAtClusterTimeSelected() || !findCommand.getReadConcern() ||
+        !findCommand.getReadConcern()->hasLevel()) {
         findCommand.setReadConcern(readConcernArgs);
     }
 

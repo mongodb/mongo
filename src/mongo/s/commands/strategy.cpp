@@ -825,13 +825,15 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     }
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    bool clientSuppliedReadConcern = readConcernArgs.isSpecified();
+    // True only when the client set a level. Partial RCs (e.g. {afterClusterTime: T}) get the
+    // level filled in below, so provenance resolves to customDefault / implicitDefault.
+    bool clientSuppliedReadConcern = readConcernArgs.hasLevel();
     bool customDefaultReadConcernWasApplied = false;
 
     auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel(),
                                                               readConcernArgs.isImplicitDefault());
 
-    auto applyDefaultReadConcern = [&](const repl::ReadConcernArgs rcDefault) -> void {
+    auto applyReadConcernDefault = [&](repl::ReadConcernArgs rcDefault) {
         // We must obtain the client lock to set ReadConcernArgs, because it's an
         // in-place reference to the object on the operation context, which may be
         // concurrently used elsewhere (eg. read by currentOp).
@@ -840,16 +842,23 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
                     2,
                     "Applying default readConcern on command",
                     "command"_attr = invocation->definition()->getName(),
-                    "readConcern"_attr = rcDefault);
-        readConcernArgs = std::move(rcDefault);
-        // Update the readConcernSupport, since the default RC was applied.
+                    "readConcern"_attr = rcDefault,
+                    "providedReadConcern"_attr = readConcernArgs,
+                    "isImplicit"_attr = !readConcernSupport.defaultReadConcernPermit.isOK());
+        if (readConcernArgs.isEmpty()) {
+            readConcernArgs = std::move(rcDefault);
+        } else {
+            readConcernArgs.setLevel(rcDefault.getLevel());
+        }
         readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel(),
                                                              !customDefaultReadConcernWasApplied);
     };
 
     auto shouldApplyDefaults = startTransaction || !TransactionRouter::get(opCtx);
     if (readConcernSupport.defaultReadConcernPermit.isOK() && shouldApplyDefaults) {
-        if (readConcernArgs.isEmpty()) {
+        // Apply the CWRC default when the client did not set a level. Empty RC: replace
+        // whole; partial RC: merge level only to preserve afterClusterTime / opTime.
+        if (!readConcernArgs.hasLevel()) {
             const auto rwcDefaults = ReadWriteConcernDefaults::get(opCtx).getDefault(opCtx);
             const auto rcDefault = rwcDefaults.getDefaultReadConcern();
             if (rcDefault) {
@@ -857,19 +866,18 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
                 customDefaultReadConcernWasApplied =
                     (readConcernSource &&
                      readConcernSource.value() == DefaultReadConcernSourceEnum::kGlobal);
-
-                applyDefaultReadConcern(*rcDefault);
+                applyReadConcernDefault(*rcDefault);
             }
         }
     }
 
-    // Apply the implicit default read concern even if the command does not support a cluster wide
-    // read concern.
+    // Apply the implicit default RC when the command does not support CWRC and the client did
+    // not set a level.
     if (!readConcernSupport.defaultReadConcernPermit.isOK() &&
         readConcernSupport.implicitDefaultReadConcernPermit.isOK() && shouldApplyDefaults &&
-        readConcernArgs.isEmpty()) {
-        const auto rcDefault = ReadWriteConcernDefaults::get(opCtx).getImplicitDefaultReadConcern();
-        applyDefaultReadConcern(rcDefault);
+        !readConcernArgs.hasLevel()) {
+        applyReadConcernDefault(
+            ReadWriteConcernDefaults::get(opCtx).getImplicitDefaultReadConcern());
     }
 
     auto& provenance = readConcernArgs.getProvenance();
