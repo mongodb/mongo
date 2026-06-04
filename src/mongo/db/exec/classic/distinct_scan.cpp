@@ -156,9 +156,6 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             auto& ru = *shard_role_details::getRecoveryUnit(opCtx());
             if (!_cursor) {
                 _cursor = indexAccessMethod()->newCursor(opCtx(), ru, _scanDirection == 1);
-            } else if (_needsFetch && _idRetrying != WorkingSet::INVALID_ID) {
-                // We're retrying a fetch! Don't call seek() or next().
-                return PlanStage::ADVANCED;
             }
 
             if (_needsSequentialScan) {
@@ -205,16 +202,24 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             if (!kv->key.isOwned())
                 kv->key = kv->key.getOwned();
 
-            // Package up the result for the caller.
-            WorkingSetID id = _workingSet->allocate();
-            WorkingSetMember* member = _workingSet->get(id);
-            member->recordId = kv->loc;
-            member->keyData.push_back(
-                IndexKeyDatum(_keyPattern,
-                              kv->key,
-                              workingSetIndexId(),
-                              shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId()));
-            _workingSet->transitionToRecordIdAndIdx(id);
+            // If we are retrying a fetch that yielded, reuse the existing working set member;
+            // otherwise allocate a new one.
+            WorkingSetID id;
+            WorkingSetMember* member;
+            if (_needsFetch && _idRetrying != WorkingSet::INVALID_ID) {
+                id = _idRetrying;
+                member = _workingSet->get(id);
+            } else {
+                id = _workingSet->allocate();
+                member = _workingSet->get(id);
+                member->recordId = kv->loc;
+                member->keyData.push_back(
+                    IndexKeyDatum(_keyPattern,
+                                  kv->key,
+                                  workingSetIndexId(),
+                                  shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId()));
+                _workingSet->transitionToRecordIdAndIdx(id);
+            }
 
             if (_needsFetch) {
                 const auto fetchRet = doFetch(member, id, out);
