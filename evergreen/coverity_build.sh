@@ -25,9 +25,11 @@ coverity_config_file="$coverity_config_dir/coverity_config.xml"
 
 build_config="--config=local --build_atlas=True --compiler_type=gcc --opt=off --dbg=False --allocator=system --define=MONGO_VERSION=${version}"
 bazel_cache="--output_user_root=$workdir/bazel_cache"
+compiledb_candidate_pattern_file="$(mktemp "$workdir/install-core-compiledb-candidates.XXXXXX")"
 compiledb_target_pattern_file="$(mktemp "$workdir/install-core-compiledb-targets.XXXXXX")"
+compatibility_query_file="$(mktemp "$workdir/install-core-compiledb-compat-query.XXXXXX")"
 query_stderr_file="$(mktemp "$workdir/install-core-compiledb-query-stderr.XXXXXX")"
-trap 'rm -f "$compiledb_target_pattern_file" "$query_stderr_file"' EXIT
+trap 'rm -f "$compiledb_candidate_pattern_file" "$compiledb_target_pattern_file" "$compatibility_query_file" "$query_stderr_file"' EXIT
 
 echo "Generating compile_commands.json for Coverity capture"
 echo "Resolving mongo_compiledb targets under //:install-core"
@@ -41,8 +43,55 @@ query_command=(
 printf ' %q' "${query_command[@]}"
 echo
 if ! "${query_command[@]}" \
-    2>"$query_stderr_file" | grep "//src/mongo" | awk '{print $1}' | sort -u >"$compiledb_target_pattern_file"; then
+    2>"$query_stderr_file" | grep "//src/mongo" |
+    awk '{print $1}' | sort -u >"$compiledb_candidate_pattern_file"; then
     echo "Failed to resolve mongo_compiledb targets under //:install-core"
+    cat "$query_stderr_file"
+    exit 1
+fi
+
+if [ ! -s "$compiledb_candidate_pattern_file" ]; then
+    echo "No mongo_compiledb targets found under //:install-core"
+    exit 1
+fi
+
+echo "Filtering platform-incompatible compiledb targets"
+printf 'set(' >"$compatibility_query_file"
+tr '\n' ' ' <"$compiledb_candidate_pattern_file" >>"$compatibility_query_file"
+printf ')\n' >>"$compatibility_query_file"
+compatibility_query_command=(
+    "$BAZEL_BINARY"
+    $bazel_cache
+    cquery
+    $build_config
+    --config=compiledb
+    --query_file="$compatibility_query_file"
+    --output=starlark
+    --starlark:expr='"%s %s" % (target.label, "INCOMPATIBLE" if "IncompatiblePlatformProvider" in providers(target) else "COMPATIBLE")'
+)
+printf ' %q' "${compatibility_query_command[@]}"
+echo
+if ! "${compatibility_query_command[@]}" 2>"$query_stderr_file" |
+    awk '
+        $1 ~ /^(@@)?\/\// && $2 == "COMPATIBLE" {
+            label = $1
+            sub(/^@@/, "", label)
+            compatible[label] = 1
+        }
+        $1 ~ /^(@@)?\/\// && $2 == "INCOMPATIBLE" {
+            label = $1
+            sub(/^@@/, "", label)
+            incompatible[label] = 1
+        }
+        END {
+            for (label in compatible) {
+                if (!(label in incompatible)) {
+                    print label
+                }
+            }
+        }
+    ' | sort -u >"$compiledb_target_pattern_file"; then
+    echo "Failed to filter platform-compatible mongo_compiledb targets under //:install-core"
     cat "$query_stderr_file"
     exit 1
 fi
