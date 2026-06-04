@@ -82,8 +82,6 @@ class MONGO_MOD_FILE_PRIVATE MetricNameMaker{public : static constexpr MetricNam
  * Helper to create MetricName instances with runtime-constructed names (e.g. names that embed
  * device names or mount paths discovered at startup). Requires N&O review since dynamic names
  * cannot be audited at compile time.
- *
- * TODO(SERVER-127521): Ensure ServerStatusOptions is boost::none for any runtime metric.
  */
 class MONGO_MOD_PUBLIC DynamicMetricNameMaker{
     public : static MetricName make(StringData name){return MetricNameMaker::make(name);
