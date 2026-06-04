@@ -596,7 +596,7 @@ const testScenarios = [
             },
         },
         spec: {key: {"a.b.geo": "2dsphere"}, name: "2dsphereIndex"},
-        expectedErrorCode: 16755, // unknown GeoJSON type
+        expectedErrorCode: [16755, ErrorCodes.GeoKeyExtractionFailed], // unknown GeoJSON type
     },
 
     //
@@ -763,7 +763,7 @@ const testScenarios = [
             "2dsphereIndexVersion": twoDSphereIndexVersion,
             name: "2dsphereBucketIndex",
         },
-        expectedErrorCode: 183934, // Can't extract geo keys: unknown GeoJSON type.
+        expectedErrorCode: [183934, ErrorCodes.GeoKeyExtractionFailedTimeseries], // Can't extract geo keys: unknown GeoJSON type.
     },
     {
         doc: {

@@ -81,6 +81,8 @@ selector:
     - jstests/core/query/batch_write/batch_write_command_delete.js
     - jstests/core/testing/failcommand_failpoint.js
     - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
+    - jstests/core/index/geo/geo_key_extraction_failure.js
+    - jstests/core/timeseries/geo/geo_key_extraction_failure_timeseries.js
     - jstests/core/query/explain/explain_uuid.js
     - jstests/core/query/explain/explain_includes_command.js
     - jstests/core/query/distinct/distinct_collator.js

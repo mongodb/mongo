@@ -4644,7 +4644,7 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
                             update_oplog_entry::makeDeltaOplogEntry(BSON(
                                 doc_diff::kUpdateSectionFieldName << fromjson("{loc: 'hi'}"))));
     auto status = runOpInitialSync(updateOp2);
-    ASSERT_EQ(status.code(), 16755);
+    ASSERT_EQ(status.code(), ErrorCodes::GeoKeyExtractionFailed);
 }
 
 TEST_F(IdempotencyTest, Geo2dsphereIndex) {

@@ -87,7 +87,7 @@ const createIdx = IndexBuildTest.startIndexBuild(
     coll.getFullName(),
     {geometry: "2dsphere"},
     {},
-    [16755],
+    [ErrorCodes.GeoKeyExtractionFailed],
     /*commitQuorum: */ 2,
 );
 

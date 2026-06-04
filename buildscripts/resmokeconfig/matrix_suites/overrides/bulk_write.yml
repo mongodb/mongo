@@ -28,6 +28,9 @@
       - jstests/core/testing/failcommand_failpoint.js
       # This test adds unknown fields to insert/update/delete ops which we ignore
       - jstests/core/query/parsing/write_commands_reject_unknown_fields.js
+      # These assert the insert command's writeError shape, which bulkWrite does not produce.
+      - jstests/core/index/geo/geo_key_extraction_failure.js
+      - jstests/core/timeseries/geo/geo_key_extraction_failure_timeseries.js
       # Expects explain to fail for using UUID instead of collection name.
       - jstests/core/query/explain/explain_uuid.js
       # Checks for specific name in the command that was executed that we override.

@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/index/geo_key_extraction_failure_info.h"
 #include "mongo/db/query/bson/multikey_dotted_path_support.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_dotted_path_support.h"
@@ -98,6 +99,20 @@ Status S2GetKeysForElement(const BSONElement& element,
     return Status::OK();
 }
 
+template <typename ExtraInfoT>
+[[noreturn]] void uassertGeoKeyExtractionFailure(StringData failingPath,
+                                                 const BSONObj& document,
+                                                 const BSONElement& elem,
+                                                 const Status& underlyingStatus) {
+    // Wrap non-objects so Array and scalar BSON types survive serialization.
+    auto failingElement =
+        (elem.type() == BSONType::object) ? elem.Obj().getOwned() : elem.wrap("element");
+    uasserted(ExtraInfoT(std::string(failingPath), underlyingStatus, std::move(failingElement)),
+              str::stream() << "Could not extract geo keys at path '" << failingPath
+                            << "' for document with _id " << redact(document["_id"].toString(false))
+                            << ": " << underlyingStatus.reason());
+}
+
 /*
  * We take the cartesian product of all keys when appending.
  */
@@ -136,7 +151,8 @@ void appendToS2Keys(const std::vector<key_string::HeapBuilder>& existingKeys,
  * Returns true if an indexed element of the document uses multiple cells for its covering, and
  * returns false otherwise.
  */
-bool getS2GeoKeys(const BSONObj& document,
+bool getS2GeoKeys(StringData failingPath,
+                  const BSONObj& document,
                   const BSONElementSet& elements,
                   const S2IndexingParams& params,
                   const std::vector<key_string::HeapBuilder>& keysToAdd,
@@ -146,18 +162,19 @@ bool getS2GeoKeys(const BSONObj& document,
                   Ordering ordering,
                   size_t maxKeys) {
     bool everGeneratedMultipleCells = false;
-    for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
+    for (const auto& elem : elements) {
         std::vector<S2CellId> cells;
-        Status status = S2GetKeysForElement(*i, params, &cells);
-        uassert(16755,
-                str::stream() << "Can't extract geo keys: " << document << "  " << status.reason(),
-                status.isOK());
-
-        uassert(16756,
-                str::stream() << "Unable to generate keys for (likely malformed) geometry"
-                              << " for document with _id "
-                              << redact(document["_id"].toString(false)),
-                cells.size() > 0);
+        auto status = S2GetKeysForElement(elem, params, &cells);
+        if (MONGO_unlikely(!status.isOK())) {
+            uassertGeoKeyExtractionFailure<GeoKeyExtractionFailureInfo>(
+                failingPath, document, elem, status);
+        } else if (MONGO_unlikely(cells.empty())) {
+            uassertGeoKeyExtractionFailure<GeoKeyExtractionFailureInfo>(
+                failingPath,
+                document,
+                elem,
+                Status(ErrorCodes::BadValue, "geometry produced no index cells"));
+        }
 
         // We'll be taking the cartesian product of cells and keysToAdd, make sure the output won't
         // be too big.
@@ -194,7 +211,8 @@ bool getS2GeoKeys(const BSONObj& document,
  * Returns true if an indexed element of the document uses multiple cells for its covering, and
  * returns false otherwise.
  */
-bool getS2BucketGeoKeys(const BSONObj& document,
+bool getS2BucketGeoKeys(StringData failingPath,
+                        const BSONObj& document,
                         const BSONElementSet& elements,
                         const S2IndexingParams& params,
                         const std::vector<key_string::HeapBuilder>& keysToAdd,
@@ -225,16 +243,21 @@ bool getS2BucketGeoKeys(const BSONObj& document,
             BSONObjBuilder shape(builder.subobjStart("shape"));
             shape.append("type", "MultiPoint");
             BSONArrayBuilder coordinates(shape.subarrayStart("coordinates"));
-            for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
+            for (const auto& elem : elements) {
                 GeometryContainer container;
-                auto status = container.parseFromStorage(*i, false, params.indexVersion);
-                uassert(183934,
-                        str::stream() << "Can't extract geo keys: " << status.reason(),
-                        status.isOK());
-                uassert(183493,
-                        str::stream()
-                            << "Time-series collections '2dsphere' indexes only support point data",
-                        container.isPoint());
+                auto status = container.parseFromStorage(elem, false, params.indexVersion);
+                if (MONGO_unlikely(!status.isOK())) {
+                    uassertGeoKeyExtractionFailure<GeoKeyExtractionFailureTimeseriesInfo>(
+                        failingPath, document, elem, status);
+                } else if (MONGO_unlikely(!container.isPoint())) {
+                    uassertGeoKeyExtractionFailure<GeoKeyExtractionFailureTimeseriesInfo>(
+                        failingPath,
+                        document,
+                        elem,
+                        Status(
+                            ErrorCodes::BadValue,
+                            "Time-series collections '2dsphere' indexes only support point data"));
+                }
 
                 auto point = container.getPoint();
                 BSONArrayBuilder pointData(coordinates.subarrayStart());
@@ -438,8 +461,8 @@ void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                 multikeyPaths ? &(*multikeyPaths)[posInIdx] : nullptr;
 
             // Trailing array values aren't being expanded, so we still need to determine whether
-            // the last component of the indexed path 'keyElem.fieldName()' causes the index to be
-            // multikey. We say that it does if
+            // the last component of the indexed path causes the index to be multikey. We say
+            // that it does if
             //   (a) the last component of the indexed path ever refers to an array value
             //   (regardless of
             //       the number of array elements)
@@ -453,7 +476,7 @@ void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                 auto elementStorage =
                     timeseries::dotted_path_support::extractAllElementsAlongBucketPath(
                         obj,
-                        keyElem.fieldName(),
+                        keyElem.fieldNameStringData(),
                         fieldElements,
                         expandArrayOnTrailingField,
                         arrayComponents);
@@ -475,18 +498,20 @@ void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                     haveGeoField = true;
                 }
 
-                lastPathComponentCausesIndexToBeMultikey = getS2BucketGeoKeys(obj,
-                                                                              fieldElements,
-                                                                              params,
-                                                                              keysToAdd,
-                                                                              &updatedKeysToAdd,
-                                                                              keyStringVersion,
-                                                                              context,
-                                                                              ordering,
-                                                                              maxNumKeys);
+                lastPathComponentCausesIndexToBeMultikey =
+                    getS2BucketGeoKeys(keyElem.fieldNameStringData(),
+                                       obj,
+                                       fieldElements,
+                                       params,
+                                       keysToAdd,
+                                       &updatedKeysToAdd,
+                                       keyStringVersion,
+                                       context,
+                                       ordering,
+                                       maxNumKeys);
             } else {
                 mdps::extractAllElementsAlongPath(obj,
-                                                  keyElem.fieldName(),
+                                                  keyElem.fieldNameStringData(),
                                                   fieldElements,
                                                   expandArrayOnTrailingField,
                                                   arrayComponents);
@@ -519,15 +544,17 @@ void getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                         }
                     }
 
-                    lastPathComponentCausesIndexToBeMultikey = getS2GeoKeys(obj,
-                                                                            fieldElements,
-                                                                            params,
-                                                                            keysToAdd,
-                                                                            &updatedKeysToAdd,
-                                                                            keyStringVersion,
-                                                                            context,
-                                                                            ordering,
-                                                                            maxNumKeys);
+                    lastPathComponentCausesIndexToBeMultikey =
+                        getS2GeoKeys(keyElem.fieldNameStringData(),
+                                     obj,
+                                     fieldElements,
+                                     params,
+                                     keysToAdd,
+                                     &updatedKeysToAdd,
+                                     keyStringVersion,
+                                     context,
+                                     ordering,
+                                     maxNumKeys);
                 } else {
                     lastPathComponentCausesIndexToBeMultikey = getS2LiteralKeys(fieldElements,
                                                                                 params.collator,

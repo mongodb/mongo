@@ -74,6 +74,7 @@ mongo_cc_library(
         "btree_key_generator.cpp",
         "expression_keys_private.cpp",
         "fts_access_method.cpp",
+        "geo_key_extraction_failure_info.cpp",
         "hash_access_method.cpp",
         "index_access_method.cpp",
         "s2_access_method.cpp",

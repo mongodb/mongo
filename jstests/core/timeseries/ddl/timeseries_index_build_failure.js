@@ -29,5 +29,8 @@ TimeseriesTest.run((insert) => {
     }
 
     const spec = {"control.min.time": "2dsphere"};
-    assert.commandFailedWithCode(createRawTimeseriesIndex(coll, spec, add2dsphereVersionIfNeededForSpec(spec)), 16755);
+    assert.commandFailedWithCode(createRawTimeseriesIndex(coll, spec, add2dsphereVersionIfNeededForSpec(spec)), [
+        16755,
+        ErrorCodes.GeoKeyExtractionFailed,
+    ]);
 });

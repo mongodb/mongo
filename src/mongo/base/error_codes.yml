@@ -48,6 +48,8 @@ error_categories:
   - PlannerEstimationError
   # This category contains all errors due to the system being under pressure
   - SystemOverloadedError
+  # Failures while extracting index keys from a document.
+  - IndexKeyExtractionError
 
 error_codes:
   #############################################################
@@ -1270,6 +1272,21 @@ error_codes:
   - {code: 508, name: SearchIndexManagementHostUnreachable}
 
   - {code: 509, name: TooManyOpenTransactions, categories: [Interruption]}
+
+  - {
+      code: 510,
+      name: GeoKeyExtractionFailed,
+      extra: GeoKeyExtractionFailureInfo,
+      extraIsOptional: True,
+      categories: [IndexKeyExtractionError],
+    }
+  - {
+      code: 511,
+      name: GeoKeyExtractionFailedTimeseries,
+      extra: GeoKeyExtractionFailureTimeseriesInfo,
+      extraIsOptional: True,
+      categories: [IndexKeyExtractionError],
+    }
 
   # ^^^^
   # Add new codes, sequentially numbered, above.

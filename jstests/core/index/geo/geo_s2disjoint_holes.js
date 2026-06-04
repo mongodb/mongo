@@ -87,12 +87,18 @@ assert.writeError(t.insert({p: multiPoly}));
 t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.insert({p: poly});
-assert.commandFailedWithCode(t.createIndex({p: "2dsphere"}, add2dsphereVersionIfNeeded()), 16755);
+assert.commandFailedWithCode(t.createIndex({p: "2dsphere"}, add2dsphereVersionIfNeeded()), [
+    16755,
+    ErrorCodes.GeoKeyExtractionFailed,
+]);
 
 t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 t.insert({p: multiPoly});
-assert.commandFailedWithCode(t.createIndex({p: "2dsphere"}, add2dsphereVersionIfNeeded()), 16755);
+assert.commandFailedWithCode(t.createIndex({p: "2dsphere"}, add2dsphereVersionIfNeeded()), [
+    16755,
+    ErrorCodes.GeoKeyExtractionFailed,
+]);
 
 //
 // But with no index we can insert bad polygons and bad multi-polygons.

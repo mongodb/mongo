@@ -152,7 +152,10 @@ TimeseriesTest.run((insert) => {
         },
     };
     // Can't extract geo keys: GeoJSON coordinates must be an array
-    assert.commandFailedWithCode(insert(timeseriescoll, docWithInvalidCoordinates), 183934);
+    assert.commandFailedWithCode(insert(timeseriescoll, docWithInvalidCoordinates), [
+        183934,
+        ErrorCodes.GeoKeyExtractionFailedTimeseries,
+    ]);
     const docsWithTypeNotPoint = [
         {
             _id: 7,
@@ -183,7 +186,10 @@ TimeseriesTest.run((insert) => {
     ];
     docsWithTypeNotPoint.forEach((invalidDoc) => {
         // Time-series collections '2dsphere' indexes only support point data
-        assert.commandFailedWithCode(insert(timeseriescoll, invalidDoc), 183493);
+        assert.commandFailedWithCode(insert(timeseriescoll, invalidDoc), [
+            183493,
+            ErrorCodes.GeoKeyExtractionFailedTimeseries,
+        ]);
     });
 
     // Assert that geoWithin queries use the index.

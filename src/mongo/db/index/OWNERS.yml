@@ -40,6 +40,10 @@ filters:
   - "expression_keys*":
     approvers:
       - 10gen/query-execution-write-exec
+  # TODO SERVER-128022: move this geo index file into a geo/ subdirectory.
+  - "geo_key_extraction_failure_info*":
+    approvers:
+      - 10gen/query-integration-features
   - "expression_params*":
     approvers:
       - 10gen/query-execution-write-exec
@@ -49,6 +53,7 @@ filters:
   - "multikey_paths*":
     approvers:
       - 10gen/query-execution-write-exec
+  # TODO SERVER-128022: move these geo index files (2d_*, s2_*) into a geo/ subdirectory.
   - "2d_*":
     approvers:
       - 10gen/query-integration-features
