@@ -40,9 +40,9 @@ assert.commandWorked(
 const now = new Date();
 assert.commandWorked(
     tsColl.insertMany([
-        {t: new Date(now - 1000), m: "a", val: 1},
+        {t: new Date(now.getTime() - 1000), m: "a", val: 1},
         {t: new Date(now), m: "a", val: 2},
-        {t: new Date(now + 1000), m: "a", val: 3},
+        {t: new Date(now.getTime() + 1000), m: "a", val: 3},
     ]),
 );
 

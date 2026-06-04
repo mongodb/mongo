@@ -101,6 +101,14 @@ protected:
         return result.getValue();
     }
 
+    // Uses the production-path (same as scope.cpp::invoke) to get the return value.
+    // The returned object has key "__returnValue" (from kInvokeResult in engine.cpp).
+    BSONObj invokeFunctionGetWrapped(uint64_t handle, const BSONObj& args) {
+        auto result = _bridge->invokeFunction(handle, wasm_helpers::convertBsonToWcVal(args));
+        uassert(result.getStatus().code(), result.getStatus().reason(), result.isOK());
+        return _bridge->getReturnValueWrapped();
+    }
+
     void setGlobal(std::string_view name, const BSONObj& value) {
         _bridge->setGlobal(name, value);
     }
@@ -617,6 +625,26 @@ TEST_F(WasmMozJSBridgeTest, BsonArgsRegex) {
     ASSERT_EQ(std::string(reElem.regex()), "Hello");
     ASSERT_EQ(std::string(reElem.regexFlags()), "i");
 }
+
+/* TODO SERVER-127482: Re-enable once mozjs regex handling is fixed.
+   Regression test: a '/' inside the regex pattern must round-trip unchanged.
+TEST_F(WasmMozJSBridgeTest, BsonArgsRegexWithSlashInPattern) {
+    auto handle = createFunction(
+        "function(re) {"
+        "  return { val: re };"
+        "}");
+
+    BSONObjBuilder bob;
+    bob.appendRegex("re", "something/extend|SMS", "i");
+
+    auto result = invokeFunction(handle, bob.obj());
+
+    BSONElement reElem = result.getField("val");
+    ASSERT_EQ(reElem.type(), BSONType::regEx);
+    ASSERT_EQ(std::string(reElem.regex()), "something/extend|SMS");
+    ASSERT_EQ(std::string(reElem.regexFlags()), "i");
+}
+*/
 
 TEST_F(WasmMozJSBridgeTest, BsonArgsMinKeyMaxKey) {
     auto handle = createFunction(
@@ -1517,22 +1545,20 @@ TEST_F(WasmMozJSBridgeTest, RuntimeErrorHasCorrectErrorCode) {
 
 TEST_F(WasmMozJSBridgeTest, RuntimeErrorContainsMessage) {
     auto handle = createFunction("function() { throw new Error('specific error text'); }");
-    auto doubleCheck = [&](auto&& ex) {
+    auto check = [&](auto&& ex) {
         getContainsCheck(ErrorCodes::JSInterpreterFailure, "specific error text")(ex);
         getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
     };
-    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()), AssertionException, doubleCheck);
+    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()), AssertionException, check);
 }
 
 TEST_F(WasmMozJSBridgeTest, RuntimeErrorFromUndefinedVariable) {
     auto handle = createFunction("function() { return nonexistentVariable.property; }");
-
-
-    auto doubleCheck = [&](auto&& ex) {
+    auto check = [&](auto&& ex) {
         getContainsCheck(ErrorCodes::JSInterpreterFailure, "nonexistentVariable")(ex);
         getContainsCheck(ErrorCodes::JSInterpreterFailure, "e-runtime")(ex);
     };
-    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()), AssertionException, doubleCheck);
+    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()), AssertionException, check);
 }
 
 TEST_F(WasmMozJSBridgeTest, RuntimeErrorFromTypeError) {
@@ -2410,7 +2436,7 @@ TEST_F(WasmMozJSBridgeTest, MapReduceOomRecoveryAfterDrain) {
 
 // Triggers the store limiter OOM path — the WASM module hits the linear memory
 // ceiling, SpiderMonkey aborts inside WASM, and wasmtime catches the resulting trap.
-// The bridge's _callFunc/_callFuncNoArgs methods latch hasTrapped() before re-throwing.
+// The bridge's _callFunc/_callFuncNoArgs method latches hasTrapped() before re-throwing.
 //
 // Disabled under TSan: when the store limiter denies memory.grow, SpiderMonkey
 // MOZ_CRASHes during GC. Wasmtime catches the SIGABRT via a signal handler that
@@ -2511,10 +2537,26 @@ constexpr auto kNestedCallToNumberLongCompare =
 
 TEST_F(WasmMozJSBridgeTest, CppMongoExceptionPreservesCodeAndMessage) {
     // C++ MongoDB exceptions thrown inside WASM are wrapped in JSExceptionInfo so the JS stack is
-    // attached. The original error code and message are preserved inExpand commentComment on lines
-    // R2512 to R2513 JSExceptionInfo::originalError.
+    // attached. The original error code and message are preserved in
+    // JSExceptionInfo::originalError. The named frames (a, b, c) defined in
+    // kNestedCallToNumberLongCompare must appear in the reason as "name@wasm:function:" entries
+    // from the captured stack property.
     auto handle = createFunction(kNestedCallToNumberLongCompare);
-    ASSERT_THROWS_CODE(invokeFunction(handle, BSONObj()), DBException, ErrorCodes::BadValue);
+    auto check = [&](auto&& ex) {
+        ASSERT_EQUALS(ex.code(), ErrorCodes::BadValue);
+        const auto& s = ex.reason();
+
+        // SpiderMonkey reports innermost frame first: c (NumberLong.compare() call site) → b → a.
+        // Each find starts from the previous frame's position to enforce ordering.
+        // NumberLong.compare() is a C++ native and has no JS frame; c@wasm:function: covers it.
+        const auto posC = s.find("c@wasm:function:");
+        ASSERT_NE(posC, std::string::npos);
+        const auto posB = s.find("b@wasm:function:", posC);
+        ASSERT_NE(posB, std::string::npos);
+        const auto posA = s.find("a@wasm:function:", posB);
+        ASSERT_NE(posA, std::string::npos);
+    };
+    ASSERT_THROWS_WITH_CHECK(invokeFunction(handle, BSONObj()), DBException, check);
 }
 
 TEST_F(WasmMozJSBridgeTest, CppMongoExceptionDoesNotTrapBridge) {
@@ -2559,6 +2601,212 @@ TEST_F(WasmMozJSBridgeTest, PostJsCallExceptionDoesNotTrapBridge) {
     ASSERT_THROWS_CODE(invokeFunction(handle, BSONObj()), DBException, ErrorCodes::BadValue);
 }
 
+// ---------------------------------------------------------------------------
+// Return-type tests: JS-constructed values returned from $function-style invocations
+// ---------------------------------------------------------------------------
+
+TEST_F(WasmMozJSBridgeTest, ReturnTimestampDirectly) {
+    // A JS function that returns a Timestamp as the top-level return value (not wrapped in an
+    // object). Exercises the TimestampInfo branch in ValueWriter::_writeObject() via the
+    // production path (getReturnValueBson()).
+    auto handle = createFunction("function() { return new Timestamp(1700000000, 42); }");
+
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo()) << "Expected __returnValue field; got: " << wrapped.toString();
+    ASSERT_EQ(retVal.type(), BSONType::timestamp)
+        << "Expected timestamp type; got type " << (int)retVal.type();
+    ASSERT_EQ(retVal.timestamp(), Timestamp(1700000000, 42));
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnTimestampFromArg) {
+    // Round-trip: pass a Timestamp as an argument, return it directly as the top-level value.
+    auto handle = createFunction("function(ts) { return ts; }");
+
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSON("ts" << Timestamp(1700000000, 42)));
+
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo()) << "Expected __returnValue field; got: " << wrapped.toString();
+    ASSERT_EQ(retVal.type(), BSONType::timestamp);
+    ASSERT_EQ(retVal.timestamp(), Timestamp(1700000000, 42));
+}
+
+/* TODO SERVER-127482: Re-enable these tests once mozjs regex handling is fixed.
+   These tests exercise the JSProto_RegExp branch in ValueWriter::_writeObject() using
+   GetRegExpSource/GetRegExpFlags, which is currently reverted pending the fix.
+
+TEST_F(WasmMozJSBridgeTest, ReturnRegexLiteral) {
+    auto handle = createFunction("function() { return /methodologies|Advanced|extend|SMS/; }");
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo()) << "Expected __returnValue field; got: " << wrapped.toString();
+    ASSERT_EQ(retVal.type(), BSONType::regEx)
+        << "Expected regEx type; got type " << (int)retVal.type();
+    ASSERT_EQ(std::string(retVal.regex()), "methodologies|Advanced|extend|SMS");
+    ASSERT_EQ(std::string(retVal.regexFlags()), "");
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnRegexLiteralWithFlags) {
+    auto handle = createFunction("function() { return /hello\\/world/gi; }");
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo());
+    ASSERT_EQ(retVal.type(), BSONType::regEx);
+    ASSERT_EQ(std::string(retVal.regex()), "hello\\/world");
+    ASSERT_EQ(std::string(retVal.regexFlags()), "gi");
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnRegexWithLeadingSlash) {
+    auto handle = createFunction("function() { return /\\/foo/g; }");
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo());
+    ASSERT_EQ(retVal.type(), BSONType::regEx);
+    ASSERT_EQ(std::string(retVal.regex()), "\\/foo");
+    ASSERT_EQ(std::string(retVal.regexFlags()), "g");
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnRegexWithTrailingSlash) {
+    auto handle = createFunction("function() { return /abc\\//; }");
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo());
+    ASSERT_EQ(retVal.type(), BSONType::regEx);
+    ASSERT_EQ(std::string(retVal.regex()), "abc\\/");
+    ASSERT_EQ(std::string(retVal.regexFlags()), "");
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnRegexPrototype) {
+    auto handle = createFunction("function() { return RegExp.prototype; }");
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo());
+    ASSERT_EQ(retVal.type(), BSONType::regEx);
+    ASSERT_EQ(std::string(retVal.regex()), "(?:)");
+    ASSERT_EQ(std::string(retVal.regexFlags()), "");
+}
+*/
+
+TEST_F(WasmMozJSBridgeTest, ReturnDateFromString) {
+    // A JS function that creates a Date from an ISO string and returns it.
+    // Uses the production path (invokeFunctionGetWrapped) which matches scope.cpp::invoke().
+    // In WASM/WASI the C-runtime date parser may produce an invalid Date (getTime() == NaN),
+    // causing ValueWriter to emit epoch 0 instead of the correct millisecond value.
+    auto handle = createFunction("function() { return new Date('2020-01-01T09:41:13.790Z'); }");
+
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo()) << "Expected __returnValue field; got: " << wrapped.toString();
+    ASSERT_EQ(retVal.type(), BSONType::date)
+        << "Expected date type; got type " << (int)retVal.type();
+    // 2020-01-01T09:41:13.790Z = 1577871673790 ms since epoch
+    ASSERT_EQ(retVal.Date().toMillisSinceEpoch(), 1577871673790LL);
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnDateFromStringEpoch) {
+    // Unix epoch expressed as an ISO string must parse to exactly 0ms.
+    auto handle = createFunction("function() { return new Date('1970-01-01T00:00:00.000Z'); }");
+
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo()) << "Expected __returnValue field; got: " << wrapped.toString();
+    ASSERT_EQ(retVal.type(), BSONType::date)
+        << "Expected date type; got type " << (int)retVal.type();
+    ASSERT_EQ(retVal.Date().toMillisSinceEpoch(), 0LL);
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnDateFromStringOneMillisBeforeEpoch) {
+    // One millisecond before epoch — exercises the negative-value path through ValueWriter.
+    auto handle = createFunction("function() { return new Date('1969-12-31T23:59:59.999Z'); }");
+
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo()) << "Expected __returnValue field; got: " << wrapped.toString();
+    ASSERT_EQ(retVal.type(), BSONType::date)
+        << "Expected date type; got type " << (int)retVal.type();
+    ASSERT_EQ(retVal.Date().toMillisSinceEpoch(), -1LL);
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnDateFromStringFarPast) {
+    // A date well before epoch (1900-01-01T00:00:00.000Z = -2208988800000ms).
+    // Validates that large-magnitude negative values survive the string-parse path in WASM.
+    auto handle = createFunction("function() { return new Date('1900-01-01T00:00:00.000Z'); }");
+
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo()) << "Expected __returnValue field; got: " << wrapped.toString();
+    ASSERT_EQ(retVal.type(), BSONType::date)
+        << "Expected date type; got type " << (int)retVal.type();
+    // 1900-01-01T00:00:00.000Z = -2208988800000ms (70 years before epoch, 17 leap years)
+    ASSERT_EQ(retVal.Date().toMillisSinceEpoch(), -2208988800000LL);
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnDateFromStringFarFuture) {
+    // Near the practical upper boundary: 9999-12-31T23:59:59.999Z = 253402300799999ms.
+    // Validates that large positive values survive the string-parse path in WASM.
+    auto handle = createFunction("function() { return new Date('9999-12-31T23:59:59.999Z'); }");
+
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo()) << "Expected __returnValue field; got: " << wrapped.toString();
+    ASSERT_EQ(retVal.type(), BSONType::date)
+        << "Expected date type; got type " << (int)retVal.type();
+    ASSERT_EQ(retVal.Date().toMillisSinceEpoch(), 253402300799999LL);
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnDateBeyondMaxBoundary) {
+    // JS Date max is 8640000000000000ms. One millisecond past it produces an Invalid Date whose
+    // getTime() returns NaN. JS::ToInt64(NaN) = 0 per ECMAScript spec, so the result is epoch 0.
+    // TODO SERVER-126786: investigate whether to throw instead, consistent with NumberLong.
+    auto handle = createFunction("function() { return new Date(8640000000000001); }");
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo());
+    ASSERT_EQ(retVal.type(), BSONType::date);
+    ASSERT_EQ(retVal.Date().toMillisSinceEpoch(), 0LL);
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnDateBeyondMinBoundary) {
+    // JS Date min is -8640000000000000ms. One millisecond before it produces an Invalid Date
+    // whose getTime() returns NaN. JS::ToInt64(NaN) = 0 per ECMAScript spec, so the result is
+    // epoch 0.
+    // TODO SERVER-126786: investigate whether to throw instead, consistent with NumberLong.
+    auto handle = createFunction("function() { return new Date(-8640000000000001); }");
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo());
+    ASSERT_EQ(retVal.type(), BSONType::date);
+    ASSERT_EQ(retVal.Date().toMillisSinceEpoch(), 0LL);
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnDateFromInvalidString) {
+    // A Date constructed from a non-parseable string is an Invalid Date (getTime() == NaN).
+    // JS::ToInt64(NaN) = 0 per ECMAScript spec, so the result is epoch 0.
+    // TODO SERVER-126786: investigate whether to throw instead, consistent with NumberLong.
+    auto handle = createFunction("function() { return new Date('not-a-date'); }");
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo());
+    ASSERT_EQ(retVal.type(), BSONType::date);
+    ASSERT_EQ(retVal.Date().toMillisSinceEpoch(), 0LL);
+}
+
+TEST_F(WasmMozJSBridgeTest, ReturnDateFromMillis) {
+    auto handle = createFunction("function() { return new Date(1577871673790); }");
+
+    BSONObj wrapped = invokeFunctionGetWrapped(handle, BSONObj());
+
+    BSONElement retVal = wrapped.getField("__returnValue");
+    ASSERT_FALSE(retVal.eoo());
+    ASSERT_EQ(retVal.type(), BSONType::date);
+    ASSERT_EQ(retVal.Date().toMillisSinceEpoch(), 1577871673790LL);
+}
 }  // namespace
 }  // namespace wasm
 }  // namespace mozjs

@@ -779,8 +779,9 @@ flags in common: {common_set}
 
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
 
-    # TODO SERVER-116054, SERVER-116052: Remove this js_engine handling
-    # section and _detect_js_engine once mozjs-wasm supports $where and $function,
+    # TODO SERVER-116054: Add support for $where
+    # TODO SERVER-127482: Re-enable $function in version tests once mozjs regex handling is fixed.
+    # Remove this js_engine handling section and _detect_js_engine once mozjs-wasm supports all WASM functionality,
     # eliminating the need for this startup-time binary invocation.
     _config.JS_ENGINE = _detect_js_engine(_config.MONGOD_EXECUTABLE)
     if _config.JS_ENGINE == "mozjs-wasm":
@@ -1192,7 +1193,7 @@ def _set_logging_config():
 
 
 _MOZJS_PATTERNS = (
-    # TODO SERVER-116052: Add support for $function.
+    # TODO SERVER-127482: Re-enable $function in version tests once mozjs regex handling is fixed.
     '"$function"',
     # TODO SERVER-116054: Add support for $where.
     '"$where"',

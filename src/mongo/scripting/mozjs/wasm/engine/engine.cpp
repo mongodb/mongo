@@ -394,10 +394,21 @@ err_code_t MozJSScriptEngine::invokeFunction(uint64_t handle,
         }
     }
 
+    // Use a fresh plain object as `this` so that Object.getOwnPropertyNames(this) inside
+    // $function returns [] rather than the full set of global properties.
+    JS::RootedObject emptyThis(_cx, JS_NewPlainObject(_cx));
+    if (!emptyThis) {
+        if (err) {
+            err->code = SM_E_OOM;
+            set_string(&err->msg, &err->msg_len, "invokeFunction: failed to allocate 'this'");
+        }
+        return SM_E_OOM;
+    }
+
     JS::RootedValue out(_cx);
     JS::RootedObject funcObj(_cx, slot->fn);
     JS::RootedValue funVal(_cx, JS::ObjectValue(*funcObj));
-    bool success = JS::Call(_cx, _global, funVal, args, &out);
+    bool success = JS::Call(_cx, emptyThis, funVal, args, &out);
 
     if (!chk.ok(success, SM_E_RUNTIME)) {
         if (err && err->code == SM_E_PENDING_EXCEPTION)
@@ -446,7 +457,8 @@ err_code_t MozJSScriptEngine::getReturnValueBson(mongo::BSONObj* out, wasm_mozjs
         return err ? err->code : SM_E_INTERNAL;
     }
 
-    // Wrap value in object for BSON (same pattern as implscope) so primitives serialize correctly.
+    // Wrap value in object for BSON (same pattern as implscope) so primitives serialize
+    // correctly.
     JS::RootedObject rout(_cx, JS_NewPlainObject(_cx));
     if (!rout) {
         if (err) {

@@ -5,7 +5,12 @@
  * @tags: [
  *   requires_fcv_60,
  *   requires_scripting,
- *   # TODO SERVER-116052: Add support for $function.
+ *   # The implicitly_shard_accessed_collections.js override races with background shard create
+ *   # collection ops triggered by active downgrade, causing ConflictingOperationInProgress.
+ *   cannot_run_during_upgrade_downgrade,
+ *   # TODO SERVER-127997: The mozjs-wasm engine is incompatible with ASAN/TSAN: libwasmtime_engine.so
+ *   # initialization takes >5 minutes under memory pressure, exceeding the 300s await_ready()
+ *   # timeout, and the Wasmtime rayon thread pool triggers TSAN CHECK failures.
  *   mozjs_wasm_unsupported,
  * ]
  */

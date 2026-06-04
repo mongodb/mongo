@@ -1,10 +1,7 @@
 // This test checks that an infinite recursion correctly produces an 'InternalError: too much
 // recursion' error and does not crash the server.
 // @tags: [
-//   requires_scripting,
-//   # TODO SERVER-116052: Add support for $function.
-//   # TODO SERVER-116054: Add support for $where.
-//   mozjs_wasm_unsupported,
+//   requires_scripting
 // ]
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 

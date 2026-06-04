@@ -83,12 +83,20 @@ std::string translateMozJSError(const wc::Val& mozJSError) {
     }
     ss << "message : '" << optStr(findField("msg")) << "', ";
     ss << "file : '" << optStr(findField("filename")) << "', ";
-    ss << "stack : '" << optStr(findField("stack")) << "', ";
     if (auto* line = findField("line"); line && line->is_u32()) {
         ss << "line : " << line->get_u32() << ", ";
     }
     if (auto* col = findField("column"); col && col->is_u32()) {
         ss << "column : " << col->get_u32();
+    }
+    // Append the JS stack trace on its own lines so callers that split on '\n' see
+    // individual frames (e.g. the agg_infinite_recursion.js test requires ≥20 lines).
+    auto* stackField = findField("stack");
+    if (stackField && stackField->is_option()) {
+        auto optVal = stackField->get_option().value();
+        if (optVal) {
+            ss << "\n" << optVal->get_string();
+        }
     }
     return ss.str();
 }

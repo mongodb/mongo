@@ -43,9 +43,9 @@ assert.commandWorked(
 const now = new Date();
 assert.commandWorked(
     tsColl.insertMany([
-        {t: new Date(now - 1000), m: "a", val: 1},
+        {t: new Date(now.getTime() - 1000), m: "a", val: 1},
         {t: new Date(now), m: "a", val: 2},
-        {t: new Date(now + 1000), m: "a", val: 3},
+        {t: new Date(now.getTime() + 1000), m: "a", val: 3},
     ]),
 );
 
@@ -64,7 +64,7 @@ assert.eq(profileObj.op, "command");
 assert.eq(profileObj.ns, tsColl.getFullName());
 assert.eq(profileObj.command.aggregate, tsCollName);
 assert.eq(profileObj.command.comment, commentObj);
-assert.eq(profileObj.docsExamined, 2);
+assert.eq(profileObj.docsExamined, 1);
 
 if (isViewfulTimeseriesOnlySuite(db)) {
     // For view-ful timeseries, there is extra info about the resolved view.

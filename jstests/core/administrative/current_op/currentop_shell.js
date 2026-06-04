@@ -20,8 +20,10 @@
  *   requires_scripting,
  *   # Tests currentOp behavior that is different between 8.1 and previous verions.
  *   requires_fcv_81,
- *   # TODO SERVER-116052: Add support for $function.
- *   mozjs_wasm_unsupported,
+ *   # The parallel shell runs a long-lived aggregate that is killed exactly once. The rerun_queries
+ *   # override would re-run the aggregate after the kill, causing the second run to hang because the
+ *   # main shell has already advanced past the killOp step and is blocked on awaitShell().
+ *   does_not_support_repeated_reads,
  * ]
  */
 

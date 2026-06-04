@@ -232,7 +232,7 @@ BSONObj WasmtimeImplScope::getObject(const char* field) {
 
 std::string WasmtimeImplScope::getString(const char* field) {
     BSONObj obj = _resolveGlobal(field);
-    return obj[kReturnValueField].String();
+    return std::string(obj[kReturnValueField].valueStringData());
 }
 
 bool WasmtimeImplScope::getBoolean(const char* field) {
@@ -252,7 +252,12 @@ int WasmtimeImplScope::getNumberInt(const char* field) {
 
 long long WasmtimeImplScope::getNumberLongLong(const char* field) {
     BSONObj obj = _resolveGlobal(field);
-    return obj[kReturnValueField].numberLong();
+    BSONElement elem = obj[kReturnValueField];
+    // BSONElement::numberLong() returns 0 for Date type; extract the actual ms value instead.
+    if (elem.type() == BSONType::date) {
+        return elem.date().toMillisSinceEpoch();
+    }
+    return elem.numberLong();
 }
 
 Decimal128 WasmtimeImplScope::getNumberDecimal(const char* field) {
@@ -399,7 +404,8 @@ void WasmtimeImplScope::_installHelpers() {
         "  };"
         "  return null;"
         "}");
-    uassertStatusOK(_bridge->invokeFunction(h, wasm::wasm_helpers::convertBsonToWcVal(BSONObj())));
+    uassertStatusOK(_bridge->invokeFunction(
+        h, wasm::wasm_helpers::convertBsonToWcVal(BSONObj()), /*ignoreReturn=*/true));
 }
 
 void WasmtimeImplScope::_drainEmitToCallback() {

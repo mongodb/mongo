@@ -1,7 +1,11 @@
 // Tests that if a mongoS cursor exceeds the maxTimeMs timeout, the cursors on the shards will be
 // cleaned up. Exercises the fix for the bug described in SERVER-62710.
 //
-// @tags: [requires_scripting]
+// @tags: [
+//  requires_scripting,
+//  # TODO SERVER-126787: Re-enable this test once MaxTimeMSExpired timeouts return the correct error code for WASM.
+//  mozjs_wasm_unsupported,
+// ]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

@@ -188,6 +188,20 @@ TEST(WasmtimeScope, Getter_IntegerTypes) {
     ASSERT_EQ(7LL, scope->getNumberLongLong("__returnValue"));
 }
 
+// Regression test: getNumberLongLong() must return the correct milliseconds for a Date return
+// value. BSONElement::numberLong() returns 0 for Date type; without special-casing, $function
+// expressions that return new Date(...) would always produce 1970-01-01T00:00:00Z.
+TEST(WasmtimeScope, Getter_DateReturnedAsMillis) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+
+    // 2019-10-15T10:32:50.169Z in milliseconds since epoch.
+    const long long expectedMs = 1571135570169LL;
+    ScriptingFunction fn = scope->createFunction("return new Date('2019-10-15T10:32:50.169Z');");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    ASSERT_EQ(expectedMs, scope->getNumberLongLong("__returnValue"));
+}
+
 // --- Setter/getter round-trips ---
 
 TEST(WasmtimeScope, Setters_NumberRoundTrip) {
@@ -524,6 +538,19 @@ TEST(WasmtimeScope, GetRegEx_NoFlags) {
     ASSERT_EQ(std::string("^foo$"), re.pattern);
     ASSERT_EQ(std::string(""), re.flags);
 }
+
+/* TODO SERVER-127482: Re-enable once mozjs regex handling is fixed.
+   getRegEx on a regex literal whose pattern contains a literal '/'.
+TEST(WasmtimeScope, GetRegEx_SlashInPattern) {
+    WasmtimeScriptEngine engine;
+    std::unique_ptr<Scope> scope(engine.createScopeForCurrentThread(boost::none));
+    ScriptingFunction fn = scope->createFunction("return /hello\\/world/gi;");
+    ASSERT_EQ(0, scope->invoke(fn, nullptr, nullptr, 0));
+    JSRegEx re = scope->getRegEx("__returnValue");
+    ASSERT_EQ(std::string("hello\\/world"), re.pattern);
+    ASSERT_EQ(std::string("gi"), re.flags);
+}
+*/
 
 // --- wasmtimeStoreMemoryLimitMB server parameter ---
 

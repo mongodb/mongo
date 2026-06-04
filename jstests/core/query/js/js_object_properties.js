@@ -9,9 +9,6 @@
 //   # Uses mapReduce command.
 //   requires_scripting,
 //   requires_getmore,
-//   # TODO SERVER-116052: Add support for $function.
-//   # TODO SERVER-116054: Add support for $where.
-//   mozjs_wasm_unsupported,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 

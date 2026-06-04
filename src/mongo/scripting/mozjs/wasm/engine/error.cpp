@@ -74,24 +74,19 @@ void ExecutionCheck::capture(err_code_t fallback) {
         return;
     }
 
-    // Capture the .stack property from the exception object before ErrorReportBuilder
-    // may consume the value.
-    {
-        JS::RootedValue exc(_cx, exnStack.exception().get());
-        if (exc.isObject()) {
-            JS::RootedObject excObj(_cx, &exc.toObject());
-            JS::RootedValue stackVal(_cx);
-            if (!JS_GetProperty(_cx, excObj, "stack", &stackVal)) {
-                JS_ClearPendingException(_cx);
-            } else if (stackVal.isString()) {
-                JS::Rooted<JSString*> stackStr(_cx, stackVal.toString());
-                if (JS_GetStringLength(stackStr) > 0) {
-                    JS::UniqueChars stackChars = JS_EncodeStringToUTF8(_cx, stackStr);
-                    if (stackChars)
-                        set_string(&_out->stack, &_out->stack_len, stackChars.get());
-                }
-            }
+    // Extract the JS stack trace from the exception object's 'stack' property.
+    // This is required so the host can include the full stacktrace in error messages.
+    JS::RootedValue exnVal(_cx, exnStack.exception());
+    if (exnVal.isObject()) {
+        JS::RootedObject exnObj(_cx, &exnVal.toObject());
+        JS::RootedValue stackVal(_cx);
+        if (JS_GetProperty(_cx, exnObj, "stack", &stackVal) && stackVal.isString()) {
+            JS::RootedString stackStr(_cx, stackVal.toString());
+            JS::UniqueChars stackChars = JS_EncodeStringToUTF8(_cx, stackStr);
+            if (stackChars)
+                set_string(&_out->stack, &_out->stack_len, stackChars.get());
         }
+        JS_ClearPendingException(_cx);
     }
 
     JS::ErrorReportBuilder report(_cx);
