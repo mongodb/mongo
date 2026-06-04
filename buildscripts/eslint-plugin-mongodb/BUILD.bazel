@@ -5,6 +5,7 @@ npm_package(
     srcs = [
         "package.json",
         "plugin.js",
+        "rules/no-non-shell-imports.js",
         "rules/no-print-fn.js",
         "rules/no-printing-tojson.js",
     ],

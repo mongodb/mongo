@@ -410,6 +410,16 @@ export default [
         },
     },
     {
+        // Shell files must not contain imports that are not packaged into the shell binary. Only imports from
+        // src/mongo/shell/ (embedded at build time) and std: (internal C++ modules) are available
+        // outside the repo. The vscode debugger subdirectory is Node.js code, not shell code.
+        files: ["src/mongo/shell/**"],
+        ignores: ["src/mongo/shell/debugger/vscode/**"],
+        rules: {
+            "mongodb/no-non-shell-imports": "error",
+        },
+    },
+    {
         files: ["src/mongo/shell/debugger/vscode/**/*.{js,mjs}"],
         ...vscodeDebuggerConfig,
     },
