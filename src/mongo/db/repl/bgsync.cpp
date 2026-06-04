@@ -749,7 +749,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
             connection = std::make_unique<DBClientConnection>();
             connection->setSoTimeout(durationCount<Milliseconds>(kRollbackOplogSocketTimeout) /
                                      1000.0);
-            connection->connect(source, StringData(), boost::none);
+            connection->connect(source, "Rollback"_sd, boost::none);
             if (auth::isInternalAuthSet()) {
                 connection->authenticateInternalUser();
             }

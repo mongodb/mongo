@@ -437,7 +437,7 @@ DBClientBase* DBConnectionPool::_finishCreate(const string& ident,
 
 DBClientBase* DBConnectionPool::get(const ConnectionString& url, double socketTimeout) {
     auto connect = [&]() {
-        auto c = url.connect(StringData(), socketTimeout);
+        auto c = url.connect(_name, socketTimeout);
         uassert(13328,
                 fmt::format(
                     "{}: connect failed {} : {}", _name, url.toString(), c.getStatus().reason()),
@@ -452,7 +452,7 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
     auto connect = [&] {
         const ConnectionString cs(uassertStatusOK(ConnectionString::parse(host)));
 
-        auto swConn = cs.connect(StringData(), socketTimeout);
+        auto swConn = cs.connect(_name, socketTimeout);
         if (!swConn.isOK()) {
             throwSocketError(SocketErrorKind::CONNECT_ERROR,
                              host,

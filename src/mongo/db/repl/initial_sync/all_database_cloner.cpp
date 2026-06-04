@@ -138,7 +138,7 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
             [this](const executor::RemoteCommandResponse& helloReply) {
                 return ensurePrimaryOrSecondary(helloReply);
             });
-        client->connect(getSource(), StringData(), boost::none);
+        client->connect(getSource(), "InitialSyncCloner"_sd, boost::none);
     } else {
         client->ensureConnection();
     }

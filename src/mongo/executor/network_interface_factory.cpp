@@ -38,6 +38,7 @@
 #include "mongo/executor/network_interface_tl.h"
 #include "mongo/executor/pooled_async_client_factory.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/util/assert_util.h"
 
 #include <memory>
 #include <utility>
@@ -66,6 +67,11 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
     ConnectionPool::Options connPoolOptions,
     transport::TransportProtocol protocol,
     bool trackRequestCounts) {
+    // instanceName flows into PooledAsyncClientFactory::_name which is sent as the
+    // applicationName in the hello handshake for every connection this interface opens.
+    // An empty name would make those connections invisible to server-side policies that
+    // identify internal clients by appName (e.g. ingress rate limiting exemptions).
+    dassert(!instanceName.empty(), "makeNetworkInterface requires a non-empty instanceName");
 
     if (!connPoolOptions.egressConnectionCloserManager && hasGlobalServiceContext()) {
         connPoolOptions.egressConnectionCloserManager =

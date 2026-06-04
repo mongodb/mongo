@@ -258,7 +258,17 @@ boost::optional<Milliseconds> clampTimeout(double timeoutInSec) {
 void DBClientSession::connect(const HostAndPort& serverAddress,
                               StringData applicationName,
                               const boost::optional<TransientSSLParams>& transientSSLParams) {
-    connectNoHello(serverAddress, transientSSLParams);
+
+    // Internal connections must always carry an applicationName so that server-side policies
+    // (e.g. ingress rate limiting) can correctly identify and exempt them.
+    dassert(!WireSpec::getWireSpec(getGlobalServiceContext()).isInternalClient() ||
+                !applicationName.empty(),
+            "Internal connections must specify a non-empty applicationName");
+
+    // Store the applicationName before connecting so it is preserved even if connectNoHello()
+    // throws. This ensures that subsequent reconnect attempts via _reconnectSession() (which
+    // passes _applicationName back to connect()) carry the correct non-empty appName rather
+    // than the empty default.
 
     // NOTE: If the 'applicationName' parameter is a view of the '_applicationName' member, as
     // happens, for instance, in the call to DBClientSession::connect from
@@ -267,6 +277,7 @@ void DBClientSession::connect(const HostAndPort& serverAddress,
     // freed. Do not reference the 'applicationName' parameter after this line. If you need to
     // access the application name, do it through the _applicationName member.
     _applicationName = std::string{applicationName};
+    connectNoHello(serverAddress, transientSSLParams);
 
     auto speculativeAuthType = auth::SpeculativeAuthType::kNone;
     std::shared_ptr<SaslClientSession> saslClientSession;
