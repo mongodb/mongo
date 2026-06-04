@@ -81,7 +81,7 @@ public:
                   "reshardingUUID"_attr = uuid());
 
             (*machine)->onCoordinatorStateAdvanced(CoordinatorStateEnum::kBlockingWrites);
-            (*machine)->awaitCriticalSectionAcquired().get(opCtx);
+            (*machine)->awaitInBlockingWritesOrError().get(opCtx);
         }
 
     private:
