@@ -306,8 +306,8 @@ protected:
     /**
      * Set the underlying source this stage should use to get Documents from. Must not throw
      * exceptions. Overrides should call this base implementation to ensure any future default
-     * behaviour is captured. External callers should use exec::agg::buildStageAndStitch() or
-     * test helpers instead.
+     * behaviour is captured. External callers should use exec::agg::buildStageAndStitch(),
+     * exec::agg::stitchStage(), or test helpers instead.
      */
     virtual void setSource(Stage* source) {
         pSource = source;
@@ -317,6 +317,8 @@ private:
     friend boost::intrusive_ptr<Stage> buildStageAndStitch(
         const boost::intrusive_ptr<DocumentSource>& ds,
         const boost::intrusive_ptr<Stage>& sourceStage);
+
+    friend void stitchStage(Stage& stage, Stage* prior);
 
     friend class MockStage;
 

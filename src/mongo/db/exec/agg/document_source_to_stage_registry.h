@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
+#include <absl/container/inlined_vector.h>
 #include <boost/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -64,6 +65,45 @@ namespace agg {
 
 using DocumentSourceToStageFn =
     std::function<StagePtr(const boost::intrusive_ptr<DocumentSource>&)>;
+
+/**
+ * Like REGISTER_AGG_STAGE_MAPPING but for DocumentSources that expand to more than one
+ * exec::agg Stage. 'documentSourceToStagesFn' must have signature:
+ *   StageExpansion(const boost::intrusive_ptr<DocumentSource>&)
+ */
+#define REGISTER_AGG_STAGES_MAPPING(name, documentSourceId, documentSourceToStagesFn) \
+    namespace {                                                                       \
+    MONGO_INITIALIZER_GENERAL(registerAggStagesMapping_##name,                        \
+                              ("BeginDocumentSourceStageRegistration"),               \
+                              ("EndDocumentSourceStageRegistration"))                 \
+    (InitializerContext*) {                                                           \
+        registerDocumentSourceToStagesFn(documentSourceId, documentSourceToStagesFn); \
+    }                                                                                 \
+    }
+
+/**
+ * Holds the exec::agg stages produced by a single DocumentSource during translation.
+ * Inline storage for one element covers the common 1:1 case with no heap allocation.
+ */
+using StageExpansion = absl::InlinedVector<StagePtr, 1>;
+
+using DocumentSourceToStagesFn =
+    std::function<StageExpansion(const boost::intrusive_ptr<DocumentSource>&)>;
+
+/**
+ * Registers a DocumentSource with a function that builds one or more exec::agg stages.
+ * Used by REGISTER_AGG_STAGES_MAPPING. Do not call directly.
+ */
+void registerDocumentSourceToStagesFn(DocumentSource::Id dsid, DocumentSourceToStagesFn fn);
+
+/**
+ * Creates the exec::agg stages for the given DocumentSource.
+ * Returns a StageExpansion with one element for 1:1 mappings and N elements for 1:N mappings.
+ */
+StageExpansion buildStages(const boost::intrusive_ptr<DocumentSource>& ds);
+
+// Needed so buildPipeline can wire expansion stages without being a friend of Stage.
+void stitchStage(Stage& stage, Stage* prior);
 
 /**
  * Registers a DocumentSource with a function that builds an aggregation 'Stage' from

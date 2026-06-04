@@ -62,6 +62,10 @@ public:
         ASSERT_EQ(true, disposed);
     }
 
+    Stage* getSource() const {
+        return pSource;
+    }
+
     GetNextResult doGetNext() final {
         return GetNextResult::makeEOF();
     }
@@ -103,6 +107,56 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceMock2ToThrowsStageMappingFn
 REGISTER_AGG_STAGE_MAPPING(ThrowsStage,
                            DocumentSourceMock2::id,
                            documentSourceMock2ToThrowsStageMappingFn);
+
+class DocumentSourceMock3 : public DocumentSourceTestOptimizations {
+public:
+    using DocumentSourceTestOptimizations::DocumentSourceTestOptimizations;
+    static const Id& id;
+    Id getId() const override {
+        return id;
+    }
+};
+
+ALLOCATE_DOCUMENT_SOURCE_ID(documentSourceMock3, DocumentSourceMock3::id);
+
+exec::agg::StageExpansion documentSourceMock3ToTwoStagesMappingFn(
+    const boost::intrusive_ptr<DocumentSource>& ds) {
+    exec::agg::StageExpansion stages;
+    stages.push_back(make_intrusive<CustomDisposeStage>(ds->getExpCtx()));
+    stages.push_back(make_intrusive<CustomDisposeStage>(ds->getExpCtx()));
+    return stages;
+}
+
+REGISTER_AGG_STAGES_MAPPING(twoStagesMock3,
+                            DocumentSourceMock3::id,
+                            documentSourceMock3ToTwoStagesMappingFn);
+
+TEST(PipelineBuilderTest, NStageExpansionProducesTwoExecStages) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto dsm3 = make_intrusive<DocumentSourceMock3>(expCtx);
+    std::list<boost::intrusive_ptr<DocumentSource>> sources{dsm3};
+    auto pipeline = mongo::Pipeline::create(std::move(sources), expCtx);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+    ASSERT_EQ(2u, execPipeline->getStages().size());
+}
+
+TEST(PipelineBuilderTest, NStageExpansionInterleavedWithSingleStage) {
+    // Pipeline: Mock1 (1→1) → Mock3 (1→2) produces 3 exec stages.
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto dsm1 = make_intrusive<DocumentSourceMock1>(expCtx);
+    auto dsm3 = make_intrusive<DocumentSourceMock3>(expCtx);
+    std::list<boost::intrusive_ptr<DocumentSource>> sources{dsm1, dsm3};
+    auto pipeline = mongo::Pipeline::create(std::move(sources), expCtx);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->freeze());
+    auto& stages = execPipeline->getStages();
+    ASSERT_EQ(3u, stages.size());
+    auto* s0 = static_cast<CustomDisposeStage*>(stages[0].get());
+    auto* s1 = static_cast<CustomDisposeStage*>(stages[1].get());
+    auto* s2 = static_cast<CustomDisposeStage*>(stages[2].get());
+    ASSERT_EQ(nullptr, s0->getSource());
+    ASSERT_EQ(s0, s1->getSource());
+    ASSERT_EQ(s1, s2->getSource());
+}
 
 TEST(PipelineBuilderTest, DisposeStagesIfExceptionOccurs) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();

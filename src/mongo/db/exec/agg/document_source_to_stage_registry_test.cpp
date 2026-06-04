@@ -71,7 +71,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceUniqueForThisTestMappingFn(
  */
 DEATH_TEST(DocumentSourceToStageRegistryTestDeathTest,
            NonexistentMapper,
-           "Missing 'DocumentSource' to 'agg::Stage' mapping function") {
+           "missing 'DocumentSource' to 'agg::Stage' mapping function") {
     const auto expCtx = make_intrusive<ExpressionContextForTest>();
 
     // Create a DocumentSources that do not have a registered mapping function.
@@ -84,6 +84,88 @@ DEATH_TEST(DocumentSourceToStageRegistryTestDeathTest,
 REGISTER_AGG_STAGE_MAPPING(uniqueForThisTest,
                            DocumentSourceUniqueForThisTest::id,
                            documentSourceUniqueForThisTestMappingFn)
+
+class DocumentSourceMultiForThisTest : public DocumentSourceTestOptimizations {
+public:
+    DocumentSourceMultiForThisTest(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceTestOptimizations(expCtx) {}
+    static const Id& id;
+    Id getId() const override {
+        return id;
+    }
+};
+
+ALLOCATE_DOCUMENT_SOURCE_ID(multiForThisTest, DocumentSourceMultiForThisTest::id)
+
+class TestStage : public Stage {
+public:
+    explicit TestStage(boost::intrusive_ptr<ExpressionContext> expCtx) : Stage("$test", expCtx) {}
+
+private:
+    GetNextResult doGetNext() final {
+        return GetNextResult::makeEOF();
+    }
+};
+
+StageExpansion documentSourceMultiForThisTestMappingFn(
+    const boost::intrusive_ptr<DocumentSource>& ds) {
+    StageExpansion expansion;
+    expansion.push_back(make_intrusive<TestStage>(ds->getExpCtx()));
+    expansion.push_back(make_intrusive<TestStage>(ds->getExpCtx()));
+    return expansion;
+}
+
+REGISTER_AGG_STAGES_MAPPING(multiForThisTest,
+                            DocumentSourceMultiForThisTest::id,
+                            documentSourceMultiForThisTestMappingFn)
+
+class DocumentSourceEmptyExpansionForThisTest : public DocumentSourceTestOptimizations {
+public:
+    DocumentSourceEmptyExpansionForThisTest(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceTestOptimizations(expCtx) {}
+    static const Id& id;
+    Id getId() const override {
+        return id;
+    }
+};
+
+ALLOCATE_DOCUMENT_SOURCE_ID(emptyExpansionForThisTest, DocumentSourceEmptyExpansionForThisTest::id)
+
+StageExpansion documentSourceEmptyExpansionMappingFn(
+    const boost::intrusive_ptr<DocumentSource>& ds) {
+    return {};
+}
+
+REGISTER_AGG_STAGES_MAPPING(emptyExpansionForThisTest,
+                            DocumentSourceEmptyExpansionForThisTest::id,
+                            documentSourceEmptyExpansionMappingFn)
+
+DEATH_TEST(DocumentSourceToStageRegistryTestDeathTest,
+           EmptyExpansionIsRejected,
+           "must contain at least one stage") {
+    auto ds = make_intrusive<DocumentSourceEmptyExpansionForThisTest>(
+        make_intrusive<ExpressionContextForTest>());
+    buildStages(ds);
+}
+
+TEST(DocumentSourceToStageRegistryTest, MultiStageMapper) {
+    auto ds =
+        make_intrusive<DocumentSourceMultiForThisTest>(make_intrusive<ExpressionContextForTest>());
+    auto expansion = buildStages(ds);
+    ASSERT_EQ(2u, expansion.size());
+    ASSERT_NE(nullptr, expansion[0]);
+    ASSERT_NE(nullptr, expansion[1]);
+}
+
+TEST(DocumentSourceToStageRegistryTest, SingleStageViaNewBuildStagesFunction) {
+    auto ds =
+        make_intrusive<DocumentSourceUniqueForThisTest>(make_intrusive<ExpressionContextForTest>());
+    mappingFnCallCount = 0;
+    auto expansion = buildStages(ds);
+    ASSERT_EQ(1u, expansion.size());
+    ASSERT_EQ(overridenStagePtr, expansion.front().get());
+    ASSERT_GT(mappingFnCallCount, 0);
+}
 
 /**
  * Verify that REGISTER_AGG_STAGE_MAPPING macro overrides the default
