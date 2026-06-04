@@ -135,15 +135,7 @@ public:
 
     bool isConnected() override;
 
-    bool isConnectedToLoadBalancerPort() const override;
-
-    bool isConnectedToPriorityPort() const override;
-
-    bool isConnectedToProxyUnixSocket() const override;
-
     Status validateProxyUnixSocketPeerPermissions() override;
-
-    bool isLoadBalancerPeer() const override;
 
     void setIsLoadBalancerPeer(bool helloHasLoadBalancedOption) override;
 
@@ -315,27 +307,6 @@ protected:
 
     AsioTransportLayer* const _tl;
 
-    /**
-     * We have a distinction here. A load balancer port can accept connections that are
-     * either attempting to connect to a load balancer or as a normal targeted connection.
-     * The bools below describe if 1/ the connection is connecting to the load balancer port,
-     * and 2/ the connection is a load balancer type connection. We only find out if the
-     * connection is a LoadBalancerConnection if the hello command parses {loadBalancer: 1}.
-     */
-    bool _isConnectedToLoadBalancerPort = false;
-    bool _isLoadBalancerPeer = false;
-
-    /**
-     * Indicates whether the connection targets the priority port or its corresponding unix
-     * socket. These connection are intended to allow high-priority operations during connection
-     * storms.
-     */
-    bool _isConnectedToPriorityPort = false;
-
-    /**
-     * Indicates whether this is a proxy unix domain socket connection.
-     */
-    bool _isConnectedToProxyUnixSocket = false;
 
     boost::optional<HostAndPort> _proxiedSrcEndpoint;
     boost::optional<HostAndPort> _proxiedDstEndpoint;

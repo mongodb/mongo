@@ -188,6 +188,7 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db/repl/hello:hello_command",
         "//src/mongo/db/sharding_environment:mongos_server_parameters",
+        "//src/mongo/transport:transport_layer_common",
     ],
 )
 

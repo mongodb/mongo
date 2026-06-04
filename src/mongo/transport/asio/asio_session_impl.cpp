@@ -64,8 +64,6 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerShortOpportunisticReadWrite);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerSessionPauseBeforeSetSocketOption);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeOpportunisticRead);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
-MONGO_FAIL_POINT_DEFINE(clientIsConnectedToLoadBalancerPort);
-MONGO_FAIL_POINT_DEFINE(clientIsLoadBalancedPeer);
 MONGO_FAIL_POINT_DEFINE(proxyUnixDomainSocketPeerCredentialValidationOverride);
 
 namespace {
@@ -258,23 +256,6 @@ CommonAsioSession::CommonAsioSession(
         LOGV2(5271001, "Initializing the AsioSession with transient SSL context", attrs);
     }
 #endif
-}
-
-bool CommonAsioSession::isConnectedToLoadBalancerPort() const {
-    return MONGO_unlikely(clientIsConnectedToLoadBalancerPort.shouldFail()) ||
-        _isConnectedToLoadBalancerPort;
-}
-
-bool CommonAsioSession::isConnectedToPriorityPort() const {
-    return _isConnectedToPriorityPort;
-}
-
-bool CommonAsioSession::isLoadBalancerPeer() const {
-    return MONGO_unlikely(clientIsLoadBalancedPeer.shouldFail()) || _isLoadBalancerPeer;
-}
-
-bool CommonAsioSession::isConnectedToProxyUnixSocket() const {
-    return _isConnectedToProxyUnixSocket;
 }
 
 #ifdef __APPLE__

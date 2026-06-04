@@ -36,6 +36,9 @@
 namespace mongo {
 namespace transport {
 
+MONGO_FAIL_POINT_DEFINE(clientIsConnectedToLoadBalancerPort);
+MONGO_FAIL_POINT_DEFINE(clientIsLoadBalancedPeer);
+
 namespace {
 
 AtomicWord<unsigned long long> sessionIdCounter(0);

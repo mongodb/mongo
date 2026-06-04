@@ -82,22 +82,6 @@ public:
         return true;
     }
 
-    bool isLoadBalancerPeer() const override {
-        return false;
-    };
-
-    bool isConnectedToLoadBalancerPort() const override {
-        return false;
-    };
-
-    bool isConnectedToPriorityPort() const override {
-        return false;
-    }
-
-    bool isConnectedToProxyUnixSocket() const override {
-        return false;
-    }
-
     Status validateProxyUnixSocketPeerPermissions() override {
         return Status::OK();
     }
@@ -240,10 +224,8 @@ protected:
 
 class MockPrioritySession : public MockSession {
 public:
-    explicit MockPrioritySession(TransportLayer* tl) : MockSession(tl) {}
-
-    bool isConnectedToPriorityPort() const override {
-        return true;
+    explicit MockPrioritySession(TransportLayer* tl) : MockSession(tl) {
+        _isConnectedToPriorityPort = true;
     }
 };
 

@@ -21,7 +21,6 @@ mongo_cc_library(
     ],
     deps = [
         ":cidr_range_list_parameter",
-        ":message_filter_hooks",
         "//src/mongo:base",
         "//src/mongo/db:connection_health_metrics_parameter",
         "//src/mongo/db:service_context",
@@ -276,6 +275,7 @@ mongo_cc_library(
     deps = [
         ":ingress_handshake_metrics",
         ":message_compressor",
+        ":message_filter_hooks",
         ":service_executor",
         ":transport_layer_common",
         "//src/mongo/db:error_labels",
