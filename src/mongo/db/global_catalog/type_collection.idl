@@ -137,14 +137,6 @@ structs:
             metadata verification.
         strict: false
         fields:
-            # TODO SERVER-124325: The resharding fields should ideally be stored exclusively in the global catalog.
-            reshardingFields:
-                type: TypeCollectionReshardingFields
-                description:
-                    "Resharding-related fields. Only set when this collection is either the
-                    original collection undergoing a resharding operation or this
-                    collection is the temporary resharding collection."
-                optional: true
             # TODO SERVER-124326: The timeseries collection fields should ideally be stored exclusively in the global catalog.
             timeseriesFields:
                 type: TypeCollectionTimeseriesFields
@@ -210,4 +202,11 @@ structs:
                     "DEPRECATED flag that determines wether this collection allows chunks to
                     move. This will only prevent migration from committing and new balancer
                     rounds, this flag will not be loaded by shards."
+                optional: true
+            reshardingFields:
+                type: TypeCollectionReshardingFields
+                description:
+                    "Resharding-related fields. Only set when this collection is either the
+                    original collection undergoing a resharding operation or this
+                    collection is the temporary resharding collection."
                 optional: true
