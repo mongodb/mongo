@@ -119,6 +119,11 @@ struct HostAndPort {
     bool isDefaultRoute() const;
 
     /**
+     * Returns true if the hostname is a Unix domain socket.
+     */
+    bool isUds() const;
+
+    /**
      * Returns a string representation of "host:port".
      */
     std::string toString() const;

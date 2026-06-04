@@ -113,6 +113,10 @@ TEST(HostAndPort, RoundTripAbility) {
     ASSERT_EQUALS(HostAndPort("abc.def:3421"), HostAndPort(HostAndPort("abc.def:3421").toString()));
     ASSERT_EQUALS(HostAndPort("[124d:]:34"), HostAndPort(HostAndPort("[124d:]:34").toString()));
     ASSERT_EQUALS(HostAndPort("[124d:]"), HostAndPort(HostAndPort("[124d:]").toString()));
+    ASSERT_EQUALS(HostAndPort("/dev/mongod.sock"),
+                  HostAndPort(HostAndPort("/dev/mongod.sock").toString()));
+    ASSERT_EQUALS(HostAndPort("anonymous unix socket"),
+                  HostAndPort(HostAndPort("anonymous unix socket").toString()));
 }
 
 TEST(HostAndPort, CanIdentifyDefaultRoutes) {
@@ -125,13 +129,27 @@ TEST(HostAndPort, CanIdentifyDefaultRoutes) {
     ASSERT_TRUE(HostAndPort("[0:0:0::00:0:0]").isDefaultRoute());
 }
 
+TEST(HostAndPort, PortRemovedFromUds) {
+    // If a UDS is created with a port, that port should not be printed via toString().
+    const auto uds = "/dev/mongod.sock"_sd;
+    const auto uds_port = "/dev/mongod.sock:1234"_sd;
+    ASSERT_EQUALS(HostAndPort(uds).toString(), uds);
+    ASSERT_EQUALS(HostAndPort(uds).toString(), HostAndPort(uds_port).toString());
+
+    const auto anon_uds = "anonymous unix socket"_sd;
+    const auto anon_uds_port = "anonymous unix socket:1234"_sd;
+    ASSERT_EQUALS(HostAndPort(anon_uds).toString(), anon_uds);
+    ASSERT_EQUALS(HostAndPort(anon_uds).toString(), HostAndPort(anon_uds_port).toString());
+}
+
 TEST(HostAndPort, Fmt) {
     const std::string specs[] = {
-        "1.2.3.4",           //
-        "1.2.3.4:123",       //
-        "[1:2:3:4]",         //
-        "[1:2:3:4]:123",     //
-        "/dev/mongod.sock",  //
+        "1.2.3.4",                //
+        "1.2.3.4:123",            //
+        "[1:2:3:4]",              //
+        "[1:2:3:4]:123",          //
+        "/dev/mongod.sock",       //
+        "anonymous unix socket",  //
     };
     for (const auto& spec : specs) {
         const HostAndPort hp(spec);

@@ -66,7 +66,7 @@ function authAndTest(mongo) {
 
     // Check that there's a "Successfully authenticated" message that includes the client
     // address. For direct TLS connections this is an IP:port (e.g. "127.0.0.1:35098"); for
-    // proxy protocol connections over a Unix domain socket it is "anonymous unix socket:<port>".
+    // proxy protocol connections over a Unix domain socket it is "anonymous unix socket".
     const log = assert.commandWorked(external.getSiblingDB("admin").runCommand({getLog: "global"})).log;
 
     function checkAuthSuccess(element /*, index, array*/) {
@@ -76,7 +76,7 @@ function authAndTest(mongo) {
             logJson.id === 5286306 &&
             logJson.attr.user === CLIENT_USER &&
             logJson.attr.db === "$external" &&
-            /(?:(?:\d{1,3}\.){3}\d{1,3}:\d+|anonymous unix socket:\d+)/.test(logJson.attr.client)
+            /(?:(?:\d{1,3}\.){3}\d{1,3}:\d+|anonymous unix socket)/.test(logJson.attr.client)
         );
     }
     assert(log.some(checkAuthSuccess));

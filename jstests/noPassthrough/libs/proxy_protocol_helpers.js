@@ -165,11 +165,11 @@ export const testClientMetadataLogOverUnixSocket = (ingressPort, unixSockPrefix,
     const unixSockPath = `${unixSockPrefix}/mongodb-${node.port}.sock`;
     const proxyUnixSockPath = `${unixSockPrefix}/proxy-mongodb-${node.port}.sock`;
 
-    // Connections via a unix domain socket should log "anonymous unix socket:27017" as remote attr.
+    // Connections via a unix domain socket should log "anonymous unix socket" as remote attr.
     const directConn = new Mongo(unixSockPath);
     assert.neq(null, directConn, "Failed to connect directly to node");
     assert.commandWorked(directConn.getDB("admin").runCommand({hello: 1}));
-    checkLog.containsJson(node, kClientMetadataLogId, {remote: "anonymous unix socket:27017"});
+    checkLog.containsJson(node, kClientMetadataLogId, {remote: "anonymous unix socket"});
 
     // Connections via the proxy unix domain socket should log the originating address reported in the proxy protocol header.
     const lbParam = isRouter ? "/?loadBalanced=true" : "";

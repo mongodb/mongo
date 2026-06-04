@@ -84,8 +84,11 @@ int HostAndPort::port() const {
 
 bool HostAndPort::isLocalHost() const {
     return (_host == "localhost" || str::startsWith(_host.c_str(), "127.") || _host == "::1" ||
-            _host == "anonymous unix socket" || _host.c_str()[0] == '/'  // unix socket
-    );
+            isUds());
+}
+
+bool HostAndPort::isUds() const {
+    return _host.c_str()[0] == '/' || _host == "anonymous unix socket";
 }
 
 bool HostAndPort::isDefaultRoute() const {
@@ -120,7 +123,7 @@ void HostAndPort::_appendToVisitor(AppendVisitor& write) const {
     } else {
         write(host());
     }
-    if (host().find('/') == std::string::npos) {
+    if (!isUds()) {
         write(":");
         write(port());
     }

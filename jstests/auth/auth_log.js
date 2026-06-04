@@ -80,10 +80,10 @@ function runClientAttrTests(connectionHealthLoggingOn) {
     try {
         mongod.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"], mechanisms: ["SCRAM-SHA-256"]});
 
-        // Connection via standard unix socket should emit "anonymous unix socket:27017" as remote addr.
+        // Connection via standard unix socket should emit "anonymous unix socket" as remote addr.
         const unixConn = new Mongo(unixSocketPath);
         const unixAdminDB = unixConn.getDB("admin");
-        testClientAttr(mongod, unixAdminDB, "anonymous unix socket:27017", connectionHealthLoggingOn);
+        testClientAttr(mongod, unixAdminDB, "anonymous unix socket", connectionHealthLoggingOn);
 
         // Connection via the proxy unix socket should emit the source ip address as remote addr.
         const proxiedConn = new Mongo(`mongodb://127.0.0.1:${ingressPort}`);
