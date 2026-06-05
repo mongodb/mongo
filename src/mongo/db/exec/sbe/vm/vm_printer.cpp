@@ -154,7 +154,6 @@ public:
                 case Instruction::fillEmpty:
                 case Instruction::traverseP:
                 case Instruction::traverseF:
-                case Instruction::setField:
                 case Instruction::aggSum:
                 case Instruction::aggMin:
                 case Instruction::aggCollMin:

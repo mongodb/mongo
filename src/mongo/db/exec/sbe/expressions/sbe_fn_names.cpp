@@ -311,7 +311,6 @@ static constexpr EFnEntry kEFnByName[] = {
     {"second"_sd,                             EFn::kSecond},
     {"setDifference"_sd,                      EFn::kSetDifference},
     {"setEquals"_sd,                          EFn::kSetEquals},
-    {"setField"_sd,                           EFn::kSetField},
     {"setIntersection"_sd,                    EFn::kSetIntersection},
     {"setIsSubset"_sd,                        EFn::kSetIsSubset},
     {"setToArray"_sd,                         EFn::kSetToArray},

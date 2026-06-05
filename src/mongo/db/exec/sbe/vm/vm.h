@@ -544,7 +544,6 @@ private:
     bool runLambdaPredicate(const CodeFragment* code, int64_t position);
     void valueBlockApplyLambda(const CodeFragment* code);
 
-    FastTuple<bool, value::TypeTags, value::Value> setField();
 
     int32_t convertNumericToInt32(value::TagValueView v);
 

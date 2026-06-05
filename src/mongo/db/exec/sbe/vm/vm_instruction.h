@@ -107,7 +107,6 @@ struct Instruction {
         traversePImm,
         traverseF,  // traverse filter paths
         traverseFImm,
-        setField,      // add or overwrite a field in a document
         getArraySize,  // number of elements
 
         aggSum,

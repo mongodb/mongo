@@ -300,22 +300,6 @@ TEST_F(AbtToSbeExpression, Lower4TwoArgsAnyLevel) {
     ASSERT_EQ(32, sbe::value::bitcastTo<int64_t>(arrResult1v0.second));
 }
 
-TEST_F(AbtToSbeExpression, Lower5) {
-    auto tree = make<FunctionCall>(
-        "setField", makeSeq(Constant::nothing(), Constant::str("fieldA"), Constant::int64(10)));
-    auto env = VariableEnvironment::build(tree);
-    SlotVarMap map;
-    sbe::InputParamToSlotMap inputParamToSlotMap;
-    auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
-            .optimize(tree);
-
-    ASSERT(expr);
-
-    auto compiledExpr = compileExpression(*expr);
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    sbe::value::ValueGuard guard(resultTag, resultVal);
-}
 
 TEST_F(AbtToSbeExpression, LowerFunctionCallFail) {
     std::string errorMessage = "Error: Bad value 123456789!";

@@ -138,7 +138,6 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,   // traversePImm
     -2,  // traverseF
     0,   // traverseFImm
-    -2,  // setField
     0,   // getArraySize
 
     -1,  // aggSum
@@ -328,7 +327,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                                         &&do_traversePImm,
                                         &&do_traverseF,
                                         &&do_traverseFImm,
-                                        &&do_setField,
                                         &&do_getArraySize,
 
                                         &&do_aggSum,
@@ -1108,15 +1106,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                   k == Instruction::True ? true : false);
     }
     DISPATCH();
-    INSTRUCTION(setField) {
-        auto [owned, tag, val] = setField();
-        popAndReleaseStack();
-        popAndReleaseStack();
-        popAndReleaseStack();
-
-        pushStack(owned, tag, val);
-    }
-    DISPATCH();
     INSTRUCTION(aggSum) {
         auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
         value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
@@ -1668,8 +1657,6 @@ const char* Instruction::toString() const {
             return "traverseF";
         case traverseFImm:
             return "traverseFImm";
-        case setField:
-            return "setField";
         case getArraySize:
             return "getArraySize";
         case aggSum:

@@ -336,7 +336,6 @@ enum class EFn : uint16_t {
     kSecond,
     kSetDifference,
     kSetEquals,
-    kSetField,
     kSetIntersection,
     kSetIsSubset,
     kSetToArray,

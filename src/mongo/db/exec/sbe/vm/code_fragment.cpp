@@ -660,10 +660,6 @@ void CodeFragment::appendGetArraySize(Instruction::Parameter input) {
     appendSimpleInstruction(Instruction::getArraySize, input);
 }
 
-void CodeFragment::appendSetField() {
-    appendSimpleInstruction(Instruction::setField);
-}
-
 void CodeFragment::appendSum() {
     appendSimpleInstruction(Instruction::aggSum);
 }
