@@ -520,6 +520,13 @@ StatusWith<std::vector<BSONObj>> addImplicitEdgesAndInferPredicates(
             const NodeId currentNodeId = resolvedPaths[currentPathId].nodeId;
             for (PathId pathId : pathSet) {
                 const NodeId nodeId = resolvedPaths[pathId].nodeId;
+                if (nodeId == currentNodeId) {
+                    // Both paths belong to the same node (e.g., results.key and
+                    // results.cor.key.foo). This would be a self-edge, which is not a join edge.
+                    // Skip it; the inferred single-table equality is handled by
+                    // inferSingleTablePredicate below.
+                    continue;
+                }
                 // The join graph limits 'maxEdgesInJoin' or 'maxPredicatesInEdge' can be hit here
                 // and the predicate wouldn't be added. This is fine because it doesn't affect the
                 // correctness of the query, only the size of the graph and the number of possible

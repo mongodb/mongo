@@ -93,4 +93,50 @@ runTestWithUnorderedComparison({
     expectedNumJoinStages: 1,
 });
 
+// Regression test: when both a localField join path ("key") and a let-bound path ("cor.key.foo")
+// on the same local collection join to the same foreign field, implicit edge inference transitively
+// infers local.key == local.cor.key.foo. This is a single-table predicate, not a join edge, and
+// used to cause a tassert ("Self edges are not permitted") in addEdge().
+{
+    const localColl = db[jsTestName() + "_self_edge_local"];
+    const otherColl = db[jsTestName() + "_self_edge_other"];
+    localColl.drop();
+    otherColl.drop();
+
+    assert.commandWorked(
+        localColl.insertMany([
+            {key: 42, cor: {key: {foo: 42}}}, // Satisfies both join conditions, produces output.
+            {key: 42, cor: {key: {foo: 99}}}, // base_other.key can't equal both simultaneously, no match.
+        ]),
+    );
+
+    assert.commandWorked(otherColl.insertMany([{key: 42}]));
+
+    // Indexes let path arrayness detect these paths as scalar so join optimization triggers.
+    assert.commandWorked(localColl.createIndex({key: 1, "cor.key.foo": 1}));
+    assert.commandWorked(otherColl.createIndex({key: 1}));
+
+    runTestWithUnorderedComparison({
+        db,
+        description: "localField and let binding on same local collection do not produce self-edge",
+        coll: localColl,
+        pipeline: [
+            {
+                $lookup: {
+                    from: otherColl.getName(),
+                    localField: "key",
+                    foreignField: "key",
+                    let: {f: "$cor.key.foo"},
+                    pipeline: [{$match: {$expr: {$eq: ["$key", "$$f"]}}}],
+                    as: "lf",
+                },
+            },
+            {$unwind: "$lf"},
+            {$project: {_id: 0, "lf._id": 0}},
+        ],
+        expectedResults: [{key: 42, cor: {key: {foo: 42}}, lf: {key: 42}}],
+        expectedUsedJoinOptimization: true,
+    });
+}
+
 MongoRunner.stopMongod(conn);

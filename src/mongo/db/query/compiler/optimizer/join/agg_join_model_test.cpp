@@ -2283,5 +2283,34 @@ TEST_F(PipelineAnalyzerTest, NumericMidPathExprIneligibleJoinPredicate) {
     ASSERT_NOT_OK(swJoinModel);
 }
 
+TEST_F(PipelineAnalyzerTest, ImplicitEdgeInferenceSelfEdgeSkipped) {
+    // Regression test: when both localField ("key") and a let-bound path ("cor.key.foo") from the
+    // local collection join to the same foreign field, implicit edge inference transitively infers
+    // local.key == local.cor.key.foo. This is a same-node equality, not a join edge, and must be
+    // silently skipped rather than trigger a tassert in addEdge().
+    const auto query = R"([
+    {
+        $lookup: {
+            from: "base_other",
+            localField: "key",
+            foreignField: "key",
+            let: {f: "$cor.key.foo"},
+            pipeline: [{$match: {$expr: {$eq: ["$key", "$$f"]}}}],
+            as: "lf"
+        }
+    },
+    { $unwind: "$lf" }
+    ])";
+
+    auto pipeline = makePipeline(query, {"base_other"});
+    markFieldsAsScalar(*pipeline, {"key"_sd, "cor.key.foo"_sd}, {{"base_other", {"key"_sd}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+    const auto& joinGraph = swJoinModel.getValue().getGraph();
+    ASSERT_EQ(joinGraph.numNodes(), 2);
+    ASSERT_EQ(joinGraph.numEdges(), 1);
+}
+
 }  // namespace
 }  // namespace mongo::join_ordering
