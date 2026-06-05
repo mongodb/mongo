@@ -90,7 +90,7 @@ namespace mongo {
 namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test", "foo");
-const ShardId kDonorShard("shard0");
+const ShardHandle kDonorShardHandle(ShardId("shard0"), UUID::gen());
 
 class ShardingWriteRouterRegistryTest : public unittest::Test {
 public:
@@ -126,10 +126,10 @@ public:
             ->setRecoveryCompleted({clusterId,
                                     ClusterRole::ShardServer,
                                     ConnectionString(kConfigHostAndPort),
-                                    kDonorShard});
+                                    kDonorShardHandle});
 
         auto [chunks, chunkManager] = createSourceChunkManager();
-        _shardVersion = ShardVersionFactory::make(chunkManager, kDonorShard);
+        _shardVersion = ShardVersionFactory::make(chunkManager, kDonorShardHandle.name());
 
         {
             const auto client = _serviceContext->getService()->makeClient("test-setup-metadata");
@@ -139,7 +139,7 @@ public:
 
             CollectionShardingRuntime::acquireExclusive(opCtx.get(), kNss)
                 ->setFilteringMetadata_nonAuthoritative(
-                    opCtx.get(), CollectionMetadata(chunkManager, kDonorShard));
+                    opCtx.get(), CollectionMetadata(chunkManager, kDonorShardHandle.name()));
         }
 
         {
@@ -151,10 +151,11 @@ public:
                 _tempReshardingNss,
                 CatalogCacheMock::makeCollectionRoutingInfoSharded(
                     _tempReshardingNss,
-                    kDonorShard,
+                    kDonorShardHandle.name(),
                     DatabaseVersion(),
                     BSON("y" << 1),
-                    {{ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY)), kDonorShard}}));
+                    {{ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY)),
+                      kDonorShardHandle.name()}}));
 
             auto mockNetwork = std::make_unique<executor::NetworkInterfaceMock>();
             auto const grid = Grid::get(opCtx.get());
@@ -200,7 +201,7 @@ protected:
         chunks.emplace_back(_sourceUUID,
                             ChunkRange(BSON("_id" << MINKEY), BSON("_id" << MAXKEY)),
                             ChunkVersion({collEpoch, collTimestamp}, {1, 0}),
-                            kDonorShard);
+                            kDonorShardHandle.name());
 
         CurrentChunkManager cm(ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
             RoutingTableHistory::makeNew(kNss,
@@ -261,7 +262,7 @@ TEST_F(ShardingWriteRouterRegistryTest, DonorRoleRegisteredReturnsShardId) {
     auto router = makeRouter();
     auto result = router.getReshardingDestinedRecipient(BSON("_id" << 0 << "y" << 5));
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(*result, kDonorShard);
+    ASSERT_EQ(*result, kDonorShardHandle.name());
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, DonorAndRecipientRolesReturnsShardId) {
@@ -273,7 +274,7 @@ TEST_F(ShardingWriteRouterRegistryTest, DonorAndRecipientRolesReturnsShardId) {
     auto router = makeRouter();
     auto result = router.getReshardingDestinedRecipient(BSON("_id" << 0 << "y" << 5));
     ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(*result, kDonorShard);
+    ASSERT_EQ(*result, kDonorShardHandle.name());
 }
 
 TEST_F(ShardingWriteRouterRegistryTest, OperationUnregisteredReturnsNone) {

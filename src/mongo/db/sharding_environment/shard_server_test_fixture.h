@@ -89,6 +89,7 @@ protected:
 
     const HostAndPort kConfigHostAndPort{"dummy", 123};
     ShardId kMyShardName{"myShardName"};
+    ShardHandle kMyShardHandle{kMyShardName, UUID::gen()};
 
     service_context_test::ShardRoleOverride _shardRole;
 

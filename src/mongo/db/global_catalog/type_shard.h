@@ -34,7 +34,7 @@
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/global_catalog/shard_handle.h"
+#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 

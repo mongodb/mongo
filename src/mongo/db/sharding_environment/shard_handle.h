@@ -46,6 +46,8 @@ namespace mongo {
  */
 class MONGO_MOD_PUBLIC ShardHandle {
 public:
+    ShardHandle() = default;
+
     ShardHandle(ShardId name, boost::optional<UUID> uuid)
         : _name(std::move(name)), _uuid(std::move(uuid)) {}
 

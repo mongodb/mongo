@@ -105,7 +105,7 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     {ClusterRole::ShardServer, ClusterRole::ConfigServer},
                                     ConnectionString::forLocal(),
-                                    ShardId("config")});
+                                    ShardHandle(ShardId("config"), UUID::gen())});
 
         // Create indexes for config.placementHistory and other config collections.
         ASSERT_OK(ShardingCatalogManager::get(operationContext())

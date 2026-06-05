@@ -137,7 +137,15 @@ ShardId ShardingState::shardId() const {
             "ShardingState cannot be accessed before it is initialized",
             _future.isReady());
 
-    return _future.get().shardId;
+    return _future.get().shardHandle.name();
+}
+
+const ShardHandle& ShardingState::getShardHandle() const {
+    uassert(ErrorCodes::ShardingStateNotInitialized,
+            "ShardingState cannot be accessed before it is initialized",
+            _future.isReady());
+
+    return _future.get().shardHandle;
 }
 
 OID ShardingState::clusterId() const {
@@ -148,7 +156,7 @@ OID ShardingState::clusterId() const {
 
 std::string ShardingState::RecoveredClusterRole::toString() const {
     return str::stream() << clusterId << " : " << role << " : " << configShardConnectionString
-                         << " : " << shardId;
+                         << " : " << shardHandle.name();
 }
 
 }  // namespace mongo

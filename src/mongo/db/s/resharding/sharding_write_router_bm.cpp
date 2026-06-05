@@ -141,7 +141,8 @@ protected:
             const uint32_t nChunks = 60;
             const auto clusterId = OID::gen();
             const auto shards = std::vector<ShardId>{ShardId("shard0")};
-            const auto originatorShard = shards[0];
+            const auto originatorShardId = shards[0];
+            const auto originatorShardHandle = ShardHandle(originatorShardId, UUID::gen());
 
             auto [chunks, chunkManager] = createChunks(nShards, nChunks, shards);
 
@@ -157,9 +158,9 @@ protected:
                 ->setRecoveryCompleted({clusterId,
                                         ClusterRole::ShardServer,
                                         ConnectionString(kConfigHostAndPort),
-                                        originatorShard});
+                                        originatorShardHandle});
 
-            _shardVersion.emplace(ShardVersionFactory::make(chunkManager, originatorShard));
+            _shardVersion.emplace(ShardVersionFactory::make(chunkManager, originatorShardId));
 
             OperationShardingState::setShardRole(
                 opCtx, kNss, _shardVersion, boost::none /* databaseVersion */);
@@ -169,7 +170,7 @@ protected:
             // the chunkManager.
             CollectionShardingRuntime::acquireExclusive(opCtx, kNss)
                 ->setFilteringMetadata_nonAuthoritative(
-                    opCtx, CollectionMetadata(chunkManager, originatorShard));
+                    opCtx, CollectionMetadata(chunkManager, originatorShardId));
 
             // Setup the CatalogCacheMock for the temp resharding ns.
             const auto reshardingTempNs =

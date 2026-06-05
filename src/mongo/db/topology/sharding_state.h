@@ -33,7 +33,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/sharding_environment/shard_handle.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/modules.h"
@@ -49,8 +49,8 @@ namespace mongo {
  * There is one instance of this object per service context on each shard node (primary or
  * secondary). It sits at the top of the hierarchy of the Shard Role runtime-authoritative caches
  * (the subordinate ones being the DatabaseShardingState and CollectionShardingState) and contains
- * global information about the shardedness of the current process, such as its shardId and the
- * clusterId to which it belongs.
+ * global information about the shardedness of the current process, such as its ShardHandle (shard
+ * name and optional UUID), clusterId, and cluster role.
  *
  * SYNCHRONISATION: This class can only be initialised once and if 'setInitialized' is called, it
  * never gets destroyed or uninitialized. Because of this it does not require external
@@ -84,7 +84,7 @@ public:
         ConnectionString configShardConnectionString;
 
         // Will be empty if running as a MongoS exclusively, otherwise must be set
-        ShardId shardId;
+        ShardHandle shardHandle;
 
         std::string toString() const;
     };
@@ -129,6 +129,11 @@ public:
      * Returns the shard id to which this node belongs.
      */
     ShardId shardId() const;
+
+    /**
+     * Returns the shard handle for this node, including its UUID when available.
+     */
+    const ShardHandle& getShardHandle() const;
 
     /**
      * Returns the cluster id of the cluster to which this node belongs.

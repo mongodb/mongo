@@ -129,7 +129,7 @@ public:
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
                                     ConnectionString(kConfigHostAndPort),
-                                    _myDonorId});
+                                    _myDonorHandle});
         {
             auto opCtx = makeOperationContext();
             auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
@@ -172,7 +172,8 @@ public:
             CollectionShardingRuntime::acquireExclusive(opCtx.get(), _outputNss)
                 ->setFilteringMetadata_nonAuthoritative(
                     opCtx.get(),
-                    CollectionMetadata(makeChunkManagerForOutputCollection(), _myDonorId));
+                    CollectionMetadata(makeChunkManagerForOutputCollection(),
+                                       _myDonorHandle.name()));
 
             _metrics =
                 ReshardingMetrics::makeInstance_forTest(_sourceUUID,
@@ -182,12 +183,12 @@ public:
                                                         serviceContext->getFastClockSource()->now(),
                                                         serviceContext);
             _oplogApplierMetrics = std::make_unique<ReshardingOplogApplierMetrics>(
-                _myDonorId, _metrics.get(), boost::none);
+                _myDonorHandle.name(), _metrics.get(), boost::none);
             _applier = std::make_unique<ReshardingOplogApplicationRules>(
                 _outputNss,
                 std::vector<NamespaceString>{_myStashNss, _otherStashNss},
                 0U,
-                _myDonorId,
+                _myDonorHandle.name(),
                 makeChunkManagerForSourceCollection(),
                 _oplogApplierMetrics.get());
         }
@@ -373,16 +374,16 @@ private:
                 ChunkRange{BSON(_currentShardKey << MINKEY),
                            BSON(_currentShardKey << -std::numeric_limits<double>::infinity())},
                 ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
-                _myDonorId},
+                _myDonorHandle.name()},
             ChunkType{_sourceUUID,
                       ChunkRange{BSON(_currentShardKey << -std::numeric_limits<double>::infinity()),
                                  BSON(_currentShardKey << 0)},
                       ChunkVersion({epoch, Timestamp(1, 1)}, {100, 1}),
-                      _otherDonorId},
+                      _otherDonorHandle.name()},
             ChunkType{_sourceUUID,
                       ChunkRange{BSON(_currentShardKey << 0), BSON(_currentShardKey << MAXKEY)},
                       ChunkVersion({epoch, Timestamp(1, 1)}, {100, 2}),
-                      _myDonorId}};
+                      _myDonorHandle.name()}};
 
         return makeChunkManager(
             epoch, _sourceNss, _sourceUUID, BSON(_currentShardKey << 1), chunks);
@@ -395,7 +396,7 @@ private:
             ChunkType{outputUuid,
                       ChunkRange{BSON(_newShardKey << MINKEY), BSON(_newShardKey << MAXKEY)},
                       ChunkVersion({epoch, Timestamp(1, 1)}, {100, 0}),
-                      _myDonorId}};
+                      _myDonorHandle.name()}};
 
         return makeChunkManager(epoch, _outputNss, outputUuid, BSON(_newShardKey << 1), chunks);
     }
@@ -414,15 +415,15 @@ private:
         NamespaceString::createNamespaceString_forTest("test_crud", "collection_being_resharded");
     const UUID _sourceUUID = UUID::gen();
 
-    const ShardId _myDonorId{"myDonorId"};
-    const ShardId _otherDonorId{"otherDonorId"};
+    const ShardHandle _myDonorHandle{ShardId("myDonorId"), UUID::gen()};
+    const ShardHandle _otherDonorHandle{ShardId("otherDonorId"), UUID::gen()};
 
     const NamespaceString _outputNss =
         resharding::constructTemporaryReshardingNss(_sourceNss, _sourceUUID);
     const NamespaceString _myStashNss =
-        resharding::getLocalConflictStashNamespace(_sourceUUID, _myDonorId);
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _myDonorHandle.name());
     const NamespaceString _otherStashNss =
-        resharding::getLocalConflictStashNamespace(_sourceUUID, _otherDonorId);
+        resharding::getLocalConflictStashNamespace(_sourceUUID, _otherDonorHandle.name());
 
     service_context_test::ShardRoleOverride _shardRole;
 
