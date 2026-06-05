@@ -68,12 +68,18 @@ private:
      * catalog. This function iterates through the list of databases and attempts to clone them
      * individually.
      */
-    void _clone(OperationContext* opCtx);
+    void _clone(OperationContext* opCtx,
+                const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                const CancellationToken& token);
 
     /**
-     * Clones the metadata for a single database while entering in shard role.
+     * Enters the shard role then clones the database and collection metadata for a single database.
      */
-    void _cloneSingleDatabaseWithShardRole(OperationContext* opCtx, const DatabaseName& dbName);
+    void _cloneSingleDatabaseWithShardRole(
+        OperationContext* opCtx,
+        const DatabaseName& dbName,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& token);
 
     /**
      * Removes a database from the list of databases to be cloned.

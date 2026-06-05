@@ -17,6 +17,14 @@ const kRetryableCommands = new Set([
     // For $querySettings retry on 'queryShapeRepresentativeQueries' collection drop.
     "setQuerySettings",
     "removeQuerySettings",
+    // Chunk operations are blocked with ConflictingOperationInProgress while the
+    // authoritative shard metadata is transitioning during an FCV upgrade/downgrade.
+    // TODO(SERVER-98118): Remove those commands after 9.0 is last LTS.
+    "moveChunk",
+    "moveRange",
+    "mergeChunks",
+    "mergeAllChunksOnShard",
+    "split",
 ]);
 
 const kQueryRetryableErrors = [

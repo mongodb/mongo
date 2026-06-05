@@ -1053,6 +1053,11 @@ commands:
         namespace: type
         type: namespacestring
         api_version: ""
+        fields:
+            primaryShardId:
+                type: shard_id
+                description: Primary shard identifier, used to determine whether the shard needs to durably persist collection metadata or not.
+                optional: false
         reply_type: OkReply
 
     # TODO (SERVER-105110): Remove this command.

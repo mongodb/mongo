@@ -25,7 +25,7 @@ filters:
   - "profile_filter_query_feature_flag.js":
     approvers:
       - 10gen/query-integration-observability
-  - "authoritative_database_metadata_on_FCV_transition.js":
+  - "authoritative_metadata_on_FCV_transition.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
       - 10gen/server-catalog-and-routing-routing-and-topology

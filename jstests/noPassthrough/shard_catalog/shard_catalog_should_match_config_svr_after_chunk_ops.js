@@ -78,12 +78,16 @@ function forceCsrAuthoritative(st, shardConn, ns) {
         );
     };
 
+    const dbName = st.s.getCollection(ns).getDB().getName();
+    const primaryShardId = st.getPrimaryShardIdForDatabase(dbName);
+
     setAllowMigrations(false);
     const session = shardConn.startSession({retryWrites: true});
     try {
         assert.commandWorked(
             session.getDatabase("admin").runCommand({
                 _shardsvrFetchCollMetadata: ns,
+                primaryShardId: primaryShardId,
                 writeConcern: {w: "majority"},
                 lsid: session.getSessionId(),
                 txnNumber: NumberLong(1),

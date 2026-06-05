@@ -34,6 +34,8 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
+#include "mongo/db/global_catalog/sharding_catalog_client.h"
+#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/shard_role/shard_catalog/commit_collection_metadata_locally.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -92,9 +94,12 @@ public:
             const auto nss = ns();
 
             // Assert that migrations are disabled.
+            // TODO (SERVER-127654): Update this check once migrations are blocked during setFCV.
+            const auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
             uassert(10140200,
                     "_shardsvrFetchCollMetadata can only run when migrations are disabled",
-                    !sharding_ddl_util::checkAllowMigrationsOnConfigServer(opCtx, nss));
+                    coll.getUnsplittable().value_or(false) ||
+                        !sharding_ddl_util::checkAllowMigrationsOnConfigServer(opCtx, nss));
 
             // Use an AlternativeClientRegion to perform the shard catalog writes outside the
             // retryable write session. The shard catalog commit contains its own idempotency
@@ -110,7 +115,10 @@ public:
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
                 newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-                shard_catalog_commit::commitCollectionMetadataLocally(newOpCtx.get(), nss);
+                const bool isPrimaryDbShard =
+                    ShardingState::get(newOpCtx.get())->shardId() == request().getPrimaryShardId();
+                shard_catalog_commit::commitCollectionMetadataLocally(
+                    newOpCtx.get(), nss, isPrimaryDbShard);
             }
 
             LOGV2_INFO(10140202, "Persisted metadata locally on shard", "ns"_attr = nss);

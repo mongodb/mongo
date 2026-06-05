@@ -30,6 +30,8 @@
 
 #include "mongo/db/global_catalog/ddl/clone_authoritative_metadata_coordinator.h"
 
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_ddl_util.h"
 #include "mongo/db/global_catalog/ddl/shardsvr_commit_create_database_metadata_command.h"
 #include "mongo/db/shard_role/ddl/ddl_lock_manager.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_runtime.h"
@@ -37,14 +39,47 @@
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/topology/sharding_state.h"
+#include "mongo/db/topology/vector_clock/vector_clock_mutable.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/logv2/log.h"
+
+#include <set>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL);
+
+namespace {
+
+std::vector<NamespaceString> getTrackedNamespaces(OperationContext* opCtx,
+                                                  const DatabaseName& dbName) {
+    auto collections = Grid::get(opCtx)->catalogClient()->getCollections(
+        opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+    std::vector<NamespaceString> nssList;
+    nssList.reserve(collections.size());
+    for (const auto& coll : collections) {
+        nssList.push_back(coll.getNss());
+    }
+    return nssList;
+}
+
+std::vector<ShardId> getDataShardsAndDbPrimaryShard(OperationContext* opCtx,
+                                                    const NamespaceString& nss) {
+    const auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
+    uassert(ErrorCodes::RequestAlreadyFulfilled,
+            str::stream() << "The collection " << nss.toStringForErrorMsg() << " is not tracked",
+            cm.hasRoutingTable());
+    std::set<ShardId> shardSet;
+    cm.getAllShardIds(&shardSet);
+    // The DB primary must always know that a collection is tracked, even when it owns no chunks.
+    shardSet.insert(ShardingState::get(opCtx)->shardId());
+    return std::vector<ShardId>(shardSet.begin(), shardSet.end());
+}
+
+}  // namespace
 
 ExecutorFuture<void> CloneAuthoritativeMetadataCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -53,21 +88,28 @@ ExecutorFuture<void> CloneAuthoritativeMetadataCoordinator::_runImpl(
         .then(_buildPhaseHandler(
             Phase::kGetDatabasesToClone,
             [this, anchor = shared_from_this()](auto* opCtx) { _prepareDbsToClone(opCtx); }))
-        .then(_buildPhaseHandler(
-            Phase::kClone, [this, anchor = shared_from_this()](auto* opCtx) { _clone(opCtx); }));
+        .then(_buildPhaseHandler(Phase::kClone,
+                                 [this, token, anchor = shared_from_this(), executor](auto* opCtx) {
+                                     _clone(opCtx, executor, token);
+                                 }));
 }
 
 void CloneAuthoritativeMetadataCoordinator::_prepareDbsToClone(OperationContext* opCtx) {
-    // At this point, any new DDL operations first clone the metadata into the shard catalog
-    // before starting the DDL. This means that we only need to clone metadata for DDL operations
-    // that committed before the most recent config time.
+    // Snapshot databases whose primary shard is the current shard; these are the databases this
+    // coordinator will make authoritative.
+    // This snapshot is taken before acquiring the DDL lock for these databases, so concurrent DDLs
+    // (e.g. movePrimary, dropDatabase) may run between the snapshot and the lock acquisition.
+    // This is safe because those DDLs are also designed to make those databases authoritative.
     auto dbs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDatabasesForShard(
         opCtx, ShardingState::get(opCtx)->shardId()));
 
     _doc.setDbsToClone(std::move(dbs));
 }
 
-void CloneAuthoritativeMetadataCoordinator::_clone(OperationContext* opCtx) {
+void CloneAuthoritativeMetadataCoordinator::_clone(
+    OperationContext* opCtx,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     tassert(10644513,
             "Expected dbsToClone to be set on the coordinator document",
             _doc.getDbsToClone());
@@ -75,13 +117,16 @@ void CloneAuthoritativeMetadataCoordinator::_clone(OperationContext* opCtx) {
 
     for (const auto& dbName : databasesToClone) {
         try {
-            _cloneSingleDatabaseWithShardRole(opCtx, dbName);
+            _cloneSingleDatabaseWithShardRole(opCtx, dbName, executor, token);
+            _removeDbFromCloningList(opCtx, dbName);
         } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
             auto extraInfo = ex.extraInfo<StaleDbRoutingVersion>();
             tassert(10050303, "StaleDbVersion must have extraInfo", extraInfo);
 
             auto wantedVersion = extraInfo->getVersionWanted();
             if (wantedVersion && *wantedVersion > extraInfo->getVersionReceived()) {
+                // TODO (SERVER-128063): Handle the case where the database has been moved.
+
                 // If there is a wanted version and this is newer than the received one, it
                 // indicates that the routing information is stale. The database has either been
                 // moved or dropped and recreated. In such cases, another DDL operation was
@@ -94,19 +139,26 @@ void CloneAuthoritativeMetadataCoordinator::_clone(OperationContext* opCtx) {
                     opCtx, extraInfo->getDb(), extraInfo->getVersionReceived());
                 throw ex;
             }
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            // If the database has been dropped, we remove it from the cloning list. If any
-            // concurrent operations are attempting to recreate it, they will handle the cloning.
-            _removeDbFromCloningList(opCtx, dbName);
         }
     }
 }
 
 void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
-    OperationContext* opCtx, const DatabaseName& dbName) {
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
     auto catalogClient = Grid::get(opCtx)->catalogClient();
-    auto dbMetadata =
-        catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+    DatabaseType dbMetadata;
+    try {
+        dbMetadata =
+            catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // If the database has been dropped, we remove it from the cloning list. If any
+        // concurrent operations are attempting to recreate it, they will handle the cloning.
+        _removeDbFromCloningList(opCtx, dbName);
+        return;
+    }
 
     if (dbMetadata.getPrimary() != ShardingState::get(opCtx)->shardId()) {
         // If this shard is no longer the primary at the time of fetching metadata, we skip cloning
@@ -135,15 +187,55 @@ void CloneAuthoritativeMetadataCoordinator::_cloneSingleDatabaseWithShardRole(
     DDLLockManager::ScopedDatabaseDDLLock dbLock(
         opCtx, dbName, "cloneAuthoritativeMetadata"_sd, MODE_IX);
 
-    // CloneAuthoritativeMetadata can bypass the critical section when writing database metadata
-    // because 1) we hold the DDL lock, which guarantees that no other conflicting DDL operations
-    // are in progress and 2) the clone serves as a refresh from the config server, which does not
-    // need to serialize with CRUD operations at the critical section level, but instead
-    // synchronizes using the DSS mutex.
-    BypassDatabaseMetadataAccess bypassDbMetadataAccess(
-        opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
+    {
+        // CloneAuthoritativeMetadata can bypass the critical section when writing database metadata
+        // because 1) we hold the DDL lock, which guarantees that no other conflicting DDL
+        // operations are in progress and 2) the clone serves as a refresh from the config server,
+        // which does not need to serialize with CRUD operations at the critical section level, but
+        // instead synchronizes using the DSS mutex.
+        BypassDatabaseMetadataAccess bypassDbMetadataAccess(
+            opCtx, BypassDatabaseMetadataAccess::Type::kWriteOnly);  // NOLINT
 
-    commitCreateDatabaseMetadataLocally(opCtx, dbMetadata, true /* fromClone */);
+        commitCreateDatabaseMetadataLocally(opCtx, dbMetadata, true /* fromClone */);
+    }
+
+    // Now that the database metadata is cloned, clone the metadata of its tracked collections by
+    // instructing the shards owning data to persist it into their local shard catalog.
+    for (const auto& nss : getTrackedNamespaces(opCtx, dbName)) {
+        try {
+            DDLLockManager::ScopedCollectionDDLLock collLock(
+                opCtx, nss, "cloneAuthoritativeMetadata"_sd, MODE_X);
+            const auto shardIds = getDataShardsAndDbPrimaryShard(opCtx, nss);
+
+            // TODO (SERVER-127654): Remove this workaround to manually stop and resume migrations
+            // once setFCV stops all chunk operations.
+            sharding_ddl_util::stopMigrations(
+                opCtx,
+                nss,
+                boost::none,
+                [&] { return getNewSession(opCtx); },
+                _doc.getAuthoritativeMetadataAccessLevel());
+
+            sharding_ddl_util::sendFetchCollMetadataToShards(opCtx,
+                                                             nss,
+                                                             shardIds,
+                                                             dbMetadata.getPrimary(),
+                                                             getNewSession(opCtx),
+                                                             executor,
+                                                             token);
+
+            sharding_ddl_util::resumeMigrations(
+                opCtx,
+                nss,
+                boost::none,
+                [&] { return getNewSession(opCtx); },
+                _doc.getAuthoritativeMetadataAccessLevel());
+        } catch (const ExceptionFor<ErrorCodes::RequestAlreadyFulfilled>&) {
+            // The collection is no longer tracked (e.g. it was dropped after we listed it but
+            // before taking the DDL lock), so there is nothing to clone. If any concurrent
+            // operations are attempting to recreate it, they will handle the cloning.
+        }
+    }
 }
 
 void CloneAuthoritativeMetadataCoordinator::_removeDbFromCloningList(OperationContext* opCtx,

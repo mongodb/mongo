@@ -260,6 +260,22 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 if (_doc.getAuthoritativeMetadataAccessLevel() ==
                     AuthoritativeMetadataAccessLevelEnum::kWritesAllowed) {
                     cloneAuthoritativeDatabaseMetadata(opCtx);
+
+                    // A clone authoritative metadata operation may have stopped migrations on some
+                    // of this database's collections and failed before resuming them (e.g. crashed
+                    // mid-clone). Resume them now, while we are still the primary shard and hold
+                    // the database DDL lock in MODE_X, so they aren't left with chunk ops disabled.
+                    // TODO (SERVER-127654): Remove together with the clone stop/resume workaround.
+                    const auto collections = Grid::get(opCtx)->catalogClient()->getCollections(
+                        opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern);
+                    for (const auto& coll : collections) {
+                        sharding_ddl_util::resumeMigrations(
+                            opCtx,
+                            coll.getNss(),
+                            coll.getUuid(),
+                            [&] { return getNewSession(opCtx); },
+                            _doc.getAuthoritativeMetadataAccessLevel());
+                    }
                 }
 
                 ScopeGuard unblockWritesLegacyOnExit([&] {

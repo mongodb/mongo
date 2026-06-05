@@ -951,10 +951,11 @@ void commitDropDatabaseMetadataToShardCatalog(
 void sendFetchCollMetadataToShards(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const std::vector<ShardId>& shardIds,
+                                   const ShardId& primaryShardId,
                                    const OperationSessionInfo& osi,
                                    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
                                    const CancellationToken& token) {
-    ShardsvrFetchCollMetadata request(nss);
+    ShardsvrFetchCollMetadata request(nss, primaryShardId);
     request.setDbName(DatabaseName::kAdmin);
 
     generic_argument_util::setMajorityWriteConcern(request);

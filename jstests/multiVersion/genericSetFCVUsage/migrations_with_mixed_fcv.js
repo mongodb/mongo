@@ -3,6 +3,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -18,6 +19,13 @@ const ns = dbName + "." + collName;
 function setup() {
     // Create 2 shards with 3 replicas each.
     let st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});
+
+    // Migrations are stopped during setFCV across Authoritative Shards (SERVER-127654).
+    if (lastLTSFCV === "8.0" && FeatureFlagUtil.isPresentAndEnabled(st.s, "AuthoritativeShardsDDL", true)) {
+        jsTestLog("Skipping test: migrations are stopped during setFCV with featureFlagAuthoritativeShardsDDL");
+        st.stop();
+        quit();
+    }
 
     // Create a sharded collection with two chunks: [-inf, 50), [50, inf)
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));

@@ -458,7 +458,7 @@ const internalCommandsMap = {
     },
     _shardsvrFetchCollMetadata: {
         testname: "_shardsvrFetchCollMetadata",
-        command: {_shardsvrFetchCollMetadata: "test", from: [], writeConcern: {w: "majority"}},
+        command: {_shardsvrFetchCollMetadata: "test", primaryShardId: shard0name, writeConcern: {w: "majority"}},
     },
     _shardsvrCompactStructuredEncryptionData: {
         testname: "_shardsvrCompactStructuredEncryptionData",
