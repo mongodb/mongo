@@ -767,6 +767,12 @@ Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
                               << _sessionId->toString()};
     }
 
+    // Only cancel if the recipient hasn't entered the critical section yet. Interrupting the opCtx
+    // after entering kEnteredCritSec would skip critical section recovery.
+    if (_state < kEnteredCritSec) {
+        _cancellationSource.cancel();
+    }
+
     _state = kAbort;
     _stateChangedCV.notify_all();
     _errmsg = "aborted";
@@ -776,6 +782,10 @@ Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
 
 void MigrationDestinationManager::abortWithoutSessionIdCheck() {
     std::lock_guard<std::mutex> sl(_mutex);
+    if (_state < kEnteredCritSec) {
+        _cancellationSource.cancel();
+    }
+
     _state = kAbort;
     _stateChangedCV.notify_all();
     _errmsg = "aborted without session id check";
@@ -1484,7 +1494,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                                                         rangeDeletionWaitDeadline);
 
             if (!status.isOK() && status != ErrorCodes::ExceededTimeLimit) {
-                _setStateFail(redact(status.toString()));
+                // Don't overwrite kAbort with kFail if an explicit abort is in progress.
+                if (getState() != kAbort) {
+                    _setStateFail(redact(status.toString()));
+                }
                 return;
             }
 

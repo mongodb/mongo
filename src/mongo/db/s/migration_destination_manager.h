@@ -396,8 +396,9 @@ private:
     // Promise that will be fulfilled when the migrateThread has finished its work.
     std::unique_ptr<SharedPromise<State>> _migrateThreadFinishedPromise;
 
-    // Cancellation source that is cancelled on stepdowns. On stepup, a new cancellation source will
-    // be installed.
+    // Cancellation source that is cancelled on stepdown, shutdown, or explicit
+    // abort — all cases where ongoing migration work should stop immediately. On stepup, a new
+    // cancellation source will be installed.
     CancellationSource _cancellationSource;
 };
 
