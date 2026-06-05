@@ -141,6 +141,7 @@ MONGO_FAIL_POINT_DEFINE(failAfterSendingShardsToDowngradingOrUpgrading);
 MONGO_FAIL_POINT_DEFINE(failDowngradeValidationDueToIncompatibleFeature);
 MONGO_FAIL_POINT_DEFINE(failUpgradeValidationDueToIncompatibleFeature);
 MONGO_FAIL_POINT_DEFINE(immediatelyTimeOutWaitForStaleOFCV);
+MONGO_FAIL_POINT_DEFINE(hangAfterConfigServerChangedFCV);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -641,6 +642,8 @@ public:
                     "Failing upgrade or downgrade due to 'failAfterReachingTransitioningState' "
                     "failpoint set",
                     !failAfterReachingTransitioningState.shouldFail());
+
+            hangAfterConfigServerChangedFCV.pauseWhileSet(opCtx);
 
             if (role && role->has(ClusterRole::ShardServer)) {
                 // This helper function is only for any actions that should be done specifically on
