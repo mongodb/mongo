@@ -50,6 +50,8 @@ BSONObj initDebuggerGlobal(const BSONObj& args, void* data);
 class DebuggerGlobal {
 public:
     static Status init(JSContext* cx);
+    // Must be called before the JSContext passed to init() is destroyed.
+    static void cleanup();
     static void handleStdinThread();
     static void setBreakpoints(SetBreakpointsRequest request);
 

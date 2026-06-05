@@ -683,12 +683,24 @@ MozJSShellRuntimeInterface* getShellRuntime(JSContext* cx) {
     return static_cast<MozJSImplScope*>(getCommonRuntime(cx));
 }
 
+static std::function<void()> sPreDestroyHook;
+
+void MozJSImplScope::registerPreDestroyHook(std::function<void()> hook) {
+    sPreDestroyHook = std::move(hook);
+}
+
 MozJSImplScope::~MozJSImplScope() {
     invariant(!_promiseResult.initialized());
     currentJSScope = nullptr;
 
     for (auto&& x : _funcs) {
         x.reset();
+    }
+
+    // Run before _context member is destroyed (members destruct after the destructor body).
+    if (sPreDestroyHook) {
+        auto hook = std::move(sPreDestroyHook);
+        hook();
     }
 
     unregisterOperation();

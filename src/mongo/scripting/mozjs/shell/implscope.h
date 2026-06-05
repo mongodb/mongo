@@ -545,6 +545,13 @@ public:
 
     ModuleLoader* getModuleLoader() const;
 
+    // Register a process-global hook that runs in ~MozJSImplScope() before _context is
+    // destroyed (i.e., before JS_DestroyContext). This is last-writer-wins: a second
+    // registration overwrites the first. The hook is cleared after it fires, so it runs at
+    // most once. Used by shell_utils to release the JS debugger's PersistentRootedObject
+    // while the owning JSContext is still alive.
+    static void registerPreDestroyHook(std::function<void()> hook);
+
     /**
      * getJSContextForTest and getGlobalForTest should only be used from implscope_test.cpp, as we
      * need a way to expose these members for some JS API calls.

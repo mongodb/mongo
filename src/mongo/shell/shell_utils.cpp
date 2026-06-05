@@ -80,6 +80,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/scripting/mozjs/shell/implscope.h"
 #include "mongo/shell/bench.h"
 #include "mongo/shell/debugger/debugger.h"
 #include "mongo/shell/shell_options.h"
@@ -1368,6 +1369,10 @@ void initScope(Scope& scope) {
             "_initDebuggerGlobal", mongo::mozjs::debugger::initDebuggerGlobal, &scope);
         try {
             scope.exec("_initDebuggerGlobal()", "(debugger-init)", false, true, false);
+            // Register cleanup to run before JS_DestroyContext: DebuggerObject holds a
+            // PersistentRootedObject that must be released while the JSContext is still alive.
+            mozjs::MozJSImplScope::registerPreDestroyHook(
+                []() { mozjs::debugger::DebuggerGlobal::cleanup(); });
         } catch (const DBException& e) {
             std::cerr << "[JSDEBUG] Failed to initialize debugger: " << e.toString() << std::endl;
         }

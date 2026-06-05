@@ -159,6 +159,7 @@ mongo_cc_library(
         "//src/mongo/db/query/virtual_collection",
         "//src/mongo/replay:mongor_lib",
         "//src/mongo/scripting",
+        "//src/mongo/scripting/mozjs/shell:mozjs_shell",
         "//src/mongo/shell/debugger:js_debugger",
         "//src/mongo/transport:message_compressor",
         "//src/mongo/transport/named_pipe",

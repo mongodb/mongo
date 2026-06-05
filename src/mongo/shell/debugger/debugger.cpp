@@ -42,6 +42,9 @@
 #include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
 #include <js/SourceText.h>
+#ifndef _WIN32
+#include <sys/select.h>
+#endif
 
 namespace mongo {
 
@@ -948,7 +951,19 @@ void DebuggerGlobal::unpause() {
     _pauseCV.notify_all();
 }
 
+static AtomicWord<bool> _shouldStop{false};
 std::unique_ptr<std::thread> _stdinThread;
+
+void DebuggerGlobal::cleanup() {
+    // Stop the stdin thread so it can't access _debuggerObject while we're resetting it.
+    _shouldStop.store(true);
+    if (_stdinThread && _stdinThread->joinable()) {
+        _stdinThread->join();
+    }
+    // Reset _debuggerObject while the JSContext is still alive. Its destructor calls
+    // ~PersistentRootedObject which must run before JS_DestroyContext.
+    _debuggerObject.reset();
+}
 
 void DebuggerGlobal::handleStdinThread() {
     // Open /dev/tty to read directly from the terminal, even when stdin is redirected
@@ -967,38 +982,68 @@ void DebuggerGlobal::handleStdinThread() {
         return;
     }
 
+    int tty_fd = fileno(tty_in);
     char buffer[256];
-    while (true) {
-        if (_paused.load()) {
-            if (!_pausedScript.empty()) {
-                fprintf(tty_out, "JSDEBUG@%s:%d> ", _pausedScript.c_str(), _pausedLine);
-            } else {
-                fprintf(tty_out, "JSDEBUG> ");
-            }
-            fflush(tty_out);
-            if (!fgets(buffer, sizeof(buffer), tty_in)) {
-                // EOF or error
+
+    while (!_shouldStop.load()) {
+        if (!_paused.load()) {
+            // Not paused: sleep in short intervals to stay responsive to _shouldStop.
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            continue;
+        }
+
+        // Paused: print prompt then wait for input. Use select() with a 100ms timeout
+        // so we can re-check _shouldStop instead of blocking indefinitely in fgets.
+        if (!_pausedScript.empty()) {
+            fprintf(tty_out, "JSDEBUG@%s:%d> ", _pausedScript.c_str(), _pausedLine);
+        } else {
+            fprintf(tty_out, "JSDEBUG> ");
+        }
+        fflush(tty_out);
+
+        bool inputReady = false;
+#ifndef _WIN32
+        while (!_shouldStop.load() && _paused.load()) {
+            fd_set fds;
+            FD_ZERO(&fds);
+            FD_SET(tty_fd, &fds);
+            // Wait up to 100ms for the user to type something. If nothing arrives we loop
+            // back and recheck _shouldStop, so cleanup() can unblock this thread promptly
+            // rather than waiting forever for keyboard input.
+            struct timeval tv = {0, 100000};  // {seconds, microseconds}
+            int ret = select(tty_fd + 1, &fds, nullptr, nullptr, &tv);
+            if (ret > 0) {
+                inputReady = true;
+                break;
+            } else if (ret < 0) {
+                // select() error (e.g. EBADF after tty closed); stop polling.
                 break;
             }
+        }
+#endif
 
-            std::string command(buffer);
+        if (!inputReady) {
+            continue;
+        }
 
-            // Trim whitespace and newline
-            command.erase(0, command.find_first_not_of(" \t\n\r"));
-            command.erase(command.find_last_not_of(" \t\n\r") + 1);
+        if (!fgets(buffer, sizeof(buffer), tty_in)) {
+            break;
+        }
 
-            if (command == "dbcont") {
-                fprintf(tty_out, "JSDEBUG> Continuing execution...\n");
-                fflush(tty_out);
-                _paused.store(false);
-            } else if (!command.empty()) {
-                auto result = evaluateInREPL(command);
-                fprintf(tty_out, "%s\n", result.c_str());
-                fflush(tty_out);
-            }
-        } else {
-            // Not paused, sleep a bit to avoid spinning
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        std::string command(buffer);
+
+        // Trim whitespace and newline
+        command.erase(0, command.find_first_not_of(" \t\n\r"));
+        command.erase(command.find_last_not_of(" \t\n\r") + 1);
+
+        if (command == "dbcont") {
+            fprintf(tty_out, "JSDEBUG> Continuing execution...\n");
+            fflush(tty_out);
+            _paused.store(false);
+        } else if (!command.empty()) {
+            auto result = evaluateInREPL(command);
+            fprintf(tty_out, "%s\n", result.c_str());
+            fflush(tty_out);
         }
     }
 
@@ -1007,6 +1052,14 @@ void DebuggerGlobal::handleStdinThread() {
 }
 
 Status DebuggerGlobal::init(JSContext* cx) {
+    // The shell may create multiple JS scopes (e.g., for parallel operations). The debugger
+    // is process-wide state: only initialize it once for the first scope.
+    static AtomicWord<bool> _initialized{false};
+    if (_initialized.swap(true)) {
+        return Status::OK();
+    }
+    // Reset the flag if we return early due to an error, so a future call can retry.
+    ScopeGuard resetOnFailure([&]() { _initialized.store(false); });
 
     // Get the main global object (the one running user code)
     JS::RootedObject mainGlobal(cx, JS::CurrentGlobalOrNull(cx));
@@ -1092,6 +1145,7 @@ Status DebuggerGlobal::init(JSContext* cx) {
     // Start stdin handling thread for debugger statement evaluations
     _stdinThread = std::make_unique<std::thread>(handleStdinThread);
 
+    resetOnFailure.dismiss();
     return status;
 }
 
