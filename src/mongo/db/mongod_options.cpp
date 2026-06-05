@@ -539,6 +539,23 @@ Status storeMongodOptions(const moe::Environment& params) {
                           str::stream() << "Cannot specify collection name without DB name");
         }
     }
+    if (params.count("validateParallel")) {
+        if (storageGlobalParams.validate) {
+            return Status(ErrorCodes::BadValue,
+                          "--validate and --validateParallel are mutually exclusive");
+        }
+        if (params.count("validateCollectionName")) {
+            return Status(ErrorCodes::BadValue,
+                          "--validateParallel cannot be combined with --validateCollectionName");
+        }
+        if (params.count("validateDbName")) {
+            gValidateDbName = params["validateDbName"].as<std::string>();
+        }
+        // 0 is the sentinel meaning "use all available cores".
+        // The IDL validator guarantees the value is non-negative, so the cast is safe.
+        storageGlobalParams.validateParallel =
+            static_cast<size_t>(params["validateParallel"].as<int>());
+    }
     if (params.count("upgrade") && params["upgrade"].as<bool>() == true) {
         storageGlobalParams.upgrade = 1;
     }

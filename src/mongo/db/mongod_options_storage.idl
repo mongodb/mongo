@@ -181,6 +181,16 @@ configs:
         arg_vartype: Switch
         source: [cli, ini]
 
+    validateParallel:
+        description: >-
+            Run validation on all collections in parallel; optional thread count clamped to the
+            number of available cores (default: number of available cores)
+        arg_vartype: Int
+        source: [cli, ini]
+        implicit: 0
+        validator:
+            gte: 0
+
     restore:
         description: >-
             This should only be used when restoring from a backup. Mongod will behave differently by

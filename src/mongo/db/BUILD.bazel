@@ -2510,6 +2510,7 @@ mongo_cc_library(
         "//src/mongo/db/index_builds:multi_index_block",
         # "//src/mongo/db/index_builds:rebuild_indexes",
         "//src/mongo/db/timeseries:timeseries_extended_range",
+        "//src/mongo/util:processinfo",
     ],
 )
 

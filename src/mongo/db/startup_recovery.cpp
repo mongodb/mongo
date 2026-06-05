@@ -90,13 +90,17 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/version/releases.h"
 
 #include <algorithm>
@@ -799,6 +803,123 @@ StatusWith<bool> offlineValidateCollection(OperationContext* opCtx,
     }
 }
 
+OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
+                                               boost::optional<Lock::GlobalWrite> globalWriteLock,
+                                               size_t maxThreadCount) {
+    invariant(!storageGlobalParams.queryableBackupMode);
+    // Must have global write lock before beginning offlineValidateParallel
+    invariant(globalWriteLock && globalWriteLock->isLocked());
+
+    const size_t numCores = ProcessInfo::getNumAvailableCores();
+    maxThreadCount = maxThreadCount == 0 ? numCores : std::min(maxThreadCount, numCores);
+
+    // Must only be called before the server accepts network connections. The lighter per-worker
+    // lock mode (IX at global, X at collection) relies on there being no concurrent writers or
+    // DDL operations — a guarantee that only holds at startup.
+    {
+        auto* tlm = opCtx->getServiceContext()->getTransportLayerManager();
+        fassert(12759001, !tlm || !tlm->hasActiveSessions());
+    }
+
+    auto& serviceLifecycle = rss::ReplicatedStorageService::get(opCtx).getServiceLifecycle();
+    serviceLifecycle.initializeStateRequiredForOfflineValidation(opCtx);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    for (const auto& dbName : CollectionCatalog::get(opCtx)->getAllDbNames()) {
+        databaseHolder->openDb(opCtx, dbName);
+    }
+
+    SingleProducerMultiConsumerQueue<NamespaceString> queue{
+        {.maxQueueDepth = maxThreadCount * 4ULL}};
+
+    globalWriteLock.reset();
+
+    // TODO SERVER-127687: update remove IILE to const the options
+    const auto opts = std::invoke([maxThreadCount] {
+        ThreadPool::Options opts_;
+        opts_.poolName = "ParallelOfflineValidate";
+        opts_.threadNamePrefix = "ov";
+        opts_.maxThreads = maxThreadCount;
+        opts_.onCreateThread = [](const auto& threadName) {
+            Client::initThread(threadName, getGlobalServiceContext()->getService());
+        };
+        return opts_;
+    });
+    ThreadPool threadPool(opts);
+    threadPool.startup();
+
+    synchronized_value<OfflineValidateResults> results{OfflineValidateResults{
+        .allValidationComplete = true,
+        .allResultsValid = true,
+    }};
+
+    // Create worker threads
+    for (size_t i = 0; i < maxThreadCount; ++i) {
+        threadPool.schedule([&queue, &results](Status status) {
+            if (!status.isOK()) {
+                results->allValidationComplete = false;
+                return;
+            }
+            auto opCtx = cc().makeOperationContext();
+
+            while (true) {
+                try {
+                    // Pull namespaces off the queue to run validation against.
+                    const auto nss = queue.pop(opCtx.get());
+                    auto swValidateResult =
+                        offlineValidateCollection(opCtx.get(), nss, !nss.isReplicated());
+
+                    // Once complete, synchronize the results.  This could be an atomic, but the
+                    // contention window for the lock should be quite small so it will be
+                    // synchronized value using a mutex.
+                    auto resultsGuard = results.synchronize();
+                    if (swValidateResult.isOK()) {
+                        resultsGuard->allResultsValid =
+                            resultsGuard->allResultsValid && swValidateResult.getValue();
+                    } else {
+                        resultsGuard->allValidationComplete = false;
+                    }
+                } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
+                    // queue exhausted, end worker thread
+                    break;
+                } catch (const DBException& e) {
+                    LOGV2_ERROR(12759002,
+                                "An error occurred running validation",
+                                "error"_attr = e.toString());
+                    results->allValidationComplete = false;
+                }
+            }
+        });
+    }
+
+    Lock::GlobalLock catalogLock(opCtx, MODE_IS);
+    const auto catalog = CollectionCatalog::get(opCtx);
+
+    auto enqueueDb = [&](const DatabaseName& dbName) {
+        for (const auto& coll : catalog->range(dbName)) {
+            queue.push(NamespaceString{coll->ns()});
+        }
+    };
+
+    if (!gValidateDbName.empty()) {
+        const boost::optional<TenantId>& tenantId = boost::none;
+        enqueueDb(DatabaseNameUtil::deserialize(
+            tenantId,
+            gValidateDbName.data(),
+            SerializationContext(SerializationContext::Source::Catalog)));
+    } else {
+        for (const auto& dbName : catalog->getAllDbNames()) {
+            enqueueDb(dbName);
+        }
+    }
+    queue.closeProducerEnd();
+
+    // Synchronize the thread pool and wait for all workers to finish.
+    threadPool.waitForIdle();
+    threadPool.shutdown();
+    threadPool.join();
+    return results.get();
+}
+
 // Performs collection validation for all collections or one collection in a database.
 // Returns if all collections complete validation and if all collections are valid.
 OfflineValidateResults offlineValidateDb(OperationContext* opCtx, DatabaseName dbName) {
@@ -954,7 +1075,7 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
                                BSONObjBuilder* startupTimeElapsedBuilder) {
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
-    Lock::GlobalWrite lk(opCtx);
+    boost::optional<Lock::GlobalWrite> lk(opCtx);
 
     // Create the FCV document for the first time, if necessary.
     // - Replica set nodes only initialize the FCV when the replica set is first initiated or by
@@ -976,6 +1097,13 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
 
     if (storageGlobalParams.repair) {
         startupRepair(opCtx, storageEngine, startupTimeElapsedBuilder);
+    } else if (storageGlobalParams.validateParallel) {
+        const auto offlineValidateResults =
+            offlineValidateParallel(opCtx, std::move(lk), *storageGlobalParams.validateParallel);
+        if (!offlineValidateResults.allValidationComplete) {
+            uassertStatusOK({ErrorCodes::OfflineValidationFailedToComplete,
+                             "Offline validation didn't complete for some collections"});
+        }
     } else if (storageGlobalParams.validate) {
         const auto offlineValidateResults = offlineValidate(opCtx);
         if (!offlineValidateResults.allValidationComplete) {

@@ -35,6 +35,7 @@
 #include <string>
 
 #include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
 
 /*
  * This file defines the storage for options that come from the command line related to data file
@@ -81,6 +82,10 @@ struct StorageGlobalParams {
     // --validate
     // Runs validation on all collections.
     bool validate;
+
+    // --validateParallel
+    // Present means run parallel validation; value is the thread count.
+    boost::optional<size_t> validateParallel;
 
     // --restore
     // This should only be used when restoring from a backup. Mongod will behave differently by

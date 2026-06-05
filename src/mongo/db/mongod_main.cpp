@@ -702,7 +702,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         exitCleanly(ExitCode::fail);
     }
 
-    if (storageGlobalParams.validate) {
+    if (storageGlobalParams.validate || storageGlobalParams.validateParallel) {
         LOGV2(9437302, "Finished validating collections");
         exitCleanly(ExitCode::clean);
     }
