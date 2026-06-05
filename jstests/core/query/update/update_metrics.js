@@ -15,6 +15,8 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 // This test makes assertions on the "arrayFilters" metric from the serverStatus, which is mongos specific.
 // pinToSingleMongos due to serverStatus command with "arrayFilters" metric.
 TestData.pinToSingleMongos = true;
@@ -97,3 +99,40 @@ assert.eq(
     serverStatusAfterTest.metrics.commands[updateField].arrayFilters,
     `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`,
 );
+
+// Cover the same counters when the target is a timeseries collection. Both viewful and viewless
+// timeseries take the same isTimeseriesLogicalRequest=true path through CmdUpdate, so a
+// non-retryable update with rawData unset must still bump the metrics. Skip when arbitrary
+// timeseries updates aren't supported (older binaries / multiversion suites).
+if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
+    const tsColl = testDB.update_metrics_timeseries;
+    assert.commandWorked(testDB.createCollection(tsColl.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(
+        tsColl.insert([
+            {t: ISODate(), m: 1, value: 1, array: [5, 10]},
+            {t: ISODate(), m: 1, value: 2, array: [5, 10]},
+        ]),
+    );
+
+    // Pipeline-style update on a timeseries collection should bump the pipeline counter.
+    serverStatusBeforeTest = testDB.serverStatus();
+    assert.commandWorked(tsColl.update({m: 1}, [{$set: {value: 99}}], {multi: true}));
+    serverStatusAfterTest = testDB.serverStatus();
+    assert.eq(
+        serverStatusBeforeTest.metrics.commands[updateField].pipeline + 1,
+        serverStatusAfterTest.metrics.commands[updateField].pipeline,
+        `timeseries pipeline update; before: ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`,
+    );
+
+    // arrayFilters update on a timeseries collection should bump the arrayFilters counter.
+    serverStatusBeforeTest = testDB.serverStatus();
+    assert.commandWorked(
+        tsColl.update({m: 1}, {$set: {"array.$[element]": 42}}, {multi: true, arrayFilters: [{"element": {$gt: 6}}]}),
+    );
+    serverStatusAfterTest = testDB.serverStatus();
+    assert.eq(
+        serverStatusBeforeTest.metrics.commands[updateField].arrayFilters + 1,
+        serverStatusAfterTest.metrics.commands[updateField].arrayFilters,
+        `timeseries arrayFilters update; before: ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`,
+    );
+}
