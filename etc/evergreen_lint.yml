@@ -220,6 +220,8 @@ rules:
             "streams_aspio_utilities",
             "streams_externaljs",
             "streams_aspio_pubsub",
+            "streams_vector_search",
+            "streams_vector_search_mongot",
             "streams_sanitizer_0",
             "streams_sanitizer_1",
             "streams_sanitizer_2",
