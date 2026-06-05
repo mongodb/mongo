@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 // Rust shims for WASI linkage.
 // Force-link the encoding shim crates so their exported C symbols are present.
 extern crate encoding_c;

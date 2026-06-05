@@ -71,6 +71,7 @@ include:
 
   - filename: etc/evergreen_yml_components/variants/amazon/test_dev.yml
   - filename: etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
+  - filename: etc/evergreen_yml_components/variants/amazon/message_filter_plugin_master_branch_only.yml
 
   - filename: etc/evergreen_yml_components/variants/macos/test_dev_master_branch_only.yml
 

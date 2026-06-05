@@ -191,6 +191,7 @@ SUPPORTED_EXTENSIONS = (
     ".yml",
     ".yaml",
     ".md",
+    ".rs",
 )
 
 
@@ -592,7 +593,7 @@ def _get_rules_lint_source_labels_for_changed_files(
     rules_lint_labels = []
     seen = set()
     for file in files_to_lint:
-        if not file.endswith((".py", ".js", ".mjs")):
+        if not file.endswith((".py", ".js", ".mjs", ".rs")):
             continue
 
         workspace_path = os.path.normpath(file).removeprefix(f".{os.sep}")
@@ -879,13 +880,15 @@ def run_rules_lint(bazel_bin: str, args: list[str]):
     for linter in ["eslint", "ruff"]:
         args.append(f"--aspects=//tools/lint:linters.bzl%{linter}")
 
+    args.append("--aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect")
+
     args.extend(
         [
             # Allow lints of code that fails some validation action
             # See https://github.com/aspect-build/rules_ts/pull/574#issuecomment-2073632879
             "--norun_validations",
             f"--build_event_json_file={buildevents_path}",
-            "--output_groups=rules_lint_human",
+            "--output_groups=rules_lint_human,clippy_checks",
             "--remote_download_regex='.*AspectRulesLint.*'",
         ]
     )

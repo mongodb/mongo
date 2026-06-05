@@ -257,6 +257,14 @@ config_setting(
     ],
 )
 
+selects.config_setting_group(
+    name = "linux_aarch64_or_x86_64",
+    match_any = [
+        ":linux_aarch64",
+        ":linux_x86_64",
+    ],
+)
+
 config_setting(
     name = "windows_x86_64",
     constraint_values = [

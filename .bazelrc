@@ -622,6 +622,9 @@ common --@rules_rust//rust/settings:experimental_use_allocator_libraries_with_ma
 # and then trying to use the local hosts libgcc when running
 common:linux --@rules_rust//rust/settings:extra_exec_rustc_flag=-Clink-arg=-static-libgcc
 
+# Treat Rust warnings as errors for all first-party crates
+common --@rules_rust//rust/settings:extra_rustc_flag=-Dwarnings
+
 common --@rules_python//python/config_settings:bootstrap_impl=script
 # https://github.com/bazel-contrib/rules_python/issues/2864
 common --@rules_python//python/config_settings:venvs_site_packages=no

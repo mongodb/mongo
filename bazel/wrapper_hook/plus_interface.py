@@ -60,7 +60,30 @@ def get_buildozer_output(autocomplete_query):
         print(p.stderr)
         sys.exit(1)
 
-    return p.stdout
+    # Rust test targets are created inside the mongo_rust_shared_library macro and
+    # are invisible to buildozer. Query the library targets by macro name and derive
+    # the test label by appending _test, then format as "label []" so the parser's
+    # empty-srcs fallback adds them to sources_to_bin.
+    rust = subprocess.run(
+        [buildozer, "print label", "//src/...:%mongo_rust_shared_library"],
+        capture_output=True,
+        text=True,
+    )
+
+    if not autocomplete_query and rust.returncode != 0:
+        print("buildozer rust test target query failed:")
+        print(rust.args)
+        print(rust.stdout)
+        print(rust.stderr)
+        sys.exit(1)
+
+    rust_lines = "".join(
+        f"{label.strip()}_test []\n"
+        for label in rust.stdout.splitlines()
+        if label.strip().startswith("//")
+    )
+
+    return p.stdout + rust_lines
 
 
 def check_bazel_command_type(args):
@@ -188,6 +211,7 @@ def test_runner_interface(
     bin_targets = []
     catch_all_target = False
     source_targets = {}
+    rust_bin_targets = {}
 
     current_bazel_command = check_bazel_command_type(args)
     command_index = next(
@@ -365,9 +389,16 @@ def test_runner_interface(
             tokens = line.split("[")
             binfile = tokens[0].strip()
             srcs = tokens[1][:-1].split(" ")
+            added_any = False
             for src in srcs:
                 if src.endswith(c_exts):
                     add_source_test(src, binfile, sources_to_bin)
+                    added_any = True
+            if not added_any:
+                target_name = pathlib.Path(binfile.replace("//", "").replace(":", "/")).name
+                if target_name and target_name.endswith("_test"):
+                    rust_bin_targets[target_name] = binfile
+                    rust_bin_targets[target_name[:-5]] = binfile
         else:
             if not in_select:
                 current_select = line.split(" ")[0]
@@ -396,6 +427,11 @@ def test_runner_interface(
     for arg in args[1:]:
         if arg.startswith(plus_starts):
             test_name = arg[arg.find("+") + 1 :]
+            if test_name in rust_bin_targets:
+                real_target = rust_bin_targets[test_name]
+                bin_targets.append(real_target)
+                replacements[arg] = [real_target]
+                continue
             real_target = sources_to_bin.get(test_name)
 
             if not real_target:
