@@ -130,6 +130,7 @@ MONGO_FAIL_POINT_DEFINE(failIndexBuildOnCommit);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeAbortCleanUp);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnStepUp);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeCommit);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterPrimaryCheckBeforeCommit);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort);
 MONGO_FAIL_POINT_DEFINE(hangBeforeBuildingIndex);
 MONGO_FAIL_POINT_DEFINE(hangBeforeBuildingIndexSecond);
@@ -3985,6 +3986,12 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                                           fromMigrate,
                                           collection->isTimeseriesCollection());
             };
+
+        if (MONGO_unlikely(hangIndexBuildAfterPrimaryCheckBeforeCommit.shouldFail())) {
+            LOGV2(12774401,
+                  "Hanging after the primary check and before committing the index build");
+            hangIndexBuildAfterPrimaryCheckBeforeCommit.pauseWhileSet(opCtx);
+        }
 
         // Commit index build.
         TimestampBlock tsBlock(opCtx, commitIndexBuildTimestamp);
