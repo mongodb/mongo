@@ -293,6 +293,26 @@ class ConnectionPoolCancellationTest : public ConnectionPoolTest {};
 class ConnectionPoolShutdownTest : public ConnectionPoolTest {};
 class ConnectionPoolMetricsTest : public ConnectionPoolTest {};
 
+class ConnectionPoolLimitControllerTest : public ConnectionPoolTest {
+protected:
+    /**
+     * Helper to set up a ConnectionPool with LimitController for testing internal behavior.
+     *
+     * Optionally pass ConnectionPool::Options to override default values. The controllerFactory
+     * cannot be overridden.
+     */
+    std::tuple<std::shared_ptr<ConnectionPool>,
+               std::shared_ptr<ConnectionPool::ControllerInterface>>
+    setupLimitController(ConnectionPool::Options opts = {}) {
+        auto controller = ConnectionPool::makeLimitController();
+        opts.controllerFactory = [=]() {
+            return controller;
+        };
+        auto pool = makePool(opts);
+        return std::make_tuple(std::move(pool), std::move(controller));
+    }
+};
+
 /**
  * Verify that a request is rejected immediately when the pending request queue is at capacity.
  */
@@ -4279,6 +4299,54 @@ TEST_F(ConnectionPoolExpiryTest, HostGroupPoolExpiresAfterHostTimeout) {
     ASSERT(controller->wasRemoved(primary)) << "Primary pool should have expired after hostTimeout";
     ASSERT(controller->wasRemoved(secondary))
         << "Secondary pool should have expired after hostTimeout";
+}
+
+TEST_F(ConnectionPoolLimitControllerTest, LimitControllerTargetConnectionsCalculation) {
+    ConnectionPool::Options opts;
+    opts.minConnections = 5;
+    opts.maxConnections = 20;
+    auto [pool, controller] = setupLimitController(opts);
+    ConnectionPool::PoolMetrics metrics;
+
+    controller->addHost(0, HostAndPort());
+
+    // Verify connection target is set to minConnections when the host is idle.
+    controller->updateHost(0, metrics);
+    auto controls = controller->getControls(0);
+    ASSERT_EQ(controls.targetConnections, opts.minConnections);
+
+    // Verify connection target is set to the sum of requests + active + leased when that sum
+    // is within the bounds of [minConnections, maxConnections].
+    metrics.leased = 1;
+    metrics.active = 2;
+    metrics.pending = 3;
+    metrics.ready = 4;
+    metrics.requests = 5;
+
+    controller->updateHost(0, metrics);
+    controls = controller->getControls(0);
+    ASSERT_EQ(controls.targetConnections, metrics.requests + metrics.active + metrics.leased);
+
+    // Verify connection target does not exceed maxConnections, even when demand exceeds this value.
+    metrics.requests = 100;
+
+    controller->updateHost(0, metrics);
+    controls = controller->getControls(0);
+    ASSERT_EQ(controls.targetConnections, opts.maxConnections);
+}
+
+TEST_F(ConnectionPoolLimitControllerTest, LimitControllerCanShutdownFollowsExpiry) {
+    auto [pool, controller] = setupLimitController();
+    ConnectionPool::PoolMetrics metrics;
+
+    controller->addHost(0, HostAndPort());
+
+    auto state = controller->updateHost(0, metrics);
+    ASSERT_EQ(state.canShutdown, false);
+
+    metrics.isExpired = true;
+    state = controller->updateHost(0, metrics);
+    ASSERT_EQ(state.canShutdown, true);
 }
 
 }  // namespace connection_pool_test_details
