@@ -7,7 +7,6 @@
  * @tags: [
  *   requires_sharding,
  *   requires_persistence,
- *   uses_parallel_shell,
  *   does_not_support_stepdowns,
  *   assumes_balancer_off,
  *   assumes_read_concern_unchanged,
@@ -393,5 +392,60 @@ describe("Test blockReplicaSetWrites command on shard replica sets in a sharded 
             assert.commandWorked(res);
             return true;
         }, "Timed out waiting to disable autoCompact");
+    });
+
+    it("Test that index builds on empty collections bypass the replica set write block", function () {
+        const shard0LocalDB = this.st.shard0.getDB(this.testDBName);
+        const emptyColl = shard0LocalDB.getCollection("emptyColl");
+        const nonEmptyColl = shard0LocalDB.getCollection("nonEmptyColl");
+
+        // Populate nonEmptyColl before enabling the write block.
+        assert.commandWorked(nonEmptyColl.insert({_id: 1, a: 1}));
+
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        // Index build on an empty collection should bypass the write block.
+        assert.commandWorked(emptyColl.createIndex({a: 1}));
+        assert.neq(
+            null,
+            emptyColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected index to exist on empty collection after bypassing write block",
+        );
+
+        // Index build on a non-empty collection should still be blocked.
+        assert.commandFailedWithCode(nonEmptyColl.createIndex({b: 1}), ErrorCodes.ReplicaSetWritesBlocked);
+    });
+
+    it("Test that new index builds on user collections are blocked when blockReplicaSetWrites is enabled", function () {
+        const shard0LocalDB = this.st.shard0.getDB(this.testDBName);
+        const testColl = shard0LocalDB.getCollection("testColl");
+        assert.commandWorked(testColl.insert({_id: 1, a: 1}));
+
+        enableReplicaSetWriteBlock(
+            this.shard0PrimaryAdminDB,
+            false /* allowDeletions */,
+            "InsufficientDiskSpace" /* reason */,
+        );
+
+        // A new index build on a non-empty user collection should be rejected with ReplicaSetWritesBlocked.
+        assert.commandFailedWithCode(testColl.createIndex({a: 1}), ErrorCodes.ReplicaSetWritesBlocked);
+        assert.eq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected index to not exist while writes are blocked",
+        );
+
+        // After disabling the write block, new index builds should succeed again.
+        disableReplicaSetWriteBlock(this.shard0PrimaryAdminDB, "InsufficientDiskSpace" /* reason */);
+        assert.commandWorked(testColl.createIndex({a: 1}));
+        assert.neq(
+            null,
+            testColl.getIndexes().find((idx) => idx.name === "a_1"),
+            "Expected index to exist after write block is disabled",
+        );
     });
 });

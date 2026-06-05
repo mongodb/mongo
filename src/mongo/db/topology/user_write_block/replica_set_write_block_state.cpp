@@ -163,4 +163,22 @@ void ReplicaSetWriteBlockState::appendReplicaSetWriteBlockRejectionMetrics(
                      static_cast<long long>(_replicaSetWriteBlockRejectedDeletes.load()));
 }
 
+
+void ReplicaSetWriteBlockState::enableUserIndexBuildBlocking() {
+    _userIndexBuildsBlocked.store(true);
+}
+
+void ReplicaSetWriteBlockState::disableUserIndexBuildBlocking() {
+    _userIndexBuildsBlocked.store(false);
+}
+
+Status ReplicaSetWriteBlockState::checkIfIndexBuildAllowedToStart(
+    OperationContext* opCtx, const NamespaceString& nss) const {
+    if (_userIndexBuildsBlocked.load() && !ReplicaSetWriteBlockBypass::get(opCtx).isEnabled() &&
+        !nss.isOnInternalDb()) {
+        return Status(ErrorCodes::ReplicaSetWritesBlocked, "Replica set writes blocked");
+    }
+    return Status::OK();
+}
+
 }  // namespace mongo

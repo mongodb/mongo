@@ -42,6 +42,7 @@
 #include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/user_write_block/block_replica_set_writes_gen.h"
+#include "mongo/db/topology/user_write_block/replica_set_write_block_state.h"
 #include "mongo/db/topology/user_write_block/writes_recoverable_critical_section_service.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/assert_util.h"
@@ -94,6 +95,14 @@ public:
                         str::stream() << "'allowDeletions' is required when enabling "
                                       << Request::kCommandName,
                         request().getAllowDeletions().has_value());
+                // Prevent new index builds from starting.
+                auto writeBlockState = ReplicaSetWriteBlockState::get(opCtx);
+                writeBlockState->enableUserIndexBuildBlocking();
+                // Temporarily block new index builds during setup. Once the critical section
+                // is committed the op observer takes over enforcement, so this is always reset.
+                ScopeGuard guard([&]() { writeBlockState->disableUserIndexBuildBlocking(); });
+
+                // Enable write blocking
                 UserWritesRecoverableCriticalSectionService::get(opCtx)
                     ->acquireRecoverableCriticalSectionBlockingReplicaSetWrites(
                         opCtx,
@@ -101,7 +110,6 @@ public:
                             kBlockReplicaSetWritesNamespace,
                         *request().getAllowDeletions(),
                         request().getReason());
-
             } else {
                 // Disable write blocking.
                 uassert(ErrorCodes::InvalidOptions,
@@ -115,6 +123,9 @@ public:
                             kBlockReplicaSetWritesNamespace,
                         request().getReason());
             }
+
+            // TODO(SERVER-128256): Wait for the write of the critical section to be majority
+            // committed.
         }
 
     private:
