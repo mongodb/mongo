@@ -591,6 +591,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
                     deletes.emplace();
                 deletes->emplace_back(
                     _clientRequest.getDeleteRequest().getDeletes().at(writeOpRef.first));
+                // TODO SERVER-122080 support query stats for deletes in legacy batch write exec.
                 deletes->back().setSampleId(targetedWrite->sampleId);
                 break;
             default:

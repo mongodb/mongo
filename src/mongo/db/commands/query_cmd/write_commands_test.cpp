@@ -40,73 +40,111 @@ namespace {
 
 using WriteCommandsTest = CatalogTestFixture;
 
+// Simulates the router-side value written into includeQueryStatsMetricsForOpIndex: the router
+// offsets its local op index by this amount before sending to a shard, so shard metrics come
+// back tagged with the original router batch index.
+constexpr int kMetricsBaseIndex = 200;
+
+/**
+ * Builds a BSON array of 'count' write op entries. For each position i, calls buildEntry(i) to
+ * get the base op fields, then appends includeQueryStatsMetricsForOpIndex = kMetricsBaseIndex + i
+ * for positions listed in requestMetricsAt.
+ */
+template <typename BuildEntryFn>
+BSONArray buildOpsWithSelectiveMetrics(int count,
+                                       BuildEntryFn buildEntry,
+                                       std::initializer_list<int> requestMetricsAt) {
+    const std::set<int> metricsPositions(requestMetricsAt);
+    BSONArrayBuilder arr;
+    for (int i = 0; i < count; ++i) {
+        BSONObjBuilder entry;
+        entry.appendElements(buildEntry(i));
+        if (metricsPositions.count(i)) {
+            entry.append("includeQueryStatsMetricsForOpIndex", kMetricsBaseIndex + i);
+        }
+        arr.append(entry.obj());
+    }
+    return arr.arr();
+}
+
+/**
+ * Asserts that 'response' contains a 'queryStatsMetrics' array with entries for exactly the
+ * original op indices in 'expectedOriginalIndices'. Each entry must have 'originalOpIndex',
+ * 'metrics', 'keysExamined', and 'docsExamined'.
+ */
+void assertQueryStatsMetrics(const BSONObj& response,
+                             std::initializer_list<int> expectedOriginalIndices) {
+    ASSERT_TRUE(response.hasField("queryStatsMetrics")) << response;
+    const auto metricsArray = response["queryStatsMetrics"].Array();
+    ASSERT_EQ(metricsArray.size(), expectedOriginalIndices.size()) << response;
+
+    std::set<int> foundIndices;
+    for (const auto& elem : metricsArray) {
+        const auto obj = elem.Obj();
+        ASSERT_TRUE(obj.hasField("originalOpIndex"));
+        ASSERT_TRUE(obj.hasField("metrics"));
+        foundIndices.insert(obj["originalOpIndex"].Int());
+
+        const auto metrics = obj["metrics"].Obj();
+        ASSERT_TRUE(metrics.hasField("keysExamined"));
+        ASSERT_TRUE(metrics.hasField("docsExamined"));
+    }
+
+    for (int idx : expectedOriginalIndices) {
+        ASSERT_EQ(foundIndices.count(idx), 1u)
+            << "Expected originalOpIndex " << idx << " not found in queryStatsMetrics";
+    }
+}
+
 TEST_F(WriteCommandsTest, UpdateReplyContainsMetricsOnlyWhenRequested) {
     NamespaceString ns =
         NamespaceString::createNamespaceString_forTest("write_commands_test", "updateColl");
     auto opCtx = operationContext();
 
-    // Create the collection.
     ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
 
-    // Insert 5 documents.
     DBDirectClient client(opCtx);
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 5; ++i)
         client.insert(ns, BSON("_id" << i << "x" << i));
-    }
 
-    // Build an update command with 5 statements.
-    // Request metrics for indices 1 and 3 only.
-    BSONArrayBuilder updatesBuilder;
-    for (int i = 0; i < 5; ++i) {
-        BSONObjBuilder updateEntry;
-        updateEntry.append("q", BSON("x" << i));
-        updateEntry.append("u", BSON("x" << (i * 10)));
-        if (i == 1 || i == 3) {
-            // Here we are saying that the i-th entry sent to a shard coorespondes to the
-            // (200 + i)th entry in the original batch that arrived at the router. The router sets
-            // this field when requesting metrics from update statements sent to shards.
-            updateEntry.append("includeQueryStatsMetricsForOpIndex", 200 + i);
-        }
-        updatesBuilder.append(updateEntry.obj());
-    }
+    // Build 5 update ops; request shard metrics for positions 1 and 3.
+    auto ops = buildOpsWithSelectiveMetrics(
+        5,
+        [](int i) { return BSON("q" << BSON("x" << i) << "u" << BSON("x" << (i * 10))); },
+        {1, 3});
 
-    BSONObj updateCmd = BSON("update" << ns.coll() << "updates" << updatesBuilder.arr());
-
-    // Run the update command.
     BSONObj response;
-    ASSERT_TRUE(client.runCommand(ns.dbName(), updateCmd, response)) << response;
+    ASSERT_TRUE(
+        client.runCommand(ns.dbName(), BSON("update" << ns.coll() << "updates" << ops), response));
     ASSERT_OK(getStatusFromCommandResult(response));
-
-    // Verify all 5 updates succeeded.
     ASSERT_EQ(response["n"].Int(), 5);
     ASSERT_EQ(response["nModified"].Int(), 5);
 
-    // Verify that queryStatsMetrics is present in the response.
-    ASSERT_TRUE(response.hasField("queryStatsMetrics")) << response;
+    assertQueryStatsMetrics(response, {kMetricsBaseIndex + 1, kMetricsBaseIndex + 3});
+}
 
-    auto metricsArray = response["queryStatsMetrics"].Array();
+TEST_F(WriteCommandsTest, DeleteReplyContainsMetricsOnlyWhenRequested) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("write_commands_test", "deleteColl");
+    auto opCtx = operationContext();
 
-    // Should have exactly 2 entries (for indices 1 and 3).
-    ASSERT_EQ(metricsArray.size(), 2u) << response;
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
 
-    // Verify the indices are correct.
-    std::set<int> metricsIndices;
-    for (const auto& elem : metricsArray) {
-        auto metricsObj = elem.Obj();
-        ASSERT_TRUE(metricsObj.hasField("originalOpIndex"));
-        ASSERT_TRUE(metricsObj.hasField("metrics"));
-        metricsIndices.insert(metricsObj["originalOpIndex"].Int());
+    DBDirectClient client(opCtx);
+    for (int i = 0; i < 5; ++i)
+        client.insert(ns, BSON("_id" << i << "x" << i));
 
-        // Verify metrics object has expected fields.
-        auto metrics = metricsObj["metrics"].Obj();
-        ASSERT_TRUE(metrics.hasField("keysExamined"));
-        ASSERT_TRUE(metrics.hasField("docsExamined"));
-    }
+    // Build 5 delete ops; request shard metrics for positions 1 and 3.
+    auto ops = buildOpsWithSelectiveMetrics(
+        5, [](int i) { return BSON("q" << BSON("_id" << i) << "limit" << 1); }, {1, 3});
 
-    // Verify we got metrics for exactly indices 201 and 203.
-    ASSERT_EQ(metricsIndices.count(201), 1u);
-    ASSERT_EQ(metricsIndices.count(203), 1u);
-    ASSERT_EQ(metricsIndices.size(), 2u);
+    BSONObj response;
+    ASSERT_TRUE(
+        client.runCommand(ns.dbName(), BSON("delete" << ns.coll() << "deletes" << ops), response));
+    ASSERT_OK(getStatusFromCommandResult(response));
+    ASSERT_EQ(response["n"].Int(), 5);
+
+    assertQueryStatsMetrics(response, {kMetricsBaseIndex + 1, kMetricsBaseIndex + 3});
 }
 
 TEST_F(WriteCommandsTest, UpdateReplyOmitsMetricsWhenNoneRequested) {
@@ -114,31 +152,43 @@ TEST_F(WriteCommandsTest, UpdateReplyOmitsMetricsWhenNoneRequested) {
         NamespaceString::createNamespaceString_forTest("write_commands_test", "updateColl2");
     auto opCtx = operationContext();
 
-    // Create the collection.
     ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
 
-    // Insert a document.
     DBDirectClient client(opCtx);
     client.insert(ns, BSON("_id" << 0 << "x" << 0));
 
-    // Build an update command without requesting metrics.
-    BSONObj updateCmd =
-        BSON("update" << ns.coll() << "updates"
-                      << BSON_ARRAY(BSON("q" << BSON("x" << 0) << "u" << BSON("x" << 10))));
-
-    // Run the update command.
     BSONObj response;
-    ASSERT_TRUE(client.runCommand(ns.dbName(), updateCmd, response)) << response;
+    ASSERT_TRUE(client.runCommand(
+        ns.dbName(),
+        BSON("update" << ns.coll() << "updates"
+                      << BSON_ARRAY(BSON("q" << BSON("x" << 0) << "u" << BSON("x" << 10)))),
+        response));
     ASSERT_OK(getStatusFromCommandResult(response));
-
-    // Verify update succeeded.
     ASSERT_EQ(response["n"].Int(), 1);
     ASSERT_EQ(response["nModified"].Int(), 1);
+    ASSERT_FALSE(response.hasField("queryStatsMetrics")) << response;
+}
 
-    // Verify that queryStatsMetrics is NOT present in the response.
+TEST_F(WriteCommandsTest, DeleteReplyOmitsMetricsWhenNoneRequested) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("write_commands_test", "deleteColl2");
+    auto opCtx = operationContext();
+
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
+
+    DBDirectClient client(opCtx);
+    client.insert(ns, BSON("_id" << 0 << "x" << 0));
+
+    BSONObj response;
+    ASSERT_TRUE(client.runCommand(
+        ns.dbName(),
+        BSON("delete" << ns.coll() << "deletes"
+                      << BSON_ARRAY(BSON("q" << BSON("_id" << 0) << "limit" << 1))),
+        response));
+    ASSERT_OK(getStatusFromCommandResult(response));
+    ASSERT_EQ(response["n"].Int(), 1);
     ASSERT_FALSE(response.hasField("queryStatsMetrics")) << response;
 }
 
 }  // namespace
 }  // namespace mongo
-

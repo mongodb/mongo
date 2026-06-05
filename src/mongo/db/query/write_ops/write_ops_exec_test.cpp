@@ -433,10 +433,10 @@ TEST_F(WriteOpsExecTest, UpdateAppendsMetricsWhenRequested) {
         opCtx, updateCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
 
     // Verify all 5 updates succeeded.
-    ASSERT_EQ(5, updateResult.results.size());
-    for (size_t i = 0; i < 5; ++i) {
-        ASSERT_OK(updateResult.results[i].getStatus());
-        ASSERT_EQ(1, updateResult.results[i].getValue().getN());
+    ASSERT_EQ(updateCmdReq.getUpdates().size(), updateResult.results.size());
+    for (const auto& result : updateResult.results) {
+        ASSERT_OK(result.getStatus());
+        ASSERT_EQ(1, result.getValue().getN());
     }
 
     // Verify that metrics are present only for indices 1 and 3.
@@ -445,6 +445,56 @@ TEST_F(WriteOpsExecTest, UpdateAppendsMetricsWhenRequested) {
     ASSERT_FALSE(updateResult.results[2].getValue().getQueryStatsMetrics().has_value());
     ASSERT_EQ(updateResult.results[3].getValue().getQueryStatsMetrics()->getOriginalOpIndex(), 203);
     ASSERT_FALSE(updateResult.results[4].getValue().getQueryStatsMetrics().has_value());
+}
+
+TEST_F(WriteOpsExecTest, DeleteAppendsMetricsWhenRequested) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "deleteColl");
+    auto opCtx = operationContext();
+
+    // Create the collection and insert 5 documents.
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    insertCmdReq.setDocuments({fromjson("{_id: 0, x: 0}"),
+                               fromjson("{_id: 1, x: 1}"),
+                               fromjson("{_id: 2, x: 2}"),
+                               fromjson("{_id: 3, x: 3}"),
+                               fromjson("{_id: 4, x: 4}")});
+    auto insertResult = write_ops_exec::performInserts(
+        opCtx, insertCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
+    ASSERT_EQ(5, insertResult.results.size());
+
+    // Build 5 DeleteOpEntry instances. Request metrics for indices 1 and 3.
+    std::vector<write_ops::DeleteOpEntry> deleteOps;
+    for (int i = 0; i < 5; ++i) {
+        write_ops::DeleteOpEntry entry;
+        entry.setQ(BSON("_id" << i));
+        entry.setMulti(false);
+        if (i == 1 || i == 3) {
+            // Simulate the router setting this field to request metrics from the shard.
+            // The value (200 + i) represents the op's index in the original router batch.
+            entry.setIncludeQueryStatsMetricsForOpIndex(200 + i);
+        }
+        deleteOps.push_back(std::move(entry));
+    }
+
+    write_ops::DeleteCommandRequest deleteCmdReq{ns, std::move(deleteOps)};
+    auto deleteResult = write_ops_exec::performDeletes(
+        opCtx, deleteCmdReq, /*preConditions=*/boost::none, OperationSource::kStandard);
+
+    // Verify all 5 deletes succeeded.
+    ASSERT_EQ(deleteCmdReq.getDeletes().size(), deleteResult.results.size());
+    for (const auto& result : deleteResult.results) {
+        ASSERT_OK(result.getStatus());
+        ASSERT_EQ(1, result.getValue().getN());
+    }
+
+    // Verify that metrics are present only for indices 1 and 3.
+    ASSERT_FALSE(deleteResult.results[0].getValue().getQueryStatsMetrics().has_value());
+    ASSERT_EQ(deleteResult.results[1].getValue().getQueryStatsMetrics()->getOriginalOpIndex(), 201);
+    ASSERT_FALSE(deleteResult.results[2].getValue().getQueryStatsMetrics().has_value());
+    ASSERT_EQ(deleteResult.results[3].getValue().getQueryStatsMetrics()->getOriginalOpIndex(), 203);
+    ASSERT_FALSE(deleteResult.results[4].getValue().getQueryStatsMetrics().has_value());
 }
 
 class OpObserverMock : public OpObserverNoop {

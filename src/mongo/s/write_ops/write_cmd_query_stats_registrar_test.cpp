@@ -380,9 +380,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
 }
 
 TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequestMultiDelete) {
-    // TODO SERVER-122077 Replace true with 'GetParam()' to test registering query stats on
-    // mongos.
-    bool skipRegistration = true;
+    bool skipRegistration = GetParam();
 
     auto deleteCmd = fromjson(R"({
         delete: "testColl",
@@ -417,9 +415,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterReques
 }
 
 TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterRequestSingleDelete) {
-    // TODO SERVER-122077 Replace true with 'GetParam()' to test registering query stats on
-    // mongos.
-    bool skipRegistration = true;
+    bool skipRegistration = GetParam();
 
     auto deleteCmd = fromjson(R"({
         delete: "testColl",
@@ -470,9 +466,7 @@ TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture, ParseAndRegisterReques
 }
 TEST_P(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
        RegisterRequestForShardsvrCoordinateDeleteForwardedFromRouter) {
-    // TODO SERVER-122077 Replace true with 'GetParam()' to test registering query stats on
-    // mongos.
-    bool skipRegistration = true;
+    bool skipRegistration = GetParam();
 
     opCtx->setCommandForwardedFromRouter();
 
@@ -725,6 +719,52 @@ TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
         // QueryStatsInfo.
         ASSERT_TRUE(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex());
         ASSERT_EQ(updateOpEntry.getIncludeQueryStatsMetricsForOpIndex(), 42);
+    }
+}
+
+TEST_F(WriteCmdQueryStatsRegistrarRegisterRequestFixture,
+       PassthroughMetricsOpIndexForCoordinateMultiDeleteTest) {
+    // Setting this to simulate the scenario that a primary shard receives a dispatched delete
+    // command (_shardsvrCoordinateMultiUpdate) from the router and it has to act like a router.
+    opCtx->setCommandForwardedFromRouter();
+
+    WriteCmdQueryStatsRegistrar queryStatsRegistrar;
+
+    auto registerMockKey = [&](OpDebug& opDebug, size_t opIndex) {
+        OpDebug::QueryStatsInfo qsi;
+        qsi.key = std::make_unique<query_stats::MockKey>(opCtx);
+        qsi.keyHash = 42;
+        opDebug.setQueryStatsInfoAtOpIndex(opIndex, std::move(qsi));
+    };
+
+    // Primary shard simply lets the provided opIndex pass through.
+    {
+        registerMockKey(CurOp::get(opCtx)->debug(), 100);
+
+        write_ops::DeleteOpEntry deleteOpEntry;
+        deleteOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
+        ASSERT_TRUE(deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::DeleteOpEntry>(
+                opCtx, 100, deleteOpEntry);
+
+        // The index in 'deleteOpEntry' should remain 42 and not be overwritten by opIndex (100).
+        ASSERT_TRUE(deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+        ASSERT_EQ(deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex(), 42);
+    }
+
+    // Primary shard lets the provided opIndex pass through even when QueryStatsInfo is empty.
+    {
+        write_ops::DeleteOpEntry deleteOpEntry;
+        deleteOpEntry.setIncludeQueryStatsMetricsForOpIndex(42);
+        ASSERT_TRUE(deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+        queryStatsRegistrar
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::DeleteOpEntry>(
+                opCtx, 200, deleteOpEntry);
+
+        // The index should remain 42 and not be unset by the empty QueryStatsInfo.
+        ASSERT_TRUE(deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex());
+        ASSERT_EQ(deleteOpEntry.getIncludeQueryStatsMetricsForOpIndex(), 42);
     }
 }
 

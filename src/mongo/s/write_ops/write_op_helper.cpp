@@ -336,6 +336,8 @@ write_ops::DeleteOpEntry getOrMakeDeleteOpEntry(DeleteOpRef deleteOp) {
     deleteOpEntry.setHint(deleteOp.getHint());
     deleteOpEntry.setCollation(deleteOp.getCollation());
     deleteOpEntry.setSampleId(deleteOp.getSampleId());
+    deleteOpEntry.setIncludeQueryStatsMetricsForOpIndex(
+        deleteOp.getIncludeQueryStatsMetricsForOpIndex());
 
     return deleteOpEntry;
 }

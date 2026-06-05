@@ -815,11 +815,31 @@ public:
 
 
             auto reply = write_ops_exec::performDeletes(opCtx, request(), preConditions, source);
+
+            // This is populated by 'singleWriteHandler' and moved into the delete reply in
+            // 'postProcessHandler'.
+            std::vector<write_ops::QueryStatsMetrics> queryStatsMetricsVec;
+
+            // Handler to process each 'SingleWriteResult'.
+            auto singleWriteHandler = [&](const SingleWriteResult& opResult, int /*index*/) {
+                if (auto queryStatsMetrics = opResult.getQueryStatsMetrics()) {
+                    queryStatsMetricsVec.emplace_back(queryStatsMetrics->getOriginalOpIndex(),
+                                                      queryStatsMetrics->getMetrics());
+                }
+            };
+
+            auto postProcessHandler = [&]() {
+                if (!queryStatsMetricsVec.empty()) {
+                    deleteReply.setQueryStatsMetrics(std::move(queryStatsMetricsVec));
+                }
+            };
+
             populateReply(opCtx,
                           !request().getWriteCommandRequestBase().getOrdered(),
                           request().getDeletes().size(),
                           std::move(reply),
-                          &deleteReply);
+                          &deleteReply,
+                          PopulateReplyHooks{singleWriteHandler, postProcessHandler});
 
             return deleteReply;
         } catch (const DBException& ex) {

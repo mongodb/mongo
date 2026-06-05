@@ -419,8 +419,13 @@ BatchedCommandRequest WriteBatchExecutor::buildBatchWriteRequest(
             // Copy the DeleteOpEntry from the original command, and then update the "sampleId"
             // field appropriately.
             std::vector<write_ops::DeleteOpEntry> deleteOps;
+            query_stats::WriteCmdQueryStatsRegistrar registrar;
             for (auto& op : ops) {
                 auto deleteOpEntry = write_op_helpers::getOrMakeDeleteOpEntry(op.getDeleteOp());
+
+                registrar
+                    .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::DeleteOpEntry>(
+                        opCtx, op.getIndex(), deleteOpEntry);
 
                 auto sampleIdIt = sampleIds.find(getWriteOpId(op));
                 deleteOpEntry.setSampleId(sampleIdIt != sampleIds.end()

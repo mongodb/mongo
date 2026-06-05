@@ -231,6 +231,25 @@ private:
 
 MultiUpdateDeleteMetrics collectMultiUpdateDeleteMetrics;
 
+void setQueryStatsMetricsOnWriteResult(CurOp* curOp,
+                                       WriteResult& out,
+                                       boost::optional<int32_t> originalOpIndex,
+                                       bool writeResultAppended) {
+    // The last SingleWriteResult will be for the operation we just executed. If it
+    // succeeded, and metrics were requested, set them now.
+    if (!originalOpIndex.has_value() || !curOp->debug().getQueryStatsInfo().metricsRequested ||
+        !writeResultAppended) {
+        return;
+    }
+
+    tassert(11514201, "A write result must be appended.", !out.results.empty());
+    if (!out.results.back().isOK()) {
+        return;
+    }
+    out.results.back().getValue().setQueryStatsMetrics(
+        write_ops::QueryStatsMetrics(*originalOpIndex, curOp->debug().getCursorMetrics()));
+}
+
 void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
     try {
         curOp->done();
@@ -2146,17 +2165,8 @@ WriteResult performUpdates(
         ON_BLOCK_EXIT([&] {
             if (curOp) {
                 finishCurOp(opCtx, &*curOp);
-                // The last SingleWriteResult will be for the operation we just executed. If it
-                // succeeded, and metrics were requested, set them now.
-                if (originalOpIndex.has_value() &&
-                    curOp->debug().getQueryStatsInfo().metricsRequested && writeResultAppended) {
-                    tassert(11514201, "A write result must be appended.", !out.results.empty());
-                    if (out.results.back().isOK()) {
-                        out.results.back().getValue().setQueryStatsMetrics(
-                            write_ops::QueryStatsMetrics(*originalOpIndex,
-                                                         curOp->debug().getCursorMetrics()));
-                    }
-                }
+                setQueryStatsMetricsOnWriteResult(
+                    &*curOp, out, originalOpIndex, writeResultAppended);
             }
         });
 
@@ -2475,12 +2485,19 @@ WriteResult performDeletes(
         const Command* cmd = parentCurOp.getCommand();
         CurOp curOp(cmd);
         curOp.push(opCtx);
+        boost::optional<int32_t> originalOpIndex = singleOp.getIncludeQueryStatsMetricsForOpIndex();
+        if (originalOpIndex.has_value() && source != OperationSource::kTimeseriesDelete) {
+            curOp.debug().getQueryStatsInfo().metricsRequested = true;
+        }
+        bool writeResultAppended = false;
         ON_BLOCK_EXIT([&] {
             if (MONGO_unlikely(hangBeforeChildRemoveOpFinishes.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeChildRemoveOpFinishes, opCtx, "hangBeforeChildRemoveOpFinishes");
             }
             finishCurOp(opCtx, &curOp);
+            setQueryStatsMetricsOnWriteResult(&curOp, out, originalOpIndex, writeResultAppended);
+
             if (MONGO_unlikely(hangBeforeChildRemoveOpIsPopped.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeChildRemoveOpIsPopped, opCtx, "hangBeforeChildRemoveOpIsPopped");
@@ -2515,6 +2532,7 @@ WriteResult performDeletes(
                                                                     source,
                                                                     wholeOp);
             out.results.push_back(reply);
+            writeResultAppended = true;
             lastOpFixer.finishedOpSuccessfully();
 
             if (singleOp.getMulti()) {

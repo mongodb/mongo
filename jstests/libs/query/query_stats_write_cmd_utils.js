@@ -9,8 +9,10 @@ import {
     assertAggregatedMetricsSingleExec,
     assertExpectedResults,
     getLatestQueryStatsEntry,
+    getQueryExecMetrics,
     resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 /**
  * Asserts that the most recent query stats entry for `coll` matches a single-execution write
@@ -250,5 +252,373 @@ export function runTokenizationTestsForTopology(label, setupFn, teardownFn, {col
         });
 
         testBodyFn(() => ({testDB, coll}));
+    });
+}
+
+/**
+ * Runs all four mongos write-command metrics scenarios for one spec (update or delete):
+ *   1. Multi-shard fanout
+ *   2. Two-phase write (filter doesn't include shard key)
+ *   3. Retryable write with _id, non-_id shard key
+ *   4. StaleConfig retry
+ */
+export function runMongosWriteMetricsTests({
+    label,
+    commands,
+    validateWriteMetricsFn,
+    validateCmdFn,
+    getQueryStatsFn,
+    extraTests,
+    docsExaminedOverride,
+}) {
+    describe(label, function () {
+        let st;
+        let mongos;
+        let testDB;
+
+        function assertExecMetrics(entry, {keysExamined, docsExamined, nAffected}) {
+            // TODO SERVER-128278 remove special handling for deletes on sharded clusters. On sharded
+            // clusters, docsExamined may exceed the expected value, so we have to validate it
+            // differently, but we never expect it to be double the expected value.
+            let resolvedDocsExamined = docsExamined;
+            if (docsExaminedOverride) {
+                const actual = getQueryExecMetrics(entry.metrics).docsExamined.sum;
+                assert.gte(actual, docsExamined);
+                assert.lte(actual, docsExamined * 2);
+                resolvedDocsExamined = actual;
+            }
+            // We validate docsExamined above, for assertAggregatedMetricsSingleExec to pass we will pass in the actual docsExamined value.
+            assertAggregatedMetricsSingleExec(entry, {
+                keysExamined,
+                docsExamined: resolvedDocsExamined,
+                hasSortStage: false,
+                usedDisk: false,
+                fromMultiPlanner: false,
+                fromPlanCache: false,
+                writes: validateWriteMetricsFn(nAffected),
+            });
+        }
+
+        before(function () {
+            const queryStatsParams = {internalQueryStatsWriteCmdSampleRate: 1};
+            st = new ShardingTest({
+                shards: 2,
+                mongosOptions: {setParameter: queryStatsParams},
+                rsOptions: {setParameter: queryStatsParams},
+            });
+            mongos = st.s;
+            testDB = mongos.getDB("test");
+            assert.commandWorked(
+                testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+            );
+        });
+
+        after(function () {
+            st?.stop();
+        });
+
+        beforeEach(function () {
+            resetQueryStatsStore(mongos, "1MB");
+        });
+
+        // -----------------------------------------------------------------------
+        // Scenario 1: Multi-shard fanout
+        //
+        // A multi:true write with no shard-key filter fans out to all shards.
+        // mongos aggregates the metrics returned from each shard.
+        // -----------------------------------------------------------------------
+        describe("multi-shard fanout", function () {
+            const collName = label + "_fanout";
+            let coll;
+            const docsPerShard = 4;
+            const totalDocs = docsPerShard * 2;
+
+            before(function () {
+                coll = testDB[collName];
+                // Shard the collection and move chunks such that the primary has documents where
+                // _id > 0 and negative _id documents are on shard1.
+                st.shardColl(coll, {_id: 1}, {_id: 0}, {_id: 0});
+            });
+
+            beforeEach(function () {
+                assert.commandWorked(coll.deleteMany({}));
+                const docs = [];
+                for (let i = 0; i < docsPerShard; i++) docs.push({_id: -(i + 1), v: i + 1});
+                for (let i = 0; i < docsPerShard; i++) docs.push({_id: i + 1, v: docsPerShard + i + 1});
+                assert.commandWorked(coll.insertMany(docs));
+                resetQueryStatsStore(mongos, "1MB");
+            });
+
+            it(`aggregates metrics across all shards`, function () {
+                assert.commandWorked(testDB.runCommand(commands.multiAll(collName)));
+
+                const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName});
+                assert.eq(entry.key.queryShape.command, label);
+                assertExecMetrics(entry, {
+                    keysExamined: 0,
+                    docsExamined: totalDocs,
+                    nAffected: totalDocs,
+                });
+                assertExpectedResults({
+                    results: entry,
+                    expectedQueryStatsKey: entry.key,
+                    expectedExecCount: 1,
+                    expectedDocsReturnedSum: 0,
+                    expectedDocsReturnedMax: 0,
+                    expectedDocsReturnedMin: 0,
+                    expectedDocsReturnedSumOfSq: 0,
+                });
+            });
+
+            it(`targeted single-shard multi-write`, function () {
+                assert.commandWorked(testDB.runCommand(commands.multiTargeted(collName)));
+
+                const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName});
+                assert.eq(entry.key.queryShape.command, label);
+                assertExecMetrics(entry, {
+                    keysExamined: docsPerShard,
+                    docsExamined: docsPerShard,
+                    nAffected: docsPerShard,
+                });
+                assertExpectedResults({
+                    results: entry,
+                    expectedQueryStatsKey: entry.key,
+                    expectedExecCount: 1,
+                    expectedDocsReturnedSum: 0,
+                    expectedDocsReturnedMax: 0,
+                    expectedDocsReturnedMin: 0,
+                    expectedDocsReturnedSumOfSq: 0,
+                });
+            });
+        });
+
+        // -----------------------------------------------------------------------
+        // Scenario 2: Two-phase write
+        //
+        // A single-doc write whose filter doesn't include the shard key triggers mongos to run a
+        // read phase (scatter-gather to find the target document) followed by a write phase
+        // (targeted update on the owning shard).
+        // -----------------------------------------------------------------------
+        describe("two-phase write (filter doesn't include shard key)", function () {
+            const collName = label + "_two_phase";
+            let coll;
+
+            before(function () {
+                coll = testDB[collName];
+                // Shard on {sk: 1} so that queries filtering on other fields don't include the
+                // shard key, triggering the two-phase write protocol. Split at {sk: 0} and move
+                // one chunk to shard1 so data is distributed across both shards.
+                st.shardColl(coll, {sk: 1}, {sk: 0}, {sk: 0});
+            });
+
+            beforeEach(function () {
+                assert.commandWorked(coll.deleteMany({}));
+                assert.commandWorked(
+                    coll.insertMany([
+                        {sk: -2, filterField: "a", v: 1},
+                        {sk: -1, filterField: "b", v: 2},
+                        {sk: 1, filterField: "c", v: 3},
+                        {sk: 2, filterField: "d", v: 4},
+                    ]),
+                );
+                resetQueryStatsStore(mongos, "1MB");
+            });
+
+            it(`match found — write phase targets by _id (keysExamined=1)`, function () {
+                assert.commandWorked(testDB.runCommand(commands.singleOp(collName, "a")));
+
+                const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName});
+                assert.eq(entry.key.queryShape.command, label);
+                // The two-phase protocol's write phase targets the document by _id on the owning
+                // shard, so keysExamined=1 (from the _id index) and docsExamined=1.
+                assertExecMetrics(entry, {keysExamined: 1, docsExamined: 1, nAffected: 1});
+                assertExpectedResults({
+                    results: entry,
+                    expectedQueryStatsKey: entry.key,
+                    expectedExecCount: 1,
+                    expectedDocsReturnedSum: 0,
+                    expectedDocsReturnedMax: 0,
+                    expectedDocsReturnedMin: 0,
+                    expectedDocsReturnedSumOfSq: 0,
+                });
+            });
+
+            it(`no document matches`, function () {
+                assert.commandWorked(testDB.runCommand(commands.noMatch(collName)));
+
+                const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName});
+                assert.eq(entry.key.queryShape.command, label);
+                assertExecMetrics(entry, {keysExamined: 0, docsExamined: 0, nAffected: 0});
+                assertExpectedResults({
+                    results: entry,
+                    expectedQueryStatsKey: entry.key,
+                    expectedExecCount: 1,
+                    expectedDocsReturnedSum: 0,
+                    expectedDocsReturnedMax: 0,
+                    expectedDocsReturnedMin: 0,
+                    expectedDocsReturnedSumOfSq: 0,
+                });
+            });
+
+            it(`batched ops each go through two-phase, accumulate execCount`, function () {
+                assert.commandWorked(testDB.runCommand(commands.batchOp(collName, "a", "c")));
+
+                const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName});
+                assert.eq(entry.key.queryShape.command, label);
+                // Each op in the batch goes through its own two-phase execution, so execCount=2.
+                // Both query shapes are identical after normalization, so they accumulate into a
+                // single query stats entry.
+                assertExpectedResults({
+                    results: entry,
+                    expectedQueryStatsKey: entry.key,
+                    expectedExecCount: 2,
+                    expectedDocsReturnedSum: 0,
+                    expectedDocsReturnedMax: 0,
+                    expectedDocsReturnedMin: 0,
+                    expectedDocsReturnedSumOfSq: 0,
+                });
+            });
+        });
+
+        // -----------------------------------------------------------------------
+        // Scenario 3: Retryable write with _id, non-_id shard key
+        //
+        // Retryable single-doc op with an _id filter on a collection sharded by a different key.
+        // This triggers the "broadcast to all shards" dispatch path (kRetryableWriteWithId in UWE,
+        // WithoutShardKeyWithId in legacy). Mongos sends the update to every shard; only the shard
+        // owning the document applies it.
+        // -----------------------------------------------------------------------
+        describe("retryable write with _id (non-_id shard key)", function () {
+            const collName = label + "_retryable";
+            let coll;
+
+            before(function () {
+                coll = testDB[collName];
+                // Shard on {sk: 1} so _id is not the shard key. Split and move so data is on
+                // both shards.
+                st.shardColl(coll, {sk: 1}, {sk: 0}, {sk: 0});
+            });
+
+            beforeEach(function () {
+                assert.commandWorked(coll.deleteMany({}));
+                assert.commandWorked(
+                    coll.insertMany([
+                        {_id: 1, sk: -1, v: 10},
+                        {_id: 2, sk: 1, v: 20},
+                    ]),
+                );
+                resetQueryStatsStore(mongos, "1MB");
+            });
+
+            it(`by _id: single execution recorded`, function () {
+                const cmd = {...commands.byId(collName), lsid: {id: UUID()}, txnNumber: NumberLong(1)};
+                const result = assert.commandWorked(testDB.runCommand(cmd));
+                validateCmdFn(result);
+
+                const entries = getQueryStatsFn(mongos, {collName});
+                assert.eq(entries.length, 1, "Expected 1 query stats entry", {entries});
+                assert.eq(entries[0].metrics.execCount, 1);
+                assertExecMetrics(entries[0], {keysExamined: 1, docsExamined: 1, nAffected: 1});
+            });
+
+            // TODO SERVER-121325 We double count for this case. Unskip this test case when that
+            // is fixed.
+            it.skip(`One by _id: double execution should not double count`, function () {
+                const cmd = {...commands.byId(collName), lsid: {id: UUID()}, txnNumber: NumberLong(1)};
+
+                // Initial execution.
+                const result = assert.commandWorked(testDB.runCommand(cmd));
+                validateCmdFn(result);
+
+                let entries = getQueryStatsFn(mongos, {collName});
+                assert.eq(entries.length, 1, "Expected 1 entry after initial exec: " + tojson(entries));
+                assert.eq(entries[0].metrics.execCount, 1);
+
+                // Retry with the same lsid/txnNumber — the server recognises this as
+                // already-executed and returns the cached result without re-executing. Query stats
+                // should not increment.
+                const retryResult = assert.commandWorked(testDB.runCommand(cmd));
+                assert.eq(retryResult.nModified, 1);
+
+                entries = getQueryStatsFn(mongos, {collName: collName});
+                assert.eq(entries.length, 1, "Expected still 1 entry after retry: " + tojson(entries));
+                assert.eq(entries[0].metrics.execCount, 1, "execCount should stay at 1 after retry");
+            });
+        });
+
+        // -----------------------------------------------------------------------
+        // Scenario 4: StaleConfig retry
+        //
+        // When a shard returns StaleConfig, mongos retries the write internally.
+        // Query stats should record exactly one execution (the successful retry).
+        // -----------------------------------------------------------------------
+        describe("StaleConfig retry", function () {
+            const collName = label + "_stale_config";
+            let coll;
+            let shard0Primary;
+
+            before(function () {
+                coll = testDB[collName];
+                assert.commandWorked(testDB.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+                assert.commandWorked(
+                    coll.insert([
+                        {_id: 1, v: 1},
+                        {_id: 2, v: 2},
+                    ]),
+                );
+                shard0Primary = st.rs0.getPrimary();
+            });
+
+            it(`exactly one entry recorded despite internal retry`, function () {
+                // Restore documents modified by a previous spec's test in the same before().
+                assert.commandWorked(coll.deleteMany({}));
+                assert.commandWorked(
+                    coll.insert([
+                        {_id: 1, v: 1},
+                        {_id: 2, v: 2},
+                    ]),
+                );
+
+                // Clear entries created by the data-reset deleteMany above on both the shard and
+                // mongos so they don't appear as additional query stats entries in the assertions.
+                resetQueryStatsStore(st.shard0, "1MB");
+                resetQueryStatsStore(mongos, "1MB");
+
+                // Wait for any pending range deletions on shard0 to complete before activating
+                // the failpoint. The alwaysThrowStaleConfigInfo failpoint fires for all
+                // namespaces, so a background range deletion task could consume the {times: 1}
+                // activation before the intended update command does, leaving the range deletion
+                // stuck in "processing" state and causing st.stop() to time out waiting for
+                // config.rangeDeletions to drain.
+                assert.soon(
+                    () => shard0Primary.getDB("config").rangeDeletions.find().itcount() === 0,
+                    "Timed out waiting for range deletions on shard0 to complete",
+                );
+
+                // Force shard0 to return StaleConfig on the next metadata check, which triggers a
+                // mongos-level retry. The failpoint expires after one activation, so the retry
+                // succeeds.
+                const fp = configureFailPoint(shard0Primary, "alwaysThrowStaleConfigInfo", {}, {times: 1});
+                const result = assert.commandWorked(testDB.runCommand(commands.byId(collName)));
+                validateCmdFn(result);
+                assert(fp.waitWithTimeout(1000), "alwaysThrowStaleConfigInfo failpoint was never triggered");
+
+                // Mongos should show exactly 1 execution despite the internal retry.
+                const mongosEntries = getQueryStatsFn(mongos, {collName});
+                assert.eq(mongosEntries.length, 1, "Expected 1 mongos entry", {mongosEntries});
+                assert.eq(mongosEntries[0].metrics.execCount, 1);
+
+                // The shard should also show exactly 1 execution (the successful one).
+                const shardEntries = getQueryStatsFn(st.shard0, {collName});
+                assert.eq(shardEntries.length, 1, "Expected 1 shard entry", {shardEntries});
+                assert.eq(shardEntries[0].metrics.execCount, 1);
+
+                fp.off();
+            });
+        });
+
+        if (extraTests) {
+            extraTests(() => ({st, mongos, testDB}));
+        }
     });
 }

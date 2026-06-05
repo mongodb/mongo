@@ -96,6 +96,39 @@ public:
     BSONObj setTopLevelOK(BSONObj&& o) {
         return o.addFields(BSON("ok" << 1));
     }
+
+    BatchedCommandResponse makeBatchResponseWithQueryStatsMetrics(
+        int n, std::vector<write_ops::QueryStatsMetrics> metrics) {
+        BatchedCommandResponse resp;
+        resp.setStatus(Status::OK());
+        resp.setN(n);
+        resp.setQueryStatsMetrics(std::move(metrics));
+        return resp;
+    }
+
+    void runProcessorWithQueryStats(OperationContext* opCtx,
+                                    RoutingContext& routingCtx,
+                                    BatchedCommandRequest& request,
+                                    std::initializer_list<int> opIndicesWithInfo,
+                                    SimpleWriteBatchResponse shardResponse) {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        for (int idx : opIndicesWithInfo)
+            opDebug.setQueryStatsInfoAtOpIndex(idx, OpDebug::QueryStatsInfo{});
+
+        WriteCommandRef cmdRef(request);
+        Stats stats;
+        WriteBatchResponseProcessor processor(cmdRef, stats);
+        processor.onWriteBatchResponse(opCtx, routingCtx, std::move(shardResponse));
+    }
+
+    void assertQueryStatsAggregated(const OpDebug& opDebug,
+                                    int opIndex,
+                                    int expectedKeys,
+                                    int expectedDocs) {
+        const auto& m = opDebug.getAdditiveMetrics(opIndex);
+        ASSERT_EQ(m.keysExamined.value_or(0), expectedKeys);
+        ASSERT_EQ(m.docsExamined.value_or(0), expectedDocs);
+    }
 };
 
 TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
@@ -2597,108 +2630,105 @@ TEST_F(WriteBatchResponseProcessorTest, TwoPhaseWriteErrorsOnlyModeWithError) {
     ASSERT_EQ(batch[0].getStatus().code(), ErrorCodes::BadValue);
 }
 
-TEST_F(WriteBatchResponseProcessorTest, QueryStatsMetricsAggregatedFromShardResponse) {
-    // Test that queryStatsMetrics from shard responses are aggregated into
-    // OpDebug.
+TEST_F(WriteBatchResponseProcessorTest, UpdateQueryStatsMetricsAggregatedFromShardResponse) {
     auto updateRequest = write_ops::UpdateCommandRequest(
         nss1,
-        std::vector<write_ops::UpdateOpEntry>{
-            write_ops::UpdateOpEntry(BSON("_id" << 0),
-                                     write_ops::UpdateModification(BSON("a" << 0))),
-            write_ops::UpdateOpEntry(BSON("_id" << 1),
-                                     write_ops::UpdateModification(BSON("a" << 1)))});
+        {write_ops::UpdateOpEntry(BSON("_id" << 0), write_ops::UpdateModification(BSON("a" << 0))),
+         write_ops::UpdateOpEntry(BSON("_id" << 1),
+                                  write_ops::UpdateModification(BSON("a" << 1)))});
     auto request = BatchedCommandRequest(updateRequest);
 
-    const bool inTransaction = false;
+    auto resp = makeBatchResponseWithQueryStatsMetrics(
+        2, {makeQueryStatsMetrics(0, 10, 5, 1), makeQueryStatsMetrics(1, 20, 15, 1)});
+    RemoteCommandResponse rcr(host1, setTopLevelOK(resp.toBSON()), Microseconds{0}, false);
 
-    // Set up QueryStatsInfo in OpDebug for each operation index.
-    // This simulates what WriteCmdQueryStatsRegistrar::parseAndRegisterRequest does.
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
-    opDebug.setQueryStatsInfoAtOpIndex(1, OpDebug::QueryStatsInfo{});
-
-    // Build the response using BatchedCommandResponse and serialize via toBSON().
-    BatchedCommandResponse batchedResponse;
-    batchedResponse.setStatus(Status::OK());
-    batchedResponse.setN(2);
-    batchedResponse.setNModified(2);
-    batchedResponse.setQueryStatsMetrics(
-        {makeQueryStatsMetrics(0, 10, 5, 1), makeQueryStatsMetrics(1, 20, 15, 1)});
-
-    RemoteCommandResponse rcr(
-        host1, setTopLevelOK(batchedResponse.toBSON()), Microseconds{0}, false);
-
-    WriteCommandRef cmdRef(request);
-    Stats stats;
-    WriteBatchResponseProcessor processor(cmdRef, stats);
-
-    processor.onWriteBatchResponse(
+    runProcessorWithQueryStats(
         opCtx,
         routingCtx,
+        request,
+        {0, 1},
         SimpleWriteBatchResponse{
             {{shard1Name,
               ShardResponse::make(
-                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, inTransaction)}}});
+                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, false /*inTransaction*/)}}});
 
-    // Verify that the metrics were aggregated into OpDebug for each operation.
-    const auto& metrics0 = opDebug.getAdditiveMetrics(0);
-    ASSERT_EQ(*metrics0.keysExamined, 10);
-    ASSERT_EQ(*metrics0.docsExamined, 5);
-
-    const auto& metrics1 = opDebug.getAdditiveMetrics(1);
-    ASSERT_EQ(*metrics1.keysExamined, 20);
-    ASSERT_EQ(*metrics1.docsExamined, 15);
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    assertQueryStatsAggregated(opDebug, 0, 10, 5);
+    assertQueryStatsAggregated(opDebug, 1, 20, 15);
 }
 
-TEST_F(WriteBatchResponseProcessorTest, QueryStatsMetricsAggregatedFromMultipleShards) {
-    // Test that queryStatsMetrics from multiple shards are aggregated correctly.
+TEST_F(WriteBatchResponseProcessorTest, UpdateQueryStatsMetricsAggregatedFromMultipleShards) {
     auto updateRequest = write_ops::UpdateCommandRequest(
         nss1,
-        std::vector<write_ops::UpdateOpEntry>{write_ops::UpdateOpEntry(
-            BSON("_id" << 0), write_ops::UpdateModification(BSON("a" << 0)))});
+        {write_ops::UpdateOpEntry(BSON("_id" << 0),
+                                  write_ops::UpdateModification(BSON("a" << 0)))});
     auto request = BatchedCommandRequest(updateRequest);
 
-    const bool inTransaction = false;
+    auto resp1 = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 10, 5, 1)});
+    auto resp2 = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 15, 8, 1)});
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(resp1.toBSON()), Microseconds{0}, false);
+    RemoteCommandResponse rcr2(host2, setTopLevelOK(resp2.toBSON()), Microseconds{0}, false);
 
-    // Set up QueryStatsInfo in OpDebug for the operation.
-    auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.setQueryStatsInfoAtOpIndex(0, OpDebug::QueryStatsInfo{});
-
-    // Build responses using BatchedCommandResponse for each shard, with different
-    // metrics for the same operation.
-    BatchedCommandResponse batchedResponse1;
-    batchedResponse1.setStatus(Status::OK());
-    batchedResponse1.setN(1);
-    batchedResponse1.setNModified(1);
-    batchedResponse1.setQueryStatsMetrics({makeQueryStatsMetrics(0, 10, 5, 1)});
-
-    BatchedCommandResponse batchedResponse2;
-    batchedResponse2.setStatus(Status::OK());
-    batchedResponse2.setN(1);
-    batchedResponse2.setNModified(1);
-    batchedResponse2.setQueryStatsMetrics({makeQueryStatsMetrics(0, 15, 8, 1)});
-
-    RemoteCommandResponse rcr1(
-        host1, setTopLevelOK(batchedResponse1.toBSON()), Microseconds{0}, false);
-    RemoteCommandResponse rcr2(
-        host2, setTopLevelOK(batchedResponse2.toBSON()), Microseconds{0}, false);
-
-    WriteCommandRef cmdRef(request);
-    Stats stats;
-    WriteBatchResponseProcessor processor(cmdRef, stats);
-
-    processor.onWriteBatchResponse(
+    runProcessorWithQueryStats(
         opCtx,
         routingCtx,
+        request,
+        {0},
         SimpleWriteBatchResponse{
-            {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)}, inTransaction)},
-             {shard2Name, ShardResponse::make(rcr2, {WriteOp(request, 0)}, inTransaction)}}});
+            {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)}, false)},
+             {shard2Name, ShardResponse::make(rcr2, {WriteOp(request, 0)}, false)}}});
 
-    // Verify that the metrics from both shards were aggregated (summed) for the
-    // operation.
-    const auto& metrics0 = opDebug.getAdditiveMetrics(0);
-    ASSERT_EQ(metrics0.keysExamined.value_or(0), 25);  // 10 + 15
-    ASSERT_EQ(metrics0.docsExamined.value_or(0), 13);  // 5 + 8
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    assertQueryStatsAggregated(opDebug, 0, 25, 13);  // 10+15, 5+8
+}
+
+TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromShardResponse) {
+    auto deleteRequest = write_ops::DeleteCommandRequest(
+        nss1,
+        {write_ops::DeleteOpEntry(BSON("_id" << 0), false /*multi*/),
+         write_ops::DeleteOpEntry(BSON("_id" << 1), false /*multi*/)});
+    auto request = BatchedCommandRequest(deleteRequest);
+
+    auto resp = makeBatchResponseWithQueryStatsMetrics(
+        2, {makeQueryStatsMetrics(0, 10, 5, 1), makeQueryStatsMetrics(1, 20, 15, 1)});
+    RemoteCommandResponse rcr(host1, setTopLevelOK(resp.toBSON()), Microseconds{0}, false);
+
+    runProcessorWithQueryStats(
+        opCtx,
+        routingCtx,
+        request,
+        {0, 1},
+        SimpleWriteBatchResponse{
+            {{shard1Name,
+              ShardResponse::make(
+                  rcr, {WriteOp(request, 0), WriteOp(request, 1)}, false /*inTransaction*/)}}});
+
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    assertQueryStatsAggregated(opDebug, 0, 10, 5);
+    assertQueryStatsAggregated(opDebug, 1, 20, 15);
+}
+
+TEST_F(WriteBatchResponseProcessorTest, DeleteQueryStatsMetricsAggregatedFromMultipleShards) {
+    auto deleteRequest = write_ops::DeleteCommandRequest(
+        nss1, {write_ops::DeleteOpEntry(BSON("_id" << 0), true /*multi*/)});
+    auto request = BatchedCommandRequest(deleteRequest);
+
+    auto resp1 = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 10, 5, 1)});
+    auto resp2 = makeBatchResponseWithQueryStatsMetrics(1, {makeQueryStatsMetrics(0, 15, 8, 1)});
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(resp1.toBSON()), Microseconds{0}, false);
+    RemoteCommandResponse rcr2(host2, setTopLevelOK(resp2.toBSON()), Microseconds{0}, false);
+
+    runProcessorWithQueryStats(
+        opCtx,
+        routingCtx,
+        request,
+        {0},
+        SimpleWriteBatchResponse{
+            {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)}, false)},
+             {shard2Name, ShardResponse::make(rcr2, {WriteOp(request, 0)}, false)}}});
+
+    auto& opDebug = CurOp::get(opCtx)->debug();
+    assertQueryStatsAggregated(opDebug, 0, 25, 13);  // 10+15, 5+8
 }
 
 }  // namespace

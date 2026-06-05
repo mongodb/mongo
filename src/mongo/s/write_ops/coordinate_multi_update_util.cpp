@@ -61,10 +61,6 @@ auto getOpsFieldNameForOp(const BatchItemRef& op) {
     }
 }
 
-auto getOpAsBson(const BatchItemRef& op) {
-    return op.toBSON();
-}
-
 // Serializes the batched request's underlying command request to BSON, dropping all generic
 // arguments.
 auto getRequestBson(const BatchedCommandRequest& clientRequest) {
@@ -107,7 +103,11 @@ BSONObj makeCommandForOp(OperationContext* opCtx,
                 opCtx, op.getIndex(), updateOpEntry);
         bob.append(getOpsFieldNameForOp(op), BSON_ARRAY(updateOpEntry.toBSON()));
     } else {
-        bob.append(getOpsFieldNameForOp(op), BSON_ARRAY(getOpAsBson(op)));
+        auto deleteOpEntry = write_op_helpers::getOrMakeDeleteOpEntry(op.getDeleteOp());
+        query_stats::WriteCmdQueryStatsRegistrar{}
+            .setIncludeQueryStatsMetricsForOpIndexIfRequested<write_ops::DeleteOpEntry>(
+                opCtx, op.getIndex(), deleteOpEntry);
+        bob.append(getOpsFieldNameForOp(op), BSON_ARRAY(deleteOpEntry.toBSON()));
     }
     bob.appendElementsUnique(getRequestBson(clientRequest));
     return bob.obj();

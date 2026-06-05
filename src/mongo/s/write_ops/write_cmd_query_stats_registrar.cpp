@@ -402,12 +402,8 @@ void WriteCmdQueryStatsRegistrar::parseAndRegisterRequest(OperationContext* opCt
                 }
                 for (size_t opIndex = 0; opIndex < nOps; opIndex++) {
                     const auto& opRef = cmdRef.getOp(opIndex);
-                    // TODO SERVER-122077 Remove 'true' to enable collecting query stats on mongos.
-                    parseAndRegisterDeleteOp(opCtx,
-                                             opRef.getNss(),
-                                             opIndex,
-                                             opRef.getDeleteOp(),
-                                             true /*skipRegistration*/);
+                    parseAndRegisterDeleteOp(
+                        opCtx, opRef.getNss(), opIndex, opRef.getDeleteOp(), skipRegistration);
                 }
                 break;
             default:
