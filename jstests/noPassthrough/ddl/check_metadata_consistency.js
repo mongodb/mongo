@@ -1200,16 +1200,6 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 (function testEmptyChunkHistory() {
     jsTest.log("Executing testEmptyChunkHistory");
 
-    // TODO SERVER-107821: do not skip test in multiversion suites
-    const isMultiVersion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
-    if (isMultiVersion) {
-        jsTestLog(
-            "Skipping testEmptyChunkHistory because checkMetadataConsistency in the previous binary " +
-                "the resharding test-only preset chunks feature was not adding the history",
-        );
-        return;
-    }
-
     const db = getNewDb();
     const collName = "collection";
     const kNss = db.getName() + "." + collName;
