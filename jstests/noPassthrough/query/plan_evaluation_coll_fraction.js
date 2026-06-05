@@ -2,7 +2,7 @@
  * Tests the behavior of the internalQueryPlanTotalEvaluationCollFraction parameter.
  */
 import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
-import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 import {describe, it, beforeEach, after} from "jstests/libs/mochalite.js";
 
 const dbName = jsTestName();
@@ -11,7 +11,7 @@ const collName = jsTestName();
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB(dbName);
 const coll = db.getCollection(collName);
-const isSBEEnabled = checkSbeFullyEnabled(db);
+const sbeFeatureFlagFullEnabled = checkSbeFullFeatureFlagEnabled(db);
 
 function resetKnobsForTest() {
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}));
@@ -117,7 +117,7 @@ describe("MultiPlanner exit condition metrics get updated correctly", function (
         resetKnobsForTest();
     });
 
-    if (planRankerMode === "automaticCE" && !isSBEEnabled) {
+    if (planRankerMode === "automaticCE" && !sbeFeatureFlagFullEnabled) {
         describe("automaticCE (CBR) mode", function () {
             describe("fallback to CBR", function () {
                 it("does not update multi-planner metrics when plan cache is disabled", function () {

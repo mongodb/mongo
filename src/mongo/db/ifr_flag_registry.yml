@@ -33,8 +33,11 @@
 rollout:
   featureFlagCostBasedRanker: {}
   featureFlagExtractFieldPathsSbeStage: {}
+  featureFlagGetExecutorDeferredEngineChoice: {}
   featureFlagMultiPlanLimiter: {}
   featureFlagSbeAccumulators: {}
+  featureFlagSbeEqLookupUnwind: {}
+  featureFlagSbeNonLeadingMatch: {}
   featureFlagSbeUpgradeBinaryTrees: {}
   featureFlagUnifiedWriteExecutor: {}
 
