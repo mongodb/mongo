@@ -474,6 +474,7 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog:index_on_config.cpp",
         "//src/mongo/db/global_catalog:type_shard_identity.cpp",
         "//src/mongo/db/global_catalog/metadata_consistency_validation:periodic_sharded_index_consistency_checker.cpp",
+        "//src/mongo/db/s:max_key_zone_scan_state_gen",
         "//src/mongo/db/s:remove_tags_gen",
         "//src/mongo/db/s/balancer:auto_merger_policy.cpp",
         "//src/mongo/db/s/balancer:balance_stats.cpp",

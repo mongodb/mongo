@@ -111,6 +111,14 @@
     /*  Namespace containing pending range deletions snapshots for rename operations. */           \
     X(kRangeDeletionForRenameNamespace, DatabaseName::kConfig, "rangeDeletionsForRename"_sd)       \
                                                                                                    \
+    /*  Namespace for the max-key orphan detection scan state document, replicated within the      \
+     *  shard replica set. */                                                                      \
+    X(kConfigMaxKeyOrphanScanStateNamespace, DatabaseName::kConfig, "maxKeyOrphanScanState"_sd)    \
+                                                                                                   \
+    /*  Namespace for the max-key zone detection scan state document, replicated within the        \
+     *  config-server replica set. */                                                              \
+    X(kConfigMaxKeyZoneScanStateNamespace, DatabaseName::kConfig, "maxKeyZoneScanState"_sd)        \
+                                                                                                   \
     /*  Namespace for the coordinator's resharding operation state. */                             \
     X(kConfigReshardingOperationsNamespace, DatabaseName::kConfig, "reshardingOperations"_sd)      \
                                                                                                    \

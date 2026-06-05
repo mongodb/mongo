@@ -64,12 +64,29 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "max_key_orphan_scan_state_gen",
+    src = "max_key_orphan_scan_state.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "max_key_zone_scan_state_gen",
+    src = "max_key_zone_scan_state.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "range_deleter_service_impl",
     srcs = [
         "range_deletion.cpp",
         "range_deletion_recovery_tracker.cpp",
         "range_deletion_task_tracker.cpp",
+        ":max_key_orphan_scan_state_gen",
     ],
     deps = [
         "//src/mongo/db:server_base",

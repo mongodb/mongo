@@ -560,6 +560,7 @@ data_movement:
     - src/mongo/db/s/config/*move_range*
     - src/mongo/db/s/*split_vector*
     - src/mongo/db/s/cleanup_orphaned_cmd.cpp
+    - src/mongo/db/s/max_key*
     - src/mongo/s/commands/*move_range*
     - src/mongo/s/request_types/move_range_request.idl
     - src/mongo/s/commands/*split_vector*
