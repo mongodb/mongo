@@ -911,6 +911,23 @@ export function countSplitPipelineStages(root, stage) {
 }
 
 /**
+ * Returns every occurrence of `stage` as a flat array of raw stage subdocuments, regardless of
+ * whether the explain is a single pipeline or a sharded split (mergerPart + shardsPart) pipeline.
+ * Unlike getSplitPipelineStages, which tags split results with their `part`, this always yields the
+ * bare stage objects so callers that only care about the stage spec get a uniform shape.
+ *
+ * @param {object} explain Explain output.
+ * @param {string} stage Stage name including '$' (e.g. "$sort").
+ * @returns {Array<object>} The matching stage subdocuments.
+ */
+export function getAggStagesAcrossSplitPipeline(explain, stage) {
+    if (explain.splitPipeline != null) {
+        return getSplitPipelineStages(explain, stage).map(({stage}) => stage);
+    }
+    return getAggPlanStages(explain, stage);
+}
+
+/**
  * Given an explain node representing a $lookup stage, identify the index used in an INLJ
  * strategy and return its name and key pattern.
  * TODO: SERVER-121842 Remove the check for the presence of the indexName field once all
