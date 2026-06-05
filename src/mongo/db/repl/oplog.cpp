@@ -3429,8 +3429,13 @@ Status applyCommand_inlock(OperationContext* opCtx,
                     return status;
                 }
 
+                // Suppress the warning for dropDatabase + NamespaceNotFound: a database is an
+                // ephemeral entity that may not exist after a restart even when a dropDatabase
+                // oplog entry is still pending, so this is never a true constraint violation.
                 if (mode == OplogApplication::Mode::kSecondary &&
-                    status.code() != ErrorCodes::IndexNotFound) {
+                    status.code() != ErrorCodes::IndexNotFound &&
+                    !(opsMapIt->first == "dropDatabase" &&
+                      status.code() == ErrorCodes::NamespaceNotFound)) {
                     const auto& opObj = redact(op->toBSONForLogging());
                     opCountersToUse->gotAcceptableErrorInCommand();
                     logOplogConstraintViolation(
