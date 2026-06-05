@@ -520,6 +520,14 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
                     (nextPhase === null ? " and complete" : ` and pause at ${nextPhase}+${posFor(nextPhase)}`),
             );
 
+            // For restart modes, wait for the index build resume state to replicate to secondaries
+            // before shutting down the primary. Container writes (including resume state) replicate
+            // asynchronously, so without this the stepped-up node could win the election without
+            // the resume state, preventing it from resuming the build.
+            if (failoverMode === PdibFailoverMode.UNCLEAN_RESTART || failoverMode === PdibFailoverMode.CLEAN_RESTART) {
+                rst.awaitReplication();
+            }
+
             // Step up first so the state change interrupts the old primary's build thread at its
             // fail point. If we released `currentFp` first, the build would simply continue past
             // the iteration on the old primary and could complete before we ever stepped up.
@@ -558,7 +566,13 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
                     `PrimaryDrivenResumableIndexBuildTest: waiting for build ${buildUUID} to ` +
                         `complete on ${newPrimary.host}`,
                 );
-                PrimaryDrivenResumableIndexBuildTest._waitForBuildOutcome(newPrimary, buildUUID);
+                PrimaryDrivenResumableIndexBuildTest._waitForBuildOutcome(
+                    newPrimary,
+                    dbName,
+                    collName,
+                    indexNames,
+                    buildUUID,
+                );
             }
 
             PrimaryDrivenResumableIndexBuildTest._verifyResumeMetric(
@@ -705,7 +719,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         );
 
         awaitCreateIndexes({checkExitSuccess: false});
-        PrimaryDrivenResumableIndexBuildTest._waitForBuildOutcome(newPrimary, buildUUID);
+        PrimaryDrivenResumableIndexBuildTest._waitForBuildOutcome(newPrimary, dbName, collName, [indexName], buildUUID);
 
         checkLog.containsJson(newPrimary, 12784900, {
             numDeleted: function (numDeleted) {
@@ -855,6 +869,14 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         // of *this* build incremented succeeded[<phase>] and didn't bump failed.
         const beforeMetrics = PrimaryDrivenResumableIndexBuildTest._readResumeMetrics(rst._pdibMetricsDir);
 
+        // For restart modes, wait for the index build resume state to replicate to secondaries
+        // before shutting down the primary. Container writes (including resume state) replicate
+        // asynchronously, so without this the stepped-up node could win the election without
+        // the resume state, preventing it from resuming the build.
+        if (failoverMode === PdibFailoverMode.UNCLEAN_RESTART || failoverMode === PdibFailoverMode.CLEAN_RESTART) {
+            rst.awaitReplication();
+        }
+
         // Step the secondary up. rst.stepUp() requests an election with a higher term, which
         // forces the old primary to step down even while its build thread is paused at our fail
         // point. This is more deterministic than replSetStepDown + waiting for the secondary to
@@ -890,7 +912,7 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
         jsTest.log.info(
             `PrimaryDrivenResumableIndexBuildTest: waiting for build ${buildUUID} to complete on new primary`,
         );
-        PrimaryDrivenResumableIndexBuildTest._waitForBuildOutcome(newPrimary, buildUUID);
+        PrimaryDrivenResumableIndexBuildTest._waitForBuildOutcome(newPrimary, dbName, collName, indexNames, buildUUID);
 
         rst.awaitReplication();
         PrimaryDrivenResumableIndexBuildTest._verifyIndexAcrossNodes(rst, dbName, collName, indexNames);
@@ -1114,30 +1136,60 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
     }
 
     /**
-     * Polls the new primary's log for either build completion (log 20663) or the
-     * resume-failure-then-abort path (log 11130400). Throws a clear error if the build was aborted
-     * instead of resumed, instead of hanging on checkLog's 10-minute default timeout.
+     * Waits for the resumed index build to complete or abort on the new primary; throws on abort.
+     *
+     * Completion: all `indexNames` are ready in `listIndexes`.
+     *
+     * Abort requires a positive signal — either the build was previously seen in-progress via
+     * `listIndexes({includeBuildUUIDs: true})` and has since disappeared, OR abort log 11130400
+     * for this `buildUUID` is in the global log. Without it, the post-step-up window where the
+     * resumed build is not yet registered would be misread as an abort.
+     *
+     * Log 20663 is not used as the completion signal: the success line can roll out before the
+     * first poll under verbose step-up traffic, causing a spurious timeout.
      *
      * @param {Mongo} newPrimary
+     * @param {string} dbName
+     * @param {string} collName
+     * @param {string[]} indexNames - Names of the indexes the build is creating.
      * @param {string} buildUUID
      * @param {number} [timeoutMs=300000]
      * @returns {void}
      */
-    static _waitForBuildOutcome(newPrimary, buildUUID, timeoutMs = 300_000) {
-        const matches = (logId) => {
-            const lines = checkLog.getGlobalLog(newPrimary) ?? [];
-            const idStr = `"id":${logId},`;
-            const uuidStr = `"$uuid":"${buildUUID}"`;
-            return lines.some((line) => line.includes(idStr) && line.includes(uuidStr));
-        };
+    static _waitForBuildOutcome(newPrimary, dbName, collName, indexNames, buildUUID, timeoutMs = 300_000) {
+        const coll = newPrimary.getDB(dbName).getCollection(collName);
+        const uuidStr = `"$uuid":"${buildUUID}"`;
         let outcome = null;
+        let observedInProgress = false;
         assert.soon(
             () => {
-                if (matches(20663)) {
+                let ready;
+                let inProgress;
+                try {
+                    ready = new Set(coll.getIndexes().map((idx) => idx.name));
+                    inProgress = coll
+                        .getIndexes({includeBuildUUIDs: true})
+                        .some((idx) => idx.buildUUID && extractUUIDFromObject(idx.buildUUID) === buildUUID);
+                } catch (e) {
+                    // listIndexes can transiently fail during step-up / state transitions; retry.
+                    return false;
+                }
+                if (inProgress) {
+                    observedInProgress = true;
+                    return false;
+                }
+                if (indexNames.every((name) => ready.has(name))) {
                     outcome = "completed";
                     return true;
                 }
-                if (matches(11130400)) {
+                // Not in progress and not ready: only conclude abort with a positive signal,
+                // otherwise keep polling (see method docstring).
+                if (observedInProgress) {
+                    outcome = "aborted_after_resume_failure";
+                    return true;
+                }
+                const lines = checkLog.getGlobalLog(newPrimary) ?? [];
+                if (lines.some((l) => l.includes('"id":11130400,') && l.includes(uuidStr))) {
                     outcome = "aborted_after_resume_failure";
                     return true;
                 }
@@ -1147,13 +1199,19 @@ export const PrimaryDrivenResumableIndexBuildTest = class {
             timeoutMs,
             1000,
         );
-        assert.eq(
-            outcome,
-            "completed",
-            `index build ${buildUUID} was aborted on the new primary instead of resumed ` +
-                `(log 11130400 fired). The resume code path likely failed; check log 12500301 ` +
-                `for the underlying error.`,
-        );
+        if (outcome === "aborted_after_resume_failure") {
+            // Opportunistically include log 11130400 details if its line is still available —
+            // purely informational, the assertion fires either way.
+            const lines = checkLog.getGlobalLog(newPrimary) ?? [];
+            const abortLine = lines.find((line) => line.includes('"id":11130400,') && line.includes(uuidStr));
+            const extra = abortLine ? ` Abort log: ${abortLine}` : "";
+            assert(
+                false,
+                `index build ${buildUUID} was aborted on the new primary instead of resumed. ` +
+                    `The resume code path likely failed; check log 12500301 for the ` +
+                    `underlying error.${extra}`,
+            );
+        }
     }
 
     /**
