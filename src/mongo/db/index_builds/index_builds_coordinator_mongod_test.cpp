@@ -34,6 +34,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
+#include "mongo/db/index_builds/primary_driven/util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -41,10 +42,12 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -88,6 +91,7 @@ struct IndexBuildMetricsSnapshot {
     int64_t started = 0;
     int64_t succeeded = 0;
     int64_t failed = 0;
+    int64_t toBeResumed = 0;
 };
 
 IndexBuildMetricsSnapshot readIndexBuildMetrics(otel::metrics::OtelMetricsCapturer& capturer) {
@@ -98,6 +102,8 @@ IndexBuildMetricsSnapshot readIndexBuildMetrics(otel::metrics::OtelMetricsCaptur
         .succeeded =
             readInt64CounterOrZero(capturer, otel::metrics::MetricNames::kIndexBuildsSucceeded),
         .failed = readInt64CounterOrZero(capturer, otel::metrics::MetricNames::kIndexBuildsFailed),
+        .toBeResumed =
+            readInt64CounterOrZero(capturer, otel::metrics::MetricNames::kIndexBuildsToBeResumed),
     };
 }
 
@@ -118,6 +124,24 @@ public:
                                                  const NamespaceString& nss);
 
     std::vector<IndexBuildInfo> makeSpecs(std::vector<std::string> keys, std::vector<int32_t> ids);
+
+    // Registers and starts a primary-driven index build on _testFooNss, returning the build's
+    // completion future. The caller is expected to have enabled the PDIB feature flags and, if a
+    // particular failure is desired, configured the 'failIndexBuildWithError' fail point first.
+    auto startPrimaryDrivenIndexBuild(const UUID& buildUUID,
+                                      const std::vector<IndexBuildInfo>& indexes) {
+        index_builds::primary_driven::registry(operationContext()->getServiceContext())
+            .add(buildUUID, _testFooNss.dbName(), _testFooUUID, indexes, boost::none);
+        return assertGet(_indexBuildsCoord->startIndexBuild(
+            operationContext(),
+            _testFooNss.dbName(),
+            _testFooUUID,
+            indexes,
+            buildUUID,
+            {.indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven,
+             .indexBuildProtocol = IndexBuildProtocol::kPrimaryDriven,
+             .commitQuorum = CommitQuorumOptions{CommitQuorumOptions::kPrimarySelfVote}}));
+    }
 
     const UUID _testFooUUID = UUID::gen();
     const NamespaceString _testFooNss = NamespaceString::createNamespaceString_forTest("test.foo");
@@ -535,6 +559,124 @@ TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsTrackAbortedBuildsAsFailures
     EXPECT_EQ(metricsAfterAbort.active, metricsBeforeBuild.active);
     EXPECT_EQ(metricsAfterAbort.started, metricsBeforeBuild.started + 1);
     EXPECT_EQ(metricsAfterAbort.failed, metricsBeforeBuild.failed + 1);
+}
+
+// Sets the 'failIndexBuildWithError' fail point so the builder thread for 'buildUUID' throws
+// 'error' once it starts running (after setup is complete and abort cleanup is required).
+BSONObj makeFailIndexBuildWithErrorData(const UUID& buildUUID, ErrorCodes::Error error) {
+    BSONObjBuilder builder;
+    builder.append("error", static_cast<int>(error));
+    buildUUID.appendToBuilder(&builder, "buildUUID");
+    return builder.obj();
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsTwoPhaseBuildAfterShutdown) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
+        return;
+    }
+    auto metricsBeforeBuild = readIndexBuildMetrics(capturer);
+
+    auto buildUUID = UUID::gen();
+    FailPointEnableBlock failBuild{
+        "failIndexBuildWithError",
+        makeFailIndexBuildWithErrorData(buildUUID, ErrorCodes::InterruptedAtShutdown)};
+
+    auto buildFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                                    _testFooNss.dbName(),
+                                                                    _testFooUUID,
+                                                                    makeSpecs({"a"}, {1}),
+                                                                    buildUUID,
+                                                                    _indexBuildOptions));
+    EXPECT_EQ(buildFuture.getNoThrow().getStatus(), ErrorCodes::InterruptedAtShutdown);
+
+    auto metricsAfter = readIndexBuildMetrics(capturer);
+    EXPECT_EQ(metricsAfter.active, metricsBeforeBuild.active);
+    EXPECT_EQ(metricsAfter.started, metricsBeforeBuild.started + 1);
+    EXPECT_EQ(metricsAfter.failed, metricsBeforeBuild.failed + 1);
+    EXPECT_EQ(metricsAfter.toBeResumed, metricsBeforeBuild.toBeResumed);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsPrimaryDrivenBuildAfterStepdown) {
+    // TODO (SERVER-116165): Remove feature flag controllers.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
+        return;
+    }
+    auto metricsBeforeBuild = readIndexBuildMetrics(capturer);
+
+    auto buildUUID = UUID::gen();
+    FailPointEnableBlock failBuild{
+        "failIndexBuildWithError",
+        makeFailIndexBuildWithErrorData(buildUUID, ErrorCodes::InterruptedDueToReplStateChange)};
+
+    auto buildFuture = startPrimaryDrivenIndexBuild(buildUUID, makeSpecs({"a"}, {1}));
+    EXPECT_EQ(buildFuture.getNoThrow().getStatus(), ErrorCodes::InterruptedDueToReplStateChange);
+
+    auto metricsAfter = readIndexBuildMetrics(capturer);
+    EXPECT_EQ(metricsAfter.active, metricsBeforeBuild.active);
+    EXPECT_EQ(metricsAfter.started, metricsBeforeBuild.started + 1);
+    EXPECT_EQ(metricsAfter.failed, metricsBeforeBuild.failed);
+    EXPECT_EQ(metricsAfter.toBeResumed, metricsBeforeBuild.toBeResumed + 1);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsPrimaryDrivenBuildAfterShutdown) {
+    // TODO (SERVER-116165): Remove feature flag controllers.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
+        return;
+    }
+    auto metricsBeforeBuild = readIndexBuildMetrics(capturer);
+
+    auto buildUUID = UUID::gen();
+    FailPointEnableBlock failBuild{
+        "failIndexBuildWithError",
+        makeFailIndexBuildWithErrorData(buildUUID, ErrorCodes::InterruptedAtShutdown)};
+
+    auto buildFuture = startPrimaryDrivenIndexBuild(buildUUID, makeSpecs({"a"}, {1}));
+    EXPECT_EQ(buildFuture.getNoThrow().getStatus(), ErrorCodes::InterruptedAtShutdown);
+
+    auto metricsAfter = readIndexBuildMetrics(capturer);
+    EXPECT_EQ(metricsAfter.active, metricsBeforeBuild.active);
+    EXPECT_EQ(metricsAfter.started, metricsBeforeBuild.started + 1);
+    EXPECT_EQ(metricsAfter.failed, metricsBeforeBuild.failed);
+    EXPECT_EQ(metricsAfter.toBeResumed, metricsBeforeBuild.toBeResumed + 1);
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, OtelMetricsPrimaryDrivenBuildAfterAbort) {
+    // TODO (SERVER-116165): Remove feature flag controllers.
+    RAIIServerParameterControllerForTest ffContainerWrites("featureFlagContainerWrites", true);
+    RAIIServerParameterControllerForTest ffPDIB("featureFlagPrimaryDrivenIndexBuilds", true);
+
+    otel::metrics::OtelMetricsCapturer capturer;
+    if (!capturer.canReadMetrics()) {
+        GTEST_SKIP() << "Skipping test due to OTel metrics being unavailable in this build";
+        return;
+    }
+    auto metricsBeforeBuild = readIndexBuildMetrics(capturer);
+
+    auto buildUUID = UUID::gen();
+    FailPointEnableBlock failBuild{
+        "failIndexBuildWithError",
+        makeFailIndexBuildWithErrorData(buildUUID, ErrorCodes::OutOfDiskSpace)};
+
+    auto buildFuture = startPrimaryDrivenIndexBuild(buildUUID, makeSpecs({"a"}, {1}));
+    EXPECT_EQ(buildFuture.getNoThrow().getStatus(), ErrorCodes::OutOfDiskSpace);
+
+    auto metricsAfter = readIndexBuildMetrics(capturer);
+    EXPECT_EQ(metricsAfter.active, metricsBeforeBuild.active);
+    EXPECT_EQ(metricsAfter.started, metricsBeforeBuild.started + 1);
+    EXPECT_EQ(metricsAfter.failed, metricsBeforeBuild.failed + 1);
+    EXPECT_EQ(metricsAfter.toBeResumed, metricsBeforeBuild.toBeResumed);
 }
 
 }  // namespace

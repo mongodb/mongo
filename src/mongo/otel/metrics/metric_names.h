@@ -150,6 +150,8 @@ public:
     static constexpr MetricName kIndexBuildsSucceeded =
         MetricNameMaker::make("index_builds.succeeded");
     static constexpr MetricName kIndexBuildsFailed = MetricNameMaker::make("index_builds.failed");
+    static constexpr MetricName kIndexBuildsToBeResumed =
+        MetricNameMaker::make("index_builds.to_be_resumed");
     static constexpr MetricName kIndexBuildSideWritesInserted =
         MetricNameMaker::make("index_builds.side_writes.inserted");
     static constexpr MetricName kIndexBuildSideWritesDeleted =

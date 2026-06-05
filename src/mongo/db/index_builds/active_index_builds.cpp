@@ -74,6 +74,11 @@ auto& failedIndexBuildsCounter = otel::metrics::MetricsService::instance().creat
     "Number of index builds that did not complete successfully",
     otel::metrics::MetricUnit::kOperations);
 
+auto& toBeResumedIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kIndexBuildsToBeResumed,
+    "Number of index builds that were interrupted and will be resumed",
+    otel::metrics::MetricUnit::kOperations);
+
 auto& startedIndexBuildsCounter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kIndexBuildsStarted,
     "Number of index builds started",
@@ -105,6 +110,9 @@ void recordIndexBuildOutcome(IndexBuildOutcome outcome) {
             return;
         case IndexBuildOutcome::kFailure:
             failedIndexBuildsCounter.add(1);
+            return;
+        case IndexBuildOutcome::kToBeResumed:
+            toBeResumedIndexBuildsCounter.add(1);
             return;
     }
     MONGO_UNREACHABLE;

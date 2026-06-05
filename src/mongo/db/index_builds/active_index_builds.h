@@ -57,6 +57,9 @@ namespace mongo {
 enum class IndexBuildOutcome {
     kSuccess,
     kFailure,
+    // The index build was interrupted before it could succeed or fail on this node (e.g. by a
+    // stepdown) and will be resumed.
+    kToBeResumed,
 };
 
 /**
