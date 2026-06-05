@@ -46,6 +46,116 @@ REPO_COPYBARA_TEMPLATE_PATH = (
     / "copybara"
     / "copybara_path_rules.bara.sky.template"
 )
+COPYBARA_EVERGREEN_BUILD_VARIANT_PREFIX = "copybara-"
+EVERGREEN_BUILD_VARIANT_ENV_KEYS = (
+    "build_variant",
+    "EVG_BUILD_VARIANT",
+    "EVERGREEN_BUILD_VARIANT",
+)
+EVERGREEN_EXPANSIONS_PATHS = (Path("../expansions.yml"), Path("expansions.yml"))
+GIT_FILTERED_FETCH_INTO_PLAIN_REPO_SUPPORTED: bool | None = None
+
+
+def get_current_evergreen_build_variant() -> str | None:
+    for key in EVERGREEN_BUILD_VARIANT_ENV_KEYS:
+        if value := os.environ.get(key):
+            return value
+
+    for expansions_path in EVERGREEN_EXPANSIONS_PATHS:
+        if not expansions_path.is_file():
+            continue
+
+        try:
+            expansions = sync_repo_with_copybara.read_config_file(expansions_path)
+        except Exception:
+            continue
+
+        if not isinstance(expansions, dict):
+            continue
+
+        build_variant = expansions.get("build_variant")
+        if isinstance(build_variant, str) and build_variant:
+            return build_variant
+
+    return None
+
+
+def skip_copybara_project_guard_tests_on_non_copybara_variant() -> bool:
+    build_variant = get_current_evergreen_build_variant()
+    return build_variant is not None and not build_variant.startswith(
+        COPYBARA_EVERGREEN_BUILD_VARIANT_PREFIX
+    )
+
+
+def initialize_git_repo_on_master() -> None:
+    sync_repo_with_copybara.run_command("git init")
+    sync_repo_with_copybara.run_command("git symbolic-ref HEAD refs/heads/master")
+
+
+def run_git_probe_command(args: Sequence[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+
+
+def check_git_probe_command(args: Sequence[str], cwd: Path) -> None:
+    process = run_git_probe_command(args, cwd)
+    if process.returncode != 0:
+        raise RuntimeError(
+            f"Git capability probe failed: {shlex.join(['git', *args])}\n{process.stdout}"
+        )
+
+
+def git_supports_filtered_fetch_into_plain_repo() -> bool:
+    global GIT_FILTERED_FETCH_INTO_PLAIN_REPO_SUPPORTED
+
+    if GIT_FILTERED_FETCH_INTO_PLAIN_REPO_SUPPORTED is not None:
+        return GIT_FILTERED_FETCH_INTO_PLAIN_REPO_SUPPORTED
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        source_dir = tmpdir_path / "source"
+        fetch_dir = tmpdir_path / "fetch"
+        source_dir.mkdir()
+
+        check_git_probe_command(["init"], source_dir)
+        check_git_probe_command(["symbolic-ref", "HEAD", "refs/heads/master"], source_dir)
+        check_git_probe_command(["config", "--local", "user.email", "test@example.com"], source_dir)
+        check_git_probe_command(["config", "--local", "user.name", "Test User"], source_dir)
+        check_git_probe_command(["config", "--local", "commit.gpgsign", "false"], source_dir)
+        (source_dir / "test.txt").write_text("test")
+        check_git_probe_command(["add", "test.txt"], source_dir)
+        check_git_probe_command(["commit", "-m", "test commit"], source_dir)
+        check_git_probe_command(["init", str(fetch_dir)], tmpdir_path)
+
+        fetch_process = run_git_probe_command(
+            [
+                "-C",
+                str(fetch_dir),
+                "fetch",
+                "--filter=blob:none",
+                str(source_dir),
+                "+refs/heads/master:refs/heads/copybara_target_branch_master",
+            ],
+            tmpdir_path,
+        )
+        if fetch_process.returncode == 0:
+            GIT_FILTERED_FETCH_INTO_PLAIN_REPO_SUPPORTED = True
+        elif "extensions.partialClone" in fetch_process.stdout:
+            GIT_FILTERED_FETCH_INTO_PLAIN_REPO_SUPPORTED = False
+        else:
+            raise RuntimeError(
+                "Git capability probe failed: "
+                "git fetch --filter=blob:none into a plain repository\n"
+                f"{fetch_process.stdout}"
+            )
+
+    return GIT_FILTERED_FETCH_INTO_PLAIN_REPO_SUPPORTED
 
 
 def get_repo_base_copybara_config_path(root: Path) -> Path:
@@ -384,7 +494,7 @@ class TestBranchFunctions(unittest.TestCase):
         :return: A list of commit hashes generated for the new commits.
         """
         os.chdir(repo_directory)
-        sync_repo_with_copybara.run_command("git init")
+        initialize_git_repo_on_master()
         sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
         sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
         sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
@@ -619,7 +729,7 @@ class TestBranchFunctions(unittest.TestCase):
 
             private_hashes = TestBranchFunctions.create_mock_repo_commits(source_dir, 1)
             os.chdir(destination_dir)
-            sync_repo_with_copybara.run_command("git init")
+            initialize_git_repo_on_master()
             sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
             sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
             sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
@@ -660,7 +770,7 @@ class TestBranchFunctions(unittest.TestCase):
             private_hashes = TestBranchFunctions.create_mock_repo_commits(source_dir, 3)
 
             os.chdir(destination_dir)
-            sync_repo_with_copybara.run_command("git init")
+            initialize_git_repo_on_master()
             sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
             sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
             sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
@@ -854,7 +964,15 @@ class TestBranchFunctions(unittest.TestCase):
             sync_repo_with_copybara.GIT_REMOTE_COMMAND_RETRY_DELAY_SECONDS
         )
 
+    def skip_if_git_does_not_support_filtered_fetch_into_plain_repo(self):
+        if not git_supports_filtered_fetch_into_plain_repo():
+            self.skipTest(
+                "Host Git does not support git fetch --filter=blob:none into a plain repository"
+            )
+
     def test_resolve_branch_target_ref_accepts_commit_in_branch_history(self):
+        self.skip_if_git_does_not_support_filtered_fetch_into_plain_repo()
+
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             os.mkdir(source_dir)
@@ -868,6 +986,8 @@ class TestBranchFunctions(unittest.TestCase):
             )
 
     def test_resolve_branch_target_ref_accepts_tag_in_branch_history(self):
+        self.skip_if_git_does_not_support_filtered_fetch_into_plain_repo()
+
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             os.mkdir(source_dir)
@@ -889,6 +1009,8 @@ class TestBranchFunctions(unittest.TestCase):
             )
 
     def test_resolve_branch_target_ref_rejects_tag_outside_branch_history(self):
+        self.skip_if_git_does_not_support_filtered_fetch_into_plain_repo()
+
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source")
             os.mkdir(source_dir)
@@ -995,7 +1117,7 @@ class TestBranchFunctions(unittest.TestCase):
             sync_repo_with_copybara.run_command("git branch v8.3")
 
             os.chdir(destination_work_dir)
-            sync_repo_with_copybara.run_command("git init")
+            initialize_git_repo_on_master()
             sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
             sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
             sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
@@ -1060,7 +1182,7 @@ class TestBranchFunctions(unittest.TestCase):
             sync_repo_with_copybara.run_command("git branch v8.3")
 
             os.chdir(destination_work_dir)
-            sync_repo_with_copybara.run_command("git init")
+            initialize_git_repo_on_master()
             sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
             sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
             sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
@@ -1118,7 +1240,7 @@ class TestBranchFunctions(unittest.TestCase):
 
             source_commit = "a" * 40
             os.chdir(destination_work_dir)
-            sync_repo_with_copybara.run_command("git init")
+            initialize_git_repo_on_master()
             sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
             sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
             sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
@@ -1184,7 +1306,7 @@ class TestBranchFunctions(unittest.TestCase):
             sync_repo_with_copybara.run_command("git branch v8.3")
 
             os.chdir(destination_work_dir)
-            sync_repo_with_copybara.run_command("git init")
+            initialize_git_repo_on_master()
             sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
             sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
             sync_repo_with_copybara.run_command("git config --local commit.gpgsign false")
@@ -7499,6 +7621,86 @@ class TestRealCopybaraSkyConfiguration(unittest.TestCase):
         self.assertIn("copybara_branches: ${copybara_branches|master}", generated_contents)
 
 
+class TestEvergreenProjectGuardVariantSelection(unittest.TestCase):
+    def test_runs_when_build_variant_is_unknown(self):
+        with (
+            patch(f"{__name__}.EVERGREEN_BUILD_VARIANT_ENV_KEYS", ("TEST_BUILD_VARIANT",)),
+            patch(f"{__name__}.EVERGREEN_EXPANSIONS_PATHS", (Path("/does/not/exist"),)),
+            patch.dict(os.environ, {}, clear=True),
+        ):
+            self.assertFalse(skip_copybara_project_guard_tests_on_non_copybara_variant())
+
+    def test_runs_on_copybara_build_variant(self):
+        with (
+            patch(f"{__name__}.EVERGREEN_BUILD_VARIANT_ENV_KEYS", ("TEST_BUILD_VARIANT",)),
+            patch(f"{__name__}.EVERGREEN_EXPANSIONS_PATHS", (Path("/does/not/exist"),)),
+            patch.dict(
+                os.environ,
+                {"TEST_BUILD_VARIANT": "copybara-sync-between-repos"},
+                clear=True,
+            ),
+        ):
+            self.assertFalse(skip_copybara_project_guard_tests_on_non_copybara_variant())
+
+    def test_skips_on_non_copybara_build_variant_from_environment(self):
+        with (
+            patch(f"{__name__}.EVERGREEN_BUILD_VARIANT_ENV_KEYS", ("TEST_BUILD_VARIANT",)),
+            patch(f"{__name__}.EVERGREEN_EXPANSIONS_PATHS", (Path("/does/not/exist"),)),
+            patch.dict(os.environ, {"TEST_BUILD_VARIANT": "ubuntu2004"}, clear=True),
+        ):
+            self.assertTrue(skip_copybara_project_guard_tests_on_non_copybara_variant())
+
+    def test_skips_on_non_copybara_build_variant_from_expansions_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            expansions_path = Path(tmpdir) / "expansions.yml"
+            expansions_path.write_text("build_variant: ubuntu2004\n")
+
+            with (
+                patch(f"{__name__}.EVERGREEN_BUILD_VARIANT_ENV_KEYS", ("TEST_BUILD_VARIANT",)),
+                patch(f"{__name__}.EVERGREEN_EXPANSIONS_PATHS", (expansions_path,)),
+                patch.dict(os.environ, {}, clear=True),
+            ):
+                self.assertTrue(skip_copybara_project_guard_tests_on_non_copybara_variant())
+
+    def test_uses_later_expansions_file_when_first_file_cannot_be_parsed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bad_expansions_path = Path(tmpdir) / "bad-expansions.yml"
+            good_expansions_path = Path(tmpdir) / "expansions.yml"
+            bad_expansions_path.write_text("[\n")
+            good_expansions_path.write_text("build_variant: ubuntu2004\n")
+
+            with (
+                patch(f"{__name__}.EVERGREEN_BUILD_VARIANT_ENV_KEYS", ("TEST_BUILD_VARIANT",)),
+                patch(
+                    f"{__name__}.EVERGREEN_EXPANSIONS_PATHS",
+                    (bad_expansions_path, good_expansions_path),
+                ),
+                patch.dict(os.environ, {}, clear=True),
+            ):
+                self.assertTrue(skip_copybara_project_guard_tests_on_non_copybara_variant())
+
+    def test_uses_later_expansions_file_when_first_file_is_not_a_mapping(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            list_expansions_path = Path(tmpdir) / "list-expansions.yml"
+            good_expansions_path = Path(tmpdir) / "expansions.yml"
+            list_expansions_path.write_text("- build_variant\n")
+            good_expansions_path.write_text("build_variant: ubuntu2004\n")
+
+            with (
+                patch(f"{__name__}.EVERGREEN_BUILD_VARIANT_ENV_KEYS", ("TEST_BUILD_VARIANT",)),
+                patch(
+                    f"{__name__}.EVERGREEN_EXPANSIONS_PATHS",
+                    (list_expansions_path, good_expansions_path),
+                ),
+                patch.dict(os.environ, {}, clear=True),
+            ):
+                self.assertTrue(skip_copybara_project_guard_tests_on_non_copybara_variant())
+
+
+@unittest.skipIf(
+    skip_copybara_project_guard_tests_on_non_copybara_variant(),
+    "Copybara Evergreen project guard is only relevant on Copybara build variants",
+)
 class TestEvergreenProjectGuard(unittest.TestCase):
     def test_passes_for_expected_master_project(self):
         sync_repo_with_copybara.ensure_expected_evergreen_project(
