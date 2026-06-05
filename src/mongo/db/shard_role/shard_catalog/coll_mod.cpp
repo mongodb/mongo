@@ -135,7 +135,6 @@ struct ParsedCollModRequest {
     // TODO(SERVER-101423): Remove once 9.0 becomes last LTS.
     boost::optional<bool> _removeLegacyTimeseriesBucketingParametersHaveChanged;
     boost::optional<bool> recordIdsReplicated;
-    boost::optional<bool> prepareConstraintValidationLevel;
 };
 
 Status getNotSupportedOnViewError(StringData fieldName) {
@@ -658,20 +657,6 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
         // The dry run option should never be included in a collMod oplog entry.
     }
 
-    if (auto prepareConstraint = cmr.getPrepareConstraintValidationLevel()) {
-        if (isView) {
-            return getNotSupportedOnViewError(CollMod::kPrepareConstraintValidationLevelFieldName);
-        }
-        if (isTimeseries) {
-            return getNotSupportedOnTimeseriesError(
-                CollMod::kPrepareConstraintValidationLevelFieldName);
-        }
-        parsed.numModifications++;
-        parsed.prepareConstraintValidationLevel = prepareConstraint;
-        oplogEntryBuilder.append(CollMod::kPrepareConstraintValidationLevelFieldName,
-                                 *prepareConstraint);
-    }
-
     // Currently disallows the use of 'indexPrepareUnique' with other collMod options.
     if (parsed.indexRequest.indexPrepareUnique && parsed.numModifications > 1) {
         return {ErrorCodes::InvalidOptions,
@@ -1034,14 +1019,12 @@ Status _collModInternal(OperationContext* opCtx,
         processCollModIndexRequest(
             opCtx, writableColl, cmrNew.indexRequest, &indexCollModInfo, result, mode);
 
-        if (cmrNew.collValidationLevel || cmrNew.collValidationAction || cmrNew.collValidator ||
-            cmrNew.prepareConstraintValidationLevel) {
+        if (cmrNew.collValidationLevel || cmrNew.collValidationAction || cmrNew.collValidator) {
             uassertStatusOKWithContext(
                 writableColl->setValidationOptions(opCtx,
                                                    cmrNew.collValidationLevel,
                                                    cmrNew.collValidationAction,
-                                                   cmrNew.collValidator,
-                                                   cmrNew.prepareConstraintValidationLevel),
+                                                   cmrNew.collValidator),
                 "Failed to set validation options");
         }
 

@@ -93,34 +93,6 @@ TEST(CollectionOptions, Validator) {
     ASSERT(!defaultOptions.toBSON()["validator"]);
 }
 
-TEST(CollectionOptions, PrepareConstraintValidationLevelDefaultsToFalse) {
-    CollectionOptions options;
-    ASSERT_FALSE(options.prepareConstraintValidationLevel);
-    // Not serialized when false.
-    ASSERT(!options.toBSON()["prepareConstraintValidationLevel"]);
-}
-
-TEST(CollectionOptions, PrepareConstraintValidationLevelRoundTripWhenTrue) {
-    CollectionOptions options;
-    options.prepareConstraintValidationLevel = true;
-    ASSERT_TRUE(options.toBSON()["prepareConstraintValidationLevel"].boolean());
-    checkRoundTrip(options);
-}
-
-TEST(CollectionOptions, PrepareConstraintValidationLevelNotSerializedWhenFalse) {
-    CollectionOptions options =
-        assertGet(CollectionOptions::parse(fromjson("{prepareConstraintValidationLevel: false}")));
-    ASSERT_FALSE(options.prepareConstraintValidationLevel);
-    ASSERT(!options.toBSON()["prepareConstraintValidationLevel"]);
-}
-
-TEST(CollectionOptions, PrepareConstraintValidationLevelRejectsNonBoolean) {
-    ASSERT_NOT_OK(
-        CollectionOptions::parse(fromjson("{prepareConstraintValidationLevel: 1}")).getStatus());
-    ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{prepareConstraintValidationLevel: 'yes'}"))
-                      .getStatus());
-}
-
 TEST(CollectionOptions, ErrorBadSize) {
     ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{capped: true, size: -1}")).getStatus());
     ASSERT_NOT_OK(CollectionOptions::parse(fromjson("{capped: false, size: -1}")).getStatus());

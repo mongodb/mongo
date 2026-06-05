@@ -128,10 +128,6 @@ const char* _describeDocumentValidationResult(Collection::DocumentValidationResu
             return "Detected one or more documents where bypassDocumentValidation was attempted "
                    "but is not permitted with 'constraint' validationLevel. Check logs for "
                    "log id 5363500.";
-        case NCR::kBypassProhibitedWithPrepareConstraintLevel:
-            return "Detected one or more documents where bypassDocumentValidation was attempted "
-                   "but is not permitted while prepareConstraintValidationLevel is set. Check "
-                   "logs for log id 5363500.";
         case NCR::kBypassProhibitedForTimeseries:
             return "Detected one or more time-series bucket documents where "
                    "bypassDocumentValidation was attempted but is not permitted on timeseries "

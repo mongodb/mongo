@@ -151,7 +151,6 @@ struct MONGO_MOD_PUBLIC CollectionOptions {
     BSONObj validator;
     boost::optional<ValidationActionEnum> validationAction;
     boost::optional<ValidationLevelEnum> validationLevel;
-    bool prepareConstraintValidationLevel = false;
 
     // The namespace's default collation.
     BSONObj collation;

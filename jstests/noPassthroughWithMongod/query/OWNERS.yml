@@ -18,6 +18,3 @@ filters:
   - "external_sort_text_agg.js":
     approvers:
       - 10gen/query-integration-search
-  - "prepare_constraint_validation_level_failpoint.js":
-    approvers:
-      - 10gen/query-execution

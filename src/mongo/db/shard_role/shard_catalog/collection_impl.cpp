@@ -410,8 +410,8 @@ void CollectionImpl::_initCommon(OperationContext* opCtx) {
     uassertStatusOK(_checkValidatorCanBeUsed(validatorDoc));
 
     // Make sure validationAction and validationLevel are allowed on this collection
-    uassertStatusOK(checkValidationOptionsCanBeUsed(
-        collectionOptions, boost::none, boost::none, boost::none, boost::none));
+    uassertStatusOK(
+        checkValidationOptionsCanBeUsed(collectionOptions, boost::none, boost::none, boost::none));
 
     // Make sure to copy the action and level before parsing MatchExpression, since certain features
     // are not supported with certain combinations of action and level.
@@ -558,15 +558,6 @@ std::pair<Collection::DocumentValidationResult, Status> CollectionImpl::checkVal
     }
 
     if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled()) {
-        if (_metadata->options.prepareConstraintValidationLevel) {
-            return {DVR{SVR::kError, NCR::kBypassProhibitedWithPrepareConstraintLevel},
-                    Status(ErrorCodes::BadValue,
-                           str::stream()
-                               << "bypassDocumentValidation is not permitted while "
-                                  "prepareConstraintValidationLevel is set. To allow "
-                                  "bypassDocumentValidation, first run: db.runCommand({collMod: \""
-                               << ns().coll() << "\", prepareConstraintValidationLevel: false})")};
-        }
         if (_metadata->options.validationLevel == ValidationLevelEnum::constraint) {
             return {
                 DVR{SVR::kError, NCR::kBypassProhibitedWithConstraintLevel},
@@ -1211,15 +1202,13 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status CollectionImpl::setValidationOptions(
-    OperationContext* opCtx,
-    boost::optional<ValidationLevelEnum> newLevel,
-    boost::optional<ValidationActionEnum> newAction,
-    boost::optional<Validator> newValidator,
-    boost::optional<bool> newPrepareConstraintValidationLevel) {
+Status CollectionImpl::setValidationOptions(OperationContext* opCtx,
+                                            boost::optional<ValidationLevelEnum> newLevel,
+                                            boost::optional<ValidationActionEnum> newAction,
+                                            boost::optional<Validator> newValidator) {
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
-    auto status = checkValidationOptionsCanBeUsed(
-        _metadata->options, newLevel, newAction, newValidator, newPrepareConstraintValidationLevel);
+    auto status =
+        checkValidationOptionsCanBeUsed(_metadata->options, newLevel, newAction, newValidator);
     if (!status.isOK()) {
         return status;
     }
@@ -1242,11 +1231,6 @@ Status CollectionImpl::setValidationOptions(
         md.options.validator = _validator.validatorDoc;
         md.options.validationLevel = validationLevel;
         md.options.validationAction = validationAction;
-        if (validationLevel == ValidationLevelEnum::constraint) {
-            md.options.prepareConstraintValidationLevel = false;
-        } else if (newPrepareConstraintValidationLevel) {
-            md.options.prepareConstraintValidationLevel = *newPrepareConstraintValidationLevel;
-        }
     });
     return Status::OK();
 }
@@ -1259,7 +1243,6 @@ boost::optional<ValidationActionEnum> CollectionImpl::getValidationAction() cons
     return _metadata->options.validationAction;
 }
 
-
 Status CollectionImpl::updateValidator(OperationContext* opCtx,
                                        BSONObj newValidatorDoc,
                                        boost::optional<ValidationLevelEnum> newLevel,
@@ -1269,13 +1252,7 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
     auto validationLevel = validationLevelOrCurrent(_metadata->options, newLevel);
     if (validationLevel == ValidationLevelEnum::constraint) {
         return Status(ErrorCodes::BadValue,
-                      "Validator cannot be changed when validationLevel is 'constraint'");
-    }
-    if (_metadata->options.prepareConstraintValidationLevel) {
-        return Status(ErrorCodes::BadValue,
-                      "Validator cannot be changed while prepareConstraintValidationLevel is set. "
-                      "To make validator changes, first run: db.runCommand({collMod: "
-                      "\"<collection>\", prepareConstraintValidationLevel: false})");
+                      "Validator can not be changed with 'constraint' validationLevel");
     }
     tassert(11738200,
             fmt::format("Illegal attempt to set a non-empty validator on viewless timeseries "
@@ -1290,8 +1267,8 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
         return newValidator.getStatus();
     }
 
-    if (auto status = checkValidationOptionsCanBeUsed(
-            _metadata->options, newLevel, newAction, newValidator, boost::none);
+    if (auto status =
+            checkValidationOptionsCanBeUsed(_metadata->options, newLevel, newAction, newValidator);
         !status.isOK()) {
         return status;
     }

@@ -195,12 +195,11 @@ public:
      * used.
      * Requires an exclusive lock on the collection.
      */
-    Status setValidationOptions(
-        OperationContext* opCtx,
-        boost::optional<ValidationLevelEnum> newLevel,
-        boost::optional<ValidationActionEnum> newAction,
-        boost::optional<Validator> newValidator,
-        boost::optional<bool> newPrepareConstraintValidationLevel = boost::none) final;
+    Status setValidationOptions(OperationContext* opCtx,
+                                boost::optional<ValidationLevelEnum> newLevel,
+                                boost::optional<ValidationActionEnum> newAction,
+                                boost::optional<Validator> newValidator) final;
+
 
     boost::optional<ValidationLevelEnum> getValidationLevel() const final;
     boost::optional<ValidationActionEnum> getValidationAction() const final;

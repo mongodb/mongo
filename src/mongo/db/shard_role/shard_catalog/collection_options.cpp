@@ -252,12 +252,6 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             } catch (const DBException& exc) {
                 return exc.toStatus();
             }
-        } else if (fieldName == "prepareConstraintValidationLevel") {
-            if (e.type() != BSONType::boolean) {
-                return Status(ErrorCodes::BadValue,
-                              "'prepareConstraintValidationLevel' has to be a boolean.");
-            }
-            collectionOptions.prepareConstraintValidationLevel = e.boolean();
         } else if (fieldName == "collation") {
             if (e.type() != BSONType::object) {
                 return Status(ErrorCodes::BadValue, "'collation' has to be a document.");
@@ -505,10 +499,6 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
                         idl::serialize(*validationAction));
     }
 
-    if (prepareConstraintValidationLevel && shouldAppend("prepareConstraintValidationLevel")) {
-        builder->appendBool("prepareConstraintValidationLevel", true);
-    }
-
     if (!collation.isEmpty() && shouldAppend(CreateCommand::kCollationFieldName)) {
         builder->append(CreateCommand::kCollationFieldName, collation);
     }
@@ -591,10 +581,6 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
     }
 
     if (validationLevel != other.validationLevel) {
-        return false;
-    }
-
-    if (prepareConstraintValidationLevel != other.prepareConstraintValidationLevel) {
         return false;
     }
 

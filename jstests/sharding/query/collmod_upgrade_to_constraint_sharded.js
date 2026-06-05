@@ -68,7 +68,6 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
         assert.commandWorked(
             testDb.runCommand({collMod: collName, validationLevel: "strict", validationAction: "warn"}),
         );
-        assert.commandWorked(testDb.runCommand({collMod: collName, prepareConstraintValidationLevel: true}));
         assert.commandWorked(
             testDb.runCommand({
                 collMod: collName,
@@ -106,7 +105,6 @@ describe("collMod upgrade to constraint validationLevel on sharded collections",
         );
 
         assert.commandWorked(testDb[collName].deleteOne({_id: -2}));
-        assert.commandWorked(testDb.runCommand({collMod: collName, prepareConstraintValidationLevel: true}));
         assert.commandWorked(
             testDb.runCommand({
                 collMod: collName,
