@@ -50,18 +50,15 @@ __rts_btree_walk_page_skip(
     if (WT_REF_GET_STATE(ref) == WT_REF_DELETED &&
       WT_REF_CAS_STATE(session, ref, WT_REF_DELETED, WT_REF_LOCKED)) {
         page_del = ref->page_del;
-        if (page_del == NULL ||
-          (__wti_rts_visibility_txn_visible_id(session, page_del->txnid) &&
-            page_del->pg_del_durable_ts <= rollback_timestamp)) {
-            /*
-             * We should never see a prepared truncate here; not at recovery time because prepared
-             * truncates can't be written to disk, and not during a runtime RTS either because it
-             * should not be possible to do that with an unresolved prepared transaction.
-             */
-            WT_ASSERT(session,
-              page_del == NULL || page_del->prepare_state == WT_PREPARE_INIT ||
-                page_del->prepare_state == WT_PREPARE_RESOLVED);
 
+        /*
+         * Prepared fast truncates must not be skipped: they were never stable. Guard against a
+         * false-positive from prepared having no transaction id on pages loaded from disk, which it
+         * would otherwise treat as committed.
+         */
+        if (page_del == NULL ||
+          (page_del->committed && __wti_rts_visibility_txn_visible_id(session, page_del->txnid) &&
+            page_del->pg_del_durable_ts <= rollback_timestamp)) {
             if (page_del == NULL)
                 __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
                   WT_RTS_VERB_TAG_SKIP_DEL_NULL "ref=%p: deleted page walk skipped", (void *)ref);
@@ -76,14 +73,27 @@ __rts_btree_walk_page_skip(
             *skipp = true;
         }
 
-        if (page_del != NULL)
-            __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_3,
-              WT_RTS_VERB_TAG_PAGE_DELETE
-              "deleted page with commit_timestamp=%s, durable_timestamp=%s > "
-              "rollback_timestamp=%s, txnid=%" PRIu64,
-              __wt_timestamp_to_string(page_del->pg_del_start_ts, time_string[0]),
-              __wt_timestamp_to_string(page_del->pg_del_durable_ts, time_string[1]),
-              __wt_timestamp_to_string(rollback_timestamp, time_string[2]), page_del->txnid);
+        if (page_del != NULL) {
+            /*
+             * A prepared truncate falls through with *skipp=false: the tree walk instantiates the
+             * page and creates per-key tombstones, which RTS then aborts individually.
+             */
+            if (page_del->prepare_state == WT_PREPARE_INPROGRESS) {
+                WT_RTS_STAT_CONN_DATA_INCR(session, txn_rts_prepared_fast_truncate);
+                __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_3,
+                  WT_RTS_VERB_TAG_PAGE_DELETE "deleted page txnid=%" PRIu64
+                                              ", prepare_timestamp=%s, prepared_id=%" PRIu64,
+                  page_del->txnid, __wt_timestamp_to_string(page_del->prepare_ts, time_string[0]),
+                  page_del->prepared_id);
+            } else
+                __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_3,
+                  WT_RTS_VERB_TAG_PAGE_DELETE
+                  "deleted page with commit_timestamp=%s, durable_timestamp=%s > "
+                  "rollback_timestamp=%s, txnid=%" PRIu64,
+                  __wt_timestamp_to_string(page_del->pg_del_start_ts, time_string[0]),
+                  __wt_timestamp_to_string(page_del->pg_del_durable_ts, time_string[1]),
+                  __wt_timestamp_to_string(rollback_timestamp, time_string[2]), page_del->txnid);
+        }
 
         WT_REF_SET_STATE(ref, WT_REF_DELETED);
         return (0);

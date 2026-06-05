@@ -28,7 +28,7 @@
 
 from time import sleep
 import wiredtiger
-import wttest, threading
+import wttest, wtthread
 
 # Prior to a bugfix in WiredTiger it was possible to read a partial transaction if the config
 # ignore prepare was provided. This test demonstrates that case.
@@ -52,7 +52,7 @@ class test_prepare28(wttest.WiredTigerTestCase):
         cursor[1] = self.value3
         self.session.prepare_transaction('prepare_timestamp=4')
         # Create a thread.
-        ooo_thread = threading.Thread(target=self.read_update)
+        ooo_thread = wtthread.Thread(target=self.read_update)
         # Start the thread
         ooo_thread.start()
         # `prepare_resolution_2` injects a sleep before assigning WT_PREPARE_RESOLVED to the updates

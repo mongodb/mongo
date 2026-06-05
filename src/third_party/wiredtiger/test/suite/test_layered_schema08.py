@@ -34,7 +34,7 @@
 #   of that same checkpoint. Operations enqueued concurrently with a running checkpoint (after
 #   prepare) remain deferred until the next checkpoint.
 
-import threading, time, wiredtiger, wttest
+import time, wiredtiger, wttest, wtthread
 from checkpoint_util import checkpoint_util
 from helper_disagg import disagg_test_class, gen_disagg_storages
 from wtscenario import make_scenarios
@@ -163,7 +163,7 @@ class test_layered_schema08(checkpoint_util):
             session.checkpoint()
             session.close()
 
-        ckpt_thread = threading.Thread(target=run_checkpoint, args=(self.conn,))
+        ckpt_thread = wtthread.Thread(target=run_checkpoint, args=(self.conn,))
         ckpt_thread.start()
 
         # checkpoint_state becomes non-zero only after checkpoint_prepare has completed
@@ -236,7 +236,7 @@ class test_layered_schema08(checkpoint_util):
             session.checkpoint()
             session.close()
 
-        ckpt_thread = threading.Thread(target=run_checkpoint, args=(self.conn,))
+        ckpt_thread = wtthread.Thread(target=run_checkpoint, args=(self.conn,))
         ckpt_thread.start()
 
         self.wait_for_checkpoint_start()

@@ -26,13 +26,16 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, time, errno, threading
+import wiredtiger, time, errno, wtthread, wttest
 from wttest import open_cursor
 from error_info_util import error_info_util
 
 # test_error_info03.py
 #   Test that the get_last_error() session API returns the last error to occur in the session,
 #   for the EBUSY during drop cases.
+
+# FIXME-WT-14509 These tests are dependent on Session.alter being available.
+@wttest.skip_for_hook("disagg", "Session.alter is not supported yet")
 class test_error_info03(error_info_util):
     conn_config = 'timing_stress_for_test=[session_alter_slow,open_index_slow]'
     uri="table:test_error_info"
@@ -61,8 +64,8 @@ class test_error_info03(error_info_util):
         """
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
-        lock_thread = threading.Thread(target=self.hold_checkpoint_and_schema_locks)
-        drop_thread = threading.Thread(target=self.try_drop_no_wait)
+        lock_thread = wtthread.Thread(target=self.hold_checkpoint_and_schema_locks)
+        drop_thread = wtthread.Thread(target=self.try_drop_no_wait)
 
         lock_thread.start()
         time.sleep(1)
@@ -79,8 +82,8 @@ class test_error_info03(error_info_util):
         """
         self.session.create(self.uri, 'key_format=S,value_format=S')
 
-        lock_thread = threading.Thread(target=self.hold_checkpoint_and_schema_locks)
-        drop_thread = threading.Thread(target=self.try_drop_no_wait_ignore_checkpoint_lock)
+        lock_thread = wtthread.Thread(target=self.hold_checkpoint_and_schema_locks)
+        drop_thread = wtthread.Thread(target=self.try_drop_no_wait_ignore_checkpoint_lock)
 
         lock_thread.start()
         time.sleep(1)
@@ -100,8 +103,8 @@ class test_error_info03(error_info_util):
         self.session.create(self.uri, 'key_format=S,value_format=S,columns=(k,v)')
         self.session.create('index:' + name + ':i0', 'columns=(k,v)')
 
-        lock_thread = threading.Thread(target=self.hold_table_lock)
-        drop_thread = threading.Thread(target=self.try_drop_no_wait)
+        lock_thread = wtthread.Thread(target=self.hold_table_lock)
+        drop_thread = wtthread.Thread(target=self.try_drop_no_wait)
 
         lock_thread.start()
         time.sleep(1)

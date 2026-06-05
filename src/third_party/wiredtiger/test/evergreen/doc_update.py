@@ -41,6 +41,7 @@ import sys
 
 from contextlib import contextmanager
 
+from github.Auth import AppAuth
 from github.GithubIntegration import GithubIntegration
 
 
@@ -67,7 +68,8 @@ if (not app_id) or (not private_key):
         "Please ensure GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY environment variables are set."
     )
 try:
-    app = GithubIntegration(int(app_id), private_key)
+    auth = AppAuth(app_id, private_key)
+    app = GithubIntegration(auth=auth)
 except Exception as e:
     sys.exit(e)
 

@@ -1189,6 +1189,12 @@ __wti_rec_row_leaf(
         if (upd == NULL) {
             /* Clear the on-disk cell time window if it is obsolete. */
             __wti_rec_time_window_clear_obsolete(session, NULL, vpack, r);
+            /*
+             * A removed-overflow cell must never be written to disk: the backing block is already
+             * gone so copying its in-memory marker produces a corrupt page image.
+             */
+            WT_ASSERT(session,
+              vpack->cell == NULL || __wt_cell_type_raw(vpack->cell) != WT_CELL_VALUE_OVFL_RM);
 
             /*
              * When the page was read into memory, there may not have been a value item.

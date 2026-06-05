@@ -1497,6 +1497,8 @@ conn_dsrc_stats = [
     TxnStat('txn_rts_keys_removed_dryrun', 'rollback to stable keys that would have been removed in non-dryrun mode'),
     TxnStat('txn_rts_keys_restored', 'rollback to stable keys restored'),
     TxnStat('txn_rts_keys_restored_dryrun', 'rollback to stable keys that would have been restored in non-dryrun mode'),
+    TxnStat('txn_rts_prepared_fast_truncate', 'rollback to stable rolled back prepared fast truncations'),
+    TxnStat('txn_rts_prepared_fast_truncate_dryrun', 'rollback to stable prepared fast truncations that would have been rolled back in non-dryrun mode'),
     TxnStat('txn_rts_stable_rle_skipped', 'rollback to stable skipping stable rle'),
     TxnStat('txn_rts_sweep_hs_keys', 'rollback to stable sweeping history store keys'),
     TxnStat('txn_rts_sweep_hs_keys_dryrun', 'rollback to stable history store keys that would have been swept in non-dryrun mode'),

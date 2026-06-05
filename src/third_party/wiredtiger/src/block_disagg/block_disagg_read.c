@@ -97,6 +97,18 @@ __block_disagg_check_lsn_frontier(WT_SESSION_IMPL *session, uint64_t lsn, uint64
 }
 
 /*
+ * __block_disagg_header_version_compatible --
+ *     Return whether this build can read a header whose oldest-compatible reader version is
+ *     compatible_version. This build can read the header when its own version is at least the
+ *     header's compatible version.
+ */
+static bool
+__block_disagg_header_version_compatible(uint8_t compatible_version)
+{
+    return (compatible_version <= WT_BLOCK_DISAGG_VERSION);
+}
+
+/*
  * __block_disagg_read_multiple --
  *     Read a full page along with its deltas, into multiple buffers. The page is referenced by a
  *     page id, checkpoint id pair.
@@ -206,12 +218,12 @@ __block_disagg_read_multiple(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_di
                       expected_magic);
                     goto corrupt;
                 }
-                if (swap.compatible_version > WT_BLOCK_DISAGG_COMPATIBLE_VERSION) {
+                if (!__block_disagg_header_version_compatible(swap.compatible_version)) {
                     __block_disagg_read_err(session, block_disagg->name, block_disagg->tableid,
                       size, page_id, lsn, is_delta, result,
-                      "compatible version error, version %" PRIu8
-                      " is greater than compatible version of %" PRIu8,
-                      swap.compatible_version, WT_BLOCK_DISAGG_COMPATIBLE_VERSION);
+                      "compatible version error, the block's compatible version %" PRIu8
+                      " is greater than the reader version of %" PRIu8,
+                      swap.compatible_version, WT_BLOCK_DISAGG_VERSION);
                     goto corrupt;
                 }
 
@@ -375,3 +387,15 @@ __wt_block_disagg_debug_read_page_id(WT_BM *bm, WT_SESSION_IMPL *session, uint64
 
     return (0);
 }
+
+#ifdef HAVE_UNITTEST
+/*
+ * __ut_block_disagg_header_version_compatible --
+ *     Unit-test wrapper for __block_disagg_header_version_compatible.
+ */
+bool
+__ut_block_disagg_header_version_compatible(uint8_t compatible_version)
+{
+    return (__block_disagg_header_version_compatible(compatible_version));
+}
+#endif

@@ -28,7 +28,7 @@
 
 import time
 
-import wttest, threading, wiredtiger
+import wttest, wtthread, wiredtiger
 from helper import simulate_crash_restart
 from wtscenario import make_scenarios
 
@@ -77,7 +77,7 @@ class test_hs24(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
         cursor.close()
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
-        thread = threading.Thread(target=self.missing_ts_deletes)
+        thread = wtthread.Thread(target=self.missing_ts_deletes)
         thread.start()
         # Give the thread a chance to get going. Otherwise typically none of the deletions
         # appear in the checkpoint and we lose the ability to test that anything interesting
@@ -136,7 +136,7 @@ class test_hs24(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
         cursor.close()
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4))
-        thread = threading.Thread(target=self.missing_ts_commits)
+        thread = wtthread.Thread(target=self.missing_ts_commits)
         thread.start()
         self.session.checkpoint()
         thread.join()

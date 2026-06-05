@@ -31,7 +31,7 @@
 # marked for sweep server expiry when file data dhandles are present.
 
 from suite_subprocess import suite_subprocess
-import wttest, threading
+import wttest, wtthread
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
@@ -82,7 +82,7 @@ class test_sweep06(wttest.WiredTigerTestCase, suite_subprocess):
         for i in range(1,100):
             threads = []
             for i in range(1,self.dhandles):
-                thread = threading.Thread(target=self.insert, args=(i, 0, 100))
+                thread = wtthread.Thread(target=self.insert, args=(i, 0, 100))
                 thread.start()
                 threads.append(thread)
 

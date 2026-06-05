@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 from time import sleep
-import wttest, threading
+import wttest, wtthread
 from helper import simulate_crash_restart
 from wtscenario import make_scenarios
 
@@ -77,7 +77,7 @@ class test_hs_evict_race01(wttest.WiredTigerTestCase):
         cursor.close()
 
         # Create a thread.
-        ooo_thread = threading.Thread(target=self.no_timestamp_update_and_evict)
+        ooo_thread = wtthread.Thread(target=self.no_timestamp_update_and_evict)
 
         # Start the thread
         ooo_thread.start()

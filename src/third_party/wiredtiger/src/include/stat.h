@@ -1391,8 +1391,10 @@ struct __wt_connection_stats {
     int64_t txn_rts_keys_removed_dryrun;
     int64_t txn_rts_keys_restored_dryrun;
     int64_t txn_rts_pages_visited;
+    int64_t txn_rts_prepared_fast_truncate_dryrun;
     int64_t txn_rts_hs_restore_tombstones;
     int64_t txn_rts_hs_restore_updates;
+    int64_t txn_rts_prepared_fast_truncate;
     int64_t txn_rts_btrees_skipped;
     int64_t txn_rts_delete_rle_skipped;
     int64_t txn_rts_stable_rle_skipped;
@@ -1838,8 +1840,10 @@ struct __wt_dsrc_stats {
     int64_t txn_rts_keys_restored;
     int64_t txn_rts_keys_removed_dryrun;
     int64_t txn_rts_keys_restored_dryrun;
+    int64_t txn_rts_prepared_fast_truncate_dryrun;
     int64_t txn_rts_hs_restore_tombstones;
     int64_t txn_rts_hs_restore_updates;
+    int64_t txn_rts_prepared_fast_truncate;
     int64_t txn_rts_btrees_skipped;
     int64_t txn_rts_delete_rle_skipped;
     int64_t txn_rts_stable_rle_skipped;

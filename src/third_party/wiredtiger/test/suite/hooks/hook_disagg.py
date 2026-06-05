@@ -234,9 +234,9 @@ def replace_uri(uri):
         return uri
 
 # Called to replace Session.alter.
-def session_alter_replace(orig_session_open_cursor, session_self, uri, config):
+def session_alter_replace(orig_session_alter, session_self, uri, config):
     uri = replace_uri(uri)
-    return orig_session_open_cursor(session_self, uri, config)
+    return orig_session_alter(session_self, uri, config)
 
 # Called to replace Session.checkpoint.
 # We add a call to flush_tier during every checkpoint to make sure we are exercising disagg
