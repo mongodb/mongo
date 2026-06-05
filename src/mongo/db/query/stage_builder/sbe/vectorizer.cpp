@@ -659,6 +659,14 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::FunctionCa
                             args[0].sourceCell};
                 }
                 break;
+            case sbe::EFn::kIsNullish:
+                if (arity == 1) {
+                    return {
+                        makeABTFunction(sbe::EFn::kValueBlockIsNullish, std::move(*args[0].expr)),
+                        TypeSignature::kBlockType.include(TypeSignature::kBooleanType),
+                        args[0].sourceCell};
+                }
+                break;
             case sbe::EFn::kMakeOwn:
                 // In block mode, ownership of values is not needed.
                 if (arity == 1) {

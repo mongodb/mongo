@@ -9,7 +9,7 @@
 [3] block_group bitset = s8 [s15] [s18 = valueBlockAggDoubleDoubleSum(s12, s10), s19 = valueBlockAggSum(s12, s11)] [s18 = aggDoubleDoubleSum(s10), s19 = sum(s11)] [s16, s17] [s10, s11] spillSlots[s13, s14] mergingExprs[aggMergeDoubleDoubleSums(s13), sum(s14)] 
 [3] project [s15 = null, s16 = cellFoldValues_P(cellBlockGetFlatValuesBlock(s5), s5), s17 = 
     let [
-        l8.0 = valueBlockLogicalOr(valueBlockFillEmpty(valueBlockTypeMatch(cellFoldValues_P(cellBlockGetFlatValuesBlock(s5), s5), 1088), true), valueBlockLogicalNot(valueBlockTypeMatch(cellFoldValues_P(cellBlockGetFlatValuesBlock(s5), s5), 851970))) 
+        l8.0 = valueBlockLogicalOr(valueBlockIsNullish(cellFoldValues_P(cellBlockGetFlatValuesBlock(s5), s5)), valueBlockLogicalNot(valueBlockTypeMatch(cellFoldValues_P(cellBlockGetFlatValuesBlock(s5), s5), 851970))) 
     ] 
     in valueBlockCombine(valueBlockNewFill(0ll, valueBlockSize(l8.0)), valueBlockNewFill(1ll, valueBlockSize(valueBlockLogicalNot(l8.0))), l8.0) 
 ] 

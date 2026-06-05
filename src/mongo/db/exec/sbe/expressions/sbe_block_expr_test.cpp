@@ -253,6 +253,28 @@ TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
     assertBlockOfBool(runTag, runVal, {true, true, true, false, true});
 }
 
+TEST_F(SBEBlockExpressionTest, BlockIsNullishTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto isNullishExpr = sbe::makeE<sbe::EFunction>(EFn::kValueBlockIsNullish,
+                                                    sbe::makeEs(makeE<EVariable>(blockSlot)));
+    auto compiledExpr = compileExpression(*isNullishExpr);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeNull());
+    block.push_back(makeInt32(43));
+    block.push_back(makeInt32(44));
+    block.push_back(makeNothing());
+    block.push_back(makeUndefined());
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockOfBool(runTag, runVal, {true, false, false, true, true});
+}
+
 TEST_F(SBEBlockExpressionTest, BlockTypeMatchInvalidMaskTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);

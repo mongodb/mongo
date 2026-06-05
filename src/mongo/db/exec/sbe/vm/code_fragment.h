@@ -79,7 +79,7 @@ public:
     void appendLocalVal(FrameId frameId, int variable, bool moveFrom);
     void appendLocalLambda(int codePosition, size_t numArgs);
     void appendPop();
-    void appendSwap();
+    void appendSwapAndPop(size_t numPops);
     void appendMakeOwn(Instruction::Parameter arg);
     void appendAdd(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendSub(Instruction::Parameter lhs, Instruction::Parameter rhs);
@@ -151,6 +151,7 @@ public:
     void appendCollMax();
     void appendExists(Instruction::Parameter input);
     void appendIsNull(Instruction::Parameter input);
+    void appendIsNullish(Instruction::Parameter input);
     void appendIsObject(Instruction::Parameter input);
     void appendIsArray(Instruction::Parameter input);
     void appendIsInList(Instruction::Parameter input);

@@ -326,15 +326,11 @@ SbExpr SbExprBuilder::makeIfNullExpr(SbExpr::Vector values) {
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbExpr expr) {
-    return makeFillEmptyTrue(makeFunction(
-        sbe::EFn::kTypeMatch, std::move(expr), makeInt32Constant(getBSONTypeMask(BSONType::null))));
+    return makeFillEmptyTrue(makeFunction(sbe::EFn::kIsNull, std::move(expr)));
 }
 
 SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbExpr expr) {
-    return makeFillEmptyTrue(makeFunction(
-        sbe::EFn::kTypeMatch,
-        std::move(expr),
-        makeInt32Constant(getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined))));
+    return makeFunction(sbe::EFn::kIsNullish, std::move(expr));
 }
 
 SbExpr SbExprBuilder::generatePositiveCheck(SbExpr expr) {
@@ -342,15 +338,11 @@ SbExpr SbExprBuilder::generatePositiveCheck(SbExpr expr) {
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbVar var) {
-    return makeFillEmptyTrue(makeFunction(
-        sbe::EFn::kTypeMatch, var, makeInt32Constant(getBSONTypeMask(BSONType::null))));
+    return makeFillEmptyTrue(makeFunction(sbe::EFn::kIsNull, var));
 }
 
 SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbVar var) {
-    return makeFillEmptyTrue(makeFunction(
-        sbe::EFn::kTypeMatch,
-        var,
-        makeInt32Constant(getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined))));
+    return makeFunction(sbe::EFn::kIsNullish, var);
 }
 
 SbExpr SbExprBuilder::generateNonStringCheck(SbVar var) {

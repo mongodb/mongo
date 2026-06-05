@@ -13,8 +13,7 @@
 0x000a: pushConstVal(value: 2ll);
 0x0014: pushConstVal(value: "test");
 0x001e: fail();
-0x001f: swap();
-0x0020: pop();
+0x001f: swapAndPop(arg: 1);
 
 
 -- EXECUTE VARIATION:

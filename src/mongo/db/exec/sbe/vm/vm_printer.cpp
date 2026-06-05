@@ -151,7 +151,6 @@ public:
             switch (i.tag) {
                 // Instructions with no arguments.
                 case Instruction::pop:
-                case Instruction::swap:
                 case Instruction::fillEmpty:
                 case Instruction::traverseP:
                 case Instruction::traverseF:
@@ -231,6 +230,7 @@ public:
                 case Instruction::getArraySize:
                 case Instruction::exists:
                 case Instruction::isNull:
+                case Instruction::isNullish:
                 case Instruction::isObject:
                 case Instruction::isArray:
                 case Instruction::isInList:
@@ -256,6 +256,12 @@ public:
                     auto offset = readFromMemory<int>(pcPointer);
                     pcPointer += sizeof(offset);
                     os << "target: " << _formatter.pcPointer(pcPointer + offset);
+                    break;
+                }
+                case Instruction::swapAndPop: {
+                    auto arg = readFromMemory<unsigned char>(pcPointer);
+                    pcPointer += sizeof(arg);
+                    os << "arg: " << static_cast<unsigned short>(arg);
                     break;
                 }
                 case Instruction::pushLocalVal:

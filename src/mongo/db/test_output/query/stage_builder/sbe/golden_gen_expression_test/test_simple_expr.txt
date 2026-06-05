@@ -21,7 +21,7 @@ ExpressionObjectToArray
     in 
         if exists(l6.0) 
         then makeOwn(move(l6.0)) 
-        elif (typeMatch(s1, 1088) ?: true) 
+        elif isNullish(s1) 
         then null 
         elif isObject(s1) 
         then Nothing 
@@ -33,7 +33,7 @@ arrayToObject([{"k" : "_id", "v" : 0}, {"k" : "field1", "v" : 4}, {"k" : "field2
 # Golden test output of GoldenGenExpressionTest/TestSimpleExpr
 ExpressionBsonSize
 
-    if (typeMatch(s1, 1088) ?: true) 
+    if isNullish(s1) 
     then null 
     elif isObject(s1) 
     then bsonSize(s1) 
@@ -46,13 +46,13 @@ ExpressionIfNull
         l12.0 = getField(s1, "null") 
     ] 
     in 
-        if (typeMatch(l12.0, 1088) ?: true) 
+        if isNullish(l12.0) 
         then 
             let [
                 l13.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l13.0, 1088) ?: true) 
+                if isNullish(l13.0) 
                 then getField(s1, "null") 
                 else move(l13.0) 
         
@@ -81,7 +81,7 @@ ExpressionLet
                 l21.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l21.0, 1088) ?: true) 
+                if isNullish(l21.0) 
                 then null 
                 elif ((
                     if isNumber(l21.0) 
@@ -98,7 +98,7 @@ ExpressionLet
             l22.0 = getField(s1, "field1") 
         ] 
         in 
-            if ((typeMatch(l20.0, 1088) ?: true) || (typeMatch(l22.0, 1088) ?: true)) 
+            if (isNullish(l20.0) || isNullish(l22.0)) 
             then null 
             elif (isNumber(l20.0) && isNumber(l22.0)) 
             then (move(l20.0) * move(l22.0)) 

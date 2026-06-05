@@ -575,6 +575,30 @@ TypeSignature TypeChecker::operator()(abt::ABT& n, abt::FunctionCall& op, bool s
                 return evaluateTypeTest(
                     n, argTypes[0], getTypeSignature(sbe::value::TypeTags::Null));
             break;
+        case sbe::EFn::kIsNullish: {
+            // isNullish returns true for Nothing, Null, and bsonUndefined — it never returns
+            // Nothing itself, so the result type is always boolean.
+            if (arity == 1) {
+                if (argTypes[0].isSubset(TypeSignature::kNullishType)) {
+                    // If the argument is only one (or more) of the types to check, evaluate to
+                    // True.
+                    swapAndUpdate(n, abt::Constant::boolean(true));
+                    return TypeSignature::kBooleanType;
+                } else if (!argTypes[0].containsAny(TypeSignature::kNullishType)) {
+                    // If the argument doesn't include any of the types to check, evaluate to False.
+                    swapAndUpdate(n, abt::Constant::boolean(false));
+                    return TypeSignature::kBooleanType;
+                } else if (saveInference && op.nodes()[0].is<abt::Variable>()) {
+                    // If this operation is testing a variable and is part of an And, add a mask
+                    // narrowing the type information of the variable with the tested types.
+                    auto& varName = op.nodes()[0].cast<abt::Variable>()->name();
+                    auto varType = getInferredType(varName).value_or(TypeSignature::kAnyScalarType);
+                    bind(varName, varType.intersect(TypeSignature::kNullishType));
+                }
+                return TypeSignature::kBooleanType;
+            }
+            break;
+        }
         case sbe::EFn::kIsNumber:
             if (arity == 1)
                 return evaluateTypeTest(n, argTypes[0], TypeSignature::kNumericType);

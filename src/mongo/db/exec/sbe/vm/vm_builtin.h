@@ -336,6 +336,7 @@ enum class Builtin : uint16_t {
     singleByteEndMarker,
     // Start of 2 byte builtins.
     valueBlockExists = 256,
+    valueBlockIsNullish,
     valueBlockTypeMatch,
     valueBlockIsTimezone,
     valueBlockFillEmpty,

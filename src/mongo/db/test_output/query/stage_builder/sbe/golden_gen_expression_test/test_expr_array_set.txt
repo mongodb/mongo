@@ -9,7 +9,7 @@ ExpressionConcatArrays
     in 
         if exists(l2.2) 
         then makeOwn(move(l2.2)) 
-        elif ((typeMatch(move(l2.0), 1088) ?: true) || (typeMatch(move(l2.1), 1088) ?: true)) 
+        elif (isNullish(move(l2.0)) || isNullish(move(l2.1))) 
         then null 
         else fail(7158000, "$concatArrays only supports arrays") 
 
@@ -21,7 +21,7 @@ ExpressionSetDifference
         l4.1 = getField(s1, "arr3") 
     ] 
     in 
-        if ((typeMatch(l4.0, 1088) ?: true) || (typeMatch(l4.1, 1088) ?: true)) 
+        if (isNullish(l4.0) || isNullish(l4.1)) 
         then null 
         elif (!(isArray(l4.0)) || !(isArray(l4.1))) 
         then fail(7158101, "All operands of $setDifference must be arrays.") 
@@ -47,7 +47,7 @@ ExpressionSetIntersection
         l8.1 = getField(s1, "arr3") 
     ] 
     in 
-        if ((typeMatch(l8.0, 1088) ?: true) || (typeMatch(l8.1, 1088) ?: true)) 
+        if (isNullish(l8.0) || isNullish(l8.1)) 
         then null 
         elif (!(isArray(l8.0)) || !(isArray(l8.1))) 
         then fail(7158101, "All operands of $setIntersection must be arrays.") 
@@ -72,7 +72,7 @@ ExpressionSetUnion
         l12.1 = getField(s1, "arr3") 
     ] 
     in 
-        if ((typeMatch(l12.0, 1088) ?: true) || (typeMatch(l12.1, 1088) ?: true)) 
+        if (isNullish(l12.0) || isNullish(l12.1)) 
         then null 
         elif (!(isArray(l12.0)) || !(isArray(l12.1))) 
         then fail(7158101, "All operands of $setUnion must be arrays.") 
@@ -85,7 +85,7 @@ ExpressionReverseArray
         l14.0 = getField(s1, "arr2") 
     ] 
     in 
-        if (typeMatch(l14.0, 1088) ?: true) 
+        if isNullish(l14.0) 
         then null 
         elif isArray(l14.0) 
         then reverseArray(move(l14.0)) 
@@ -98,7 +98,7 @@ ExpressionSortArray
         l16.0 = getField(s1, "arr2") 
     ] 
     in 
-        if (typeMatch(l16.0, 1088) ?: true) 
+        if isNullish(l16.0) 
         then null 
         elif isArray(l16.0) 
         then sortArray(move(l16.0), {"" : -1L}) 
@@ -113,7 +113,7 @@ ExpressionTopN
     in 
         if ((2 != trunc(2)) ?: true) 
         then fail(1127469, "$topN requires 'n' to be an integer") 
-        elif (typeMatch(l18.0, 1088) ?: true) 
+        elif isNullish(l18.0) 
         then null 
         elif isArray(l18.0) 
         then topN(2, move(l18.0), {"" : -1L}) 
@@ -126,7 +126,7 @@ ExpressionTop
         l20.0 = getField(s1, "arr2") 
     ] 
     in 
-        if (typeMatch(l20.0, 1088) ?: true) 
+        if isNullish(l20.0) 
         then null 
         elif isArray(l20.0) 
         then top(move(l20.0), {"" : -1L}) 
@@ -141,7 +141,7 @@ ExpressionBottomN
     in 
         if ((2 != trunc(2)) ?: true) 
         then fail(1127469, "$bottomN requires 'n' to be an integer") 
-        elif (typeMatch(l22.0, 1088) ?: true) 
+        elif isNullish(l22.0) 
         then null 
         elif isArray(l22.0) 
         then bottomN(2, move(l22.0), {"" : -1L}) 
@@ -154,7 +154,7 @@ ExpressionBottom
         l24.0 = getField(s1, "arr2") 
     ] 
     in 
-        if (typeMatch(l24.0, 1088) ?: true) 
+        if isNullish(l24.0) 
         then null 
         elif isArray(l24.0) 
         then bottom(move(l24.0), {"" : -1L}) 

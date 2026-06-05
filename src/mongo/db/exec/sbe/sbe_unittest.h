@@ -261,6 +261,10 @@ static std::pair<value::TypeTags, value::Value> makeNull() {
     return {value::TypeTags::Null, value::bitcastFrom<int64_t>(0)};
 }
 
+static std::pair<value::TypeTags, value::Value> makeUndefined() {
+    return {value::TypeTags::bsonUndefined, value::bitcastFrom<int64_t>(0)};
+}
+
 static std::pair<value::TypeTags, value::Value> makeInt32(int32_t value) {
     return {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(value)};
 }

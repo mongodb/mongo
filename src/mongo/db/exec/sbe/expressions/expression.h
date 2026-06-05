@@ -418,6 +418,10 @@ public:
         return (op >= less && op <= cmp3w);
     }
 
+    Op op() const {
+        return _op;
+    }
+
     std::unique_ptr<EExpression> clone() const override;
 
     vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
@@ -425,6 +429,13 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const override;
 
     size_t estimateSize() const final;
+
+    const EExpression* lhs() const {
+        return _nodes[0].get();
+    }
+    const EExpression* rhs() const {
+        return _nodes[1].get();
+    };
 
 private:
     std::vector<const EExpression*> collectOrClauses() const;
@@ -471,6 +482,10 @@ public:
     EFunction(EFn fn, EExpression::Vector args) : _fn(fn) {
         _nodes = std::move(args);
         validateNodes();
+    }
+
+    EFn fn() const {
+        return _fn;
     }
 
     std::unique_ptr<EExpression> clone() const override;

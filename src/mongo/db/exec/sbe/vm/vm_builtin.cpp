@@ -241,6 +241,8 @@ std::string builtinToString(Builtin b) {
             return "validateFromStringFormat";
         case Builtin::setUnion:
             return "setUnion";
+        case Builtin::setIsSubset:
+            return "setIsSubset";
         case Builtin::setIntersection:
             return "setIntersection";
         case Builtin::setDifference:
@@ -249,6 +251,8 @@ std::string builtinToString(Builtin b) {
             return "setEquals";
         case Builtin::collSetUnion:
             return "collSetUnion";
+        case Builtin::collSetIsSubset:
+            return "collSetIsSubset";
         case Builtin::collSetIntersection:
             return "collSetIntersection";
         case Builtin::collSetDifference:
@@ -529,6 +533,8 @@ std::string builtinToString(Builtin b) {
             return "valueBlockIsTimezone";
         case Builtin::valueBlockExists:
             return "valueBlockExists";
+        case Builtin::valueBlockIsNullish:
+            return "valueBlockIsNullish";
         case Builtin::valueBlockFillEmpty:
             return "valueBlockFillEmpty";
         case Builtin::valueBlockFillEmptyBlock:
@@ -1129,6 +1135,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggLinearFillFinalize(arity).releaseToRaw();
         case Builtin::valueBlockExists:
             return builtinValueBlockExists(arity).releaseToMaybeOwnedRaw();
+        case Builtin::valueBlockIsNullish:
+            return builtinValueBlockIsNullish(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockTypeMatch:
             return builtinValueBlockTypeMatch(arity).releaseToMaybeOwnedRaw();
         case Builtin::valueBlockIsTimezone:

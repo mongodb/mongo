@@ -32,7 +32,7 @@ traverseF(getField(s1, "field1"), lambda(l14.0) { isMember(move(l14.0), s2) }, f
 # Golden test output of GoldenSbeFilterBuilderTestFixture/TestSimpleExpr
 InMatchExpressionRegex
 traverseF(getField(s1, "str"), lambda(l16.0) { (isMember(
-    if (typeMatch(l16.0, 1024) ?: true) 
+    if (isNull(l16.0) ?: true) 
     then null 
     else l16.0 
 , s3) || ((isMember(l16.0, [/ABc/i]) ?: false) || (regexMatch([PcreRegex(/ABc/i)], l16.0) ?: false))) }, false) 

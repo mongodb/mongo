@@ -13,8 +13,7 @@
 0x000a: pushLocalVal(arg: 0);
 0x000f: pushLocalVal(arg: 1);
 0x0014: functionSmall(f: newArray, arity: 2);
-0x0017: swap();
-0x0018: pop();
+0x0017: swapAndPop(arg: 1);
 
 
 -- EXECUTE VARIATION:

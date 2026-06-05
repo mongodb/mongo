@@ -13,7 +13,7 @@
 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x0064] stackSize: 1, maxStackSize: 4
+[0x0000-0x0060] stackSize: 1, maxStackSize: 4
 0x0000: pushAccessVal(accessor: <accessor>);
 0x0009: pushConstVal(value: 10);
 0x0013: pushConstVal(value: 20);
@@ -29,12 +29,7 @@
 0x004f: pushLocalVal(arg: 0);
 0x0054: jmp(target: 0x005e);
 0x0059: pushLocalVal(arg: 1);
-0x005e: swap();
-0x005f: pop();
-0x0060: swap();
-0x0061: pop();
-0x0062: swap();
-0x0063: pop();
+0x005e: swapAndPop(arg: 3);
 
 
 -- EXECUTE VARIATION:

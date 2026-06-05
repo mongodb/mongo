@@ -97,7 +97,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     1,   // pushOneArgLambda
     1,   // pushTwoArgLambda
     -1,  // pop
-    0,   // swap
+    0,   // swapAndPop does a variable number of pop operations
     0,   // makeOwn
 
     -1,  // add
@@ -153,6 +153,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
 
     0,  // exists
     0,  // isNull
+    0,  // isNullish
     0,  // isObject
     0,  // isArray
     0,  // isInList
@@ -285,7 +286,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                                         &&do_pushOneArgLambda,
                                         &&do_pushTwoArgLambda,
                                         &&do_pop,
-                                        &&do_swap,
+                                        &&do_swapAndPop,
                                         &&do_makeOwn,
 
                                         &&do_add,
@@ -342,6 +343,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
                                         &&do_exists,
                                         &&do_isNull,
+                                        &&do_isNullish,
                                         &&do_isObject,
                                         &&do_isArray,
                                         &&do_isInList,
@@ -499,8 +501,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         popAndReleaseStack();
     }
     DISPATCH();
-    INSTRUCTION(swap) {
-        swapStack();
+    INSTRUCTION(swapAndPop) {
+        auto numPops = readFromMemory<unsigned char>(pcPointer);
+        pcPointer += sizeof(numPops);
+
+        for (unsigned char i = 0; i < numPops; i++) {
+            swapStack();
+            popAndReleaseStack();
+        }
     }
     DISPATCH();
     INSTRUCTION(makeOwn) {
@@ -1261,6 +1269,18 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         runTagCheck(pcPointer, value::TypeTags::Null);
     }
     DISPATCH();
+    INSTRUCTION(isNullish) {
+        auto [popParam, moveFromParam, offsetParam] =
+            Instruction::Parameter::decodeParam(pcPointer);
+        auto [owned, tag, val] = getFromStack(offsetParam, popParam);
+
+        pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(value::isNullish(tag)));
+
+        if (owned && popParam) {
+            value::releaseValue(tag, val);
+        }
+    }
+    DISPATCH();
     INSTRUCTION(isObject) {
         runTagCheck(pcPointer, value::isObject);
     }
@@ -1576,8 +1596,8 @@ const char* Instruction::toString() const {
             return "pushTwoArgLambda";
         case pop:
             return "pop";
-        case swap:
-            return "swap";
+        case swapAndPop:
+            return "swapAndPop";
         case makeOwn:
             return "makeOwn";
         case add:
@@ -1672,6 +1692,8 @@ const char* Instruction::toString() const {
             return "exists";
         case isNull:
             return "isNull";
+        case isNullish:
+            return "isNullish";
         case isObject:
             return "isObject";
         case isArray:

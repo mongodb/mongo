@@ -206,6 +206,24 @@ std::unique_ptr<EExpression> EPrimNary::clone() const {
     return std::make_unique<EPrimNary>(_op, std::move(args));
 }
 
+namespace {
+
+/**
+ * Return whether the provided expression is guaranteed to never return a Nothing value as result.
+ */
+template <typename Expression>
+bool cannotReturnNothing(const Expression& expr) {
+    if (auto primary = expr->template as<EPrimBinary>(); primary) {
+        if (auto rhs = dynamic_cast<const EConstant*>(primary->rhs()); rhs) {
+            return primary->op() == EPrimBinary::Op::fillEmpty &&
+                rhs->getConstant().first != value::TypeTags::Nothing;
+        }
+    } else if (auto function = expr->template as<EFunction>(); function) {
+        return function->fn() == EFn::kExists || function->fn() == EFn::kIsNullish;
+    }
+    return false;
+}
+
 /*
  * Given a vector of clauses named [lhs1,...,lhsN-1, rhs], and a boolean isDisjunctive to indicate
  * whether we are ANDing or ORing the clauses, we output the appropriate short circuiting
@@ -246,7 +264,9 @@ vm::CodeFragment buildShortCircuitCode(CompileCtx& ctx, const Vector& clauses, b
         vm::CodeFragment code;
         for (size_t i = 0; i < clauses.size() - 1; i++) {
             auto clauseCode = clauses.at(i)->compileDirect(ctx);
-            clauseCode.appendLabelJumpNothing(endLabel);
+            if (!cannotReturnNothing(clauses.at(i))) {
+                clauseCode.appendLabelJumpNothing(endLabel);
+            }
 
             if (isDisjunction) {
                 clauseCode.appendLabelJumpTrue(resultLabel);
@@ -274,6 +294,8 @@ vm::CodeFragment buildShortCircuitCode(CompileCtx& ctx, const Vector& clauses, b
         return code;
     });
 }
+
+}  // namespace
 
 vm::CodeFragment EPrimNary::compileDirect(CompileCtx& ctx) const {
     if (_op == EPrimNary::logicAnd || _op == EPrimNary::logicOr) {
@@ -1082,6 +1104,8 @@ static stdx::unordered_map<EFn, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::aggRemovableBottomNFinalize, false}},
     {EFn::kValueBlockExists,
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::valueBlockExists, false}},
+    {EFn::kValueBlockIsNullish,
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::valueBlockIsNullish, false}},
     {EFn::kValueBlockTypeMatch,
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockTypeMatch, false}},
     {EFn::kValueBlockIsTimezone,
@@ -1366,6 +1390,7 @@ static stdx::unordered_map<EFn, InstrFn> kInstrFunctions = {
     {EFn::kIsDate, InstrFn{1, generator<1, &vm::CodeFragment::appendIsDate>, false}},
     {EFn::kIsNumber, InstrFn{1, generator<1, &vm::CodeFragment::appendIsNumber>, false}},
     {EFn::kIsNull, InstrFn{1, generator<1, &vm::CodeFragment::appendIsNull>, false}},
+    {EFn::kIsNullish, InstrFn{1, generator<1, &vm::CodeFragment::appendIsNullish>, false}},
     {EFn::kIsObject, InstrFn{1, generator<1, &vm::CodeFragment::appendIsObject>, false}},
     {EFn::kIsArray, InstrFn{1, generator<1, &vm::CodeFragment::appendIsArray>, false}},
     {EFn::kIsInList, InstrFn{1, generator<1, &vm::CodeFragment::appendIsInList>, false}},
@@ -1531,7 +1556,9 @@ vm::CodeFragment EIf::compileDirect(CompileCtx& ctx) const {
         auto code = _nodes[0]->compileDirect(ctx);
 
         // Compile the jumps
-        code.appendLabelJumpNothing(endLabel);
+        if (!cannotReturnNothing(_nodes[0])) {
+            code.appendLabelJumpNothing(endLabel);
+        }
         code.appendLabelJumpTrue(thenLabel);
 
         // Compile else-branch
@@ -1619,7 +1646,9 @@ vm::CodeFragment ESwitch::compileDirect(CompileCtx& ctx) const {
         // Compile the condition
         auto code = getCondition(i)->compileDirect(ctx);
         // Compile the jumps
-        code.appendLabelJumpNothing(endLabel);
+        if (!cannotReturnNothing(getCondition(i))) {
+            code.appendLabelJumpNothing(endLabel);
+        }
         code.appendLabelJumpTrue(labels[i]);
         mainCode.append(std::move(code));
     }
@@ -1700,10 +1729,7 @@ vm::CodeFragment ELocalBind::compileDirect(CompileCtx& ctx) const {
     // After the execution we have to cleanup the stack; i.e. local variables go out of scope.
     // However, note that the top of the stack holds the overall result (i.e. the 'in' expression)
     // and it cannot be destroyed. So we 'bubble' it down with a series of swap/pop instructions.
-    for (size_t idx = 0; idx < _nodes.size() - 1; ++idx) {
-        code.appendSwap();
-        code.appendPop();
-    }
+    code.appendSwapAndPop(_nodes.size() - 1);
 
     // Local variables are no longer accessible after this point so remove the frame.
     code.removeFrame(_frameId);

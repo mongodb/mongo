@@ -128,10 +128,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
         code.appendSub({0, 0, frameId}, {});
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 2; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(2);
 
         runTest(code);
     }
@@ -152,10 +149,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
         code.append(std::move(code2));
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 2; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(2);
 
         runTest(code);
     }
@@ -182,10 +176,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
 
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 2; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(2);
 
         runTest(code);
     }
@@ -212,10 +203,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
 
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 2; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(2);
 
         runTest(code);
     }
@@ -239,10 +227,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
         code.appendSub({}, {0, 0, frameId});
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 2; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(2);
 
         runTest(code);
     }
@@ -263,10 +248,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
         code.append(std::move(code2));
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 2; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(2);
 
         runTest(code);
     }
@@ -293,10 +275,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
 
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 2; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(2);
 
         runTest(code);
     }
@@ -323,10 +302,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
 
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 2; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(2);
 
         runTest(code);
     }
@@ -351,10 +327,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_BothOnFrame) {
         code.appendSub({0, 0, frameId}, {1, 0, frameId});
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 3; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(3);
 
         runTest(code);
     }
@@ -375,10 +348,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_BothOnFrame) {
         code.append(std::move(code2));
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 3; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(3);
 
         runTest(code);
     }
@@ -402,10 +372,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_BothOnFrame) {
 
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 3; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(3);
 
         runTest(code);
     }
@@ -430,10 +397,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal) {
         code.append(std::move(code2));
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 2; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(2);
 
         runTest(code);
     }
@@ -450,10 +414,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal) {
         code.appendLocalVal(frameId, 0, false);
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 2; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(2);
 
         runTest(code);
     }
@@ -505,10 +466,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         code.append(std::move(code2));
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 3; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(3);
 
         runTest(code);
     }
@@ -533,10 +491,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         code.append(std::move(code2));
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 3; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(3);
 
         runTest(code);
     }
@@ -567,10 +522,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         code.append(std::move(instr));
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 3; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(3);
 
         runTest(code);
     }
@@ -601,10 +553,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         code.append(std::move(code2));
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 3; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(3);
 
         runTest(code);
     }
@@ -638,10 +587,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         code.append(std::move(code2));
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 3; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(3);
 
         runTest(code);
     }
@@ -661,10 +607,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         code.appendSub({}, {});
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 3; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(3);
 
         runTest(code);
     }
@@ -697,10 +640,7 @@ TEST_F(SBECodeFragmentTest, AppendMakeOwn) {
         code.append(std::move(code2));
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 3; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(3);
 
         runTest(code);
     }
@@ -730,10 +670,7 @@ TEST_F(SBECodeFragmentTest, DeclareFrameNotEmptyStack) {
         code.append(std::move(code2));
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 5; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(5);
 
         runTest(code);
     }
@@ -755,10 +692,7 @@ TEST_F(SBECodeFragmentTest, DeclareFrameNotEmptyStack) {
         code.appendLocalVal(frameId, 0, false);
         code.removeFrame(frameId);
 
-        for (int i = 0; i < 5; i++) {
-            code.appendSwap();
-            code.appendPop();
-        }
+        code.appendSwapAndPop(5);
 
         runTest(code);
     }

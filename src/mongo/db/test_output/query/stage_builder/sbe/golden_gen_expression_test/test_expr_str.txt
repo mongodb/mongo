@@ -5,7 +5,7 @@ ExpressionConcat
         l2.0 = getField(s1, "pattern") 
     ] 
     in 
-        if (typeMatch(l2.0, 1088) ?: true) 
+        if isNullish(l2.0) 
         then null 
         elif isString(l2.0) 
         then concat("This is", " a ", move(l2.0)) 
@@ -18,7 +18,7 @@ ExpressionSplit
         l4.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l4.0, 1088) ?: true) 
+        if isNullish(l4.0) 
         then null 
         elif !(isString(l4.0)) 
         then fail(7158202, "$split string expression must be a string") 
@@ -33,7 +33,7 @@ ExpressionStrcasecmp
         l7.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l7.0, 1088) ?: true) 
+        if isNullish(l7.0) 
         then "" 
         elif typeMatch(l7.0, 999942) 
         then toUpper(coerceToString(move(l7.0))) 
@@ -46,7 +46,7 @@ ExpressionSubstrBytes
         l9.0 = getField(s1, "str") 
     ] 
     in substrBytes(
-        if (typeMatch(l9.0, 1088) ?: true) 
+        if isNullish(l9.0) 
         then "" 
         elif (coerceToString(l9.0) ?: true) 
         then fail(5155608, "$substrBytes: string expression could not be resolved to a string") 
@@ -60,7 +60,7 @@ ExpressionSubstrCP
         l11.0 = getField(s1, "str") 
     ] 
     in substrCP(
-        if (typeMatch(l11.0, 1088) ?: true) 
+        if isNullish(l11.0) 
         then "" 
         elif (coerceToString(l11.0) ?: true) 
         then fail(5155708, "$substrCP: string expression could not be resolved to a string") 
@@ -96,7 +96,7 @@ ExpressionToLower
         l17.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l17.0, 1088) ?: true) 
+        if isNullish(l17.0) 
         then "" 
         elif typeMatch(l17.0, 999942) 
         then toLower(coerceToString(move(l17.0))) 
@@ -109,7 +109,7 @@ ExpressionToUpper
         l19.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l19.0, 1088) ?: true) 
+        if isNullish(l19.0) 
         then "" 
         elif typeMatch(l19.0, 999942) 
         then toUpper(coerceToString(move(l19.0))) 
@@ -122,7 +122,7 @@ ExpressionTrim
         l21.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l21.0, 1088) ?: true) 
+        if isNullish(l21.0) 
         then null 
         elif isString(l21.0) 
         then trim(move(l21.0), ".") 
@@ -135,7 +135,7 @@ ExpressionIndexOfBytes
         l23.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l23.0, 1088) ?: true) 
+        if isNullish(l23.0) 
         then null 
         elif isString(l23.0) 
         then indexOfBytes(move(l23.0), "is", 
@@ -152,7 +152,7 @@ ExpressionIndexOfCP
         l25.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l25.0, 1088) ?: true) 
+        if isNullish(l25.0) 
         then null 
         elif isString(l25.0) 
         then indexOfCP(move(l25.0), "is", 
@@ -169,7 +169,7 @@ ExpressionIndexOfCP
         l27.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l27.0, 1088) ?: true) 
+        if isNullish(l27.0) 
         then null 
         elif isString(l27.0) 
         then indexOfCP(move(l27.0), " ", 
@@ -190,7 +190,7 @@ ExpressionRegexFind
         l30.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l30.0, 1088) ?: true) 
+        if isNullish(l30.0) 
         then null 
         elif isString(l30.0) 
         then 
@@ -212,7 +212,7 @@ ExpressionRegexFindAll
         l34.1 = getField(s1, "pattern") 
     ] 
     in 
-        if (typeMatch(l34.0, 1088) ?: true) 
+        if isNullish(l34.0) 
         then [] 
         elif isString(l34.0) 
         then 
@@ -251,7 +251,7 @@ ExpressionRegexMatch
         l38.0 = getField(s1, "str") 
     ] 
     in 
-        if (typeMatch(l38.0, 1088) ?: true) 
+        if isNullish(l38.0) 
         then false 
         elif isString(l38.0) 
         then 

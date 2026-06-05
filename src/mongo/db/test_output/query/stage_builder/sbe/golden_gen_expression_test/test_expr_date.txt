@@ -5,7 +5,7 @@ ExpressionDateAdd
         l2.0 = getField(s1, "date1") 
     ] 
     in 
-        if (typeMatch(l2.0, 1088) ?: true) 
+        if isNullish(l2.0) 
         then null 
         elif !(isTimezone(s2, "America/New_York")) 
         then fail(7157903, "$dateAdd expects a valid timezone") 
@@ -20,7 +20,7 @@ ExpressionDateSubtract
         l4.0 = getField(s1, "date1") 
     ] 
     in 
-        if (typeMatch(l4.0, 1088) ?: true) 
+        if isNullish(l4.0) 
         then null 
         elif !(isTimezone(s2, "America/New_York")) 
         then fail(7157903, "$dateSubtract expects a valid timezone") 
@@ -36,9 +36,9 @@ ExpressionDateDiff
         l6.1 = getField(s1, "date2") 
     ] 
     in 
-        if (typeMatch(l6.0, 1088) ?: true) 
+        if isNullish(l6.0) 
         then null 
-        elif (typeMatch(l6.1, 1088) ?: true) 
+        elif isNullish(l6.1) 
         then null 
         elif !(isTimezone(s2, "America/New_York")) 
         then fail(7157920, "$dateDiff parameter 'timezone' must be a valid timezone") 
@@ -55,7 +55,7 @@ ExpressionDateFromString
         l8.0 = getField(s1, "dateStr") 
     ] 
     in 
-        if (typeMatch(l8.0, 1088) ?: true) 
+        if isNullish(l8.0) 
         then null 
         elif isString(l8.0) 
         then dateFromString(s2, move(l8.0), "GMT", "%m/%d/%Y %H:%M:%S") 
@@ -73,7 +73,7 @@ ExpressionDateToParts
     in 
         if !(isTimezone(s2, "UTC")) 
         then fail(7157913, "$dateToParts timezone must be a valid timezone") 
-        elif (typeMatch(l23.0, 1088) ?: true) 
+        elif isNullish(l23.0) 
         then null 
         elif typeMatch(l23.0, 131712) 
         then dateToParts(s2, move(l23.0), "UTC", false) 
@@ -89,7 +89,7 @@ ExpressionDateToString
     in 
         if exists(l25.1) 
         then makeOwn(move(l25.1)) 
-        elif (typeMatch(l25.0, 1088) ?: true) 
+        elif isNullish(l25.0) 
         then false 
         elif typeMatch(move(l25.0), 131712) 
         then Nothing 
@@ -106,7 +106,7 @@ ExpressionDateTrunc
         if exists(l28.1) 
         then makeOwn(move(l28.1)) 
         else 
-            if (typeMatch(l28.0, 1088) ?: true) 
+            if isNullish(l28.0) 
             then null 
             elif typeMatch(move(l28.0), 131712) 
             then Nothing 
@@ -122,7 +122,7 @@ ExpressionDayOfMonth
     in 
         if exists(l30.1) 
         then makeOwn(move(l30.1)) 
-        elif (typeMatch(l30.0, 1088) ?: true) 
+        elif isNullish(l30.0) 
         then null 
         elif typeMatch(move(l30.0), 131712) 
         then Nothing 
@@ -138,7 +138,7 @@ ExpressionDayOfWeek
     in 
         if exists(l32.1) 
         then makeOwn(move(l32.1)) 
-        elif (typeMatch(l32.0, 1088) ?: true) 
+        elif isNullish(l32.0) 
         then null 
         elif typeMatch(move(l32.0), 131712) 
         then Nothing 
@@ -154,7 +154,7 @@ ExpressionDayOfYear
     in 
         if exists(l34.1) 
         then makeOwn(move(l34.1)) 
-        elif (typeMatch(l34.0, 1088) ?: true) 
+        elif isNullish(l34.0) 
         then null 
         elif typeMatch(move(l34.0), 131712) 
         then Nothing 
@@ -170,7 +170,7 @@ ExpressionHour
     in 
         if exists(l36.1) 
         then makeOwn(move(l36.1)) 
-        elif (typeMatch(l36.0, 1088) ?: true) 
+        elif isNullish(l36.0) 
         then null 
         elif typeMatch(move(l36.0), 131712) 
         then Nothing 
@@ -186,7 +186,7 @@ ExpressionMillisecond
     in 
         if exists(l38.1) 
         then makeOwn(move(l38.1)) 
-        elif (typeMatch(l38.0, 1088) ?: true) 
+        elif isNullish(l38.0) 
         then null 
         elif typeMatch(move(l38.0), 131712) 
         then Nothing 
@@ -202,7 +202,7 @@ ExpressionMinute
     in 
         if exists(l40.1) 
         then makeOwn(move(l40.1)) 
-        elif (typeMatch(l40.0, 1088) ?: true) 
+        elif isNullish(l40.0) 
         then null 
         elif typeMatch(move(l40.0), 131712) 
         then Nothing 
@@ -218,7 +218,7 @@ ExpressionMonth
     in 
         if exists(l42.1) 
         then makeOwn(move(l42.1)) 
-        elif (typeMatch(l42.0, 1088) ?: true) 
+        elif isNullish(l42.0) 
         then null 
         elif typeMatch(move(l42.0), 131712) 
         then Nothing 
@@ -234,7 +234,7 @@ ExpressionSecond
     in 
         if exists(l44.1) 
         then makeOwn(move(l44.1)) 
-        elif (typeMatch(l44.0, 1088) ?: true) 
+        elif isNullish(l44.0) 
         then null 
         elif typeMatch(move(l44.0), 131712) 
         then Nothing 
@@ -250,7 +250,7 @@ ExpressionWeek
     in 
         if exists(l46.1) 
         then makeOwn(move(l46.1)) 
-        elif (typeMatch(l46.0, 1088) ?: true) 
+        elif isNullish(l46.0) 
         then null 
         elif typeMatch(move(l46.0), 131712) 
         then Nothing 
@@ -266,7 +266,7 @@ ExpressionIsoWeekYear
     in 
         if exists(l48.1) 
         then makeOwn(move(l48.1)) 
-        elif (typeMatch(l48.0, 1088) ?: true) 
+        elif isNullish(l48.0) 
         then null 
         elif typeMatch(move(l48.0), 131712) 
         then Nothing 
@@ -282,7 +282,7 @@ ExpressionIsoDayOfWeek
     in 
         if exists(l50.1) 
         then makeOwn(move(l50.1)) 
-        elif (typeMatch(l50.0, 1088) ?: true) 
+        elif isNullish(l50.0) 
         then null 
         elif typeMatch(move(l50.0), 131712) 
         then Nothing 
@@ -298,7 +298,7 @@ ExpressionYear
     in 
         if exists(l52.1) 
         then makeOwn(move(l52.1)) 
-        elif (typeMatch(l52.0, 1088) ?: true) 
+        elif isNullish(l52.0) 
         then null 
         elif typeMatch(move(l52.0), 131712) 
         then Nothing 
@@ -311,7 +311,7 @@ ExpressionTsSecond
         l54.0 = getField(s1, "ts") 
     ] 
     in 
-        if (typeMatch(l54.0, 1088) ?: true) 
+        if isNullish(l54.0) 
         then null 
         elif isTimestamp(l54.0) 
         then tsSecond(move(l54.0)) 
@@ -324,7 +324,7 @@ ExpressionTsIncrement
         l56.0 = getField(s1, "ts") 
     ] 
     in 
-        if (typeMatch(l56.0, 1088) ?: true) 
+        if isNullish(l56.0) 
         then null 
         elif isTimestamp(l56.0) 
         then tsIncrement(move(l56.0)) 

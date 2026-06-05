@@ -9,7 +9,7 @@ NothingCheck_EqNull_ScalarIntermediate
         then traverseF(move(l4.0), lambda(l5.0) { 
             if (isObject(l5.0) ?: false) 
             then traverseF(getField(move(l5.0), "b"), lambda(l6.0) { ((
-                if (typeMatch(l6.0, 1024) ?: true) 
+                if (isNull(l6.0) ?: true) 
                 then null 
                 else move(l6.0) 
             == null) ?: false) }, false) 
@@ -28,7 +28,7 @@ NothingCheck_LteNull_ScalarIntermediate
         then traverseF(move(l10.0), lambda(l11.0) { 
             if (isObject(l11.0) ?: false) 
             then traverseF(getField(move(l11.0), "b"), lambda(l12.0) { ((
-                if (typeMatch(l12.0, 1024) ?: true) 
+                if (isNull(l12.0) ?: true) 
                 then null 
                 else move(l12.0) 
             <= null) ?: false) }, false) 
@@ -47,7 +47,7 @@ NothingCheck_GteNull_ScalarIntermediate
         then traverseF(move(l16.0), lambda(l17.0) { 
             if (isObject(l17.0) ?: false) 
             then traverseF(getField(move(l17.0), "b"), lambda(l18.0) { ((
-                if (typeMatch(l18.0, 1024) ?: true) 
+                if (isNull(l18.0) ?: true) 
                 then null 
                 else move(l18.0) 
             >= null) ?: false) }, false) 
@@ -66,7 +66,7 @@ NothingCheck_InNull_ScalarIntermediate
         then traverseF(move(l22.0), lambda(l23.0) { 
             if (isObject(l23.0) ?: false) 
             then traverseF(getField(move(l23.0), "b"), lambda(l24.0) { isMember(
-                if (typeMatch(l24.0, 1024) ?: true) 
+                if (isNull(l24.0) ?: true) 
                 then null 
                 else move(l24.0) 
            , s2) }, false) 
@@ -85,7 +85,7 @@ NothingCheck_EqNull_ObjectIntermediate
         then traverseF(move(l28.0), lambda(l29.0) { 
             if (isObject(l29.0) ?: false) 
             then traverseF(getField(move(l29.0), "b"), lambda(l30.0) { ((
-                if (typeMatch(l30.0, 1024) ?: true) 
+                if (isNull(l30.0) ?: true) 
                 then null 
                 else move(l30.0) 
             == null) ?: false) }, false) 
@@ -104,7 +104,7 @@ NothingCheck_EqNull_MissingField
         then traverseF(move(l34.0), lambda(l35.0) { 
             if (isObject(l35.0) ?: false) 
             then traverseF(getField(move(l35.0), "b"), lambda(l36.0) { ((
-                if (typeMatch(l36.0, 1024) ?: true) 
+                if (isNull(l36.0) ?: true) 
                 then null 
                 else move(l36.0) 
             == null) ?: false) }, false) 

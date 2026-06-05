@@ -86,6 +86,8 @@ TypeSignature TypeSignature::kBooleanType = getTypeSignature(sbe::value::TypeTag
 TypeSignature TypeSignature::kDateTimeType =
     getTypeSignature(sbe::value::TypeTags::Date, sbe::value::TypeTags::Timestamp);
 TypeSignature TypeSignature::kNothingType = getTypeSignature(sbe::value::TypeTags::Nothing);
+TypeSignature TypeSignature::kNullishType = getTypeSignature(
+    sbe::value::TypeTags::Nothing, sbe::value::TypeTags::Null, sbe::value::TypeTags::bsonUndefined);
 TypeSignature TypeSignature::kNumericType = getTypeSignature(sbe::value::TypeTags::NumberInt32,
                                                              sbe::value::TypeTags::NumberInt64,
                                                              sbe::value::TypeTags::NumberDecimal,

@@ -8,7 +8,7 @@ ExpressionAdd
         l3.0 = getField(s1, "field1") 
     ] 
     in 
-        if (typeMatch(l3.0, 1088) ?: true) 
+        if isNullish(l3.0) 
         then null 
         elif ((0 + 
             if isNumber(l3.0) 
@@ -30,7 +30,7 @@ ExpressionDivide
         l6.0 = getField(s1, "field1") 
     ] 
     in 
-        if (typeMatch(l6.0, 1088) ?: true) 
+        if isNullish(l6.0) 
         then null 
         elif isNumber(l6.0) 
         then (9 / move(l6.0)) 
@@ -63,7 +63,7 @@ ExpressionMod
         l12.0 = getField(s1, "field1") 
     ] 
     in 
-        if (typeMatch(l12.0, 1088) ?: true) 
+        if isNullish(l12.0) 
         then null 
         elif isNumber(l12.0) 
         then mod(19, move(l12.0)) 
@@ -76,7 +76,7 @@ ExpressionMultiply
         l14.0 = getField(s1, "field1") 
     ] 
     in 
-        if (typeMatch(l14.0, 1088) ?: true) 
+        if isNullish(l14.0) 
         then null 
         elif isNumber(l14.0) 
         then (4.5L * move(l14.0)) 
@@ -89,7 +89,7 @@ ExpressionPow
         l16.0 = getField(s1, "field1") 
     ] 
     in (pow(4, l16.0) ?: 
-        if (typeMatch(l16.0, 1088) ?: true) 
+        if isNullish(l16.0) 
         then null 
         elif isNumber(l16.0) 
         then Nothing 
@@ -103,7 +103,7 @@ ExpressionRound
         l18.0 = getField(s1, "field1") 
     ] 
     in 
-        if (typeMatch(l18.0, 1088) ?: true) 
+        if isNullish(l18.0) 
         then null 
         elif (((l18.0 != trunc(l18.0)) ?: true) || (l18.0 < -20) || (l18.0 > 100)) 
         then fail(5155301, "$round requires "place" argument to be an integer between -20 and 100") 
@@ -116,7 +116,7 @@ ExpressionSubtract
         l20.0 = getField(s1, "field1") 
     ] 
     in 
-        if (typeMatch(l20.0, 1088) ?: true) 
+        if isNullish(l20.0) 
         then null 
         elif 
             if isNumber(l20.0) 
@@ -133,7 +133,7 @@ ExpressionSqrt
         l22.0 = getField(s1, "field1") 
     ] 
     in 
-        if (typeMatch(l22.0, 1088) ?: true) 
+        if isNullish(l22.0) 
         then null 
         elif !(isNumber(l22.0)) 
         then fail(7157709, "$sqrt only supports numeric types") 
@@ -150,7 +150,7 @@ ExpressionCosine
                 l26.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l26.0, 1088) ?: true) 
+                if isNullish(l26.0) 
                 then null 
                 elif !(isNumber(l26.0)) 
                 then fail(7157802, "$cos supports only numeric types") 
@@ -161,7 +161,7 @@ ExpressionCosine
                 else fail(7157803, "Cannot apply $cos, value must be in (-inf, inf)") 
     ] 
     in 
-        if (typeMatch(l25.0, 1088) ?: true) 
+        if isNullish(l25.0) 
         then null 
         elif !(isNumber(l25.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -178,7 +178,7 @@ ExpressionSine
                 l30.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l30.0, 1088) ?: true) 
+                if isNullish(l30.0) 
                 then null 
                 elif !(isNumber(l30.0)) 
                 then fail(7157802, "$sin supports only numeric types") 
@@ -189,7 +189,7 @@ ExpressionSine
                 else fail(7157803, "Cannot apply $sin, value must be in (-inf, inf)") 
     ] 
     in 
-        if (typeMatch(l29.0, 1088) ?: true) 
+        if isNullish(l29.0) 
         then null 
         elif !(isNumber(l29.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -206,7 +206,7 @@ ExpressionTangent
                 l34.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l34.0, 1088) ?: true) 
+                if isNullish(l34.0) 
                 then null 
                 elif !(isNumber(l34.0)) 
                 then fail(7157802, "$tan supports only numeric types") 
@@ -217,7 +217,7 @@ ExpressionTangent
                 else fail(7157803, "Cannot apply $tan, value must be in (-inf, inf)") 
     ] 
     in 
-        if (typeMatch(l33.0, 1088) ?: true) 
+        if isNullish(l33.0) 
         then null 
         elif !(isNumber(l33.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -234,7 +234,7 @@ ExpressionArcCosine
                 l38.0 = getField(s1, "field2") 
             ] 
             in 
-                if (typeMatch(l38.0, 1088) ?: true) 
+                if isNullish(l38.0) 
                 then null 
                 elif !(isNumber(l38.0)) 
                 then fail(7157802, "$acos supports only numeric types") 
@@ -245,7 +245,7 @@ ExpressionArcCosine
                 else fail(7157803, "Cannot apply $acos, value must be in [-1, 1]") 
     ] 
     in 
-        if (typeMatch(l37.0, 1088) ?: true) 
+        if isNullish(l37.0) 
         then null 
         elif !(isNumber(l37.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -262,7 +262,7 @@ ExpressionArcSine
                 l42.0 = getField(s1, "field2") 
             ] 
             in 
-                if (typeMatch(l42.0, 1088) ?: true) 
+                if isNullish(l42.0) 
                 then null 
                 elif !(isNumber(l42.0)) 
                 then fail(7157802, "$asin supports only numeric types") 
@@ -273,7 +273,7 @@ ExpressionArcSine
                 else fail(7157803, "Cannot apply $asin, value must be in [-1, 1]") 
     ] 
     in 
-        if (typeMatch(l41.0, 1088) ?: true) 
+        if isNullish(l41.0) 
         then null 
         elif !(isNumber(l41.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -290,14 +290,14 @@ ExpressionArcTangent
                 l46.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l46.0, 1088) ?: true) 
+                if isNullish(l46.0) 
                 then null 
                 elif isNumber(l46.0) 
                 then atan(move(l46.0)) 
                 else fail(7157800, "$atan supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l45.0, 1088) ?: true) 
+        if isNullish(l45.0) 
         then null 
         elif !(isNumber(l45.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -315,14 +315,14 @@ ExpressionArcTangent2
                 l50.1 = getField(s1, "field2") 
             ] 
             in 
-                if ((typeMatch(l50.0, 1088) ?: true) || (typeMatch(l50.1, 1088) ?: true)) 
+                if (isNullish(l50.0) || isNullish(l50.1)) 
                 then null 
                 elif (isNumber(l50.0) && isNumber(l50.1)) 
                 then atan2(move(l50.0), move(l50.1)) 
                 else fail(7157801, "$atan2 supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l49.0, 1088) ?: true) 
+        if isNullish(l49.0) 
         then null 
         elif !(isNumber(l49.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -339,7 +339,7 @@ ExpressionHyperbolicArcTangent
                 l54.0 = getField(s1, "field2") 
             ] 
             in 
-                if (typeMatch(l54.0, 1088) ?: true) 
+                if isNullish(l54.0) 
                 then null 
                 elif !(isNumber(l54.0)) 
                 then fail(7157802, "$atanh supports only numeric types") 
@@ -350,7 +350,7 @@ ExpressionHyperbolicArcTangent
                 else fail(7157803, "Cannot apply $atanh, value must be in [-1, 1]") 
     ] 
     in 
-        if (typeMatch(l53.0, 1088) ?: true) 
+        if isNullish(l53.0) 
         then null 
         elif !(isNumber(l53.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -367,7 +367,7 @@ ExpressionHyperbolicArcCosine
                 l58.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l58.0, 1088) ?: true) 
+                if isNullish(l58.0) 
                 then null 
                 elif !(isNumber(l58.0)) 
                 then fail(7157802, "$acosh supports only numeric types") 
@@ -378,7 +378,7 @@ ExpressionHyperbolicArcCosine
                 else fail(7157803, "Cannot apply $acosh, value must be in [1, inf]") 
     ] 
     in 
-        if (typeMatch(l57.0, 1088) ?: true) 
+        if isNullish(l57.0) 
         then null 
         elif !(isNumber(l57.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -395,14 +395,14 @@ ExpressionHyperbolicArcSine
                 l62.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l62.0, 1088) ?: true) 
+                if isNullish(l62.0) 
                 then null 
                 elif isNumber(l62.0) 
                 then asinh(move(l62.0)) 
                 else fail(7157800, "$asinh supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l61.0, 1088) ?: true) 
+        if isNullish(l61.0) 
         then null 
         elif !(isNumber(l61.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -419,14 +419,14 @@ ExpressionHyperbolicCosine
                 l66.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l66.0, 1088) ?: true) 
+                if isNullish(l66.0) 
                 then null 
                 elif isNumber(l66.0) 
                 then cosh(move(l66.0)) 
                 else fail(7157800, "$cosh supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l65.0, 1088) ?: true) 
+        if isNullish(l65.0) 
         then null 
         elif !(isNumber(l65.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -443,14 +443,14 @@ ExpressionHyperbolicSine
                 l70.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l70.0, 1088) ?: true) 
+                if isNullish(l70.0) 
                 then null 
                 elif isNumber(l70.0) 
                 then sinh(move(l70.0)) 
                 else fail(7157800, "$sinh supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l69.0, 1088) ?: true) 
+        if isNullish(l69.0) 
         then null 
         elif !(isNumber(l69.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -467,14 +467,14 @@ ExpressionHyperbolicTangent
                 l74.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l74.0, 1088) ?: true) 
+                if isNullish(l74.0) 
                 then null 
                 elif isNumber(l74.0) 
                 then tanh(move(l74.0)) 
                 else fail(7157800, "$tanh supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l73.0, 1088) ?: true) 
+        if isNullish(l73.0) 
         then null 
         elif !(isNumber(l73.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -491,14 +491,14 @@ ExpressionDegreesToRadians
                 l78.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l78.0, 1088) ?: true) 
+                if isNullish(l78.0) 
                 then null 
                 elif isNumber(l78.0) 
                 then degreesToRadians(move(l78.0)) 
                 else fail(7157800, "$degreesToRadians supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l77.0, 1088) ?: true) 
+        if isNullish(l77.0) 
         then null 
         elif !(isNumber(l77.0)) 
         then fail(5155300, "$trunc only supports numeric types") 
@@ -515,14 +515,14 @@ ExpressionRadiansToDegrees
                 l82.0 = getField(s1, "field1") 
             ] 
             in 
-                if (typeMatch(l82.0, 1088) ?: true) 
+                if isNullish(l82.0) 
                 then null 
                 elif isNumber(l82.0) 
                 then radiansToDegrees(move(l82.0)) 
                 else fail(7157800, "$radiansToDegrees supports only numeric types") 
     ] 
     in 
-        if (typeMatch(l81.0, 1088) ?: true) 
+        if isNullish(l81.0) 
         then null 
         elif !(isNumber(l81.0)) 
         then fail(5155300, "$trunc only supports numeric types") 

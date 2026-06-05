@@ -32,7 +32,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/unittest/unittest.h"
@@ -150,6 +149,25 @@ TEST(TypeCheckerTest, FoldFillEmptyInComplexCheck) {
     TypeChecker{}.typeCheck(tree);
 
     ASSERT(tree.is<BinaryOp>() && tree.cast<BinaryOp>()->op() == Operations::And);
+}
+
+TEST(TypeCheckerTest, FoldIsNullishInComplexNaryCheck) {
+    // Run both IsNullish+Exists and IsString as part of an And, and expect that the resulting
+    // expression replaced IsString with a constant (because IsNullish+Exists would have excluded
+    // the possibility that the variable is a string).
+    auto tree = make<If>(
+        make<NaryOp>(Operations::And,
+                     makeSeq(make<FunctionCall>("isNullish", makeSeq(make<Variable>("inputVar"))),
+                             make<FunctionCall>("exists", makeSeq(make<Variable>("inputVar"))),
+                             make<FunctionCall>("isString", makeSeq(make<Variable>("inputVar"))))),
+        Constant::str("impossible"),
+        Constant::boolean(true));
+
+    TypeChecker{}.typeCheck(tree);
+
+    ASSERT(tree.is<If>() && tree.cast<If>()->getCondChild().is<NaryOp>() &&
+           tree.cast<If>()->getCondChild().cast<NaryOp>()->op() == Operations::And &&
+           tree.cast<If>()->getCondChild().cast<NaryOp>()->nodes().back().is<Constant>());
 }
 
 TEST(TypeCheckerTest, FoldFillEmptyInComplexNaryCheck) {

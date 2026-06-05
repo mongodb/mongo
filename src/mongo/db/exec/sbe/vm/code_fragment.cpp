@@ -447,8 +447,26 @@ void CodeFragment::appendPop() {
     appendSimpleInstruction(Instruction::pop);
 }
 
-void CodeFragment::appendSwap() {
-    appendSimpleInstruction(Instruction::swap);
+void CodeFragment::appendSwapAndPop(size_t numPops) {
+    auto popOperation = [&](unsigned char numPops) {
+        Instruction i;
+        i.tag = Instruction::swapAndPop;
+
+        auto offset = allocateSpace(sizeof(Instruction) + sizeof(numPops));
+
+        offset += writeToMemory(offset, i);
+        offset += writeToMemory(offset, numPops);
+        _stackSize -= numPops;
+    };
+
+    size_t maxPops = std::numeric_limits<unsigned char>::max();
+    while (numPops > maxPops) {
+        popOperation(maxPops);
+        numPops -= maxPops;
+    }
+    if (numPops > 0) {
+        popOperation(numPops);
+    }
 }
 
 void CodeFragment::appendMakeOwn(Instruction::Parameter arg) {
@@ -684,6 +702,10 @@ void CodeFragment::appendExists(Instruction::Parameter input) {
 
 void CodeFragment::appendIsNull(Instruction::Parameter input) {
     appendSimpleInstruction(Instruction::isNull, input);
+}
+
+void CodeFragment::appendIsNullish(Instruction::Parameter input) {
+    appendSimpleInstruction(Instruction::isNullish, input);
 }
 
 void CodeFragment::appendIsObject(Instruction::Parameter input) {

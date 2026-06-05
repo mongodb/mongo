@@ -83,6 +83,56 @@ value::TagValueOwned ByteCode::builtinValueBlockExists(ArityType arity) {
                                 value::bitcastFrom<value::ValueBlock*>(out.release()));
 }
 
+/*
+ * Given a ValueBlock as input, returns a BoolBlock indicating whether each value in the input was
+ * either Nothing, Null or Undefined.
+ */
+value::TagValueOwned ByteCode::builtinValueBlockIsNullish(ArityType arity) {
+    tassert(12697000, "Unexpected arity value", arity == 1);
+    auto input = viewFromStack(0);
+
+    tassert(12697001,
+            "Expected argument to be of valueBlock type",
+            input.tag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(input.value);
+
+    uint32_t nullUndefinedTypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::null) |
+                                                           getBSONTypeMask(BSONType::undefined));
+    const auto cmpOp = value::makeColumnOp<ColumnOpType::kNoFlags>(
+        [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
+            if (tag == value::TypeTags::Nothing) {
+                return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
+            }
+            return {value::TypeTags::Boolean,
+                    value::bitcastFrom<bool>(
+                        static_cast<bool>(getBSONTypeMask(tag) & nullUndefinedTypeMask))};
+        },
+        [&](value::TypeTags inTag,
+            const value::Value* inVals,
+            value::TypeTags* outTags,
+            value::Value* outVals,
+            size_t count) {
+            auto [outTag, outVal] = [&]() -> std::pair<value::TypeTags, value::Value> {
+                if (inTag == value::TypeTags::Nothing) {
+                    return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
+                }
+                return {value::TypeTags::Boolean,
+                        value::bitcastFrom<bool>(
+                            static_cast<bool>(getBSONTypeMask(inTag) & nullUndefinedTypeMask))};
+            }();
+
+            for (size_t index = 0; index < count; index++) {
+                outTags[index] = outTag;
+                outVals[index] = outVal;
+            }
+        });
+
+    auto valueBlockOut = valueBlockIn->map(cmpOp);
+
+    return value::TagValueOwned(value::TypeTags::valueBlock,
+                                value::bitcastFrom<value::ValueBlock*>(valueBlockOut.release()));
+}
+
 /* This instruction takes as input a ValueBlock and a type mask and returns a ValueBlock indicating
  * whether each value in the ValueBlock is of the type defined by the type mask. If the value is
  * Nothing then Nothing is returned. If no type mask is provided, it returns a MonoBlock with

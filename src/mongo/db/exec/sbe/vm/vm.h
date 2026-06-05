@@ -1029,6 +1029,7 @@ private:
     // Block builtins
 
     value::TagValueOwned builtinValueBlockExists(ArityType arity);
+    value::TagValueOwned builtinValueBlockIsNullish(ArityType arity);
     value::TagValueOwned builtinValueBlockTypeMatch(ArityType arity);
     value::TagValueOwned builtinValueBlockIsTimezone(ArityType arity);
     value::TagValueMaybeOwned builtinValueBlockFillEmpty(ArityType arity);
