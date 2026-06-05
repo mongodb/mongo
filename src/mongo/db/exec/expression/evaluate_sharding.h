@@ -37,12 +37,18 @@
 
 namespace mongo {
 
+class SimpleMemoryUsageTracker;
+
 namespace exec::expression {
 
 Value evaluate(const ExpressionInternalOwningShard& expr,
                const Document& root,
-               Variables* variables);
-Value evaluate(const ExpressionInternalIndexKey& expr, const Document& root, Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionInternalIndexKey& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
 }  // namespace exec::expression
 }  // namespace mongo

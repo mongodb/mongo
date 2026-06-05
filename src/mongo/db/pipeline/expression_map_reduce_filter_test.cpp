@@ -103,7 +103,8 @@ static Document fromJson(const std::string& json) {
 
 TEST_F(ExpressionMapReduceFilterTest, MapNonArray) {
     auto expressionMap = parse<ExpressionMap>("{ $map: {input: 'MongoDB', in: 15213}}");
-    ASSERT_CODE(expressionMap->evaluate(MutableDocument().freeze(), &getExpCtx().variables), 16883);
+    ASSERT_CODE(expressionMap->evaluate(MutableDocument().freeze(), &getExpCtx().variables, {}),
+                16883);
 }
 
 // Test several parsing errors.

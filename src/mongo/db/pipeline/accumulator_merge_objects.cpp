@@ -47,9 +47,9 @@ namespace mongo {
 /* ------------------------- AccumulatorMergeObjects ----------------------------- */
 
 template <>
-Value ExpressionFromAccumulator<AccumulatorMergeObjects>::evaluate(const Document& root,
-                                                                   Variables* variables) const {
-    return evaluateAccumulator(*this, root, variables);
+Value ExpressionFromAccumulator<AccumulatorMergeObjects>::evaluate(
+    const Document& root, Variables* variables, const EvaluationContext& ctx) const {
+    return evaluateAccumulator(*this, root, variables, ctx);
 }
 
 REGISTER_ACCUMULATOR(mergeObjects,

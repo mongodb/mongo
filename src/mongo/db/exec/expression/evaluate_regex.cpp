@@ -165,11 +165,12 @@ void compile(const boost::optional<std::string>& pattern,
 template <typename RegexExpression>
 RegexExecutionState buildInitialState(const RegexExpression& expr,
                                       const Document& root,
-                                      Variables* variables) {
-    Value textInput = expr.getInput()->evaluate(root, variables);
-    Value regexPattern = expr.getRegex()->evaluate(root, variables);
+                                      Variables* variables,
+                                      const EvaluationContext& ctx) {
+    Value textInput = expr.getInput()->evaluate(root, variables, ctx);
+    Value regexPattern = expr.getRegex()->evaluate(root, variables, ctx);
     Value regexOptions =
-        expr.getOptions() ? expr.getOptions()->evaluate(root, variables) : Value(BSONNULL);
+        expr.getOptions() ? expr.getOptions()->evaluate(root, variables, ctx) : Value(BSONNULL);
 
     RegexExecutionState executionState;
 
@@ -334,17 +335,23 @@ ExpressionRegex::PrecompiledRegex precompileRegex(const Value& regex,
     return precompiledRegex;
 }
 
-Value evaluate(const ExpressionRegexFind& expr, const Document& root, Variables* variables) {
-    auto executionState = buildInitialState(expr, root, variables);
+Value evaluate(const ExpressionRegexFind& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto executionState = buildInitialState(expr, root, variables, ctx);
     if (executionState.nullish()) {
         return Value(BSONNULL);
     }
     return nextMatch(&executionState, expr.getOpName());
 }
 
-Value evaluate(const ExpressionRegexFindAll& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionRegexFindAll& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     std::vector<Value> output;
-    auto executionState = buildInitialState(expr, root, variables);
+    auto executionState = buildInitialState(expr, root, variables, ctx);
     if (executionState.nullish()) {
         return Value(std::move(output));
     }
@@ -394,8 +401,11 @@ Value evaluate(const ExpressionRegexFindAll& expr, const Document& root, Variabl
     return Value(std::move(output));
 }
 
-Value evaluate(const ExpressionRegexMatch& expr, const Document& root, Variables* variables) {
-    auto state = buildInitialState(expr, root, variables);
+Value evaluate(const ExpressionRegexMatch& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto state = buildInitialState(expr, root, variables, ctx);
     if (state.nullish()) {
         return Value(false);
     }
@@ -431,10 +441,13 @@ void validateSplitArguments(const ExpressionSplit& expr,
 }
 }  // namespace
 
-Value evaluate(const ExpressionSplit& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionSplit& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
-    Value inputArg = children[0]->evaluate(root, variables);
-    Value separatorArg = children[1]->evaluate(root, variables);
+    Value inputArg = children[0]->evaluate(root, variables, ctx);
+    Value separatorArg = children[1]->evaluate(root, variables, ctx);
 
     if (inputArg.nullish() || separatorArg.nullish()) {
         return Value(BSONNULL);
@@ -508,11 +521,12 @@ Value evaluateReplace(
     ExpressionReplace& expr,
     const Document& root,
     Variables* variables,
+    const EvaluationContext& ctx,
     std::function<Value(StringData, StringData, StringData)> replaceOpStr,
     std::function<Value(StringData, RegexExecutionState, StringData)> replaceOpRegEx) {
-    Value input = expr.getInput()->evaluate(root, variables);
-    Value find = expr.getFind()->evaluate(root, variables);
-    Value replacement = expr.getReplacement()->evaluate(root, variables);
+    Value input = expr.getInput()->evaluate(root, variables, ctx);
+    Value find = expr.getFind()->evaluate(root, variables, ctx);
+    Value replacement = expr.getReplacement()->evaluate(root, variables, ctx);
 
     uassert(10503904,
             str::stream() << expr.getOpName()
@@ -562,7 +576,10 @@ Value evaluateReplace(
 }
 }  // namespace
 
-Value evaluate(const ExpressionReplaceOne& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionReplaceOne& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto replaceOneOp = [](StringData input, StringData find, StringData replacement) -> Value {
         size_t startIndex = input.find(find);
         if (startIndex == std::string::npos) {
@@ -589,10 +606,13 @@ Value evaluate(const ExpressionReplaceOne& expr, const Document& root, Variables
         output << beforeMatch << replacement << input.substr(executionState.beforeMatchStrStart);
         return Value(output.stringData());
     };
-    return evaluateReplace(expr, root, variables, replaceOneOp, replaceOneOpRegEx);
+    return evaluateReplace(expr, root, variables, ctx, replaceOneOp, replaceOneOpRegEx);
 }
 
-Value evaluate(const ExpressionReplaceAll& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionReplaceAll& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto replaceAllOpStr = [](StringData input, StringData find, StringData replacement) -> Value {
         // An empty string matches at every position, so replaceAll should insert 'replacement'
         // at every position when 'find' is empty. Handling this as a special case lets us
@@ -642,7 +662,7 @@ Value evaluate(const ExpressionReplaceAll& expr, const Document& root, Variables
 
         return Value(output.stringData());
     };
-    return evaluateReplace(expr, root, variables, replaceAllOpStr, replaceAllOpRegEx);
+    return evaluateReplace(expr, root, variables, ctx, replaceAllOpStr, replaceAllOpRegEx);
 }
 
 }  // namespace exec::expression

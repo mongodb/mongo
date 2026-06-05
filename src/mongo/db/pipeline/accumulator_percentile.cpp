@@ -61,8 +61,9 @@ namespace {
 template <typename TAccumulator>
 Value evaluateAccumulatorQuantile(const ExpressionFromAccumulatorQuantile<TAccumulator>& expr,
                                   const Document& root,
-                                  Variables* variables) {
-    auto input = expr.getInput()->evaluate(root, variables);
+                                  Variables* variables,
+                                  const EvaluationContext& ctx) {
+    auto input = expr.getInput()->evaluate(root, variables, ctx);
     if (input.numeric()) {
         // On a scalar value, all percentiles are the same for all methods.
         return TAccumulator::formatFinalValue(
@@ -101,14 +102,14 @@ Value evaluateAccumulatorQuantile(const ExpressionFromAccumulatorQuantile<TAccum
 
 template <>
 Value ExpressionFromAccumulatorQuantile<AccumulatorPercentile>::evaluate(
-    const Document& root, Variables* variables) const {
-    return evaluateAccumulatorQuantile(*this, root, variables);
+    const Document& root, Variables* variables, const EvaluationContext& ctx) const {
+    return evaluateAccumulatorQuantile(*this, root, variables, ctx);
 }
 
 template <>
-Value ExpressionFromAccumulatorQuantile<AccumulatorMedian>::evaluate(const Document& root,
-                                                                     Variables* variables) const {
-    return evaluateAccumulatorQuantile(*this, root, variables);
+Value ExpressionFromAccumulatorQuantile<AccumulatorMedian>::evaluate(
+    const Document& root, Variables* variables, const EvaluationContext& ctx) const {
+    return evaluateAccumulatorQuantile(*this, root, variables, ctx);
 }
 
 namespace {

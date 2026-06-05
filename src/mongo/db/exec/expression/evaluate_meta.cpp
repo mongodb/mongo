@@ -34,7 +34,10 @@ namespace mongo {
 
 namespace exec::expression {
 
-Value evaluate(const ExpressionMeta& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionMeta& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     const auto& metadata = root.metadata();
     switch (expr.getMetaType()) {
         case DocumentMetadataFields::MetaType::kScore:
@@ -105,17 +108,24 @@ Value evaluate(const ExpressionMeta& expr, const Document& root, Variables* vari
 
 Value evaluate(const ExpressionInternalRawSortKey& expr,
                const Document& root,
-               Variables* variables) {
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return root.metadata().getSortKey();
 }
 
-Value evaluate(const ExpressionType& expr, const Document& root, Variables* variables) {
-    Value val(expr.getChildren()[0]->evaluate(root, variables));
+Value evaluate(const ExpressionType& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value val(expr.getChildren()[0]->evaluate(root, variables, ctx));
     return Value(StringData(typeName(val.getType())));
 }
 
-Value evaluate(const ExpressionSubtype& expr, const Document& root, Variables* variables) {
-    Value val(expr.getChildren()[0]->evaluate(root, variables));
+Value evaluate(const ExpressionSubtype& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value val(expr.getChildren()[0]->evaluate(root, variables, ctx));
     if (val.nullish()) {
         return Value(BSONNULL);
     }
@@ -128,21 +138,30 @@ Value evaluate(const ExpressionSubtype& expr, const Document& root, Variables* v
     return Value(static_cast<int>(val.getBinData().type));
 }
 
-Value evaluate(const ExpressionTestApiVersion& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionTestApiVersion& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return Value(1);
 }
 
-Value evaluate(const ExpressionLet& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionLet& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     for (const auto& item : expr.getVariableMap()) {
         // It is guaranteed at parse-time that these expressions don't use the variable ids we
         // are setting
-        variables->setValue(item.first, item.second.expression->evaluate(root, variables));
+        variables->setValue(item.first, item.second.expression->evaluate(root, variables, ctx));
     }
 
-    return expr.getSubExpression()->evaluate(root, variables);
+    return expr.getSubExpression()->evaluate(root, variables, ctx);
 }
 
-Value evaluate(const ExpressionTestFeatureFlags& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionTestFeatureFlags& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return Value(1);
 }
 

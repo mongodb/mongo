@@ -38,7 +38,10 @@ namespace mongo {
 
 namespace exec::expression {
 
-Value evaluate(const ExpressionFunction& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionFunction& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto jsExec = expr.getExpressionContext()->getJsExecWithScope(expr.getAssignFirstArgToThis());
     auto scope = jsExec->getScope();
 
@@ -47,7 +50,7 @@ Value evaluate(const ExpressionFunction& expr, const Document& root, Variables* 
     ScriptingFunction func = jsExec->getScope()->createFunction(expr.getFuncSource().c_str());
     uassert(31265, "The body function did not evaluate", func);
 
-    auto argValue = expr.getPassedArgs()->evaluate(root, variables);
+    auto argValue = expr.getPassedArgs()->evaluate(root, variables, ctx);
     uassert(31266, "The args field must be of type array", argValue.getType() == BSONType::array);
 
     // This logic exists to desugar $where into $expr + $function. In this case set the global obj
@@ -146,8 +149,11 @@ BSONObj emitFromJS(const BSONObj& args, void* data) {
 }
 }  // namespace
 
-Value evaluate(const ExpressionInternalJsEmit& expr, const Document& root, Variables* variables) {
-    Value thisVal = expr.getThisRef()->evaluate(root, variables);
+Value evaluate(const ExpressionInternalJsEmit& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value thisVal = expr.getThisRef()->evaluate(root, variables, ctx);
     uassert(31225, "'this' must be an object.", thisVal.getType() == BSONType::object);
 
     // If the scope does not exist and is created by the following call, then make sure to

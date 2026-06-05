@@ -46,8 +46,10 @@
 
 namespace mongo {
 
-Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionInternalOwningShard::evaluate(const Document& root,
+                                              Variables* variables,
+                                              const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
 boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::parse(ExpressionContext* expCtx,
@@ -115,8 +117,10 @@ Value ExpressionInternalIndexKey::serialize(const SerializationOptions& options)
                                              << specExprConstant->getValue())));
 }
 
-Value ExpressionInternalIndexKey::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionInternalIndexKey::evaluate(const Document& root,
+                                           Variables* variables,
+                                           const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
 REGISTER_STABLE_EXPRESSION(_internalOwningShard, ExpressionInternalOwningShard::parse);

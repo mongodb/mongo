@@ -54,8 +54,9 @@ using boost::intrusive_ptr;
 
 template <>
 Value ExpressionFromAccumulator<AccumulatorSum>::evaluate(const Document& root,
-                                                          Variables* variables) const {
-    return evaluateAccumulator(*this, root, variables);
+                                                          Variables* variables,
+                                                          const EvaluationContext& ctx) const {
+    return evaluateAccumulator(*this, root, variables, ctx);
 }
 
 REGISTER_ACCUMULATOR(sum, parseSumAccumulator<AccumulatorSum>);

@@ -33,16 +33,22 @@
 
 namespace mongo {
 
-Value ExpressionInternalFindPositional::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionInternalFindPositional::evaluate(const Document& root,
+                                                 Variables* variables,
+                                                 const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionInternalFindSlice::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionInternalFindSlice::evaluate(const Document& root,
+                                            Variables* variables,
+                                            const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionInternalFindElemMatch::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionInternalFindElemMatch::evaluate(const Document& root,
+                                                Variables* variables,
+                                                const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
 }  // namespace mongo

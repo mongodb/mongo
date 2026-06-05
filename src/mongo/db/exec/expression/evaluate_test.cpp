@@ -68,7 +68,7 @@ TEST(ExpressionConstantTest, ConstantOfValueMissingRemovesField) {
     intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value());
     ASSERT_BSONOBJ_BINARY_EQ(
         BSONObj(),
-        toBson(expression->evaluate(Document{{"foo", Value("bar"_sd)}}, &expCtx.variables)));
+        toBson(expression->evaluate(Document{{"foo", Value("bar"_sd)}}, &expCtx.variables, {})));
 }
 
 namespace BuiltinRemoveVariable {
@@ -91,14 +91,14 @@ TEST(NowAndClusterTime, BasicTest) {
     // $$NOW is the Date type.
     {
         auto expression = ExpressionFieldPath::parse(&expCtx, "$$NOW", expCtx.variablesParseState);
-        Value result = expression->evaluate(Document(), &expCtx.variables);
+        Value result = expression->evaluate(Document(), &expCtx.variables, {});
         ASSERT_EQ(result.getType(), BSONType::date);
     }
     // $$CLUSTER_TIME is the timestamp type.
     {
         auto expression =
             ExpressionFieldPath::parse(&expCtx, "$$CLUSTER_TIME", expCtx.variablesParseState);
-        Value result = expression->evaluate(Document(), &expCtx.variables);
+        Value result = expression->evaluate(Document(), &expCtx.variables, {});
         ASSERT_EQ(result.getType(), BSONType::timestamp);
     }
 
@@ -106,7 +106,7 @@ TEST(NowAndClusterTime, BasicTest) {
     {
         auto expression = Expression::parseExpression(
             &expCtx, fromjson("{$eq: [\"$$NOW\", \"$$NOW\"]}"), expCtx.variablesParseState);
-        Value result = expression->evaluate(Document(), &expCtx.variables);
+        Value result = expression->evaluate(Document(), &expCtx.variables, {});
 
         ASSERT_VALUE_EQ(result, Value{true});
     }
@@ -116,7 +116,7 @@ TEST(NowAndClusterTime, BasicTest) {
             Expression::parseExpression(&expCtx,
                                         fromjson("{$eq: [\"$$CLUSTER_TIME\", \"$$CLUSTER_TIME\"]}"),
                                         expCtx.variablesParseState);
-        Value result = expression->evaluate(Document(), &expCtx.variables);
+        Value result = expression->evaluate(Document(), &expCtx.variables, {});
 
         ASSERT_VALUE_EQ(result, Value{true});
     }

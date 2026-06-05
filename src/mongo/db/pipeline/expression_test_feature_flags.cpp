@@ -43,8 +43,10 @@ void ExpressionTestFeatureFlags::_validateInternal(const BSONElement& expr,
             expr.numberInt() == 1);
 }
 
-Value ExpressionTestFeatureFlags::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionTestFeatureFlags::evaluate(const Document& root,
+                                           Variables* variables,
+                                           const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
 // 'featureFlagBlender' is permanently enabled on the latest FCV.

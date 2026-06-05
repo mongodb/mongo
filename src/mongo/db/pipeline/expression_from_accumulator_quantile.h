@@ -72,7 +72,9 @@ public:
         return Value(DOC(getOpName() << md.freeze()));
     }
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);

@@ -66,7 +66,9 @@ public:
           _path{std::move(path)},
           _matchExpr{std::move(matchExpr)} {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -145,7 +147,9 @@ public:
                                 int limit)
         : Expression{expCtx, {postImageExpr}}, _path{std::move(path)}, _skip{skip}, _limit{limit} {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -214,7 +218,9 @@ public:
                                     CopyableMatchExpression matchExpr)
         : Expression{expCtx, {child}}, _path{std::move(path)}, _matchExpr{std::move(matchExpr)} {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);

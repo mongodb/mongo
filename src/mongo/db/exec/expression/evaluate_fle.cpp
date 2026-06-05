@@ -34,8 +34,11 @@ namespace mongo {
 
 namespace exec::expression {
 
-Value evaluate(const ExpressionInternalFLEEqual& expr, const Document& root, Variables* variables) {
-    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables);
+Value evaluate(const ExpressionInternalFLEEqual& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables, ctx);
     if (fieldValue.nullish()) {
         return Value(BSONNULL);
     }
@@ -56,8 +59,9 @@ Value evaluate(const ExpressionInternalFLEEqual& expr, const Document& root, Var
 
 Value evaluate(const ExpressionInternalFLEBetween& expr,
                const Document& root,
-               Variables* variables) {
-    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables);
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables, ctx);
     if (fieldValue.nullish()) {
         return Value(BSONNULL);
     }
@@ -74,8 +78,11 @@ Value evaluate(const ExpressionInternalFLEBetween& expr,
         }));
 }
 
-Value evaluate(const ExpressionEncStrStartsWith& expr, const Document& root, Variables* variables) {
-    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables);
+Value evaluate(const ExpressionEncStrStartsWith& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables, ctx);
     if (fieldValue.nullish()) {
         return Value(BSONNULL);
     }
@@ -94,8 +101,11 @@ Value evaluate(const ExpressionEncStrStartsWith& expr, const Document& root, Var
         }));
 }
 
-Value evaluate(const ExpressionEncStrEndsWith& expr, const Document& root, Variables* variables) {
-    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables);
+Value evaluate(const ExpressionEncStrEndsWith& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables, ctx);
     if (fieldValue.nullish()) {
         return Value(BSONNULL);
     }
@@ -114,8 +124,11 @@ Value evaluate(const ExpressionEncStrEndsWith& expr, const Document& root, Varia
         }));
 }
 
-Value evaluate(const ExpressionEncStrContains& expr, const Document& root, Variables* variables) {
-    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables);
+Value evaluate(const ExpressionEncStrContains& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables, ctx);
     if (fieldValue.nullish()) {
         return Value(BSONNULL);
     }
@@ -136,8 +149,9 @@ Value evaluate(const ExpressionEncStrContains& expr, const Document& root, Varia
 
 Value evaluate(const ExpressionEncStrNormalizedEq& expr,
                const Document& root,
-               Variables* variables) {
-    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables);
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto fieldValue = expr.getChildren()[0]->evaluate(root, variables, ctx);
     if (fieldValue.nullish()) {
         return Value(BSONNULL);
     }

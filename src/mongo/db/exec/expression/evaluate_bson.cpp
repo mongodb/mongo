@@ -37,17 +37,23 @@ namespace mongo {
 
 namespace exec::expression {
 
-Value evaluate(const ExpressionObject& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionObject& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto& expressions = expr.getChildExpressions();
     MutableDocument outputDoc(expressions.size());
     for (auto&& pair : expressions) {
-        outputDoc.addField(pair.first, pair.second->evaluate(root, variables));
+        outputDoc.addField(pair.first, pair.second->evaluate(root, variables, ctx));
     }
     return outputDoc.freezeToValue();
 }
 
-Value evaluate(const ExpressionBsonSize& expr, const Document& root, Variables* variables) {
-    Value arg = expr.getChildren()[0]->evaluate(root, variables);
+Value evaluate(const ExpressionBsonSize& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value arg = expr.getChildren()[0]->evaluate(root, variables, ctx);
 
     if (arg.nullish()) {
         return Value(BSONNULL);
@@ -104,8 +110,11 @@ Value evaluatePathArray(const FieldPath& fieldPath, size_t index, const Value& i
     return Value(std::move(result));
 }
 
-Value evaluate(const ExpressionGetField& expr, const Document& root, Variables* variables) {
-    auto fieldValue = expr.getField()->evaluate(root, variables);
+Value evaluate(const ExpressionGetField& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto fieldValue = expr.getField()->evaluate(root, variables, ctx);
     // If '_children[_kField]' is a constant expression, the parser guarantees that it evaluates to
     // a string. If it's a dynamic expression, its type can't be deduced during parsing.
     uassert(3041704,
@@ -115,7 +124,7 @@ Value evaluate(const ExpressionGetField& expr, const Document& root, Variables* 
                           << typeName(fieldValue.getType()),
             fieldValue.getType() == BSONType::string);
 
-    auto inputValue = expr.getInput()->evaluate(root, variables);
+    auto inputValue = expr.getInput()->evaluate(root, variables, ctx);
     if (inputValue.nullish()) {
         if (inputValue.missing()) {
             return Value();
@@ -129,8 +138,11 @@ Value evaluate(const ExpressionGetField& expr, const Document& root, Variables* 
     return inputValue.getDocument().getField(fieldValue.getStringData());
 }
 
-Value evaluate(const ExpressionSetField& expr, const Document& root, Variables* variables) {
-    auto input = expr.getInput()->evaluate(root, variables);
+Value evaluate(const ExpressionSetField& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto input = expr.getInput()->evaluate(root, variables, ctx);
     if (input.nullish()) {
         return Value(BSONNULL);
     }
@@ -140,7 +152,7 @@ Value evaluate(const ExpressionSetField& expr, const Document& root, Variables* 
                           << " requires 'input' to evaluate to type Object",
             input.getType() == BSONType::object);
 
-    auto value = expr.getValue()->evaluate(root, variables);
+    auto value = expr.getValue()->evaluate(root, variables, ctx);
 
     // Build output document and modify 'field'.
     MutableDocument outputDoc(input.getDocument());
@@ -150,7 +162,8 @@ Value evaluate(const ExpressionSetField& expr, const Document& root, Variables* 
 
 Value evaluate(const ExpressionInternalFindAllValuesAtPath& expr,
                const Document& root,
-               Variables* variables) {
+               Variables* variables,
+               const EvaluationContext& ctx) {
     BSONElementSet elts(expr.getExpressionContext()->getCollator());
     auto bsonRoot = root.toBson();
     multikey_dotted_path_support::extractAllElementsAlongPath(

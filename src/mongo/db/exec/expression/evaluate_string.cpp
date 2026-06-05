@@ -38,13 +38,16 @@ namespace mongo {
 
 namespace exec::expression {
 
-Value evaluate(const ExpressionConcat& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionConcat& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
     const size_t n = children.size();
 
     StringBuilder result;
     for (size_t i = 0; i < n; ++i) {
-        Value val = children[i]->evaluate(root, variables);
+        Value val = children[i]->evaluate(root, variables, ctx);
         if (val.nullish()) {
             return Value(BSONNULL);
         }
@@ -59,10 +62,13 @@ Value evaluate(const ExpressionConcat& expr, const Document& root, Variables* va
     return Value(result.stringData());
 }
 
-Value evaluate(const ExpressionStrcasecmp& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionStrcasecmp& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
-    Value pString1(children[0]->evaluate(root, variables));
-    Value pString2(children[1]->evaluate(root, variables));
+    Value pString1(children[0]->evaluate(root, variables, ctx));
+    Value pString2(children[1]->evaluate(root, variables, ctx));
 
     /* boost::iequals returns a bool not an int so strings must actually be allocated */
     std::string str1 = boost::to_upper_copy(pString1.coerceToString());
@@ -78,11 +84,14 @@ Value evaluate(const ExpressionStrcasecmp& expr, const Document& root, Variables
     }
 }
 
-Value evaluate(const ExpressionSubstrBytes& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionSubstrBytes& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
-    Value pString(children[0]->evaluate(root, variables));
-    Value pLower(children[1]->evaluate(root, variables));
-    Value pLength(children[2]->evaluate(root, variables));
+    Value pString(children[0]->evaluate(root, variables, ctx));
+    Value pLower(children[1]->evaluate(root, variables, ctx));
+    Value pLength(children[2]->evaluate(root, variables, ctx));
 
     std::string str = pString.coerceToString();
     uassert(16034,
@@ -130,11 +139,14 @@ Value evaluate(const ExpressionSubstrBytes& expr, const Document& root, Variable
     return Value(StringData(str).substr(lower, length));
 }
 
-Value evaluate(const ExpressionSubstrCP& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionSubstrCP& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
-    Value inputVal(children[0]->evaluate(root, variables));
-    Value lowerVal(children[1]->evaluate(root, variables));
-    Value lengthVal(children[2]->evaluate(root, variables));
+    Value inputVal(children[0]->evaluate(root, variables, ctx));
+    Value lowerVal(children[1]->evaluate(root, variables, ctx));
+    Value lengthVal(children[2]->evaluate(root, variables, ctx));
 
     std::string str = inputVal.coerceToString();
     uassert(34450,
@@ -183,8 +195,11 @@ Value strLenBytes(StringData str) {
 }
 }  // namespace
 
-Value evaluate(const ExpressionStrLenBytes& expr, const Document& root, Variables* variables) {
-    Value str(expr.getChildren()[0]->evaluate(root, variables));
+Value evaluate(const ExpressionStrLenBytes& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value str(expr.getChildren()[0]->evaluate(root, variables, ctx));
 
     uassert(34473,
             str::stream() << "$strLenBytes requires a string argument, found: "
@@ -194,8 +209,11 @@ Value evaluate(const ExpressionStrLenBytes& expr, const Document& root, Variable
     return strLenBytes(str.getStringData());
 }
 
-Value evaluate(const ExpressionBinarySize& expr, const Document& root, Variables* variables) {
-    Value arg = expr.getChildren()[0]->evaluate(root, variables);
+Value evaluate(const ExpressionBinarySize& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value arg = expr.getChildren()[0]->evaluate(root, variables, ctx);
     if (arg.nullish()) {
         return Value(BSONNULL);
     }
@@ -213,8 +231,11 @@ Value evaluate(const ExpressionBinarySize& expr, const Document& root, Variables
     return Value(binData.length);
 }
 
-Value evaluate(const ExpressionStrLenCP& expr, const Document& root, Variables* variables) {
-    Value val(expr.getChildren()[0]->evaluate(root, variables));
+Value evaluate(const ExpressionStrLenCP& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value val(expr.getChildren()[0]->evaluate(root, variables, ctx));
 
     uassert(34471,
             str::stream() << "$strLenCP requires a string argument, found: "
@@ -231,22 +252,31 @@ Value evaluate(const ExpressionStrLenCP& expr, const Document& root, Variables* 
     return Value(static_cast<int>(strLen));
 }
 
-Value evaluate(const ExpressionToLower& expr, const Document& root, Variables* variables) {
-    Value pString(expr.getChildren()[0]->evaluate(root, variables));
+Value evaluate(const ExpressionToLower& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value pString(expr.getChildren()[0]->evaluate(root, variables, ctx));
     std::string str = pString.coerceToString();
     boost::to_lower(str);
     return Value(str);
 }
 
-Value evaluate(const ExpressionToUpper& expr, const Document& root, Variables* variables) {
-    Value pString(expr.getChildren()[0]->evaluate(root, variables));
+Value evaluate(const ExpressionToUpper& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value pString(expr.getChildren()[0]->evaluate(root, variables, ctx));
     std::string str(pString.coerceToString());
     boost::to_upper(str);
     return Value(str);
 }
 
-Value evaluate(const ExpressionTrim& expr, const Document& root, Variables* variables) {
-    auto unvalidatedInput = expr.getInput()->evaluate(root, variables);
+Value evaluate(const ExpressionTrim& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto unvalidatedInput = expr.getInput()->evaluate(root, variables, ctx);
     if (unvalidatedInput.nullish()) {
         return Value(BSONNULL);
     }
@@ -266,7 +296,7 @@ Value evaluate(const ExpressionTrim& expr, const Document& root, Variables* vari
                                             trimType == ExpressionTrim::TrimType::kBoth ||
                                                 trimType == ExpressionTrim::TrimType::kRight));
     }
-    auto unvalidatedUserChars = expr.getCharacters()->evaluate(root, variables);
+    auto unvalidatedUserChars = expr.getCharacters()->evaluate(root, variables, ctx);
     if (unvalidatedUserChars.nullish()) {
         return Value(BSONNULL);
     }
@@ -317,9 +347,12 @@ void uassertIfNotIntegralAndNonNegative(Value val,
 
 }  // namespace
 
-Value evaluate(const ExpressionIndexOfBytes& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionIndexOfBytes& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
-    Value stringArg = children[0]->evaluate(root, variables);
+    Value stringArg = children[0]->evaluate(root, variables, ctx);
 
     if (stringArg.nullish()) {
         return Value(BSONNULL);
@@ -331,7 +364,7 @@ Value evaluate(const ExpressionIndexOfBytes& expr, const Document& root, Variabl
             stringArg.getType() == BSONType::string);
     const std::string& input = stringArg.getString();
 
-    Value tokenArg = children[1]->evaluate(root, variables);
+    Value tokenArg = children[1]->evaluate(root, variables, ctx);
     uassert(40092,
             str::stream() << "$indexOfBytes requires a string as the second argument, found: "
                           << typeName(tokenArg.getType()),
@@ -340,14 +373,14 @@ Value evaluate(const ExpressionIndexOfBytes& expr, const Document& root, Variabl
 
     size_t startIndex = 0;
     if (children.size() > 2) {
-        Value startIndexArg = children[2]->evaluate(root, variables);
+        Value startIndexArg = children[2]->evaluate(root, variables, ctx);
         uassertIfNotIntegralAndNonNegative(startIndexArg, expr.getOpName(), "starting index");
         startIndex = static_cast<size_t>(startIndexArg.coerceToInt());
     }
 
     size_t endIndex = input.size();
     if (children.size() > 3) {
-        Value endIndexArg = children[3]->evaluate(root, variables);
+        Value endIndexArg = children[3]->evaluate(root, variables, ctx);
         uassertIfNotIntegralAndNonNegative(endIndexArg, expr.getOpName(), "ending index");
         // Don't let 'endIndex' exceed the length of the string.
         endIndex = std::min(input.size(), static_cast<size_t>(endIndexArg.coerceToInt()));
@@ -365,9 +398,12 @@ Value evaluate(const ExpressionIndexOfBytes& expr, const Document& root, Variabl
     return Value(static_cast<int>(position));
 }
 
-Value evaluate(const ExpressionIndexOfCP& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionIndexOfCP& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
-    Value stringArg = children[0]->evaluate(root, variables);
+    Value stringArg = children[0]->evaluate(root, variables, ctx);
 
     if (stringArg.nullish()) {
         return Value(BSONNULL);
@@ -379,7 +415,7 @@ Value evaluate(const ExpressionIndexOfCP& expr, const Document& root, Variables*
             stringArg.getType() == BSONType::string);
     const std::string& input = stringArg.getString();
 
-    Value tokenArg = children[1]->evaluate(root, variables);
+    Value tokenArg = children[1]->evaluate(root, variables, ctx);
     uassert(40094,
             str::stream() << "$indexOfCP requires a string as the second argument, found: "
                           << typeName(tokenArg.getType()),
@@ -388,7 +424,7 @@ Value evaluate(const ExpressionIndexOfCP& expr, const Document& root, Variables*
 
     size_t startCodePointIndex = 0;
     if (children.size() > 2) {
-        Value startIndexArg = children[2]->evaluate(root, variables);
+        Value startIndexArg = children[2]->evaluate(root, variables, ctx);
         uassertIfNotIntegralAndNonNegative(startIndexArg, expr.getOpName(), "starting index");
         startCodePointIndex = static_cast<size_t>(startIndexArg.coerceToInt());
     }
@@ -411,7 +447,7 @@ Value evaluate(const ExpressionIndexOfCP& expr, const Document& root, Variables*
 
     size_t endCodePointIndex = codePointLength;
     if (children.size() > 3) {
-        Value endIndexArg = children[3]->evaluate(root, variables);
+        Value endIndexArg = children[3]->evaluate(root, variables, ctx);
         uassertIfNotIntegralAndNonNegative(endIndexArg, expr.getOpName(), "ending index");
 
         // Don't let 'endCodePointIndex' exceed the number of code points in the string.

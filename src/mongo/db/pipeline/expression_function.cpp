@@ -120,8 +120,10 @@ boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* co
                                   langField.str());
 }
 
-Value ExpressionFunction::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionFunction::evaluate(const Document& root,
+                                   Variables* variables,
+                                   const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
 }  // namespace mongo

@@ -53,13 +53,14 @@ bool evaluateNumberWithDefault(const Document& root,
                                StringData fieldName,
                                long long defaultValue,
                                long long* returnValue,
-                               Variables* variables) {
+                               Variables* variables,
+                               const EvaluationContext& ctx) {
     if (!field) {
         *returnValue = defaultValue;
         return true;
     }
 
-    auto fieldValue = field->evaluate(root, variables);
+    auto fieldValue = field->evaluate(root, variables, ctx);
 
     if (fieldValue.nullish()) {
         return false;
@@ -86,15 +87,16 @@ bool evaluateNumberWithDefaultAndBounds(const Document& root,
                                         StringData fieldName,
                                         long long defaultValue,
                                         long long* returnValue,
-                                        Variables* variables) {
+                                        Variables* variables,
+                                        const EvaluationContext& ctx) {
     // Some date conversions spend a long time iterating through date tables when dealing with large
     // input numbers, so we place a reasonable limit on the magnitude of any argument to
     // $dateFromParts: inputs that fit within a 16-bit int are permitted.
     static constexpr long long kMaxValueForDatePart = std::numeric_limits<int16_t>::max();
     static constexpr long long kMinValueForDatePart = std::numeric_limits<int16_t>::lowest();
 
-    bool result =
-        evaluateNumberWithDefault(root, field, fieldName, defaultValue, returnValue, variables);
+    bool result = evaluateNumberWithDefault(
+        root, field, fieldName, defaultValue, returnValue, variables, ctx);
 
     uassert(
         31034,
@@ -108,12 +110,13 @@ bool evaluateNumberWithDefaultAndBounds(const Document& root,
 
 boost::optional<int> evaluateIso8601Flag(const Expression* iso8601,
                                          const Document& root,
-                                         Variables* variables) {
+                                         Variables* variables,
+                                         const EvaluationContext& ctx) {
     if (!iso8601) {
         return false;
     }
 
-    auto iso8601Output = iso8601->evaluate(root, variables);
+    auto iso8601Output = iso8601->evaluate(root, variables, ctx);
 
     if (iso8601Output.nullish()) {
         return boost::none;
@@ -169,14 +172,15 @@ DayOfWeek parseDayOfWeek(const Value& value, StringData expressionName, StringDa
 boost::optional<TimeZone> makeTimeZone(const TimeZoneDatabase* tzdb,
                                        const Document& root,
                                        const Expression* timeZone,
-                                       Variables* variables) {
+                                       Variables* variables,
+                                       const EvaluationContext& ctx) {
     tassert(11103500, "Expected non-null TimeZoneDatabase", tzdb);
 
     if (!timeZone) {
         return mongo::TimeZoneDatabase::utcZone();
     }
 
-    auto timeZoneId = timeZone->evaluate(root, variables);
+    auto timeZoneId = timeZone->evaluate(root, variables, ctx);
 
     if (timeZoneId.nullish()) {
         return boost::none;
@@ -203,15 +207,20 @@ unsigned long long convertDateTruncBinSizeValue(const Value& value) {
     return static_cast<unsigned long long>(binSize);
 }
 
-Value evaluate(const ExpressionDateFromParts& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionDateFromParts& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     long long hour, minute, second, millisecond;
 
-    if (!evaluateNumberWithDefaultAndBounds(root, expr.getHour(), "hour"_sd, 0, &hour, variables) ||
+    if (!evaluateNumberWithDefaultAndBounds(
+            root, expr.getHour(), "hour"_sd, 0, &hour, variables, ctx) ||
         !evaluateNumberWithDefaultAndBounds(
-            root, expr.getMinute(), "minute"_sd, 0, &minute, variables) ||
-        !evaluateNumberWithDefault(root, expr.getSecond(), "second"_sd, 0, &second, variables) ||
+            root, expr.getMinute(), "minute"_sd, 0, &minute, variables, ctx) ||
         !evaluateNumberWithDefault(
-            root, expr.getMillisecond(), "millisecond"_sd, 0, &millisecond, variables)) {
+            root, expr.getSecond(), "second"_sd, 0, &second, variables, ctx) ||
+        !evaluateNumberWithDefault(
+            root, expr.getMillisecond(), "millisecond"_sd, 0, &millisecond, variables, ctx)) {
         // One of the evaluated inputs in nullish.
         return Value(BSONNULL);
     }
@@ -221,7 +230,8 @@ Value evaluate(const ExpressionDateFromParts& expr, const Document& root, Variab
         timeZone = makeTimeZone(expr.getExpressionContext()->getTimeZoneDatabase(),
                                 root,
                                 expr.getTimeZone(),
-                                variables);
+                                variables,
+                                ctx);
         if (!timeZone) {
             return Value(BSONNULL);
         }
@@ -230,11 +240,12 @@ Value evaluate(const ExpressionDateFromParts& expr, const Document& root, Variab
     if (expr.getYear()) {
         long long year, month, day;
 
-        if (!evaluateNumberWithDefault(root, expr.getYear(), "year"_sd, 1970, &year, variables) ||
+        if (!evaluateNumberWithDefault(
+                root, expr.getYear(), "year"_sd, 1970, &year, variables, ctx) ||
             !evaluateNumberWithDefaultAndBounds(
-                root, expr.getMonth(), "month"_sd, 1, &month, variables) ||
+                root, expr.getMonth(), "month"_sd, 1, &month, variables, ctx) ||
             !evaluateNumberWithDefaultAndBounds(
-                root, expr.getDay(), "day"_sd, 1, &day, variables)) {
+                root, expr.getDay(), "day"_sd, 1, &day, variables, ctx)) {
             // One of the evaluated inputs in nullish.
             return Value(BSONNULL);
         }
@@ -251,12 +262,22 @@ Value evaluate(const ExpressionDateFromParts& expr, const Document& root, Variab
     if (expr.getIsoWeekYear()) {
         long long isoWeekYear, isoWeek, isoDayOfWeek;
 
-        if (!evaluateNumberWithDefault(
-                root, expr.getIsoWeekYear(), "isoWeekYear"_sd, 1970, &isoWeekYear, variables) ||
+        if (!evaluateNumberWithDefault(root,
+                                       expr.getIsoWeekYear(),
+                                       "isoWeekYear"_sd,
+                                       1970,
+                                       &isoWeekYear,
+                                       variables,
+                                       ctx) ||
             !evaluateNumberWithDefaultAndBounds(
-                root, expr.getIsoWeek(), "isoWeek"_sd, 1, &isoWeek, variables) ||
-            !evaluateNumberWithDefaultAndBounds(
-                root, expr.getIsoDayOfWeek(), "isoDayOfWeek"_sd, 1, &isoDayOfWeek, variables)) {
+                root, expr.getIsoWeek(), "isoWeek"_sd, 1, &isoWeek, variables, ctx) ||
+            !evaluateNumberWithDefaultAndBounds(root,
+                                                expr.getIsoDayOfWeek(),
+                                                "isoDayOfWeek"_sd,
+                                                1,
+                                                &isoDayOfWeek,
+                                                variables,
+                                                ctx)) {
             // One of the evaluated inputs in nullish.
             return Value(BSONNULL);
         }
@@ -273,14 +294,17 @@ Value evaluate(const ExpressionDateFromParts& expr, const Document& root, Variab
     MONGO_UNREACHABLE;
 }
 
-Value evaluate(const ExpressionDateFromString& expr, const Document& root, Variables* variables) {
-    const Value dateString = expr.getDateString()->evaluate(root, variables);
+Value evaluate(const ExpressionDateFromString& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    const Value dateString = expr.getDateString()->evaluate(root, variables, ctx);
     Value formatValue;
 
     // Eagerly validate the format parameter, ignoring if nullish since the input string nullish
     // behavior takes precedence.
     if (expr.getFormat()) {
-        formatValue = expr.getFormat()->evaluate(root, variables);
+        formatValue = expr.getFormat()->evaluate(root, variables, ctx);
         if (!formatValue.nullish()) {
             uassert(40684,
                     str::stream() << "$dateFromString requires that 'format' be a string, found: "
@@ -299,12 +323,14 @@ Value evaluate(const ExpressionDateFromString& expr, const Document& root, Varia
         timeZone = makeTimeZone(expr.getExpressionContext()->getTimeZoneDatabase(),
                                 root,
                                 expr.getTimeZone(),
-                                variables);
+                                variables,
+                                ctx);
     }
 
     // Behavior for nullish input takes precedence over other nullish elements.
     if (dateString.nullish()) {
-        return expr.getOnNull() ? expr.getOnNull()->evaluate(root, variables) : Value(BSONNULL);
+        return expr.getOnNull() ? expr.getOnNull()->evaluate(root, variables, ctx)
+                                : Value(BSONNULL);
     }
 
     try {
@@ -333,28 +359,32 @@ Value evaluate(const ExpressionDateFromString& expr, const Document& root, Varia
             dateTimeString, timeZone.value()));
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         if (expr.getOnError()) {
-            return expr.getOnError()->evaluate(root, variables);
+            return expr.getOnError()->evaluate(root, variables, ctx);
         }
         throw;
     }
 }
 
-Value evaluate(const ExpressionDateToParts& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionDateToParts& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     tassert(9711500, "Missing date argument", expr.getDate() != nullptr);
-    const Value date = expr.getDate()->evaluate(root, variables);
+    const Value date = expr.getDate()->evaluate(root, variables, ctx);
 
     boost::optional<TimeZone> timeZone = expr.getParsedTimeZone();
     if (!timeZone) {
         timeZone = makeTimeZone(expr.getExpressionContext()->getTimeZoneDatabase(),
                                 root,
                                 expr.getTimeZone(),
-                                variables);
+                                variables,
+                                ctx);
         if (!timeZone) {
             return Value(BSONNULL);
         }
     }
 
-    auto iso8601 = evaluateIso8601Flag(expr.getIso8601(), root, variables);
+    auto iso8601 = evaluateIso8601Flag(expr.getIso8601(), root, variables, ctx);
     if (!iso8601) {
         return Value(BSONNULL);
     }
@@ -386,15 +416,18 @@ Value evaluate(const ExpressionDateToParts& expr, const Document& root, Variable
     }
 }
 
-Value evaluate(const ExpressionDateToString& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionDateToString& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     tassert(9711501, "Missing date argument", expr.getDate() != nullptr);
-    const Value date = expr.getDate()->evaluate(root, variables);
+    const Value date = expr.getDate()->evaluate(root, variables, ctx);
     Value formatValue;
 
     // Eagerly validate the format parameter, ignoring if nullish since the input date nullish
     // behavior takes precedence.
     if (expr.getFormat()) {
-        formatValue = expr.getFormat()->evaluate(root, variables);
+        formatValue = expr.getFormat()->evaluate(root, variables, ctx);
         if (!formatValue.nullish()) {
             uassert(18533,
                     str::stream() << "$dateToString requires that 'format' be a string, found: "
@@ -413,11 +446,13 @@ Value evaluate(const ExpressionDateToString& expr, const Document& root, Variabl
         timeZone = makeTimeZone(expr.getExpressionContext()->getTimeZoneDatabase(),
                                 root,
                                 expr.getTimeZone(),
-                                variables);
+                                variables,
+                                ctx);
     }
 
     if (date.nullish()) {
-        return expr.getOnNull() ? expr.getOnNull()->evaluate(root, variables) : Value(BSONNULL);
+        return expr.getOnNull() ? expr.getOnNull()->evaluate(root, variables, ctx)
+                                : Value(BSONNULL);
     }
 
     if (!timeZone) {
@@ -437,12 +472,15 @@ Value evaluate(const ExpressionDateToString& expr, const Document& root, Variabl
         timeZone->isUtcZone() ? kIsoFormatStringZ : kIsoFormatStringNonZ, date.coerceToDate())));
 }
 
-Value evaluate(const ExpressionDateDiff& expr, const Document& root, Variables* variables) {
-    const Value startDateValue = expr.getStartDate()->evaluate(root, variables);
+Value evaluate(const ExpressionDateDiff& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    const Value startDateValue = expr.getStartDate()->evaluate(root, variables, ctx);
     if (startDateValue.nullish()) {
         return Value(BSONNULL);
     }
-    const Value endDateValue = expr.getEndDate()->evaluate(root, variables);
+    const Value endDateValue = expr.getEndDate()->evaluate(root, variables, ctx);
     if (endDateValue.nullish()) {
         return Value(BSONNULL);
     }
@@ -451,7 +489,7 @@ Value evaluate(const ExpressionDateDiff& expr, const Document& root, Variables* 
     if (expr.getParsedUnit()) {
         unit = *expr.getParsedUnit();
     } else {
-        const Value unitValue = expr.getUnit()->evaluate(root, variables);
+        const Value unitValue = expr.getUnit()->evaluate(root, variables, ctx);
         if (unitValue.nullish()) {
             return Value(BSONNULL);
         }
@@ -463,7 +501,7 @@ Value evaluate(const ExpressionDateDiff& expr, const Document& root, Variables* 
         if (expr.getParsedStartOfWeek()) {
             startOfWeek = *expr.getParsedStartOfWeek();
         } else if (expr.getStartOfWeek()) {
-            const Value startOfWeekValue = expr.getStartOfWeek()->evaluate(root, variables);
+            const Value startOfWeekValue = expr.getStartOfWeek()->evaluate(root, variables, ctx);
             if (startOfWeekValue.nullish()) {
                 return Value(BSONNULL);
             }
@@ -478,7 +516,8 @@ Value evaluate(const ExpressionDateDiff& expr, const Document& root, Variables* 
                 return makeTimeZone(expr.getExpressionContext()->getTimeZoneDatabase(),
                                     root,
                                     expr.getTimeZone(),
-                                    variables);
+                                    variables,
+                                    ctx);
             },
             "$dateDiff parameter 'timezone' value parsing failed"_sd);
         if (!timezone) {
@@ -499,11 +538,12 @@ namespace {
 bool extractDateArithmetics(const ExpressionDateArithmetics& expr,
                             const Document& root,
                             Variables* variables,
+                            const EvaluationContext& ctx,
                             Date_t& outDate,
                             TimeUnit& unit,
                             long long& outAmount,
                             boost::optional<TimeZone>& timezone) {
-    const Value startDate = expr.getStartDate()->evaluate(root, variables);
+    const Value startDate = expr.getStartDate()->evaluate(root, variables, ctx);
     if (startDate.nullish()) {
         return false;
     }
@@ -511,14 +551,14 @@ bool extractDateArithmetics(const ExpressionDateArithmetics& expr,
     if (expr.getParsedUnit()) {
         unit = *expr.getParsedUnit();
     } else {
-        const Value unitVal = expr.getUnit()->evaluate(root, variables);
+        const Value unitVal = expr.getUnit()->evaluate(root, variables, ctx);
         if (unitVal.nullish()) {
             return false;
         }
         unit = parseTimeUnit(unitVal, expr.getOpName());
     }
 
-    auto amount = expr.getAmount()->evaluate(root, variables);
+    auto amount = expr.getAmount()->evaluate(root, variables, ctx);
     if (amount.nullish()) {
         return false;
     }
@@ -529,7 +569,8 @@ bool extractDateArithmetics(const ExpressionDateArithmetics& expr,
         timezone = makeTimeZone(expr.getExpressionContext()->getTimeZoneDatabase(),
                                 root,
                                 expr.getTimeZone(),
-                                variables);
+                                variables,
+                                ctx);
         if (!timezone) {
             return false;
         }
@@ -549,23 +590,29 @@ bool extractDateArithmetics(const ExpressionDateArithmetics& expr,
 
 }  // namespace
 
-Value evaluate(const ExpressionDateAdd& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionDateAdd& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     Date_t date;
     TimeUnit unit;
     long long amount;
     boost::optional<TimeZone> timezone;
-    if (!extractDateArithmetics(expr, root, variables, date, unit, amount, timezone)) {
+    if (!extractDateArithmetics(expr, root, variables, ctx, date, unit, amount, timezone)) {
         return Value(BSONNULL);
     }
     return Value(dateAdd(date, unit, amount, *timezone));
 }
 
-Value evaluate(const ExpressionDateSubtract& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionDateSubtract& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     Date_t date;
     TimeUnit unit;
     long long amount;
     boost::optional<TimeZone> timezone;
-    if (!extractDateArithmetics(expr, root, variables, date, unit, amount, timezone)) {
+    if (!extractDateArithmetics(expr, root, variables, ctx, date, unit, amount, timezone)) {
         return Value(BSONNULL);
     }
     // Long long min value cannot be negated.
@@ -575,9 +622,12 @@ Value evaluate(const ExpressionDateSubtract& expr, const Document& root, Variabl
     return Value(dateAdd(date, unit, -amount, *timezone));
 }
 
-Value evaluate(const ExpressionDateTrunc& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionDateTrunc& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     tassert(9711502, "Missing date argument", expr.getDate() != nullptr);
-    const Value dateValue = expr.getDate()->evaluate(root, variables);
+    const Value dateValue = expr.getDate()->evaluate(root, variables, ctx);
     if (dateValue.nullish()) {
         return Value(BSONNULL);
     }
@@ -586,7 +636,7 @@ Value evaluate(const ExpressionDateTrunc& expr, const Document& root, Variables*
     if (expr.getParsedBinSize()) {
         binSize = *expr.getParsedBinSize();
     } else if (expr.getBinSize()) {
-        const Value binSizeValue = expr.getBinSize()->evaluate(root, variables);
+        const Value binSizeValue = expr.getBinSize()->evaluate(root, variables, ctx);
         if (binSizeValue.nullish()) {
             return Value(BSONNULL);
         }
@@ -597,7 +647,7 @@ Value evaluate(const ExpressionDateTrunc& expr, const Document& root, Variables*
     if (expr.getParsedUnit()) {
         unit = *expr.getParsedUnit();
     } else {
-        const Value unitValue = expr.getUnit()->evaluate(root, variables);
+        const Value unitValue = expr.getUnit()->evaluate(root, variables, ctx);
         if (unitValue.nullish()) {
             return Value(BSONNULL);
         }
@@ -609,7 +659,7 @@ Value evaluate(const ExpressionDateTrunc& expr, const Document& root, Variables*
         if (expr.getParsedStartOfWeek()) {
             startOfWeek = *expr.getParsedStartOfWeek();
         } else if (expr.getStartOfWeek()) {
-            const Value startOfWeekValue = expr.getStartOfWeek()->evaluate(root, variables);
+            const Value startOfWeekValue = expr.getStartOfWeek()->evaluate(root, variables, ctx);
             if (startOfWeekValue.nullish()) {
                 return Value(BSONNULL);
             }
@@ -624,7 +674,8 @@ Value evaluate(const ExpressionDateTrunc& expr, const Document& root, Variables*
                 return makeTimeZone(expr.getExpressionContext()->getTimeZoneDatabase(),
                                     root,
                                     expr.getTimeZone(),
-                                    variables);
+                                    variables,
+                                    ctx);
             },
             "$dateTrunc parameter 'timezone' value parsing failed"_sd);
         if (!timezone) {
@@ -637,8 +688,11 @@ Value evaluate(const ExpressionDateTrunc& expr, const Document& root, Variables*
     return Value{truncateDate(date, unit, binSize, *timezone, startOfWeek)};
 }
 
-Value evaluate(const ExpressionTsSecond& expr, const Document& root, Variables* variables) {
-    const Value operand = expr.getOperandList()[0]->evaluate(root, variables);
+Value evaluate(const ExpressionTsSecond& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    const Value operand = expr.getOperandList()[0]->evaluate(root, variables, ctx);
 
     if (operand.nullish()) {
         return Value(BSONNULL);
@@ -652,8 +706,11 @@ Value evaluate(const ExpressionTsSecond& expr, const Document& root, Variables* 
     return Value(static_cast<long long>(operand.getTimestamp().getSecs()));
 }
 
-Value evaluate(const ExpressionTsIncrement& expr, const Document& root, Variables* variables) {
-    const Value operand = expr.getOperandList()[0]->evaluate(root, variables);
+Value evaluate(const ExpressionTsIncrement& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    const Value operand = expr.getOperandList()[0]->evaluate(root, variables, ctx);
 
     if (operand.nullish()) {
         return Value(BSONNULL);
@@ -677,9 +734,10 @@ template <typename dateFuncFn>
 Value evaluateDateTimezoneArg(const DateExpressionAcceptingTimeZone& expr,
                               const Document& root,
                               Variables* variables,
+                              const EvaluationContext& ctx,
                               dateFuncFn dateFn) {
     tassert(9711503, "Missing date argument", expr.getDate() != nullptr);
-    auto dateVal = expr.getDate()->evaluate(root, variables);
+    auto dateVal = expr.getDate()->evaluate(root, variables, ctx);
     if (dateVal.nullish()) {
         return Value(BSONNULL);
     }
@@ -692,7 +750,8 @@ Value evaluateDateTimezoneArg(const DateExpressionAcceptingTimeZone& expr,
             makeTimeZone(expr.getExpressionContext()->getTimeZoneDatabase(),
                          root,
                          expr.getTimeZone(),
-                         variables);
+                         variables,
+                         ctx);
         if (!timeZone) {
             return Value(BSONNULL);
         } else {
@@ -702,98 +761,140 @@ Value evaluateDateTimezoneArg(const DateExpressionAcceptingTimeZone& expr,
 }
 }  // namespace
 
-Value evaluate(const ExpressionDayOfMonth& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionDayOfMonth& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.dateParts(date).dayOfMonth);
         });
 }
 
-Value evaluate(const ExpressionDayOfWeek& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionDayOfWeek& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.dayOfWeek(date));
         });
 }
 
-Value evaluate(const ExpressionDayOfYear& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionDayOfYear& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.dayOfYear(date));
         });
 }
 
-Value evaluate(const ExpressionHour& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionHour& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.dateParts(date).hour);
         });
 }
 
-Value evaluate(const ExpressionMillisecond& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionMillisecond& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.dateParts(date).millisecond);
         });
 }
 
-Value evaluate(const ExpressionMinute& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionMinute& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.dateParts(date).minute);
         });
 }
 
-Value evaluate(const ExpressionMonth& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionMonth& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.dateParts(date).month);
         });
 }
 
-Value evaluate(const ExpressionSecond& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionSecond& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.dateParts(date).second);
         });
 }
 
-Value evaluate(const ExpressionWeek& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionWeek& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.week(date));
         });
 }
 
-Value evaluate(const ExpressionIsoWeekYear& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionIsoWeekYear& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.isoYear(date));
         });
 }
 
-Value evaluate(const ExpressionIsoDayOfWeek& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionIsoDayOfWeek& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.isoDayOfWeek(date));
         });
 }
 
-Value evaluate(const ExpressionIsoWeek& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionIsoWeek& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.isoWeek(date));
         });
 }
 
-Value evaluate(const ExpressionYear& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionYear& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     return evaluateDateTimezoneArg(
-        expr, root, variables, [](Date_t date, const TimeZone& timeZone) {
+        expr, root, variables, ctx, [](Date_t date, const TimeZone& timeZone) {
             return Value(timeZone.dateParts(date).year);
         });
 }
 
-Value evaluate(const ExpressionCurrentDate&, const Document&, Variables*) {
+Value evaluate(const ExpressionCurrentDate&,
+               const Document&,
+               Variables*,
+               const EvaluationContext&) {
     if (MONGO_unlikely(sleepBeforeCurrentDateEvaluation.shouldFail())) {
         sleepBeforeCurrentDateEvaluation.execute(
             [&](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });

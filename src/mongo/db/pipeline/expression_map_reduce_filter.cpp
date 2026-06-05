@@ -179,8 +179,10 @@ Value ExpressionMap::serialize(const SerializationOptions& options) const {
                            {"in", _children[_kEach]->serialize(options)}}}});
 }
 
-Value ExpressionMap::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionMap::evaluate(const Document& root,
+                              Variables* variables,
+                              const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
 /* ------------------------ ExpressionReduce ------------------------------ */
@@ -305,8 +307,10 @@ boost::intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* cons
                                             valueId);
 }
 
-Value ExpressionReduce::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionReduce::evaluate(const Document& root,
+                                 Variables* variables,
+                                 const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
 boost::intrusive_ptr<Expression> ExpressionReduce::optimize() {
@@ -472,8 +476,10 @@ Value ExpressionFilter::serialize(const SerializationOptions& options) const {
                            {"limit", _limit ? _children[*_limit]->serialize(options) : Value()}}}});
 }
 
-Value ExpressionFilter::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionFilter::evaluate(const Document& root,
+                                 Variables* variables,
+                                 const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
 }  // namespace mongo

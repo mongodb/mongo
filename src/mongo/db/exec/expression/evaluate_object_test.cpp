@@ -50,10 +50,11 @@ namespace expression_evaluation_test {
 TEST(ExpressionObjectEvaluate, EmptyObjectShouldEvaluateToEmptyDocument) {
     auto expCtx = ExpressionContextForTest{};
     auto object = ExpressionObject::create(&expCtx, {});
-    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document(), &(expCtx.variables)));
-    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document{{"a", 1}}, &(expCtx.variables)));
+    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document(), &(expCtx.variables), {}));
     ASSERT_VALUE_EQ(Value(Document()),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables)));
+                    object->evaluate(Document{{"a", 1}}, &(expCtx.variables), {}));
+    ASSERT_VALUE_EQ(Value(Document()),
+                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables), {}));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateEachField) {
@@ -64,11 +65,11 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateEachField) {
 
 
     ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
-                    object->evaluate(Document(), &(expCtx.variables)));
+                    object->evaluate(Document(), &(expCtx.variables), {}));
     ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
-                    object->evaluate(Document{{"a", 1}}, &(expCtx.variables)));
+                    object->evaluate(Document{{"a", 1}}, &(expCtx.variables), {}));
     ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables)));
+                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables), {}));
 }
 
 TEST(ExpressionObjectEvaluate, OrderOfFieldsInOutputShouldMatchOrderInSpecification) {
@@ -82,7 +83,8 @@ TEST(ExpressionObjectEvaluate, OrderOfFieldsInOutputShouldMatchOrderInSpecificat
     ASSERT_VALUE_EQ(
         Value(Document{{"a", "A"_sd}, {"b", "B"_sd}, {"c", "C"_sd}}),
         object->evaluate(Document{{"c", "C"_sd}, {"a", "A"_sd}, {"b", "B"_sd}, {"_id", "ID"_sd}},
-                         &(expCtx.variables)));
+                         &(expCtx.variables),
+                         {}));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldRemoveFieldsThatHaveMissingValues) {
@@ -94,8 +96,9 @@ TEST(ExpressionObjectEvaluate, ShouldRemoveFieldsThatHaveMissingValues) {
          {"b",
           ExpressionFieldPath::createPathFromString(
               &expCtx, "missing", expCtx.variablesParseState)}});
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx.variables)));
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document{{"a", 1}}, &(expCtx.variables)));
+    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx.variables), {}));
+    ASSERT_VALUE_EQ(Value(Document{}),
+                    object->evaluate(Document{{"a", 1}}, &(expCtx.variables), {}));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateFieldsWithinNestedObject) {
@@ -109,9 +112,9 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateFieldsWithinNestedObject) {
                                      ExpressionFieldPath::createPathFromString(
                                          &expCtx, "_id", expCtx.variablesParseState)}})}});
     ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}}}}),
-                    object->evaluate(Document(), &(expCtx.variables)));
+                    object->evaluate(Document(), &(expCtx.variables), {}));
     ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}, {"c", "ID"_sd}}}}),
-                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables)));
+                    object->evaluate(Document{{"_id", "ID"_sd}}, &(expCtx.variables), {}));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissing) {
@@ -120,11 +123,11 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissin
                                            {{"a",
                                              ExpressionFieldPath::createPathFromString(
                                                  &expCtx, "missing", expCtx.variablesParseState)}});
-    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx.variables)));
+    ASSERT_VALUE_EQ(Value(Document{}), object->evaluate(Document(), &(expCtx.variables), {}));
 
     auto objectWithNestedObject = ExpressionObject::create(&expCtx, {{"nested", object}});
     ASSERT_VALUE_EQ(Value(Document{{"nested", Document{}}}),
-                    objectWithNestedObject->evaluate(Document(), &(expCtx.variables)));
+                    objectWithNestedObject->evaluate(Document(), &(expCtx.variables), {}));
 }
 
 }  // namespace expression_evaluation_test

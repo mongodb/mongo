@@ -66,64 +66,94 @@ REGISTER_STABLE_EXPRESSION(atan2, ExpressionArcTangent2::parse);
 REGISTER_STABLE_EXPRESSION(degreesToRadians, ExpressionDegreesToRadians::parse);
 REGISTER_STABLE_EXPRESSION(radiansToDegrees, ExpressionRadiansToDegrees::parse);
 
-Value ExpressionArcCosine::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionArcCosine::evaluate(const Document& root,
+                                    Variables* variables,
+                                    const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionArcSine::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionArcSine::evaluate(const Document& root,
+                                  Variables* variables,
+                                  const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionHyperbolicArcTangent::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionHyperbolicArcTangent::evaluate(const Document& root,
+                                               Variables* variables,
+                                               const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionHyperbolicArcCosine::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionHyperbolicArcCosine::evaluate(const Document& root,
+                                              Variables* variables,
+                                              const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionCosine::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionCosine::evaluate(const Document& root,
+                                 Variables* variables,
+                                 const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionSine::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionSine::evaluate(const Document& root,
+                               Variables* variables,
+                               const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionTangent::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionTangent::evaluate(const Document& root,
+                                  Variables* variables,
+                                  const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionArcTangent::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionArcTangent::evaluate(const Document& root,
+                                     Variables* variables,
+                                     const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionHyperbolicArcSine::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionHyperbolicArcSine::evaluate(const Document& root,
+                                            Variables* variables,
+                                            const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionHyperbolicCosine::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionHyperbolicCosine::evaluate(const Document& root,
+                                           Variables* variables,
+                                           const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionHyperbolicSine::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionHyperbolicSine::evaluate(const Document& root,
+                                         Variables* variables,
+                                         const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionHyperbolicTangent::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionHyperbolicTangent::evaluate(const Document& root,
+                                            Variables* variables,
+                                            const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionArcTangent2::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionArcTangent2::evaluate(const Document& root,
+                                      Variables* variables,
+                                      const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionDegreesToRadians::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionDegreesToRadians::evaluate(const Document& root,
+                                           Variables* variables,
+                                           const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
-Value ExpressionRadiansToDegrees::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionRadiansToDegrees::evaluate(const Document& root,
+                                           Variables* variables,
+                                           const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
 }  // namespace mongo

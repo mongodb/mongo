@@ -66,7 +66,9 @@ public:
         return new ExpressionInternalJsEmit{expCtx, thisRef, std::move(funcSourceString)};
     }
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     Value serialize(const SerializationOptions& options) const final;
 

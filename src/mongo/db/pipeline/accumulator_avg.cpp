@@ -50,8 +50,9 @@ namespace mongo {
 
 template <>
 Value ExpressionFromAccumulator<AccumulatorAvg>::evaluate(const Document& root,
-                                                          Variables* variables) const {
-    return evaluateAccumulator(*this, root, variables);
+                                                          Variables* variables,
+                                                          const EvaluationContext& ctx) const {
+    return evaluateAccumulator(*this, root, variables, ctx);
 }
 
 REGISTER_ACCUMULATOR(avg, genericParseSingleExpressionAccumulator<AccumulatorAvg>);

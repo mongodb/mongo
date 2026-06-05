@@ -106,8 +106,10 @@ Value ExpressionTestApiVersion::serialize(const SerializationOptions& options) c
                                     {"deprecated", _deprecated ? Value(_deprecated) : Value()}}}});
 }
 
-Value ExpressionTestApiVersion::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionTestApiVersion::evaluate(const Document& root,
+                                         Variables* variables,
+                                         const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
 }  // namespace mongo

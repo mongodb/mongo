@@ -246,7 +246,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
 
     auto lessThan = _expCtx->getValueComparator().getLessThan();
 
-    Value base = (*_sortExpr)->evaluate(*(*this)[0], &_expCtx->variables);
+    Value base = (*_sortExpr)->evaluate(*(*this)[0], &_expCtx->variables, {});
     if (range.unit) {
         uassert(
             5429513,
@@ -317,7 +317,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
                           if (!doc) {
                               return boost::none;
                           }
-                          Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                          Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables, {});
                           if (hasExpectedType(v)) {
                               return i;
                           }
@@ -336,7 +336,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
 
                       boost::optional<Document> doc;
                       for (int i = start; (doc = (*this)[i]); ++i) {
-                          Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                          Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables, {});
                           if (!lessThan(v, threshold)) {
                               // This is the first doc we've scanned that crossed the
                               // threshold, so it's the first doc in the window (as long as
@@ -381,7 +381,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
 
                       boost::optional<Document> doc;
                       for (int i = start; (doc = (*this)[i]); ++i) {
-                          Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                          Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables, {});
                           if (!hasExpectedType(v)) {
                               // The previously scanned doc is the rightmost numeric one.
                               // Since we start from '0', 'hint', or 'lower', which are all
@@ -417,7 +417,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
                               // the end of the partition.
                               return getMaxCachedOffset();
                           }
-                          Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                          Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables, {});
                           if (lessThan(threshold, v)) {
                               // This doc exceeded the upper bound.
                               // The previously scanned doc (if any) is the greatest in-bounds

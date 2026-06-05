@@ -1452,7 +1452,7 @@ bool extractFromAcc(const AccumulatorN* acc,
         // perform the lastpoint rewrite.
         if (auto constInit = dynamic_cast<ExpressionConstant*>(init.get()); constInit) {
             // Since this is a $const expression, the input to evaluate() should not matter.
-            auto constVal = constInit->evaluate(Document(), nullptr);
+            auto constVal = constInit->evaluate(Document(), nullptr, {});
             if (!constVal.numeric() || (constVal.coerceToLong() != 1)) {
                 return false;
             }

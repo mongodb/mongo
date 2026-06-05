@@ -85,7 +85,9 @@ Value ExpressionInternalJsEmit::serialize(const SerializationOptions& options) c
                   Document{{"eval", _funcSource}, {"this", _thisRef->serialize(options)}}}});
 }
 
-Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionInternalJsEmit::evaluate(const Document& root,
+                                         Variables* variables,
+                                         const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 }  // namespace mongo

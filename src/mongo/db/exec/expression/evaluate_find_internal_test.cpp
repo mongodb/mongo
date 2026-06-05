@@ -82,7 +82,7 @@ TEST_F(ExpressionInternalFindPositionalTest, AppliesProjectionToPostImage) {
 
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{bar:1, foo: [6]}")},
-        expr->evaluate(Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}, &getExpCtx()->variables)
+        expr->evaluate(Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}, &getExpCtx()->variables, {})
             .getDocument());
 }
 
@@ -109,7 +109,7 @@ TEST_F(ExpressionInternalFindSliceTest, AppliesProjectionToPostImage) {
 
     ASSERT_DOCUMENT_EQ(
         Document{fromjson("{bar: 1, foo: [2,6]}")},
-        expr->evaluate(Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}, &getExpCtx()->variables)
+        expr->evaluate(Document{fromjson("{bar: 1, foo: [1,2,6,10]}")}, &getExpCtx()->variables, {})
             .getDocument());
 }
 
@@ -135,7 +135,8 @@ TEST_F(ExpressionInternalFindElemMatchTest, AppliesProjectionToRootDocument) {
     ASSERT_VALUE_EQ(Document{fromjson("{foo: [{bar: 6, z: 6}]}")}["foo"],
                     expr->evaluate(Document{fromjson("{foo: [{bar: 1, z: 1}, {bar: 2, z: 2}, "
                                                      "{bar: 6, z: 6}, {bar: 10, z: 10}]}")},
-                                   &getExpCtx()->variables));
+                                   &getExpCtx()->variables,
+                                   {}));
 }
 
 

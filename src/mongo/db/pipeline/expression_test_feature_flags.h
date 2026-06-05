@@ -53,7 +53,9 @@ public:
     ExpressionTestFeatureFlags(ExpressionContext* const expCtx, StringData exprName)
         : Expression(expCtx), _exprName(exprName) {};
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     Value serialize(const SerializationOptions& options = {}) const final {
         return Value(Document{{_exprName, Value(1)}});

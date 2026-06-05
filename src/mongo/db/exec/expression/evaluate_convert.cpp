@@ -1531,18 +1531,23 @@ std::string stringifyObjectOrArray(ExpressionContext* const expCtx, Value val) {
 
 }  // namespace
 
-Value evaluate(const ExpressionConvert& expr, const Document& root, Variables* variables) {
-    auto toValue = expr.getTo()->evaluate(root, variables);
-    auto inputValue = expr.getInput()->evaluate(root, variables);
-    auto baseValue = expr.getBase() ? expr.getBase()->evaluate(root, variables) : Value();
-    auto formatValue = expr.getFormat() ? expr.getFormat()->evaluate(root, variables) : Value();
+Value evaluate(const ExpressionConvert& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto toValue = expr.getTo()->evaluate(root, variables, ctx);
+    auto inputValue = expr.getInput()->evaluate(root, variables, ctx);
+    auto baseValue = expr.getBase() ? expr.getBase()->evaluate(root, variables, ctx) : Value();
+    auto formatValue =
+        expr.getFormat() ? expr.getFormat()->evaluate(root, variables, ctx) : Value();
     auto byteOrderValue =
-        expr.getByteOrder() ? expr.getByteOrder()->evaluate(root, variables) : Value();
+        expr.getByteOrder() ? expr.getByteOrder()->evaluate(root, variables, ctx) : Value();
 
     auto targetTypeInfo = ExpressionConvert::ConvertTargetTypeInfo::parse(toValue);
 
     if (inputValue.nullish()) {
-        return expr.getOnNull() ? expr.getOnNull()->evaluate(root, variables) : Value(BSONNULL);
+        return expr.getOnNull() ? expr.getOnNull()->evaluate(root, variables, ctx)
+                                : Value(BSONNULL);
     }
 
     if (!targetTypeInfo) {
@@ -1558,7 +1563,7 @@ Value evaluate(const ExpressionConvert& expr, const Document& root, Variables* v
         return performConversion(expr, *targetTypeInfo, inputValue, base, format, byteOrder);
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         if (expr.getOnError()) {
-            return expr.getOnError()->evaluate(root, variables);
+            return expr.getOnError()->evaluate(root, variables, ctx);
         } else {
             throw;
         }

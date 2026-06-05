@@ -61,13 +61,15 @@ namespace ExpressionTests {
 /** A dummy child of ExpressionNary used for testing. */
 class Testable : public ExpressionNary {
 public:
-    Value evaluate(const Document& root, Variables* variables) const override {
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const override {
         // Just put all the values in a list.
         // By default, this is not associative/commutative so the results will change if
         // instantiated as commutative or associative and operations are reordered.
         std::vector<Value> values;
         for (auto&& child : _children)
-            values.push_back(child->evaluate(root, variables));
+            values.push_back(child->evaluate(root, variables, ctx));
         return Value(values);
     }
 

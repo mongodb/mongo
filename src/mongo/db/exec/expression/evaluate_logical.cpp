@@ -34,8 +34,11 @@ namespace mongo {
 
 namespace exec::expression {
 
-Value evaluate(const ExpressionAllElementsTrue& expr, const Document& root, Variables* variables) {
-    const Value arr = expr.getChildren()[0]->evaluate(root, variables);
+Value evaluate(const ExpressionAllElementsTrue& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    const Value arr = expr.getChildren()[0]->evaluate(root, variables, ctx);
     uassert(17040,
             str::stream() << expr.getOpName() << "'s argument must be an array, but is "
                           << typeName(arr.getType()),
@@ -49,8 +52,11 @@ Value evaluate(const ExpressionAllElementsTrue& expr, const Document& root, Vari
     return Value(true);
 }
 
-Value evaluate(const ExpressionAnyElementTrue& expr, const Document& root, Variables* variables) {
-    const Value arr = expr.getChildren()[0]->evaluate(root, variables);
+Value evaluate(const ExpressionAnyElementTrue& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    const Value arr = expr.getChildren()[0]->evaluate(root, variables, ctx);
     uassert(17041,
             str::stream() << expr.getOpName() << "'s argument must be an array, but is "
                           << typeName(arr.getType()),
@@ -64,9 +70,12 @@ Value evaluate(const ExpressionAnyElementTrue& expr, const Document& root, Varia
     return Value(false);
 }
 
-Value evaluate(const ExpressionIn& expr, const Document& root, Variables* variables) {
-    Value argument(expr.getChildren()[0]->evaluate(root, variables));
-    Value arrayOfValues(expr.getChildren()[1]->evaluate(root, variables));
+Value evaluate(const ExpressionIn& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value argument(expr.getChildren()[0]->evaluate(root, variables, ctx));
+    Value arrayOfValues(expr.getChildren()[1]->evaluate(root, variables, ctx));
 
     uassert(40081,
             str::stream() << "$in requires an array as a second argument, found: "
@@ -97,10 +106,11 @@ template <typename ExpressionBitwiseOp>
 Value evaluateBitwiseOp(ExpressionBitwiseOp& expr,
                         const Document& root,
                         Variables* variables,
+                        const EvaluationContext& ctx,
                         std::function<SafeNum(const SafeNum&, const SafeNum&)> bitwiseOp) {
     auto result = expr.getIdentity();
     for (auto&& child : expr.getChildren()) {
-        Value val = child->evaluate(root, variables);
+        Value val = child->evaluate(root, variables, ctx);
         if (val.nullish()) {
             return Value(BSONNULL);
         }
@@ -111,25 +121,34 @@ Value evaluateBitwiseOp(ExpressionBitwiseOp& expr,
 }
 }  // namespace
 
-Value evaluate(const ExpressionBitAnd& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionBitAnd& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto op = [](const SafeNum& a, const SafeNum& b) -> SafeNum {
         return a.bitAnd(b);
     };
-    return evaluateBitwiseOp(expr, root, variables, op);
+    return evaluateBitwiseOp(expr, root, variables, ctx, op);
 }
 
-Value evaluate(const ExpressionBitOr& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionBitOr& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto op = [](const SafeNum& a, const SafeNum& b) -> SafeNum {
         return a.bitOr(b);
     };
-    return evaluateBitwiseOp(expr, root, variables, op);
+    return evaluateBitwiseOp(expr, root, variables, ctx, op);
 }
 
-Value evaluate(const ExpressionBitXor& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionBitXor& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto op = [](const SafeNum& a, const SafeNum& b) -> SafeNum {
         return a.bitXor(b);
     };
-    return evaluateBitwiseOp(expr, root, variables, op);
+    return evaluateBitwiseOp(expr, root, variables, ctx, op);
 }
 
 }  // namespace exec::expression

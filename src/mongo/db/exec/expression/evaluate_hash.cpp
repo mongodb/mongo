@@ -69,8 +69,11 @@ HashAlgorithm parseAlgorithm(Value algorithm) {
 
 }  // namespace
 
-Value evaluate(const ExpressionHash& expr, const Document& root, Variables* variables) {
-    auto input = expr.getInput().evaluate(root, variables);
+Value evaluate(const ExpressionHash& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto input = expr.getInput().evaluate(root, variables, ctx);
     if (input.nullish()) {
         return Value(BSONNULL);
     }
@@ -83,7 +86,7 @@ Value evaluate(const ExpressionHash& expr, const Document& root, Variables* vari
         (inputType == BSONType::string && isValidUTF8(input.getStringData())) ||
             inputType == BSONType::binData);
 
-    auto algorithm = parseAlgorithm(expr.getAlgorithm().evaluate(root, variables));
+    auto algorithm = parseAlgorithm(expr.getAlgorithm().evaluate(root, variables, ctx));
 
     ConstDataRange inputBytes = inputType == BSONType::string
         ? ConstDataRange(input.getStringData().data(), input.getStringData().size())

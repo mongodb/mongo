@@ -43,14 +43,16 @@ namespace mongo {
 
 template <>
 Value ExpressionFromAccumulator<AccumulatorMax>::evaluate(const Document& root,
-                                                          Variables* variables) const {
-    return evaluateAccumulator(*this, root, variables);
+                                                          Variables* variables,
+                                                          const EvaluationContext& ctx) const {
+    return evaluateAccumulator(*this, root, variables, ctx);
 }
 
 template <>
 Value ExpressionFromAccumulator<AccumulatorMin>::evaluate(const Document& root,
-                                                          Variables* variables) const {
-    return evaluateAccumulator(*this, root, variables);
+                                                          Variables* variables,
+                                                          const EvaluationContext& ctx) const {
+    return evaluateAccumulator(*this, root, variables, ctx);
 }
 
 REGISTER_ACCUMULATOR(max, genericParseSingleExpressionAccumulator<AccumulatorMax>);

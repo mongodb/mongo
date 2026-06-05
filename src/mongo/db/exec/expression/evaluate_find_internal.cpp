@@ -36,11 +36,12 @@ namespace exec::expression {
 
 Value evaluate(const ExpressionInternalFindPositional& expr,
                const Document& root,
-               Variables* variables) {
+               Variables* variables,
+               const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
 
-    auto preImage = children[0]->evaluate(root, variables);
-    auto postImage = children[1]->evaluate(root, variables);
+    auto preImage = children[0]->evaluate(root, variables, ctx);
+    auto postImage = children[1]->evaluate(root, variables, ctx);
     uassert(51255,
             fmt::format("Positional operator pre-image can only be an object, but got {}",
                         typeName(preImage.getType())),
@@ -57,8 +58,9 @@ Value evaluate(const ExpressionInternalFindPositional& expr,
 
 Value evaluate(const ExpressionInternalFindSlice& expr,
                const Document& root,
-               Variables* variables) {
-    auto postImage = expr.getChildren()[0]->evaluate(root, variables);
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto postImage = expr.getChildren()[0]->evaluate(root, variables, ctx);
     uassert(51256,
             fmt::format("$slice operator can only be applied to an object, but got {}",
                         typeName(postImage.getType())),
@@ -69,8 +71,9 @@ Value evaluate(const ExpressionInternalFindSlice& expr,
 
 Value evaluate(const ExpressionInternalFindElemMatch& expr,
                const Document& root,
-               Variables* variables) {
-    auto input = expr.getChildren()[0]->evaluate(root, variables);
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto input = expr.getChildren()[0]->evaluate(root, variables, ctx);
     tassert(
         11103501,
         fmt::format("Expected the input to be an object, but got {}", typeName(input.getType())),

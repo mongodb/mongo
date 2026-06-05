@@ -183,7 +183,7 @@ BSONObj SortKeyGenerator::computeSortKeyFromDocument(const BSONObj& obj,
 
         invariant(part.expression);
         auto value =
-            part.expression->evaluate(documentWithMetdata.freeze(), nullptr /* variables */);
+            part.expression->evaluate(documentWithMetdata.freeze(), nullptr /* variables */, {});
         if (!value.missing()) {
             value.addToBsonObj(&mergedKeyBob, ""_sd);
         } else {
@@ -284,8 +284,8 @@ boost::optional<Value> SortKeyGenerator::extractKeyPart(
         documentWithMetadata.setMetadata(DocumentMetadataFields(metadata));
 
         // ExpressionMeta does not use Variables.
-        plainKey = patternPart.expression->evaluate(documentWithMetadata.freeze(),
-                                                    nullptr /* variables */);
+        plainKey = patternPart.expression->evaluate(
+            documentWithMetadata.freeze(), nullptr /* variables */, {});
     }
 
     return plainKey.missing() ? Value{BSONNULL} : getCollationComparisonKey(plainKey);

@@ -79,7 +79,9 @@ public:
             expCtx, passedArgs, true, std::move(funcSourceString), std::move(lang)};
     }
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     Value serialize(const SerializationOptions& options) const final;
 

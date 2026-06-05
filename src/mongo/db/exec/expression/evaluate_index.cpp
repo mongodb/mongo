@@ -37,8 +37,11 @@ namespace mongo {
 
 namespace exec::expression {
 
-Value evaluate(const ExpressionToHashedIndexKey& expr, const Document& root, Variables* variables) {
-    Value inpVal(expr.getChildren()[0]->evaluate(root, variables));
+Value evaluate(const ExpressionToHashedIndexKey& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value inpVal(expr.getChildren()[0]->evaluate(root, variables, ctx));
     if (inpVal.missing()) {
         inpVal = Value(BSONNULL);
     }
@@ -49,13 +52,14 @@ Value evaluate(const ExpressionToHashedIndexKey& expr, const Document& root, Var
 
 Value evaluate(const ExpressionInternalKeyStringValue& expr,
                const Document& root,
-               Variables* variables) {
-    const Value input = expr.getInput()->evaluate(root, variables);
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    const Value input = expr.getInput()->evaluate(root, variables, ctx);
     auto inputBson = input.wrap("");
 
     std::unique_ptr<CollatorInterface> collator = nullptr;
     if (auto collationExpr = expr.getCollation(); collationExpr) {
-        const Value collation = collationExpr->evaluate(root, variables);
+        const Value collation = collationExpr->evaluate(root, variables, ctx);
         uassert(8281503,
                 str::stream() << "Collation spec must be an object, not "
                               << typeName(collation.getType()),

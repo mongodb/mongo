@@ -44,15 +44,15 @@
 namespace mongo {
 
 template <>
-Value ExpressionFromAccumulator<AccumulatorStdDevPop>::evaluate(const Document& root,
-                                                                Variables* variables) const {
-    return evaluateAccumulator(*this, root, variables);
+Value ExpressionFromAccumulator<AccumulatorStdDevPop>::evaluate(
+    const Document& root, Variables* variables, const EvaluationContext& ctx) const {
+    return evaluateAccumulator(*this, root, variables, ctx);
 }
 
 template <>
-Value ExpressionFromAccumulator<AccumulatorStdDevSamp>::evaluate(const Document& root,
-                                                                 Variables* variables) const {
-    return evaluateAccumulator(*this, root, variables);
+Value ExpressionFromAccumulator<AccumulatorStdDevSamp>::evaluate(
+    const Document& root, Variables* variables, const EvaluationContext& ctx) const {
+    return evaluateAccumulator(*this, root, variables, ctx);
 }
 
 REGISTER_ACCUMULATOR(stdDevPop, genericParseSingleExpressionAccumulator<AccumulatorStdDevPop>);

@@ -61,14 +61,15 @@ namespace exec::expression {
 
 Value evaluate(const ExpressionInternalOwningShard& expr,
                const Document& root,
-               Variables* variables) {
+               Variables* variables,
+               const EvaluationContext& ctx) {
     uassert(6868600,
             "$_internalOwningShard is currently not supported on mongos",
             !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
     auto expCtx = expr.getExpressionContext();
 
-    Value input = expr.getChildren()[0]->evaluate(root, variables);
+    Value input = expr.getChildren()[0]->evaluate(root, variables, ctx);
     if (input.nullish()) {
         return Value(BSONNULL);
     }
@@ -445,13 +446,16 @@ private:
 
 }  // namespace
 
-Value evaluate(const ExpressionInternalIndexKey& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionInternalIndexKey& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     uassert(6868510,
             str::stream() << expr.getOpName() << " is currently not supported on mongos",
             !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer));
 
-    auto docObj = expr.getDoc()->evaluate(root, variables).getDocument().toBson();
-    auto specObj = expr.getSpec()->evaluate(root, variables).getDocument().toBson();
+    auto docObj = expr.getDoc()->evaluate(root, variables, ctx).getDocument().toBson();
+    auto specObj = expr.getSpec()->evaluate(root, variables, ctx).getDocument().toBson();
 
     // Parse and validate the index spec and then create the index descriptor object from it.
     auto indexSpec = index_key_validate::parseAndValidateIndexSpecs(

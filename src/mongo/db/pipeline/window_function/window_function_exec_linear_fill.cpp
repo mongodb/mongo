@@ -79,7 +79,7 @@ boost::optional<std::pair<Value, Value>> WindowFunctionExecLinearFill::findX2Y2(
     while (const auto doc = _iter[index]) {
         if (const auto fillFieldValue = evaluateInput(*doc)) {
             Value sortFieldValue =
-                _sortBy->evaluate(*doc, &_sortBy->getExpressionContext()->variables);
+                _sortBy->evaluate(*doc, &_sortBy->getExpressionContext()->variables, {});
             if (!sortFieldValue.nullish()) {
                 _prevX2Y2 = boost::optional<std::pair<Value, Value>>(
                     std::make_pair(sortFieldValue, *fillFieldValue));
@@ -99,7 +99,7 @@ Value WindowFunctionExecLinearFill::getNext(boost::optional<Document> current) {
                           << fillFieldValue.getType(),
             fillFieldValue.numeric() || fillFieldValue.nullish());
     Value sortFieldValue =
-        _sortBy->evaluate(currentDoc, &_sortBy->getExpressionContext()->variables);
+        _sortBy->evaluate(currentDoc, &_sortBy->getExpressionContext()->variables, {});
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "Value of the sortBy field must be numeric or a date, but found "
                           << sortFieldValue.getType(),

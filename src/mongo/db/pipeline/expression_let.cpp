@@ -214,8 +214,10 @@ Value ExpressionLet::serialize(const SerializationOptions& options) const {
                                           << _children[_kSubExpression]->serialize(options))));
 }
 
-Value ExpressionLet::evaluate(const Document& root, Variables* variables) const {
-    return exec::expression::evaluate(*this, root, variables);
+Value ExpressionLet::evaluate(const Document& root,
+                              Variables* variables,
+                              const EvaluationContext& ctx) const {
+    return exec::expression::evaluate(*this, root, variables, ctx);
 }
 
 }  // namespace mongo

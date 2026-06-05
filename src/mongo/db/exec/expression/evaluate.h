@@ -46,6 +46,8 @@
 
 namespace mongo {
 
+class SimpleMemoryUsageTracker;
+
 namespace exec::expression {
 
 /**
@@ -84,7 +86,8 @@ DayOfWeek parseDayOfWeek(const Value& value, StringData expressionName, StringDa
 boost::optional<TimeZone> makeTimeZone(const TimeZoneDatabase* tzdb,
                                        const Document& root,
                                        const Expression* timeZone,
-                                       Variables* variables);
+                                       Variables* variables,
+                                       const EvaluationContext& ctx);
 
 /**
  * Converts $dateTrunc expression parameter "binSize" 'value' to 64-bit integer.
@@ -108,81 +111,281 @@ ExpressionRegex::PrecompiledRegex precompileRegex(const Value& regex,
                                                   const Value& options,
                                                   const std::string& opName);
 
-Value evaluate(const ExpressionDateFromParts& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDateFromString& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDateToParts& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDateToString& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDateDiff& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDateAdd& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDateSubtract& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDateTrunc& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionTsSecond& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionTsIncrement& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDayOfMonth& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDayOfWeek& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDayOfYear& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionHour& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionMillisecond& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionMinute& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionMonth& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSecond& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionWeek& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionIsoWeekYear& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionIsoDayOfWeek& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionIsoWeek& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionYear& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionCurrentDate& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionDateFromParts& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDateFromString& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDateToParts& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDateToString& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDateDiff& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDateAdd& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDateSubtract& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDateTrunc& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionTsSecond& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionTsIncrement& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDayOfMonth& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDayOfWeek& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDayOfYear& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionHour& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionMillisecond& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionMinute& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionMonth& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSecond& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionWeek& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionIsoWeekYear& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionIsoDayOfWeek& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionIsoWeek& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionYear& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionCurrentDate& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-Value evaluate(const ExpressionArray& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionArrayElemAt& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionFirst& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionLast& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionObjectToArray& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionArrayToObject& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionConcatArrays& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionIndexOfArray& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionIsArray& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionReverseArray& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSortArray& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionTopN& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionTop& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionBottomN& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionBottom& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSetDifference& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSetEquals& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSetIntersection& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSetIsSubset& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSetUnion& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSlice& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSize& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionZip& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionArray& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionArrayElemAt& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionFirst& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionLast& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionObjectToArray& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionArrayToObject& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionConcatArrays& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionIndexOfArray& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionIsArray& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionReverseArray& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSortArray& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionTopN& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionTop& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionBottomN& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionBottom& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSetDifference& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSetEquals& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSetIntersection& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSetIsSubset& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSetUnion& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSlice& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSize& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionZip& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 Value evaluate(const ExpressionSimilarityDotProduct& expr,
                const Document& root,
-               Variables* variables);
-Value evaluate(const ExpressionSimilarityCosine& expr, const Document& root, Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSimilarityCosine& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 Value evaluate(const ExpressionSimilarityEuclidean& expr,
                const Document& root,
-               Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-Value evaluate(const ExpressionMap& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionReduce& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionFilter& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionMap& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionReduce& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionFilter& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-Value evaluate(const ExpressionConcat& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionReplaceOne& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionReplaceAll& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionStrcasecmp& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSubstrBytes& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSubstrCP& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionStrLenBytes& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionBinarySize& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionStrLenCP& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionToLower& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionToUpper& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionTrim& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSplit& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionIndexOfBytes& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionIndexOfCP& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionConcat& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionReplaceOne& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionReplaceAll& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionStrcasecmp& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSubstrBytes& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSubstrCP& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionStrLenBytes& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionBinarySize& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionStrLenCP& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionToLower& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionToUpper& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionTrim& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSplit& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionIndexOfBytes& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionIndexOfCP& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
 /**
  * Adds two values as if by {$add: [{$const: lhs}, {$const: rhs}]}.
@@ -240,78 +443,194 @@ StatusWith<Value> evaluateDivide(Value lhs, Value rhs);
  */
 StatusWith<Value> evaluateMod(Value lhs, Value rhs);
 
-Value evaluate(const ExpressionAdd& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionAdd& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-inline Value evaluate(const ExpressionConstant& expr, const Document& root, Variables* variables) {
+inline Value evaluate(const ExpressionConstant& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
     return expr.getValue();
 }
 
-inline Value evaluate(const ExpressionDivide& expr, const Document& root, Variables* variables) {
+inline Value evaluate(const ExpressionDivide& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
-    return uassertStatusOK(evaluateDivide(children[0]->evaluate(root, variables),
-                                          children[1]->evaluate(root, variables)));
+    return uassertStatusOK(evaluateDivide(children[0]->evaluate(root, variables, ctx),
+                                          children[1]->evaluate(root, variables, ctx)));
 }
 
-inline Value evaluate(const ExpressionMod& expr, const Document& root, Variables* variables) {
+inline Value evaluate(const ExpressionMod& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
-    return uassertStatusOK(evaluateMod(children[0]->evaluate(root, variables),
-                                       children[1]->evaluate(root, variables)));
+    return uassertStatusOK(evaluateMod(children[0]->evaluate(root, variables, ctx),
+                                       children[1]->evaluate(root, variables, ctx)));
 }
 
-Value evaluate(const ExpressionMultiply& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionLog& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionRandom& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionRange& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionMultiply& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionLog& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionRandom& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionRange& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-inline Value evaluate(const ExpressionSubtract& expr, const Document& root, Variables* variables) {
+inline Value evaluate(const ExpressionSubtract& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
     auto& children = expr.getChildren();
-    return uassertStatusOK(evaluateSubtract(children[0]->evaluate(root, variables),
-                                            children[1]->evaluate(root, variables)));
+    return uassertStatusOK(evaluateSubtract(children[0]->evaluate(root, variables, ctx),
+                                            children[1]->evaluate(root, variables, ctx)));
 }
 
-Value evaluate(const ExpressionRound& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionTrunc& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionRound& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionTrunc& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-inline Value evaluate(const ExpressionIsNumber& expr, const Document& root, Variables* variables) {
-    return Value(expr.getChildren()[0]->evaluate(root, variables).numeric());
+inline Value evaluate(const ExpressionIsNumber& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
+    return Value(expr.getChildren()[0]->evaluate(root, variables, ctx).numeric());
 }
 
-Value evaluate(const ExpressionConvert& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionAbs& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionCeil& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionExp& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionPow& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionFloor& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionLn& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionLog10& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSqrt& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionBitNot& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDegreesToRadians& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionRadiansToDegrees& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionArcTangent2& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionCosine& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSine& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionTangent& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionArcCosine& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionArcSine& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionConvert& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionAbs& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionCeil& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionExp& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionPow& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionFloor& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionLn& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionLog10& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSqrt& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionBitNot& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDegreesToRadians& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionRadiansToDegrees& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionArcTangent2& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionCosine& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSine& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionTangent& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionArcCosine& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionArcSine& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 Value evaluate(const ExpressionHyperbolicArcTangent& expr,
                const Document& root,
-               Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
 Value evaluate(const ExpressionHyperbolicArcCosine& expr,
                const Document& root,
-               Variables* variables);
-Value evaluate(const ExpressionArcTangent& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionHyperbolicArcSine& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionHyperbolicCosine& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionHyperbolicSine& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionHyperbolicTangent& expr, const Document& root, Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionArcTangent& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionHyperbolicArcSine& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionHyperbolicCosine& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionHyperbolicSine& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionHyperbolicTangent& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-Value evaluate(const ExpressionFunction& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionInternalJsEmit& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionFunction& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionInternalJsEmit& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-inline Value evaluate(const ExpressionAnd& expr, const Document& root, Variables* variables) {
+inline Value evaluate(const ExpressionAnd& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
     for (auto&& child : expr.getChildren()) {
-        if (!child->evaluate(root, variables).coerceToBool()) {
+        if (!child->evaluate(root, variables, ctx).coerceToBool()) {
             return Value(false);
         }
     }
@@ -319,13 +638,22 @@ inline Value evaluate(const ExpressionAnd& expr, const Document& root, Variables
     return Value(true);
 }
 
-Value evaluate(const ExpressionAllElementsTrue& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionAnyElementTrue& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionAllElementsTrue& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionAnyElementTrue& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-inline Value evaluate(const ExpressionCompare& expr, const Document& root, Variables* variables) {
+inline Value evaluate(const ExpressionCompare& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
     const auto& children = expr.getChildren();
     int cmp = expr.getExpressionContext()->getValueComparator().compare(
-        children[0]->evaluate(root, variables), children[1]->evaluate(root, variables));
+        children[0]->evaluate(root, variables, ctx), children[1]->evaluate(root, variables, ctx));
 
     // Make cmp one of 1, 0, or -1.
     if (cmp == 0) {
@@ -356,17 +684,23 @@ inline Value evaluate(const ExpressionCompare& expr, const Document& root, Varia
     return Value(returnValue);
 }
 
-inline Value evaluate(const ExpressionCond& expr, const Document& root, Variables* variables) {
+inline Value evaluate(const ExpressionCond& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
     const auto& children = expr.getChildren();
-    int idx = children[0]->evaluate(root, variables).coerceToBool() ? 1 : 2;
-    return children[idx]->evaluate(root, variables);
+    int idx = children[0]->evaluate(root, variables, ctx).coerceToBool() ? 1 : 2;
+    return children[idx]->evaluate(root, variables, ctx);
 }
 
-inline Value evaluate(const ExpressionIfNull& expr, const Document& root, Variables* variables) {
+inline Value evaluate(const ExpressionIfNull& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
     const auto& children = expr.getChildren();
     const size_t n = children.size();
     for (size_t i = 0; i < n; ++i) {
-        Value pValue(children[i]->evaluate(root, variables));
+        Value pValue(children[i]->evaluate(root, variables, ctx));
         if (!pValue.nullish() || i == n - 1) {
             return pValue;
         }
@@ -374,15 +708,24 @@ inline Value evaluate(const ExpressionIfNull& expr, const Document& root, Variab
     return Value();
 }
 
-Value evaluate(const ExpressionIn& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionIn& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-inline Value evaluate(const ExpressionNot& expr, const Document& root, Variables* variables) {
-    return Value(!expr.getChildren()[0]->evaluate(root, variables).coerceToBool());
+inline Value evaluate(const ExpressionNot& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
+    return Value(!expr.getChildren()[0]->evaluate(root, variables, ctx).coerceToBool());
 }
 
-inline Value evaluate(const ExpressionOr& expr, const Document& root, Variables* variables) {
+inline Value evaluate(const ExpressionOr& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
     for (auto&& child : expr.getChildren()) {
-        if (child->evaluate(root, variables).coerceToBool()) {
+        if (child->evaluate(root, variables, ctx).coerceToBool()) {
             return Value(true);
         }
     }
@@ -390,13 +733,16 @@ inline Value evaluate(const ExpressionOr& expr, const Document& root, Variables*
     return Value(false);
 }
 
-inline Value evaluate(const ExpressionSwitch& expr, const Document& root, Variables* variables) {
+inline Value evaluate(const ExpressionSwitch& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
     for (int i = 0; i < expr.numBranches(); ++i) {
         auto [caseExpr, thenExpr] = expr.getBranch(i);
-        Value caseResult = caseExpr->evaluate(root, variables);
+        Value caseResult = caseExpr->evaluate(root, variables, ctx);
 
         if (caseResult.coerceToBool()) {
-            return thenExpr->evaluate(root, variables);
+            return thenExpr->evaluate(root, variables, ctx);
         }
     }
 
@@ -404,19 +750,43 @@ inline Value evaluate(const ExpressionSwitch& expr, const Document& root, Variab
             "$switch could not find a matching branch for an input, and no default was specified.",
             expr.defaultExpr());
 
-    return expr.defaultExpr()->evaluate(root, variables);
+    return expr.defaultExpr()->evaluate(root, variables, ctx);
 }
 
-Value evaluate(const ExpressionBitAnd& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionBitOr& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionBitXor& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionBitAnd& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionBitOr& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionBitXor& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-Value evaluate(const ExpressionRegexFind& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionRegexFindAll& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionRegexMatch& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionRegexFind& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionRegexFindAll& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionRegexMatch& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-Value evaluate(const ExpressionObject& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionBsonSize& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionObject& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionBsonSize& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
 /*
  * Helper function to evaluate ExpressionFieldPath, used recursively.
@@ -439,7 +809,10 @@ Value evaluatePath(const FieldPath& fieldPath, size_t index, const Document& inp
  */
 Value evaluatePathArray(const FieldPath& fieldPath, size_t index, const Value& input);
 
-inline Value evaluate(const ExpressionFieldPath& expr, const Document& root, Variables* variables) {
+inline Value evaluate(const ExpressionFieldPath& expr,
+                      const Document& root,
+                      Variables* variables,
+                      const EvaluationContext& ctx) {
     auto& fieldPath = expr.getFieldPath();
     auto variable = expr.getVariableId();
 
@@ -463,50 +836,108 @@ inline Value evaluate(const ExpressionFieldPath& expr, const Document& root, Var
     }
 }
 
-Value evaluate(const ExpressionGetField& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSetField& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionGetField& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSetField& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 Value evaluate(const ExpressionInternalFindAllValuesAtPath& expr,
                const Document& root,
-               Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-Value evaluate(const ExpressionMeta& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionType& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionSubtype& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionTestApiVersion& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionLet& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionMeta& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionType& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionSubtype& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionTestApiVersion& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionLet& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 Value evaluate(const ExpressionInternalRawSortKey& expr,
                const Document& root,
-               Variables* variables);
-Value evaluate(const ExpressionTestFeatureFlags& expr, const Document& root, Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionTestFeatureFlags& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-Value evaluate(const ExpressionToHashedIndexKey& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionToHashedIndexKey& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 Value evaluate(const ExpressionInternalKeyStringValue& expr,
                const Document& root,
-               Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
 
 Value evaluate(const ExpressionInternalFindPositional& expr,
                const Document& root,
-               Variables* variables);
-Value evaluate(const ExpressionInternalFindSlice& expr, const Document& root, Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionInternalFindSlice& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 Value evaluate(const ExpressionInternalFindElemMatch& expr,
                const Document& root,
-               Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-Value evaluate(const ExpressionInternalFLEEqual& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionInternalFLEEqual& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 Value evaluate(const ExpressionInternalFLEBetween& expr,
                const Document& root,
-               Variables* variables);
-Value evaluate(const ExpressionEncStrStartsWith& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionEncStrEndsWith& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionEncStrContains& expr, const Document& root, Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionEncStrStartsWith& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionEncStrEndsWith& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionEncStrContains& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 Value evaluate(const ExpressionEncStrNormalizedEq& expr,
                const Document& root,
-               Variables* variables);
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-Value evaluate(const ExpressionSerializeEJSON& expr, const Document& root, Variables* variables);
-Value evaluate(const ExpressionDeserializeEJSON& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionSerializeEJSON& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
+Value evaluate(const ExpressionDeserializeEJSON& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
-Value evaluate(const ExpressionHash& expr, const Document& root, Variables* variables);
+Value evaluate(const ExpressionHash& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx);
 
 }  // namespace exec::expression
 }  // namespace mongo

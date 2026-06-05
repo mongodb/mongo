@@ -69,9 +69,12 @@ std::function<void()> getExpressionInterruptChecker(OperationContext* opCtx) {
 }  // namespace
 
 
-Value evaluate(const ExpressionMap& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionMap& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     // guaranteed at parse time that this isn't using our _varId
-    Value inputVal = expr.getInput()->evaluate(root, variables);
+    Value inputVal = expr.getInput()->evaluate(root, variables, ctx);
     if (inputVal.nullish()) {
         return Value(BSONNULL);
     }
@@ -101,7 +104,7 @@ Value evaluate(const ExpressionMap& expr, const Document& root, Variables* varia
             variables->setValue(*expr.getIndexVariableId(), Value(static_cast<int>(i)));
         }
 
-        Value toInsert = expr.getEach()->evaluate(root, variables);
+        Value toInsert = expr.getEach()->evaluate(root, variables, ctx);
         if (toInsert.missing()) {
             toInsert = Value(BSONNULL);  // can't insert missing values into array
         }
@@ -117,8 +120,11 @@ Value evaluate(const ExpressionMap& expr, const Document& root, Variables* varia
     return Value(std::move(output));
 }
 
-Value evaluate(const ExpressionReduce& expr, const Document& root, Variables* variables) {
-    Value inputVal = expr.getInput()->evaluate(root, variables);
+Value evaluate(const ExpressionReduce& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    Value inputVal = expr.getInput()->evaluate(root, variables, ctx);
 
     if (inputVal.nullish()) {
         return Value(BSONNULL);
@@ -134,7 +140,7 @@ Value evaluate(const ExpressionReduce& expr, const Document& root, Variables* va
     mapReduceFilterWaitBeforeLoop(expr.getExpressionContext()->getOperationContext());
 
     size_t memLimit = internalQueryMaxMapFilterReduceBytes.load();
-    Value accumulatedValue = expr.getInitial()->evaluate(root, variables);
+    Value accumulatedValue = expr.getInitial()->evaluate(root, variables, ctx);
 
     int32_t prevDepth = -1;
     size_t interval = expr.getAccumulatedValueDepthCheckInterval();
@@ -148,7 +154,7 @@ Value evaluate(const ExpressionReduce& expr, const Document& root, Variables* va
             variables->setValue(*expr.getIndexVariableId(), Value(static_cast<int>(i)));
         }
 
-        accumulatedValue = expr.getIn()->evaluate(root, variables);
+        accumulatedValue = expr.getIn()->evaluate(root, variables, ctx);
         if ((interval > 0) && (i % interval) == 0 &&
             (accumulatedValue.isObject() || accumulatedValue.isArray())) {
             int32_t depth =
@@ -175,9 +181,12 @@ Value evaluate(const ExpressionReduce& expr, const Document& root, Variables* va
     return accumulatedValue;
 }
 
-Value evaluate(const ExpressionFilter& expr, const Document& root, Variables* variables) {
+Value evaluate(const ExpressionFilter& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
     // We are guaranteed at parse time that this isn't using our _varId.
-    Value inputVal = expr.getInput()->evaluate(root, variables);
+    Value inputVal = expr.getInput()->evaluate(root, variables, ctx);
 
     if (inputVal.nullish()) {
         return Value(BSONNULL);
@@ -201,7 +210,7 @@ Value evaluate(const ExpressionFilter& expr, const Document& root, Variables* va
     auto approximateOutputSize = input.size();
     boost::optional<int> remainingLimitCounter;
     if (expr.hasLimit()) {
-        auto limitValue = (expr.getChildren()[*expr.getLimit()])->evaluate(root, variables);
+        auto limitValue = (expr.getChildren()[*expr.getLimit()])->evaluate(root, variables, ctx);
         // If the $filter query contains limit: null, we interpret the query as being "limit-less"
         // and therefore return all matching elements per doc.
         if (!limitValue.nullish()) {
@@ -235,7 +244,7 @@ Value evaluate(const ExpressionFilter& expr, const Document& root, Variables* va
             variables->setValue(*expr.getIndexVariableId(), Value(static_cast<int>(i)));
         }
 
-        if (expr.getCond()->evaluate(root, variables).coerceToBool()) {
+        if (expr.getCond()->evaluate(root, variables, ctx).coerceToBool()) {
             output.push_back(input[i]);
             if (remainingLimitCounter && --*remainingLimitCounter == 0) {
                 return Value(std::move(output));

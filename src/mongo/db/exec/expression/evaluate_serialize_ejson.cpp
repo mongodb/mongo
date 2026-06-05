@@ -34,9 +34,13 @@ namespace mongo {
 
 namespace exec::expression {
 
-Value evaluate(const ExpressionSerializeEJSON& expr, const Document& root, Variables* variables) {
-    auto input = expr.getInput().evaluate(root, variables);
-    auto relaxed = expr.getRelaxed() ? expr.getRelaxed()->evaluate(root, variables) : Value(true);
+Value evaluate(const ExpressionSerializeEJSON& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto input = expr.getInput().evaluate(root, variables, ctx);
+    auto relaxed =
+        expr.getRelaxed() ? expr.getRelaxed()->evaluate(root, variables, ctx) : Value(true);
     uassert(ErrorCodes::BadValue,
             str::stream() << "Unexpected value for relaxed: " << relaxed.toString(),
             relaxed.getType() == BSONType::boolean);
@@ -47,14 +51,17 @@ Value evaluate(const ExpressionSerializeEJSON& expr, const Document& root, Varia
         return serialize_ejson_utils::serializeToExtendedJson(input, relaxed.getBool());
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         if (expr.getOnError()) {
-            return expr.getOnError()->evaluate(root, variables);
+            return expr.getOnError()->evaluate(root, variables, ctx);
         }
         throw;
     }
 }
 
-Value evaluate(const ExpressionDeserializeEJSON& expr, const Document& root, Variables* variables) {
-    auto input = expr.getInput().evaluate(root, variables);
+Value evaluate(const ExpressionDeserializeEJSON& expr,
+               const Document& root,
+               Variables* variables,
+               const EvaluationContext& ctx) {
+    auto input = expr.getInput().evaluate(root, variables, ctx);
     if (input.missing()) {
         return Value(BSONNULL);
     }
@@ -62,7 +69,7 @@ Value evaluate(const ExpressionDeserializeEJSON& expr, const Document& root, Var
         return serialize_ejson_utils::deserializeFromExtendedJson(input);
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         if (expr.getOnError()) {
-            return expr.getOnError()->evaluate(root, variables);
+            return expr.getOnError()->evaluate(root, variables, ctx);
         }
         throw;
     }

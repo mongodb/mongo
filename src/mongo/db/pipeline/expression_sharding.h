@@ -59,7 +59,9 @@ public:
         expCtx->capSbeCompatibility(SbeCompatibility::notCompatible);
     }
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     const char* getOpName() const final {
         return opName;
@@ -148,7 +150,9 @@ public:
 
     Value serialize(const SerializationOptions& options) const final;
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     const char* getOpName() const {
         return opName;

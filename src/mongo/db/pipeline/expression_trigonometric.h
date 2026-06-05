@@ -186,7 +186,9 @@ public:
     ExpressionArcTangent2(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionTwoNumericArgs(expCtx, std::move(children)) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     const char* getOpName() const final {
         return "$atan2";
@@ -218,7 +220,9 @@ public:
                                        ExpressionVector&& children)                                \
             : ExpressionBoundedTrigonometric(expCtx, std::move(children)) {}                       \
                                                                                                    \
-        Value evaluate(const Document& root, Variables* variables) const final;                    \
+        Value evaluate(const Document& root,                                                       \
+                       Variables* variables,                                                       \
+                       const EvaluationContext& ctx) const final;                                  \
                                                                                                    \
         double getLowerBound() const final {                                                       \
             return lowerBound;                                                                     \
@@ -293,7 +297,9 @@ CREATE_BOUNDED_TRIGONOMETRIC_CLASS(Tangent,
                                        ExpressionVector&& children)                       \
             : ExpressionUnboundedTrigonometric(expCtx, std::move(children)) {}            \
                                                                                           \
-        Value evaluate(const Document& root, Variables* variables) const final;           \
+        Value evaluate(const Document& root,                                              \
+                       Variables* variables,                                              \
+                       const EvaluationContext& ctx) const final;                         \
                                                                                           \
         const char* getOpName() const final {                                             \
             return "$" #funcName;                                                         \
@@ -330,7 +336,9 @@ public:
                                         ExpressionVector&& children)
         : ExpressionSingleNumericArg(expCtx, std::move(children)) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     const char* getOpName() const final {
         return "$degreesToRadians";
@@ -359,7 +367,9 @@ public:
                                         ExpressionVector&& children)
         : ExpressionSingleNumericArg(expCtx, std::move(children)) {}
 
-    Value evaluate(const Document& root, Variables* variables) const final;
+    Value evaluate(const Document& root,
+                   Variables* variables,
+                   const EvaluationContext& ctx) const final;
 
     const char* getOpName() const final {
         return "$radiansToDegrees";
