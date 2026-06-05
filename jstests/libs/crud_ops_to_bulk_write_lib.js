@@ -5,6 +5,20 @@
 export const BulkWriteUtils = (function () {
     const commandsToBulkWriteOverride = new Set(["insert", "update", "delete"]);
 
+    // Optional writeError fields forwarded from a bulkWrite reply item when present, including
+    // structured ErrorExtraInfo such as doc validation (errInfo) and geo key extraction.
+    const optionalWriteErrorFields = [
+        "errInfo",
+        "db",
+        "collectionUUID",
+        "expectedCollection",
+        "actualCollection",
+        "failingPath",
+        "underlyingCode",
+        "underlyingReason",
+        "failingElement",
+    ];
+
     let numOpsPerResponse = [];
     let nsInfos = [];
     let bufferedOps = [];
@@ -236,7 +250,7 @@ export const BulkWriteUtils = (function () {
                 let writeError = {index: current.idx, code: current.code, errmsg: current.errmsg};
 
                 // Include optional error fields if they exist.
-                ["errInfo", "db", "collectionUUID", "expectedCollection", "actualCollection"].forEach((property) => {
+                optionalWriteErrorFields.forEach((property) => {
                     if (current.hasOwnProperty(property)) {
                         writeError[property] = current[property];
                     }
@@ -302,13 +316,11 @@ export const BulkWriteUtils = (function () {
                         let writeError = {index: num, code: current.code, errmsg: current.errmsg};
 
                         // Include optional error fields if they exist.
-                        ["errInfo", "db", "collectionUUID", "expectedCollection", "actualCollection"].forEach(
-                            (property) => {
-                                if (current.hasOwnProperty(property)) {
-                                    writeError[property] = current[property];
-                                }
-                            },
-                        );
+                        optionalWriteErrorFields.forEach((property) => {
+                            if (current.hasOwnProperty(property)) {
+                                writeError[property] = current[property];
+                            }
+                        });
 
                         resp["writeErrors"].push(writeError);
                     } else {
