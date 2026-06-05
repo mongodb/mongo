@@ -8,12 +8,7 @@
  * ]
  */
 
-import {
-    getWinningPlanFromExplain,
-    getAllPlanStages,
-    getQueryPlanner,
-    getRejectedPlans,
-} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 import {runTestWithUnorderedComparison} from "jstests/libs/query/join_utils.js";
 
 // TODO SERVER-127575: remove the feature flag once the flag is defaulted to true.
@@ -21,7 +16,6 @@ let conn = MongoRunner.runMongod({
     setParameter: {
         featureFlagPathArrayness: true,
         internalEnableJoinOptimization: true,
-        internalInferSingleTablePredicates: true,
     },
 });
 
@@ -163,7 +157,7 @@ runTest({
     ],
 });
 
-// Simplest $or case: for join A.a = B.b and STP B.b = 7 or 8, we can infer A.a = 7 or 8.
+// We do not support propagating $or predicates. For join A.a = B.b and STP B.b = 7 or 8, we do not propagate infer A.a = 7 or 8.
 runTest({
     pipeline: [
         {
@@ -186,32 +180,7 @@ runTest({
         {$unwind: "$joinedB"},
     ],
     expectedFilters: {
-        A: {
-            "$and": [
-                {
-                    "$expr": {
-                        "$or": [
-                            {
-                                "$eq": [
-                                    "$a",
-                                    {
-                                        "$const": 7,
-                                    },
-                                ],
-                            },
-                            {
-                                "$eq": [
-                                    "$a",
-                                    {
-                                        "$const": 8,
-                                    },
-                                ],
-                            },
-                        ],
-                    },
-                },
-            ],
-        },
+        A: {},
         B: {
             "$and": [
                 {

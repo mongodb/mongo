@@ -182,6 +182,7 @@ std::optional<SingleTablePredicate> combineChildren(
 
     return std::nullopt;
 }
+
 /*
  * This is a recursive function that descends a join node's access path (expr) to return any single
  * table predicates that reference the node's fieldPath that is associated with this given
@@ -236,6 +237,15 @@ std::optional<SingleTablePredicate> getSingleTablePredicateForField(
         return expr->clone();
     }
 
+    if (expr->matchType() == MatchExpression::MATCH_IN) {
+        const auto* inExpr = checked_cast<const InMatchExpression*>(expr);
+        if (inExpr->path() != fieldPath.fullPath()) {
+            return std::nullopt;
+        }
+
+        return inExpr->clone();
+    }
+
     if (expr->matchType() == MatchExpression::AND) {
         std::vector<SingleTablePredicate> children;
         for (size_t i = 0; i < expr->numChildren(); ++i) {
@@ -259,27 +269,7 @@ std::optional<SingleTablePredicate> getSingleTablePredicateForField(
         }
     }
 
-    if (expr->matchType() == MatchExpression::OR) {
-        std::vector<SingleTablePredicate> children;
-        for (size_t i = 0; i < expr->numChildren(); ++i) {
-            auto child = getSingleTablePredicateForField(expr->getChild(i), fieldPath, expCtx);
-            if (child) {
-                children.push_back(std::move(*child));
-            }
-        }
-        if (children.empty()) {
-            return std::nullopt;
-        }
-
-        if (children.size() == 1) {
-            return std::move(children[0]);
-        }
-
-        if (auto combined =
-                combineChildren<ExpressionOr, OrMatchExpression>(std::move(children), expCtx)) {
-            return combined;
-        }
-    }
+    // Do not support $or, $nor, $not
     return std::nullopt;
 }
 

@@ -15,6 +15,18 @@ if (!joinOptimizationStatus) {
     quit();
 }
 
+// TODO SERVER-127575 remove this setParameter call once we correct cardinality estimates from inferred predicates.
+const oldParams = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalInferSingleTablePredicates: 1}),
+).internalInferSingleTablePredicates;
+
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        internalInferSingleTablePredicates: false,
+    }),
+);
+
 let goodEstimations = 0;
 let badEstimations = 0;
 
@@ -459,3 +471,11 @@ estimatePipeline("many_rows", [
 print("# Summary");
 print(`Good estimations: ${goodEstimations}  `);
 print(`Bad estimations: ${badEstimations}  `);
+
+// TODO SERVER-127575 remove this setParameter call once we correct cardinality estimates from inferred predicates.
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        internalInferSingleTablePredicates: oldParams,
+    }),
+);

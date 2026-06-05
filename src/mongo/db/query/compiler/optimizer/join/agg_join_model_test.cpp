@@ -61,7 +61,6 @@ std::vector<std::string> sortedAndChildStrings(const MatchExpression* expr) {
 }
 
 TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnSameField) {
-    RAIIServerParameterControllerForTest knob{"internalInferSingleTablePredicates", true};
     // For join A.a = B.a and STP B.a = 3, we can infer access path A.a = 3
     auto query = R"([
     {
@@ -98,7 +97,6 @@ TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnSameField) {
 }
 
 TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnDiffField) {
-    RAIIServerParameterControllerForTest knob{"internalInferSingleTablePredicates", true};
     // For join A.a = B.b and STP B.b = 3, we can infer access path A.a = 3
     auto query = R"([
     {
@@ -167,7 +165,6 @@ TEST_F(PipelineAnalyzerTest, InferSingleTablePredicateOnDiffField) {
 }
 
 TEST_F(PipelineAnalyzerTest, PropagateSomeButNotAllSTPs) {
-    RAIIServerParameterControllerForTest knob{"internalInferSingleTablePredicates", true};
     // For join A.a = B.b and STPs A.x = 100, B.b = 3, we propagate A.a = 3 but *not*  B.x = 100.
     const auto query = R"([
         { $match: { x: 100 } },
@@ -202,7 +199,6 @@ TEST_F(PipelineAnalyzerTest, PropagateSomeButNotAllSTPs) {
 }
 
 TEST_F(PipelineAnalyzerTest, PropagateSTPsThruJoinChain) {
-    RAIIServerParameterControllerForTest knob{"internalInferSingleTablePredicates", true};
     // For joins A.a = B.a, A.b = B.b and C.a = B.a and STP B.a = 3 and B.b = 4, we
     // can infer A.a = 3, A.b = 4 and C.a = 3.
     const auto query = R"([
@@ -272,13 +268,12 @@ TEST_F(PipelineAnalyzerTest, PropagateSTPsThruJoinChain) {
 }
 
 TEST_F(PipelineAnalyzerTest, JoinChainWithPartialSTPPropagation) {
-    RAIIServerParameterControllerForTest knob{"internalInferSingleTablePredicates", true};
     /**
-     * For joins B.b = A.a, B.x = A.x and STPs B.x ∈ {100,200,300} and B.p = 10 and B.m = 500, we
-     * propagate A.x ∈ {100,200,300}.
+     * For joins B.b = A.a, B.x = A.x and STPs A.y = 5, B.x = 100 and B.p = 10 and B.m = 500, we
+     * propagate A.x = 100.
      *
-     * For joins C.c = joinedB.b, C.x = joinedB.x, C.n = B.m and STP C.q = 42, we propagate C.x ∈
-     * {100,200,300} and C.n = 500.
+     * For joins C.c = joinedB.b, C.x = joinedB.x, C.n = B.m and STP C.q = 42, we propagate C.x
+     * 100 and C.n = 500.
      *
      * For join D.d = joinedC.c and join D.o = joinedC.n and STP D.r ∈ {7,8}, we propagate D.d =
      * 500.
@@ -295,11 +290,7 @@ TEST_F(PipelineAnalyzerTest, JoinChainWithPartialSTPPropagation) {
                             $and: [
                                 { $eq: ["$b", "$$a_val"] },
                                 { $eq: ["$x", "$$x_val"] },
-                                { $or: [
-                                    { $eq: ["$x", 100] },
-                                    { $eq: ["$x", 200] },
-                                    { $eq: ["$x", 300] }
-                                ] },
+                                { $eq: ["$x", 100] },
                                 { $eq: ["$p", 10] },
                                 { $eq: ["$m", 500]}
                             ]
@@ -370,34 +361,26 @@ TEST_F(PipelineAnalyzerTest, JoinChainWithPartialSTPPropagation) {
     auto* baseCollCQ = joinGraph.accessPathAt((NodeId)0);
     ASSERT_EQ(baseCollCQ->nss().coll(), "pipeline_test");
     auto expectedChildren =
-        "{ $and: [ { $or: [ { x: { $_internalExprEq: 100 } }, { x: { $_internalExprEq: 200 } }, { "
-        "x: { $_internalExprEq: 300 } } ] }, { y: { $eq: 5 } }, { $expr: { $or: [ { $eq: [ \"$x\", "
-        "{ $const: 100 } ] }, { $eq: [ \"$x\", { $const: 200 } ] }, { $eq: [ \"$x\", { $const: 300 "
-        "} ] } ] } } ] }";
+        "{ $and: [ { y: { $eq: 5 } }, { $expr: { $eq: [ \"$x\", { $const: 100 } ] } }, { x: { "
+        "$_internalExprEq: 100 } } ] }";
     ASSERT_EQ(expectedChildren, baseCollCQ->getPrimaryMatchExpression()->toString());
 
     auto* bCollCQ = joinGraph.accessPathAt((NodeId)1);
     ASSERT_EQ(bCollCQ->nss().coll(), "B");
     expectedChildren =
-        "{ $and: [ { $or: [ { x: { $_internalExprEq: 100 } }, { x: { $_internalExprEq: 200 } }, { "
-        "x: { $_internalExprEq: 300 } } ] }, { $expr: { $and: [ { $or: [ { $eq: [ \"$x\", { "
-        "$const: 100 } ] }, { $eq: [ \"$x\", { $const: 200 } ] }, { $eq: [ \"$x\", { $const: 300 } "
-        "] } ] }, { $eq: [ \"$p\", { $const: 10 } ] }, { $eq: [ \"$m\", { $const: 500 } ] } ] } }, "
-        "{ m: { $_internalExprEq: 500 } }, { p: { $_internalExprEq: 10 } } ] }";
+        "{ $and: [ { $expr: { $and: [ { $eq: [ \"$x\", { $const: 100 } ] }, { $eq: [ \"$p\", { "
+        "$const: 10 } ] }, { $eq: [ \"$m\", { $const: 500 } ] } ] } }, { m: { $_internalExprEq: "
+        "500 } }, { p: { $_internalExprEq: 10 } }, { x: { $_internalExprEq: 100 } } ] }";
     ASSERT_EQ(expectedChildren, bCollCQ->getPrimaryMatchExpression()->toString());
 
     auto* cCollCQ = joinGraph.accessPathAt((NodeId)2);
     ASSERT_EQ(cCollCQ->nss().coll(), "C");
     std::vector<std::string> expectedChildrenVec = {
-        "{ $expr: { $eq: [ \"$n\", { $const: 500 } ] } }",
         "{ $expr: { $eq: [ \"$q\", { $const: 42 } ] } }",
-        "{ $expr: { $or: [ { $eq: [ \"$x\", { $const: 100 } ] }, { $eq: [ \"$x\", { $const: 200 } "
-        "] }, { $eq: [ \"$x\", { $const: 300 } ] } ] } }",
-        "{ $or: [ { x: { $_internalExprEq: 100 } }, { x: { $_internalExprEq: 200 } }, { x: { "
-        "$_internalExprEq: 300 } } ] }",
+        "{ $expr: { $eq: [ \"$x\", { $const: 100 } ] } }",
         "{ n: { $_internalExprEq: 500 } }",
-        "{ q: { $_internalExprEq: 42 } }"};
-
+        "{ q: { $_internalExprEq: 42 } }",
+        "{ x: { $_internalExprEq: 100 } }"};
     ASSERT_EQ(expectedChildrenVec, sortedAndChildStrings(cCollCQ->getPrimaryMatchExpression()));
 
     auto* dCollCQ = joinGraph.accessPathAt((NodeId)3);
@@ -410,8 +393,149 @@ TEST_F(PipelineAnalyzerTest, JoinChainWithPartialSTPPropagation) {
     ASSERT_EQ(expectedChildren, dCollCQ->getPrimaryMatchExpression()->toString());
 }
 
+TEST_F(PipelineAnalyzerTest, DoNotPropagateOrNorNinSingleTablePredicates) {
+    // For the join A.joinKey1 = B.joinKey1 and STP B.joinKey1 ∈ {10,20} - we do not
+    // propagate the STP to A because the STP is an $or.
+    // For the join B.joinKey2 = C.joinKey2 and STP C.joinKey2 ∉ {400, 500, 600}
+    // we do not propagate the STP to B because the STP is a $nor.
+    const auto query = R"([
+    {
+        $match: {
+        $nor: [
+            { joinKey1: 10 },
+            { joinKey1: 20 }
+        ]
+        }
+    },
+    {
+        $lookup: {
+        from: "B",
+        localField: "joinKey1",
+        foreignField: "joinKey1",
+        as: "B",
+        pipeline: [
+            {
+            $match: {
+                $expr: {
+                $and: [
+                    { $eq: ["$a", true] },
+                    {
+                    $or: [
+                        { $eq: ["$joinKey2", 1] },
+                        { $eq: ["$joinKey2", -1] }
+                    ]
+                    }
+                ]
+                }
+            }
+            }
+        ]
+        }
+    },
+    { $unwind: "$B" },
+    {
+        $lookup: {
+        from: "C",
+        localField: "B.joinKey2",
+        foreignField: "joinKey2",
+        as: "C",
+        pipeline: [
+            {
+            $match: {
+                joinKey2: { $nin: [400, 500, 600] }
+            }
+            }
+        ]
+        }
+    },
+    { $unwind: "$C" }
+    ])";
+
+    auto pipeline = makePipeline(query, {"B", "C"});
+
+    markFieldsAsScalar(*pipeline,
+                       {"joinKey1"_sd, "joinKey2"_sd},
+                       {{"B", {"joinKey1"_sd, "joinKey2"_sd}}, {"C", {"joinKey2"_sd}}});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
+    auto& joinGraph = joinModel.getGraph();
+    ASSERT_EQ(joinGraph.numNodes(), 3);
+
+    auto* baseCollCQ = joinGraph.accessPathAt((NodeId)0);
+    ASSERT_EQ(baseCollCQ->nss().coll(), "pipeline_test");
+    auto expectedChildren = "{ $nor: [ { joinKey1: { $eq: 10 } }, { joinKey1: { $eq: 20 } } ] }";
+    ASSERT_EQ(expectedChildren, baseCollCQ->getPrimaryMatchExpression()->toString());
+
+    auto* bCollCQ = joinGraph.accessPathAt((NodeId)1);
+    ASSERT_EQ(bCollCQ->nss().coll(), "B");
+    expectedChildren =
+        "{ $and: [ { $or: [ { joinKey2: { $_internalExprEq: 1 } }, { joinKey2: { $_internalExprEq: "
+        "-1 } } ] }, { $expr: { $and: [ { $eq: [ \"$a\", { $const: true } ] }, { $or: [ { $eq: [ "
+        "\"$joinKey2\", { $const: 1 } ] }, { $eq: [ \"$joinKey2\", { $const: -1 } ] } ] } ] } }, { "
+        "a: { $_internalExprEq: true } } ] }";
+    ASSERT_EQ(expectedChildren, bCollCQ->getPrimaryMatchExpression()->toString());
+
+    auto* cCollCQ = joinGraph.accessPathAt((NodeId)2);
+    ASSERT_EQ(cCollCQ->nss().coll(), "C");
+    expectedChildren = "{ joinKey2: { $not: { $in: [ 400, 500, 600 ] } } }";
+    ASSERT_EQ(expectedChildren, cCollCQ->getPrimaryMatchExpression()->toString());
+}
+
+
+TEST_F(PipelineAnalyzerTest, PropagateInSingleTablePredicate) {
+    // At the moment the only disjunctive predicate we support propagating is $in.
+    // Consider join A.a = B.b and STP {$or: [{B.b: 100}, {B.b: 200}]}. The STP
+    // gets optimized/rewritten to { b: { $in: [ 100, 200 ] } }, making it therefore eligible
+    // for propagation to A.
+    const auto query = R"([
+    {
+        $lookup: {
+        from: "B",
+        localField: "a",
+        foreignField: "b",
+        as: "joinedB",
+        pipeline: [
+            {
+            $match: {
+                $and: [
+                {
+                    $or: [
+                    { b: 100 },
+                    { b: 200 }
+                    ]
+                }
+                ]
+            }
+            }
+        ]
+        }
+    },
+    { $unwind: "$joinedB" }
+    ])";
+    auto pipeline = makePipeline(query, {"B"});
+    markFieldsAsScalar(*pipeline, {"a"_sd, "c"_sd}, {{"B", {"b"_sd}}});
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
+    auto& joinGraph = joinModel.getGraph();
+
+    const auto* baseCollCQ = joinGraph.accessPathAt((NodeId)0);
+    ASSERT_EQ(baseCollCQ->nss().coll(), "pipeline_test");
+    auto expectedChildren = "{ a: { $in: [ 100, 200 ] } }";
+    ASSERT_EQ(expectedChildren, baseCollCQ->getPrimaryMatchExpression()->toString());
+
+    const auto* bCollCQ = joinGraph.accessPathAt((NodeId)1);
+    ASSERT_EQ(bCollCQ->nss().coll(), "B");
+    expectedChildren = "{ b: { $in: [ 100, 200 ] } }";
+    ASSERT_EQ(expectedChildren, bCollCQ->getPrimaryMatchExpression()->toString());
+}
+
 TEST_F(PipelineAnalyzerTest, PreserveEqExprSemantics) {
-    RAIIServerParameterControllerForTest knob{"internalInferSingleTablePredicates", true};
+
     // This query has STPs with a mix of $eq and $expr semantics.
     // For join A.a = B.b and B.b = 5 ($eq semantics) and A.c = C.c and C.c = 10 ($expr semantics),
     // we need to propagate A.a = 5 with $eq semantics and A.c = 10 with $expr semantics
@@ -478,7 +602,7 @@ TEST_F(PipelineAnalyzerTest, PreserveEqExprSemantics) {
 }
 
 TEST_F(PipelineAnalyzerTest, PreserveEqExprSemanticsInAJoinCycle) {
-    RAIIServerParameterControllerForTest knob{"internalInferSingleTablePredicates", true};
+
     // This query is a four-node cyclic join graph with five join predicates that contain a mix of
     // $eq and $expr semantics.
 
