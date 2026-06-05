@@ -40,9 +40,15 @@
 namespace mongo {
 namespace plan_ranking {
 
+struct RankingContext {
+    QuerySolutionVector solutions;
+    StringSet topLevelSampleFieldNames = {};
+    bool hasRelevantMultikeyIndex = false;
+};
+
 class PlanRankingStrategy {
 public:
-    virtual StatusWith<PlanRankingResult> rankPlans(PlannerData& pd) = 0;
+    virtual StatusWith<PlanRankingResult> rankPlans(PlannerData& pd, RankingContext& rctx) = 0;
 
     virtual ~PlanRankingStrategy() = default;
 };

@@ -176,7 +176,6 @@ namespace {
  */
 class SlotBasedPrepareExecutionResult {
 public:
-    using QuerySolutionVector = std::vector<std::unique_ptr<QuerySolution>>;
     using PlanStageVector =
         std::vector<std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>>;
 

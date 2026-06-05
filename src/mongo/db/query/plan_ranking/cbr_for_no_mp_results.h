@@ -43,7 +43,7 @@ namespace mongo {
 namespace plan_ranking {
 class CBRForNoMPResultsStrategy : public PlanRankingStrategy {
 public:
-    StatusWith<PlanRankingResult> rankPlans(PlannerData& pd) override;
+    StatusWith<PlanRankingResult> rankPlans(PlannerData& pd, RankingContext& rctx) override;
 
 protected:
     // TODO SERVER-115496. Once solutions are received as argument, this no longer needs to be

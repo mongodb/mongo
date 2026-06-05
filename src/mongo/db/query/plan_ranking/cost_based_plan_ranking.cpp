@@ -39,6 +39,8 @@
 #include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/logv2/log.h"
 
+#include <utility>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE
 
 namespace mongo {
@@ -100,38 +102,53 @@ StatusWith<PlanRankingResult> getBestMPPlan(
     // tassert(11306811, "Expected multi-planner to have returned a solution!", soln);
     out.solutions.push_back(std::move(soln));
     out.execState = std::move(mp).extractExecState();
-    return std::move(out);
+    return out;
 }
 
 StatusWith<PlanRankingResult> getBestCBRPlan(OperationContext* opCtx,
                                              CanonicalQuery& query,
                                              QueryPlannerParams& plannerParams,
                                              PlanYieldPolicy::YieldPolicy yieldPolicy,
-                                             const MultipleCollectionAccessor& collections) {
-    CBRPlanRankingStrategy cbrStrategy;
-    plannerParams.planRankerMode = QueryPlanRankerModeEnum::kSamplingCE;
-    auto result = cbrStrategy.rankPlans(opCtx, query, plannerParams, yieldPolicy, collections);
-    plannerParams.planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
-    return result;
-}
-
-// TODO SERVER-117372. Populate explains output.
-StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerData& plannerData) {
-    OperationContext* opCtx = plannerData.opCtx;
-    CanonicalQuery& query = *plannerData.cq;
-    QueryPlannerParams& plannerParams = const_cast<QueryPlannerParams&>(*plannerData.plannerParams);
-    PlanYieldPolicy::YieldPolicy yieldPolicy = plannerData.yieldPolicy;
-    const MultipleCollectionAccessor& collections = plannerData.collections;
-    // TODO SERVER-115496 refactor and move to plan_ranking
+                                             const MultipleCollectionAccessor& collections,
+                                             StringSet topLevelSampleFieldNames,
+                                             bool hasRelevantMultikeyIndex) {
+    // Multiplanning has already consumed the solutions; re-enumerate them.
+    // TODO SERVER-127982: Remove this repeated enumeration by making multiplanner operate on a
+    // vector of solutions without taking ownership.
     auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus().withContext(
             str::stream() << "error processing query: " << query.toStringForErrorMsg()
                           << " planner returned error");
     }
+    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 
-    std::vector<std::unique_ptr<QuerySolution>> solutions =
-        std::move(statusWithMultiPlanSolns.getValue());
+    CBRPlanRankingStrategy cbrStrategy;
+    auto origMode =
+        std::exchange(plannerParams.planRankerMode, QueryPlanRankerModeEnum::kSamplingCE);
+    auto result = cbrStrategy.rankPlans(opCtx,
+                                        query,
+                                        plannerParams,
+                                        yieldPolicy,
+                                        collections,
+                                        std::move(solutions),
+                                        std::move(topLevelSampleFieldNames),
+                                        hasRelevantMultikeyIndex);
+    plannerParams.planRankerMode = origMode;
+    return result;
+}
+
+// TODO SERVER-117372. Populate explains output.
+StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerData& plannerData,
+                                                                      RankingContext& rctx) {
+    OperationContext* opCtx = plannerData.opCtx;
+    CanonicalQuery& query = *plannerData.cq;
+    QueryPlannerParams& plannerParams = const_cast<QueryPlannerParams&>(*plannerData.plannerParams);
+    PlanYieldPolicy::YieldPolicy yieldPolicy = plannerData.yieldPolicy;
+    const MultipleCollectionAccessor& collections = plannerData.collections;
+
+    auto& solutions = rctx.solutions;
+
     size_t numSolutions = solutions.size();
 
     if (solutions.size() == 1) {
@@ -139,7 +156,7 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
         // so it applies everywhere. Only one solution, no need to rank.
         PlanRankingResult out;
         out.solutions.push_back(std::move(solutions.front()));
-        return std::move(out);
+        return out;
     }
 
     // Analyze all solutions for some structural properties
@@ -244,7 +261,13 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
                    "minProductivityForMP"_attr =
                        static_cast<double>(numResultsMP) / numWorksPerPlanMP);
         mp.emitAccumulatedStats();
-        return getBestCBRPlan(opCtx, query, plannerParams, yieldPolicy, collections);
+        return getBestCBRPlan(opCtx,
+                              query,
+                              plannerParams,
+                              yieldPolicy,
+                              collections,
+                              std::move(rctx.topLevelSampleFieldNames),
+                              rctx.hasRelevantMultikeyIndex);
     }
 
     // Remaining number of documents to fill a batch, that is, to end MP.
@@ -285,7 +308,13 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(PlannerDat
     // CBR is substantially more efficient than the remaining MP, choose the best plan using CBR
     LOGV2_INFO(11306800, "AutomaticCE chooses CBR (5)", "Reason"_attr = "it is cheaper than MP");
     mp.emitAccumulatedStats();
-    return getBestCBRPlan(opCtx, query, plannerParams, yieldPolicy, collections);
+    return getBestCBRPlan(opCtx,
+                          query,
+                          plannerParams,
+                          yieldPolicy,
+                          collections,
+                          std::move(rctx.topLevelSampleFieldNames),
+                          rctx.hasRelevantMultikeyIndex);
 }
 
 }  // namespace plan_ranking

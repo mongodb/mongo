@@ -136,7 +136,7 @@ public:
         const QueryPlannerParams& params,
         ce::SamplingEstimator* samplingEstimator,
         const ce::ExactCardinalityEstimator* exactCardinality,
-        StatusWith<std::vector<std::unique_ptr<QuerySolution>>> statusWithMultiPlanSolns,
+        std::vector<std::unique_ptr<QuerySolution>> allSoln,
         const CanonicalQuery& query);
 
     /**

@@ -28,8 +28,11 @@
  */
 #include "mongo/db/query/plan_ranking/cbr_for_no_mp_results.h"
 
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/stats/collection_statistics_impl.h"
+#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_ranking/plan_ranking_test_fixture.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
@@ -69,7 +72,29 @@ public:
 
 StatusWith<PlanRankingResult> planAndRank(plan_ranking::PlanRankingStrategy& strategy,
                                           PlannerData& plannerData) {
-    return strategy.rankPlans(plannerData);
+    auto& query = *plannerData.cq;
+    const auto& plannerParams = *plannerData.plannerParams;
+
+    auto topLevelSampleFieldNames =
+        ce::extractTopLevelFieldsFromMatchExpression(query.getPrimaryMatchExpression());
+    bool hasRelevantMultikeyIndex = false;
+    auto statusWithMultiPlanSolns =
+        QueryPlanner::plan(query,
+                           plannerParams,
+                           topLevelSampleFieldNames,
+                           boost::optional<bool&>(hasRelevantMultikeyIndex));
+    if (!statusWithMultiPlanSolns.isOK()) {
+        return statusWithMultiPlanSolns.getStatus().withContext(
+            str::stream() << "error processing query: " << query.toStringForErrorMsg()
+                          << " planner returned error");
+    }
+    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
+
+    plan_ranking::RankingContext rctx{.solutions = std::move(solutions),
+                                      .topLevelSampleFieldNames =
+                                          std::move(topLevelSampleFieldNames),
+                                      .hasRelevantMultikeyIndex = hasRelevantMultikeyIndex};
+    return strategy.rankPlans(plannerData, rctx);
 }
 
 TEST_F(CBRForNoMPResultsTest, SingleSolutionDoesNotUseMultiPlanner) {
@@ -84,7 +109,7 @@ TEST_F(CBRForNoMPResultsTest, SingleSolutionDoesNotUseMultiPlanner) {
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     ASSERT_FALSE(status.getValue().maybeExplainData.has_value());
-    ASSERT_EQ(strategy.getMultiPlanner(), boost::none);
+    ASSERT_FALSE(strategy.getMultiPlanner());
     ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, false);
 
     ASSERT_FALSE(status.getValue().execState);
@@ -231,7 +256,7 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
         ASSERT_FALSE(rejectedPlan.solution == nullptr);
         ASSERT_EQ(rejectedPlan.planStage, nullptr);  // Not rejected by the multi-planner
     }
-    ASSERT_TRUE(strategy.getMultiPlanner().has_value());
+    ASSERT_TRUE(strategy.getMultiPlanner());
     auto stats = strategy.getMultiPlanner()->getSpecificStats();
     ASSERT_TRUE(stats->earlyExit);
     ASSERT_EQ(stats->numResultsFound, 0);
@@ -347,7 +372,7 @@ TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
     ASSERT(!explainData.rejectedPlansWithStages[3].planStage);
     ASSERT(!explainData.rejectedPlansWithStages[4].planStage);
 
-    ASSERT_TRUE(strategy.getMultiPlanner().has_value());
+    ASSERT_TRUE(strategy.getMultiPlanner());
     auto stats = strategy.getMultiPlanner()->getSpecificStats();
     ASSERT_FALSE(stats->earlyExit);
     ASSERT_EQ(stats->numResultsFound, 0);
@@ -406,7 +431,7 @@ TEST_F(CBRForNoMPResultsTest, StrategyDoesNotCollectExplainData) {
     ASSERT_FALSE(status.getValue().maybeExplainData.has_value());
     ASSERT_EQ(status.getValue().needsWorksMeasuredForPlanCache, false);
     ASSERT_TRUE(status.getValue().execState);
-    ASSERT_TRUE(strategy.getMultiPlanner().has_value());
+    ASSERT_TRUE(strategy.getMultiPlanner());
 }
 }  // namespace
 }  // namespace mongo

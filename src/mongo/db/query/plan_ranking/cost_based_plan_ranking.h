@@ -58,7 +58,7 @@ public:
      *
      * Returns the best plan or error.
      */
-    StatusWith<PlanRankingResult> rankPlans(PlannerData& pd) override;
+    StatusWith<PlanRankingResult> rankPlans(PlannerData& pd, RankingContext& rctx) override;
 };
 
 }  // namespace mongo::plan_ranking

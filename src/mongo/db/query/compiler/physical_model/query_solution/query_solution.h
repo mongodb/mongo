@@ -548,6 +548,8 @@ private:
     PlanNodeId _unextendedRootId{kEmptyPlanNodeId};
 };
 
+using QuerySolutionVector = std::vector<std::unique_ptr<QuerySolution>>;
+
 struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     CollectionScanNode(NamespaceString nss = {});
     ~CollectionScanNode() override {}

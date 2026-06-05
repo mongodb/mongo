@@ -30,6 +30,7 @@
 #include "mongo/db/query/plan_ranking/plan_ranker.h"
 
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/cbr_for_no_mp_results.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
@@ -85,21 +86,42 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
                                                     const MultipleCollectionAccessor& collections,
                                                     PlannerData plannerData,
                                                     bool isClassic) {
-    auto rankerMode = plannerParams.planRankerMode;
+    auto& rankerMode = plannerParams.planRankerMode;
+    auto autoStrategy = query.getExpCtx()
+                            ->getQueryKnobConfiguration()
+                            .getPlanRankingStrategyForAutomaticQueryPlanRankerMode();
 
     const bool canUseCBR = plannerParams.cbrEnabled && isClassic;
-    std::unique_ptr<PlanRankingStrategy> strategy;
-    if (!canUseCBR) {
-        strategy = std::make_unique<MPPlanRankingStrategy>();
-    } else {
-        strategy = makeStrategy(rankerMode,
-                                query.getExpCtx()
-                                    ->getQueryKnobConfiguration()
-                                    .getPlanRankingStrategyForAutomaticQueryPlanRankerMode());
-    }
 
-    // TODO SERVER-115496. Enumerate solutions here and pass them to the ranking strategy.
-    auto swRankingResult = strategy->rankPlans(plannerData);
+    RankingContext rctx;
+
+    rctx.topLevelSampleFieldNames =
+        ce::extractTopLevelFieldsFromMatchExpression(query.getPrimaryMatchExpression());
+
+    // Populating the 'topLevelSampleFields' requires 2 steps:
+    //  1. Extract the fields of the relevant indexes from the plan() function by passing in
+    //  the pointer to 'topLevelSampleFieldNames' as an output parameter.
+    //  We do this also for trivially estimable queries, as the presence of relevant multikey
+    //  indices prevent us from switching to heuristicCE.
+    //  2. Extract the set of top level fields from the filter, sort and project
+    //  components of the CanonicalQuery. We do this only for CE methods which might use sampling.
+    auto statusWithMultiPlanSolns =
+        QueryPlanner::plan(query,
+                           plannerParams,
+                           rctx.topLevelSampleFieldNames,
+                           boost::optional<bool&>(rctx.hasRelevantMultikeyIndex));
+    if (!statusWithMultiPlanSolns.isOK()) {
+        return statusWithMultiPlanSolns.getStatus().withContext(
+            str::stream() << "error enumerating plans for query: " << query.toStringForErrorMsg()
+                          << " planner returned error");
+    }
+    rctx.solutions = std::move(statusWithMultiPlanSolns.getValue());
+
+    std::unique_ptr<PlanRankingStrategy> strategy = canUseCBR
+        ? makeStrategy(rankerMode, autoStrategy)
+        : std::make_unique<MPPlanRankingStrategy>();
+
+    auto swRankingResult = strategy->rankPlans(plannerData, rctx);
     return swRankingResult;
 }
 }  // namespace plan_ranking

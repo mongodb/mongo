@@ -33,19 +33,14 @@
 
 namespace mongo::plan_ranking {
 
-StatusWith<PlanRankingResult> MPPlanRankingStrategy::rankPlans(PlannerData& pd) {
-    CanonicalQuery& query = *pd.cq;
-    const QueryPlannerParams& plannerParams = *pd.plannerParams;
+StatusWith<PlanRankingResult> MPPlanRankingStrategy::rankPlans(PlannerData& pd,
+                                                               RankingContext& rctx) {
     /**
      * This is a special plan ranking strategy in that it does not actually rank plans, but
      * rather returns all enumerated plans. This will result in multi-planning being used
      * to select a winning plan at runtime.
      */
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
-    if (!statusWithMultiPlanSolns.isOK()) {
-        return statusWithMultiPlanSolns.getStatus();
-    }
-    return PlanRankingResult{.solutions = std::move(statusWithMultiPlanSolns.getValue())};
+    return PlanRankingResult{.solutions = std::move(rctx.solutions)};
 }
 
 }  // namespace mongo::plan_ranking

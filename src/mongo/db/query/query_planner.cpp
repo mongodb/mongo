@@ -1767,7 +1767,7 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
     const QueryPlannerParams& params,
     ce::SamplingEstimator* samplingEstimator,
     const ce::ExactCardinalityEstimator* exactCardinality,
-    StatusWith<std::vector<std::unique_ptr<QuerySolution>>> statusWithMultiPlanSolns,
+    std::vector<std::unique_ptr<QuerySolution>> allSoln,
     const CanonicalQuery& query) {
     using namespace cost_based_ranker;
     auto cbrMode = params.planRankerMode;
@@ -1776,9 +1776,6 @@ StatusWith<PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
     tassert(9969001, "CBR received incomplete catalog statistics", collInfo.collStats != nullptr);
     CardinalityEstimator cardEstimator(collInfo, samplingEstimator, estimates, cbrMode);
     CostEstimator costEstimator(estimates);
-
-    std::vector<std::unique_ptr<QuerySolution>> allSoln =
-        std::move(statusWithMultiPlanSolns.getValue());
     // This set of plans contains the optimal plan. If 'acceptedSoln' contains a single
     // plan, then that is the optimal (winning) plan chosen by the planner. Otherwise, if there is
     // more than one plan, those plans are sent to the multi-planner to choose the winning plan.

@@ -75,25 +75,22 @@ void addRemappedEstimates(const QuerySolutionNode* mpNode,
 
 }  // namespace
 
-StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& plannerData) {
+StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& plannerData,
+                                                                   RankingContext& rctx) {
     OperationContext* opCtx = plannerData.opCtx;
     CanonicalQuery& query = *plannerData.cq;
     QueryPlannerParams& plannerParams = *plannerData.plannerParams;
     PlanYieldPolicy::YieldPolicy yieldPolicy = plannerData.yieldPolicy;
     const MultipleCollectionAccessor& collections = plannerData.collections;
 
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
-    if (!statusWithMultiPlanSolns.isOK()) {
-        return statusWithMultiPlanSolns.getStatus();
-    }
-    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
+    auto& solutions = rctx.solutions;
 
     if (solutions.size() == 1) {
         // TODO SERVER-115496. Make sure this short circuit logic is also taken to main plan_ranking
         // so it applies everywhere. Only one solution, no need to rank.
         PlanRankingResult out;
         out.solutions.push_back(std::move(solutions.front()));
-        return std::move(out);
+        return out;
     }
     auto solutionsSize = solutions.size();  // Caching the value before moving it.
     _multiPlanner.emplace(std::move(plannerData), std::move(solutions), PlanExplainerData{});
@@ -134,10 +131,13 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(PlannerData& 
             stats->numResultsFound == 0);
 
     // No plan produced any results during the trials phase.
-    CBRPlanRankingStrategy cbrStrategy;
-    plannerParams.planRankerMode = QueryPlanRankerModeEnum::kSamplingCE;
-    auto cbrResult = cbrStrategy.rankPlans(opCtx, query, plannerParams, yieldPolicy, collections);
-    plannerParams.planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
+    auto cbrResult = getBestCBRPlan(opCtx,
+                                    query,
+                                    plannerParams,
+                                    yieldPolicy,
+                                    collections,
+                                    std::move(rctx.topLevelSampleFieldNames),
+                                    rctx.hasRelevantMultikeyIndex);
     if (!cbrResult.isOK()) {
         return cbrResult.getStatus();
     }

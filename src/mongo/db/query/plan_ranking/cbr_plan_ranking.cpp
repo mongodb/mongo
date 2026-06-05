@@ -39,6 +39,7 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -99,8 +100,16 @@ bool isTriviallyEstimable(const CanonicalQuery& cq) {
 
 namespace plan_ranking {
 
-StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(PlannerData& pd) {
-    return rankPlans(pd.opCtx, *pd.cq, *pd.plannerParams, pd.yieldPolicy, pd.collections);
+StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(PlannerData& pd,
+                                                                RankingContext& rctx) {
+    return rankPlans(pd.opCtx,
+                     *pd.cq,
+                     *pd.plannerParams,
+                     pd.yieldPolicy,
+                     pd.collections,
+                     std::move(rctx.solutions),
+                     std::move(rctx.topLevelSampleFieldNames),
+                     rctx.hasRelevantMultikeyIndex);
 }
 
 StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
@@ -108,31 +117,15 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
     CanonicalQuery& query,
     QueryPlannerParams& plannerParams,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    const MultipleCollectionAccessor& collections) const {
+    const MultipleCollectionAccessor& collections,
+    QuerySolutionVector solutions,
+    StringSet topLevelSampleFieldNames,
+    bool hasRelevantMultikeyIndex) const {
     using namespace cost_based_ranker;
 
+    size_t numSolutions = solutions.size();
+
     const bool isTrivialQuery = isTriviallyEstimable(query);
-
-    StringSet topLevelSampleFieldNames;
-    bool hasRelevantMultikeyIndex = false;
-
-    // Populating the 'topLevelSampleFields' requires 2 steps:
-    //  1. Extract the fields of the relevant indexes from the plan() function by passing in
-    //  the pointer to 'topLevelSampleFieldNames' as an output parameter.
-    //  We do this also for trivially estimable queries, as the presence of relevant multikey
-    //  indices prevent us from switching to heuristicCE.
-    //  2. Extract the set of top level fields from the filter, sort and project
-    //  components of the CanonicalQuery. We do this only for CE methods which might use sampling.
-    auto statusWithMultiPlanSolns = QueryPlanner::plan(
-        query,
-        plannerParams,
-        topLevelSampleFieldNames,
-        isTrivialQuery ? boost::optional<bool&>(hasRelevantMultikeyIndex) : boost::none);
-    if (!statusWithMultiPlanSolns.isOK()) {
-        return statusWithMultiPlanSolns.getStatus().withContext(
-            str::stream() << "error processing query: " << query.toStringForErrorMsg()
-                          << " planner returned error");
-    }
 
     if (isTrivialQuery && !hasRelevantMultikeyIndex) {
         // For trivially estimable queries, heuristic CE is sufficient.
@@ -150,8 +143,6 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
         topLevelSampleFieldNames.merge(meTopLevelFields);
     }
 
-    size_t numSolutions = statusWithMultiPlanSolns.getValue().size();
-
     // Start timer for server status metrics
     auto tickSource = opCtx->getServiceContext()->getTickSource();
     auto startTicks = tickSource->getTicks();
@@ -160,14 +151,14 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
     numPlansTotal.increment(numSolutions);
     invocationCount.increment();
 
-    if (numSolutions == 1 &&
+    if (solutions.size() == 1 &&
         (!query.getExplain() ||
          // TODO(SERVER-118659): Remove this disjunction once we support costing count_scan
-         QueryPlannerAnalysis::isCountScan(statusWithMultiPlanSolns.getValue()[0].get()))) {
+         QueryPlannerAnalysis::isCountScan(solutions[0].get()))) {
         // TODO SERVER-115496. Make sure this short circuit logic is also taken to main plan_ranking
         // so it applies everywhere. Only one solution, no need to rank.
         std::vector<std::unique_ptr<QuerySolution>> solns;
-        solns.push_back(std::move(statusWithMultiPlanSolns.getValue()[0]));
+        solns.push_back(std::move(solutions[0]));
         return PlanRankingResult{.solutions = std::move(solns)};
     }
 
@@ -207,12 +198,11 @@ StatusWith<PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
         CurOp::get(opCtx)->debug().getAdditiveMetrics().nDocsSampled = static_cast<uint64_t>(n);
     }
 
-    auto planRankingResult =
-        QueryPlanner::planWithCostBasedRanking(plannerParams,
-                                               samplingEstimator.get(),
-                                               exactCardinality.get(),
-                                               std::move(statusWithMultiPlanSolns),
-                                               query);
+    auto planRankingResult = QueryPlanner::planWithCostBasedRanking(plannerParams,
+                                                                    samplingEstimator.get(),
+                                                                    exactCardinality.get(),
+                                                                    std::move(solutions),
+                                                                    query);
 
     // Calculate duration for server status metrics
     auto durationMicros = tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks);
