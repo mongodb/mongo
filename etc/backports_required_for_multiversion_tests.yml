@@ -179,6 +179,38 @@ last-continuous:
       ticket: SERVER-124967
     - test_file: jstests/core/txns/multi_statement_transaction_command_args.js
       ticket: SERVER-127661
+    - test_file: jstests/core/repro/dbcase2.js
+      ticket: SERVER-95530
+    - test_file: jstests/core/timeseries/write/timeseries_bypass_document_validation_raw_buckets.js
+      ticket: SERVER-121714
+    - test_file: jstests/noPassthrough/ddl/clear_jumbo.js
+      ticket: SERVER-125661
+    - test_file: jstests/noPassthrough/sharded_cluster_topology/shard_registry_rsm_removal_race.js
+      ticket: SERVER-123567
+    - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_commit_prepared_transaction.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_drop_collection.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_during_stepdown.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp_no_oplog_application.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_rename_collection.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
+      ticket: SERVER-121218
+    - test_file: jstests/replsets/initial_sync_test_fixture_test.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_waits_for_stable_timestamp.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/server_status_metrics.js
+      ticket: SERVER-120318
+    - test_file: jstests/sharding/chunk_migration_maxkey_boundary.js
+      ticket: SERVER-121533
   suites: null
 last-lts:
   all:
@@ -258,60 +290,60 @@ last-lts:
       ticket: SERVER-92665
     - test_file: jstests/noPassthrough/server_status_metrics_retryable_writes.js
       ticket: SERVER-86253
-    - test_file: jstests/sharding/retryable_update_one_by_id_chunk_migration.js
-      ticket: SERVER-89018
-    - test_file: jstests/sharding/auth_catalog_shard_localhost_exception.js
-      ticket: SERVER-88735
-    - test_file: jstests/sharding/catalog_shard_mongos_ops_on_config_and_admin.js
-      ticket: SERVER-88735
-    - test_file: jstests/sharding/invalid_shard_identity_doc.js
-      ticket: SERVER-88735
-    - test_file: jstests/sharding/move_chunk_update_shard_key_in_retryable_write.js
-      ticket: SERVER-84796
-    - test_file: jstests/sharding/retryable_upsert_single_write_shard.js
-      ticket: SERVER-84796
-    - test_file: jstests/sharding/direct_connection_auth_transition.js
-      ticket: SERVER-77073
-    - test_file: jstests/sharding/query/index_scan_in_backward_direction.js
-      ticket: SERVER-95627
-    - test_file: jstests/core/query/query_settings/query_settings_index_application_aggregate.js
-      ticket: SERVER-88629
-    - test_file: jstests/core/index/elemmatch_index.js
-      ticket: SERVER-90747
-    - test_file: jstests/core/command_let_variables_expressions.js
-      ticket: SERVER-89268
-    - test_file: jstests/sharding/analyze_shard_key/sample_write_queries_sharded.js
-      ticket: SERVER-89268
-    - test_file: jstests/sharding/analyze_shard_key/sample_write_queries_unsharded.js
-      ticket: SERVER-89268
-    - test_file: jstests/sharding/balancer_should_return_random_migrations_failpoint.js
-      ticket: SERVER-89395
-    - test_file: jstests/core/query/explain/explain_skip.js
-      ticket: SERVER-88949
-    - test_file: jstests/core/timeseries/query/timeseries_groupby_reorder.js
-      ticket: SERVER-87961
-    - test_file: jstests/core/timeseries/query/timeseries_lastpoint.js
-      ticket: SERVER-87961
-    - test_file: jstests/sharding/transactions_stale_shard_version_errors.js
-      ticket: SERVER-84623
-    - test_file: jstests/core/timeseries/geo/timeseries_geonear_lookup.js
-      ticket: SERVER-81454
-    - test_file: jstests/replsets/reconstruct_prepared_transactions_initial_sync.js
-      ticket: SERVER-89618
-    - test_file: jstests/replsets/initial_sync_survives_restart.js
-      ticket: SERVER-88447
-    - test_file: jstests/core/timeseries/query/timeseries_computed_field.js
-      ticket: SERVER-88072
-    - test_file: jstests/auth/commands_builtin_roles_replset.js
-      ticket: SERVER-92411
-    - test_file: jstests/auth/curop_auth_info.js
-      ticket: SERVER-89664
-    - test_file: jstests/auth/killop_own_ops.js
-      ticket: SERVER-89664
-    - test_file: jstests/core/query/query_settings/query_shape_hash_in_current_op.js
-      ticket: SERVER-89664
+    - test_file: jstests/noPassthrough/sharded_cluster_topology/shard_registry_rsm_removal_race.js
+      ticket: SERVER-123567
+    - test_file: jstests/query_golden/distinct_index_eligibility_md.js
+      ticket: SERVER-111486
+    - test_file: jstests/replsets/auth_coordinateCommitTransaction.js
+      ticket: SERVER-103618
+    - test_file: jstests/replsets/backwards_compatible_timeseries_catalog_options.js
+      ticket: SERVER-91195
+    - test_file: jstests/replsets/catchup_ignores_old_heartbeats.js
+      ticket: SERVER-86674
+    - test_file: jstests/replsets/configurable_fetcher_timeout.js
+      ticket: SERVER-106165
+    - test_file: jstests/replsets/election_term_over_int_max.js
+      ticket: SERVER-119413
+    - test_file: jstests/replsets/index_builds/rollback_index_build_start_abort.js
+      ticket: SERVER-103955
+    - test_file: jstests/replsets/initial_sync_check_initiating_set_oplog_entry.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_collStats_resumes_after_network_error.js
+      ticket: SERVER-94259
+    - test_file: jstests/replsets/initial_sync_commit_prepared_transaction.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_drop_collection.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_during_stepdown.js
+      ticket: SERVER-113184
     - test_file: jstests/replsets/initial_sync_during_stepdown.js
       ticket: SERVER-89664
+    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_fetch_from_oldest_active_transaction_timestamp_no_oplog_application.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_index_conflict_recreate.js
+      ticket: SERVER-93141
+    - test_file: jstests/replsets/initial_sync_rename_collection.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_replSetGetStatus.js
+      ticket: SERVER-121218
+    - test_file: jstests/replsets/initial_sync_survives_restart.js
+      ticket: SERVER-88447
+    - test_file: jstests/replsets/initial_sync_test_fixture_test.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/initial_sync_waits_for_stable_timestamp.js
+      ticket: SERVER-113184
+    - test_file: jstests/replsets/large_dockey_succeeds_on_secondary.js
+      ticket: SERVER-104405
+    - test_file: jstests/replsets/log_unprepared_abort_txns.js
+      ticket: SERVER-111017
+    - test_file: jstests/replsets/malformed_heartbeat_request.js
+      ticket: SERVER-104563
+    - test_file: jstests/replsets/new_primary_prevents_stale_majority_reads_on_stepup.js
+      ticket: SERVER-53813
+    - test_file: jstests/replsets/oplog_fetch_lag_metric.js
+      ticket: SERVER-116300
     - test_file: jstests/replsets/quiesce_mode.js
       ticket: SERVER-89664
     - test_file: jstests/replsets/read_operations_during_step_down.js

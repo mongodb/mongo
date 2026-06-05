@@ -285,6 +285,20 @@ public:
      */
     void processSuccessfulFCVFetcherResponseLastLTS();
 
+    /**
+     * Schedules and processes a successful response to the network request sent by InitialSyncer's
+     * earliest oplog entry fetcher (used when initialSyncWaitForSyncSourceLastStableRecoveryTs is
+     * enabled). Validates that sort is $natural:1 (ascending).
+     */
+    void processSuccessfulEarliestOplogEntryFetcherResponse(std::vector<BSONObj> docs);
+
+    /**
+     * Enables initialSyncWaitForSyncSourceLastStableRecoveryTs, starts the initial syncer, and
+     * drives it through all preamble network steps up to and including the FCV fetch. Leaves the
+     * earliest oplog entry fetch request pending for the caller to handle.
+     */
+    void runWaitStableTsPreamble(int beginApplyingT = 1);
+
     void finishProcessingNetworkResponse() {
         getNet()->runReadyNetworkOperations();
         if (getNet()->hasReadyRequests()) {
@@ -324,6 +338,7 @@ protected:
 
     void setUp() override {
         executor::ThreadPoolExecutorTest::setUp();
+        initialSyncWaitForSyncSourceLastStableRecoveryTs.store(false);
         _storageInterface = std::make_unique<StorageInterfaceMock>();
         _storageInterface->createOplogFn = [this](OperationContext* opCtx,
                                                   const NamespaceString& nss) {
@@ -526,6 +541,7 @@ protected:
         _replicationProcess.reset();
         _storageInterface.reset();
         _mock.reset();
+        initialSyncWaitForSyncSourceLastStableRecoveryTs.store(false);
     }
 
     /**
@@ -738,6 +754,64 @@ void InitialSyncerTest::processSuccessfulFCVFetcherResponse(std::vector<BSONObj>
             makeCursorResponse(0LL, NamespaceString::kServerConfigurationNamespace, docs)));
     assertFCVRequest(request);
     net->runReadyNetworkOperations();
+}
+
+void InitialSyncerTest::processSuccessfulEarliestOplogEntryFetcherResponse(
+    std::vector<BSONObj> docs) {
+    auto net = getNet();
+    auto request =
+        assertRemoteCommandNameEquals("find",
+                                      net->scheduleSuccessfulResponse(makeCursorResponse(
+                                          0LL, NamespaceString::kRsOplogNamespace, docs)));
+    ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
+    ASSERT_TRUE(request.cmdObj.hasField("sort"));
+    ASSERT_EQUALS(mongo::BSONType::object, request.cmdObj["sort"].type());
+    ASSERT_BSONOBJ_EQ(BSON("$natural" << 1), request.cmdObj.getObjectField("sort"));
+    net->runReadyNetworkOperations();
+}
+
+BSONObj makeInitiatingSetOplogEntryObj(int t) {
+    return DurableOplogEntry(OpTime(Timestamp(t, 1), -1),
+                             OpTypeEnum::kNoop,
+                             NamespaceString::createNamespaceString_forTest(""),
+                             boost::none,
+                             boost::none,
+                             boost::none,
+                             boost::none,
+                             OplogEntry::kOplogVersion,
+                             BSON("msg" << repl::kInitiatingSetMsg),
+                             boost::none,
+                             {},
+                             boost::none,
+                             Date_t() + Seconds(t),
+                             {},
+                             boost::none,
+                             boost::none,
+                             boost::none,
+                             boost::none,
+                             boost::none,
+                             boost::none)
+        .toBSON();
+}
+
+void InitialSyncerTest::runWaitStableTsPreamble(int beginApplyingT) {
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    auto opCtx = makeOpCtx();
+    ASSERT_OK(getInitialSyncer().startup(opCtx.get(), 1U));
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+        auto txnRequest = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+        assertRemoteCommandNameEquals("find", txnRequest);
+        net->runReadyNetworkOperations();
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(beginApplyingT)});
+        processSuccessfulFCVFetcherResponseLastLTS();
+    }
+    // The FCV callback has now scheduled the earliest oplog entry fetch, leaving one pending
+    // request in the queue for the caller to handle.
 }
 
 TEST_F(InitialSyncerTest, InvalidConstruction) {
@@ -5074,6 +5148,558 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerFailsIfEarliestOplogEntryFetcherReturnsEmptyBatch) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    runWaitStableTsPreamble();
+    auto initialSyncer = &getInitialSyncer();
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        processSuccessfulEarliestOplogEntryFetcherResponse({});
+    }
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerPassesThroughEarliestOplogEntryFetcherCallbackErrorWhenWaitingForStableTs) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    runWaitStableTsPreamble();
+    auto initialSyncer = &getInitialSyncer();
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        assertRemoteCommandNameEquals(
+            "find",
+            net->scheduleErrorResponse(
+                Status(ErrorCodes::OperationFailed, "find command failed at sync source")));
+        net->runReadyNetworkOperations();
+    }
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerPassesThroughReplSetGetStatusCallbackErrorWhenWaitingForStableTs) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    runWaitStableTsPreamble();
+    auto initialSyncer = &getInitialSyncer();
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        processSuccessfulEarliestOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+        assertRemoteCommandNameEquals(
+            "replSetGetStatus",
+            net->scheduleErrorResponse(
+                Status(ErrorCodes::OperationFailed, "replSetGetStatus failed at sync source")));
+        net->runReadyNetworkOperations();
+    }
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerPassesThroughReplSetGetStatusCommandErrorWhenWaitingForStableTs) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    runWaitStableTsPreamble();
+    auto initialSyncer = &getInitialSyncer();
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        processSuccessfulEarliestOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+        // Network call succeeds but command returns {ok: 0} — only caught by
+        // getStatusFromCommandResult, not by the response.status check.
+        auto replSetGetStatusRequest = net->scheduleSuccessfulResponse(
+            BSON("ok" << 0 << "code" << ErrorCodes::NotWritablePrimary << "errmsg"
+                      << "not primary"));
+        assertRemoteCommandNameEquals("replSetGetStatus", replSetGetStatusRequest);
+        net->runReadyNetworkOperations();
+    }
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest,
+       InitialSyncerFailsIfReplSetGetStatusResponseMissingLastStableRecoveryTimestamp) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    runWaitStableTsPreamble();
+    auto initialSyncer = &getInitialSyncer();
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        processSuccessfulEarliestOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+        auto replSetGetStatusRequest =
+            net->scheduleSuccessfulResponse(BSON("ok" << 1 /* no lastStableRecoveryTimestamp */));
+        assertRemoteCommandNameEquals("replSetGetStatus", replSetGetStatusRequest);
+        net->runReadyNetworkOperations();
+    }
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerSkipsWaitWhenInitiatingSetWithinThreshold) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    // Use t=5 for beginApplyingTimestamp so we can verify it gets overridden to t=1.
+    runWaitStableTsPreamble(5);
+    auto initialSyncer = &getInitialSyncer();
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        // Earliest oplog entry is the "initiating set" noop at ts(1,1).
+        processSuccessfulEarliestOplogEntryFetcherResponse({makeInitiatingSetOplogEntryObj(1)});
+
+        // lastStableRecoveryTimestamp matches exactly — diff = 0, well within threshold.
+        auto replSetGetStatusRequest = net->scheduleSuccessfulResponse(
+            BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(1, 1)));
+        assertRemoteCommandNameEquals("replSetGetStatus", replSetGetStatusRequest);
+        net->runReadyNetworkOperations();
+
+        // _checkIfInitiatingSet took the skip path and set beginApplyingTimestamp to the
+        // initiating set entry's timestamp (t=1), overriding the original value (t=5).
+        // The executor thread is blocked while InNetworkGuard is held, so _initialSyncState
+        // is still valid here.
+        auto progress = initialSyncer->getInitialSyncProgress();
+        ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
+
+        // Shut down to cancel the scheduled _initializeOplogFetcherAndDbCloners cleanly.
+        ASSERT_OK(initialSyncer->shutdown());
+        net->runReadyNetworkOperations();
+    }
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerDoesNotSkipWaitWhenNotInitiatingSet) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    // Use t=5 for beginApplyingTimestamp so it is distinguishable from the earliest oplog entry
+    // timestamp (t=1). This lets us verify the timestamp was NOT overridden to t=1.
+    runWaitStableTsPreamble(5);
+    auto initialSyncer = &getInitialSyncer();
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        // Earliest oplog entry is a regular insert at ts(1,1) — not an initiating-set noop.
+        processSuccessfulEarliestOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        auto replSetGetStatusRequest = net->scheduleSuccessfulResponse(
+            BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(1, 1)));
+        assertRemoteCommandNameEquals("replSetGetStatus", replSetGetStatusRequest);
+        net->runReadyNetworkOperations();
+
+        // _checkIfInitiatingSet did not take the skip path because the earliest oplog entry is not
+        // the initiating-set noop. beginApplyingTimestamp must remain at its original value (t=5),
+        // not be reset to the earliest oplog entry timestamp (t=1).
+        auto progress = initialSyncer->getInitialSyncProgress();
+        ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(5, 1)) << progress;
+
+        ASSERT_OK(initialSyncer->shutdown());
+        net->runReadyNetworkOperations();
+    }
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerDoesNotSkipWaitWhenInitiatingSetOutsideThreshold) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    // Lower the threshold so we can test with easily-constructed timestamps.
+    initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs.store(10);
+    const ScopeGuard resetThreshold([] {
+        initialSyncWaitForSyncSourceLastStableRecoveryTsInitiatingSetThresholdSecs.store(3600);
+    });
+
+    // Use t=5 for beginApplyingTimestamp so it is distinguishable from the initiating-set entry
+    // timestamp (t=1). This lets us verify the timestamp was NOT overridden to t=1.
+    runWaitStableTsPreamble(5);
+    auto initialSyncer = &getInitialSyncer();
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        // Earliest oplog entry is the initiating-set noop at ts(1,1).
+        processSuccessfulEarliestOplogEntryFetcherResponse({makeInitiatingSetOplogEntryObj(1)});
+
+        // lastStableRecoveryTimestamp is 100 s ahead — outside the 10 s test threshold.
+        auto replSetGetStatusRequest = net->scheduleSuccessfulResponse(
+            BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(101, 1)));
+        assertRemoteCommandNameEquals("replSetGetStatus", replSetGetStatusRequest);
+        net->runReadyNetworkOperations();
+
+        // _checkIfInitiatingSet did not take the skip path because lastStableRecoveryTimestamp
+        // (t=101) is outside the threshold (10 s) of the initiating-set entry (t=1).
+        // beginApplyingTimestamp must remain at its original value (t=5), not be reset to t=1.
+        auto progress = initialSyncer->getInitialSyncProgress();
+        ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(5, 1)) << progress;
+
+        ASSERT_OK(initialSyncer->shutdown());
+        net->runReadyNetworkOperations();
+    }
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+
+TEST_F(InitialSyncerTest, InitialSyncerWaitLoopIgnoresFsyncError) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    {
+        MockNetwork::InSequence seq(*_mock);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(2);
+        _mock
+            ->expect([](auto& r) { return r["find"].str() == "system.version"; },
+                     makeCursorResponse(
+                         0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+            .times(1);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(1);
+        // Stable ts not yet advanced; schedules fsync after 100ms backoff.
+        _mock
+            ->expect("replSetGetStatus",
+                     BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(0, 0)))
+            .times(1);
+        // fsync is fire-and-forget: a transport error must be silently ignored.
+        _mock
+            ->expect("fsync",
+                     RemoteCommandResponse::make_forTest(
+                         Status(ErrorCodes::OperationFailed, "fsync failed at sync source")))
+            .times(1);
+        // replSetGetStatus is still called after the fsync failure.  The final error comes from
+        // here (NotWritablePrimary), not from fsync (OperationFailed), confirming the fsync
+        // error was swallowed.
+        _mock
+            ->expect("replSetGetStatus",
+                     RemoteCommandResponse::make_forTest(
+                         Status(ErrorCodes::NotWritablePrimary, "not primary")))
+            .times(1);
+    }
+    const auto startTime = getNet()->now();
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    // Advance clock past the 100ms backoff so the fsync and subsequent replSetGetStatus fire.
+    _mock->runUntil(startTime + Milliseconds(200));
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerWaitLoopPassesThroughReplSetGetStatusError) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    {
+        MockNetwork::InSequence seq(*_mock);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(2);
+        _mock
+            ->expect([](auto& r) { return r["find"].str() == "system.version"; },
+                     makeCursorResponse(
+                         0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+            .times(1);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(1);
+        // Stable ts not yet advanced; schedules fsync after 100ms backoff.
+        _mock
+            ->expect("replSetGetStatus",
+                     BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(0, 0)))
+            .times(1);
+        _mock->expect("fsync", BSON("ok" << 1)).times(1);
+        _mock
+            ->expect("replSetGetStatus",
+                     RemoteCommandResponse::make_forTest(Status(ErrorCodes::OperationFailed,
+                                                                "replSetGetStatus failed at sync "
+                                                                "source")))
+            .times(1);
+    }
+    const auto startTime = getNet()->now();
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    // Advance clock past the 100ms backoff so the fsync and subsequent replSetGetStatus fire.
+    _mock->runUntil(startTime + Milliseconds(200));
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerWaitLoopPassesThroughReplSetGetStatusCommandError) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    {
+        MockNetwork::InSequence seq(*_mock);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(2);
+        _mock
+            ->expect([](auto& r) { return r["find"].str() == "system.version"; },
+                     makeCursorResponse(
+                         0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+            .times(1);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(1);
+        // Stable ts not yet advanced; schedules fsync after 100ms backoff.
+        _mock
+            ->expect("replSetGetStatus",
+                     BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(0, 0)))
+            .times(1);
+        _mock->expect("fsync", BSON("ok" << 1)).times(1);
+        // Network call succeeds but command returns {ok: 0}.
+        _mock
+            ->expect("replSetGetStatus",
+                     BSON("ok" << 0 << "code" << ErrorCodes::NotWritablePrimary << "errmsg"
+                               << "not primary"))
+            .times(1);
+    }
+    const auto startTime = getNet()->now();
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    _mock->runUntil(startTime + Milliseconds(200));
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::NotWritablePrimary, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerWaitLoopRetriesUntilStableTimestampAdvances) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    {
+        MockNetwork::InSequence seq(*_mock);
+        // Begin fetching and applying timestamps.
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(2)}))
+            .times(2);
+        _mock
+            ->expect([](auto& r) { return r["find"].str() == "system.version"; },
+                     makeCursorResponse(
+                         0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+            .times(1);
+        // Earliest oplog entry.
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(0)}))
+            .times(1);
+        // Return lastStableRecoveryTimestamp not equal to earliest ts so that we don't skip the
+        // wait. Stable ts not yet advanced (Timestamp(1,1) < beginApplyingTs≈Timestamp(2,0));
+        // schedules fsync after 100ms backoff.
+        _mock
+            ->expect("replSetGetStatus",
+                     BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(1, 1)))
+            .times(1);
+        // First check (after 100ms backoff): stable timestamp has advanced.
+        _mock->expect("fsync", BSON("ok" << 1)).times(1);
+        _mock
+            ->expect("replSetGetStatus",
+                     BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(2, 1)))
+            .times(1);
+    }
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    // Advance mock clock by 100ms to trigger the 100ms retry backoff and consume all expectations.
+    _mock->runUntil(getNet()->now() + Milliseconds(100));
+    ASSERT_OK(initialSyncer->shutdown());
+    _mock->runUntilIdle();
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerWaitLoopTimesOut) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    RAIIServerParameterControllerForTest noRetryPeriod(
+        "initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs", 1);
+
+    FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
+        "skipRecoverUserWriteCriticalSections");
+
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    {
+        MockNetwork::InSequence seq(*_mock);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(2);
+        _mock
+            ->expect([](auto& r) { return r["find"].str() == "system.version"; },
+                     makeCursorResponse(
+                         0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+            .times(1);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(1);
+        // Stable ts not yet advanced; schedules fsync after 100ms. Then 4 rounds of
+        // fsync+replSetGetStatus at T≈100ms, 300ms, 700ms, 1000ms (deadline-clamped).
+        _mock
+            ->expect("replSetGetStatus",
+                     BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(0, 0)))
+            .times(1);
+        for (int i = 0; i < 4; ++i) {
+            _mock->expect("fsync", BSON("ok" << 1)).times(1);
+            _mock
+                ->expect("replSetGetStatus",
+                         BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(0, 0)))
+                .times(1);
+        }
+    }
+    const auto startTime = getNet()->now();
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    _mock->runUntil(startTime + Seconds(2));
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, _lastApplied.getStatus());
+}
+
+// Verifies the kMaxExponentialBackoffMillis (30 s) cap on the retry sleep interval.
+//
+// After round 9 (T=51100ms), sleepMillis would double to 51200ms without the cap. With the 30s
+// cap it becomes 30000ms, so round 10 fires at T=81100ms instead of T=102300ms. Setting the
+// deadline to 82s means round 11 fires at the deadline (82000ms), whereas without the cap only 10
+// waits fire before the deadline, leaving one unsatisfied expectation and failing the test.
+TEST_F(InitialSyncerTest, InitialSyncerWaitLoopBackoffCappedAt30Seconds) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    RAIIServerParameterControllerForTest retryPeriod(
+        "initialSyncWaitForSyncSourceLastStableRecoveryTsRetryPeriodSecs", 82);
+
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    {
+        MockNetwork::InSequence seq(*_mock);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(2);
+        _mock
+            ->expect([](auto& r) { return r["find"].str() == "system.version"; },
+                     makeCursorResponse(
+                         0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+            .times(1);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(1);
+        // Ts not yet advanced; schedules fsync after 100ms backoff. 11 rounds of
+        // (fsync + replSetGetStatus) fire at T≈100ms, 300ms, 700ms, 1500ms, 3100ms, 6300ms,
+        // 12700ms, 25500ms, 51100ms, 81100ms (cap kicks in here), and 82000ms (deadline).
+        // Round 11 at T=82000ms sees now >= deadline and returns ExceededTimeLimit.
+        _mock
+            ->expect("replSetGetStatus",
+                     BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(0, 0)))
+            .times(1);
+        for (int i = 0; i < 11; ++i) {
+            _mock->expect("fsync", BSON("ok" << 1)).times(1);
+            _mock
+                ->expect("replSetGetStatus",
+                         BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(0, 0)))
+                .times(1);
+        }
+    }
+    const auto startTime = getNet()->now();
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    _mock->runUntil(startTime + Seconds(83));
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, _lastApplied.getStatus());
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerWaitLoopFailsIfLastStableRecoveryTsMissing) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    {
+        MockNetwork::InSequence seq(*_mock);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(2);
+        _mock
+            ->expect([](auto& r) { return r["find"].str() == "system.version"; },
+                     makeCursorResponse(
+                         0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+            .times(1);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(1);
+        // Stable ts not yet advanced; schedules fsync after 100ms backoff.
+        _mock
+            ->expect("replSetGetStatus",
+                     BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(0, 0)))
+            .times(1);
+        _mock->expect("fsync", BSON("ok" << 1)).times(1);
+        // First wait-loop check (after fsync): response missing lastStableRecoveryTimestamp.
+        _mock->expect("replSetGetStatus", BSON("ok" << 1 /* no lastStableRecoveryTimestamp */))
+            .times(1);
+    }
+    const auto startTime = getNet()->now();
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    // Advance past the 100ms backoff to trigger the fsync and subsequent replSetGetStatus.
+    _mock->runUntil(startTime + Milliseconds(100));
+    _mock->runUntilExpectationsSatisfied();
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, _lastApplied);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerWaitLoopExitsOnFirstCheckWhenStableTsAlreadyAdvanced) {
+    initialSyncWaitForSyncSourceLastStableRecoveryTs.store(true);
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    {
+        MockNetwork::InSequence seq(*_mock);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(2);
+        _mock
+            ->expect([](auto& r) { return r["find"].str() == "system.version"; },
+                     makeCursorResponse(
+                         0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+            .times(1);
+        _mock
+            ->expect(
+                BSON("find" << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(1);
+        // replSetGetStatus returns a ts already past beginApplyingTs — no fsync expected.
+        _mock
+            ->expect("replSetGetStatus",
+                     BSON("ok" << 1 << "lastStableRecoveryTimestamp" << Timestamp(99, 1)))
+            .times(1);
+    }
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    _mock->runUntilExpectationsSatisfied();
+    ASSERT_OK(initialSyncer->shutdown());
+    _mock->runUntilIdle();
+    initialSyncer->join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
 }
 
 }  // namespace

@@ -78,6 +78,17 @@ secondary = replTest.start(
                 data: {namespace: testColl.getFullName(), numDocsToClone: 2},
             }),
             "numInitialSyncAttempts": 1,
+            // Disable this parameter as this test explicitly wants to validate a
+            // beginFetching/beginApplying timestamp in initial sync. These timestamps may
+            // get reset during the 'wait for stable timestamp' phase of initial sync, so
+            // we skip this phase.
+            // We must also disable this because the primary may be able to advance the stable
+            // timestamp after initiate prior to this restart. As a result, the initial sync
+            // node may see that it is no longer initiating the set, and wait for stable
+            // to advance to beginApplying in initial sync. Since the majority of this
+            // set is 2, the primary will be unable to advance its stable, leaving this node
+            // stuck in initial sync. We must disable the wait to avoid this scenario.
+            "initialSyncWaitForSyncSourceLastStableRecoveryTs": false,
         },
     },
     true /* wait */,
