@@ -60,8 +60,7 @@ public:
             ConnectionString cstr(request().getCommandParameter());
 
             auto taskExecutor = executor::ThreadPoolTaskExecutor::create(
-                std::make_unique<ThreadPool>(ThreadPool::Options{}),
-                executor::makeNetworkInterface("HelloMe-TaskExecutor"));
+                ThreadPool::make({}), executor::makeNetworkInterface("HelloMe-TaskExecutor"));
             taskExecutor->startup();
 
             auto options = std::make_shared<async_rpc::AsyncRPCOptions<HelloCommand>>(

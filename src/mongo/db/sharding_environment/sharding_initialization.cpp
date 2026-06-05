@@ -110,12 +110,10 @@ static constexpr auto kRetryInterval = Seconds{2};
 std::shared_ptr<executor::TaskExecutor> makeShardingFixedTaskExecutor(
     std::unique_ptr<NetworkInterface> net) {
     return executor::ShardingTaskExecutor::create(
-        ThreadPoolTaskExecutor::create(std::make_unique<ThreadPool>([] {
-                                           ThreadPool::Options opts;
-                                           opts.poolName = "Sharding-Fixed";
-                                           opts.maxThreads = ThreadPool::Options::kUnlimited;
-                                           return opts;
-                                       }()),
+        ThreadPoolTaskExecutor::create(ThreadPool::make({
+                                           .poolName = "Sharding-Fixed",
+                                           .maxThreads = ThreadPool::Options::kUnlimited,
+                                       }),
                                        std::move(net)));
 }
 

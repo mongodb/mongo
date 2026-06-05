@@ -110,12 +110,8 @@ class DocumentSourceExchangeTest : service_context_test::WithSetupTransportLayer
                                    public AggregationContextFixture {
 protected:
     void setUp() override {
-        auto net = executor::makeNetworkInterface("ExchangeTest");
-
-        ThreadPool::Options options;
-        auto pool = std::make_unique<ThreadPool>(options);
-
-        _executor = executor::ThreadPoolTaskExecutor::create(std::move(pool), std::move(net));
+        _executor = executor::ThreadPoolTaskExecutor::create(
+            ThreadPool::make({}), executor::makeNetworkInterface("ExchangeTest"));
         _executor->startup();
     }
 

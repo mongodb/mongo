@@ -248,10 +248,8 @@ public:
 
 }  // namespace
 
-ThreadPool::Limits ReshardingDonorService::getThreadPoolLimits() const {
-    ThreadPool::Limits threadPoolLimit;
-    threadPoolLimit.maxThreads = resharding::gReshardingDonorServiceMaxThreadCount;
-    return threadPoolLimit;
+auto ReshardingDonorService::getThreadPoolLimits() const -> ThreadPoolLimits {
+    return {.maxThreads = static_cast<size_t>(resharding::gReshardingDonorServiceMaxThreadCount)};
 }
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::constructInstance(

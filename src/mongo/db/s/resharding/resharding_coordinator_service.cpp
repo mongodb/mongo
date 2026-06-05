@@ -49,10 +49,9 @@ bool shouldStopAttemptingToCreateIndex(Status status, const CancellationToken& t
 
 }  // namespace
 
-ThreadPool::Limits ReshardingCoordinatorService::getThreadPoolLimits() const {
-    ThreadPool::Limits threadPoolLimit;
-    threadPoolLimit.maxThreads = resharding::gReshardingCoordinatorServiceMaxThreadCount;
-    return threadPoolLimit;
+auto ReshardingCoordinatorService::getThreadPoolLimits() const -> ThreadPoolLimits {
+    return {.maxThreads =
+                static_cast<size_t>(resharding::gReshardingCoordinatorServiceMaxThreadCount)};
 }
 
 void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(

@@ -146,11 +146,9 @@ NamespaceString MultiUpdateCoordinatorService::getStateDocumentsNS() const {
     return NamespaceString::kMultiUpdateCoordinatorsNamespace;
 }
 
-ThreadPool::Limits MultiUpdateCoordinatorService::getThreadPoolLimits() const {
-    ThreadPool::Limits limits;
-    limits.minThreads = gMultiUpdateCoordinatorServiceMinThreadCount;
-    limits.maxThreads = gMultiUpdateCoordinatorServiceMaxThreadCount;
-    return limits;
+auto MultiUpdateCoordinatorService::getThreadPoolLimits() const -> ThreadPoolLimits {
+    return {.minThreads = static_cast<size_t>(gMultiUpdateCoordinatorServiceMinThreadCount),
+            .maxThreads = static_cast<size_t>(gMultiUpdateCoordinatorServiceMaxThreadCount)};
 }
 
 void MultiUpdateCoordinatorService::checkIfConflictsWithOtherInstances(

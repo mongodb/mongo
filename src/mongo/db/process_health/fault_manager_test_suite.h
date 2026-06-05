@@ -154,12 +154,8 @@ public:
             _executor->join();
         }
 
-        auto network = std::shared_ptr<executor::NetworkInterface>(
-            executor::makeNetworkInterface("FaultManagerTest").release());
-        ThreadPool::Options options;
-        auto pool = std::make_unique<ThreadPool>(options);
-
-        _executor = executor::ThreadPoolTaskExecutor::create(std::move(pool), std::move(network));
+        _executor = executor::ThreadPoolTaskExecutor::create(
+            ThreadPool::make({}), executor::makeNetworkInterface("FaultManagerTest"));
     }
 
     void resetManager(std::unique_ptr<FaultManagerConfig> config = nullptr) {

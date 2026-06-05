@@ -250,21 +250,22 @@ public:
         // The ReshardingOplogBatchApplier expects there to already be a Client associated with the
         // thread from the thread pool. We set up the ThreadPoolTaskExecutor identically to how the
         // recipient's primary-only service is set up.
-        ThreadPool::Options threadPoolOptions;
-        threadPoolOptions.maxThreads = 1;
-        threadPoolOptions.threadNamePrefix = "TestReshardOplogBatchApplier-";
-        threadPoolOptions.poolName = "TestReshardOplogBatchApplierThreadPool";
-        threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName, getGlobalServiceContext()->getService());
-            auto* client = Client::getCurrent();
-            AuthorizationSession::get(*client)->grantInternalAuthorization();
-        };
 
         auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
         hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(getServiceContext()));
 
         auto executor = executor::ThreadPoolTaskExecutor::create(
-            std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
+            ThreadPool::make({
+                .poolName = "TestReshardOplogBatchApplierThreadPool",
+                .threadNamePrefix = "TestReshardOplogBatchApplier-",
+                .maxThreads = 1,
+                .onCreateThread =
+                    [](const std::string& threadName) {
+                        Client::initThread(threadName, getGlobalServiceContext()->getService());
+                        auto* client = Client::getCurrent();
+                        AuthorizationSession::get(*client)->grantInternalAuthorization();
+                    },
+            }),
             executor::makeNetworkInterface(
                 "TestReshardOplogBatchApplierNetwork", nullptr, std::move(hookList)));
 

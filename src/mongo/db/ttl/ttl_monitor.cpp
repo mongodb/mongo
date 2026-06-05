@@ -301,18 +301,19 @@ const IndexCatalogEntry* getValidTTLIndex(OperationContext* opCtx,
 TTLMonitor::TTLMonitor()
     : BackgroundJob(false /* selfDelete */),
       _ttlMonitorSleepSecs(Seconds{ttlMonitorSleepSecs.load()}) {
-    ThreadPool::Options threadPoolOptions;
-    threadPoolOptions.poolName = "TTLMonitorMetadataRefresh";
-    threadPoolOptions.threadNamePrefix = "TTLMonitorMetadataRefresh-";
-    threadPoolOptions.minThreads = 0;
-    threadPoolOptions.maxThreads = ttlMonitorMaxMetadataRecoveryThreads.load();
-    threadPoolOptions.onCreateThread = [](const std::string& name) {
-        Client::initThread(name, getGlobalServiceContext()->getService());
-        AuthorizationSession::get(cc())->grantInternalAuthorization();
-    };
 
     _metadataRefreshTaskExecutor = executor::ThreadPoolTaskExecutor::create(
-        std::make_unique<ThreadPool>(threadPoolOptions),
+        ThreadPool::make({
+            .poolName = "TTLMonitorMetadataRefresh",
+            .threadNamePrefix = "TTLMonitorMetadataRefresh-",
+            .minThreads = 0,
+            .maxThreads = static_cast<size_t>(ttlMonitorMaxMetadataRecoveryThreads.load()),
+            .onCreateThread =
+                [](const std::string& name) {
+                    Client::initThread(name, getGlobalServiceContext()->getService());
+                    AuthorizationSession::get(cc())->grantInternalAuthorization();
+                },
+        }),
         executor::makeNetworkInterface("TTLMonitorMetadataRefreshNetwork"));
     _metadataRefreshTaskExecutor->startup();
 }

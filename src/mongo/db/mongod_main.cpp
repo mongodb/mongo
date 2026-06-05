@@ -1374,18 +1374,19 @@ void setUpCatalog(ServiceContext* serviceContext) {
 }
 
 auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {
-    ThreadPool::Options tpOptions;
-    tpOptions.threadNamePrefix = "ReplNodeDbWorker-";
-    tpOptions.poolName = "ReplNodeDbWorkerThreadPool";
-    tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
-    tpOptions.onCreateThread = [serviceContext](const std::string& threadName) {
-        Client::initThread(threadName,
-                           serviceContext->getService(),
-                           Client::noSession(),
-                           ClientOperationKillableByStepdown{false});
-    };
     return executor::ThreadPoolTaskExecutor::create(
-        std::make_unique<ThreadPool>(tpOptions),
+        ThreadPool::make({
+            .poolName = "ReplNodeDbWorkerThreadPool",
+            .threadNamePrefix = "ReplNodeDbWorker-",
+            .maxThreads = ThreadPool::Options::kUnlimited,
+            .onCreateThread =
+                [serviceContext](const std::string& threadName) {
+                    Client::initThread(threadName,
+                                       serviceContext->getService(),
+                                       Client::noSession(),
+                                       ClientOperationKillableByStepdown{false});
+                },
+        }),
         executor::makeNetworkInterface(
             "ReplNodeDbWorkerNetwork", nullptr, makeShardingEgressHooksList(serviceContext)));
 }

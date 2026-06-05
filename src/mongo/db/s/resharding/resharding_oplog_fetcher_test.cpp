@@ -233,12 +233,12 @@ public:
     }
 
     auto makeExecutor() {
-        ThreadPool::Options threadPoolOpts;
-        threadPoolOpts.maxThreads = 100;
-        threadPoolOpts.threadNamePrefix = "ReshardingOplogFetcherTest-";
-        threadPoolOpts.poolName = "ReshardingOplogFetcherTestThreadPool";
         return executor::ThreadPoolTaskExecutor::create(
-            std::make_unique<ThreadPool>(threadPoolOpts),
+            ThreadPool::make({
+                .poolName = "ReshardingOplogFetcherTestThreadPool",
+                .threadNamePrefix = "ReshardingOplogFetcherTest-",
+                .maxThreads = 100,
+            }),
             std::make_unique<executor::NetworkInterfaceMock>());
     }
 

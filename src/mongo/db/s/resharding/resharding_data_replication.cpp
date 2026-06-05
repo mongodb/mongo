@@ -184,17 +184,14 @@ std::vector<std::unique_ptr<ReshardingOplogFetcher>> ReshardingDataReplication::
 
 std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeOplogFetcherExecutor(
     size_t numDonors) {
-    ThreadPool::Limits threadPoolLimits;
-    threadPoolLimits.maxThreads = numDonors;
-    ThreadPool::Options threadPoolOptions(std::move(threadPoolLimits));
-
-    auto prefix = "ReshardingOplogFetcher"_sd;
-    threadPoolOptions.threadNamePrefix = std::string{prefix} + "-";
-    threadPoolOptions.poolName = std::string{prefix} + "ThreadPool";
-
+    static constexpr auto prefix = "ReshardingOplogFetcher"_sd;
     auto executor = executor::ThreadPoolTaskExecutor::create(
-        std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
-        executor::makeNetworkInterface(std::string{prefix} + "Network"));
+        ThreadPool::make({
+            .poolName = fmt::format("{}ThreadPool", prefix),
+            .threadNamePrefix = fmt::format("{}-", prefix),
+            .maxThreads = numDonors,
+        }),
+        executor::makeNetworkInterface(fmt::format("{}Network", prefix)));
 
     executor->startup();
     return executor;
@@ -202,26 +199,24 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeOplogFet
 
 std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeCollectionClonerExecutor(
     size_t numDonors) {
-    ThreadPool::Limits threadPoolLimits;
-    // We may transiently use 2 threads per reader while passing things around within the task
-    // executor.  Each writer uses a dedicated thread, plus 1 thread for waiting on the rest.
-    threadPoolLimits.maxThreads =
-        2 * numDonors + resharding::gReshardingCollectionClonerWriteThreadCount.load() + 1;
-    ThreadPool::Options threadPoolOptions(std::move(threadPoolLimits));
-
     auto prefix = "ReshardingCollectionCloner"_sd;
-    threadPoolOptions.threadNamePrefix = std::string{prefix} + "-";
-    threadPoolOptions.poolName = std::string{prefix} + "ThreadPool";
-    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName, getGlobalServiceContext()->getService());
-        auto* client = Client::getCurrent();
-        AuthorizationSession::get(*client)->grantInternalAuthorization();
-    };
-
     auto executor = executor::ThreadPoolTaskExecutor::create(
-        std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
-        executor::makeNetworkInterface(std::string{prefix} + "Network"));
-
+        ThreadPool::make({
+            .poolName = fmt::format("{}ThreadPool", prefix),
+            .threadNamePrefix = fmt::format("{}-", prefix),
+            // We may transiently use 2 threads per reader while passing things around within the
+            // task executor.  Each writer uses a dedicated thread, plus 1 thread for waiting on the
+            // rest.
+            .maxThreads =
+                2 * numDonors + resharding::gReshardingCollectionClonerWriteThreadCount.load() + 1,
+            .onCreateThread =
+                [](const std::string& threadName) {
+                    Client::initThread(threadName, getGlobalServiceContext()->getService());
+                    auto* client = Client::getCurrent();
+                    AuthorizationSession::get(*client)->grantInternalAuthorization();
+                },
+        }),
+        executor::makeNetworkInterface(fmt::format("{}Network", prefix)));
     executor->startup();
     return executor;
 }

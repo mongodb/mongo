@@ -108,10 +108,6 @@ public:
         return NamespaceString::createNamespaceString_forTest("config", "test_service");
     }
 
-    ThreadPool::Limits getThreadPoolLimits() const override {
-        return ThreadPool::Limits();
-    }
-
     void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
@@ -374,16 +370,16 @@ public:
     }
 
     std::shared_ptr<executor::TaskExecutor> makeTestExecutor() {
-        ThreadPool::Options threadPoolOptions;
-        threadPoolOptions.threadNamePrefix = "PrimaryOnlyServiceTest-";
-        threadPoolOptions.poolName = "PrimaryOnlyServiceTestThreadPool";
-        threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName, getGlobalServiceContext()->getService());
-        };
-
         auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
         auto executor = executor::ThreadPoolTaskExecutor::create(
-            std::make_unique<ThreadPool>(threadPoolOptions),
+            ThreadPool::make({
+                .poolName = "PrimaryOnlyServiceTestThreadPool",
+                .threadNamePrefix = "PrimaryOnlyServiceTest-",
+                .onCreateThread =
+                    [](const std::string& threadName) {
+                        Client::initThread(threadName, getGlobalServiceContext()->getService());
+                    },
+            }),
             executor::makeNetworkInterface(
                 "PrimaryOnlyServiceTestNetwork", nullptr, std::move(hookList)));
         executor->startup();

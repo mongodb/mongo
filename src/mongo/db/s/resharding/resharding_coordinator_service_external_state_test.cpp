@@ -82,11 +82,10 @@ public:
         }
 
         // Set up the task executor.
-        ThreadPool::Options threadPoolOptions;
-        threadPoolOptions.poolName = "ReshardingCoordinatorExternalStateTest";
-
         executor = executor::ThreadPoolTaskExecutor::create(
-            std::make_unique<ThreadPool>(threadPoolOptions),
+            ThreadPool::make({
+                .poolName = "ReshardingCoordinatorExternalStateTest",
+            }),
             executor::makeNetworkInterface("ReshardingCoordinatorExternalStateTest"));
         executor->startup();
         taskExecutor = std::make_shared<executor::ScopedTaskExecutor>(executor);

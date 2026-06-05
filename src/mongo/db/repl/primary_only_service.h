@@ -219,6 +219,15 @@ public:
         }
     };
 
+    /**
+     * A subset of the fields from `ThreadPool::Options` relevant to POS custom configuration.
+     */
+    struct ThreadPoolLimits {
+        size_t minThreads = 1;
+        size_t maxThreads = 8;
+        Milliseconds maxIdleThreadAge = Seconds{30};
+    };
+
     explicit PrimaryOnlyService(ServiceContext* serviceContext);
     virtual ~PrimaryOnlyService() = default;
 
@@ -238,7 +247,9 @@ public:
      * Returns the limits that should be imposed on the size of the underlying thread pool used for
      * running Instances of this PrimaryOnlyService.
      */
-    virtual ThreadPool::Limits getThreadPoolLimits() const = 0;
+    virtual ThreadPoolLimits getThreadPoolLimits() const {
+        return {};
+    }
 
     /**
      * Constructs and starts up _executor.

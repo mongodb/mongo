@@ -110,26 +110,26 @@ const StringData kMaxNumActiveUserIndexBuildsServerParameterName = "maxNumActive
  * Constructs the options for the loader thread pool.
  */
 ThreadPool::Options makeDefaultThreadPoolOptions(bool killableByStepdown) {
-    ThreadPool::Options options;
-    options.poolName = "IndexBuildsCoordinatorMongod";
-    options.minThreads = 0;
-    // Both the primary and secondary nodes will have an unlimited thread pool size. This is done to
-    // allow secondary nodes to startup as many index builders as necessary in order to prevent
-    // scheduling deadlocks during initial sync or oplog application. When commands are run from
-    // user connections that need to create indexes, those commands will hang until there are less
-    // than 'maxNumActiveUserIndexBuilds' running index build threads, or until the operation is
-    // interrupted.
-    options.maxThreads = ThreadPool::Options::kUnlimited;
+    return {
+        .poolName = "IndexBuildsCoordinatorMongod",
+        .minThreads = 0,
+        // Both the primary and secondary nodes will have an unlimited thread pool size. This is
+        // done to allow secondary nodes to startup as many index builders as necessary in order to
+        // prevent scheduling deadlocks during initial sync or oplog application. When commands are
+        // run from user connections that need to create indexes, those commands will hang until
+        // there are less than 'maxNumActiveUserIndexBuilds' running index build threads, or until
+        // the operation is interrupted.
+        .maxThreads = ThreadPool::Options::kUnlimited,
 
-    // Ensure all threads have a client.
-    options.onCreateThread = [killableByStepdown](const std::string& threadName) {
-        Client::initThread(threadName,
-                           getGlobalServiceContext()->getService(),
-                           Client::noSession(),
-                           ClientOperationKillableByStepdown{killableByStepdown});
+        // Ensure all threads have a client.
+        .onCreateThread =
+            [killableByStepdown](const std::string& threadName) {
+                Client::initThread(threadName,
+                                   getGlobalServiceContext()->getService(),
+                                   Client::noSession(),
+                                   ClientOperationKillableByStepdown{killableByStepdown});
+            },
     };
-
-    return options;
 }
 
 void runVoteCommand(OperationContext* opCtx,
@@ -229,7 +229,7 @@ IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod() {
 ThreadPool& IndexBuildsCoordinatorMongod::_ensureThreadPool(bool killableByStepdown) {
     auto pool = _threadPool.synchronize();
     if ((*pool) == nullptr) {
-        *pool = std::make_unique<ThreadPool>(makeDefaultThreadPoolOptions(killableByStepdown));
+        *pool = ThreadPool::make(makeDefaultThreadPoolOptions(killableByStepdown));
         (*pool)->startup();
     }
     return **pool;

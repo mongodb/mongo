@@ -412,14 +412,15 @@ protected:
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service, replSettings);
         repl::ReplicationCoordinator::set(service, std::move(replCoord));
 
-        ThreadPool::Options dbThreadPoolOptions;
-        dbThreadPoolOptions.poolName = "dbthread";
-        dbThreadPoolOptions.minThreads = 1U;
-        dbThreadPoolOptions.maxThreads = 1U;
-        dbThreadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName, getGlobalServiceContext()->getService());
-        };
-        _dbWorkThreadPool = std::make_unique<ThreadPool>(dbThreadPoolOptions);
+        _dbWorkThreadPool = ThreadPool::make({
+            .poolName = "dbthread",
+            .minThreads = 1,
+            .maxThreads = 1,
+            .onCreateThread =
+                [](const std::string& threadName) {
+                    Client::initThread(threadName, getGlobalServiceContext()->getService());
+                },
+        });
         _dbWorkThreadPool->startup();
 
         // Required by CollectionCloner::listIndexesStage() and IndexBuildsCoordinator.

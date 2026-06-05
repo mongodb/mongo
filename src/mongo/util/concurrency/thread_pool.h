@@ -51,18 +51,6 @@ namespace MONGO_MOD_PUB mongo {
 class ThreadPool final : public ThreadPoolInterface {
 public:
     /**
-     * Contains a subset of the fields from Options related to limiting the number of concurrent
-     * threads in the pool. Used in places where we want a way to specify limits to the size of a
-     * ThreadPool without overriding the other behaviors of the pool such thread names or onCreate
-     * behaviors. Each field of Limits maps directly to the same-named field in Options.
-     */
-    struct Limits {
-        size_t minThreads = 1;
-        size_t maxThreads = 8;
-        Milliseconds maxIdleThreadAge = Seconds{30};
-    };
-
-    /**
      * Structure used to configure an instance of ThreadPool.
      */
     struct Options {
@@ -70,13 +58,6 @@ public:
         // Note: the value used here is high enough that it will never be reached, but low enough
         // that it won't cause overflows if mixed with signed ints or math.
         static constexpr size_t kUnlimited = 1'000'000'000;
-
-        Options() = default;
-
-        explicit Options(const Limits& limits)
-            : minThreads(limits.minThreads),
-              maxThreads(limits.maxThreads),
-              maxIdleThreadAge(limits.maxIdleThreadAge) {}
 
         // Name of the thread pool. If this string is empty, the pool will be assigned a
         // name unique to the current process.
@@ -128,6 +109,10 @@ public:
         // The last time that no threads in the pool were idle.
         Date_t lastFullUtilizationDate;
     };
+
+    static std::unique_ptr<ThreadPool> make(Options options) {
+        return std::make_unique<ThreadPool>(std::move(options));
+    }
 
     /**
      * Constructs a thread pool, configured with the given "options".

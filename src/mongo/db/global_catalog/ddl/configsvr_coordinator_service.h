@@ -66,10 +66,6 @@ public:
         return NamespaceString::kConfigsvrCoordinatorsNamespace;
     }
 
-    ThreadPool::Limits getThreadPoolLimits() const override {
-        return ThreadPool::Limits();
-    }
-
     std::shared_ptr<ConfigsvrCoordinator> getOrCreateService(OperationContext* opCtx,
                                                              BSONObj coorDoc);
 

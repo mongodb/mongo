@@ -61,7 +61,7 @@ public:
         return NamespaceString::kConfigReshardingOperationsNamespace;
     }
 
-    MONGO_MOD_PRIVATE ThreadPool::Limits getThreadPoolLimits() const override;
+    MONGO_MOD_PRIVATE ThreadPoolLimits getThreadPoolLimits() const override;
 
     // The service implemented its own conflict check before this method was added.
     MONGO_MOD_PRIVATE void checkIfConflictsWithOtherInstances(

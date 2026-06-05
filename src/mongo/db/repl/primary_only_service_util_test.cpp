@@ -149,10 +149,6 @@ public:
             kTestPrimaryOnlyServiceStateDocumentNss);
     }
 
-    ThreadPool::Limits getThreadPoolLimits() const final {
-        return ThreadPool::Limits();
-    }
-
     static TestDefaultPrimaryOnlyService* getService(OperationContext* opCtx) {
         auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
         auto service = registry->lookupServiceByName(kTestPrimaryOnlyServiceInstanceName);

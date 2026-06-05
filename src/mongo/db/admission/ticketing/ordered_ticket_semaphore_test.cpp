@@ -65,10 +65,10 @@ public:
         _client = getServiceContext()->getService()->makeClient("test");
         _opCtx = _client->makeOperationContext();
 
-        ThreadPool::Options opts;
-        opts.maxThreads = 32;  // big enough for all blocked waiters.
-        opts.minThreads = 0;
-        _pool = std::make_unique<ThreadPool>(opts);
+        _pool = ThreadPool::make({
+            .minThreads = 0,
+            .maxThreads = 32,  // big enough for all blocked waiters.
+        });
         _pool->startup();
     }
 

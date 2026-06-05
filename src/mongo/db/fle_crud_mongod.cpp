@@ -101,16 +101,6 @@ namespace {
 
 std::shared_ptr<executor::TaskExecutor> _fleCrudExecutor;
 
-ThreadPool::Options getThreadPoolOptions() {
-    ThreadPool::Options tpOptions;
-    tpOptions.poolName = "FLECrud";
-    tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
-
-    // SEPTransactionClient::runCommand manages the client itself so do not create one via
-    // onCreateThread
-    return tpOptions;
-}
-
 void setMongosFieldsInReply(OperationContext* opCtx, write_ops::WriteCommandReplyBase* replyBase) {
     // Update the OpTime for the reply to current OpTime
     //
@@ -370,7 +360,11 @@ void startFLECrud(ServiceContext* serviceContext) {
     }
 
     _fleCrudExecutor = executor::ThreadPoolTaskExecutor::create(
-        std::make_unique<ThreadPool>(getThreadPoolOptions()),
+        ThreadPool::make({
+            // No .onCreateThread. SEPTransactionClient::runCommand manages the client.
+            .poolName = "FLECrud",
+            .maxThreads = ThreadPool::Options::kUnlimited,
+        }),
         executor::makeNetworkInterface("FLECrudNetwork"));
 
     _fleCrudExecutor->startup();

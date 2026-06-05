@@ -84,17 +84,7 @@ public:
             // The ReshardingCollectionCloner expects there to already be a Client associated with
             // the thread from the thread pool. We set up the ThreadPoolTaskExecutor identically to
             // how the recipient's primary-only service is set up.
-            ThreadPool::Options threadPoolOptions;
             auto donorShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx).size();
-            threadPoolOptions.maxThreads = 1 + 2 * donorShards +
-                resharding::gReshardingCollectionClonerWriteThreadCount.load();
-            threadPoolOptions.threadNamePrefix = "TestReshardCloneCollection-";
-            threadPoolOptions.poolName = "TestReshardCloneCollectionThreadPool";
-            threadPoolOptions.onCreateThread = [opCtx](const std::string& threadName) {
-                Client::initThread(threadName, opCtx->getService());
-                auto* client = Client::getCurrent();
-                AuthorizationSession::get(*client)->grantInternalAuthorization();
-            };
 
             auto metrics =
                 ReshardingMetrics::makeInstance_forTest(request().getUuid(),
@@ -109,7 +99,18 @@ public:
                 std::make_unique<rpc::VectorClockMetadataHook>(opCtx->getServiceContext()));
 
             auto executor = executor::ThreadPoolTaskExecutor::create(
-                std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
+                ThreadPool::make({
+                    .poolName = "TestReshardCloneCollectionThreadPool",
+                    .threadNamePrefix = "TestReshardCloneCollection-",
+                    .maxThreads = 1 + 2 * donorShards +
+                        resharding::gReshardingCollectionClonerWriteThreadCount.load(),
+                    .onCreateThread =
+                        [opCtx](const std::string& threadName) {
+                            Client::initThread(threadName, opCtx->getService());
+                            auto* client = Client::getCurrent();
+                            AuthorizationSession::get(*client)->grantInternalAuthorization();
+                        },
+                }),
                 executor::makeNetworkInterface(
                     "TestReshardCloneCollectionNetwork", nullptr, std::move(hookList)));
             executor->startup();

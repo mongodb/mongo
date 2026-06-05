@@ -100,16 +100,16 @@ public:
     }
 
     std::shared_ptr<executor::TaskExecutor> makeTestExecutor() {
-        ThreadPool::Options threadPoolOptions;
-        threadPoolOptions.maxThreads = 1;
-        threadPoolOptions.threadNamePrefix = "ShardingCoordinatorServiceTest-";
-        threadPoolOptions.poolName = "ShardingCoordinatorServiceTestThreadPool";
-        threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName, getGlobalServiceContext()->getService());
-        };
-
         auto executor = executor::ThreadPoolTaskExecutor::create(
-            std::make_unique<ThreadPool>(threadPoolOptions),
+            ThreadPool::make({
+                .poolName = "ShardingCoordinatorServiceTestThreadPool",
+                .threadNamePrefix = "ShardingCoordinatorServiceTest-",
+                .maxThreads = 1,
+                .onCreateThread =
+                    [](const std::string& threadName) {
+                        Client::initThread(threadName, getGlobalServiceContext()->getService());
+                    },
+            }),
             executor::makeNetworkInterface(
                 "ShardingCoordinatorServiceTestNetwork", nullptr, nullptr));
         executor->startup();

@@ -285,23 +285,24 @@ public:
     void setUp() override {
         ServiceContextTest::setUp();
 
-        ThreadPool::Options cancellationOpts;
-        cancellationOpts.poolName = "DeltaCollectorTestCancellation";
-        cancellationOpts.minThreads = 1;
-        cancellationOpts.maxThreads = 1;
-        _executorForCancellation = std::make_shared<ThreadPool>(cancellationOpts);
+        _executorForCancellation = ThreadPool::make({
+            .poolName = "DeltaCollectorTestCancellation",
+            .minThreads = 1,
+            .maxThreads = 1,
+        });
         _executorForCancellation->startup();
 
-        ThreadPool::Options threadPoolOpts;
-        threadPoolOpts.poolName = "DeltaCollectorTest";
-        threadPoolOpts.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName, getGlobalServiceContext()->getService());
-        };
-
         _taskExecutor = executor::ThreadPoolTaskExecutor::create(
-            std::make_unique<ThreadPool>(std::move(threadPoolOpts)),
+            ThreadPool::make({
+                .poolName = "DeltaCollectorTest",
+                .onCreateThread =
+                    [](const std::string& threadName) {
+                        Client::initThread(threadName, getGlobalServiceContext()->getService());
+                    },
+            }),
             executor::makeNetworkInterface("DeltaCollectorTestNetwork"));
         _taskExecutor->startup();
+
         _scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(_taskExecutor);
     }
 

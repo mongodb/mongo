@@ -277,10 +277,9 @@ bool containsNonIdIndex(const std::vector<BSONObj>& indexSpecs) {
 
 }  // namespace
 
-ThreadPool::Limits ReshardingRecipientService::getThreadPoolLimits() const {
-    ThreadPool::Limits threadPoolLimit;
-    threadPoolLimit.maxThreads = resharding::gReshardingRecipientServiceMaxThreadCount;
-    return threadPoolLimit;
+auto ReshardingRecipientService::getThreadPoolLimits() const -> ThreadPoolLimits {
+    return {.maxThreads =
+                static_cast<size_t>(resharding::gReshardingRecipientServiceMaxThreadCount)};
 }
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::constructInstance(

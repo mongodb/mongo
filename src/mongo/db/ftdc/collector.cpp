@@ -233,12 +233,11 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
 }
 
 void SampleCollectorCache::_startNewPool(size_t minThreads, size_t maxThreads) {
-    ThreadPool::Options options;
-    options.poolName = "FTDCCollector";
-    options.minThreads = minThreads;
-    options.maxThreads = maxThreads;
-
-    _pool = std::make_unique<ThreadPool>(std::move(options));
+    _pool = ThreadPool::make({
+        .poolName = "FTDCCollector",
+        .minThreads = minThreads,
+        .maxThreads = maxThreads,
+    });
     _pool->startup();
 }
 

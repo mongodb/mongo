@@ -70,8 +70,7 @@ public:
         _client = getServiceContext()->getService()->makeClient("test");
         _opCtx = _client->makeOperationContext();
 
-        ThreadPool::Options opts;
-        _pool = std::make_unique<ThreadPool>(opts);
+        _pool = ThreadPool::make({});
         _pool->startup();
     }
 

@@ -154,12 +154,12 @@ public:
 
             std::lock_guard<std::mutex> lg(mutex);
             if (!executor) {
-                ThreadPool::Options options;
-                options.poolName = "InternalTransaction";
-                options.minThreads = 0;
-                options.maxThreads = 4;
                 executor = executor::ThreadPoolTaskExecutor::create(
-                    std::make_unique<ThreadPool>(std::move(options)),
+                    ThreadPool::make({
+                        .poolName = "InternalTransaction",
+                        .minThreads = 0,
+                        .maxThreads = 4,
+                    }),
                     executor::makeNetworkInterface("InternalTransactionNetwork"));
                 executor->startup();
             }

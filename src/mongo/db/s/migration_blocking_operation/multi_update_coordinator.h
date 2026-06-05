@@ -58,7 +58,7 @@ public:
 
     MONGO_MOD_PRIVATE NamespaceString getStateDocumentsNS() const override;
 
-    MONGO_MOD_PRIVATE ThreadPool::Limits getThreadPoolLimits() const override;
+    MONGO_MOD_PRIVATE ThreadPoolLimits getThreadPoolLimits() const override;
 
     MONGO_MOD_PRIVATE void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,

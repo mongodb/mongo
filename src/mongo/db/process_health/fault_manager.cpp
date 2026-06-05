@@ -83,15 +83,13 @@ const auto sFaultManager = ServiceContext::declareDecoration<std::unique_ptr<Fau
 ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
     "FaultManagerRegisterer", [](ServiceContext* svcCtx) {
         // construct task executor
-        std::shared_ptr<executor::NetworkInterface> networkInterface =
-            executor::makeNetworkInterface("FaultManager-TaskExecutor");
-        ThreadPool::Options threadPoolOptions;
-        threadPoolOptions.maxThreads = kMaxThreadPoolSize;
-        threadPoolOptions.threadNamePrefix = "FaultManager-";
-        threadPoolOptions.poolName = "FaultManagerThreadPool";
-        auto pool = std::make_unique<ThreadPool>(threadPoolOptions);
-        auto taskExecutor =
-            executor::ThreadPoolTaskExecutor::create(std::move(pool), networkInterface);
+        auto taskExecutor = executor::ThreadPoolTaskExecutor::create(
+            ThreadPool::make({
+                .poolName = "FaultManagerThreadPool",
+                .threadNamePrefix = "FaultManager-",
+                .maxThreads = kMaxThreadPoolSize,
+            }),
+            executor::makeNetworkInterface("FaultManager-TaskExecutor"));
 
         auto faultManager = std::make_unique<FaultManager>(
             svcCtx, taskExecutor, std::make_unique<FaultManagerConfig>());

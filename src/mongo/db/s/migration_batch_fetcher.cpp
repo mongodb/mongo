@@ -106,14 +106,12 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
     int maxBufferedSizeBytesPerThread)
     : _nss{std::move(nss)},
       _sessionId{std::move(sessionId)},
-      _inserterWorkers{[&]() {
-          ThreadPool::Options options;
-          options.poolName = "ChunkMigrationInserters";
-          options.minThreads = 1;
-          options.maxThreads = 1;
-          options.onCreateThread = Inserter::onCreateThread;
-          return std::make_unique<ThreadPool>(options);
-      }()},
+      _inserterWorkers{ThreadPool::make({
+          .poolName = "ChunkMigrationInserters",
+          .minThreads = 1,
+          .maxThreads = 1,
+          .onCreateThread = Inserter::onCreateThread,
+      })},
       _migrateCloneRequest{_createMigrateCloneRequest()},
       _outerOpCtx{outerOpCtx},
       _innerOpCtx{innerOpCtx},
@@ -151,14 +149,12 @@ BSONObj MigrationBatchFetcher<Inserter>::_fetchBatch(OperationContext* opCtx) {
 
 template <typename Inserter>
 void MigrationBatchFetcher<Inserter>::fetchAndScheduleInsertion() {
-    auto fetchersThreadPool = [&]() {
-        ThreadPool::Options options;
-        options.poolName = "ChunkMigrationFetchers";
-        options.minThreads = 1;
-        options.maxThreads = 1;
-        options.onCreateThread = onCreateThread;
-        return std::make_unique<ThreadPool>(options);
-    }();
+    auto fetchersThreadPool = ThreadPool::make({
+        .poolName = "ChunkMigrationFetchers",
+        .minThreads = 1,
+        .maxThreads = 1,
+        .onCreateThread = onCreateThread,
+    });
     fetchersThreadPool->startup();
     fetchersThreadPool->schedule([this](Status status) { this->_runFetcher(); });
 

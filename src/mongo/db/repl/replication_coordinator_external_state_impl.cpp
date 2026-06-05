@@ -175,18 +175,19 @@ OplogBufferMetrics oplogBufferMetrics;
  * Returns new thread pool for thread pool task executor.
  */
 auto makeThreadPool(const std::string& poolName, const std::string& threadName) {
-    ThreadPool::Options threadPoolOptions;
-    threadPoolOptions.threadNamePrefix = threadName + "-";
-    threadPoolOptions.poolName = poolName;
-    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName,
-                           getGlobalServiceContext()->getService(),
-                           Client::noSession(),
-                           ClientOperationKillableByStepdown{false});
+    return ThreadPool::make({
+        .poolName = poolName,
+        .threadNamePrefix = fmt::format("{}-", threadName),
+        .onCreateThread =
+            [](const std::string& threadName) {
+                Client::initThread(threadName,
+                                   getGlobalServiceContext()->getService(),
+                                   Client::noSession(),
+                                   ClientOperationKillableByStepdown{false});
 
-        AuthorizationSession::get(cc())->grantInternalAuthorization();
-    };
-    return std::make_unique<ThreadPool>(threadPoolOptions);
+                AuthorizationSession::get(cc())->grantInternalAuthorization();
+            },
+    });
 }
 
 /**

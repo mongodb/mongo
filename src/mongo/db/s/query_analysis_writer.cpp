@@ -513,17 +513,17 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
             }
         });
 
-    ThreadPool::Options threadPoolOptions;
-    threadPoolOptions.maxThreads = gQueryAnalysisWriterMaxThreadPoolSize;
-    threadPoolOptions.minThreads = gQueryAnalysisWriterMinThreadPoolSize;
-    threadPoolOptions.threadNamePrefix = "QueryAnalysisWriter-";
-    threadPoolOptions.poolName = "QueryAnalysisWriterThreadPool";
-    threadPoolOptions.onCreateThread = [service =
-                                            opCtx->getService()](const std::string& threadName) {
-        Client::initThread(threadName, service);
-    };
     _executor = executor::ThreadPoolTaskExecutor::create(
-        std::make_unique<ThreadPool>(threadPoolOptions),
+        ThreadPool::make({
+            .poolName = "QueryAnalysisWriterThreadPool",
+            .threadNamePrefix = "QueryAnalysisWriter-",
+            .minThreads = static_cast<size_t>(gQueryAnalysisWriterMinThreadPoolSize),
+            .maxThreads = static_cast<size_t>(gQueryAnalysisWriterMaxThreadPoolSize),
+            .onCreateThread =
+                [service = opCtx->getService()](const std::string& threadName) {
+                    Client::initThread(threadName, service);
+                },
+        }),
         executor::makeNetworkInterface("QueryAnalysisWriterNetwork"));
     _executor->startup();
 }

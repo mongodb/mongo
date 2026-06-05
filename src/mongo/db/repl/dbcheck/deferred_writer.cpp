@@ -164,15 +164,16 @@ DeferredWriter::~DeferredWriter() {}
 void DeferredWriter::startup(std::string workerName) {
     // We should only start up once.
     invariant(!_pool);
-    ThreadPool::Options options;
-    options.poolName = "deferred writer pool";
-    options.threadNamePrefix = workerName;
-    options.minThreads = 0;
-    options.maxThreads = 1;
-    options.onCreateThread = [](const std::string& name) {
-        Client::initThread(name, getGlobalServiceContext()->getService());
-    };
-    _pool = std::make_unique<ThreadPool>(options);
+    _pool = ThreadPool::make({
+        .poolName = "deferred writer pool",
+        .threadNamePrefix = workerName,
+        .minThreads = 0,
+        .maxThreads = 1,
+        .onCreateThread =
+            [](const std::string& name) {
+                Client::initThread(name, getGlobalServiceContext()->getService());
+            },
+    });
     _pool->startup();
 }
 

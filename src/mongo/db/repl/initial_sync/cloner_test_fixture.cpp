@@ -61,13 +61,14 @@ void ClonerTestFixture::setUp() {
     _oldClient = Client::releaseCurrent();
     Client::initThread("ClonerTest", getGlobalServiceContext()->getService());
 
-    ThreadPool::Options options;
-    options.minThreads = 1U;
-    options.maxThreads = 1U;
-    options.onCreateThread = [](StringData threadName) {
-        Client::initThread(threadName, getGlobalServiceContext()->getService());
-    };
-    _dbWorkThreadPool = std::make_unique<ThreadPool>(options);
+    _dbWorkThreadPool = ThreadPool::make({
+        .minThreads = 1,
+        .maxThreads = 1,
+        .onCreateThread =
+            [](StringData threadName) {
+                Client::initThread(threadName, getGlobalServiceContext()->getService());
+            },
+    });
     _dbWorkThreadPool->startup();
     _source = HostAndPort{"local:1234"};
     _mockServer = std::make_unique<MockRemoteDBServer>(_source.toString());

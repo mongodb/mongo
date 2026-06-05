@@ -833,19 +833,16 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
 
     globalWriteLock.reset();
 
-    // TODO SERVER-127687: update remove IILE to const the options
-    const auto opts = std::invoke([maxThreadCount] {
-        ThreadPool::Options opts_;
-        opts_.poolName = "ParallelOfflineValidate";
-        opts_.threadNamePrefix = "ov";
-        opts_.maxThreads = maxThreadCount;
-        opts_.onCreateThread = [](const auto& threadName) {
-            Client::initThread(threadName, getGlobalServiceContext()->getService());
-        };
-        return opts_;
+    auto threadPool = ThreadPool::make({
+        .poolName = "ParallelOfflineValidate",
+        .threadNamePrefix = "ov",
+        .maxThreads = maxThreadCount,
+        .onCreateThread =
+            [](const auto& threadName) {
+                Client::initThread(threadName, getGlobalServiceContext()->getService());
+            },
     });
-    ThreadPool threadPool(opts);
-    threadPool.startup();
+    threadPool->startup();
 
     synchronized_value<OfflineValidateResults> results{OfflineValidateResults{
         .allValidationComplete = true,
@@ -854,7 +851,7 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
 
     // Create worker threads
     for (size_t i = 0; i < maxThreadCount; ++i) {
-        threadPool.schedule([&queue, &results](Status status) {
+        threadPool->schedule([&queue, &results](Status status) {
             if (!status.isOK()) {
                 results->allValidationComplete = false;
                 return;
@@ -914,9 +911,9 @@ OfflineValidateResults offlineValidateParallel(OperationContext* opCtx,
     queue.closeProducerEnd();
 
     // Synchronize the thread pool and wait for all workers to finish.
-    threadPool.waitForIdle();
-    threadPool.shutdown();
-    threadPool.join();
+    threadPool->waitForIdle();
+    threadPool->shutdown();
+    threadPool->join();
     return results.get();
 }
 

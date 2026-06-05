@@ -54,10 +54,10 @@ public:
         ShardServerTestFixture::setUp();
         addRemoteShards({{kShardId, HostAndPort("shard0", 1234)}});
 
-        ThreadPool::Options threadPoolOptions;
-        threadPoolOptions.poolName = "ParticipantCausalityBarrierTest";
         _executor = executor::ThreadPoolTaskExecutor::create(
-            std::make_unique<ThreadPool>(threadPoolOptions),
+            ThreadPool::make({
+                .poolName = "ParticipantCausalityBarrierTest",
+            }),
             executor::makeNetworkInterface("ParticipantCausalityBarrierTest"));
         _executor->startup();
 

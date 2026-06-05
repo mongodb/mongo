@@ -960,13 +960,12 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) {
             std::string{kMirrorMaestroName}, {}, {}, std::move(options));
     };
 
-    auto makePool = [&] {
-        ThreadPool::Options options;
-        options.poolName = std::string{kMirrorMaestroName};
-        options.maxThreads = kMirrorMaestroThreadPoolMaxThreads;
-        return std::make_unique<ThreadPool>(std::move(options));
-    };
-    _executor = executor::ThreadPoolTaskExecutor::create(makePool(), makeNet());
+    _executor = executor::ThreadPoolTaskExecutor::create(
+        ThreadPool::make({
+            .poolName = std::string{kMirrorMaestroName},
+            .maxThreads = kMirrorMaestroThreadPoolMaxThreads,
+        }),
+        makeNet());
 
     _executor->startup();
     _topologyVersionObserver.init(serviceContext);

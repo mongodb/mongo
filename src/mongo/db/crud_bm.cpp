@@ -87,14 +87,15 @@ void setupReplication(ServiceContext* svcCtx, ClusterRole role) {
     };
 
     auto makeReplicationExecutor = [](auto svcCtx) {
-        ThreadPool::Options options;
-        options.onCreateThread = [svcCtx](const std::string& threadName) {
-            Client::initThread(threadName,
-                               svcCtx->getService(),
-                               Client::noSession(),
-                               ClientOperationKillableByStepdown{false});
-        };
-        auto tp = std::make_unique<ThreadPool>(options);
+        auto tp = ThreadPool::make({
+            .onCreateThread =
+                [svcCtx](const std::string& threadName) {
+                    Client::initThread(threadName,
+                                       svcCtx->getService(),
+                                       Client::noSession(),
+                                       ClientOperationKillableByStepdown{false});
+                },
+        });
         auto ni = std::make_unique<executor::NetworkInterfaceMock>();
         return executor::ThreadPoolTaskExecutor::create(std::move(tp), std::move(ni));
     };

@@ -57,12 +57,9 @@ class RunAggregateTest : service_context_test::WithSetupTransportLayer,
 protected:
     void setUp() override {
         DBCommandTestFixture::setUp();
-        auto net = executor::makeNetworkInterface("RunAggregateTest");
 
-        ThreadPool::Options options;
-        auto pool = std::make_unique<ThreadPool>(options);
-
-        _executor = executor::ThreadPoolTaskExecutor::create(std::move(pool), std::move(net));
+        _executor = executor::ThreadPoolTaskExecutor::create(
+            ThreadPool::make({}), executor::makeNetworkInterface("RunAggregateTest"));
         _executor->startup();
     }
 

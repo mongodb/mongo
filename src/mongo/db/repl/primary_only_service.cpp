@@ -351,21 +351,8 @@ std::shared_ptr<executor::TaskExecutor> PrimaryOnlyService::getInstanceCleanupEx
 }
 
 void PrimaryOnlyService::startup(OperationContext* opCtx) {
-    // Initialize the thread pool options with the service-specific limits on pool size.
-    ThreadPool::Options threadPoolOptions(getThreadPoolLimits());
-
-    // Now add the options that are fixed for all PrimaryOnlyServices.
-    threadPoolOptions.threadNamePrefix = std::string{getServiceName()} + "-";
-    threadPoolOptions.poolName = std::string{getServiceName()} + "ThreadPool";
-    threadPoolOptions.onCreateThread = [this](const std::string& threadName) {
-        Client::initThread(threadName, getGlobalServiceContext()->getService());
-        auto client = Client::getCurrent();
-        AuthorizationSession::get(*client)->grantInternalAuthorization();
-
-        // Associate this Client with this PrimaryOnlyService
-        primaryOnlyServiceStateForClient(client).primaryOnlyService = this;
-    };
-
+    auto serviceName = getServiceName();
+    auto limits = getThreadPoolLimits();
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(opCtx->getServiceContext()));
 
@@ -375,9 +362,23 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
     }
 
     _executor = executor::ThreadPoolTaskExecutor::create(
-        std::make_unique<ThreadPool>(threadPoolOptions),
+        ThreadPool::make({
+            .poolName = fmt::format("{}ThreadPool", serviceName),
+            .threadNamePrefix = fmt::format("{}-", serviceName),
+            .minThreads = limits.minThreads,
+            .maxThreads = limits.maxThreads,
+            .maxIdleThreadAge = limits.maxIdleThreadAge,
+            .onCreateThread =
+                [this](const std::string& threadName) {
+                    Client::initThread(threadName, getGlobalServiceContext()->getService());
+                    auto client = Client::getCurrent();
+                    AuthorizationSession::get(*client)->grantInternalAuthorization();
+                    // Associate this Client with this PrimaryOnlyService
+                    primaryOnlyServiceStateForClient(client).primaryOnlyService = this;
+                },
+        }),
         executor::makeNetworkInterface(
-            std::string{getServiceName()} + "Network", nullptr, std::move(hookList)));
+            fmt::format("{}Network", serviceName), nullptr, std::move(hookList)));
     _setHasExecutor(lk);
 
     _executor->startup();

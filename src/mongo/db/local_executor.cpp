@@ -59,17 +59,6 @@ void setLocalExecutor(ServiceContext* service, std::shared_ptr<executor::TaskExe
 
 std::shared_ptr<executor::TaskExecutor> createLocalExecutor(ServiceContext* serviceContext,
                                                             const std::string& name) {
-    ThreadPool::Options tpOptions;
-    tpOptions.threadNamePrefix = name + "-";
-    tpOptions.poolName = name + "ThreadPool";
-    tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
-    tpOptions.onCreateThread = [serviceContext](const std::string& threadName) {
-        Client::initThread(threadName,
-                           serviceContext->getService(),
-                           Client::noSession(),
-                           ClientOperationKillableByStepdown{false});
-    };
-
     class BlockerHook : public rpc::EgressMetadataHook {
     public:
         Status writeRequestMetadata(OperationContext*, BSONObjBuilder*) override {
@@ -86,7 +75,18 @@ std::shared_ptr<executor::TaskExecutor> createLocalExecutor(ServiceContext* serv
     hookList->addHook(std::make_unique<BlockerHook>());
 
     return executor::ThreadPoolTaskExecutor::create(
-        std::make_unique<ThreadPool>(tpOptions),
+        ThreadPool::make({
+            .poolName = fmt::format("{}ThreadPool", name),
+            .threadNamePrefix = fmt::format("{}-", name),
+            .maxThreads = ThreadPool::Options::kUnlimited,
+            .onCreateThread =
+                [serviceContext](const std::string& threadName) {
+                    Client::initThread(threadName,
+                                       serviceContext->getService(),
+                                       Client::noSession(),
+                                       ClientOperationKillableByStepdown{false});
+                },
+        }),
         executor::makeNetworkInterface(name + "Network", nullptr, std::move(hookList)));
 }
 

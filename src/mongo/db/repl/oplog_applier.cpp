@@ -163,20 +163,21 @@ namespace {
 std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount,
                                                StringData name,
                                                bool isKillableByStepdown) {
-    ThreadPool::Options options;
-    options.threadNamePrefix = std::string{name} + "-";
-    options.poolName = std::string{name} + "ThreadPool";
-    options.minThreads = std::min(getMinThreadCountForReplWorkerPool(), threadCount);
-    options.maxThreads = threadCount;
-    options.onCreateThread = [isKillableByStepdown](const std::string&) {
-        Client::initThread(getThreadName(),
-                           getGlobalServiceContext()->getService(),
-                           Client::noSession(),
-                           ClientOperationKillableByStepdown{isKillableByStepdown});
-        auto client = Client::getCurrent();
-        AuthorizationSession::get(*client)->grantInternalAuthorization();
-    };
-    auto pool = std::make_unique<ThreadPool>(options);
+    auto pool = ThreadPool::make({
+        .poolName = fmt::format("{}ThreadPool", name),
+        .threadNamePrefix = fmt::format("{}-", name),
+        .minThreads = std::min(getMinThreadCountForReplWorkerPool(), threadCount),
+        .maxThreads = threadCount,
+        .onCreateThread =
+            [isKillableByStepdown](const std::string&) {
+                Client::initThread(getThreadName(),
+                                   getGlobalServiceContext()->getService(),
+                                   Client::noSession(),
+                                   ClientOperationKillableByStepdown{isKillableByStepdown});
+                auto client = Client::getCurrent();
+                AuthorizationSession::get(*client)->grantInternalAuthorization();
+            },
+    });
     pool->startup();
     return pool;
 }

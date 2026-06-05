@@ -73,14 +73,14 @@ constexpr static auto kWaitClientName = "WaitForMajorityServiceWaiter";
 constexpr static auto kCancelClientName = "WaitForMajorityServiceCanceler";
 
 std::unique_ptr<ThreadPool> makeThreadPool(StringData readOrWrite) {
-    ThreadPool::Options options;
-    options.poolName = "WaitForMajorityService" + std::string{readOrWrite} + "ThreadPool";
-    options.minThreads = 0;
-    // This service must have the ability to use at least two background threads. If it is limited
-    // to one, than if that thread is blocking waiting on an opTime, any cancellations cannot be
-    // completed until that wait is complete.
-    options.maxThreads = 2;
-    return std::make_unique<ThreadPool>(options);
+    return ThreadPool::make({
+        .poolName = fmt::format("WaitForMajorityService{}ThreadPool", readOrWrite),
+        .minThreads = 0,
+        // This service must have the ability to use at least two background threads. If it is
+        // limited to one, than if that thread is blocking waiting on an opTime, any cancellations
+        // cannot be completed until that wait is complete.
+        .maxThreads = 2,
+    });
 }
 }  // namespace
 

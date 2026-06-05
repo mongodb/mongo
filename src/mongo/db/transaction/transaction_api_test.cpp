@@ -441,13 +441,12 @@ protected:
 
         // Use a thread pool with one max thread to verify the API can run truly asynchronously on
         // its executor.
-        ThreadPool::Options options;
-        options.poolName = "TxnAPITest";
-        options.minThreads = 1;
-        options.maxThreads = 1;
-
         _executor = executor::ThreadPoolTaskExecutor::create(
-            std::make_unique<ThreadPool>(std::move(options)),
+            ThreadPool::make({
+                .poolName = "TxnAPITest",
+                .minThreads = 1,
+                .maxThreads = 1,
+            }),
             executor::makeNetworkInterface("TxnAPITestNetwork"));
 
         _executor->startup();
@@ -2630,12 +2629,12 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled) {
     // Use an executor with higher max threads so a best effort abort could actually run
     // concurrently within the API. Otherwise the API would always wait for the best effort abort
     // even if the wait wasn't explicit.
-    ThreadPool::Options options;
-    options.poolName = "TxnAPITest-WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled";
-    options.minThreads = 1;
-    options.maxThreads = 8;
     auto executor = executor::ThreadPoolTaskExecutor::create(
-        std::make_unique<ThreadPool>(std::move(options)),
+        ThreadPool::make({
+            .poolName = "TxnAPITest-WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled",
+            .minThreads = 1,
+            .maxThreads = 8,
+        }),
         executor::makeNetworkInterface("TxnAPITestNetwork"));
     executor->startup();
     resetTxnWithRetries(nullptr /* resourceYielder */, executor);
@@ -2690,12 +2689,12 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
     // Use an executor with higher max threads so a best effort abort could actually run
     // concurrently within the API. Otherwise the API would always wait for the best effort abort
     // even if the wait wasn't explicit.
-    ThreadPool::Options options;
-    options.poolName = "TxnAPITest-WaitsForBestEffortAbortOnTransientError";
-    options.minThreads = 1;
-    options.maxThreads = 8;
     auto executor = executor::ThreadPoolTaskExecutor::create(
-        std::make_unique<ThreadPool>(std::move(options)),
+        ThreadPool::make({
+            .poolName = "TxnAPITest-WaitsForBestEffortAbortOnTransientError",
+            .minThreads = 1,
+            .maxThreads = 8,
+        }),
         executor::makeNetworkInterface("TxnAPITestNetwork"));
     executor->startup();
     resetTxnWithRetries(nullptr /* resourceYielder */, executor);

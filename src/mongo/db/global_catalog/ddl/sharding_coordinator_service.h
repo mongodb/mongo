@@ -93,10 +93,8 @@ public:
         return NamespaceString::kShardingDDLCoordinatorsNamespace;
     }
 
-    ThreadPool::Limits getThreadPoolLimits() const override {
-        ThreadPool::Limits limits;
-        limits.maxThreads = ThreadPool::Options::kUnlimited;
-        return limits;
+    ThreadPoolLimits getThreadPoolLimits() const override {
+        return {.maxThreads = ThreadPool::Options::kUnlimited};
     }
 
     // The service implemented its own conflict check before this method was added.

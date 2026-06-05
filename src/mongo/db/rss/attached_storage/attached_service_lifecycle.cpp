@@ -52,20 +52,21 @@ ServiceContext::ConstructorActionRegisterer registerAttachedServiceLifecycle{
     }};
 
 auto makeReplicationExecutor(ServiceContext* serviceContext) {
-    ThreadPool::Options tpOptions;
-    tpOptions.threadNamePrefix = "ReplCoord-";
-    tpOptions.poolName = "ReplCoordThreadPool";
-    tpOptions.maxThreads = 50;
-    tpOptions.onCreateThread = [serviceContext](const std::string& threadName) {
-        Client::initThread(threadName,
-                           serviceContext->getService(),
-                           Client::noSession(),
-                           ClientOperationKillableByStepdown{false});
-    };
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
     return executor::ThreadPoolTaskExecutor::create(
-        std::make_unique<ThreadPool>(tpOptions),
+        ThreadPool::make({
+            .poolName = "ReplCoordThreadPool",
+            .threadNamePrefix = "ReplCoord-",
+            .maxThreads = 50,
+            .onCreateThread =
+                [serviceContext](const std::string& threadName) {
+                    Client::initThread(threadName,
+                                       serviceContext->getService(),
+                                       Client::noSession(),
+                                       ClientOperationKillableByStepdown{false});
+                },
+        }),
         executor::makeNetworkInterface("ReplNetwork", nullptr, std::move(hookList)));
 }
 }  // namespace

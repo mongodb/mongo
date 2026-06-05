@@ -48,13 +48,11 @@ namespace primary_only_service_helpers {
 class WithAutomaticRetryTest : public unittest::Test {
 protected:
     void setUp() override {
-        auto network = std::make_unique<executor::NetworkInterfaceMock>();
-        auto pool = std::make_unique<ThreadPool>([]() {
-            ThreadPool::Options options;
-            options.maxThreads = 2;
-            return options;
-        }());
-        _executor = executor::ThreadPoolTaskExecutor::create(std::move(pool), std::move(network));
+        _executor = executor::ThreadPoolTaskExecutor::create(
+            ThreadPool::make({
+                .maxThreads = 2,
+            }),
+            std::make_unique<executor::NetworkInterfaceMock>());
         _executor->startup();
     }
 

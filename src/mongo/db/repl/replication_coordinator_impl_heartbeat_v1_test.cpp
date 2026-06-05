@@ -1827,7 +1827,7 @@ void HBStepdownAndReconfigTest::setUp() {
     ReplCoordHBV1Test::setUp();
 
     // We need one thread to run processReplSetReconfig, use a pool for convenience.
-    _threadPool = std::make_unique<ThreadPool>(ThreadPool::Options());
+    _threadPool = ThreadPool::make({});
     _threadPool->startup();
 
     assertStartSuccess(_initialConfig, HostAndPort("node0", 12345));

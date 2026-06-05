@@ -115,12 +115,11 @@ public:
 #endif
         }
 
-        ThreadPool::Options tpOptions;
-        tpOptions.threadNamePrefix = "TaskExecutorTestThreadPool-";
-        tpOptions.poolName = "TaskExecutorTestThreadPool";
-        tpOptions.maxThreads = 4;
-
-        return ThreadPoolTaskExecutor::create(std::make_unique<ThreadPool>(tpOptions),
+        return ThreadPoolTaskExecutor::create(ThreadPool::make({
+                                                  .poolName = "TaskExecutorTestThreadPool",
+                                                  .threadNamePrefix = "TaskExecutorTestThreadPool-",
+                                                  .maxThreads = 4,
+                                              }),
                                               std::move(net));
     }
 
