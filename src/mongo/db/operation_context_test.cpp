@@ -1145,7 +1145,7 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
                 lk, expCtx, threadClient.get(), truncateOps, &bobNoOpCtx);
 
             auto threadOpCtx = threadClient->makeOperationContext();
-            getServiceContext()->killAndDelistOperation(threadOpCtx.get());
+            getServiceContext()->killAndMarkOperationAsPendingDestruction(threadOpCtx.get());
 
             // Generate report in presence of a killed opCtx
             CurOp::reportCurrentOpForClient(

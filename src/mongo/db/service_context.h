@@ -622,25 +622,28 @@ public:
                        ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
     /**
-     * Delists the operation by removing it from its client. Both
-     * "opCtx->getClient()->getServiceContext()" and "this" must point to the same instance of
-     * ServiceContext. Also, "opCtx" should never be deleted before this method returns. Finally,
+     * As a performance optimization, we defer actually destroying operation contexts until after
+     * sending a response to the client. In between the operation completing and the operation
+     * context being destroyed, the operation context is "pending destruction" and is not considered
+     * an active operation for things like CurOp.
+     *
+     * Both "opCtx->getClient()->getServiceContext()" and "this" must point to the same instance of
+     * ServiceContext. Also, "opCtx" should never be deleted before this method returns.  Finally,
      * the thread invoking this method must not hold the client and the service context locks.
      */
-    void delistOperation(OperationContext* opCtx);
+    void markOperationAsPendingDestruction(OperationContext* opCtx);
 
     /**
-     * Kills the operation "opCtx" with the code "killCode", if opCtx has not already been killed,
-     * and delists the operation by removing it from its client. Both
-     * "opCtx->getClient()->getServiceContext()" and "this" must point to the same instance of
-     * service context. Also, "opCtx" should never be deleted before this method returns. Finally,
-     * the thread invoking this method must not hold (own) the client and the service context locks.
-     * It is highly recommended to use "ErrorCodes::OperationIsKilledAndDelisted" as the error code
-     * to facilitate debugging.
+     * If the operation is not already killed, kills it with "killCode", and then either way marks
+     * it as pending destruction.
+     *
+     * This has the same requirements as markOperationAsPendingDestruction() and works similarly to
+     * calling killOperation() followed by that, but avoids releasing the client lock in between the
+     * steps.
      */
-    void killAndDelistOperation(
+    void killAndMarkOperationAsPendingDestruction(
         OperationContext* opCtx,
-        ErrorCodes::Error killError = ErrorCodes::OperationIsKilledAndDelisted);
+        ErrorCodes::Error killCode = ErrorCodes::OperationIsKilledAndDelisted);
 
     /**
      * Registers a listener to be notified each time an op is killed.
@@ -812,12 +815,11 @@ private:
     struct ServiceSet;
 
     /**
-     * Removes the operation from its client. It will acquire both client and service context locks,
-     * and should only be used internally by other ServiceContext methods. To ensure delisted
-     * operations are shortly deleted, this method should only be called after killing an operation
-     * or in its destructor.
+     * Mark an operation as being logically complete and awaiting destruction. If a killCode is
+     * supplied, it is also killed using that code.
      */
-    void _delistOperation(OperationContext* opCtx);
+    void _killAndMarkOperationAsPendingDestruction(OperationContext* opCtx,
+                                                   boost::optional<ErrorCodes::Error> killCode);
 
     ObservableMutex<std::mutex> _mutex;
 

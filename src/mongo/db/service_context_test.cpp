@@ -245,13 +245,19 @@ TEST_F(ServiceContextOpContextTest, MakeOperationContextCreatesOperationId) {
 using ServiceContextOpContextTestDeathTest = ServiceContextOpContextTest;
 DEATH_TEST_F(ServiceContextOpContextTestDeathTest,
              MakeOperationContextFailsWhenAlreadyExists,
-             "Tripwire assertion") {
+             "4946801") {
     auto client = makeClient();
     auto opCtx = client->makeOperationContext();
+    client->makeOperationContext();
+}
 
-    // This will trip a tripwire assert and kill the previous opCtx.
-    ASSERT_THROWS(client->makeOperationContext(), DBException);
-    ASSERT_NOT_OK(opCtx->getKillStatus());
+DEATH_TEST_F(ServiceContextOpContextTestDeathTest,
+             MakeOperationContextFailsWhenPendingDestructionOpCtxAlreadyExists,
+             "4946801") {
+    auto client = makeClient();
+    auto opCtx = client->makeOperationContext();
+    getServiceContext()->markOperationAsPendingDestruction(opCtx.get());
+    client->makeOperationContext();
 }
 
 TEST_F(ServiceContextOpContextTest, DeleteOperationContext) {
@@ -275,18 +281,27 @@ TEST_F(ServiceContextOpContextTest, DeleteOperationContext) {
     ASSERT_EQ(batonTaskStatus.code(), ErrorCodes::ShutdownInProgress);
 }
 
-TEST_F(ServiceContextOpContextTest, DelistOperation) {
+TEST_F(ServiceContextOpContextTest, MarkOperationPendingDestruction) {
     auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
-    getServiceContext()->delistOperation(opCtx.get());
+    ASSERT_EQ(client->getOperationContext(), opCtx.get());
+    ASSERT_FALSE(client->operationContextIsPendingDestruction());
 
-    ASSERT_EQ(client->getOperationContext(), nullptr);
+    getServiceContext()->markOperationAsPendingDestruction(opCtx.get());
+
+    ASSERT_EQ(client->getOperationContext(), opCtx.get());
+    ASSERT_TRUE(client->operationContextIsPendingDestruction());
     ASSERT_EQ(countingKillOpListener.interruptAllCount, 0);
     ASSERT_EQ(countingKillOpListener.interruptCount, 0);
+
+    opCtx.reset();
+
+    ASSERT_EQ(client->getOperationContext(), nullptr);
+    ASSERT_FALSE(client->operationContextIsPendingDestruction());
 }
 
-TEST_F(ServiceContextOpContextTest, DelistOperationWithOperationKey) {
+TEST_F(ServiceContextOpContextTest, MarkOperationPendingDestructionWithOperationKey) {
     auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
@@ -300,19 +315,19 @@ TEST_F(ServiceContextOpContextTest, DelistOperationWithOperationKey) {
     // Operation key is tracked in OperationKeyManager.
     ASSERT_NE(OperationKeyManager::get(client.get()).at(opKey), boost::none);
 
-    // Delisting the operation releases the OperationKey from the manager.
-    getServiceContext()->delistOperation(opCtx.get());
+    // Marking the operation as pending destruction releases the OperationKey from the manager.
+    getServiceContext()->markOperationAsPendingDestruction(opCtx.get());
     ASSERT_EQ(OperationKeyManager::get(client.get()).at(opKey), boost::none);
 }
 
 DEATH_TEST_F(ServiceContextOpContextTestDeathTest,
-             DelistOperationWrongServiceContext,
+             MarkOperationPendingDestructionWrongServiceContext,
              "Invariant failure") {
     auto otherServiceContext = ServiceContext::make();
     auto otherClient = otherServiceContext->getService()->makeClient("other client");
     auto opCtx = otherClient->makeOperationContext();
 
-    getServiceContext()->delistOperation(opCtx.get());
+    getServiceContext()->markOperationAsPendingDestruction(opCtx.get());
 }
 
 TEST_F(ServiceContextOpContextTest, KillOperation) {
@@ -330,13 +345,15 @@ TEST_F(ServiceContextOpContextTest, KillOperation) {
     ASSERT_EQ(countingKillOpListener.interruptCount, 1);
 }
 
-TEST_F(ServiceContextOpContextTest, KillAndDelistOperation) {
+TEST_F(ServiceContextOpContextTest, KillAndMarkOperationPendingDestruction) {
     auto client = makeClient();
     auto opCtx = client->makeOperationContext();
 
-    getServiceContext()->killAndDelistOperation(opCtx.get(), ErrorCodes::InternalError);
+    getServiceContext()->killAndMarkOperationAsPendingDestruction(opCtx.get(),
+                                                                  ErrorCodes::InternalError);
 
-    ASSERT_EQ(client->getOperationContext(), nullptr);
+    ASSERT_EQ(client->getOperationContext(), opCtx.get());
+    ASSERT_TRUE(client->operationContextIsPendingDestruction());
     ASSERT_EQUALS(opCtx->getKillStatus(), ErrorCodes::InternalError);
     ASSERT_EQ(countingKillOpListener.interruptAllCount, 0);
     ASSERT_EQ(countingKillOpListener.interruptCount, 1);

@@ -361,39 +361,6 @@ boost::optional<Message> makeExhaustMessage(Message requestMsg, DbResponse& resp
     return exhaustMessage;
 }
 
-/**
- * If `in` encodes a "getMore" command, make a best-effort attempt to kill its
- * cursor. Returns true if such an attempt was successful. If the killCursors request
- * fails here for any reasons, it will still be cleaned up once the cursor times
- * out.
- */
-bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
-    try {
-        auto inRequest = OpMsgRequest::parse(in, client);
-        const BSONObj& body = inRequest.body;
-        const auto& [cmd, firstElement] = body.firstElement();
-        if (cmd != "getMore"_sd)
-            return false;
-        auto opCtx = client->makeOperationContext();
-        auto dbName = inRequest.parseDbName();
-        sep->handleRequest(opCtx.get(),
-                           OpMsgRequestBuilder::create(
-                               auth::ValidatedTenancyScope::get(opCtx.get()),
-                               dbName,
-                               KillCursorsCommandRequest(NamespaceStringUtil::deserialize(
-                                                             dbName, body["collection"].String()),
-                                                         {CursorId{firstElement.Long()}})
-                                   .toBSON())
-                               .serialize(),
-                           client->getServiceContext()->getFastClockSource()->now())
-            .get();
-        return true;
-    } catch (const DBException& e) {
-        LOGV2(22992, "Error cleaning up resources for exhaust request", "error"_attr = e);
-    }
-    return false;
-}
-
 bool isPreAuth(Client* client) {
     if (MONGO_unlikely(serverGlobalParams.isMongoBridge)) {
         // Do not perform pre-auth check for mongo bridge connections.
@@ -619,6 +586,10 @@ public:
         _opCtx = std::move(newOpCtx);
     }
 
+    void clearOperation() {
+        _opCtx.reset();
+    }
+
     OperationContext* opCtx() const {
         return _opCtx.get();
     }
@@ -681,6 +652,28 @@ public:
         synth->_isExhaust = true;
         synth->_compressorId = _compressorId;
         return synth;
+    }
+
+    /**
+     * If this work item is a "getMore" command on an exhaust cursor, return the parsed request.
+     */
+    boost::optional<OpMsgRequest> getRequestIfGetMoreOnExhaustCursor(Client* client) {
+        if (!_isExhaust) {
+            return boost::none;
+        }
+        try {
+            auto inRequest = OpMsgRequest::parse(in(), client);
+            const BSONObj& body = inRequest.body;
+            const auto& [cmd, firstElement] = body.firstElement();
+            if (cmd != "getMore"_sd)
+                return boost::none;
+            return inRequest;
+        } catch (const DBException& e) {
+            LOGV2(12615100,
+                  "Failed to parse request for cleanup of exhaust cursor",
+                  "error"_attr = e);
+        }
+        return boost::none;
     }
 
 private:
@@ -933,11 +926,12 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
 
 void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     auto&& work = *_work;
-    // opCtx must be delisted here so that the operation cannot show up in currentOp results after
-    // the response reaches the client. We are assuming that the operation has already been killed
-    // once we are accepting the response here, so delisting is sufficient. Destruction of the
-    // already killed opCtx is postponed for later (i.e., after completion of the future-chain) to
-    // mitigate its performance impact on the critical path of execution.
+    // The opCtx must be marked as pending destruction here so that the operation cannot show up in
+    // currentOp results after the response reaches the client. We are assuming that the operation
+    // has already been killed once we are accepting the response here, so marking it as pending
+    // destruction is sufficient. Actual destruction of the already killed opCtx is postponed for
+    // later (i.e., after completion of the future-chain) to mitigate its performance impact on the
+    // critical path of execution.
     // Note that destroying futures after execution, rather that postponing the destruction
     // until completion of the future-chain, would expose the cost of destroying opCtx to
     // the critical path and result in serious performance implications.
@@ -945,7 +939,7 @@ void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     // starting the actual operation. Request rate limiting will do that in order to return a
     // passable error response without paying the cost of starting the operation.
     if (const auto opCtx = work.opCtx()) {
-        _serviceContext->delistOperation(opCtx);
+        _serviceContext->markOperationAsPendingDestruction(opCtx);
     }
     // Format our response, if we have one
     Message& toSink = response.response;
@@ -1103,20 +1097,55 @@ void SessionWorkflow::Impl::terminateIfTagsDontMatch(Client::TagMask tags) {
 }
 
 void SessionWorkflow::Impl::_cleanupExhaustResources() {
-    auto clean = [&](auto& w) {
-        return w && w->isExhaust() && killExhaust(w->in(), _sep, client());
-    };
-    clean(_nextWork) || clean(_work);
+    // Make a best-effort attempt to kill any exhaust cursors for this request. If the killCursors
+    // request fails here for any reason, it will still be cleaned up once the cursor times out.
+    // Check if we have an exhaust cursor to kill in either the current or next work items
+    boost::optional<OpMsgRequest> inRequest;
+    if (_nextWork)
+        inRequest = _nextWork->getRequestIfGetMoreOnExhaustCursor(client());
+    if (!inRequest && _work)
+        inRequest = _work->getRequestIfGetMoreOnExhaustCursor(client());
+    if (!inRequest)
+        return;
+
+    // Normally we want to defer destroying operation contexts until after we've sent the response
+    // to the user, but the work item's opctx has been killed and can't be used to kill the cursor.
+    // A client can only have one opctx at a time, so we need to destroy the existing one and make a
+    // new one.
+    if (_work)
+        _work->clearOperation();
+    if (_nextWork)
+        _nextWork->clearOperation();
+    auto opCtx = client()->makeOperationContext();
+
+    try {
+        const BSONObj& body = inRequest->body;
+        auto dbName = inRequest->parseDbName();
+        _sep->handleRequest(opCtx.get(),
+                            OpMsgRequestBuilder::create(
+                                auth::ValidatedTenancyScope::get(opCtx.get()),
+                                dbName,
+                                KillCursorsCommandRequest(NamespaceStringUtil::deserialize(
+                                                              dbName, body["collection"].String()),
+                                                          {CursorId{body.firstElement().Long()}})
+                                    .toBSON())
+                                .serialize(),
+                            client()->getServiceContext()->getFastClockSource()->now())
+            .get();
+    } catch (const DBException& e) {
+        LOGV2(22992, "Error cleaning up resources for exhaust request", "error"_attr = e);
+    }
 }
 
 void SessionWorkflow::Impl::_cleanupSession(const Status& status) {
     LOGV2_DEBUG(5127900, 2, "Ending session", "error"_attr = status);
     if (_work && _work->opCtx()) {
-        // Make sure we clean up and delist the operation in the case we error between creating
-        // the opCtx and getting a response back for the work item. This is required in the case
-        // that we need to create a new opCtx to kill existing exhaust resources.
-        _serviceContext->killAndDelistOperation(_work->opCtx(),
-                                                ErrorCodes::OperationIsKilledAndDelisted);
+        // Make sure we clean up and mark the operation as pending destruction in the case we error
+        // between creating the opCtx and getting a response back for the work item. This is
+        // required in the case that we need to create a new opCtx to kill existing exhaust
+        // resources.
+        _serviceContext->killAndMarkOperationAsPendingDestruction(
+            _work->opCtx(), ErrorCodes::OperationIsKilledAndDelisted);
     }
     _cleanupExhaustResources();
     _taskRunner = {};

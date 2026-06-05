@@ -212,7 +212,8 @@ TEST_F(OpIdPoolTest, RenewLeaseErasesOldLeaseFromMap) {
     auto clientFromMap = manager.findAndLockClient(opId1);
     ASSERT_FALSE(clientFromMap);
 
-    getServiceContext()->delistOperation(opCtx.get());
+    getServiceContext()->markOperationAsPendingDestruction(opCtx.get());
+    opCtx.reset();
 
     // A newly issued OperationId correctly maps to the client.
     auto opCtx2 = getServiceContext()->makeOperationContext(client.get());
