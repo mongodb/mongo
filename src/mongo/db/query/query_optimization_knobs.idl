@@ -927,6 +927,19 @@ server_parameters:
         default: false
         redact: false
 
+    # TODO SERVER-127563: Revisit the naming and organization of CBR-related knobs
+    internalQuerySamplingByStrides:
+        description:
+            Indicate sampling CE to generate a repeatable sample by sequentially scanning
+            the target collection and filtering to documents whose _id satisfies
+            shardHash(_id) % max(1, collCard / sampleSize) == 0, capped at the requested sample size.
+            This sampling method is useful for testing purposes and should not be used in production.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQuerySamplingByStrides"
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
+
     internalJoinPlanSamplingSize:
         description: For queries running through join optimization, control the sample size.
         set_at: [startup, runtime]

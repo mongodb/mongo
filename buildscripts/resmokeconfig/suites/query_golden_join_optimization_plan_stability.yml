@@ -26,7 +26,7 @@ executor:
         featureFlagPathArrayness: true
         # Deterministic sampling is required in order to get
         # deterministic query plans in plan stability tests
-        internalQuerySamplingBySequentialScan: true
+        internalQuerySamplingByStrides: true
         # Concurrent index builds can also cause non-determinism
         # in the in-memory or on-disk representations.
         maxNumActiveUserIndexBuilds: 1

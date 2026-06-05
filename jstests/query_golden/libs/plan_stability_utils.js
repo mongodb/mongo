@@ -156,13 +156,15 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
                 getParameter: 1,
                 internalQueryPlannerEnableSortIndexIntersection: 1,
                 internalQuerySamplingBySequentialScan: 1,
+                internalQuerySamplingByStrides: 1,
             }),
         );
         assert.commandWorked(
             db.adminCommand({
                 setParameter: 1,
                 internalQueryPlannerEnableSortIndexIntersection: true,
-                internalQuerySamplingBySequentialScan: true,
+                internalQuerySamplingBySequentialScan: false,
+                internalQuerySamplingByStrides: true,
             }),
         );
     }
@@ -245,6 +247,7 @@ export function runPlanStabilityPipelines(db, collName, pipelines) {
             samplingConfidenceInterval: null,
             internalQuerySamplingCEMethod: null,
             internalQuerySamplingBySequentialScan: null,
+            internalQuerySamplingByStrides: null,
         };
 
         for (const param in parameters) {

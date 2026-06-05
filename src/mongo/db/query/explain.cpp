@@ -203,6 +203,8 @@ void generatePlannerInfo(PlanExecutor* exec,
                         return "fullCollScan"_sd;
                     case cost_based_ranker::SamplingTechnique::kSeqScan:
                         return "seqScan"_sd;
+                    case cost_based_ranker::SamplingTechnique::kStrides:
+                        return "strides"_sd;
                 }
                 MONGO_UNREACHABLE;
             };

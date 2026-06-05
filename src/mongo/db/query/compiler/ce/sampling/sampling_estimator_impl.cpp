@@ -34,6 +34,7 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/sbe/expressions/sbe_fn_names.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
+#include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/generic_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
@@ -586,7 +587,11 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
     if (internalQuerySamplingBySequentialScan.load()) {
         // This is only used for testing purposes when a repeatable sample is needed.
         _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kSeqScan;
-        generateSampleBySeqScanningForTesting();
+        generateSampleForTesting(cost_based_ranker::SamplingTechnique::kSeqScan);
+    } else if (internalQuerySamplingByStrides.load()) {
+        // This is only used for testing purposes when a repeatable sample is needed.
+        _usedSamplingTechnique = cost_based_ranker::SamplingTechnique::kStrides;
+        generateSampleForTesting(cost_based_ranker::SamplingTechnique::kStrides);
     } else if (_sampleSize >= _collectionCard.cardinality().v()) {
         // If the required sample is larger than the collection, the sample is generated from all
         // the documents on the collection.
@@ -607,7 +612,13 @@ void SamplingEstimatorImpl::generateSample(ce::ProjectionParams projectionParams
     hangAfterCBRSamplingGenerateSample.pauseWhileSet(_opCtx);
 }
 
-void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
+void SamplingEstimatorImpl::generateSampleForTesting(
+    cost_based_ranker::SamplingTechnique technique) {
+    tassert(12433205,
+            "generateSampleForTesting only supports kSeqScan and kStrides",
+            technique == cost_based_ranker::SamplingTechnique::kSeqScan ||
+                technique == cost_based_ranker::SamplingTechnique::kStrides);
+
     // Create a CanonicalQuery for the sampling plan.
     auto cq = makeEmptyCanonicalQuery(_nss, _opCtx, _outerExpCtx);
     auto sbeYieldPolicy = PlanYieldPolicySBE::make(_opCtx, _yieldPolicy, _collections, _nss);
@@ -616,16 +627,63 @@ void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
     sbe::value::SlotIdGenerator ids;
     staticData->resultSlot = ids.generate();
     const CollectionPtr& collection = _collections.lookupCollection(_nss);
-    // Scan the first '_sampleSize' documents sequentially from the start of the target collection
-    // in order to generate a repeatable sample.
     auto stage = makeScanStage(
         collection, staticData->resultSlot, boost::none, boost::none, false, sbeYieldPolicy.get());
-    stage = sbe::makeS<sbe::LimitSkipStage>(
-        std::move(stage),
-        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                   sbe::value::bitcastFrom<int64_t>(_sampleSize)),
-        nullptr /* skip */,
-        0 /* nodeId */);
+
+    switch (technique) {
+        case cost_based_ranker::SamplingTechnique::kSeqScan: {
+            // Scan the first '_sampleSize' documents sequentially from the start of the target
+            // collection in order to generate a repeatable sample.
+            stage = sbe::makeS<sbe::LimitSkipStage>(
+                std::move(stage),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                           sbe::value::bitcastFrom<int64_t>(_sampleSize)),
+                nullptr /* skip */,
+                0 /* nodeId */);
+            break;
+        }
+        case cost_based_ranker::SamplingTechnique::kStrides: {
+            const auto collCard = static_cast<size_t>(_collectionCard.cardinality().v());
+            tassert(12433206,
+                    "Sample size must be greater than zero for stride sampling",
+                    _sampleSize > 0);
+            const auto strideModulus =
+                std::max(int64_t{1}, static_cast<int64_t>(collCard / _sampleSize));
+
+            // Sequentially scan the collection and keep documents whose _id satisfies
+            // shardHash(_id) % strideModulus == 0, then cap the sample at '_sampleSize' documents.
+            // Use shardHash (BSONElementHasher) rather than hash (Abseil) because Abseil hash
+            // values are randomized per process and are not stable across process restarts.
+            auto hashed = sbe::makeE<sbe::EFunction>(
+                sbe::EFn::kShardHash,
+                sbe::makeEs(sbe::makeE<sbe::EFunction>(
+                    sbe::EFn::kGetField,
+                    sbe::makeEs(sbe::makeE<sbe::EVariable>(staticData->resultSlot.get()),
+                                sbe::makeE<sbe::EConstant>("_id"_sd)))));
+            auto modded = sbe::makeE<sbe::EFunction>(
+                sbe::EFn::kMod,
+                sbe::makeEs(
+                    std::move(hashed),
+                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                               sbe::value::bitcastFrom<int64_t>(strideModulus))));
+            auto hashModFilter = sbe::makeE<sbe::EPrimBinary>(
+                sbe::EPrimBinary::eq,
+                std::move(modded),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                           sbe::value::bitcastFrom<int64_t>(0)));
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), std::move(hashModFilter), 0 /* nodeId */);
+            stage = sbe::makeS<sbe::LimitSkipStage>(
+                std::move(stage),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                           sbe::value::bitcastFrom<int64_t>(_sampleSize)),
+                nullptr /* skip */,
+                0 /* nodeId */);
+            break;
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
 
     // Inject projection if topLevelSampleFieldNames is non-empty.
     if (!_topLevelSampleFieldNames.empty()) {
@@ -643,9 +701,16 @@ void SamplingEstimatorImpl::generateSampleBySeqScanningForTesting() {
     auto plan =
         std::make_pair<std::unique_ptr<sbe::PlanStage>, mongo::stage_builder::PlanStageData>(
             std::move(stage), std::move(data));
+    {
+        sbe::DebugPrintInfo debugPrintInfo{};
+        LOGV2_DEBUG(12433207,
+                    5,
+                    "SamplingCE test sampling SBE plan",
+                    "technique"_attr = technique,
+                    "SBE Plan"_attr =
+                        sbe::DebugPrinter{}.print(plan.first.get()->debugPrint(debugPrintInfo)));
+    }
     executeSamplingQueryAndSample(plan, std::move(cq), std::move(sbeYieldPolicy));
-
-    return;
 }
 
 namespace {

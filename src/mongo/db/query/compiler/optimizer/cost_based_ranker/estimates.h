@@ -584,6 +584,7 @@ enum class SamplingTechnique {
     kChunk,
     kFullCollScan,
     kSeqScan,
+    kStrides,
 };
 
 /**

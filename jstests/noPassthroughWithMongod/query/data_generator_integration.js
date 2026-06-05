@@ -208,12 +208,13 @@ try {
 
     sg.execute({spec: collName, size: size});
     checkDifferentDocuments(collName);
-    const data = db[collName].find({}, {"_id": 0}).toArray();
+    const data = db[collName].find({}).toArray();
 
     sg.execute({spec: collName, size: size});
     checkDifferentDocuments(collName);
-    const data2 = db[collName].find({}, {"_id": 0}).toArray();
+    const data2 = db[collName].find({}).toArray();
 
+    // Confirm that the data is deterministically generated, including the _id field.
     for (let i = 0; i < size; i++) {
         assert.eq(data[i], data2[i]);
     }

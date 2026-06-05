@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/hasher.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
@@ -50,6 +51,40 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::ce {
+
+namespace {
+
+/**
+ * Returns true if 'doc' has an '_id' field and shardHash(_id) % modulus == 0.
+ * Mirrors the hash-mod filter used by stride sampling in SamplingEstimatorImpl.
+ */
+bool idPassesHashModFilter(const BSONObj& doc, int64_t modulus) {
+    const auto idElem = doc.getField("_id");
+    if (idElem.eoo()) {
+        return false;
+    }
+    const auto hashVal = BSONElementHasher::hash64(idElem, BSONElementHasher::DEFAULT_HASH_SEED);
+    return (hashVal % modulus) == 0;
+}
+
+/**
+ * Returns the '_id' values (0 .. collCard-1) that stride sampling would select when
+ * scanning in natural order: documents satisfying shardHash(_id) % modulus == 0, where
+ * modulus = max(1, collCard / sampleSize), stopping after 'sampleSize' matches.
+ */
+std::set<int> expectedHashModSampleIds(size_t collCard, size_t sampleSize) {
+    const int64_t modulus = std::max(int64_t{1}, static_cast<int64_t>(collCard / sampleSize));
+    std::set<int> expectedIds;
+    for (size_t i = 0; i < collCard && expectedIds.size() < sampleSize; ++i) {
+        BSONObj doc = BSON("_id" << static_cast<int>(i) << "a" << static_cast<int>(i));
+        if (idPassesHashModFilter(doc, modulus)) {
+            expectedIds.insert(static_cast<int>(i));
+        }
+    }
+    return expectedIds;
+}
+
+}  // namespace
 
 using namespace mongo::cost_based_ranker;
 
@@ -85,6 +120,103 @@ TEST_F(SamplingEstimatorTest, RandomSamplingProcess) {
 
     auto sample = samplingEstimator.getSample();
     ASSERT_EQUALS(sample.size(), kSampleSize);
+}
+
+TEST_F(SamplingEstimatorTest, HashModStrideSampling) {
+    const size_t collCard = 10;
+    const size_t sampleSize = 5;
+    insertDocuments(kTestNss, createDocuments(collCard));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    RAIIServerParameterControllerForTest stridesKnob("internalQuerySamplingByStrides", true);
+
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(collCard));
+    samplingEstimator.generateSample(ce::NoProjection{});
+
+    const auto expectedIds = expectedHashModSampleIds(collCard, sampleSize);
+    const auto sample = samplingEstimator.getSample();
+    ASSERT_LTE(sample.size(), sampleSize);
+    ASSERT_EQUALS(sample.size(), std::min(sampleSize, expectedIds.size()));
+
+    std::set<int> actualIds;
+    for (const auto& doc : sample) {
+        ASSERT(idPassesHashModFilter(
+            doc, std::max(int64_t{1}, static_cast<int64_t>(collCard / sampleSize))));
+        actualIds.insert(doc.getField("_id").numberInt());
+    }
+    ASSERT_EQUALS(actualIds, expectedIds);
+}
+
+TEST_F(SamplingEstimatorTest, HashModStrideSamplingSmallCollection) {
+    const size_t collCard = 10;
+    const size_t sampleSize = 20;
+    insertDocuments(kTestNss, createDocuments(collCard));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    RAIIServerParameterControllerForTest stridesKnob("internalQuerySamplingByStrides", true);
+
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(collCard));
+    samplingEstimator.generateSample(ce::NoProjection{});
+
+    ASSERT_EQUALS(samplingEstimator.getSample().size(), collCard);
+}
+
+TEST_F(SamplingEstimatorTest, HashModStrideSamplingWithProjection) {
+    const size_t collCard = 10;
+    const size_t sampleSize = 5;
+    insertDocuments(kTestNss, createDocuments(collCard));
+
+    auto coll = acquireCollection(operationContext(), kTestNss);
+    auto colls = MultipleCollectionAccessor(
+        coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+    RAIIServerParameterControllerForTest stridesKnob("internalQuerySamplingByStrides", true);
+
+    SamplingEstimatorForTesting samplingEstimator(operationContext(),
+                                                  colls,
+                                                  kTestNss,
+                                                  PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                  sampleSize,
+                                                  SamplingCEMethodEnum::kRandom,
+                                                  numChunks,
+                                                  makeCardinalityEstimate(collCard));
+    samplingEstimator.generateSample(includedSampleFields);
+
+    const auto expectedIds = expectedHashModSampleIds(collCard, sampleSize);
+    const auto sample = samplingEstimator.getSample();
+    ASSERT_LTE(sample.size(), sampleSize);
+    ASSERT_EQUALS(sample.size(), std::min(sampleSize, expectedIds.size()));
+
+    std::set<int> actualIds;
+    for (const auto& doc : sample) {
+        ASSERT_EQUALS(doc.getFieldNames<std::set<std::string>>(),
+                      std::set(includedSampleFields.begin(), includedSampleFields.end()));
+        ASSERT_TRUE(doc.getObjectField("obj").hasField("nil"));
+        ASSERT(idPassesHashModFilter(
+            doc, std::max(int64_t{1}, static_cast<int64_t>(collCard / sampleSize))));
+        actualIds.insert(doc.getField("_id").numberInt());
+    }
+    ASSERT_EQUALS(actualIds, expectedIds);
 }
 
 TEST_F(SamplingEstimatorTest, RandomSamplingProcessWithProjection) {

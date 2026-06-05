@@ -83,6 +83,9 @@ export function populateSimplePlanStabilityDataset(collName, collSize) {
     const documents = [];
     for (let i = 0; i < collSize; i++) {
         documents.push({
+            // Deterministic _id is required for internalQuerySamplingByStrides to
+            // deliver a determinstic sample
+            _id: i,
             i_idx: i,
             z_idx: zipfianValues[i],
             c_idx: 1,

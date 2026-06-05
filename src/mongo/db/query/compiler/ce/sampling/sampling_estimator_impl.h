@@ -392,11 +392,16 @@ private:
         std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy);
 
     /**
-     * Generates a sample by sequentially scanning documents from the start of the target
-     * collection. The sample is generated from the first '_sampleSize' documents of the collection.
-     * This sampling method is only used for testing purposes where a repeatable sample is needed.
+     * Generates a repeatable sample for testing using one of the deterministic scan-based
+     * techniques:
+     *   - kSeqScan: sequentially scan from the start of the collection and take the first
+     *     '_sampleSize' documents.
+     *   - kStrides: sequentially scan and keep documents whose _id satisfies
+     *     shardHash(_id) % M == 0, where M = max(1, collCard / sampleSize). shardHash uses
+     *     BSONElementHasher, which is stable across process restarts. The result is capped at
+     *     '_sampleSize' documents.
      */
-    void generateSampleBySeqScanningForTesting();
+    void generateSampleForTesting(cost_based_ranker::SamplingTechnique technique);
 
     /**
      * If '_samplingSource' is kPersistentSample, attempts to load a previously persisted sample

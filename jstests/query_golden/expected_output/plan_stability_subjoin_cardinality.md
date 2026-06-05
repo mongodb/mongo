@@ -378,7 +378,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_availqty":{"$eq":2021}},{"ps_availqty":{"$gt":5420}},{"ps_availqty":{"$gte":3530}}]},{"$or":[{"ps_availqty":{"$eq":5432}},{"ps_supplycost":{"$gt":941.7}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 269  
+Estimated cardinality: 399  
 Actual cardinality: 621  
 Orders of magnitude: 0
 
@@ -417,7 +417,7 @@ HJ p_partkey = partsupp.ps_partkey
       -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_availqty":{"$eq":2021}},{"ps_availqty":{"$gt":5420}},{"ps_availqty":{"$gte":3530}}]},{"$or":[{"ps_availqty":{"$eq":5432}},{"ps_supplycost":{"$gt":941.7}}]}]} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 2  
+Estimated cardinality: 5  
 Actual cardinality: 7  
 Orders of magnitude: 0
 
@@ -607,7 +607,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_availqty":{"$lt":6696}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 1718  
+Estimated cardinality: 1692  
 Actual cardinality: 1245  
 Orders of magnitude: 0
 
@@ -644,7 +644,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_type":{"$regex":"^ECONOMY"}}
 ```
-Estimated cardinality: 249  
+Estimated cardinality: 262  
 Actual cardinality: 193  
 Orders of magnitude: 0
 
@@ -889,7 +889,7 @@ INLJ s_nationkey = c_nationkey
   -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$and":[{"c_mktsegment":{"$eq":"MACHINERY"}},{"c_acctbal":{"$gte":6089.13}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_nationkey_1
 ```
-Estimated cardinality: 72  
+Estimated cardinality: 82  
 Actual cardinality: 87  
 Orders of magnitude: 0
 
@@ -917,7 +917,7 @@ HJ customer.c_custkey = o_custkey
   -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"o_orderpriority":{"$eq":"3-MEDIUM"}} 
       -> IXSCAN: plan_stability_subjoin_cardinality_md.orders o_orderdate_1 {"o_orderdate":["(new Date(887932800000), new Date(9223372036854775807)]"]}
 ```
-Estimated cardinality: 10  
+Estimated cardinality: 14  
 Actual cardinality: 17  
 Orders of magnitude: 0
 
@@ -951,7 +951,7 @@ INLJ orders.o_orderkey = l_orderkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 40  
+Estimated cardinality: 54  
 Actual cardinality: 80  
 Orders of magnitude: 0
 
@@ -1114,7 +1114,7 @@ INLJ s_nationkey = c_nationkey
   -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$and":[{"c_acctbal":{"$gt":1687.58}},{"c_mktsegment":{"$not":{"$eq":"MACHINERY"}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_nationkey_1
 ```
-Estimated cardinality: 375  
+Estimated cardinality: 380  
 Actual cardinality: 355  
 Orders of magnitude: 0
 
@@ -1142,7 +1142,7 @@ HJ customer.c_custkey = o_custkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_nationkey_1
   -> [orders] COLLSCAN: plan_stability_subjoin_cardinality_md.orders {"$and":[{"o_orderdate":{"$not":{"$gt":"1996-01-31T00:00:00.000Z"}}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000052"}},{"o_orderstatus":{"$eq":"P"}},{"o_shippriority":{"$gt":0}}]},{"$nor":[{"o_orderpriority":{"$eq":"5-LOW"}},{"o_orderpriority":{"$eq":"3-MEDIUM"}},{"o_totalprice":{"$gt":6549.4}}]}]}
 ```
-Estimated cardinality: 15  
+Estimated cardinality: 32  
 Actual cardinality: 23  
 Orders of magnitude: 0
 
@@ -1176,7 +1176,7 @@ INLJ orders.o_orderkey = l_orderkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_receiptdate":{"$not":{"$gte":"1996-12-14T00:00:00.000Z"}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 44  
+Estimated cardinality: 91  
 Actual cardinality: 24  
 Orders of magnitude: 0
 
@@ -1467,7 +1467,7 @@ INLJ s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_availqty":{"$eq":9578}},{"ps_supplycost":{"$lte":161.52}}]},{"$or":[{"ps_availqty":{"$lte":1414}},{"ps_availqty":{"$gte":2826}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 716  
+Estimated cardinality: 806  
 Actual cardinality: 758  
 Orders of magnitude: 0
 
@@ -1494,7 +1494,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_container":{"$in":["JUMBO BAG","LG CASE","MED PACK","SM CAN"]}}
 ```
-Estimated cardinality: 72  
+Estimated cardinality: 75  
 Actual cardinality: 69  
 Orders of magnitude: 0
 
@@ -1526,7 +1526,7 @@ Subjoin plan:
 FETCH: plan_stability_subjoin_cardinality_md.orders {"o_orderstatus":{"$eq":"O"}} 
   -> IXSCAN: plan_stability_subjoin_cardinality_md.orders o_orderdate_1 {"o_orderdate":["(new Date(901670400000), new Date(9223372036854775807)]"]}
 ```
-Estimated cardinality: 150  
+Estimated cardinality: 468  
 Actual cardinality: 242  
 Orders of magnitude: 0
 
@@ -1548,9 +1548,9 @@ HJ o_custkey = c_custkey
       -> IXSCAN: plan_stability_subjoin_cardinality_md.orders o_orderdate_1 {"o_orderdate":["(new Date(901670400000), new Date(9223372036854775807)]"]}
   -> [customer] COLLSCAN: plan_stability_subjoin_cardinality_md.customer {"$and":[{"c_mktsegment":{"$eq":"HOUSEHOLD"}},{"c_name":{"$not":{"$eq":"Customer#000010639"}}}]}
 ```
-Estimated cardinality: 30  
+Estimated cardinality: 101  
 Actual cardinality: 47  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 24-2
@@ -1576,7 +1576,7 @@ INLJ orders.o_orderkey = l_orderkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 121  
+Estimated cardinality: 405  
 Actual cardinality: 201  
 Orders of magnitude: 0
 
@@ -1609,9 +1609,9 @@ HJ s_nationkey = customer.c_nationkey
       -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 534  
+Estimated cardinality: 1782  
 Actual cardinality: 882  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ## >>> Command idx 25
@@ -1725,7 +1725,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_comment":{"$regex":"^. de"}},{"ps_availqty":{"$not":{"$gte":8163}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 28  
+Estimated cardinality: 40  
 Actual cardinality: 50  
 Orders of magnitude: 0
 
@@ -1764,7 +1764,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"p_partkey":{"$not":{"$eq":5801}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 28  
+Estimated cardinality: 40  
 Actual cardinality: 50  
 Orders of magnitude: 0
 
@@ -1842,7 +1842,7 @@ INLJ p_partkey = l_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_shipmode":{"$eq":"REG AIR"}},{"l_linenumber":{"$gt":4}},{"l_partkey":{"$not":{"$eq":6234}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 168  
+Estimated cardinality: 200  
 Actual cardinality: 169  
 Orders of magnitude: 0
 
@@ -1870,11 +1870,9 @@ INLJ p_partkey = ps_partkey, lineitem.l_partkey = ps_partkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_supplycost":{"$not":{"$gte":495.17}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 26225  
+Estimated cardinality: 364  
 Actual cardinality: 358  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 29
@@ -1976,7 +1974,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$gte":597.44}},{"ps_comment":{"$regex":"^ s"}}]},{"ps_comment":{"$regex":"^. "}}]}
 ```
-Estimated cardinality: 5520  
+Estimated cardinality: 3757  
 Actual cardinality: 4230  
 Orders of magnitude: 0
 
@@ -1997,7 +1995,7 @@ HJ ps_partkey = p_partkey
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$gte":597.44}},{"ps_comment":{"$regex":"^ s"}}]},{"ps_comment":{"$regex":"^. "}}]} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_mfgr":{"$not":{"$in":["Manufacturer#2","Manufacturer#3","Manufacturer#5"]}}}
 ```
-Estimated cardinality: 2191  
+Estimated cardinality: 1521  
 Actual cardinality: 1765  
 Orders of magnitude: 0
 
@@ -2011,23 +2009,22 @@ db.partsupp.aggregate(EJSON.deserialize(
 {"$match":{"p_mfgr":{"$not":{"$in":["Manufacturer#2","Manufacturer#3","Manufacturer#5"]}}}}]}},
 {"$unwind":"$part"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$part"]}}},
 {"$lookup":{"from":"lineitem","localField":"p_partkey","foreignField":"l_partkey","as":"lineitem","pipeline":[
-{"$match":{"$and":[{"$or":[{"l_quantity":{"$lte":46}},{"l_discount":{"$lt":0.07}}]},{"$nor":[{"l_returnflag":{"$eq":"R"}},{"l_extendedprice":{"$gt":46445.4}}]},{"$nor":[{"l_suppkey":{"$eq":169}},{"l_linenumber":{"$lte":6}}]}]}}]}},
+{"$match":{"$and":[{"$and":[{"$or":[{"l_quantity":{"$lte":46}},{"l_discount":{"$lt":0.07}}]},{"$nor":[{"l_returnflag":{"$eq":"R"}},{"l_extendedprice":{"$gt":46445.4}}]},{"$nor":[{"l_suppkey":{"$eq":169}},{"l_linenumber":{"$lte":6}}]}]},{}]}}]}},
 {"$unwind":"$lineitem"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$lineitem"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-HJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
+INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
   -> [none] HJ ps_partkey = p_partkey
       -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$gte":597.44}},{"ps_comment":{"$regex":"^ s"}}]},{"ps_comment":{"$regex":"^. "}}]} 
       -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_mfgr":{"$not":{"$in":["Manufacturer#2","Manufacturer#3","Manufacturer#5"]}}} 
-  -> [lineitem] COLLSCAN: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"$or":[{"l_quantity":{"$lte":46}},{"l_discount":{"$lt":0.07}}]},{"$nor":[{"l_returnflag":{"$eq":"R"}},{"l_extendedprice":{"$gt":46445.4}}]},{"$nor":[{"l_suppkey":{"$eq":169}},{"l_linenumber":{"$lte":6}}]}]}
+  -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"$or":[{"l_quantity":{"$lte":46}},{"l_discount":{"$lt":0.07}}]},{"$nor":[{"l_returnflag":{"$eq":"R"}},{"l_extendedprice":{"$gt":46445.4}}]},{"$nor":[{"l_suppkey":{"$eq":169}},{"l_linenumber":{"$lte":6}}]}]} 
+      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 87722  
+Estimated cardinality: 835  
 Actual cardinality: 925  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 31
@@ -2140,7 +2137,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_supplycost":{"$lte":285.82}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 112  
+Estimated cardinality: 120  
 Actual cardinality: 142  
 Orders of magnitude: 0
 
@@ -2354,7 +2351,7 @@ INLJ s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$nor":[{"ps_availqty":{"$eq":2977}},{"ps_supplycost":{"$lte":548.54}},{"ps_supplycost":{"$gt":659.13}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 17  
+Estimated cardinality: 19  
 Actual cardinality: 16  
 Orders of magnitude: 0
 
@@ -2383,7 +2380,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 17  
+Estimated cardinality: 19  
 Actual cardinality: 16  
 Orders of magnitude: 0
 
@@ -2554,7 +2551,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_supplycost":{"$lte":889.05}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 314  
+Estimated cardinality: 313  
 Actual cardinality: 205  
 Orders of magnitude: 0
 
@@ -2587,7 +2584,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part
 ```
-Estimated cardinality: 314  
+Estimated cardinality: 313  
 Actual cardinality: 205  
 Orders of magnitude: 0
 
@@ -2706,7 +2703,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^nic"}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 2  
+Estimated cardinality: 1  
 Actual cardinality: 1  
 Orders of magnitude: 0
 
@@ -2746,7 +2743,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 2  
+Estimated cardinality: 1  
 Actual cardinality: 1  
 Orders of magnitude: 0
 
@@ -2864,7 +2861,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_comment":{"$regex":"^t"}},{"$nor":[{"ps_availqty":{"$lte":5420}},{"ps_comment":{"$regex":"^ "}}]},{"$nor":[{"ps_comment":{"$regex":"^ bl"}},{"ps_comment":{"$regex":"^are"}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 2  
+Estimated cardinality: 1  
 Actual cardinality: 1  
 Orders of magnitude: 0
 
@@ -2897,7 +2894,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 2  
+Estimated cardinality: 1  
 Actual cardinality: 1  
 Orders of magnitude: 0
 
@@ -2949,7 +2946,7 @@ INLJ s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_supplycost":{"$lt":892.51}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 144  
+Estimated cardinality: 143  
 Actual cardinality: 138  
 Orders of magnitude: 0
 
@@ -3354,7 +3351,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^y ac"}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 1  
+Estimated cardinality: 0  
 Actual cardinality: 5  
 Orders of magnitude: 0
 
@@ -3444,7 +3441,7 @@ INLJ s_nationkey = c_nationkey
   -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$and":[{"$or":[{"c_acctbal":{"$lt":108.03}},{"c_mktsegment":{"$in":["BUILDING","HOUSEHOLD"]}}]},{"c_name":{"$not":{"$eq":"Customer#000013077"}}},{"$nor":[{"c_mktsegment":{"$eq":"HOUSEHOLD"}},{"c_mktsegment":{"$eq":"BUILDING"}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_nationkey_1
 ```
-Estimated cardinality: 33  
+Estimated cardinality: 41  
 Actual cardinality: 40  
 Orders of magnitude: 0
 
@@ -3472,7 +3469,7 @@ INLJ customer.c_custkey = o_custkey
   -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"$and":[{"o_orderpriority":{"$eq":"4-NOT SPECIFIED"}},{"o_orderstatus":{"$eq":"O"}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.orders o_custkey_1
 ```
-Estimated cardinality: 32  
+Estimated cardinality: 39  
 Actual cardinality: 39  
 Orders of magnitude: 0
 
@@ -3506,7 +3503,7 @@ INLJ orders.o_orderkey = l_orderkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_discount":{"$lte":0}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 12  
+Estimated cardinality: 13  
 Actual cardinality: 14  
 Orders of magnitude: 0
 
@@ -3622,7 +3619,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$gt":47.97}},{"ps_supplycost":{"$gte":632.83}},{"ps_comment":{"$regex":"^s a"}}]},{"ps_availqty":{"$gt":298}},{"ps_comment":{"$regex":"^b"}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 56  
+Estimated cardinality: 25  
 Actual cardinality: 64  
 Orders of magnitude: 0
 
@@ -3661,7 +3658,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 56  
+Estimated cardinality: 25  
 Actual cardinality: 64  
 Orders of magnitude: 0
 
@@ -3679,75 +3676,7 @@ Orders of magnitude: 0
 {"$unwind":"$lineitem"},
 {"$match":{"$nor":[{"lineitem.l_suppkey":2},{"p_type":{"$regex":{"$regex":"^MEDIUM","$options":""}}}]}}],"cursor":{},"idx":53}
 ```
-### >>> Subjoin 53-0
-```
-db.lineitem.aggregate(EJSON.deserialize(
-[
-{"$match":{"$and":[{"l_tax":{"$not":{"$gt":0}}},{"l_suppkey":277}]}}]
-));
-```
-Subjoin plan:
-```
-FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_tax":{"$not":{"$gt":0}}} 
-  -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_suppkey_1 {"l_suppkey":["[277.0, 277.0]"]}
-```
-Estimated cardinality: 1  
-Actual cardinality: 69  
-Orders of magnitude: 1
-
----
-### >>> Subjoin 53-1
-```
-db.lineitem.aggregate(EJSON.deserialize(
-[
-{"$match":{"$and":[{"l_tax":{"$not":{"$gt":0}}},{"l_suppkey":277}]}},
-{"$lookup":{"from":"part","localField":"l_partkey","foreignField":"p_partkey","as":"part","pipeline":[
-{"$match":{"$and":[{"p_type":{"$not":{"$regex":"^MEDIUM"}}},{}]}}]}},
-{"$unwind":"$part"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$part"]}}}]
-));
-```
-Subjoin plan:
-```
-INLJ l_partkey = p_partkey
-  -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_tax":{"$not":{"$gt":0}}} 
-      -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_suppkey_1 {"l_suppkey":["[277.0, 277.0]"]}
-  -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"p_type":{"$not":{"$regex":"^MEDIUM"}}} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
-```
-Estimated cardinality: 1  
-Actual cardinality: 66  
-Orders of magnitude: 1
-
----
-### >>> Subjoin 53-2
-```
-db.lineitem.aggregate(EJSON.deserialize(
-[
-{"$match":{"$and":[{"l_tax":{"$not":{"$gt":0}}},{"l_suppkey":277}]}},
-{"$lookup":{"from":"part","localField":"l_partkey","foreignField":"p_partkey","as":"part","pipeline":[
-{"$match":{"$and":[{"p_type":{"$not":{"$regex":"^MEDIUM"}}},{}]}}]}},
-{"$unwind":"$part"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$part"]}}},
-{"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","as":"partsupp","pipeline":[
-{"$match":{"$and":[{"$and":[{"ps_supplycost":{"$lte":407.57}},{"ps_availqty":{"$lt":6104}},{"$nor":[{"ps_availqty":{"$eq":7813}},{"ps_availqty":{"$lte":4909}},{"ps_availqty":{"$lt":4947}}]}]},{}]}}]}},
-{"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}}]
-));
-```
-Subjoin plan:
-```
-INLJ p_partkey = ps_partkey, lineitem.l_partkey = ps_partkey
-  -> [none] INLJ l_partkey = p_partkey
-      -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_tax":{"$not":{"$gt":0}}} 
-          -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_suppkey_1 {"l_suppkey":["[277.0, 277.0]"]}
-      -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"p_type":{"$not":{"$regex":"^MEDIUM"}}} 
-          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
-  -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$lte":407.57}},{"ps_availqty":{"$lt":6104}},{"$nor":[{"ps_availqty":{"$eq":7813}},{"ps_availqty":{"$lte":4909}},{"ps_availqty":{"$lt":4947}}]}]} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
-```
-Estimated cardinality: 12  
-Actual cardinality: 13  
-Orders of magnitude: 0
-
----
+Test does not currently support joins with multiple predicates over resolved fields.
 ## >>> Command idx 54
 ```
 {"aggregate":"part","pipeline":[
@@ -3851,9 +3780,9 @@ INLJ s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_availqty":{"$gte":5937}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 96  
+Estimated cardinality: 101  
 Actual cardinality: 86  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 58-2
@@ -3878,7 +3807,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$nor":[{"p_comment":{"$regex":"^ "}},{"p_container":{"$not":{"$in":["LG BAG","MED DRUM"]}}}]}
 ```
-Estimated cardinality: 3  
+Estimated cardinality: 5  
 Actual cardinality: 4  
 Orders of magnitude: 0
 
@@ -3977,7 +3906,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$gte":9820}},{"ps_comment":{"$regex":"^ "}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 11  
+Estimated cardinality: 12  
 Actual cardinality: 23  
 Orders of magnitude: 0
 
@@ -4011,7 +3940,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 11  
+Estimated cardinality: 12  
 Actual cardinality: 23  
 Orders of magnitude: 0
 
@@ -4249,7 +4178,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_availqty":{"$not":{"$lte":4022}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 745  
+Estimated cardinality: 775  
 Actual cardinality: 828  
 Orders of magnitude: 0
 
@@ -4333,7 +4262,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$lte":146.47}},{"ps_availqty":{"$gt":5069}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 366  
+Estimated cardinality: 402  
 Actual cardinality: 395  
 Orders of magnitude: 0
 
@@ -4367,7 +4296,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part
 ```
-Estimated cardinality: 366  
+Estimated cardinality: 402  
 Actual cardinality: 395  
 Orders of magnitude: 0
 
@@ -4602,7 +4531,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_availqty":{"$lte":724}},{"ps_availqty":{"$gt":9149}},{"ps_comment":{"$regex":"^y r"}}]},{"$nor":[{"ps_supplycost":{"$eq":770.46}},{"ps_supplycost":{"$lt":546.77}},{"ps_comment":{"$regex":"^quic"}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 183  
+Estimated cardinality: 187  
 Actual cardinality: 358  
 Orders of magnitude: 0
 
@@ -4641,7 +4570,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part
 ```
-Estimated cardinality: 183  
+Estimated cardinality: 187  
 Actual cardinality: 358  
 Orders of magnitude: 0
 
@@ -4723,7 +4652,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^lu"}}
 ```
-Estimated cardinality: 160  
+Estimated cardinality: 256  
 Actual cardinality: 181  
 Orders of magnitude: 0
 
@@ -4744,7 +4673,7 @@ HJ ps_suppkey = s_suppkey
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^lu"}} 
   -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_name":{"$not":{"$eq":"Supplier#000000439"}}},{"s_nationkey":{"$not":{"$eq":19}}}]}
 ```
-Estimated cardinality: 155  
+Estimated cardinality: 247  
 Actual cardinality: 173  
 Orders of magnitude: 0
 
@@ -4770,7 +4699,7 @@ HJ partsupp.ps_partkey = p_partkey
       -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_name":{"$not":{"$eq":"Supplier#000000439"}}},{"s_nationkey":{"$not":{"$eq":19}}}]} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part
 ```
-Estimated cardinality: 155  
+Estimated cardinality: 247  
 Actual cardinality: 173  
 Orders of magnitude: 0
 
@@ -4918,7 +4847,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$lte":161.52}},{"ps_availqty":{"$lt":854}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 21  
+Estimated cardinality: 30  
 Actual cardinality: 6  
 Orders of magnitude: 1
 
@@ -4956,7 +4885,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 21  
+Estimated cardinality: 30  
 Actual cardinality: 6  
 Orders of magnitude: 1
 
@@ -5166,7 +5095,7 @@ INLJ s_nationkey = c_nationkey
   -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"c_mktsegment":{"$not":{"$eq":"BUILDING"}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_nationkey_1
 ```
-Estimated cardinality: 468  
+Estimated cardinality: 470  
 Actual cardinality: 486  
 Orders of magnitude: 0
 
@@ -5195,7 +5124,7 @@ INLJ customer.c_custkey = o_custkey
   -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"o_clerk":{"$not":{"$eq":"Clerk#000000567"}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.orders o_custkey_1
 ```
-Estimated cardinality: 4675  
+Estimated cardinality: 4693  
 Actual cardinality: 4548  
 Orders of magnitude: 0
 
@@ -5218,9 +5147,7 @@ db.supplier.aggregate(EJSON.deserialize(
 ```
 Subjoin plan:
 ```
-HJ l_orderkey = orders.o_orderkey
-  -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem 
-      -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_commitdate_1 {"l_commitdate":["[new Date(-9223372036854775808), new Date(703123200000)]"]}
+HJ orders.o_orderkey = l_orderkey
   -> [none] INLJ customer.c_custkey = o_custkey
       -> [none] INLJ s_nationkey = c_nationkey
           -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_acctbal":{"$lt":4663.08}},{"s_name":{"$eq":"Supplier#000000949"}}]} 
@@ -5229,10 +5156,12 @@ HJ l_orderkey = orders.o_orderkey
               -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_nationkey_1
       -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"o_clerk":{"$not":{"$eq":"Clerk#000000567"}}} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.orders o_custkey_1
+  -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem 
+      -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_commitdate_1 {"l_commitdate":["[new Date(-9223372036854775808), new Date(703123200000)]"]}
 ```
-Estimated cardinality: 94  
+Estimated cardinality: 225  
 Actual cardinality: 387  
-Orders of magnitude: 1
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 81
@@ -5287,7 +5216,7 @@ INLJ p_partkey = ps_partkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$lt":941.7}},{"ps_availqty":{"$gt":5124}},{"ps_availqty":{"$gte":756}}]},{"ps_availqty":{"$lte":854}},{"ps_comment":{"$regex":"^ "}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 7  
+Estimated cardinality: 2  
 Actual cardinality: 6  
 Orders of magnitude: 0
 
@@ -5301,20 +5230,21 @@ db.part.aggregate(EJSON.deserialize(
 {"$match":{"$and":[{"$and":[{"$or":[{"ps_supplycost":{"$lt":941.7}},{"ps_availqty":{"$gt":5124}},{"ps_availqty":{"$gte":756}}]},{"ps_availqty":{"$lte":854}},{"ps_comment":{"$regex":"^ "}}]},{}]}}]}},
 {"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}},
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","as":"supplier","pipeline":[
-{"$match":{"s_acctbal":{"$gt":4269.56}}}]}},
+{"$match":{"$and":[{"s_acctbal":{"$gt":4269.56}},{}]}}]}},
 {"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-HJ partsupp.ps_suppkey = s_suppkey
+INLJ partsupp.ps_suppkey = s_suppkey
   -> [none] INLJ p_partkey = ps_partkey
       -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^egul"}} 
       -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$lt":941.7}},{"ps_availqty":{"$gt":5124}},{"ps_availqty":{"$gte":756}}]},{"ps_availqty":{"$lte":854}},{"ps_comment":{"$regex":"^ "}}]} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
-  -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"s_acctbal":{"$gt":4269.56}}
+  -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"s_acctbal":{"$gt":4269.56}} 
+      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.supplier s_suppkey_1
 ```
-Estimated cardinality: 4  
+Estimated cardinality: 1  
 Actual cardinality: 4  
 Orders of magnitude: 0
 
@@ -5328,7 +5258,7 @@ db.part.aggregate(EJSON.deserialize(
 {"$match":{"$and":[{"$and":[{"$or":[{"ps_supplycost":{"$lt":941.7}},{"ps_availqty":{"$gt":5124}},{"ps_availqty":{"$gte":756}}]},{"ps_availqty":{"$lte":854}},{"ps_comment":{"$regex":"^ "}}]},{}]}}]}},
 {"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}},
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","as":"supplier","pipeline":[
-{"$match":{"s_acctbal":{"$gt":4269.56}}}]}},
+{"$match":{"$and":[{"s_acctbal":{"$gt":4269.56}},{}]}}]}},
 {"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}},
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","as":"nation","pipeline":[
 {"$match":{"n_name":{"$not":{"$in":["FRANCE","RUSSIA"]}}}}]}},
@@ -5338,15 +5268,16 @@ db.part.aggregate(EJSON.deserialize(
 Subjoin plan:
 ```
 HJ supplier.s_nationkey = n_nationkey
-  -> [none] HJ partsupp.ps_suppkey = s_suppkey
+  -> [none] INLJ partsupp.ps_suppkey = s_suppkey
       -> [none] INLJ p_partkey = ps_partkey
           -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^egul"}} 
           -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$lt":941.7}},{"ps_availqty":{"$gt":5124}},{"ps_availqty":{"$gte":756}}]},{"ps_availqty":{"$lte":854}},{"ps_comment":{"$regex":"^ "}}]} 
               -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
-      -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"s_acctbal":{"$gt":4269.56}} 
+      -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"s_acctbal":{"$gt":4269.56}} 
+          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.supplier s_suppkey_1
   -> [nation_s] COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"n_name":{"$not":{"$in":["FRANCE","RUSSIA"]}}}
 ```
-Estimated cardinality: 3  
+Estimated cardinality: 1  
 Actual cardinality: 4  
 Orders of magnitude: 0
 
@@ -5360,7 +5291,7 @@ db.part.aggregate(EJSON.deserialize(
 {"$match":{"$and":[{"$and":[{"$or":[{"ps_supplycost":{"$lt":941.7}},{"ps_availqty":{"$gt":5124}},{"ps_availqty":{"$gte":756}}]},{"ps_availqty":{"$lte":854}},{"ps_comment":{"$regex":"^ "}}]},{}]}}]}},
 {"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}},
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","as":"supplier","pipeline":[
-{"$match":{"s_acctbal":{"$gt":4269.56}}}]}},
+{"$match":{"$and":[{"s_acctbal":{"$gt":4269.56}},{}]}}]}},
 {"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}},
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","as":"nation","pipeline":[
 {"$match":{"n_name":{"$not":{"$in":["FRANCE","RUSSIA"]}}}}]}},
@@ -5372,18 +5303,19 @@ db.part.aggregate(EJSON.deserialize(
 ```
 Subjoin plan:
 ```
-HJ r_regionkey = nation_s.n_regionkey
-  -> [region_s] COLLSCAN: plan_stability_subjoin_cardinality_md.region {"$and":[{"r_name":{"$not":{"$eq":"EUROPE"}}},{"r_name":{"$not":{"$eq":"MIDDLE EAST"}}}]} 
+HJ nation_s.n_regionkey = r_regionkey
   -> [none] HJ supplier.s_nationkey = n_nationkey
-      -> [none] HJ partsupp.ps_suppkey = s_suppkey
+      -> [none] INLJ partsupp.ps_suppkey = s_suppkey
           -> [none] INLJ p_partkey = ps_partkey
               -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^egul"}} 
               -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$lt":941.7}},{"ps_availqty":{"$gt":5124}},{"ps_availqty":{"$gte":756}}]},{"ps_availqty":{"$lte":854}},{"ps_comment":{"$regex":"^ "}}]} 
                   -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
-          -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"s_acctbal":{"$gt":4269.56}} 
-      -> [nation_s] COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"n_name":{"$not":{"$in":["FRANCE","RUSSIA"]}}}
+          -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"s_acctbal":{"$gt":4269.56}} 
+              -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.supplier s_suppkey_1
+      -> [nation_s] COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"n_name":{"$not":{"$in":["FRANCE","RUSSIA"]}}} 
+  -> [region_s] COLLSCAN: plan_stability_subjoin_cardinality_md.region {"$and":[{"r_name":{"$not":{"$eq":"EUROPE"}}},{"r_name":{"$not":{"$eq":"MIDDLE EAST"}}}]}
 ```
-Estimated cardinality: 2  
+Estimated cardinality: 1  
 Actual cardinality: 3  
 Orders of magnitude: 0
 
@@ -5489,7 +5421,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.customer {"$and":[{"c_acctbal":{"$lte":4306.41}},{"c_name":{"$not":{"$eq":"Customer#000008556"}}},{"c_acctbal":{"$not":{"$gte":-540.14}}}]}
 ```
-Estimated cardinality: 720  
+Estimated cardinality: 855  
 Actual cardinality: 657  
 Orders of magnitude: 0
 
@@ -5510,9 +5442,9 @@ HJ c_custkey = o_custkey
   -> [customer] COLLSCAN: plan_stability_subjoin_cardinality_md.customer {"$and":[{"c_acctbal":{"$lte":4306.41}},{"c_name":{"$not":{"$eq":"Customer#000008556"}}},{"c_acctbal":{"$not":{"$gte":-540.14}}}]} 
   -> [orders] COLLSCAN: plan_stability_subjoin_cardinality_md.orders {"o_totalprice":{"$lte":42850.94}}
 ```
-Estimated cardinality: 871  
+Estimated cardinality: 1085  
 Actual cardinality: 815  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 83-2
@@ -5537,7 +5469,7 @@ INLJ orders.o_orderkey = l_orderkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_shipmode":{"$not":{"$in":["AIR","FOB","MAIL","RAIL","REG AIR"]}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 1085  
+Estimated cardinality: 1139  
 Actual cardinality: 322  
 Orders of magnitude: 1
 
@@ -5570,7 +5502,7 @@ HJ s_nationkey = customer.c_nationkey
       -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_shipmode":{"$not":{"$in":["AIR","FOB","MAIL","RAIL","REG AIR"]}}} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 1562  
+Estimated cardinality: 1640  
 Actual cardinality: 468  
 Orders of magnitude: 1
 
@@ -5714,7 +5646,7 @@ HJ supplier.s_suppkey = ps_suppkey
       -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"s_nationkey":{"$not":{"$eq":2}}} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^y "}}
 ```
-Estimated cardinality: 648  
+Estimated cardinality: 782  
 Actual cardinality: 659  
 Orders of magnitude: 0
 
@@ -5786,7 +5718,7 @@ INLJ s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_supplycost":{"$gte":969.52}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 80  
+Estimated cardinality: 92  
 Actual cardinality: 92  
 Orders of magnitude: 0
 
@@ -5800,22 +5732,21 @@ db.supplier.aggregate(EJSON.deserialize(
 {"$match":{"$and":[{"ps_supplycost":{"$gte":969.52}},{}]}}]}},
 {"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}},
 {"$lookup":{"from":"part","localField":"ps_partkey","foreignField":"p_partkey","as":"part","pipeline":[
-{"$match":{"$and":[{"$nor":[{"p_comment":{"$regex":"^ck"}},{"p_type":{"$regex":"^SMALL"}}]},{}]}}]}},
+{"$match":{"$nor":[{"p_comment":{"$regex":"^ck"}},{"p_type":{"$regex":"^SMALL"}}]}}]}},
 {"$unwind":"$part"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$part"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-INLJ partsupp.ps_partkey = p_partkey
+HJ partsupp.ps_partkey = p_partkey
   -> [none] INLJ s_suppkey = ps_suppkey
       -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"o_shippriority":{"$not":{"$gt":0}}} 
           -> IXSCAN: plan_stability_subjoin_cardinality_md.supplier s_nationkey_1 {"s_nationkey":["[17.0, 17.0]"]}
       -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_supplycost":{"$gte":969.52}} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
-  -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"$nor":[{"p_comment":{"$regex":"^ck"}},{"p_type":{"$regex":"^SMALL"}}]} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
+  -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$nor":[{"p_comment":{"$regex":"^ck"}},{"p_type":{"$regex":"^SMALL"}}]}
 ```
-Estimated cardinality: 66  
+Estimated cardinality: 76  
 Actual cardinality: 74  
 Orders of magnitude: 0
 
@@ -5877,7 +5808,7 @@ INLJ p_partkey = ps_partkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$eq":705.79}},{"ps_availqty":{"$lte":4022}}]},{"ps_comment":{"$in":[{"$regex":"^ar d","$options":""},{"$regex":"^ ","$options":""}]}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 23  
+Estimated cardinality: 20  
 Actual cardinality: 23  
 Orders of magnitude: 0
 
@@ -5905,11 +5836,9 @@ INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_linenumber":{"$gte":3}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 28844  
+Estimated cardinality: 285  
 Actual cardinality: 384  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 92
@@ -5935,7 +5864,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_availqty":{"$eq":6218}},{"ps_comment":{"$in":[{"$regex":"^ nag","$options":""},{"$regex":"^t ","$options":""}]}}]},{"ps_availqty":{"$not":{"$gt":7214}}}]}
 ```
-Estimated cardinality: 480  
+Estimated cardinality: 598  
 Actual cardinality: 381  
 Orders of magnitude: 0
 
@@ -5956,7 +5885,7 @@ HJ ps_partkey = p_partkey
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_availqty":{"$eq":6218}},{"ps_comment":{"$in":[{"$regex":"^ nag","$options":""},{"$regex":"^t ","$options":""}]}}]},{"ps_availqty":{"$not":{"$gt":7214}}}]} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part
 ```
-Estimated cardinality: 480  
+Estimated cardinality: 598  
 Actual cardinality: 381  
 Orders of magnitude: 0
 
@@ -5983,11 +5912,9 @@ INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_linenumber":{"$gte":5}},{"l_shipmode":{"$in":["RAIL","REG AIR"]}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 66684  
+Estimated cardinality: 985  
 Actual cardinality: 708  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 93
@@ -6034,7 +5961,7 @@ INLJ s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$nor":[{"ps_supplycost":{"$lt":354.85}},{"ps_comment":{"$regex":"^ pa"}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 1790  
+Estimated cardinality: 1733  
 Actual cardinality: 1782  
 Orders of magnitude: 0
 
@@ -6061,7 +5988,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_size":{"$not":{"$lte":28}}}
 ```
-Estimated cardinality: 750  
+Estimated cardinality: 754  
 Actual cardinality: 773  
 Orders of magnitude: 0
 
@@ -6278,7 +6205,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^ "}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 1739  
+Estimated cardinality: 1402  
 Actual cardinality: 1613  
 Orders of magnitude: 0
 
@@ -6316,7 +6243,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_mfgr":{"$not":{"$in":["Manufacturer#1","Manufacturer#2","Manufacturer#3"]}}}
 ```
-Estimated cardinality: 676  
+Estimated cardinality: 545  
 Actual cardinality: 665  
 Orders of magnitude: 0
 
@@ -6368,7 +6295,7 @@ INLJ s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$not":{"$lt":836.01}}},{"$nor":[{"ps_availqty":{"$lte":5069}},{"ps_availqty":{"$lt":1843}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 276  
+Estimated cardinality: 259  
 Actual cardinality: 255  
 Orders of magnitude: 0
 
@@ -6396,7 +6323,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_mfgr":{"$not":{"$eq":"Manufacturer#3"}}}
 ```
-Estimated cardinality: 213  
+Estimated cardinality: 204  
 Actual cardinality: 198  
 Orders of magnitude: 0
 
@@ -6467,7 +6394,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^ions"}}
 ```
-Estimated cardinality: 40  
+Estimated cardinality: 60  
 Actual cardinality: 38  
 Orders of magnitude: 0
 
@@ -6489,7 +6416,7 @@ INLJ p_partkey = ps_partkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$lte":298}},{"ps_supplycost":{"$lt":707.48}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 3  
+Estimated cardinality: 6  
 Actual cardinality: 5  
 Orders of magnitude: 0
 
@@ -6503,21 +6430,20 @@ db.part.aggregate(EJSON.deserialize(
 {"$match":{"$and":[{"$and":[{"ps_availqty":{"$lte":298}},{"ps_supplycost":{"$lt":707.48}}]},{}]}}]}},
 {"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}},
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","as":"supplier","pipeline":[
-{"$match":{"$and":[{"$nor":[{"s_name":{"$eq":"Supplier#000000547"}},{"s_name":{"$eq":"Supplier#000000906"}}]},{}]}}]}},
+{"$match":{"$nor":[{"s_name":{"$eq":"Supplier#000000547"}},{"s_name":{"$eq":"Supplier#000000906"}}]}}]}},
 {"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-INLJ partsupp.ps_suppkey = s_suppkey
+HJ partsupp.ps_suppkey = s_suppkey
   -> [none] INLJ p_partkey = ps_partkey
       -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^ions"}} 
       -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$lte":298}},{"ps_supplycost":{"$lt":707.48}}]} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
-  -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"$nor":[{"s_name":{"$eq":"Supplier#000000547"}},{"s_name":{"$eq":"Supplier#000000906"}}]} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.supplier s_suppkey_1
+  -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$nor":[{"s_name":{"$eq":"Supplier#000000547"}},{"s_name":{"$eq":"Supplier#000000906"}}]}
 ```
-Estimated cardinality: 3  
+Estimated cardinality: 6  
 Actual cardinality: 5  
 Orders of magnitude: 0
 
@@ -6531,7 +6457,7 @@ db.part.aggregate(EJSON.deserialize(
 {"$match":{"$and":[{"$and":[{"ps_availqty":{"$lte":298}},{"ps_supplycost":{"$lt":707.48}}]},{}]}}]}},
 {"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}},
 {"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","as":"supplier","pipeline":[
-{"$match":{"$and":[{"$nor":[{"s_name":{"$eq":"Supplier#000000547"}},{"s_name":{"$eq":"Supplier#000000906"}}]},{}]}}]}},
+{"$match":{"$nor":[{"s_name":{"$eq":"Supplier#000000547"}},{"s_name":{"$eq":"Supplier#000000906"}}]}}]}},
 {"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}},
 {"$lookup":{"from":"nation","localField":"s_nationkey","foreignField":"n_nationkey","as":"nation","pipeline":[
 {"$match":{"n_regionkey":{"$in":[2,3]}}}]}},
@@ -6541,16 +6467,15 @@ db.part.aggregate(EJSON.deserialize(
 Subjoin plan:
 ```
 HJ supplier.s_nationkey = n_nationkey
-  -> [none] INLJ partsupp.ps_suppkey = s_suppkey
+  -> [none] HJ partsupp.ps_suppkey = s_suppkey
       -> [none] INLJ p_partkey = ps_partkey
           -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^ions"}} 
           -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$lte":298}},{"ps_supplycost":{"$lt":707.48}}]} 
               -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
-      -> [supplier] FETCH: plan_stability_subjoin_cardinality_md.supplier {"$nor":[{"s_name":{"$eq":"Supplier#000000547"}},{"s_name":{"$eq":"Supplier#000000906"}}]} 
-          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.supplier s_suppkey_1
+      -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$nor":[{"s_name":{"$eq":"Supplier#000000547"}},{"s_name":{"$eq":"Supplier#000000906"}}]} 
   -> [nation_s] COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"n_regionkey":{"$in":[2,3]}}
 ```
-Estimated cardinality: 1  
+Estimated cardinality: 2  
 Actual cardinality: 3  
 Orders of magnitude: 0
 
@@ -6628,7 +6553,7 @@ HJ supplier.s_suppkey = ps_suppkey
       -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$nor":[{"s_name":{"$eq":"Supplier#000000290"}},{"s_nationkey":{"$eq":5}}]} 
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$gt":5464}},{"ps_comment":{"$regex":"^p"}}]}
 ```
-Estimated cardinality: 476  
+Estimated cardinality: 462  
 Actual cardinality: 443  
 Orders of magnitude: 0
 
@@ -6659,7 +6584,7 @@ HJ partsupp.ps_partkey = p_partkey
       -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$gt":5464}},{"ps_comment":{"$regex":"^p"}}]} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_mfgr":{"$not":{"$eq":"Manufacturer#1"}}}
 ```
-Estimated cardinality: 384  
+Estimated cardinality: 368  
 Actual cardinality: 359  
 Orders of magnitude: 0
 
@@ -6753,49 +6678,49 @@ Orders of magnitude: 0
 ```
 ### >>> Subjoin 104-0
 ```
-db.supplier.aggregate(EJSON.deserialize(
+db.partsupp.aggregate(EJSON.deserialize(
 [
-{"$match":{"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000103"}},{"s_acctbal":{"$gte":7448.46}}]},{"$nor":[{"s_acctbal":{"$eq":7888.41}},{"s_nationkey":{"$eq":7}}]},{"$nor":[{"s_name":{"$eq":"Supplier#000000803"}},{"o_shippriority":{"$gte":0}}]}]}}]
+{"$match":{"ps_comment":{"$regex":"^bea"}}}]
 ));
 ```
 Subjoin plan:
 ```
-COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000103"}},{"s_acctbal":{"$gte":7448.46}}]},{"$nor":[{"s_acctbal":{"$eq":7888.41}},{"s_nationkey":{"$eq":7}}]},{"$nor":[{"s_name":{"$eq":"Supplier#000000803"}},{"o_shippriority":{"$gte":0}}]}]}
+COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^bea"}}
 ```
-Estimated cardinality: 218  
-Actual cardinality: 218  
-Orders of magnitude: 0
+Estimated cardinality: 85  
+Actual cardinality: 143  
+Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 104-1
 ```
-db.supplier.aggregate(EJSON.deserialize(
+db.partsupp.aggregate(EJSON.deserialize(
 [
-{"$match":{"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000103"}},{"s_acctbal":{"$gte":7448.46}}]},{"$nor":[{"s_acctbal":{"$eq":7888.41}},{"s_nationkey":{"$eq":7}}]},{"$nor":[{"s_name":{"$eq":"Supplier#000000803"}},{"o_shippriority":{"$gte":0}}]}]}},
-{"$lookup":{"from":"partsupp","localField":"s_suppkey","foreignField":"ps_suppkey","as":"partsupp","pipeline":[
-{"$match":{"ps_comment":{"$regex":"^bea"}}}]}},
-{"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}}]
+{"$match":{"ps_comment":{"$regex":"^bea"}}},
+{"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","as":"supplier","pipeline":[
+{"$match":{"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000103"}},{"s_acctbal":{"$gte":7448.46}}]},{"$nor":[{"s_acctbal":{"$eq":7888.41}},{"s_nationkey":{"$eq":7}}]},{"$nor":[{"s_name":{"$eq":"Supplier#000000803"}},{"o_shippriority":{"$gte":0}}]}]}}]}},
+{"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-HJ s_suppkey = ps_suppkey
-  -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000103"}},{"s_acctbal":{"$gte":7448.46}}]},{"$nor":[{"s_acctbal":{"$eq":7888.41}},{"s_nationkey":{"$eq":7}}]},{"$nor":[{"s_name":{"$eq":"Supplier#000000803"}},{"o_shippriority":{"$gte":0}}]}]} 
-  -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^bea"}}
+HJ ps_suppkey = s_suppkey
+  -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^bea"}} 
+  -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000103"}},{"s_acctbal":{"$gte":7448.46}}]},{"$nor":[{"s_acctbal":{"$eq":7888.41}},{"s_nationkey":{"$eq":7}}]},{"$nor":[{"s_name":{"$eq":"Supplier#000000803"}},{"o_shippriority":{"$gte":0}}]}]}
 ```
-Estimated cardinality: 70  
+Estimated cardinality: 19  
 Actual cardinality: 25  
 Orders of magnitude: 0
 
 ---
 ### >>> Subjoin 104-2
 ```
-db.supplier.aggregate(EJSON.deserialize(
+db.partsupp.aggregate(EJSON.deserialize(
 [
-{"$match":{"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000103"}},{"s_acctbal":{"$gte":7448.46}}]},{"$nor":[{"s_acctbal":{"$eq":7888.41}},{"s_nationkey":{"$eq":7}}]},{"$nor":[{"s_name":{"$eq":"Supplier#000000803"}},{"o_shippriority":{"$gte":0}}]}]}},
-{"$lookup":{"from":"partsupp","localField":"s_suppkey","foreignField":"ps_suppkey","as":"partsupp","pipeline":[
-{"$match":{"ps_comment":{"$regex":"^bea"}}}]}},
-{"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}},
+{"$match":{"ps_comment":{"$regex":"^bea"}}},
+{"$lookup":{"from":"supplier","localField":"ps_suppkey","foreignField":"s_suppkey","as":"supplier","pipeline":[
+{"$match":{"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000103"}},{"s_acctbal":{"$gte":7448.46}}]},{"$nor":[{"s_acctbal":{"$eq":7888.41}},{"s_nationkey":{"$eq":7}}]},{"$nor":[{"s_name":{"$eq":"Supplier#000000803"}},{"o_shippriority":{"$gte":0}}]}]}}]}},
+{"$unwind":"$supplier"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$supplier"]}}},
 {"$lookup":{"from":"part","localField":"ps_partkey","foreignField":"p_partkey","as":"part","pipeline":[
 {"$match":{"$and":[{"$nor":[{"p_type":{"$eq":"MEDIUM ANODIZED NICKEL"}},{"p_name":{"$regex":"^b"}}]},{}]}}]}},
 {"$unwind":"$part"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$part"]}}}]
@@ -6804,13 +6729,13 @@ db.supplier.aggregate(EJSON.deserialize(
 Subjoin plan:
 ```
 INLJ partsupp.ps_partkey = p_partkey
-  -> [none] HJ s_suppkey = ps_suppkey
-      -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000103"}},{"s_acctbal":{"$gte":7448.46}}]},{"$nor":[{"s_acctbal":{"$eq":7888.41}},{"s_nationkey":{"$eq":7}}]},{"$nor":[{"s_name":{"$eq":"Supplier#000000803"}},{"o_shippriority":{"$gte":0}}]}]} 
+  -> [none] HJ ps_suppkey = s_suppkey
       -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^bea"}} 
+      -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"$or":[{"s_name":{"$eq":"Supplier#000000103"}},{"s_acctbal":{"$gte":7448.46}}]},{"$nor":[{"s_acctbal":{"$eq":7888.41}},{"s_nationkey":{"$eq":7}}]},{"$nor":[{"s_name":{"$eq":"Supplier#000000803"}},{"o_shippriority":{"$gte":0}}]}]} 
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"$nor":[{"p_type":{"$eq":"MEDIUM ANODIZED NICKEL"}},{"p_name":{"$regex":"^b"}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 62  
+Estimated cardinality: 17  
 Actual cardinality: 21  
 Orders of magnitude: 0
 
@@ -6859,7 +6784,7 @@ INLJ s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$lt":7155}},{"ps_availqty":{"$gt":4947}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 450  
+Estimated cardinality: 431  
 Actual cardinality: 449  
 Orders of magnitude: 0
 
@@ -6886,7 +6811,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part
 ```
-Estimated cardinality: 450  
+Estimated cardinality: 431  
 Actual cardinality: 449  
 Orders of magnitude: 0
 
@@ -6975,7 +6900,7 @@ INLJ s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$lt":6925}},{"ps_availqty":{"$not":{"$eq":298}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 223  
+Estimated cardinality: 222  
 Actual cardinality: 217  
 Orders of magnitude: 0
 
@@ -7002,7 +6927,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$nor":[{"p_type":{"$eq":"ECONOMY BRUSHED COPPER"}},{"p_comment":{"$regex":"^s"}}]}
 ```
-Estimated cardinality: 205  
+Estimated cardinality: 203  
 Actual cardinality: 199  
 Orders of magnitude: 0
 
@@ -7045,7 +6970,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$lt":72.58}},{"$nor":[{"ps_availqty":{"$lt":9806}},{"ps_comment":{"$regex":"^i"}}]}]}
 ```
-Estimated cardinality: 80  
+Estimated cardinality: 85  
 Actual cardinality: 96  
 Orders of magnitude: 0
 
@@ -7067,7 +6992,7 @@ INLJ ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 80  
+Estimated cardinality: 85  
 Actual cardinality: 96  
 Orders of magnitude: 0
 
@@ -7095,11 +7020,9 @@ INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_linenumber":{"$not":{"$gt":6}}},{"$nor":[{"l_orderkey":{"$eq":342531}},{"l_suppkey":{"$eq":237}},{"l_suppkey":{"$eq":40}},{"l_linenumber":{"$lte":3}},{"l_shipdate":{"$lte":"1992-11-11T00:00:00.000Z"}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 54816  
+Estimated cardinality: 612  
 Actual cardinality: 842  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 111
@@ -7146,72 +7069,7 @@ Query is not eligible, as it does not have an SBE-only plan.
 {"$unwind":"$lineitem"},
 {"$match":{"$nor":[{"lineitem.l_shipinstruct":"DELIVER IN PERSON"},{"p_comment":{"$regex":{"$regex":"^uick","$options":""}}}]}}],"cursor":{},"idx":113}
 ```
-### >>> Subjoin 113-0
-```
-db.lineitem.aggregate(EJSON.deserialize(
-[
-{"$match":{"$and":[{"$or":[{"l_orderkey":{"$eq":100355}},{"l_shipinstruct":{"$eq":"DELIVER IN PERSON"}}]},{"l_shipinstruct":{"$not":{"$eq":"DELIVER IN PERSON"}}}]}}]
-));
-```
-Subjoin plan:
-```
-COLLSCAN: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"$or":[{"l_orderkey":{"$eq":100355}},{"l_shipinstruct":{"$eq":"DELIVER IN PERSON"}}]},{"l_shipinstruct":{"$not":{"$eq":"DELIVER IN PERSON"}}}]}
-```
-Estimated cardinality: 1  
-Actual cardinality: 4  
-Orders of magnitude: 0
-
----
-### >>> Subjoin 113-1
-```
-db.lineitem.aggregate(EJSON.deserialize(
-[
-{"$match":{"$and":[{"$or":[{"l_orderkey":{"$eq":100355}},{"l_shipinstruct":{"$eq":"DELIVER IN PERSON"}}]},{"l_shipinstruct":{"$not":{"$eq":"DELIVER IN PERSON"}}}]}},
-{"$lookup":{"from":"part","localField":"l_partkey","foreignField":"p_partkey","as":"part","pipeline":[
-{"$match":{"$and":[{"p_comment":{"$not":{"$regex":"^uick"}}},{}]}}]}},
-{"$unwind":"$part"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$part"]}}}]
-));
-```
-Subjoin plan:
-```
-INLJ l_partkey = p_partkey
-  -> [lineitem] COLLSCAN: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"$or":[{"l_orderkey":{"$eq":100355}},{"l_shipinstruct":{"$eq":"DELIVER IN PERSON"}}]},{"l_shipinstruct":{"$not":{"$eq":"DELIVER IN PERSON"}}}]} 
-  -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$not":{"$regex":"^uick"}}} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
-```
-Estimated cardinality: 1  
-Actual cardinality: 4  
-Orders of magnitude: 0
-
----
-### >>> Subjoin 113-2
-```
-db.lineitem.aggregate(EJSON.deserialize(
-[
-{"$match":{"$and":[{"$or":[{"l_orderkey":{"$eq":100355}},{"l_shipinstruct":{"$eq":"DELIVER IN PERSON"}}]},{"l_shipinstruct":{"$not":{"$eq":"DELIVER IN PERSON"}}}]}},
-{"$lookup":{"from":"part","localField":"l_partkey","foreignField":"p_partkey","as":"part","pipeline":[
-{"$match":{"$and":[{"p_comment":{"$not":{"$regex":"^uick"}}},{}]}}]}},
-{"$unwind":"$part"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$part"]}}},
-{"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","as":"partsupp","pipeline":[
-{"$match":{"$and":[{"$and":[{"$or":[{"ps_supplycost":{"$eq":136.6}},{"ps_supplycost":{"$gt":889.05}},{"ps_comment":{"$regex":"^eque"}}]},{"ps_comment":{"$regex":"^."}},{"ps_comment":{"$not":{"$regex":"^ve"}}}]},{}]}}]}},
-{"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}}]
-));
-```
-Subjoin plan:
-```
-INLJ p_partkey = ps_partkey, lineitem.l_partkey = ps_partkey
-  -> [none] INLJ l_partkey = p_partkey
-      -> [lineitem] COLLSCAN: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"$or":[{"l_orderkey":{"$eq":100355}},{"l_shipinstruct":{"$eq":"DELIVER IN PERSON"}}]},{"l_shipinstruct":{"$not":{"$eq":"DELIVER IN PERSON"}}}]} 
-      -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$not":{"$regex":"^uick"}}} 
-          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
-  -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$eq":136.6}},{"ps_supplycost":{"$gt":889.05}},{"ps_comment":{"$regex":"^eque"}}]},{"ps_comment":{"$regex":"^."}},{"ps_comment":{"$not":{"$regex":"^ve"}}}]} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
-```
-Estimated cardinality: 33  
-Actual cardinality: 1  
-Orders of magnitude: 1
-
----
+Test does not currently support joins with multiple predicates over resolved fields.
 ## >>> Command idx 114
 ```
 {"aggregate":"lineitem","pipeline":[
@@ -7238,9 +7096,9 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.customer {"$and":[{"$or":[{"c_mktsegment":{"$in":["AUTOMOBILE","FURNITURE"]}},{"c_name":{"$in":["Customer#000002309","Customer#000013077"]}}]},{"c_name":{"$eq":"Customer#000010639"}}]}
 ```
-Estimated cardinality: 1  
+Estimated cardinality: 15  
 Actual cardinality: 1  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 114-1
@@ -7260,9 +7118,9 @@ INLJ c_custkey = o_custkey
   -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"$and":[{"o_orderdate":{"$lte":"1995-02-03T00:00:00.000Z"}},{"o_shippriority":{"$lte":0}},{"o_totalprice":{"$lte":116740.24}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.orders o_custkey_1
 ```
-Estimated cardinality: 2  
+Estimated cardinality: 27  
 Actual cardinality: 6  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 114-2
@@ -7288,9 +7146,9 @@ INLJ orders.o_orderkey = l_orderkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_returnflag":{"$in":["N","R"]}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 6  
+Estimated cardinality: 84  
 Actual cardinality: 6  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 114-3
@@ -7321,9 +7179,9 @@ HJ customer.c_nationkey = s_nationkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
   -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"s_name":{"$not":{"$eq":"Supplier#000000119"}}}
 ```
-Estimated cardinality: 245  
+Estimated cardinality: 3348  
 Actual cardinality: 246  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ## >>> Command idx 115
@@ -7405,7 +7263,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$not":{"$lt":2302}}},{"$nor":[{"ps_supplycost":{"$lte":892.51}},{"ps_supplycost":{"$lt":175.44}},{"ps_comment":{"$regex":"^ordi"}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 43  
+Estimated cardinality: 49  
 Actual cardinality: 27  
 Orders of magnitude: 0
 
@@ -7439,7 +7297,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 43  
+Estimated cardinality: 49  
 Actual cardinality: 27  
 Orders of magnitude: 0
 
@@ -7647,7 +7505,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_brand":{"$not":{"$in":["Brand#24","Brand#31","Brand#44"]}}}
 ```
-Estimated cardinality: 161  
+Estimated cardinality: 159  
 Actual cardinality: 139  
 Orders of magnitude: 0
 
@@ -7898,7 +7756,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$lt":7155}},{"ps_comment":{"$regex":"^s. "}},{"ps_comment":{"$not":{"$regex":"^ "}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 124  
+Estimated cardinality: 154  
 Actual cardinality: 124  
 Orders of magnitude: 0
 
@@ -7930,7 +7788,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_name":{"$regex":"^co"}}
 ```
-Estimated cardinality: 4  
+Estimated cardinality: 5  
 Actual cardinality: 6  
 Orders of magnitude: 0
 
@@ -8083,7 +7941,7 @@ INLJ s_nationkey = c_nationkey
   -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$and":[{"c_acctbal":{"$lte":2998.55}},{"$nor":[{"c_mktsegment":{"$eq":"AUTOMOBILE"}},{"c_mktsegment":{"$eq":"AUTOMOBILE"}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_nationkey_1
 ```
-Estimated cardinality: 184  
+Estimated cardinality: 175  
 Actual cardinality: 186  
 Orders of magnitude: 0
 
@@ -8111,7 +7969,7 @@ INLJ customer.c_custkey = o_custkey
   -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"$and":[{"$or":[{"o_totalprice":{"$lt":37208.13}},{"o_shippriority":{"$gt":0}}]},{"$or":[{"o_totalprice":{"$lt":141506.52}},{"o_shippriority":{"$gt":0}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.orders o_custkey_1
 ```
-Estimated cardinality: 171  
+Estimated cardinality: 196  
 Actual cardinality: 177  
 Orders of magnitude: 0
 
@@ -8145,9 +8003,9 @@ INLJ orders.o_orderkey = l_orderkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_shipmode":{"$eq":"RAIL"}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 99  
+Estimated cardinality: 104  
 Actual cardinality: 23  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ## >>> Command idx 127
@@ -8197,7 +8055,7 @@ INLJ s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$lte":7831}},{"ps_comment":{"$regex":"^ar"}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 37  
+Estimated cardinality: 18  
 Actual cardinality: 34  
 Orders of magnitude: 0
 
@@ -8226,7 +8084,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"p_size":{"$not":{"$gt":40}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 30  
+Estimated cardinality: 15  
 Actual cardinality: 27  
 Orders of magnitude: 0
 
@@ -8318,75 +8176,7 @@ Orders of magnitude: 0
 {"$unwind":"$lineitem"},
 {"$match":{"$nor":[{"p_mfgr":"Manufacturer#2"},{"lineitem.l_shipinstruct":"NONE"}]}}],"cursor":{},"idx":129}
 ```
-### >>> Subjoin 129-0
-```
-db.lineitem.aggregate(EJSON.deserialize(
-[
-{"$match":{"$and":[{"$and":[{"l_shipinstruct":{"$not":{"$eq":"NONE"}}},{"l_tax":{"$lte":0.01}}]},{"l_commitdate":"1993-03-17T00:00:00.000Z"}]}}]
-));
-```
-Subjoin plan:
-```
-FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_shipinstruct":{"$not":{"$eq":"NONE"}}},{"l_tax":{"$lte":0.01}}]} 
-  -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_commitdate_1 {"l_commitdate":["[new Date(732326400000), new Date(732326400000)]"]}
-```
-Estimated cardinality: 1  
-Actual cardinality: 38  
-Orders of magnitude: 1
-
----
-### >>> Subjoin 129-1
-```
-db.lineitem.aggregate(EJSON.deserialize(
-[
-{"$match":{"$and":[{"$and":[{"l_shipinstruct":{"$not":{"$eq":"NONE"}}},{"l_tax":{"$lte":0.01}}]},{"l_commitdate":"1993-03-17T00:00:00.000Z"}]}},
-{"$lookup":{"from":"part","localField":"l_partkey","foreignField":"p_partkey","as":"part","pipeline":[
-{"$match":{"$and":[{"p_mfgr":{"$not":{"$eq":"Manufacturer#2"}}},{}]}}]}},
-{"$unwind":"$part"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$part"]}}}]
-));
-```
-Subjoin plan:
-```
-INLJ l_partkey = p_partkey
-  -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_shipinstruct":{"$not":{"$eq":"NONE"}}},{"l_tax":{"$lte":0.01}}]} 
-      -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_commitdate_1 {"l_commitdate":["[new Date(732326400000), new Date(732326400000)]"]}
-  -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"p_mfgr":{"$not":{"$eq":"Manufacturer#2"}}} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
-```
-Estimated cardinality: 1  
-Actual cardinality: 32  
-Orders of magnitude: 1
-
----
-### >>> Subjoin 129-2
-```
-db.lineitem.aggregate(EJSON.deserialize(
-[
-{"$match":{"$and":[{"$and":[{"l_shipinstruct":{"$not":{"$eq":"NONE"}}},{"l_tax":{"$lte":0.01}}]},{"l_commitdate":"1993-03-17T00:00:00.000Z"}]}},
-{"$lookup":{"from":"part","localField":"l_partkey","foreignField":"p_partkey","as":"part","pipeline":[
-{"$match":{"$and":[{"p_mfgr":{"$not":{"$eq":"Manufacturer#2"}}},{}]}}]}},
-{"$unwind":"$part"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$part"]}}},
-{"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","as":"partsupp","pipeline":[
-{"$match":{"$and":[{"$nor":[{"ps_supplycost":{"$gt":355.65}},{"ps_supplycost":{"$gte":47.26}}]},{}]}}]}},
-{"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}}]
-));
-```
-Subjoin plan:
-```
-INLJ p_partkey = ps_partkey, lineitem.l_partkey = ps_partkey
-  -> [none] INLJ l_partkey = p_partkey
-      -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_shipinstruct":{"$not":{"$eq":"NONE"}}},{"l_tax":{"$lte":0.01}}]} 
-          -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_commitdate_1 {"l_commitdate":["[new Date(732326400000), new Date(732326400000)]"]}
-      -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"p_mfgr":{"$not":{"$eq":"Manufacturer#2"}}} 
-          -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
-  -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$nor":[{"ps_supplycost":{"$gt":355.65}},{"ps_supplycost":{"$gte":47.26}}]} 
-      -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
-```
-Estimated cardinality: 9  
-Actual cardinality: 3  
-Orders of magnitude: 0
-
----
+Test does not currently support joins with multiple predicates over resolved fields.
 ## >>> Command idx 130
 ```
 {"aggregate":"partsupp","pipeline":[
@@ -8488,9 +8278,9 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^li"}}
 ```
-Estimated cardinality: 160  
+Estimated cardinality: 80  
 Actual cardinality: 132  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 131-1
@@ -8510,7 +8300,7 @@ INLJ p_partkey = ps_partkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$lte":17.49}},{"ps_supplycost":{"$not":{"$gt":944.57}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 6  
+Estimated cardinality: 5  
 Actual cardinality: 10  
 Orders of magnitude: 1
 
@@ -8538,11 +8328,9 @@ INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_discount":{"$gte":0.02}},{"$nor":[{"l_linestatus":{"$eq":"O"}},{"l_linenumber":{"$lt":5}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 1166  
+Estimated cardinality: 13  
 Actual cardinality: 20  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 132
@@ -8570,7 +8358,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_comment":{"$regex":"^s. "}},{"$nor":[{"ps_availqty":{"$lte":758}},{"ps_supplycost":{"$gt":705.79}},{"ps_comment":{"$regex":"^req"}}]},{"$nor":[{"ps_comment":{"$regex":"^. "}},{"ps_comment":{"$regex":"^ea"}}]}]}
 ```
-Estimated cardinality: 720  
+Estimated cardinality: 854  
 Actual cardinality: 924  
 Orders of magnitude: 0
 
@@ -8591,7 +8379,7 @@ HJ ps_partkey = p_partkey
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_comment":{"$regex":"^s. "}},{"$nor":[{"ps_availqty":{"$lte":758}},{"ps_supplycost":{"$gt":705.79}},{"ps_comment":{"$regex":"^req"}}]},{"$nor":[{"ps_comment":{"$regex":"^. "}},{"ps_comment":{"$regex":"^ea"}}]}]} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_retailprice":{"$not":{"$gte":1103.19}}}
 ```
-Estimated cardinality: 146  
+Estimated cardinality: 162  
 Actual cardinality: 183  
 Orders of magnitude: 0
 
@@ -8617,7 +8405,7 @@ HJ partsupp.ps_suppkey = s_suppkey
       -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_retailprice":{"$not":{"$gte":1103.19}}} 
   -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_name":{"$not":{"$eq":"Supplier#000000556"}}},{"s_name":{"$not":{"$eq":"Supplier#000000046"}}},{"s_nationkey":{"$not":{"$eq":9}}}]}
 ```
-Estimated cardinality: 139  
+Estimated cardinality: 155  
 Actual cardinality: 177  
 Orders of magnitude: 0
 
@@ -8647,9 +8435,9 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^b"}}
 ```
-Estimated cardinality: 1120  
+Estimated cardinality: 512  
 Actual cardinality: 1021  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 133-1
@@ -8668,7 +8456,7 @@ HJ ps_partkey = p_partkey
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^b"}} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$nor":[{"p_brand":{"$eq":"Brand#15"}},{"p_mfgr":{"$in":["Manufacturer#1","Manufacturer#3"]}}]}
 ```
-Estimated cardinality: 648  
+Estimated cardinality: 299  
 Actual cardinality: 588  
 Orders of magnitude: 0
 
@@ -8688,13 +8476,13 @@ db.partsupp.aggregate(EJSON.deserialize(
 ```
 Subjoin plan:
 ```
-HJ s_suppkey = partsupp.ps_suppkey
-  -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_acctbal":{"$gte":2800.6}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000062"}},{"o_orderpriority":{"$eq":"1-URGENT"}}]}]} 
+HJ partsupp.ps_suppkey = s_suppkey
   -> [none] HJ ps_partkey = p_partkey
       -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^b"}} 
-      -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$nor":[{"p_brand":{"$eq":"Brand#15"}},{"p_mfgr":{"$in":["Manufacturer#1","Manufacturer#3"]}}]}
+      -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$nor":[{"p_brand":{"$eq":"Brand#15"}},{"p_mfgr":{"$in":["Manufacturer#1","Manufacturer#3"]}}]} 
+  -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_acctbal":{"$gte":2800.6}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000062"}},{"o_orderpriority":{"$eq":"1-URGENT"}}]}]}
 ```
-Estimated cardinality: 419  
+Estimated cardinality: 193  
 Actual cardinality: 386  
 Orders of magnitude: 0
 
@@ -8719,13 +8507,13 @@ Subjoin plan:
 ```
 HJ n_nationkey = supplier.s_nationkey
   -> [nation_s] COLLSCAN: plan_stability_subjoin_cardinality_md.nation {"$nor":[{"n_name":{"$eq":"UNITED STATES"}},{"n_name":{"$eq":"CHINA"}}]} 
-  -> [none] HJ s_suppkey = partsupp.ps_suppkey
-      -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_acctbal":{"$gte":2800.6}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000062"}},{"o_orderpriority":{"$eq":"1-URGENT"}}]}]} 
+  -> [none] HJ partsupp.ps_suppkey = s_suppkey
       -> [none] HJ ps_partkey = p_partkey
           -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^b"}} 
-          -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$nor":[{"p_brand":{"$eq":"Brand#15"}},{"p_mfgr":{"$in":["Manufacturer#1","Manufacturer#3"]}}]}
+          -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$nor":[{"p_brand":{"$eq":"Brand#15"}},{"p_mfgr":{"$in":["Manufacturer#1","Manufacturer#3"]}}]} 
+      -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_acctbal":{"$gte":2800.6}},{"$nor":[{"o_clerk":{"$eq":"Clerk#000000062"}},{"o_orderpriority":{"$eq":"1-URGENT"}}]}]}
 ```
-Estimated cardinality: 385  
+Estimated cardinality: 177  
 Actual cardinality: 346  
 Orders of magnitude: 0
 
@@ -8752,7 +8540,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^x"}}
 ```
-Estimated cardinality: 120  
+Estimated cardinality: 140  
 Actual cardinality: 119  
 Orders of magnitude: 0
 
@@ -8774,7 +8562,7 @@ INLJ p_partkey = ps_partkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_supplycost":{"$lt":892.51}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 431  
+Estimated cardinality: 500  
 Actual cardinality: 430  
 Orders of magnitude: 0
 
@@ -8801,7 +8589,7 @@ HJ s_suppkey = partsupp.ps_suppkey
       -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_supplycost":{"$lt":892.51}} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 78  
+Estimated cardinality: 90  
 Actual cardinality: 74  
 Orders of magnitude: 0
 
@@ -8830,7 +8618,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$lt":240.39}},{"ps_comment":{"$regex":"^lu"}}]},{"ps_comment":{"$regex":"^ f"}}]}
 ```
-Estimated cardinality: 160  
+Estimated cardinality: 256  
 Actual cardinality: 269  
 Orders of magnitude: 0
 
@@ -8851,7 +8639,7 @@ HJ ps_partkey = p_partkey
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$lt":240.39}},{"ps_comment":{"$regex":"^lu"}}]},{"ps_comment":{"$regex":"^ f"}}]} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_container":{"$in":["LG CAN","WRAP CAN","WRAP PACK"]}}
 ```
-Estimated cardinality: 10  
+Estimated cardinality: 20  
 Actual cardinality: 18  
 Orders of magnitude: 0
 
@@ -8878,11 +8666,9 @@ INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_shipinstruct":{"$eq":"DELIVER IN PERSON"}},{"l_discount":{"$lte":0.09}},{"l_shipmode":{"$in":["RAIL","REG AIR"]}},{"l_tax":{"$not":{"$lte":0.06}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 555  
+Estimated cardinality: 8  
 Actual cardinality: 6  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 136
@@ -8943,7 +8729,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^aref"}}
 ```
-Estimated cardinality: 560  
+Estimated cardinality: 256  
 Actual cardinality: 399  
 Orders of magnitude: 0
 
@@ -8964,7 +8750,7 @@ HJ ps_suppkey = s_suppkey
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^aref"}} 
   -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"s_acctbal":{"$lte":5704.81}}
 ```
-Estimated cardinality: 338  
+Estimated cardinality: 154  
 Actual cardinality: 231  
 Orders of magnitude: 0
 
@@ -8990,7 +8776,7 @@ HJ partsupp.ps_partkey = p_partkey
       -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"s_acctbal":{"$lte":5704.81}} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_size":{"$not":{"$eq":15}}}
 ```
-Estimated cardinality: 333  
+Estimated cardinality: 152  
 Actual cardinality: 222  
 Orders of magnitude: 0
 
@@ -9068,7 +8854,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$gt":3160}},{"ps_availqty":{"$gt":9530}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 3  
+Estimated cardinality: 4  
 Actual cardinality: 3  
 Orders of magnitude: 0
 
@@ -9101,7 +8887,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"p_type":{"$not":{"$eq":"LARGE POLISHED COPPER"}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 3  
+Estimated cardinality: 4  
 Actual cardinality: 3  
 Orders of magnitude: 0
 
@@ -9205,9 +8991,9 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$lte":836.01}},{"ps_supplycost":{"$gt":498.13}},{"ps_comment":{"$regex":"^b"}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 18  
+Estimated cardinality: 3  
 Actual cardinality: 7  
-Orders of magnitude: 1
+Orders of magnitude: 0
 
 ---
 ### >>> Subjoin 141-3
@@ -9239,9 +9025,9 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"p_type":{"$not":{"$eq":"STANDARD POLISHED BRASS"}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 18  
+Estimated cardinality: 3  
 Actual cardinality: 7  
-Orders of magnitude: 1
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 142
@@ -9267,7 +9053,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$not":{"$lte":485.1}}},{"ps_availqty":{"$not":{"$lt":9913}}}]}
 ```
-Estimated cardinality: 400  
+Estimated cardinality: 342  
 Actual cardinality: 358  
 Orders of magnitude: 0
 
@@ -9288,7 +9074,7 @@ HJ ps_partkey = p_partkey
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$not":{"$lte":485.1}}},{"ps_availqty":{"$not":{"$lt":9913}}}]} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^e"}}
 ```
-Estimated cardinality: 38  
+Estimated cardinality: 34  
 Actual cardinality: 31  
 Orders of magnitude: 0
 
@@ -9315,11 +9101,9 @@ INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_shipmode":{"$in":["REG AIR","TRUCK"]}},{"l_orderkey":{"$not":{"$eq":555271}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 28572  
+Estimated cardinality: 291  
 Actual cardinality: 264  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 143
@@ -9472,7 +9256,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^y"}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 486  
+Estimated cardinality: 464  
 Actual cardinality: 412  
 Orders of magnitude: 0
 
@@ -9591,7 +9375,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$nor":[{"ps_availqty":{"$eq":7854}},{"ps_supplycost":{"$gt":705.79}},{"ps_comment":{"$regex":"^bold"}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 111  
+Estimated cardinality: 112  
 Actual cardinality: 676  
 Orders of magnitude: 0
 
@@ -9630,7 +9414,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_partkey":{"$not":{"$eq":15534}}}
 ```
-Estimated cardinality: 111  
+Estimated cardinality: 112  
 Actual cardinality: 676  
 Orders of magnitude: 0
 
@@ -9678,7 +9462,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_type":{"$eq":"PROMO BRUSHED NICKEL"}}
 ```
-Estimated cardinality: 100  
+Estimated cardinality: 140  
 Actual cardinality: 148  
 Orders of magnitude: 0
 
@@ -9700,7 +9484,7 @@ INLJ p_partkey = ps_partkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_supplycost":{"$gt":257.33}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 301  
+Estimated cardinality: 406  
 Actual cardinality: 431  
 Orders of magnitude: 0
 
@@ -9727,7 +9511,7 @@ HJ partsupp.ps_suppkey = s_suppkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
   -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_acctbal":{"$gte":1050.66}},{"s_acctbal":{"$gte":1050.66}}]}
 ```
-Estimated cardinality: 244  
+Estimated cardinality: 329  
 Actual cardinality: 348  
 Orders of magnitude: 0
 
@@ -9759,7 +9543,7 @@ HJ n_nationkey = supplier.s_nationkey
               -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
       -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_acctbal":{"$gte":1050.66}},{"s_acctbal":{"$gte":1050.66}}]}
 ```
-Estimated cardinality: 205  
+Estimated cardinality: 276  
 Actual cardinality: 285  
 Orders of magnitude: 0
 
@@ -9942,7 +9726,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_availqty":{"$not":{"$lte":7969}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 562  
+Estimated cardinality: 593  
 Actual cardinality: 769  
 Orders of magnitude: 0
 
@@ -10216,7 +10000,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^f"}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 333  
+Estimated cardinality: 261  
 Actual cardinality: 258  
 Orders of magnitude: 0
 
@@ -10475,7 +10259,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^ts "}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 4  
+Estimated cardinality: 5  
 Actual cardinality: 20  
 Orders of magnitude: 1
 
@@ -10514,7 +10298,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 4  
+Estimated cardinality: 5  
 Actual cardinality: 20  
 Orders of magnitude: 1
 
@@ -10594,7 +10378,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_availqty":{"$not":{"$lte":5124}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 397  
+Estimated cardinality: 396  
 Actual cardinality: 902  
 Orders of magnitude: 0
 
@@ -10717,7 +10501,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$eq":739.85}},{"ps_comment":{"$regex":"^ i"}}]},{"ps_comment":{"$not":{"$regex":"^si"}}}]}
 ```
-Estimated cardinality: 960  
+Estimated cardinality: 427  
 Actual cardinality: 724  
 Orders of magnitude: 0
 
@@ -10738,7 +10522,7 @@ HJ ps_partkey = p_partkey
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$eq":739.85}},{"ps_comment":{"$regex":"^ i"}}]},{"ps_comment":{"$not":{"$regex":"^si"}}}]} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$and":[{"p_retailprice":{"$gt":1416.49}},{"p_size":{"$gt":22}}]}
 ```
-Estimated cardinality: 261  
+Estimated cardinality: 119  
 Actual cardinality: 201  
 Orders of magnitude: 0
 
@@ -10765,11 +10549,9 @@ INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_quantity":{"$gt":33}},{"l_shipinstruct":{"$in":["DELIVER IN PERSON","TAKE BACK RETURN"]}},{"$nor":[{"l_linenumber":{"$gt":3}},{"l_quantity":{"$gte":47}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 52877  
+Estimated cardinality: 294  
 Actual cardinality: 508  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 167
@@ -10879,7 +10661,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$not":{"$regex":"^d"}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 512  
+Estimated cardinality: 507  
 Actual cardinality: 791  
 Orders of magnitude: 0
 
@@ -10960,7 +10742,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_availqty":{"$lt":4038}},{"ps_comment":{"$regex":"^ts i"}}]},{"ps_comment":{"$not":{"$regex":"^sly"}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 942  
+Estimated cardinality: 873  
 Actual cardinality: 768  
 Orders of magnitude: 0
 
@@ -10992,7 +10774,7 @@ HJ p_partkey = partsupp.ps_partkey
       -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_availqty":{"$lt":4038}},{"ps_comment":{"$regex":"^ts i"}}]},{"ps_comment":{"$not":{"$regex":"^sly"}}}]} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 3  
+Estimated cardinality: 5  
 Actual cardinality: 4  
 Orders of magnitude: 0
 
@@ -11103,7 +10885,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^ly "}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 201  
+Estimated cardinality: 137  
 Actual cardinality: 355  
 Orders of magnitude: 0
 
@@ -11180,7 +10962,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$gte":9209}},{"ps_supplycost":{"$gte":773.39}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 19  
+Estimated cardinality: 30  
 Actual cardinality: 18  
 Orders of magnitude: 0
 
@@ -11292,7 +11074,7 @@ HJ supplier.s_suppkey = ps_suppkey
       -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"s_name":{"$not":{"$eq":"Supplier#000000390"}}} 
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^d"}}
 ```
-Estimated cardinality: 292  
+Estimated cardinality: 442  
 Actual cardinality: 309  
 Orders of magnitude: 0
 
@@ -11328,7 +11110,7 @@ HJ partsupp.ps_partkey = p_partkey
       -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^d"}} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_partkey":{"$not":{"$eq":14923}}}
 ```
-Estimated cardinality: 292  
+Estimated cardinality: 442  
 Actual cardinality: 309  
 Orders of magnitude: 0
 
@@ -11404,7 +11186,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_availqty":{"$not":{"$gte":724}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 128  
+Estimated cardinality: 132  
 Actual cardinality: 136  
 Orders of magnitude: 0
 
@@ -11600,7 +11382,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^ar "}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 2  
+Estimated cardinality: 1  
 Actual cardinality: 6  
 Orders of magnitude: 0
 
@@ -11649,7 +11431,7 @@ INLJ s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$gte":210.63}},{"ps_comment":{"$regex":"^ pac"}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 24  
+Estimated cardinality: 26  
 Actual cardinality: 27  
 Orders of magnitude: 0
 
@@ -11677,7 +11459,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"$nor":[{"p_mfgr":{"$eq":"Manufacturer#5"}},{"p_partkey":{"$eq":14703}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 20  
+Estimated cardinality: 21  
 Actual cardinality: 24  
 Orders of magnitude: 0
 
@@ -11790,7 +11572,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$not":{"$regex":"^fin"}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 63  
+Estimated cardinality: 64  
 Actual cardinality: 159  
 Orders of magnitude: 1
 
@@ -11874,7 +11656,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_availqty":{"$lt":3930}},{"ps_supplycost":{"$gt":889.05}}]},{"$or":[{"ps_availqty":{"$gte":6415}},{"ps_comment":{"$regex":"^th"}}]},{"ps_supplycost":{"$not":{"$gt":670.76}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 28  
+Estimated cardinality: 15  
 Actual cardinality: 32  
 Orders of magnitude: 0
 
@@ -11908,7 +11690,7 @@ INLJ partsupp.ps_partkey = p_partkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.part {"p_name":{"$regex":"^bisq"}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.part p_partkey_1
 ```
-Estimated cardinality: 1  
+Estimated cardinality: 0  
 Actual cardinality: 1  
 Orders of magnitude: 0
 
@@ -12265,7 +12047,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_availqty":{"$lt":9806}},{"ps_supplycost":{"$gt":164.22}},{"$nor":[{"ps_availqty":{"$gte":5275}},{"ps_comment":{"$regex":"^fil"}},{"ps_comment":{"$regex":"^s"}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 223  
+Estimated cardinality: 218  
 Actual cardinality: 1012  
 Orders of magnitude: 1
 
@@ -12303,7 +12085,7 @@ HJ partsupp.ps_partkey = p_partkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_name":{"$regex":"^h"}}
 ```
-Estimated cardinality: 6  
+Estimated cardinality: 3  
 Actual cardinality: 22  
 Orders of magnitude: 1
 
@@ -12335,7 +12117,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^rio"}}
 ```
-Estimated cardinality: 180  
+Estimated cardinality: 100  
 Actual cardinality: 110  
 Orders of magnitude: 0
 
@@ -12357,7 +12139,7 @@ INLJ p_partkey = ps_partkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_comment":{"$not":{"$regex":"^ si"}}},{"$nor":[{"ps_availqty":{"$eq":1972}},{"ps_availqty":{"$gte":9410}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 682  
+Estimated cardinality: 371  
 Actual cardinality: 415  
 Orders of magnitude: 0
 
@@ -12384,7 +12166,7 @@ HJ partsupp.ps_suppkey = s_suppkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
   -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_name":{"$not":{"$eq":"Supplier#000000904"}}},{"s_name":{"$not":{"$eq":"Supplier#000000162"}}}]}
 ```
-Estimated cardinality: 680  
+Estimated cardinality: 370  
 Actual cardinality: 413  
 Orders of magnitude: 0
 
@@ -12417,9 +12199,9 @@ HJ n_nationkey = supplier.s_nationkey
               -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
       -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_name":{"$not":{"$eq":"Supplier#000000904"}}},{"s_name":{"$not":{"$eq":"Supplier#000000162"}}}]}
 ```
-Estimated cardinality: 136  
+Estimated cardinality: 74  
 Actual cardinality: 75  
-Orders of magnitude: 1
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 187
@@ -12726,7 +12508,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$lt":780.26}},{"ps_supplycost":{"$gte":636.17}},{"ps_comment":{"$in":[{"$regex":"^ f","$options":""},{"$regex":"^hin","$options":""}]}}]},{"$or":[{"ps_supplycost":{"$lt":977.14}},{"ps_comment":{"$regex":"^s "}}]},{"ps_supplycost":{"$not":{"$eq":184.87}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 2672  
+Estimated cardinality: 2662  
 Actual cardinality: 3599  
 Orders of magnitude: 0
 
@@ -12759,7 +12541,7 @@ HJ p_partkey = partsupp.ps_partkey
       -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$lt":780.26}},{"ps_supplycost":{"$gte":636.17}},{"ps_comment":{"$in":[{"$regex":"^ f","$options":""},{"$regex":"^hin","$options":""}]}}]},{"$or":[{"ps_supplycost":{"$lt":977.14}},{"ps_comment":{"$regex":"^s "}}]},{"ps_supplycost":{"$not":{"$eq":184.87}}}]} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 88  
+Estimated cardinality: 99  
 Actual cardinality: 121  
 Orders of magnitude: 1
 
@@ -12786,7 +12568,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^usu"}}
 ```
-Estimated cardinality: 80  
+Estimated cardinality: 60  
 Actual cardinality: 39  
 Orders of magnitude: 0
 
@@ -12808,7 +12590,7 @@ INLJ p_partkey = ps_partkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_availqty":{"$not":{"$lt":3991}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 188  
+Estimated cardinality: 148  
 Actual cardinality: 94  
 Orders of magnitude: 1
 
@@ -12835,7 +12617,7 @@ HJ partsupp.ps_suppkey = s_suppkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
   -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_acctbal":{"$gte":7337.45}},{"$nor":[{"s_name":{"$eq":"Supplier#000000478"}},{"s_nationkey":{"$eq":18}}]}]}
 ```
-Estimated cardinality: 43  
+Estimated cardinality: 33  
 Actual cardinality: 16  
 Orders of magnitude: 0
 
@@ -12864,9 +12646,9 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_comment":{"$regex":"^lit"}}
 ```
-Estimated cardinality: 160  
+Estimated cardinality: 80  
 Actual cardinality: 129  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 192-1
@@ -12886,7 +12668,7 @@ INLJ p_partkey = ps_partkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_availqty":{"$eq":9578}},{"ps_availqty":{"$lt":8052}}]},{"ps_supplycost":{"$gt":587.19}},{"ps_comment":{"$regex":"^f"}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 5  
+Estimated cardinality: 3  
 Actual cardinality: 3  
 Orders of magnitude: 0
 
@@ -12914,11 +12696,9 @@ INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_shipinstruct":{"$eq":"TAKE BACK RETURN"}},{"l_shipdate":{"$gte":"1997-06-13T00:00:00.000Z"}},{"l_shipmode":{"$in":["AIR","FOB","MAIL","SHIP"]}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 326  
+Estimated cardinality: 3  
 Actual cardinality: 2  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 193
@@ -13134,9 +12914,9 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^ bli"}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 10  
+Estimated cardinality: 0  
 Actual cardinality: 54  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ## >>> Command idx 197
@@ -13254,7 +13034,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$not":{"$gte":587.19}}},{"ps_comment":{"$not":{"$regex":"^ula"}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 486  
+Estimated cardinality: 484  
 Actual cardinality: 1004  
 Orders of magnitude: 1
 
@@ -13280,7 +13060,8 @@ db.region.aggregate(EJSON.deserialize(
 ```
 Subjoin plan:
 ```
-HJ partsupp.ps_partkey = p_partkey
+HJ p_partkey = partsupp.ps_partkey
+  -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_name":{"$regex":"^li"}} 
   -> [none] INLJ supplier.s_suppkey = ps_suppkey
       -> [none] INLJ nation_s.n_nationkey = s_nationkey
           -> [none] NLJ r_regionkey = n_regionkey
@@ -13291,9 +13072,8 @@ HJ partsupp.ps_partkey = p_partkey
               -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.supplier s_nationkey_1
       -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"ps_supplycost":{"$not":{"$gte":587.19}}},{"ps_comment":{"$not":{"$regex":"^ula"}}}]} 
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
-  -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_name":{"$regex":"^li"}}
 ```
-Estimated cardinality: 16  
+Estimated cardinality: 12  
 Actual cardinality: 37  
 Orders of magnitude: 0
 
@@ -13390,7 +13170,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^hi"}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 4  
+Estimated cardinality: 8  
 Actual cardinality: 2  
 Orders of magnitude: 0
 
@@ -13670,7 +13450,7 @@ INLJ s_nationkey = c_nationkey
   -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$and":[{"c_acctbal":{"$gte":-588.23}},{"c_acctbal":{"$gte":6089.13}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_nationkey_1
 ```
-Estimated cardinality: 206  
+Estimated cardinality: 212  
 Actual cardinality: 229  
 Orders of magnitude: 0
 
@@ -13698,7 +13478,7 @@ HJ customer.c_custkey = o_custkey
   -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"$nor":[{"o_clerk":{"$eq":"Clerk#000000013"}},{"o_orderdate":{"$eq":"1995-07-14T00:00:00.000Z"}}]} 
       -> IXSCAN: plan_stability_subjoin_cardinality_md.orders o_orderdate_1 {"o_orderdate":["[new Date(-9223372036854775808), new Date(695779200000))"]}
 ```
-Estimated cardinality: 23  
+Estimated cardinality: 18  
 Actual cardinality: 11  
 Orders of magnitude: 0
 
@@ -13732,7 +13512,7 @@ INLJ orders.o_orderkey = l_orderkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 91  
+Estimated cardinality: 71  
 Actual cardinality: 41  
 Orders of magnitude: 0
 
@@ -13902,7 +13682,7 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^pe"}}
 ```
-Estimated cardinality: 400  
+Estimated cardinality: 342  
 Actual cardinality: 508  
 Orders of magnitude: 0
 
@@ -13923,7 +13703,7 @@ HJ ps_partkey = p_partkey
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$regex":"^pe"}} 
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_container":{"$in":["JUMBO PKG","LG JAR","WRAP DRUM"]}}
 ```
-Estimated cardinality: 36  
+Estimated cardinality: 24  
 Actual cardinality: 42  
 Orders of magnitude: 0
 
@@ -13950,11 +13730,9 @@ INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"$and":[{"l_shipdate":{"$lt":"1993-05-14T00:00:00.000Z"}},{"l_extendedprice":{"$gte":75749.12}},{"l_shipmode":{"$in":["FOB","MAIL","RAIL","REG AIR"]}},{"$nor":[{"l_orderkey":{"$eq":232065}},{"l_quantity":{"$eq":35}},{"l_shipinstruct":{"$eq":"TAKE BACK RETURN"}},{"l_shipmode":{"$eq":"TRUCK"}},{"l_suppkey":{"$eq":543}},{"l_commitdate":{"$lt":"1992-11-21T00:00:00.000Z"}}]}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 419  
+Estimated cardinality: 1  
 Actual cardinality: 1  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 219
@@ -13970,50 +13748,51 @@ Orders of magnitude: 2
 ```
 ### >>> Subjoin 219-0
 ```
-db.part.aggregate(EJSON.deserialize(
+db.lineitem.aggregate(EJSON.deserialize(
 [
-{"$match":{"p_container":{"$eq":"JUMBO CASE"}}}]
+{"$match":{"l_shipdate":"1998-03-11T00:00:00.000Z"}}]
 ));
 ```
 Subjoin plan:
 ```
-COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_container":{"$eq":"JUMBO CASE"}}
+FETCH: plan_stability_subjoin_cardinality_md.lineitem 
+  -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_shipdate_1 {"l_shipdate":["[new Date(889574400000), new Date(889574400000)]"]}
 ```
-Estimated cardinality: 500  
-Actual cardinality: 501  
+Estimated cardinality: 601  
+Actual cardinality: 243  
 Orders of magnitude: 0
 
 ---
 ### >>> Subjoin 219-1
 ```
-db.part.aggregate(EJSON.deserialize(
+db.lineitem.aggregate(EJSON.deserialize(
 [
-{"$match":{"p_container":{"$eq":"JUMBO CASE"}}},
-{"$lookup":{"from":"lineitem","localField":"p_partkey","foreignField":"l_partkey","as":"lineitem","pipeline":[
-{"$match":{"l_shipdate":"1998-03-11T00:00:00.000Z"}}]}},
-{"$unwind":"$lineitem"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$lineitem"]}}}]
+{"$match":{"l_shipdate":"1998-03-11T00:00:00.000Z"}},
+{"$lookup":{"from":"part","localField":"l_partkey","foreignField":"p_partkey","as":"part","pipeline":[
+{"$match":{"p_container":{"$eq":"JUMBO CASE"}}}]}},
+{"$unwind":"$part"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$part"]}}}]
 ));
 ```
 Subjoin plan:
 ```
-HJ p_partkey = l_partkey
-  -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_container":{"$eq":"JUMBO CASE"}} 
+HJ l_partkey = p_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem 
       -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_shipdate_1 {"l_shipdate":["[new Date(889574400000), new Date(889574400000)]"]}
+  -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_container":{"$eq":"JUMBO CASE"}}
 ```
-Estimated cardinality: 15  
+Estimated cardinality: 24  
 Actual cardinality: 6  
 Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 219-2
 ```
-db.part.aggregate(EJSON.deserialize(
+db.lineitem.aggregate(EJSON.deserialize(
 [
-{"$match":{"p_container":{"$eq":"JUMBO CASE"}}},
-{"$lookup":{"from":"lineitem","localField":"p_partkey","foreignField":"l_partkey","as":"lineitem","pipeline":[
-{"$match":{"l_shipdate":"1998-03-11T00:00:00.000Z"}}]}},
-{"$unwind":"$lineitem"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$lineitem"]}}},
+{"$match":{"l_shipdate":"1998-03-11T00:00:00.000Z"}},
+{"$lookup":{"from":"part","localField":"l_partkey","foreignField":"p_partkey","as":"part","pipeline":[
+{"$match":{"p_container":{"$eq":"JUMBO CASE"}}}]}},
+{"$unwind":"$part"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$part"]}}},
 {"$lookup":{"from":"partsupp","localField":"p_partkey","foreignField":"ps_partkey","as":"partsupp","pipeline":[
 {"$match":{"$and":[{"ps_comment":{"$not":{"$regex":"^ am"}}},{}]}}]}},
 {"$unwind":"$partsupp"},{"$replaceRoot":{"newRoot":{"$mergeObjects":["$$ROOT","$partsupp"]}}}]
@@ -14022,18 +13801,16 @@ db.part.aggregate(EJSON.deserialize(
 Subjoin plan:
 ```
 INLJ p_partkey = ps_partkey, lineitem.l_partkey = ps_partkey
-  -> [none] HJ p_partkey = l_partkey
-      -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_container":{"$eq":"JUMBO CASE"}} 
+  -> [none] HJ l_partkey = p_partkey
       -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem 
           -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_shipdate_1 {"l_shipdate":["[new Date(889574400000), new Date(889574400000)]"]}
+      -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_container":{"$eq":"JUMBO CASE"}} 
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_comment":{"$not":{"$regex":"^ am"}}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 4705  
+Estimated cardinality: 88  
 Actual cardinality: 24  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 220
@@ -14147,9 +13924,9 @@ Subjoin plan:
 ```
 COLLSCAN: plan_stability_subjoin_cardinality_md.part {"$and":[{"p_type":{"$eq":"MEDIUM BRUSHED STEEL"}},{"p_mfgr":{"$in":["Manufacturer#1","Manufacturer#4"]}}]}
 ```
-Estimated cardinality: 80  
+Estimated cardinality: 1  
 Actual cardinality: 45  
-Orders of magnitude: 0
+Orders of magnitude: 1
 
 ---
 ### >>> Subjoin 222-1
@@ -14169,7 +13946,7 @@ INLJ p_partkey = ps_partkey
   -> [partsupp] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"$and":[{"$or":[{"ps_supplycost":{"$gte":498.13}},{"ps_comment":{"$regex":"^t"}}]},{"ps_availqty":{"$lte":5420}},{"ps_comment":{"$regex":"^s. "}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_partkey_1
 ```
-Estimated cardinality: 1  
+Estimated cardinality: 0  
 Actual cardinality: 2  
 Orders of magnitude: 0
 
@@ -14197,7 +13974,7 @@ INLJ partsupp.ps_partkey = l_partkey, p_partkey = l_partkey
   -> [lineitem] FETCH: plan_stability_subjoin_cardinality_md.lineitem {"l_shipmode":{"$eq":"MAIL"}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_partkey_1
 ```
-Estimated cardinality: 310  
+Estimated cardinality: 0  
 Actual cardinality: 13  
 Orders of magnitude: 1
 
@@ -14225,7 +14002,7 @@ Subjoin plan:
 FETCH: plan_stability_subjoin_cardinality_md.lineitem 
   -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_suppkey_1 {"l_suppkey":["[646.0, 646.0]","[943.0, 943.0]"]}
 ```
-Estimated cardinality: 1802  
+Estimated cardinality: 1201  
 Actual cardinality: 1283  
 Orders of magnitude: 0
 
@@ -14247,7 +14024,7 @@ HJ l_partkey = p_partkey
       -> IXSCAN: plan_stability_subjoin_cardinality_md.lineitem l_suppkey_1 {"l_suppkey":["[646.0, 646.0]","[943.0, 943.0]"]}
   -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_mfgr":{"$not":{"$in":["Manufacturer#1","Manufacturer#2","Manufacturer#3"]}}}
 ```
-Estimated cardinality: 701  
+Estimated cardinality: 467  
 Actual cardinality: 497  
 Orders of magnitude: 0
 
@@ -14274,11 +14051,9 @@ HJ p_partkey = ps_partkey, lineitem.l_partkey = ps_partkey
       -> [none] COLLSCAN: plan_stability_subjoin_cardinality_md.part {"p_mfgr":{"$not":{"$in":["Manufacturer#1","Manufacturer#2","Manufacturer#3"]}}} 
   -> [partsupp] COLLSCAN: plan_stability_subjoin_cardinality_md.partsupp {"ps_supplycost":{"$gte":587.19}}
 ```
-Estimated cardinality: 90350  
+Estimated cardinality: 700  
 Actual cardinality: 708  
-Orders of magnitude: 2
-> [!WARNING]
-> Estimate discrepancy is more than 2 orders of magnitude.
+Orders of magnitude: 0
 
 ---
 ## >>> Command idx 224
@@ -14358,7 +14133,7 @@ INLJ supplier.s_suppkey = ps_suppkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.partsupp {"ps_availqty":{"$lte":2592}} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.partsupp ps_suppkey_1
 ```
-Estimated cardinality: 310  
+Estimated cardinality: 309  
 Actual cardinality: 847  
 Orders of magnitude: 0
 
@@ -14457,7 +14232,7 @@ INLJ orders.o_orderkey = l_orderkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 3  
+Estimated cardinality: 4  
 Actual cardinality: 14  
 Orders of magnitude: 1
 
@@ -14490,7 +14265,7 @@ HJ customer.c_nationkey = s_nationkey
           -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
   -> [supplier] COLLSCAN: plan_stability_subjoin_cardinality_md.supplier {"$and":[{"s_acctbal":{"$gte":1432.69}},{"$nor":[{"s_name":{"$eq":"Supplier#000000719"}},{"s_nationkey":{"$eq":1}}]}]}
 ```
-Estimated cardinality: 105  
+Estimated cardinality: 114  
 Actual cardinality: 364  
 Orders of magnitude: 0
 
@@ -14544,7 +14319,7 @@ INLJ s_nationkey = c_nationkey
   -> [customer] FETCH: plan_stability_subjoin_cardinality_md.customer {"$and":[{"$or":[{"c_mktsegment":{"$eq":"HOUSEHOLD"}},{"c_name":{"$eq":"Customer#000001342"}}]},{"c_acctbal":{"$lt":8496.37}},{"c_name":{"$not":{"$eq":"Customer#000011646"}}}]} 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.customer c_nationkey_1
 ```
-Estimated cardinality: 110  
+Estimated cardinality: 113  
 Actual cardinality: 105  
 Orders of magnitude: 0
 
@@ -14572,9 +14347,9 @@ HJ customer.c_custkey = o_custkey
   -> [orders] FETCH: plan_stability_subjoin_cardinality_md.orders {"$or":[{"o_orderstatus":{"$eq":"P"}},{"o_totalprice":{"$lt":34828.99}}]} 
       -> IXSCAN: plan_stability_subjoin_cardinality_md.orders o_orderdate_1 {"o_orderdate":["[MinKey, new Date(-9223372036854775808))","[new Date(873849600000), MaxKey]"]}
 ```
-Estimated cardinality: 9  
+Estimated cardinality: 19  
 Actual cardinality: 10  
-Orders of magnitude: 1
+Orders of magnitude: 0
 
 ---
 ### >>> Subjoin 227-3
@@ -14606,7 +14381,7 @@ INLJ orders.o_orderkey = l_orderkey
   -> [none] FETCH: plan_stability_subjoin_cardinality_md.lineitem 
       -> INDEX_PROBE_NODE: plan_stability_subjoin_cardinality_md.lineitem l_orderkey_1
 ```
-Estimated cardinality: 35  
+Estimated cardinality: 75  
 Actual cardinality: 15  
 Orders of magnitude: 0
 

@@ -125,17 +125,22 @@ async def upstream(
     import datagen.serialize
 
     tasks = []
+    doc_index = 0
 
     while count:
         num = min(1000, count)  # Batch the inserts.
+        docs = []
+        for _ in range(num):
+            doc = datagen.serialize.serialize_doc(dataclasses.asdict(next(source)))
+            # Give each document a deterministic _id to ensure test determinism.
+            doc["_id"] = doc_index
+            doc_index += 1
+            docs.append(doc)
         tasks.append(
             asyncio.create_task(
                 database_instance.insert_many(
                     collection_name,
-                    [
-                        datagen.serialize.serialize_doc(dataclasses.asdict(next(source)))
-                        for _ in range(num)
-                    ],
+                    docs,
                     context_manager,
                 )
             )
