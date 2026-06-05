@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/owned_lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_params.h"
 #include "mongo/util/str.h"
@@ -61,11 +62,11 @@ InternalDocumentResultsAndMetadataLiteParsed::parse(const NamespaceString& nss,
             "$_internalDocumentResultsAndMetadata 'source' must be an object",
             sourceElem.type() == BSONType::object);
 
+    OwnedLiteParsedPipeline sourcePipeline(nss, {sourceElem.embeddedObject()}, options);
+    LiteParsedDesugarer::desugar(&*sourcePipeline, options.ifrContext);
+
     return std::make_unique<InternalDocumentResultsAndMetadataLiteParsed>(
-        spec,
-        parsedSpec.getMetadata(),
-        parsedSpec.getReturnCursor(),
-        OwnedLiteParsedPipeline(nss, {sourceElem.embeddedObject()}, options));
+        spec, parsedSpec.getMetadata(), parsedSpec.getReturnCursor(), std::move(sourcePipeline));
 }
 
 }  // namespace mongo

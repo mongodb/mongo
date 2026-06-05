@@ -40,7 +40,10 @@ public:
     using StageExpander =
         std::function<size_t(LiteParsedPipeline*, size_t index, LiteParsedDocumentSource&)>;
 
-    // Desugars the LiteParsedPipeline and returns whether the pipeline was modified or not.
+    // Desugars the LiteParsedPipeline and returns whether the pipeline was modified or not. Callers
+    // that embed a sub-pipeline (e.g. $unionWith) should call desugar() eagerly on the sub-pipeline
+    // so that extension sources are replaced by their expanded LiteParsed representation before
+    // bindViewInfo() and constraints checks run.
     static bool desugar(LiteParsedPipeline* pipeline,
                         std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext);
 

@@ -2023,20 +2023,6 @@ TEST_F(DocumentSourceExtensionOptimizableTest, StageCanSerializeForQueryExecutio
 }
 
 DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
-             SerializeWithWrongOptsFails,
-             "11217800") {
-    auto astNode = new sdk::ExtensionAggStageAstNodeAdapter(
-        sdk::shared_test_stages::TransformAggStageAstNode::make());
-    auto astHandle = AggStageAstNodeHandle(astNode);
-
-    auto optimizable =
-        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
-
-    [[maybe_unused]] auto serialized =
-        optimizable->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions);
-}
-
-DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
              CreateFromParseNodeHandleWithMultipleNodesFails,
              "11623000") {
     // Create a parse node that expands to multiple nodes.

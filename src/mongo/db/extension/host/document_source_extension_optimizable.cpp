@@ -307,11 +307,6 @@ void DocumentSourceExtensionOptimizable::registerStage(AggStageDescriptorHandle 
 ALLOCATE_DOCUMENT_SOURCE_ID(extensionOptimizable, DocumentSourceExtensionOptimizable::id);
 
 Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& opts) const {
-    tassert(11217800,
-            "SerializationOptions should keep literals unchanged while represented as a "
-            "DocumentSourceExtensionOptimizable",
-            opts.isKeepingLiteralsUnchanged());
-
     if (opts.isSerializingForExplain()) {
         auto wrappedCtx = std::make_unique<QueryExecutionContext>(getExpCtx().get());
         host_connector::QueryExecutionContextAdapter ctxAdapter(std::move(wrappedCtx));
