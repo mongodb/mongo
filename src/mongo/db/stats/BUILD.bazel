@@ -19,6 +19,8 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/query/query_stats",
+        "//src/mongo/otel/metrics:metric_unit",
+        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 
@@ -308,5 +310,20 @@ mongo_cc_unit_test(
         "//src/mongo/db/sharding_environment:unittest_noop_sharding_initialization_mongod",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "top_otel_test",
+    srcs = [
+        "top_otel_test.cpp",
+    ],
+    tags = ["mongo_unittest_fourth_group"],
+    deps = [
+        ":top",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:service_context_test_fixture",
+        "//src/mongo/otel/metrics:metrics_test_util",
+        "//src/mongo/transport:transport_layer_mock",
     ],
 )

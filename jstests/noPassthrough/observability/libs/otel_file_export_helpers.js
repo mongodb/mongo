@@ -84,6 +84,29 @@ function latestTime(record) {
 }
 
 /**
+ * Returns the most recent raw OTLP JSON record from the metrics directory, or null if none exist.
+ */
+export function getLatestRawRecord(directory) {
+    const files = findMetricsFiles(directory);
+    const records = files
+        .map((file) => {
+            const record = readJsonlFile(file.name);
+            if (record.length === 0) {
+                jsTest.log.info(`No records found in file ${file.name}`);
+            }
+            return record;
+        })
+        .filter((record) => record.length > 0)
+        .map((records) => records.at(-1));
+    if (records.length === 0) {
+        return null;
+    }
+    return records.reduce((latest, curRecord) => {
+        return latestTime(latest) > latestTime(curRecord) ? latest : curRecord;
+    }, records.at(0));
+}
+
+/**
  * Gets the most recent metrics from the given directory.
  * @param {string} directory - The directory path to search in.
  * @returns {Object} An object with the metric name as the key and the metric value as the value, or null if no metrics
@@ -109,29 +132,13 @@ function latestTime(record) {
  *  }
  */
 export function getLatestMetrics(directory) {
-    let record = undefined;
-    const files = findMetricsFiles(directory);
-    const records = files
-        .map((file) => {
-            const record = readJsonlFile(file.name);
-            if (record.length === 0) {
-                jsTest.log.info(`No records found in file ${file.name}`);
-            }
-            return record;
-        })
-        .filter((record) => record.length > 0)
-        // Each record contains all the metrics, so just return the last, i.e. most recent, one.
-        .map((records) => records.at(-1));
-    if (records.length === 0) {
+    const record = getLatestRawRecord(directory);
+    if (!record) {
         return null;
     }
-    // Of all the records from multiple files, take the most recent one.
-    record = records.reduce((latest, curRecord) => {
-        return latestTime(latest) > latestTime(curRecord) ? latest : curRecord;
-    }, records.at(0));
 
     let metrics = [];
-    for (const resourceMetric of record?.resourceMetrics ?? []) {
+    for (const resourceMetric of record.resourceMetrics ?? []) {
         for (const scopeMetric of resourceMetric.scopeMetrics ?? []) {
             for (const metric of scopeMetric.metrics ?? []) {
                 metrics.push(metric);
@@ -159,6 +166,30 @@ export function getLatestMetrics(directory) {
     );
     result.time = latestTime(record);
     return result;
+}
+
+/**
+ * Returns the histogram data point count for a specific metric name and attribute key/value pair
+ * from the latest metrics snapshot, or 0 if not found. Useful for histograms with multiple data
+ * points keyed by an attribute (e.g. op_type: "read").
+ */
+export function getHistogramCount(metricsDir, metricName, attrKey, attrValue) {
+    const record = getLatestRawRecord(metricsDir);
+    if (!record) return 0;
+    for (const resourceMetric of record.resourceMetrics ?? []) {
+        for (const scopeMetric of resourceMetric.scopeMetrics ?? []) {
+            for (const metric of scopeMetric.metrics ?? []) {
+                if (metric.name !== metricName) continue;
+                for (const dp of metric.histogram?.dataPoints ?? []) {
+                    const match = (dp.attributes ?? []).some(
+                        (a) => a.key === attrKey && a.value?.stringValue === attrValue,
+                    );
+                    if (match) return Number(dp.count ?? 0);
+                }
+            }
+        }
+    }
+    return 0;
 }
 
 /**
@@ -252,5 +283,20 @@ export function waitForMetric({metricsDir, metricName, minValue, afterDate}) {
         `Expected ${metricName} >= ${minValue} in ${metricsDir}`,
         30000,
         300,
+    );
+}
+
+/**
+ * Asserts that the data point count for `metricName` with attribute `attrKey=attrValue` increases
+ * by at least `minIncrease` after `fn` runs.
+ */
+export function assertHistogramMetricIncreases({metricsDir, metricName, attrKey, attrValue, minIncrease = 1, fn}) {
+    const baseline = getHistogramCount(metricsDir, metricName, attrKey, attrValue);
+    fn();
+    assert.soon(
+        () => getHistogramCount(metricsDir, metricName, attrKey, attrValue) >= baseline + minIncrease,
+        `Expected ${metricName} ${attrKey}=${attrValue} count to increase by at least ${minIncrease} from ${baseline}`,
+        30000,
+        500,
     );
 }

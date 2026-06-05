@@ -284,6 +284,9 @@ public:
     static constexpr MetricName kGlobalLockActiveClientsWriters =
         MetricNameMaker::make("serverStatus.globalLock.activeClients.writers");
 
+    static constexpr MetricName kOperationLatency =
+        MetricNameMaker::make("serverStatus.opLatencies.latency");
+
     // Op Counters
     static constexpr MetricName kInsertOpCount =
         MetricNameMaker::make("serverStatus.opcounters.inserts");
