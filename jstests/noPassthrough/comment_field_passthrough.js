@@ -68,7 +68,10 @@ const impls = {
             typeof testObj.command === "function" ? testObj.command(state, testCase.commandArgs) : testObj.command;
         command["comment"] = {comment: true};
         const res = cmdDb.runCommand(command);
-        assert(res.ok == 1 || testCase.expectFail || res.code == ErrorCodes.CommandNotSupported, tojson(res));
+        const expectFail =
+            testCase.expectFail ||
+            (testCase.expectFailWithErrorCodes && testCase.expectFailWithErrorCodes.includes(res.code));
+        assert(res.ok == 1 || expectFail || res.code == ErrorCodes.CommandNotSupported, tojson(res));
 
         if (testObj.teardown) {
             testObj.teardown(cmdDb, res);
