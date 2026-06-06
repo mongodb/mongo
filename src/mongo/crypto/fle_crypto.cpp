@@ -2952,8 +2952,24 @@ FLE2IndexedRangeEncryptedValueV2::getMetadataBlocks() const {
 FLE2IndexedTextEncryptedValue::FLE2IndexedTextEncryptedValue()
     : _value(mc_FLE2IndexedEncryptedValueV2_new()) {}
 
+void FLE2IndexedTextEncryptedValue::verifyTotalTagCountIsWithinLimit(ConstDataRange toParse) {
+    constexpr size_t kCountsOffset = 1 + 16 + 1;  // fle_blob_subtype + key_uuid + bson_type
+    constexpr size_t kMinHeaderSize = kCountsOffset + 3 * sizeof(uint32_t);
+    uassert(12773700,
+            "Encountered a buffer with invalid length for a FLE2IndexedTextEncryptedValue",
+            toParse.length() >= kMinHeaderSize);
+
+    ConstDataRangeCursor cursor(toParse);
+    cursor.advance(kCountsOffset);
+    auto edgeCount = cursor.readAndAdvance<uint32_t>();
+    uassert(12773701,
+            "FLE2IndexedTextEncryptedValue contains tags that exceed the tag limit",
+            edgeCount <= EncryptionInformationHelpers::kFLE2PerFieldTagLimit);
+}
+
 FLE2IndexedTextEncryptedValue::FLE2IndexedTextEncryptedValue(ConstDataRange toParse)
     : _value(mc_FLE2IndexedEncryptedValueV2_new()) {
+    verifyTotalTagCountIsWithinLimit(toParse);
     auto buf = MongoCryptBuffer::borrow(toParse);
     MongoCryptStatus status;
     mc_FLE2IndexedEncryptedValueV2_parse(_value.get(), buf.get(), status);

@@ -825,10 +825,10 @@ private:
  * struct {
  *   uint8_t fle_blob_subtype = 17;
  *   uint8_t key_uuid[16];
- *   uint8_t original_bson_type;
- *   uint8_t total_tag_count;
- *   uint8_t substring_tag_count;
- *   uint8_t suffix_tag_count;
+ *   uint8_t bson_type;
+ *   uint32_t total_tag_count;
+ *   uint32_t substring_tag_count;
+ *   uint32_t suffix_tag_count;
  *   ciphertext[ciphertext_length];
  *   metadataBlock exact_metadata;
  *   array<metadataBlock> substring_metadata;
@@ -865,6 +865,8 @@ public:
 
 private:
     FLE2IndexedTextEncryptedValue();
+    void verifyTotalTagCountIsWithinLimit(ConstDataRange toParse);
+
     UniqueMCFLE2IndexedEncryptedValueV2 _value;
     // Cached parsed values
     mutable boost::optional<std::vector<uint8_t>> _cachedSerializedPayload;
