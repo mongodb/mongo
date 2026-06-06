@@ -2390,6 +2390,116 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
     }
 }
 
+static constexpr size_t kFLE2IEVHeaderSize = 1 + UUID::kNumBytes + 1;  // 18, common to IEV types
+static constexpr size_t kFLE2IEVMinCipherTextLen =
+    17;  // ciphertext size minimum enforced by libmongocrypt is 17 (16 byte IV + 1 byte CTR)
+static constexpr size_t kFLE2IEVMblockLen =
+    sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob);
+static constexpr size_t kFLE2TextSubstrCountOffset = kFLE2IEVHeaderSize + sizeof(uint32_t);
+static constexpr size_t kFLE2TextSuffixCountOffset = kFLE2TextSubstrCountOffset + sizeof(uint32_t);
+
+// Helper to write a little-endian uint32 into a byte vector at a given offset.
+static void writeU32LE(std::vector<uint8_t>& buf, size_t offset, uint32_t val) {
+    buf[offset + 0] = val & 0xFF;
+    buf[offset + 1] = (val >> 8) & 0xFF;
+    buf[offset + 2] = (val >> 16) & 0xFF;
+    buf[offset + 3] = (val >> 24) & 0xFF;
+}
+
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_FLE2IndexedEqualityEncryptedValueV2_ParseErrors) {
+    // First, test the shortest valid buffer can be parsed successfully
+    auto validBuf =
+        std::vector<uint8_t>(kFLE2IEVHeaderSize + kFLE2IEVMinCipherTextLen + kFLE2IEVMblockLen);
+    validBuf.at(0) = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValueV2);
+    ASSERT_DOES_NOT_THROW(FLE2IndexedEqualityEncryptedValueV2{validBuf});
+
+    // Test short inputs for equality payload
+    std::vector<size_t> truncatedLengths = {0,
+                                            kFLE2IEVHeaderSize - 1,
+                                            kFLE2IEVHeaderSize,
+                                            kFLE2IEVHeaderSize + 1,
+                                            kFLE2IEVHeaderSize + kFLE2IEVMblockLen,
+                                            validBuf.size() - 1};
+    for (auto& testLength : truncatedLengths) {
+        std::vector<uint8_t> buf(testLength);
+        std::copy(validBuf.begin(), validBuf.begin() + testLength, buf.begin());
+        ASSERT_THROWS_CODE(
+            FLE2IndexedEqualityEncryptedValueV2{buf}, DBException, ErrorCodes::LibmongocryptError);
+    }
+
+    // Test with invalid blob type
+    auto buf = validBuf;
+    buf[0] = 255;
+    ASSERT_THROWS_CODE(
+        FLE2IndexedEqualityEncryptedValueV2(buf), DBException, ErrorCodes::LibmongocryptError);
+}
+
+TEST_F(ServiceContextTest, FLE_EDC_ServerSide_FLE2IndexedTextEncryptedValue_ParseErrors) {
+    constexpr size_t kHeaderSize = kFLE2IEVHeaderSize + 3 * sizeof(uint32_t);
+
+    // First, test the shortest valid buffer can be parsed successfully
+    auto validBuf =
+        std::vector<uint8_t>(kHeaderSize + kFLE2IEVMinCipherTextLen + kFLE2IEVMblockLen);
+    validBuf.at(0) = static_cast<uint8_t>(EncryptedBinDataType::kFLE2TextIndexedValue);
+    writeU32LE(validBuf, kFLE2IEVHeaderSize, 1);  // total edge count
+    writeU32LE(validBuf, kFLE2TextSubstrCountOffset, 0);
+    writeU32LE(validBuf, kFLE2TextSuffixCountOffset, 0);
+    ASSERT_DOES_NOT_THROW(FLE2IndexedTextEncryptedValue{validBuf});
+
+    // Test edge count exceeds limit
+    auto buf = validBuf;
+    writeU32LE(buf, kFLE2IEVHeaderSize, EncryptionInformationHelpers::kFLE2PerFieldTagLimit + 1);
+    ASSERT_THROWS_CODE(FLE2IndexedTextEncryptedValue(buf), DBException, 12773701);
+
+    // Test edge count is zero
+    writeU32LE(buf, kFLE2IEVHeaderSize, 0);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedTextEncryptedValue(buf), DBException, ErrorCodes::LibmongocryptError);
+
+    // Test input buffer less than kHeaderSize
+    std::vector<size_t> truncatedLengths = {0, kHeaderSize - 1};
+    for (auto& length : truncatedLengths) {
+        std::vector<uint8_t> shortBuf(length);
+        std::copy(validBuf.begin(), validBuf.begin() + length, shortBuf.begin());
+        ASSERT_THROWS_CODE(FLE2IndexedTextEncryptedValue{shortBuf}, DBException, 12773700);
+    }
+
+    // Test with invalid blob type
+    buf = validBuf;
+    buf[0] = 255;
+    ASSERT_THROWS_CODE(
+        FLE2IndexedTextEncryptedValue(buf), DBException, ErrorCodes::LibmongocryptError);
+
+    // Test input buffers where total edge_count = 1, but the length after kHeaderSize is
+    // less than min ciphertext length & mblock length
+    truncatedLengths = {kHeaderSize, kHeaderSize + kFLE2IEVMblockLen, validBuf.size() - 1};
+
+    for (auto& length : truncatedLengths) {
+        std::vector<uint8_t> shortBuf(length);
+        std::copy(validBuf.begin(), validBuf.begin() + length, shortBuf.begin());
+        ASSERT_THROWS_CODE(
+            FLE2IndexedTextEncryptedValue{shortBuf}, DBException, ErrorCodes::LibmongocryptError);
+    }
+
+    // Test total tags > number of metadata blocks in buffer
+    buf = validBuf;
+    writeU32LE(buf, kFLE2IEVHeaderSize, 1024);
+    ASSERT_THROWS_CODE(
+        FLE2IndexedTextEncryptedValue{buf}, DBException, ErrorCodes::LibmongocryptError);
+
+    // substring + suffix overflow
+    // substr(UINT32_MAX) + suffix(1) + 1 wraps to 1 in uint32_t
+    // but equals 4294967297 in uint64_t, still exceeding edge_count(14).
+    buf = validBuf;
+    writeU32LE(buf, kFLE2IEVHeaderSize, 10);                    // set edge_count = 10
+    writeU32LE(buf, kFLE2TextSuffixCountOffset, 1);             // set suffix count = 1
+    buf.insert(buf.end(), kFLE2IEVMblockLen * 9, '\0');         // add 9 additional mblocks
+    ASSERT_DOES_NOT_THROW(FLE2IndexedTextEncryptedValue{buf});  // assert it works
+    writeU32LE(buf, kFLE2TextSubstrCountOffset, std::numeric_limits<uint32_t>::max());
+    ASSERT_THROWS_CODE(
+        FLE2IndexedTextEncryptedValue{buf}, DBException, ErrorCodes::LibmongocryptError);
+}
+
 TEST_F(ServiceContextTest, FLE_EDC_DuplicateSafeContent_CompatibleType) {
 
     TestKeyVault keyVault;

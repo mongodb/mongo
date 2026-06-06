@@ -2875,7 +2875,11 @@ FLE2IndexedEqualityEncryptedValueV2::FLE2IndexedEqualityEncryptedValueV2(ConstDa
     auto buf = MongoCryptBuffer::borrow(cdr);
     MongoCryptStatus status;
     mc_FLE2IndexedEncryptedValueV2_parse(_value.get(), buf.get(), status);
-    uassertStatusOK(status.toStatus());
+    auto parseStatus = status.toStatus();
+    if (!parseStatus.isOK()) {
+        _value->edge_count = 0;
+    }
+    uassertStatusOK(parseStatus);
 }
 
 FLE2IndexedEqualityEncryptedValueV2 FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
@@ -3227,12 +3231,32 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedRangeEncryptedValueV2::serialize(
 FLE2IndexedTextEncryptedValue::FLE2IndexedTextEncryptedValue()
     : _value(mc_FLE2IndexedEncryptedValueV2_new()) {}
 
+void FLE2IndexedTextEncryptedValue::verifyTotalTagCountIsWithinLimit(ConstDataRange toParse) {
+    constexpr size_t kCountsOffset = 1 + 16 + 1;  // fle_blob_subtype + key_uuid + bson_type
+    constexpr size_t kMinHeaderSize = kCountsOffset + 3 * sizeof(uint32_t);
+    uassert(12773700,
+            "Encountered a buffer with invalid length for a FLE2IndexedTextEncryptedValue",
+            toParse.length() >= kMinHeaderSize);
+
+    ConstDataRangeCursor cursor(toParse);
+    cursor.advance(kCountsOffset);
+    auto edgeCount = cursor.readAndAdvance<uint32_t>();
+    uassert(12773701,
+            "FLE2IndexedTextEncryptedValue contains tags that exceed the tag limit",
+            edgeCount <= EncryptionInformationHelpers::kFLE2PerFieldTagLimit);
+}
+
 FLE2IndexedTextEncryptedValue::FLE2IndexedTextEncryptedValue(ConstDataRange toParse)
     : _value(mc_FLE2IndexedEncryptedValueV2_new()) {
+    verifyTotalTagCountIsWithinLimit(toParse);
     auto buf = MongoCryptBuffer::borrow(toParse);
     MongoCryptStatus status;
     mc_FLE2IndexedEncryptedValueV2_parse(_value.get(), buf.get(), status);
-    uassertStatusOK(status.toStatus());
+    auto parseStatus = status.toStatus();
+    if (!parseStatus.isOK()) {
+        _value->edge_count = 0;
+    }
+    uassertStatusOK(parseStatus);
     uassert(9784115,
             fmt::format("Expected buffer to begin with type tag {}, but began with {}",
                         fmt::underlying(kFLE2IEVTypeText),
