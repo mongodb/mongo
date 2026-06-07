@@ -1,11 +1,9 @@
 /**
  * Tests that after a getMore on a change stream cursor returns a batch with change events, the
- * cursor's changeStreams.optime is exposed in $currentOp idle cursor output.
+ * change stream cursor metrics are exposed in $currentOp output.
  *
  * @tags: [
  *   requires_getmore,
- *   # TODO SERVER-123932: Remove the 'assumes_against_mongod_not_mongos' tag once the metrics are available on mongos.
- *   assumes_against_mongod_not_mongos,
  *   # The test assumes that cursors are opened on the primary, which is not guaranteed when change streams
  *   # are opened on secondaries.
  *   assumes_no_implicit_cursor_exhaustion,
@@ -15,15 +13,19 @@
  */
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {CursorList} from "jstests/libs/query/change_stream_util.js";
+import {CursorList, getClusterTime} from "jstests/libs/query/change_stream_util.js";
 import {listIdleCursors} from "jstests/libs/query/change_stream_util.js";
 import {TestDataModifyGuard} from "jstests/change_streams/change_stream_metrics_util.js";
-import {findMatchingLogLine} from "jstests/libs/log.js";
 
 describe("change stream cursor metrics in currentOp", function () {
     const testDB = db.getSiblingDB(jsTestName());
     const adminDB = db.getSiblingDB("admin");
     const testColl = testDB.getCollection("test");
+
+    const getClusterTimeFromInsert = (db) => {
+        return assert.commandWorked(db.runCommand({insert: "unrelated_collection", documents: [{}]})).$clusterTime
+            .clusterTime;
+    };
 
     function idleCursorFilter(comment, cursor = null) {
         const filter = {"cursor.originatingCommand.comment": comment};
@@ -34,7 +36,7 @@ describe("change stream cursor metrics in currentOp", function () {
     }
 
     function getIdleCursor(comment, cursor = null) {
-        const cursors = listIdleCursors(adminDB, idleCursorFilter(comment, cursor));
+        const cursors = listIdleCursors(adminDB, idleCursorFilter(comment, cursor), {localOps: true});
         assert.eq(1, cursors.length, "Expected exactly one idle change stream cursor");
         return cursors[0];
     }
@@ -49,11 +51,22 @@ describe("change stream cursor metrics in currentOp", function () {
         );
     }
 
+    // Returns a high-water-mark resume token by opening a temporary change stream, advancing it,
+    // and closing it — without leaving any cursor open.
+    function getHwmToken() {
+        const csCursor = testColl.watch();
+        try {
+            csCursor.hasNext();
+            return csCursor.getResumeToken();
+        } finally {
+            csCursor.close();
+        }
+    }
+
     before(function () {
-        assertDropAndRecreateCollection(testDB, testColl.getName());
-        assert.commandWorked(testColl.insert({_id: 1}));
         // The test is incompatible with multi-router setup, as we're checking per-process metrics.
         this.testDataChange = new TestDataModifyGuard("pinToSingleMongos", true);
+        assertDropAndRecreateCollection(testDB, testColl.getName());
     });
 
     beforeEach(function () {
@@ -71,8 +84,8 @@ describe("change stream cursor metrics in currentOp", function () {
         this.testDataChange.restore();
     });
 
-    it("changeStreams.optime is set to the high-watermark when no events have been returned", function () {
-        const comment = "change_stream_cursor hwm no events";
+    it("optime equals postBatchResumeToken clusterTime after empty getMore", function () {
+        const comment = "optime equals postBatchResumeToken clusterTime after empty getMore";
         let cursor = this.cursorList.push(testColl.watch([], {comment, cursor: {batchSize: 0}}));
 
         // Issue a getMore that returns immediately with no events by using a 1ms timeout.
@@ -100,7 +113,7 @@ describe("change stream cursor metrics in currentOp", function () {
     });
 
     it("changeStreams is not set for regular (non change stream) cursors", function () {
-        const comment = "regular_cursor_no_optime";
+        const comment = "changeStreams is not set for regular (non change stream) cursors";
 
         const findCursor = this.cursorList.push(
             new DBCommandCursor(
@@ -124,75 +137,13 @@ describe("change stream cursor metrics in currentOp", function () {
         });
     });
 
-    it("changeStreams.optime is at least the clusterTime of the last returned event", function () {
-        const comment = "change_stream_cursor current time";
-        let cursor = this.cursorList.push(testColl.watch([], {comment, cursor: {batchSize: 0}}));
-
-        assert.commandWorked(testColl.insert({_id: 2}));
-
-        // read from the cursor
-        assert.soon(() => cursor.hasNext());
-        const event = cursor.next();
-
-        const idleCursor = getIdleCursor(comment, cursor);
-
-        const optime = idleCursor.cursor.changeStreams.optime;
-        assert(optime instanceof Timestamp, "Expected changeStreams.optime to be a Timestamp", {
-            idleCursor,
-        });
-        // The optime is a high-watermark: it equals the last event's clusterTime when no
-        // additional oplog entries were scanned in the same getMore, but may be higher if
-        // concurrent operations wrote oplog entries that the cursor scanned past without matching.
-        assert.gte(optime, event.clusterTime, "Expected changeStreams.optime to be >= the event's clusterTime");
-    });
-
-    it("changeStreams.optime is the initial HWM before any getMore is issued", function () {
-        const comment = "change_stream_cursor no getMore initial hwm";
+    it("optime not bumped when startAtOperationTime is behind oplog tip", function () {
+        const comment = "optime not bumped when startAtOperationTime is behind oplog tip";
 
         // Get a past timestamp to use as the change stream start point.
-        const anchorRes = assert.commandWorked(
-            testDB.runCommand({
-                insert: testColl.getName(),
-                documents: [{_id: "anchor_no_getMore"}],
-            }),
-        );
-        const startAtTime = anchorRes.operationTime;
-        assert(startAtTime instanceof Timestamp, "Expected operationTime from insert", {anchorRes});
+        const startAtTime = getClusterTime(testDB);
 
-        // Open the change stream starting at the past timestamp, with batchSize:0, and issue no
-        // getMores. The plan executor initializes _latestOplogTimestamp from the initial post-batch
-        // resume token at construction time, so $currentOp should reflect it immediately.
-        let cursor = this.cursorList.push(
-            testColl.watch([], {
-                comment,
-                startAtOperationTime: startAtTime,
-                cursor: {batchSize: 0},
-            }),
-        );
-
-        const idleCursor = getIdleCursor(comment, cursor);
-
-        assert.eq(
-            startAtTime,
-            idleCursor.cursor.changeStreams.optime,
-            "Expected changeStreams.optime to equal startAtOperationTime before any getMore",
-        );
-    });
-
-    it("changeStreams.optime equals startAtOperationTime even when it is behind the current oplog tip", function () {
-        const comment = "change_stream_cursor past startAtOperationTime no getMore";
-
-        // Record a past timestamp from an anchor insert.
-        const anchorRes = assert.commandWorked(
-            testDB.runCommand({
-                insert: testColl.getName(),
-                documents: [{_id: "anchor_past_start"}],
-            }),
-        );
-        const startAtTime = anchorRes.operationTime;
-        assert(startAtTime instanceof Timestamp, "Expected operationTime from insert", {anchorRes});
-
-        // Advance the oplog past startAtTime so that currentLatest > startAtTime.
+        // Advance the oplog past 'startAtTime' so that currentLatest > startAtTime.
         assert.commandWorked(testColl.insert({_id: "advance_oplog_past_start"}));
 
         // Open the change stream with a startAtOperationTime that is clearly behind the current
@@ -215,8 +166,8 @@ describe("change stream cursor metrics in currentOp", function () {
         );
     });
 
-    it("changeStreams.optime advances when unrelated oplog events are skipped", function () {
-        const comment = "change_stream_cursor optime advances unrelated event";
+    it("optime advances when unrelated oplog events are skipped", function () {
+        const comment = "optime advances when unrelated oplog events are skipped";
 
         // Open a change stream scoped only to testColl.
         let cursor = this.cursorList.push(testColl.watch([], {comment, cursor: {batchSize: 0}}));
@@ -226,8 +177,6 @@ describe("change stream cursor metrics in currentOp", function () {
         assert.soon(() => cursor.hasNext());
         const event = cursor.next();
 
-        // Filter by cursor ID to avoid picking up cursors from concurrent test instances
-        // (e.g. burn_in runs the same test in parallel with identical comment strings).
         const cursorAfterFirst = getIdleCursor(comment, cursor);
 
         const optimeAfterFirstEvent = cursorAfterFirst.cursor.changeStreams.optime;
@@ -268,5 +217,94 @@ describe("change stream cursor metrics in currentOp", function () {
             "Expected changeStreams.optime to advance after an unrelated oplog event was scanned",
             {before: optimeAfterFirstEvent, after: optimeAfterUnrelated},
         );
+    });
+
+    for (const resumeOption of ["resumeAfter", "startAfter"]) {
+        it(`optime initialized from ${resumeOption} token`, function () {
+            const comment = `optime initialized from ${resumeOption} token`;
+            const hwmToken = getHwmToken();
+            let cursor = this.cursorList.push(
+                testColl.watch([], {comment, [resumeOption]: hwmToken, cursor: {batchSize: 0}}),
+            );
+            const idleCursor = getIdleCursor(comment, cursor);
+
+            const optime = idleCursor.cursor.changeStreams.optime;
+            assert(optime instanceof Timestamp, "Expected changeStreams.optime to be a Timestamp", {
+                idleCursor,
+            });
+            assert.eq(
+                optime,
+                decodeResumeToken(hwmToken).clusterTime,
+                `changeStreams.optime must equal the clusterTime of the ${resumeOption} token`,
+                {optime, resumeToken: hwmToken},
+            );
+        });
+    }
+
+    it("optime initialized from future startAtOperationTime", function () {
+        // Uses a future timestamp to exercise the mongoS initial aggregate path before any oplog
+        // entries at that time exist, verifying the PBRT is derived from startAtOperationTime
+        // and not clamped to the current oplog tip.
+        const comment = "optime initialized from future startAtOperationTime";
+        const futureTimestamp = Timestamp(Math.floor(Date.now() / 1000) + 60, 0);
+        let cursor = this.cursorList.push(
+            testColl.watch([], {
+                comment,
+                startAtOperationTime: futureTimestamp,
+                cursor: {batchSize: 0},
+            }),
+        );
+        const idleCursor = getIdleCursor(comment, cursor);
+
+        assert.eq(
+            futureTimestamp,
+            idleCursor.cursor.changeStreams.optime,
+            "changeStreams.optime must equal startAtOperationTime before any getMore",
+        );
+    });
+
+    it("optime initialized to cluster time with no start option", function () {
+        const comment = "optime initialized to cluster time with no start option";
+
+        // TODO SERVER-128391: Investigate why using 'getClusterTime()' from change_stream_util.js
+        // does not work in disagg test suites.
+        const currentClusterTime = getClusterTimeFromInsert(testDB);
+        let cursor = this.cursorList.push(testColl.watch([], {comment, cursor: {batchSize: 0}}));
+
+        const idleCursor = getIdleCursor(comment, cursor);
+
+        jsTest.log.info("Important timestamps", {
+            clusterTimeFromHello: getClusterTime(testDB),
+            clusterTimeFromInsert: currentClusterTime,
+            clusterTimeFromAdminDB: getClusterTime(testDB.getSiblingDB("admin")),
+            changeStreamOptime: idleCursor.cursor.changeStreams.optime,
+        });
+
+        const optime = idleCursor.cursor.changeStreams.optime;
+        assert(optime instanceof Timestamp, "Expected changeStreams.optime to be a timestamp", {idleCursor});
+        assert.gte(
+            optime,
+            currentClusterTime,
+            "Expected changeStreams.optime greater or equal to the cluster time snapshot",
+            {idleCursor},
+        );
+    });
+
+    it("optime advances monotonically across successive getMores", function () {
+        const comment = "optime advances monotonically across successive getMores";
+        let prevOptime = getClusterTimeFromInsert(testDB);
+        const cursor = this.cursorList.push(testColl.watch([], {comment, cursor: {batchSize: 0}}));
+
+        for (let i = 0; i < 3; i++) {
+            assert.commandWorked(testColl.insert({_id: `multi${i}`}));
+            assert.soon(() => cursor.hasNext());
+            const event = cursor.next();
+            const idleCursor = getIdleCursor(comment, cursor);
+            const optime = idleCursor.cursor.changeStreams.optime;
+            assert(optime instanceof Timestamp, `Expected optime after getMore ${i}`, {idleCursor});
+            assert.gte(optime, event.clusterTime, "Expected optime >= event clusterTime");
+            assert.gt(optime, prevOptime, "Expected optime to advance between getMores");
+            prevOptime = optime;
+        }
     });
 });

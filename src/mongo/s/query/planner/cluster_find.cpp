@@ -1080,6 +1080,8 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     {
         CurOp::get(opCtx)->debug().nShards = pinnedCursor.getValue()->getNumRemotes();
         CurOp::get(opCtx)->debug().cursorid = cursorId;
+        CurOp::get(opCtx)->debug().isChangeStreamQuery =
+            pinnedCursor.getValue()->isChangeStreamCursor();
         std::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setShouldOmitDiagnosticInformation(
             lk, pinnedCursor.getValue()->shouldOmitDiagnosticInformation());
@@ -1222,6 +1224,13 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     opDebug.cursorExhausted = (idToReturn == 0);
     opDebug.getAdditiveMetrics().nBatches = 1;
     CurOp::get(opCtx)->setEndOfOpMetrics(batch.size());
+    if (opDebug.isChangeStreamQuery) {
+        tassert(12552801,
+                "expected a post batch resume token for change stream query on the sharded cluster",
+                !postBatchResumeToken.isEmpty());
+        opDebug.changeStreamMetrics.setOptime(
+            ResumeToken::parse(postBatchResumeToken).getClusterTime());
+    }
 
     const bool partialResultsReturned = pinnedCursor.getValue()->partialResultsReturned();
     pinnedCursor.getValue()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());

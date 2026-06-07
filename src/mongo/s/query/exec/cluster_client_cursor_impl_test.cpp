@@ -549,5 +549,62 @@ TEST_F(ClusterClientCursorImplTest, ChangeStreamCursorCanBeDisposedEvenIfTimeGoe
     ASSERT_EQ(0, logs.countBSONContainingSubset(BSON("id" << 23077)));
 }
 
+TEST_F(ClusterClientCursorImplTest, UpdateCursorMetricsStoresOptimeForChangeStream) {
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::make_unique<RouterStageMock>(_opCtx.get()),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none /* ReadPreferenceSetting */,
+                                  boost::none /* repl::ReadConcernArgs */,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+
+    ChangeStreamCursorMetrics csMetrics;
+    csMetrics.setOptime(Timestamp(100, 1));
+    cursor.updateMetrics(csMetrics);
+
+    ASSERT(cursor.getChangeStreamMetrics().has_value());
+    ASSERT_EQ(Timestamp(100, 1), *cursor.getChangeStreamMetrics()->getOptime());
+}
+
+TEST_F(ClusterClientCursorImplTest, UpdateCursorMetricsIgnoredForNonChangeStreamCursor) {
+    // isChangeStreamQuery defaults to false — cursor is not a change stream cursor.
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::make_unique<RouterStageMock>(_opCtx.get()),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none /* ReadPreferenceSetting */,
+                                  boost::none /* repl::ReadConcernArgs */,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+
+    ChangeStreamCursorMetrics csMetrics;
+    csMetrics.setOptime(Timestamp(100, 1));
+    cursor.updateMetrics(csMetrics);
+
+    ASSERT_FALSE(cursor.getChangeStreamMetrics().has_value());
+}
+
+TEST_F(ClusterClientCursorImplTest, UpdateCursorMetricsIgnoresNullOptime) {
+    CurOp::get(_opCtx.get())->debug().isChangeStreamQuery = true;
+    ClusterClientCursorImpl cursor(
+        _opCtx.get(),
+        std::make_unique<RouterStageMock>(_opCtx.get()),
+        ClusterClientCursorParams(NamespaceString::createNamespaceString_forTest("unused"),
+                                  APIParameters(),
+                                  boost::none /* ReadPreferenceSetting */,
+                                  boost::none /* repl::ReadConcernArgs */,
+                                  OperationSessionInfoFromClient()),
+        boost::none);
+
+    ChangeStreamCursorMetrics csMetrics;  // optime not set (boost::none)
+    cursor.updateMetrics(csMetrics);
+
+    ASSERT_FALSE(cursor.getChangeStreamMetrics().has_value());
+}
+
 }  // namespace
 }  // namespace mongo

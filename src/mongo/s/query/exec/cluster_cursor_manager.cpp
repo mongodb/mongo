@@ -115,6 +115,9 @@ GenericCursor cursorToGenericCursor(ClusterClientCursor* cursor,
             gc.setPeakTrackedMemBytes(peakTrackedMemBytes);
         }
     }
+    if (cursor->isChangeStreamCursor()) {
+        gc.setChangeStreams(cursor->getChangeStreamMetrics());
+    }
     return gc;
 }
 

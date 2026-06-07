@@ -1459,6 +1459,29 @@ TEST_F(ClusterCursorManagerTest, ChangeStreamCursorMetricsTrackPinned) {
     ASSERT_EQ(capturer.readInt64Counter(MetricNames::kChangeStreamCursorsOpenPinned), 0);
 }
 
+TEST_F(ClusterCursorManagerTest, CursorToGenericCursorIncludesChangeStreamMetrics) {
+    auto cursorId =
+        assertGet(getManager()->registerCursor(getOperationContext(),
+                                               allocateMockCursor(boost::none, boost::none, true),
+                                               nss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               boost::none));
+
+    auto pinnedCursor =
+        getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
+    ASSERT_OK(pinnedCursor.getStatus());
+
+    ChangeStreamCursorMetrics csMetrics;
+    csMetrics.setOptime(Timestamp(42, 7));
+    pinnedCursor.getValue()->updateMetrics(csMetrics);
+
+    auto gc = pinnedCursor.getValue().toGenericCursor();
+    ASSERT(gc.getChangeStreams().has_value());
+    ASSERT(gc.getChangeStreams()->getOptime().has_value());
+    ASSERT_EQ(Timestamp(42, 7), *gc.getChangeStreams()->getOptime());
+}
+
 
 }  // namespace
 

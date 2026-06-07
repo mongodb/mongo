@@ -266,11 +266,27 @@ public:
         _metrics.incrementNBatches();
     }
 
-    void incrementCursorMetrics(const OpDebug::AdditiveMetrics& newMetrics) {
+    void updateMetrics(const OpDebug::AdditiveMetrics& newMetrics) {
         _metrics.add(newMetrics);
         if (!_firstResponseExecutionTime) {
             _firstResponseExecutionTime = _metrics.executionTime;
         }
+    }
+
+    void updateMetrics(const ChangeStreamCursorMetrics& csMetrics) {
+        if (!isChangeStreamCursor()) {
+            return;
+        }
+        if (csMetrics.getOptime() && !csMetrics.getOptime()->isNull()) {
+            if (!_changeStreamMetrics) {
+                _changeStreamMetrics.emplace();
+            }
+            _changeStreamMetrics->setOptime(csMetrics.getOptime());
+        }
+    }
+
+    const boost::optional<ChangeStreamCursorMetrics>& getChangeStreamMetrics() const {
+        return _changeStreamMetrics;
     }
 
     //
@@ -333,6 +349,9 @@ protected:
 
     // The execution time collected from the initial operation prior to any getMore requests.
     boost::optional<Microseconds> _firstResponseExecutionTime;
+
+    // Change stream cursor metrics, updated on each cursor unpin.
+    boost::optional<ChangeStreamCursorMetrics> _changeStreamMetrics;
 
 private:
     // Unused maxTime budget for this cursor.

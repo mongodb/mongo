@@ -58,12 +58,12 @@ void collectQueryStatsMongos(OperationContext* opCtx, std::unique_ptr<query_stat
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor) {
     auto& opDebug = CurOp::get(opCtx)->debug();
     opDebug.getAdditiveMetrics().aggregateDataBearingNodeMetrics(cursor->takeRemoteMetrics());
-    cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().getAdditiveMetrics());
+    cursor->updateMetrics(opDebug.getAdditiveMetrics());
+    cursor->updateMetrics(opDebug.changeStreamMetrics);
 
     // For a change stream query that never ends, we want to collect query stats on the initial
     // query and each getMore. Here we record the initial query.
     if (cursor->getQueryStatsWillNeverExhaust()) {
-        auto& opDebug = CurOp::get(opCtx)->debug();
 
         auto snapshot = query_stats::captureMetrics(
             opCtx,
@@ -82,12 +82,12 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& 
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor) {
     auto& opDebug = CurOp::get(opCtx)->debug();
     opDebug.getAdditiveMetrics().aggregateDataBearingNodeMetrics(cursor->takeRemoteMetrics());
-    cursor->incrementCursorMetrics(CurOp::get(opCtx)->debug().getAdditiveMetrics());
+    cursor->updateMetrics(opDebug.getAdditiveMetrics());
+    cursor->updateMetrics(opDebug.changeStreamMetrics);
 
     // For a change stream query that never ends, we want to update query stats for every getMore on
     // the cursor.
     if (cursor->getQueryStatsWillNeverExhaust()) {
-        auto& opDebug = CurOp::get(opCtx)->debug();
 
         auto snapshot = query_stats::captureMetrics(
             opCtx,

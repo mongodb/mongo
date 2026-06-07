@@ -613,6 +613,21 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     opDebug.getAdditiveMetrics().nBatches = 1;
     CurOp::get(opCtx)->setEndOfOpMetrics(responseBuilder.numDocs());
 
+    if (opDebug.isChangeStreamQuery) {
+        auto pbrt = ccc->getPostBatchResumeToken();
+        // On each shard, PlanExecutorPipeline::_performChangeStreamsAccounting() unconditionally
+        // includes a PBRT in every batch response — either the last returned event's resume token
+        // or a high-water-mark token when the oplog advanced but no matching events were found.
+        // On mongoS, AsyncResultsMerger tracks the minimum promised sort key across all shards and
+        // surfaces it as the cluster-level high water mark via ClusterClientCursor::
+        // getPostBatchResumeToken(). Because every shard response carries a PBRT, the merged high
+        // water mark is always non-empty after the first batch.
+        tassert(12552800,
+                "expected a post batch resume token for change stream query on the sharded cluster",
+                !pbrt.isEmpty());
+        opDebug.changeStreamMetrics.setOptime(ResumeToken::parse(pbrt).getClusterTime());
+    }
+
     if (exhausted) {
         opDebug.getAdditiveMetrics().aggregateDataBearingNodeMetrics(ccc->takeRemoteMetrics());
         collectQueryStatsMongos(opCtx, ccc->takeKey());
@@ -1089,7 +1104,8 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
             ars.done());
 
     uassertStatusOK(response.swResponse);
-    auto commandStatus = getStatusFromCommandResult(response.swResponse.getValue().data);
+    const BSONObj& responseData = response.swResponse.getValue().data;
+    auto commandStatus = getStatusFromCommandResult(responseData);
 
     if (ErrorCodes::isStaleShardVersionError(commandStatus.code())) {
         uassertStatusOK(commandStatus.withContext("command failed because of stale config"));
@@ -1101,15 +1117,29 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
     BSONObj result;
     if (explain) {
         // If this was an explain, then we get back an explain result object rather than a cursor.
-        result = response.swResponse.getValue().data;
+        result = responseData;
         collectQueryStatsMongos(opCtx,
                                 std::move(CurOp::get(opCtx)->debug().getQueryStatsInfo().key));
     } else {
+        // Populate changeStreamMetrics before storePossibleCursor, because storePossibleCursor
+        // calls collectQueryStatsMongos which transfers these metrics into the cursor so they
+        // appear in $currentOp output. The $_passthroughToShard path skips
+        // dispatchPipelineAndMerge, which is normally responsible for this step.
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        if (opDebug.isChangeStreamQuery && commandStatus.isOK()) {
+            auto pbrt =
+                responseData.getObjectField("cursor").getObjectField("postBatchResumeToken");
+            tassert(12552802,
+                    "expected a postBatchResumeToken in the shard response for a change stream "
+                    "$_passthroughToShard cursor",
+                    !pbrt.isEmpty());
+            opDebug.changeStreamMetrics.setOptime(ResumeToken::parse(pbrt).getClusterTime());
+        }
         result = uassertStatusOK(storePossibleCursor(
             opCtx,
             shardId,
             *response.shardHostAndPort,
-            response.swResponse.getValue().data,
+            responseData,
             namespaces.requestedNss,
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
             Grid::get(opCtx)->getCursorManager(),
