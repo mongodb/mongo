@@ -2,7 +2,10 @@ import {getPlanRankerMode, getAutomaticCEPlanRankingStrategy} from "jstests/libs
 import {
     checkSbeStatus,
     checkJoinOptimizationStatus,
+    checkSbeNonLeadingMatchEnabled,
+    checkSbeEqLookupUnwindEnabled,
     checkSbeTransformStagesEnabled,
+    isDeferredGetExecutorEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 // Run any set-up necessary for a golden jstest. This function should be called from the suite
@@ -30,8 +33,12 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     const planRankerMode = getPlanRankerMode(typeof db === "undefined" ? null : db);
     const autoPlanRankingStrategy = getAutomaticCEPlanRankingStrategy(typeof db === "undefined" ? null : db);
     const joinOptimizationStatus = checkJoinOptimizationStatus(typeof db === "undefined" ? null : db);
+    const sbeNonLeadingMatchEnabled = checkSbeNonLeadingMatchEnabled(typeof db === "undefined" ? null : db);
+    const sbeEqLookupUnwindEnabled = checkSbeEqLookupUnwindEnabled(typeof db === "undefined" ? null : db);
     const sbeTransformStagesEnabled = checkSbeTransformStagesEnabled(typeof db === "undefined" ? null : db);
-    const sbeIndividualFeaturesEnabled = sbeTransformStagesEnabled;
+    const deferredGetExecutorStatus = isDeferredGetExecutorEnabled(typeof db === "undefined" ? null : db);
+    const sbeIndividualFeaturesEnabled =
+        sbeNonLeadingMatchEnabled && sbeEqLookupUnwindEnabled && sbeTransformStagesEnabled;
 
     const sbeIndividualFeaturesExpectedExists = fileExists(
         relativePathToExpectedOutput + "/sbeIndividualFeatures/" + outputName,
@@ -44,12 +51,18 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
             : relativePathToExpectedOutput + "/" + planRankerMode + "/" + autoPlanRankingStrategy;
     const planRankerModeExpectedExists = fileExists(outputDirPlanRanking + "/" + outputName);
 
+    const deferredGetExecutorExpectedExists = fileExists(
+        relativePathToExpectedOutput + "/deferredGetExecutor/" + outputName,
+    );
+
     const joinOptimizationExpectedExists = fileExists(
         relativePathToExpectedOutput + "/internalEnableJoinOptimization/" + outputName,
     );
 
     if (joinOptimizationStatus && joinOptimizationExpectedExists) {
         relativePathToExpectedOutput += "/internalEnableJoinOptimization";
+    } else if (deferredGetExecutorStatus && deferredGetExecutorExpectedExists) {
+        relativePathToExpectedOutput += "/deferredGetExecutor";
     } else if (sbeIndividualFeaturesEnabled && sbeIndividualFeaturesExpectedExists) {
         relativePathToExpectedOutput += "/sbeIndividualFeatures";
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {

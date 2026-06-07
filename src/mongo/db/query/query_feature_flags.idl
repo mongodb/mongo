@@ -425,8 +425,8 @@ feature_flags:
         description: "Feature flag to enable non-leading $match in SBE."
         cpp_varname: gFeatureFlagSbeNonLeadingMatch
         fcv_gated: false
-        default: true
-        incremental_rollout_phase: rollout
+        default: false
+        incremental_rollout_phase: in_development
 
     featureFlag2dsphereIndexVersion4:
         description: "Feature flag to enable v4 of 2dsphereIndexVersion."
@@ -445,16 +445,16 @@ feature_flags:
     featureFlagSbeEqLookupUnwind:
         description: "Feature flag to enable $lookup-$unwind in SBE."
         cpp_varname: gFeatureFlagSbeEqLookupUnwind
-        default: true
+        default: false
         fcv_gated: false
-        incremental_rollout_phase: rollout
+        incremental_rollout_phase: in_development
 
     featureFlagGetExecutorDeferredEngineChoice:
         description: "Feature flag to enable engine selection based on query plan, rather than query text."
         cpp_varname: gFeatureFlagGetExecutorDeferredEngineChoice
         fcv_gated: false
-        default: true
-        incremental_rollout_phase: rollout
+        default: false
+        incremental_rollout_phase: in_development
 
     featureFlagImprovedDepsAnalysis:
         description: "Feature flag to enable pipeline rewrites that require a dependency graph"

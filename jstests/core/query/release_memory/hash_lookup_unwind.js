@@ -51,17 +51,6 @@ const sbeIncreasedSpillingInitialValue = getServerParameter(sbeIncreasedSpilling
 // HashLookup in SBE might use HashAgg. We want to control spilling. Disable increased spilling.
 setServerParameter(sbeIncreasedSpillingKnob, "never");
 
-// When the $project after $lookup-$unwind isn't pushed to SBE, the agg CursorStage wraps the SBE
-// plan and would otherwise drain it to EOF (and dispose it) before releaseMemory runs, leaving
-// nothing to spill. Force the DSCursor to read one doc at a time so the SBE exec stays alive.
-// TODO SERVER-127608 set parameters with try/finally to avoid leaking changed values on failure
-const dsCursorKnobs = ["internalDocumentSourceCursorInitialBatchSize", "internalDocumentSourceCursorBatchSizeBytes"];
-const dsCursorKnobValues = [];
-for (const knob of dsCursorKnobs) {
-    dsCursorKnobValues.push(getServerParameter(knob));
-    setServerParameter(knob, 1);
-}
-
 // 'locations' is used as the foreign collection for $lookup.
 const locations = db[jsTestName() + "_locations"];
 locations.drop();
@@ -245,6 +234,3 @@ for (let pipeline of [pipeline1, pipeline2, pipeline3]) {
 }
 
 setServerParameter(sbeIncreasedSpillingKnob, sbeIncreasedSpillingInitialValue);
-for (let i = 0; i < dsCursorKnobs.length; i++) {
-    setServerParameter(dsCursorKnobs[i], dsCursorKnobValues[i]);
-}

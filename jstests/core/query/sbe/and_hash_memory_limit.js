@@ -20,11 +20,10 @@
  */
 
 import {getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeFullyEnabled, isDeferredGetExecutorEnabled} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {runWithParamsAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
-// Deferred get_executor path does not run AND_HASH plans in SBE.
-if (!checkSbeFullyEnabled(db) || isDeferredGetExecutorEnabled(db)) {
+if (!checkSbeFullyEnabled(db)) {
     jsTest.log.info("Skipping test: SBE AND_HASH memory limit requires SBE to be fully enabled.");
     quit();
 }

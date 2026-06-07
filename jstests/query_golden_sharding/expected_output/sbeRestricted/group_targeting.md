@@ -693,14 +693,6 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"filter" : {
-							"_id" : {
-								"$lte" : "shard1_1"
-							}
-						},
-						"stage" : "MATCH"
-					},
-					{
 						"stage" : "GROUP"
 					},
 					{
@@ -713,6 +705,13 @@
 						"stage" : "COLLSCAN"
 					}
 				]
+			}
+		},
+		{
+			"$match" : {
+				"_id" : {
+					"$lte" : "shard1_1"
+				}
 			}
 		},
 		{
@@ -729,14 +728,6 @@
 				"rejectedPlans" : [ ],
 				"winningPlan" : [
 					{
-						"filter" : {
-							"_id" : {
-								"$lte" : "shard1_1"
-							}
-						},
-						"stage" : "MATCH"
-					},
-					{
 						"stage" : "GROUP"
 					},
 					{
@@ -749,6 +740,13 @@
 						"stage" : "COLLSCAN"
 					}
 				]
+			}
+		},
+		{
+			"$match" : {
+				"_id" : {
+					"$lte" : "shard1_1"
+				}
 			}
 		},
 		{

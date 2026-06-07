@@ -4,11 +4,11 @@
  *
  * @tags: [
  *      requires_sbe,
+ *      featureFlagSbeEqLookupUnwind,
  *      assumes_against_mongod_not_mongos,
  *      assumes_read_preference_unchanged,
  *      requires_pipeline_optimization,
  *      do_not_wrap_aggregations_in_facets,
- *      requires_fcv_90
  *  ]
  */
 

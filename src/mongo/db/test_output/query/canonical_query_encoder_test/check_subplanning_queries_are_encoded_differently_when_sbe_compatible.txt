@@ -7,33 +7,33 @@
         y $eq 2
 Sort: {}
 Proj: {}
-or[an[eqa,eqx],an[eqb,eqy]]||||ftr
+or[an[eqa,eqx],an[eqb,eqy]]||||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
     a $eq 1
     x $eq 1
 Sort: {}
 Proj: {}
-an[eqa,eqx]||||fts
+an[eqa,eqx]||||ffo
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
     b $eq 1
     y $eq 2
 Sort: {}
 Proj: {}
-an[eqb,eqy]||||fts
+an[eqb,eqy]||||ffo
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
     a $eq 1
     x $eq 1
 Sort: {}
 Proj: {}
-an[eqa,eqx]||||ftr
+an[eqa,eqx]||||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
     b $eq 1
     y $eq 2
 Sort: {}
 Proj: {}
-an[eqb,eqy]||||ftr
+an[eqb,eqy]||||ffs
 

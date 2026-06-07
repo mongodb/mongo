@@ -4,25 +4,14 @@
  * plan-based engine selection.
  *
  * @tags: [
- * requires_fcv_90
+ * featureFlagSbeEqLookupUnwind
  * ]
  */
 
 import {getEngine} from "jstests/libs/query/analyze_plan.js";
-import {checkSbeCompletelyDisabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {featureFlagGetExecutorDeferredEngineChoice: true}});
 const db = conn.getDB("engine_selection");
-
-// This test expects SBE to be selected, which cannot happen when forceClassicEngine is set.
-if (checkSbeCompletelyDisabled(db) || checkSbeFullyEnabled(db)) {
-    jsTest.log(
-        "Exiting early because forceClassicEngine is set or SBE is fully enabled, " +
-            "so engine selection won't be used.",
-    );
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 
 // Set logLevel to 1 so that all queries will be logged.
 assert.commandWorked(db.setLogLevel(1));

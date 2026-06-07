@@ -1,24 +1,24 @@
 ==== VARIATION: cq=ns=test.collectionTree: $and
 Sort: {}
 Proj: {}
-an||||ftr
+an||||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: $or
     a $eq 1
     b $eq 2
 Sort: {}
 Proj: {}
-or[eqa,eqb]||||ftr
+or[eqa,eqb]||||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: a $eq 1
 Sort: {}
 Proj: {}
-eqa||||ftr
+eqa||||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: b $eq 1
 Sort: {}
 Proj: {}
-eqb||||ftr
+eqb||||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
     a $eq 1
@@ -26,50 +26,50 @@ eqb||||ftr
     c $eq 1
 Sort: {}
 Proj: {}
-an[eqa,eqb,eqc]||||ftr
+an[eqa,eqb,eqc]||||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
 Sort: { a: 1 }
 Proj: {}
-an|aa|||ftr
+an|aa|||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
 Sort: { a: -1 }
 Proj: {}
-an|da|||ftr
+an|da|||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: a $eq 1
 Sort: { a: 1 }
 Proj: {}
-eqa|aa|||ftr
+eqa|aa|||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: a $eq 1
 Sort: { a: 1 }
 Proj: { a: 1 }
-eqa|aa|_id-a||ftr
+eqa|aa|_id-a||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
 Sort: { a: 1 }
 Proj: { a: 1 }
-an|aa|_id-a||ftr
+an|aa|_id-a||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
 Sort: { a: 1 }
 Proj: { a: 1 }
-an|aa|_id-a||ftr
+an|aa|_id-a||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
 Sort: {}
 Proj: { a: 1 }
-an||_id-a||ftr
+an||_id-a||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
 Sort: {}
 Proj: { a: true }
-an||_id-a||ftr
+an||_id-a||ffs
 
 ==== VARIATION: cq=ns=test.collectionTree: $and
 Sort: {}
 Proj: { a: false }
-an||||ftr
+an||||ffs
 
