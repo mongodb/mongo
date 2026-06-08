@@ -242,21 +242,25 @@ class Suite(object):
 
                     # ensures that select_tests results is only used if no exceptions or type errors are thrown from it
                     if select_tests_succeeds_flag and use_test_selection:
-                        evergreen_filtered_tests = result["tests"]
-                        evergreen_excluded_tests = set(
-                            evergreen_filtered_tests
-                        ).symmetric_difference(set(tests))
+                        evergreen_filtered_tests_set = set(result["tests"])
+                        # Intersect with the tag-filtered list so that TSS can only reduce
+                        # the set of tests to run, never expand it. Without this, TSS could
+                        # return tests that were excluded by the resource_intensive tag split,
+                        # causing the same test to run in both the resource-intensive suite
+                        # and the normal suite.
+                        tss_selected = [t for t in tests if t in evergreen_filtered_tests_set]
+                        evergreen_excluded_tests = set(tests) - evergreen_filtered_tests_set
                         loggers.ROOT_EXECUTOR_LOGGER.info(
                             f"Evergreen applied the following test selection strategies: {test_selection_strategy}"
                         )
                         loggers.ROOT_EXECUTOR_LOGGER.info(
-                            f"to test after the test selection strategy was applied: {evergreen_filtered_tests}"
+                            f"to test after the test selection strategy was applied: {tss_selected}"
                         )
                         loggers.ROOT_EXECUTOR_LOGGER.info(
                             f"to exclude the following tests: {evergreen_excluded_tests}"
                         )
                         excluded.extend(evergreen_excluded_tests)
-                        tests = evergreen_filtered_tests
+                        tests = tss_selected
 
         tests = self.filter_tests_for_shard(tests, _config.SHARD_COUNT, _config.SHARD_INDEX)
 

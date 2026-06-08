@@ -83,6 +83,8 @@ class TestGetTestsForKind(unittest.TestCase):
         self.default_evergreen_patch_build = under_test._config.EVERGREEN_PATCH_BUILD
         self.default_evergreen_task_name = under_test._config.EVERGREEN_TASK_NAME
         self.default_tss_enabled = under_test._config.TSS_ENABLED
+        self.default_selector = under_test._selector
+        self.default_evergreen_conn = under_test.evergreen_conn
 
     def tearDown(self):
         # Restore original suite configuration
@@ -103,6 +105,8 @@ class TestGetTestsForKind(unittest.TestCase):
             self.default_evergreen_test_selection_strategy
         )
         under_test._config.TSS_ENABLED = self.default_tss_enabled
+        under_test._selector = self.default_selector
+        under_test.evergreen_conn = self.default_evergreen_conn
 
     def test_simple(self):
         self.assertFalse(under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION)
@@ -159,6 +163,48 @@ class TestGetTestsForKind(unittest.TestCase):
                 tests=["test1", "test2"],
                 strategies="strategy",
             )
+
+    def test_tss_cannot_add_tests_outside_tag_filtered_list(self):
+        """TSS returning tests not in the tag-filtered list must not cause them to run.
+
+        When TestRunnerEvg splits a suite into "resource intensive" and "not resource intensive"
+        halves, each half is independently tag-filtered before TSS is called. If TSS returns
+        tests that were filtered out by tags (e.g. returning a resource_intensive test for the
+        "not resource intensive" suite), the current code accepts them via
+        `tests = evergreen_filtered_tests`, bypassing the tag filter. That test then runs in
+        both the resource-intensive suite (correct) and the normal suite (incorrect).
+        """
+        mock_selector = MagicMock()
+        # Simulate Suite B (not resource_intensive): tag filter produced only test_normal.js.
+        mock_selector.filter_tests.return_value = (["test_normal.js"], [])
+        # group_tests passes tests through unchanged.
+        mock_selector.group_tests.side_effect = lambda _kind, _cfg, tests: tests
+
+        under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION = True
+        under_test._config.EVERGREEN_PROJECT_NAME = "project"
+        under_test._config.EVERGREEN_VARIANT_NAME = "variant"
+        under_test._config.EVERGREEN_REQUESTER = "requester"
+        under_test._config.EVERGREEN_TASK_ID = "task_id"
+        under_test._config.EVERGREEN_TASK_NAME = "task_name"
+        under_test._config.EVERGREEN_TEST_SELECTION_STRATEGY = ["NotFailing"]
+        under_test._config.EVERGREEN_PATCH_BUILD = True
+        under_test._config.TSS_ENABLED = True
+
+        # TSS returns test_ri.js in addition to test_normal.js.  test_ri.js was not in the
+        # tag-filtered list — it belongs to the resource_intensive suite, not this one.
+        mock_evg_api = MagicMock()
+        mock_evg_api.select_tests.return_value = {
+            "tests": ["test_normal.js", "test_ri.js"],
+        }
+        under_test.evergreen_conn = MagicMock()
+        under_test.evergreen_conn.get_evergreen_api.return_value = mock_evg_api
+        under_test._selector = mock_selector
+
+        tests, excluded = self.suite._get_tests_for_kind("js_test")
+
+        # test_ri.js was not in the tag-filtered input; TSS must not be able to add it.
+        self.assertNotIn("test_ri.js", tests)
+        self.assertIn("test_normal.js", tests)
 
     def test_sharding(self):
         tests = ["1.js", "2.js", "3.js"]
