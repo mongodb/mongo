@@ -129,6 +129,14 @@ void WasmtimeScriptEngine::unregisterOperation(OperationContext* opCtx) {
     (*opCtx)[operationWasmtimeScopeDecoration] = nullptr;
 }
 
+void WasmtimeScriptEngine::enableJavaScriptProtection(bool value) {
+    gJavascriptProtection.store(value);
+}
+
+bool WasmtimeScriptEngine::isJavaScriptProtectionEnabled() const {
+    return gJavascriptProtection.load();
+}
+
 // TODO (SERVER-116056): Add memory tracking functionality
 int WasmtimeScriptEngine::getJSHeapLimitMB() const {
     return gJSHeapLimitMB.load();

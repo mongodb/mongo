@@ -122,12 +122,11 @@ void exitWithError(const int statusCode, const std::string& msg) {
 
 // Recursively scans a BSON object for operators that require the MozJS JavaScript engine.
 // Operators checked (will be removed from this check in the future when mozjs-wasm supports them):
-// TODO SERVER-116054: Add support for $where
 // TODO SERVER-127482: Re-enable $function once mozjs regex handling is fixed.
 bool containsUnsupportedJSWasmOperators(const BSONObj& obj) {
     for (const auto& elem : obj) {
         const auto fieldName = elem.fieldNameStringData();
-        if (fieldName == "$where"_sd || fieldName == "$function"_sd) {
+        if (fieldName == "$function"_sd) {
             return true;
         }
         if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
@@ -149,7 +148,6 @@ bool shouldSkipFile(const QueryFile& currFile, DBClientConnection* conn) {
     // operators, and if so, skip the file since those queries won't run successfully.
     // Remove this check once all MozJS functionality is supported in mozjs-wasm mode.
     // TODO SERVER-127482: Re-enable $function in version tests once mozjs regex handling is fixed.
-    // TODO SERVER-116054: Add support for $where
     static constexpr auto kMozJsWasmEngine = "mozjs-wasm"_sd;
     auto bob = BSONObjBuilder{};
     bob.append("buildInfo", 1);

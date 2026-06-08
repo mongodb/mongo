@@ -92,22 +92,24 @@ public:
     void advanceGeneration() override {}
     void requireOwnedObjects() override {}
 
-    // These methods are mongosh-specific and not needed as part of runtime. Probably could refactor
-    // to a separate interface if we wanted to implement mongosh support in Wasmtime.
     bool exec(StringData code,
               const std::string& name,
               bool printResult,
               bool reportError,
               bool assertOnError,
-              int timeoutMs = 0) override {
-        MONGO_UNREACHABLE
+              int timeoutMs = 0) override;
+
+    // These methods are mongosh-specific and not needed as part of the server runtime.
+    std::string getBaseURL() const override {
+        uasserted(11605402,
+                  "Calls to `getBaseURL()` are unsupported with this JS engine configuration");
     };
-    std::string getBaseURL() const override { MONGO_UNREACHABLE };
     void externalSetup() override {
-        MONGO_UNREACHABLE;
+        uasserted(11605403,
+                  "Calls to `externalSetup` are unsupported with this JS engine configuration.");
     }
     void gc() override {
-        MONGO_UNREACHABLE;
+        uasserted(11605404, "calls to `gc()` are unsupported in this JS engine configuration.");
     }
 
 protected:

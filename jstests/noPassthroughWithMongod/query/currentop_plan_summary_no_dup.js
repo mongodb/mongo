@@ -3,8 +3,6 @@
 // the cursor establishing command.
 //
 // @tags: [
-//   # TODO SERVER-116054: Add support for $where.
-//   mozjs_wasm_unsupported,
 // ]
 TestData.disableImplicitSessions = true;
 

@@ -14,8 +14,6 @@
  *   do_not_wrap_aggregations_in_facets,
  *   # featureFlagImprovedDepsAnalysis behavior can differ across FCV boundaries.
  *   cannot_run_during_upgrade_downgrade,
- *   # TODO SERVER-116052: Add support for $function.
- *   mozjs_wasm_unsupported,
  * ]
  */
 import {it} from "jstests/libs/mochalite.js";

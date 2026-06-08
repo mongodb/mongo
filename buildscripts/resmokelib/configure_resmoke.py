@@ -779,7 +779,6 @@ flags in common: {common_set}
 
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
 
-    # TODO SERVER-116054: Add support for $where
     # TODO SERVER-127482: Re-enable $function in version tests once mozjs regex handling is fixed.
     # Remove this js_engine handling section and _detect_js_engine once mozjs-wasm supports all WASM functionality,
     # eliminating the need for this startup-time binary invocation.
@@ -787,6 +786,8 @@ flags in common: {common_set}
     if _config.JS_ENGINE == "mozjs-wasm":
         _config.EXCLUDE_WITH_ANY_TAGS.append("mozjs_wasm_unsupported")
         _config.EXCLUDE_FILES = _find_mozjs_jstestfuzz_files()
+    else:
+        _config.EXCLUDE_WITH_ANY_TAGS.append("requires_mozjs_wasm")
 
     mongod_set_parameters = config.pop("mongod_set_parameters")
 
@@ -1195,8 +1196,6 @@ def _set_logging_config():
 _MOZJS_PATTERNS = (
     # TODO SERVER-127482: Re-enable $function in version tests once mozjs regex handling is fixed.
     '"$function"',
-    # TODO SERVER-116054: Add support for $where.
-    '"$where"',
 )
 
 

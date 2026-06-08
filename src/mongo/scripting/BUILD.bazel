@@ -43,10 +43,13 @@ mongo_cc_library(
         "jsexception.cpp",
         "mongo_path_util.cpp",
         "utils.cpp",
+        ":config_engine_gen",
         ":config_gen",
         ":deadline_monitor_gen",
+        "//src/mongo/scripting/mozjs/common:hex_md5.cpp",
     ],
     hdrs = [
+        ":config_engine_gen",
         ":config_gen",
     ],
     deps = [
@@ -54,7 +57,6 @@ mongo_cc_library(
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db:server_base",
         "//src/mongo/shell:mongojs",
-        "//src/mongo/util:md5",
     ],
 )
 
