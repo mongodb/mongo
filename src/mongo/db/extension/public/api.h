@@ -809,7 +809,7 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      * The host calls this instead of a per-rule function pointer, so that the extension stage can
      * dispatch to the correct rule internally. Writes the boolean result to `*result`.
      */
-    MongoExtensionStatus* (*evaluate_rule_precondition)(
+    MongoExtensionStatus* (*evaluate_pipeline_rewrite_rule_precondition)(
         const MongoExtensionLogicalAggStage* logicalStage,
         MongoExtensionByteView ruleName,
         const MongoExtensionPipelineRewriteContext* ctx,
@@ -827,10 +827,11 @@ typedef struct MongoExtensionLogicalAggStageVTable {
      * matching stages one at a time. Return false once no further modification is possible to stop
      * requeuing.
      */
-    MongoExtensionStatus* (*evaluate_rule_transform)(MongoExtensionLogicalAggStage* logicalStage,
-                                                     MongoExtensionByteView ruleName,
-                                                     MongoExtensionPipelineRewriteContext* ctx,
-                                                     bool* result);
+    MongoExtensionStatus* (*evaluate_pipeline_rewrite_rule_transform)(
+        MongoExtensionLogicalAggStage* logicalStage,
+        MongoExtensionByteView ruleName,
+        MongoExtensionPipelineRewriteContext* ctx,
+        bool* result);
 
     /**
      * Populates the filter predicate that will be applied by the stage, if applicable. If the stage
@@ -1155,7 +1156,7 @@ typedef struct MongoExtensionPipelineRewriteContextVTable {
      */
     MongoExtensionStatus* (*erase_nth_next_stage)(MongoExtensionPipelineRewriteContext* ctx,
                                                   size_t index,
-                                                  bool* out);
+                                                  bool* result);
 
     /**
      * Populates out with true if the underlying pipeline wrapped by
@@ -1163,7 +1164,7 @@ typedef struct MongoExtensionPipelineRewriteContextVTable {
      * otw.
      */
     MongoExtensionStatus* (*has_at_least_n_next_stages)(
-        const MongoExtensionPipelineRewriteContext* ctx, size_t n, bool* out);
+        const MongoExtensionPipelineRewriteContext* ctx, size_t n, bool* result);
 
     /**
      * Computes the DocsNeededBounds for all stages in the pipeline after the current stage
@@ -1189,7 +1190,7 @@ typedef struct MongoExtensionPipelineDependenciesVTable {
      */
     MongoExtensionStatus* (*needs_metadata)(const MongoExtensionPipelineDependencies* deps,
                                             MongoExtensionByteView name,
-                                            bool* out);
+                                            bool* result);
 
     /**
      * Populates 'out' with true if the pipeline references the builtin variable identified
@@ -1197,13 +1198,13 @@ typedef struct MongoExtensionPipelineDependenciesVTable {
      */
     MongoExtensionStatus* (*needs_variable)(const MongoExtensionPipelineDependencies* deps,
                                             MongoExtensionByteView name,
-                                            bool* out);
+                                            bool* result);
 
     /**
      * Populates 'out' with true if the pipeline requires the full document.
      */
     MongoExtensionStatus* (*needs_whole_document)(const MongoExtensionPipelineDependencies* deps,
-                                                  bool* out);
+                                                  bool* result);
 
     /**
      * Populates 'result' with a BSON array of dotted field-path strings representing the specific

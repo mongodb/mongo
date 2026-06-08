@@ -150,27 +150,28 @@ private:
         });
     }
 
-    static ::MongoExtensionStatus* _hostEvaluateRulePrecondition(
+    static ::MongoExtensionStatus* _hostEvaluatePipelineRewriteRulePrecondition(
         const ::MongoExtensionLogicalAggStage* logicalStage,
         ::MongoExtensionByteView ruleName,
         const ::MongoExtensionPipelineRewriteContext* ctx,
         bool* result) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(12303707,
-                      "_hostEvaluateRulePrecondition should not be called on a host-allocated "
-                      "logical stage.");
+                      "_hostEvaluatePipelineRewriteRulePrecondition should not be called on a "
+                      "host-allocated logical stage.");
         });
     }
 
-    static ::MongoExtensionStatus* _hostEvaluateRuleTransform(
+    static ::MongoExtensionStatus* _hostEvaluatePipelineRewriteRuleTransform(
         ::MongoExtensionLogicalAggStage* logicalStage,
         ::MongoExtensionByteView ruleName,
         ::MongoExtensionPipelineRewriteContext* ctx,
         bool* result) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(12303708,
-                      "_hostEvaluateRuleTransform should not be called on a host-allocated logical "
-                      "stage.");
+                      "_hostEvaluatePipelineRewriteRuleTransform should not be called on a "
+                      "host-allocated "
+                      "logical stage.");
         });
     }
 
@@ -226,8 +227,9 @@ private:
         .clone = &_hostClone,
         .set_vector_search_limit_for_optimization_deprecated =
             &_hostSetVectorSearchLimitForOptimization,
-        .evaluate_rule_precondition = &_hostEvaluateRulePrecondition,
-        .evaluate_rule_transform = &_hostEvaluateRuleTransform,
+        .evaluate_pipeline_rewrite_rule_precondition =
+            &_hostEvaluatePipelineRewriteRulePrecondition,
+        .evaluate_pipeline_rewrite_rule_transform = &_hostEvaluatePipelineRewriteRuleTransform,
         .get_filter = &_hostGetFilter,
         .apply_pipeline_suffix_dependencies = &_hostApplyPipelineSuffixDependencies,
         .get_sort_pattern = &_hostGetSortPattern,

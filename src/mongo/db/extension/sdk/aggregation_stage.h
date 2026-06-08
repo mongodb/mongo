@@ -132,8 +132,8 @@ public:
     /**
      * Evaluates the precondition of the rule identified by name. Extensions override this.
      */
-    virtual bool evaluateRulePrecondition(
-        std::string_view ruleNam, ConstPipelineRewriteContextHandle pipelineRewriteContext) const {
+    virtual bool evaluatePipelineRewriteRulePrecondition(
+        std::string_view ruleName, ConstPipelineRewriteContextHandle pipelineRewriteContext) const {
         return false;
     }
 
@@ -141,8 +141,8 @@ public:
      * Applies the transform of the rule identified by name. Extensions override this.
      * Returns true if the pipeline was modified.
      */
-    virtual bool evaluateRuleTransform(std::string_view ruleName,
-                                       PipelineRewriteContextHandle pipelineRewriteContext) {
+    virtual bool evaluatePipelineRewriteRuleTransform(
+        std::string_view ruleName, PipelineRewriteContextHandle pipelineRewriteContext) {
         return false;
     }
 
@@ -281,7 +281,7 @@ private:
         });
     }
 
-    static ::MongoExtensionStatus* _extEvaluateRulePrecondition(
+    static ::MongoExtensionStatus* _extEvaluatePipelineRewriteRulePrecondition(
         const ::MongoExtensionLogicalAggStage* extLogicalStage,
         ::MongoExtensionByteView ruleName,
         const ::MongoExtensionPipelineRewriteContext* ctx,
@@ -290,12 +290,12 @@ private:
             *result = false;
             auto& adapter = *static_cast<const ExtensionLogicalAggStageAdapter*>(extLogicalStage);
             ConstPipelineRewriteContextHandle rewriteContext{ctx};
-            *result = adapter.getImpl().evaluateRulePrecondition(byteViewAsStringView(ruleName),
-                                                                 rewriteContext);
+            *result = adapter.getImpl().evaluatePipelineRewriteRulePrecondition(
+                byteViewAsStringView(ruleName), rewriteContext);
         });
     }
 
-    static ::MongoExtensionStatus* _extEvaluateRuleTransform(
+    static ::MongoExtensionStatus* _extEvaluatePipelineRewriteRuleTransform(
         ::MongoExtensionLogicalAggStage* extLogicalStage,
         ::MongoExtensionByteView ruleName,
         ::MongoExtensionPipelineRewriteContext* ctx,
@@ -304,8 +304,8 @@ private:
             *result = false;
             auto& adapter = *static_cast<ExtensionLogicalAggStageAdapter*>(extLogicalStage);
             PipelineRewriteContextHandle rewriteContext{ctx};
-            *result = adapter.getImpl().evaluateRuleTransform(byteViewAsStringView(ruleName),
-                                                              rewriteContext);
+            *result = adapter.getImpl().evaluatePipelineRewriteRuleTransform(
+                byteViewAsStringView(ruleName), rewriteContext);
         });
     }
 
@@ -384,8 +384,8 @@ private:
         .clone = &_extClone,
         .set_vector_search_limit_for_optimization_deprecated =
             &_extSetVectorSearchLimitForOptimization,
-        .evaluate_rule_precondition = &_extEvaluateRulePrecondition,
-        .evaluate_rule_transform = &_extEvaluateRuleTransform,
+        .evaluate_pipeline_rewrite_rule_precondition = &_extEvaluatePipelineRewriteRulePrecondition,
+        .evaluate_pipeline_rewrite_rule_transform = &_extEvaluatePipelineRewriteRuleTransform,
         .get_filter = &_extGetFilter,
         .apply_pipeline_suffix_dependencies = &_extApplyPipelineSuffixDependencies,
         .get_sort_pattern = &_extGetSortPattern,

@@ -40,10 +40,10 @@ namespace mongo::extension::host_connector {
 ::MongoExtensionStatus* PipelineDependenciesAdapter::_hostNeedsMetadata(
     const ::MongoExtensionPipelineDependencies* deps,
     ::MongoExtensionByteView name,
-    bool* out) noexcept {
+    bool* result) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         const auto sv = byteViewAsStringView(name);
-        *out = static_cast<const PipelineDependenciesAdapter*>(deps)->getImpl().getNeedsMetadata(
+        *result = static_cast<const PipelineDependenciesAdapter*>(deps)->getImpl().getNeedsMetadata(
             DocumentMetadataFields::parseMetaType(StringData{sv.data(), sv.size()}));
     });
 }
@@ -51,19 +51,20 @@ namespace mongo::extension::host_connector {
 ::MongoExtensionStatus* PipelineDependenciesAdapter::_hostNeedsVariable(
     const ::MongoExtensionPipelineDependencies* deps,
     ::MongoExtensionByteView name,
-    bool* out) noexcept {
+    bool* result) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         const auto sv = byteViewAsStringView(name);
         const auto& variableRefs =
             static_cast<const PipelineDependenciesAdapter*>(deps)->getVariableRefs();
-        *out = variableRefs.contains(std::string(sv));
+        *result = variableRefs.contains(std::string(sv));
     });
 }
 
 ::MongoExtensionStatus* PipelineDependenciesAdapter::_hostNeedsWholeDocument(
-    const ::MongoExtensionPipelineDependencies* deps, bool* out) noexcept {
+    const ::MongoExtensionPipelineDependencies* deps, bool* result) noexcept {
     return wrapCXXAndConvertExceptionToStatus([&]() {
-        *out = static_cast<const PipelineDependenciesAdapter*>(deps)->getImpl().needWholeDocument;
+        *result =
+            static_cast<const PipelineDependenciesAdapter*>(deps)->getImpl().needWholeDocument;
     });
 }
 

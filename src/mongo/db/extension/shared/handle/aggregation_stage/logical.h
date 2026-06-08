@@ -93,15 +93,15 @@ public:
     /**
      * Evaluates the precondition of the rule identified by name. Return the precondition value.
      */
-    bool evaluateRulePrecondition(
+    bool evaluatePipelineRewriteRulePrecondition(
         StringData ruleName, MongoExtensionPipelineRewriteContext* pipelineRewriteContext) const;
 
     /**
      * Applies the transform of the rule identified by name. Returns true if pipeline was modified
      * and rule should be requeued in RBR engine.
      */
-    bool evaluateRuleTransform(StringData ruleName,
-                               MongoExtensionPipelineRewriteContext* pipelineRewriteContext);
+    bool evaluatePipelineRewriteRuleTransform(
+        StringData ruleName, MongoExtensionPipelineRewriteContext* pipelineRewriteContext);
 
     /**
      * Returns the filter predicate applied by this stage for shard targeting. Returns an empty
@@ -145,11 +145,11 @@ public:
                 "LogicalAggStage 'set_vector_search_limit_for_optimization' is null",
                 vtable.set_vector_search_limit_for_optimization_deprecated != nullptr);
         tassert(12201402,
-                "LogicalAggStage 'evaluate_rule_precondition' is null",
-                vtable.evaluate_rule_precondition != nullptr);
+                "LogicalAggStage 'evaluate_pipeline_rewrite_rule_precondition' is null",
+                vtable.evaluate_pipeline_rewrite_rule_precondition != nullptr);
         tassert(12201403,
-                "LogicalAggStage 'evaluate_rule_transform' is null",
-                vtable.evaluate_rule_transform != nullptr);
+                "LogicalAggStage 'evaluate_pipeline_rewrite_rule_transform' is null",
+                vtable.evaluate_pipeline_rewrite_rule_transform != nullptr);
         tassert(12200400, "LogicalAggStage 'get_filter' is null", vtable.get_filter != nullptr);
         tassert(12200100,
                 "LogicalAggStage 'apply_pipeline_suffix_dependencies' is null",

@@ -99,7 +99,7 @@ public:
         return serialize();
     }
 
-    bool evaluateRulePrecondition(
+    bool evaluatePipelineRewriteRulePrecondition(
         std::string_view ruleName,
         mongo::extension::ConstPipelineRewriteContextHandle ctx) const override {
         if (ruleName == "eraseStage") {
@@ -113,8 +113,8 @@ public:
         return ruleName == "noopInPlace" || ruleName == "applyPipelineBounds";
     }
 
-    bool evaluateRuleTransform(std::string_view ruleName,
-                               mongo::extension::PipelineRewriteContextHandle ctx) override {
+    bool evaluatePipelineRewriteRuleTransform(
+        std::string_view ruleName, mongo::extension::PipelineRewriteContextHandle ctx) override {
         // Reorder Rule Transforms
         if (ruleName == "eraseStage") {
             return ctx->eraseNthNext(1);

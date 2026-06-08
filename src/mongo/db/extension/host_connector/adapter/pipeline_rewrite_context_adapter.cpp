@@ -54,19 +54,19 @@ MongoExtensionStatus* PipelineRewriteContextAdapter::_hostGetNthNextStage(
 }
 
 MongoExtensionStatus* PipelineRewriteContextAdapter::_hostEraseNthNextStage(
-    MongoExtensionPipelineRewriteContext* ctx, size_t index, bool* out) {
+    MongoExtensionPipelineRewriteContext* ctx, size_t index, bool* result) {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         auto& pipelineRewriteCtx = static_cast<PipelineRewriteContextAdapter*>(ctx)->getCtxImpl();
-        *out = pipelineRewriteCtx.eraseNthNext(index);
+        *result = pipelineRewriteCtx.eraseNthNext(index);
     });
 }
 
 MongoExtensionStatus* PipelineRewriteContextAdapter::_hostHasAtLeastNNextStages(
-    const MongoExtensionPipelineRewriteContext* ctx, size_t n, bool* out) {
+    const MongoExtensionPipelineRewriteContext* ctx, size_t n, bool* result) {
     return wrapCXXAndConvertExceptionToStatus([&]() {
         const auto& pipelineRewriteCtx =
             static_cast<const PipelineRewriteContextAdapter*>(ctx)->getCtxImpl();
-        *out = pipelineRewriteCtx.hasAtLeastNNextStages(n);
+        *result = pipelineRewriteCtx.hasAtLeastNNextStages(n);
     });
 }
 
@@ -117,14 +117,14 @@ HostPipelineRewriteRule wrapExtensionRule(const extension::PipelineRewriteRule& 
             auto hostCtx = host::PipelineRewriteContext::make(&ctx);
             auto hostAdapter =
                 std::make_unique<host_connector::PipelineRewriteContextAdapter>(std::move(hostCtx));
-            return extensionStage->evaluateRulePrecondition(
+            return extensionStage->evaluatePipelineRewriteRulePrecondition(
                 StringData(ruleName.data(), ruleName.size()), hostAdapter.get());
         },
         .transform = [extensionStage, ruleName](PipelineRewriteContext& ctx) mutable -> bool {
             auto hostCtx = host::PipelineRewriteContext::make(&ctx);
             auto hostAdapter =
                 std::make_unique<host_connector::PipelineRewriteContextAdapter>(std::move(hostCtx));
-            return extensionStage->evaluateRuleTransform(
+            return extensionStage->evaluatePipelineRewriteRuleTransform(
                 StringData(ruleName.data(), ruleName.size()), hostAdapter.get());
         },
         .tags = tags,

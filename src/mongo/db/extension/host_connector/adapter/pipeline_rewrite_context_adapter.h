@@ -74,9 +74,9 @@ private:
         size_t index,
         MongoExtensionLogicalAggStage** out);
     static MongoExtensionStatus* _hostEraseNthNextStage(
-        MongoExtensionPipelineRewriteContext* extCtx, size_t index, bool* out);
+        MongoExtensionPipelineRewriteContext* extCtx, size_t index, bool* result);
     static MongoExtensionStatus* _hostHasAtLeastNNextStages(
-        const MongoExtensionPipelineRewriteContext* extCtx, size_t n, bool* out);
+        const MongoExtensionPipelineRewriteContext* extCtx, size_t n, bool* result);
     static MongoExtensionStatus* _hostGetPipelineSuffixBounds(
         const MongoExtensionPipelineRewriteContext* extCtx, MongoExtensionDocsNeededBounds* out);
 
@@ -98,8 +98,8 @@ private:
 
 /**
  * Wraps an extension PipelineRewriteRule into a host-side PipelineRewriteRule by adapting the
- * extension's evaluateRulePrecondition/evaluateRuleTransform vtable calls into the host's
- * rule-based rewriter precondition/transform function signatures.
+ * extension's evaluatePipelineRewriteRulePrecondition/evaluatePipelineRewriteRuleTransform vtable
+ * calls into the host's rule-based rewriter precondition/transform function signatures.
  */
 rule_based_rewrites::pipeline::PipelineRewriteRule wrapExtensionRule(
     const extension::PipelineRewriteRule& extRule, UnownedLogicalAggStageHandle extensionStage);

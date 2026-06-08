@@ -74,13 +74,13 @@ private:
     static ::MongoExtensionStatus* _hostNeedsMetadata(
         const ::MongoExtensionPipelineDependencies* deps,
         ::MongoExtensionByteView name,
-        bool* out) noexcept;
+        bool* result) noexcept;
     static ::MongoExtensionStatus* _hostNeedsVariable(
         const ::MongoExtensionPipelineDependencies* deps,
         ::MongoExtensionByteView name,
-        bool* out) noexcept;
+        bool* result) noexcept;
     static ::MongoExtensionStatus* _hostNeedsWholeDocument(
-        const ::MongoExtensionPipelineDependencies* deps, bool* out) noexcept;
+        const ::MongoExtensionPipelineDependencies* deps, bool* result) noexcept;
     static ::MongoExtensionStatus* _hostGetNeededFields(
         const ::MongoExtensionPipelineDependencies* deps,
         ::MongoExtensionByteBuf** result) noexcept;

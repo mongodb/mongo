@@ -106,25 +106,26 @@ void LogicalAggStageAPI::setExtractedLimitVal_deprecated(
     });
 }
 
-bool LogicalAggStageAPI::evaluateRulePrecondition(
+bool LogicalAggStageAPI::evaluatePipelineRewriteRulePrecondition(
     StringData ruleName, MongoExtensionPipelineRewriteContext* pipelineRewriteContext) const {
     bool result = false;
     auto nameView = ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(ruleName.data()),
                                              ruleName.size()};
     invokeCAndConvertStatusToException([&]() {
-        return _vtable().evaluate_rule_precondition(
+        return _vtable().evaluate_pipeline_rewrite_rule_precondition(
             get(), nameView, pipelineRewriteContext, &result);
     });
     return result;
 }
 
-bool LogicalAggStageAPI::evaluateRuleTransform(
+bool LogicalAggStageAPI::evaluatePipelineRewriteRuleTransform(
     StringData ruleName, MongoExtensionPipelineRewriteContext* pipelineRewriteContext) {
     bool result = false;
     auto nameView = ::MongoExtensionByteView{reinterpret_cast<const uint8_t*>(ruleName.data()),
                                              ruleName.size()};
     invokeCAndConvertStatusToException([&]() {
-        return _vtable().evaluate_rule_transform(get(), nameView, pipelineRewriteContext, &result);
+        return _vtable().evaluate_pipeline_rewrite_rule_transform(
+            get(), nameView, pipelineRewriteContext, &result);
     });
     return result;
 }

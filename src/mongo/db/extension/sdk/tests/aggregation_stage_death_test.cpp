@@ -438,13 +438,13 @@ DEATH_TEST(DistributedPlanLogicVTableDeathTest, InvalidDPLVTableFailsGetSortPatt
 
 DEATH_TEST(LogicalAggStageVTableDeathTest, NullEvaluateRulePreconditionTasserts, "12201402") {
     auto vtable = sdk::ExtensionLogicalAggStageAdapter::getVTable();
-    vtable.evaluate_rule_precondition = nullptr;
+    vtable.evaluate_pipeline_rewrite_rule_precondition = nullptr;
     LogicalAggStageAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(LogicalAggStageVTableDeathTest, NullEvaluateRuleTransformTasserts, "12201403") {
     auto vtable = sdk::ExtensionLogicalAggStageAdapter::getVTable();
-    vtable.evaluate_rule_transform = nullptr;
+    vtable.evaluate_pipeline_rewrite_rule_transform = nullptr;
     LogicalAggStageAPI::assertVTableConstraints(vtable);
 }
 

@@ -234,8 +234,9 @@ public:
         _neededFields = deps->getNeededFields();
     }
 
-    bool evaluateRulePrecondition(std::string_view ruleName,
-                                  extension::ConstPipelineRewriteContextHandle ctx) const override {
+    bool evaluatePipelineRewriteRulePrecondition(
+        std::string_view ruleName,
+        extension::ConstPipelineRewriteContextHandle ctx) const override {
         // $readNDocuments desugars to [$produceIds, $_internalSearchIdLookup, ...]. From
         // $produceIds, index 1 is the id-lookup stage and index 2 is the first user-added stage.
         if (ruleName == "applyMatchPushdown") {
@@ -253,8 +254,8 @@ public:
         return false;
     }
 
-    bool evaluateRuleTransform(std::string_view ruleName,
-                               extension::PipelineRewriteContextHandle ctx) override {
+    bool evaluatePipelineRewriteRuleTransform(
+        std::string_view ruleName, extension::PipelineRewriteContextHandle ctx) override {
         if (ruleName == "applyMatchPushdown") {
             ctx->eraseNthNext(2);
             return true;

@@ -107,8 +107,7 @@ MongoExtensionStatus* LoggerAdapter::_extShouldLog(::MongoExtensionLogSeverity l
         } else {
             severity = convertSeverity(levelOrSeverity);
         }
-        bool result = logv2::shouldLog(logv2::LogComponent::kExtensionMongot, severity);
-        *out = result;
+        *out = logv2::shouldLog(logv2::LogComponent::kExtensionMongot, severity);
     });
 }
 }  // namespace mongo::extension::host_connector
