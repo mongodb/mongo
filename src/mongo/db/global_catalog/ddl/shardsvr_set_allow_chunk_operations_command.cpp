@@ -184,9 +184,9 @@ public:
                     OperationShardingState::get(opCtx).getShardVersion(nss),
                     OperationShardingState::get(opCtx).getDbVersion(nss.dbName()));
 
-                // While holding an acquisition, write conflicts are likely, so wrap everything
-                // inside a writeConflictRetry.
-                // TODO (SERVER-127438): remove this outer writeConflictRetry loop.
+                // DBDirectClient retries WriteConflictException only when yielding is allowed.
+                // This command holds a CollectionAcquisition across the commit path, so yielding
+                // is disabled and WriteConflictException would otherwise propagate.
                 writeConflictRetry(newOpCtx, "ShardsvrSetAllowChunkOperations", nss, [&] {
                     // This command is invoked following the shard version protocol, so it is
                     // necessary to acquire the target collection to enforce it. Additionally,
