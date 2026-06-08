@@ -27,6 +27,9 @@ filters:
   - "standalone_recover_to_oplog_timestamp.js":
     approvers:
       - 10gen/server-recovery
+  - "standalone_recover_to_oplog_timestamp_multikey_metadata.js":
+    approvers:
+      - 10gen/server-recovery
   - "*startup_recovery*":
     approvers:
       - 10gen/server-recovery
