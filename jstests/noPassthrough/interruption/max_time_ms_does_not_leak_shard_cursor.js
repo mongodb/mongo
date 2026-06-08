@@ -55,7 +55,8 @@ assertNoIdleCursors(st.shard0, collName);
 
 // Perform a query that sleeps after retrieving each document. This is guaranteed to exceed the
 // specified maxTimeMS limit. The timeout may happen either on mongoS or on shard. The query might
-// occasionally return the 'NetworkInterfaceExceededTimeLimit' error.
+// occasionally return the 'NetworkInterfaceExceededTimeLimit' error. When the WASM JS engine is
+// used, the query might get killed with 'Interrupted'.
 {
     const curs = coll
         .find({
@@ -69,7 +70,7 @@ assertNoIdleCursors(st.shard0, collName);
     assert.eq(getIdleCursors(st.shard0, collName).length, 0);
     assert.throwsWithCode(
         () => curs.itcount(),
-        [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit],
+        [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit, ErrorCodes.Interrupted],
     );
     assertNoIdleCursors(st.shard0, collName, curs);
 }
