@@ -522,8 +522,7 @@ value::TagValueOwned ByteCode::builtinValueBlockAggCount(ArityType arity) {
         }
     }
 
-    return value::TagValueOwned(value::TypeTags::NumberInt64,
-                                value::bitcastFrom<int64_t>(n + count));
+    return value::TagValueOwned::numberInt64(n + count);
 }
 
 /*
@@ -1893,7 +1892,7 @@ value::TagValueMaybeOwned ByteCode::blockRoundTrunc(std::string funcName,
     if (arity == 2) {
         const auto placeView = viewFromStack(1);
         if (!value::isNumber(placeView.tag)) {
-            return value::TagValueMaybeOwned(false, value::TypeTags::Nothing, 0);
+            return value::TagValueMaybeOwned::nothing();
         }
         place = convertNumericToInt32(placeView);
     }
@@ -2496,7 +2495,7 @@ value::TagValueMaybeOwned ByteCode::builtinCellBlockGetFlatValuesBlock(ArityType
     auto [cellOwn, cellTag, cellVal] = getFromStack(0);
 
     if (cellTag != value::TypeTags::cellBlock) {
-        return value::TagValueMaybeOwned(false, value::TypeTags::Nothing, 0);
+        return value::TagValueMaybeOwned::nothing();
     }
     tassert(7946600, "Cannot process temporary cell values", !cellOwn);
 

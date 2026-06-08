@@ -564,6 +564,8 @@ struct TagValueView {
     static TagValueView numberInt32(int32_t v) noexcept;
     static TagValueView numberInt64(int64_t v) noexcept;
     static TagValueView numberDouble(double v) noexcept;
+    static TagValueView date(int64_t v) noexcept;
+    static TagValueView timestamp(uint64_t v) noexcept;
 };
 
 inline TagValueView rawToView(std::pair<TypeTags, Value> tv) {
@@ -589,6 +591,15 @@ public:
     static TagValueOwned fromRaw(TypeTags t, Value v) {
         return TagValueOwned(t, v);
     }
+
+    static TagValueOwned nothing() noexcept;
+    static TagValueOwned null() noexcept;
+    static TagValueOwned boolean(bool b) noexcept;
+    static TagValueOwned numberInt32(int32_t v) noexcept;
+    static TagValueOwned numberInt64(int64_t v) noexcept;
+    static TagValueOwned numberDouble(double v) noexcept;
+    static TagValueOwned date(int64_t v) noexcept;
+    static TagValueOwned timestamp(uint64_t v) noexcept;
 
     TagValueOwned() : _tag(TypeTags::Nothing), _value(0) {}
 
@@ -690,6 +701,15 @@ public:
     static TagValueMaybeOwned fromRaw(bool owned, TypeTags t, Value v) {
         return TagValueMaybeOwned(owned, t, v);
     }
+
+    static TagValueMaybeOwned nothing() noexcept;
+    static TagValueMaybeOwned null() noexcept;
+    static TagValueMaybeOwned boolean(bool b) noexcept;
+    static TagValueMaybeOwned numberInt32(int32_t v) noexcept;
+    static TagValueMaybeOwned numberInt64(int64_t v) noexcept;
+    static TagValueMaybeOwned numberDouble(double v) noexcept;
+    static TagValueMaybeOwned date(int64_t v) noexcept;
+    static TagValueMaybeOwned timestamp(uint64_t v) noexcept;
 
     TagValueMaybeOwned() : _owned(false), _tag(TypeTags::Nothing), _value(0) {}
 
@@ -921,6 +941,62 @@ inline TagValueView TagValueView::numberInt64(int64_t v) noexcept {
 }
 inline TagValueView TagValueView::numberDouble(double v) noexcept {
     return {TypeTags::NumberDouble, bitcastFrom<double>(v)};
+}
+inline TagValueView TagValueView::date(int64_t v) noexcept {
+    return {TypeTags::Date, bitcastFrom<int64_t>(v)};
+}
+inline TagValueView TagValueView::timestamp(uint64_t v) noexcept {
+    return {TypeTags::Timestamp, bitcastFrom<uint64_t>(v)};
+}
+
+inline TagValueOwned TagValueOwned::nothing() noexcept {
+    return TagValueOwned(TypeTags::Nothing, 0);
+}
+inline TagValueOwned TagValueOwned::null() noexcept {
+    return TagValueOwned(TypeTags::Null, 0);
+}
+inline TagValueOwned TagValueOwned::boolean(bool b) noexcept {
+    return TagValueOwned(TypeTags::Boolean, bitcastFrom<bool>(b));
+}
+inline TagValueOwned TagValueOwned::numberInt32(int32_t v) noexcept {
+    return TagValueOwned(TypeTags::NumberInt32, bitcastFrom<int32_t>(v));
+}
+inline TagValueOwned TagValueOwned::numberInt64(int64_t v) noexcept {
+    return TagValueOwned(TypeTags::NumberInt64, bitcastFrom<int64_t>(v));
+}
+inline TagValueOwned TagValueOwned::numberDouble(double v) noexcept {
+    return TagValueOwned(TypeTags::NumberDouble, bitcastFrom<double>(v));
+}
+inline TagValueOwned TagValueOwned::date(int64_t v) noexcept {
+    return TagValueOwned(TypeTags::Date, bitcastFrom<int64_t>(v));
+}
+inline TagValueOwned TagValueOwned::timestamp(uint64_t v) noexcept {
+    return TagValueOwned(TypeTags::Timestamp, bitcastFrom<uint64_t>(v));
+}
+
+inline TagValueMaybeOwned TagValueMaybeOwned::nothing() noexcept {
+    return TagValueMaybeOwned(false, TypeTags::Nothing, 0);
+}
+inline TagValueMaybeOwned TagValueMaybeOwned::null() noexcept {
+    return TagValueMaybeOwned(false, TypeTags::Null, 0);
+}
+inline TagValueMaybeOwned TagValueMaybeOwned::boolean(bool b) noexcept {
+    return TagValueMaybeOwned(false, TypeTags::Boolean, bitcastFrom<bool>(b));
+}
+inline TagValueMaybeOwned TagValueMaybeOwned::numberInt32(int32_t v) noexcept {
+    return TagValueMaybeOwned(false, TypeTags::NumberInt32, bitcastFrom<int32_t>(v));
+}
+inline TagValueMaybeOwned TagValueMaybeOwned::numberInt64(int64_t v) noexcept {
+    return TagValueMaybeOwned(false, TypeTags::NumberInt64, bitcastFrom<int64_t>(v));
+}
+inline TagValueMaybeOwned TagValueMaybeOwned::numberDouble(double v) noexcept {
+    return TagValueMaybeOwned(false, TypeTags::NumberDouble, bitcastFrom<double>(v));
+}
+inline TagValueMaybeOwned TagValueMaybeOwned::date(int64_t v) noexcept {
+    return TagValueMaybeOwned(false, TypeTags::Date, bitcastFrom<int64_t>(v));
+}
+inline TagValueMaybeOwned TagValueMaybeOwned::timestamp(uint64_t v) noexcept {
+    return TagValueMaybeOwned(false, TypeTags::Timestamp, bitcastFrom<uint64_t>(v));
 }
 
 template <typename T>

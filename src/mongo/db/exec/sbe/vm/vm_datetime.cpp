@@ -226,18 +226,18 @@ value::TagValueMaybeOwned genericDateExpressionAcceptingTimeZone(value::TagValue
                       value::TypeTags::Timestamp,
                       value::TypeTags::ObjectId,
                       value::TypeTags::bsonObjectId)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto dateMs = getDate(date);
 
     if (tzDB.tag != value::TypeTags::timeZoneDB) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto timezoneDB = value::getTimeZoneDBView(tzDB.value);
 
     // Get timezone.
     if (!value::isString(tz.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto timezone = getTimezone(tz, timezoneDB);
 
@@ -246,11 +246,9 @@ value::TagValueMaybeOwned genericDateExpressionAcceptingTimeZone(value::TagValue
 
     if constexpr (std::is_same<Op, ISOWeekYear>::value) {
         // convert type to long to be compatible with classic
-        return {false,
-                value::TypeTags::NumberInt64,
-                value::bitcastFrom<int64_t>(static_cast<int64_t>(result))};
+        return value::TagValueMaybeOwned::numberInt64(static_cast<int64_t>(result));
     } else {
-        return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(result)};
+        return value::TagValueMaybeOwned::numberInt32(result);
     }
 }
 
@@ -267,12 +265,12 @@ value::TagValueMaybeOwned genericDateExpressionAcceptingTimeZone(value::TagValue
                       value::TypeTags::Timestamp,
                       value::TypeTags::ObjectId,
                       value::TypeTags::bsonObjectId)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto dateMs = getDate(date);
 
     if (!value::isTimeZone(tz.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto timezone = *value::getTimeZoneView(tz.value);
 
@@ -281,11 +279,9 @@ value::TagValueMaybeOwned genericDateExpressionAcceptingTimeZone(value::TagValue
 
     if constexpr (std::is_same<Op, ISOWeekYear>::value) {
         // convert type to long to be compatible with classic
-        return {false,
-                value::TypeTags::NumberInt64,
-                value::bitcastFrom<int64_t>(static_cast<int64_t>(result))};
+        return value::TagValueMaybeOwned::numberInt64(static_cast<int64_t>(result));
     } else {
-        return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(result)};
+        return value::TagValueMaybeOwned::numberInt32(result);
     }
 }
 

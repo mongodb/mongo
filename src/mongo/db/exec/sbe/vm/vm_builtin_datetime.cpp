@@ -70,7 +70,7 @@ value::TagValueMaybeOwned builtinDateHelper(DateFn computeDateFn,
         !value::isNumber(hour.tag) || !value::isNumber(minute.tag) ||
         !value::isNumber(second.tag) || !value::isNumber(millisecond.tag) ||
         !value::isString(timezone.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     tassert(11054000, "unexpected TZDB value", tzdb.value);
@@ -87,7 +87,7 @@ value::TagValueMaybeOwned builtinDateHelper(DateFn computeDateFn,
                               value::numericCast<int64_t>(minute),
                               value::numericCast<int64_t>(second),
                               value::numericCast<int64_t>(millisecond));
-    return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(date.asInt64())};
+    return value::TagValueMaybeOwned::date(date.asInt64());
 }
 
 value::TagValueMaybeOwned ByteCode::builtinDate(ArityType arity) {
@@ -118,31 +118,31 @@ value::TagValueMaybeOwned ByteCode::builtinDateToString(ArityType arity) {
 
     auto timezoneDBView = viewFromStack(0);
     if (timezoneDBView.tag != value::TypeTags::timeZoneDB) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto timezoneDB = value::getTimeZoneDBView(timezoneDBView.value);
 
     // Get date.
     auto dateView = viewFromStack(1);
     if (!coercibleToDate(dateView.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto date = getDate(dateView);
 
     // Get format.
     auto formatView = viewFromStack(2);
     if (!value::isString(formatView.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto formatString = value::getStringView(formatView.tag, formatView.value);
     if (!TimeZone::isValidToStringFormat(formatString)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     // Get timezone.
     auto timezoneView = viewFromStack(3);
     if (!isValidTimezone(timezoneView, timezoneDB)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto timezone = getTimezone(timezoneView, timezoneDB);
 
@@ -151,7 +151,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateToString(ArityType arity) {
     auto status = timezone.outputDateWithFormat(formatted, formatString, date);
 
     if (status != Status::OK()) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto [strTag, strValue] = sbe::value::makeNewString(formatted.stringData());
@@ -161,7 +161,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateToString(ArityType arity) {
 value::TagValueMaybeOwned ByteCode::builtinDateFromString(ArityType arity) {
     auto timezoneDBView = viewFromStack(0);
     if (timezoneDBView.tag != value::TypeTags::timeZoneDB) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto timezoneDB = value::getTimeZoneDBView(timezoneDBView.value);
 
@@ -181,11 +181,11 @@ value::TagValueMaybeOwned ByteCode::builtinDateFromString(ArityType arity) {
         // Fetch format from the stack, validate it, and call fromString with it.
         auto formatView = viewFromStack(3);
         if (!value::isString(formatView.tag)) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
         auto formatString = value::getStringView(formatView.tag, formatView.value);
         if (!TimeZone::isValidFromStringFormat(formatString)) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
         date = timezoneDB->fromString(dateString, timezone, formatString);
     }
@@ -198,7 +198,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateFromStringNoThrow(ArityType arity
         return builtinDateFromString(arity);
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         // Upon error, we return Nothing and let the caller decide whether to raise an error.
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 }
 
@@ -210,14 +210,12 @@ value::TagValueMaybeOwned ByteCode::dateTrunc(value::TypeTags dateTag,
                                               DayOfWeek startOfWeek) {
     // Get date.
     if (!coercibleToDate(dateTag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto date = getDate({dateTag, dateValue});
 
     auto truncatedDate = truncateDate(date, unit, binSize, timezone, startOfWeek);
-    return {false,
-            value::TypeTags::Date,
-            value::bitcastFrom<int64_t>(truncatedDate.toMillisSinceEpoch())};
+    return value::TagValueMaybeOwned::date(truncatedDate.toMillisSinceEpoch());
 }
 
 value::TagValueMaybeOwned ByteCode::builtinDateWeekYear(ArityType arity) {
@@ -246,7 +244,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateWeekYear(ArityType arity) {
 value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
     auto timezoneDBView = viewFromStack(0);
     if (timezoneDBView.tag != value::TypeTags::timeZoneDB) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto timezoneDB = value::getTimeZoneDBView(timezoneDBView.value);
     auto dateView = viewFromStack(1);
@@ -254,7 +252,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
     // Get timezone.
     auto timezoneView = viewFromStack(2);
     if (!value::isString(timezoneView.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     TimeZone timezone = getTimezone(timezoneView, timezoneDB);
 
@@ -264,7 +262,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
                       value::TypeTags::Timestamp,
                       value::TypeTags::ObjectId,
                       value::TypeTags::bsonObjectId)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     Date_t date = getDate(dateView);
 
@@ -288,7 +286,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateToParts(ArityType arity) {
 value::TagValueMaybeOwned ByteCode::builtinIsoDateToParts(ArityType arity) {
     auto timezoneDBView = viewFromStack(0);
     if (timezoneDBView.tag != value::TypeTags::timeZoneDB) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto timezoneDB = value::getTimeZoneDBView(timezoneDBView.value);
     auto dateView = viewFromStack(1);
@@ -296,7 +294,7 @@ value::TagValueMaybeOwned ByteCode::builtinIsoDateToParts(ArityType arity) {
     // Get timezone.
     auto timezoneView = viewFromStack(2);
     if (!value::isString(timezoneView.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     TimeZone timezone = getTimezone(timezoneView, timezoneDB);
 
@@ -306,7 +304,7 @@ value::TagValueMaybeOwned ByteCode::builtinIsoDateToParts(ArityType arity) {
                       value::TypeTags::Timestamp,
                       value::TypeTags::ObjectId,
                       value::TypeTags::bsonObjectId)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     Date_t date = getDate(dateView);
 
@@ -513,41 +511,37 @@ value::TagValueMaybeOwned ByteCode::builtinIsTimeUnit(ArityType arity) {
     tassert(11080037, "Unexpected arity value", arity == 1);
     auto timeUnit = viewFromStack(0);
     if (!value::isString(timeUnit.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
-    return {false,
-            value::TypeTags::Boolean,
-            value::bitcastFrom<bool>(
-                isValidTimeUnit(value::getStringView(timeUnit.tag, timeUnit.value)))};
+    return value::TagValueMaybeOwned::boolean(
+        isValidTimeUnit(value::getStringView(timeUnit.tag, timeUnit.value)));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinIsDayOfWeek(ArityType arity) {
     tassert(11080036, "Unexpected arity value", arity == 1);
     auto dayOfWeek = viewFromStack(0);
     if (!value::isString(dayOfWeek.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
-    return {false,
-            value::TypeTags::Boolean,
-            value::bitcastFrom<bool>(
-                isValidDayOfWeek(value::getStringView(dayOfWeek.tag, dayOfWeek.value)))};
+    return value::TagValueMaybeOwned::boolean(
+        isValidDayOfWeek(value::getStringView(dayOfWeek.tag, dayOfWeek.value)));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinIsTimezone(ArityType arity) {
     auto tzDB = viewFromStack(0);
     if (tzDB.tag != value::TypeTags::timeZoneDB) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto timezoneDB = value::getTimeZoneDBView(tzDB.value);
     auto tz = viewFromStack(1);
     if (!value::isString(tz.tag)) {
-        return {false, value::TypeTags::Boolean, false};
+        return value::TagValueMaybeOwned::boolean(false);
     }
     auto timezoneStr = value::getStringView(tz.tag, tz.value);
     if (timezoneDB->isTimeZoneIdentifier(timezoneStr)) {
-        return {false, value::TypeTags::Boolean, true};
+        return value::TagValueMaybeOwned::boolean(true);
     }
-    return {false, value::TypeTags::Boolean, false};
+    return value::TagValueMaybeOwned::boolean(false);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinTsSecond(ArityType arity) {
@@ -556,11 +550,11 @@ value::TagValueMaybeOwned ByteCode::builtinTsSecond(ArityType arity) {
     auto input = viewFromStack(0);
 
     if (input.tag != value::TypeTags::Timestamp) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto timestamp = Timestamp(value::bitcastTo<uint64_t>(input.value));
-    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<uint64_t>(timestamp.getSecs())};
+    return value::TagValueMaybeOwned::numberInt64(static_cast<int64_t>(timestamp.getSecs()));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinTsIncrement(ArityType arity) {
@@ -569,11 +563,11 @@ value::TagValueMaybeOwned ByteCode::builtinTsIncrement(ArityType arity) {
     auto input = viewFromStack(0);
 
     if (input.tag != value::TypeTags::Timestamp) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto timestamp = Timestamp(value::bitcastTo<uint64_t>(input.value));
-    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<uint64_t>(timestamp.getInc())};
+    return value::TagValueMaybeOwned::numberInt64(static_cast<int64_t>(timestamp.getInc()));
 }
 
 /**
@@ -663,7 +657,7 @@ value::TagValueMaybeOwned ByteCode::builtinDateTrunc(ArityType arity) {
     DayOfWeek startOfWeek{kStartOfWeekDefault};
 
     if (!validateDateTruncParameters<>(&unit, &binSize, &timezone, &startOfWeek)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     // Get date.
@@ -761,18 +755,18 @@ value::TagValueMaybeOwned ByteCode::builtinDateDiff(ArityType arity) {
 
     if (!validateDateDiffParameters<>(
             &endDate, &unit, &timezone, arity == 6 ? &startOfWeek : nullptr)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     // Get startDate.
     auto startDateView = viewFromStack(1);
     if (!coercibleToDate(startDateView.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto startDate = getDate(startDateView);
 
     auto result = dateDiff(startDate, endDate, unit, timezone, startOfWeek);
-    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
+    return value::TagValueMaybeOwned::numberInt64(result);
 }
 
 
@@ -835,18 +829,17 @@ value::TagValueMaybeOwned ByteCode::builtinDateAdd(ArityType arity) {
     TimeZone timezone{};
 
     if (!validateDateAddParameters<>(&unit, &amount, &timezone)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto startDateView = viewFromStack(1);
     if (!coercibleToDate(startDateView.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto startDate = getDate(startDateView);
 
     auto resDate = dateAdd(startDate, unit, amount, timezone);
-    return {
-        false, value::TypeTags::Date, value::bitcastFrom<int64_t>(resDate.toMillisSinceEpoch())};
+    return value::TagValueMaybeOwned::date(resDate.toMillisSinceEpoch());
 }
 
 namespace {
@@ -1157,7 +1150,7 @@ value::TagValueMaybeOwned ByteCode::builtinCurrentDate(ArityType arity) {
             [&](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
     }
 
-    return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(Date_t::now().asInt64())};
+    return value::TagValueMaybeOwned::date(Date_t::now().asInt64());
 }
 
 }  // namespace mongo::sbe::vm

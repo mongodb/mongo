@@ -44,7 +44,7 @@ value::TagValueMaybeOwned ByteCode::builtinFtsMatch(ArityType arity) {
     auto input = viewFromStack(1);
 
     if (matcher.tag != value::TypeTags::ftsMatcher || !value::isObject(input.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto obj = [inputTag = input.tag, inputVal = input.value]() {
@@ -60,7 +60,7 @@ value::TagValueMaybeOwned ByteCode::builtinFtsMatch(ArityType arity) {
     }();
 
     const bool matches = value::getFtsMatcherView(matcher.value)->matches(obj);
-    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(matches)};
+    return value::TagValueMaybeOwned::boolean(matches);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinRunJsPredicate(ArityType arity) {
@@ -70,7 +70,7 @@ value::TagValueMaybeOwned ByteCode::builtinRunJsPredicate(ArityType arity) {
     auto input = viewFromStack(1);
 
     if (predicate.tag != value::TypeTags::jsFunction || !value::isObject(input.tag)) {
-        return {false, value::TypeTags::Nothing, value::bitcastFrom<int64_t>(0)};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     BSONObj obj;
@@ -86,7 +86,7 @@ value::TagValueMaybeOwned ByteCode::builtinRunJsPredicate(ArityType arity) {
 
     auto jsFn = value::getJsFunctionView(predicate.value);
     auto predicateResult = jsFn->runAsPredicate(obj);
-    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(predicateResult)};
+    return value::TagValueMaybeOwned::boolean(predicateResult);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinShardFilter(ArityType arity) {
@@ -105,14 +105,12 @@ value::TagValueMaybeOwned ByteCode::builtinShardFilter(ArityType arity) {
                           "keyPattern"_attr =
                               value::getShardFiltererView(filter.value)->getKeyPattern());
         }
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     BSONObj keyAsUnownedBson{sbe::value::bitcastTo<const char*>(shardKey.value)};
-    return {false,
-            value::TypeTags::Boolean,
-            value::bitcastFrom<bool>(
-                value::getShardFiltererView(filter.value)->keyBelongsToMe(keyAsUnownedBson))};
+    return value::TagValueMaybeOwned::boolean(
+        value::getShardFiltererView(filter.value)->keyBelongsToMe(keyAsUnownedBson));
 }
 
 }  // namespace vm

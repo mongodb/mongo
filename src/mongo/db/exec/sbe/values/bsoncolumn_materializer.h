@@ -78,11 +78,11 @@ struct MONGO_MOD_NEEDS_REPLACEMENT SBEColumnMaterializer {
     }
 
     static inline Element materialize(BSONElementStorage& allocator, Date_t val) {
-        return {value::TypeTags::Date, value::bitcastFrom<long long>(val.toMillisSinceEpoch())};
+        return value::TagValueView::date(val.toMillisSinceEpoch());
     }
 
     static inline Element materialize(BSONElementStorage& allocator, Timestamp val) {
-        return {value::TypeTags::Timestamp, value::bitcastFrom<unsigned long long>(val.asULL())};
+        return value::TagValueView::timestamp(val.asULL());
     }
 
     static inline Element materialize(BSONElementStorage& allocator, StringData val) {
@@ -227,7 +227,7 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<Timesta
     dassert(val.type() == BSONType::timestamp,
             "materialize invoked with incorrect BSONElement type");
     uint64_t u = ConstDataView(val.value()).read<LittleEndian<uint64_t>>();
-    return {value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(u)};
+    return value::TagValueView::timestamp(u);
 }
 
 template <>

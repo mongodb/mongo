@@ -48,7 +48,7 @@ value::TagValueMaybeOwned ByteCode::builtinBitTestPosition(ArityType arity) {
             bitTestBehaviorView.tag == value::TypeTags::NumberInt32);
 
     if (!value::isArray(mask.tag) || !value::isBinData(input.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto bitPositions = value::getArrayView(mask.value);
@@ -85,16 +85,13 @@ value::TagValueMaybeOwned ByteCode::builtinBitTestPosition(ArityType arity) {
               (!isBitSet &&
                (bitTestBehavior == BitTestBehavior::AllClear ||
                 bitTestBehavior == BitTestBehavior::AnySet)))) {
-            return {false,
-                    value::TypeTags::Boolean,
-                    value::bitcastFrom<bool>(bitTestBehavior == BitTestBehavior::AnyClear ||
-                                             bitTestBehavior == BitTestBehavior::AnySet)};
+            return value::TagValueMaybeOwned::boolean(bitTestBehavior ==
+                                                          BitTestBehavior::AnyClear ||
+                                                      bitTestBehavior == BitTestBehavior::AnySet);
         }
     }
-    return {false,
-            value::TypeTags::Boolean,
-            value::bitcastFrom<bool>(bitTestBehavior == BitTestBehavior::AllSet ||
-                                     bitTestBehavior == BitTestBehavior::AllClear)};
+    return value::TagValueMaybeOwned::boolean(bitTestBehavior == BitTestBehavior::AllSet ||
+                                              bitTestBehavior == BitTestBehavior::AllClear);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinBitTestZero(ArityType arity) {
@@ -104,13 +101,13 @@ value::TagValueMaybeOwned ByteCode::builtinBitTestZero(ArityType arity) {
 
     if ((mask.tag != value::TypeTags::NumberInt32 && mask.tag != value::TypeTags::NumberInt64) ||
         (input.tag != value::TypeTags::NumberInt32 && input.tag != value::TypeTags::NumberInt64)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto maskNum = value::numericCast<int64_t>(mask);
     auto inputNum = value::numericCast<int64_t>(input);
     auto result = (maskNum & inputNum) == 0;
-    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
+    return value::TagValueMaybeOwned::boolean(result);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinBitTestMask(ArityType arity) {
@@ -120,13 +117,13 @@ value::TagValueMaybeOwned ByteCode::builtinBitTestMask(ArityType arity) {
 
     if ((mask.tag != value::TypeTags::NumberInt32 && mask.tag != value::TypeTags::NumberInt64) ||
         (input.tag != value::TypeTags::NumberInt32 && input.tag != value::TypeTags::NumberInt64)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto maskNum = value::numericCast<int64_t>(mask);
     auto inputNum = value::numericCast<int64_t>(input);
     auto result = (maskNum & inputNum) == maskNum;
-    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
+    return value::TagValueMaybeOwned::boolean(result);
 }
 
 }  // namespace vm

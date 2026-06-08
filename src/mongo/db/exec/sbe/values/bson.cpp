@@ -121,7 +121,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
     switch (type) {
         case BSONType::numberDouble: {
             double dbl = ConstDataView(be).read<LittleEndian<double>>();
-            return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(dbl)};
+            return value::TagValueView::numberDouble(dbl);
         }
         case BSONType::numberDecimal: {
             if constexpr (View) {
@@ -217,24 +217,24 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
             return {tag, val};
         }
         case BSONType::boolean:
-            return {value::TypeTags::Boolean, value::bitcastFrom<bool>(*(be))};
+            return value::TagValueView::boolean(static_cast<bool>(*be));
         case BSONType::date: {
             int64_t integer = ConstDataView(be).read<LittleEndian<int64_t>>();
-            return {value::TypeTags::Date, value::bitcastFrom<int64_t>(integer)};
+            return value::TagValueView::date(integer);
         }
         case BSONType::null:
-            return {value::TypeTags::Null, 0};
+            return value::TagValueView::null();
         case BSONType::numberInt: {
             int32_t integer = ConstDataView(be).read<LittleEndian<int32_t>>();
-            return {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(integer)};
+            return value::TagValueView::numberInt32(integer);
         }
         case BSONType::timestamp: {
             uint64_t val = ConstDataView(be).read<LittleEndian<uint64_t>>();
-            return {value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(val)};
+            return value::TagValueView::timestamp(val);
         }
         case BSONType::numberLong: {
             int64_t val = ConstDataView(be).read<LittleEndian<int64_t>>();
-            return {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(val)};
+            return value::TagValueView::numberInt64(val);
         }
         case BSONType::minKey:
             return {value::TypeTags::MinKey, 0};

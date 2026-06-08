@@ -72,7 +72,7 @@ public:
         auto [objOwned, objTag, objVal] = getInputObject();
 
         if (specTag != value::TypeTags::makeObjSpec) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
 
         auto spec = value::getMakeObjSpecView(specVal);
@@ -85,7 +85,7 @@ public:
             if (spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnNothing) {
                 // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
                 // 'kReturnNothing', then return Nothing.
-                return {false, value::TypeTags::Nothing, 0};
+                return value::TagValueMaybeOwned::nothing();
             } else if (spec->nonObjInputBehavior ==
                        MakeObjSpec::NonObjInputBehavior::kReturnInput) {
                 // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals

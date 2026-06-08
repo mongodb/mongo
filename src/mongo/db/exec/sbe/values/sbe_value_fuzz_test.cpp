@@ -80,17 +80,17 @@ value::TagValueOwned toTagValueOwned(const SBEScalarSpec& spec) {
         [](auto&& v) -> value::TagValueOwned {
             using T = std::decay_t<decltype(v)>;
             if constexpr (std::is_same_v<T, Null>)
-                return value::TagValueOwned::fromRaw(value::TagValueView::null());
+                return value::TagValueOwned::null();
             else if constexpr (std::is_same_v<T, Nothing>)
-                return value::TagValueOwned::fromRaw(value::TagValueView::nothing());
+                return value::TagValueOwned::nothing();
             else if constexpr (std::is_same_v<T, bool>)
-                return value::TagValueOwned::fromRaw(value::TagValueView::boolean(v));
+                return value::TagValueOwned::boolean(v);
             else if constexpr (std::is_same_v<T, int32_t>)
-                return value::TagValueOwned::fromRaw(value::TagValueView::numberInt32(v));
+                return value::TagValueOwned::numberInt32(v);
             else if constexpr (std::is_same_v<T, int64_t>)
-                return value::TagValueOwned::fromRaw(value::TagValueView::numberInt64(v));
+                return value::TagValueOwned::numberInt64(v);
             else
-                return value::TagValueOwned::fromRaw(value::TagValueView::numberDouble(v));
+                return value::TagValueOwned::numberDouble(v);
         },
         spec);
 }

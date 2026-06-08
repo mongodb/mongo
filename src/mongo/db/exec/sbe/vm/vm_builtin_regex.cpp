@@ -57,16 +57,16 @@ value::TagValueMaybeOwned pcreNextMatch(pcre::Regex* pcre,
         LOGV2_ERROR(5073414,
                     "Error occurred while executing regular expression.",
                     "execResult"_attr = redact(errorMessage(m.error())));
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     if (isMatch) {
         // $regexMatch returns true or false.
-        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(!!m)};
+        return value::TagValueMaybeOwned::boolean(!!m);
     }
     // $regexFind and $regexFindAll build result object or return null.
     if (!m) {
-        return {false, value::TypeTags::Null, 0};
+        return value::TagValueMaybeOwned::null();
     }
 
     // Create the result object {"match" : .., "idx" : ..., "captures" : ...}
@@ -114,7 +114,7 @@ value::TagValueMaybeOwned genericPcreRegexSingleMatch(value::TypeTags typeTagPcr
                                                       value::Value valueInputStr,
                                                       bool isMatch) {
     if (!value::isStringOrSymbol(typeTagInputStr) || !value::isPcreRegex(typeTagPcreRegex)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto inputString = value::getStringOrSymbolView(typeTagInputStr, valueInputStr);
@@ -134,14 +134,14 @@ value::TagValueMaybeOwned ByteCode::builtinRegexCompile(ArityType arity) {
     auto optionsView = viewFromStack(1);
 
     if (!value::isString(patternView.tag) || !value::isString(optionsView.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto pattern = value::getStringView(patternView.tag, patternView.value);
     auto options = value::getStringView(optionsView.tag, optionsView.value);
 
     if (pattern.find('\0', 0) != std::string::npos || options.find('\0', 0) != std::string::npos) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto [pcreTag, pcreValue] = makeNewPcreRegex(pattern, options);
@@ -166,7 +166,7 @@ value::TagValueMaybeOwned ByteCode::builtinRegexMatch(ArityType arity) {
             }
         }
 
-        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
+        return value::TagValueMaybeOwned::boolean(false);
     }
 
     return genericPcreRegexSingleMatch(
@@ -188,7 +188,7 @@ value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
     auto inputStrView = viewFromStack(1);
 
     if (!value::isString(inputStrView.tag) || pcreRegexView.tag != value::TypeTags::pcreRegex) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto inputString = value::getStringView(inputStrView.tag, inputStrView.value);
@@ -210,7 +210,7 @@ value::TagValueMaybeOwned ByteCode::builtinRegexFindAll(ArityType arity) {
             break;
         }
         if (match.tag() != value::TypeTags::Object) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
 
         resultSize += getApproximateSize(match.tag(), match.value());
@@ -252,7 +252,7 @@ value::TagValueMaybeOwned ByteCode::builtinGetRegexPattern(ArityType arity) {
     auto regexView = viewFromStack(0);
 
     if (regexView.tag != value::TypeTags::bsonRegex) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto regex = value::getBsonRegexView(regexView.value);
@@ -266,7 +266,7 @@ value::TagValueMaybeOwned ByteCode::builtinGetRegexFlags(ArityType arity) {
     auto regexView = viewFromStack(0);
 
     if (regexView.tag != value::TypeTags::bsonRegex) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto regex = value::getBsonRegexView(regexView.value);

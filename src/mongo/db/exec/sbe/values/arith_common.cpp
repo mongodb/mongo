@@ -137,8 +137,7 @@ value::TagValueMaybeOwned genericArithmeticOp(value::TypeTags lhsTag,
                 if (!Op::doOperation(numericCast<int32_t>(lhsTag, lhsValue),
                                      numericCast<int32_t>(rhsTag, rhsValue),
                                      result)) {
-                    return {
-                        false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(result)};
+                    return value::TagValueMaybeOwned::numberInt32(result);
                 }
                 // The result does not fit into int32_t so fallthru to the wider type.
                 [[fallthrough]];
@@ -148,8 +147,7 @@ value::TagValueMaybeOwned genericArithmeticOp(value::TypeTags lhsTag,
                 if (!Op::doOperation(numericCast<int64_t>(lhsTag, lhsValue),
                                      numericCast<int64_t>(rhsTag, rhsValue),
                                      result)) {
-                    return {
-                        false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
+                    return value::TagValueMaybeOwned::numberInt64(result);
                 }
                 // The result does not fit into int64_t so fallthru to the wider type.
                 [[fallthrough]];
@@ -159,7 +157,7 @@ value::TagValueMaybeOwned genericArithmeticOp(value::TypeTags lhsTag,
                 Op::doOperation(numericCast<double>(lhsTag, lhsValue),
                                 numericCast<double>(rhsTag, rhsValue),
                                 result);
-                return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(result)};
+                return value::TagValueMaybeOwned::numberDouble(result);
             }
             case value::TypeTags::NumberDecimal: {
                 Decimal128 result;
@@ -185,7 +183,7 @@ value::TagValueMaybeOwned genericArithmeticOp(value::TypeTags lhsTag,
                         doubleLhs < static_cast<double>(limits::max()) &&
                         !Op::template doOperation<int64_t>(
                             llround(doubleLhs), bitcastTo<int64_t>(rhsValue), result)) {
-                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                        return value::TagValueMaybeOwned::date(result);
                     }
                     break;
                 }
@@ -196,7 +194,7 @@ value::TagValueMaybeOwned genericArithmeticOp(value::TypeTags lhsTag,
                         decimalLhs.isLess(Decimal128{limits::max()}) &&
                         !Op::doOperation(
                             decimalLhs.toLong(), bitcastTo<int64_t>(rhsValue), result)) {
-                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                        return value::TagValueMaybeOwned::date(result);
                     }
                     break;
                 }
@@ -204,7 +202,7 @@ value::TagValueMaybeOwned genericArithmeticOp(value::TypeTags lhsTag,
                     if (!Op::doOperation(numericCast<int64_t>(lhsTag, lhsValue),
                                          bitcastTo<int64_t>(rhsValue),
                                          result)) {
-                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                        return value::TagValueMaybeOwned::date(result);
                     }
                 }
             }
@@ -220,7 +218,7 @@ value::TagValueMaybeOwned genericArithmeticOp(value::TypeTags lhsTag,
                         doubleRhs < static_cast<double>(limits::max()) &&
                         !Op::template doOperation<int64_t>(
                             bitcastTo<int64_t>(lhsValue), llround(doubleRhs), result)) {
-                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                        return value::TagValueMaybeOwned::date(result);
                     }
                     break;
                 }
@@ -231,7 +229,7 @@ value::TagValueMaybeOwned genericArithmeticOp(value::TypeTags lhsTag,
                     std::int64_t longRhs = decimalRhs.toLong(&signalingFlags);
                     if (signalingFlags == Decimal128::SignalingFlag::kNoFlag &&
                         !Op::doOperation(bitcastTo<int64_t>(lhsValue), longRhs, result)) {
-                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                        return value::TagValueMaybeOwned::date(result);
                     }
                     break;
                 }
@@ -239,7 +237,7 @@ value::TagValueMaybeOwned genericArithmeticOp(value::TypeTags lhsTag,
                     if (!Op::doOperation(bitcastTo<int64_t>(lhsValue),
                                          numericCast<int64_t>(rhsTag, rhsValue),
                                          result)) {
-                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                        return value::TagValueMaybeOwned::date(result);
                     }
                 }
             }
@@ -247,14 +245,14 @@ value::TagValueMaybeOwned genericArithmeticOp(value::TypeTags lhsTag,
             int64_t result;
             if (!Op::doOperation(
                     bitcastTo<int64_t>(lhsValue), bitcastTo<int64_t>(rhsValue), result)) {
-                return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
+                return value::TagValueMaybeOwned::numberInt64(result);
             }
         }
         // We got here if the Date operation overflowed.
         uasserted(ErrorCodes::Overflow, "date overflow");
     }
 
-    return {false, value::TypeTags::Nothing, 0};
+    return value::TagValueMaybeOwned::nothing();
 }
 
 value::TagValueMaybeOwned genericAdd(value::TypeTags lhsTag,
@@ -296,7 +294,7 @@ value::TagValueMaybeOwned genericNumConvert(value::TypeTags lhsTag,
                 MONGO_UNREACHABLE_TASSERT(11122910);
         }
     }
-    return {false, value::TypeTags::Nothing, 0};
+    return value::TagValueMaybeOwned::nothing();
 }
 
 }  // namespace mongo::sbe::value

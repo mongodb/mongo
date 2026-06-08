@@ -79,7 +79,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewArrayFromRange(ArityType arity) {
 
     for (auto tag : {startView.tag, endView.tag, stepView.tag}) {
         if (value::TypeTags::NumberInt32 != tag) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
     }
 
@@ -89,7 +89,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewArrayFromRange(ArityType arity) {
     auto stepVal = value::numericCast<int64_t>(stepView);
 
     if (stepVal == 0) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     // Calculate how much memory is needed to generate the array and avoid going over the memLimit.
@@ -224,7 +224,7 @@ value::TagValueMaybeOwned ByteCode::builtinConcatArrays(ArityType arity) {
     for (ArityType idx = 0; idx < arity; ++idx) {
         auto elem = viewFromStack(idx);
         if (!value::isArray(elem.tag)) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
 
         value::arrayForEach(elem.tag, elem.value, [&](value::TypeTags elTag, value::Value elVal) {
@@ -244,7 +244,7 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
 
     if (useLongestLengthView.tag != value::TypeTags::Boolean ||
         inputSizeView.tag != value::TypeTags::NumberInt32) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     const bool useLongestLength = value::bitcastTo<bool>(useLongestLengthView.value);
@@ -270,7 +270,7 @@ value::TagValueMaybeOwned ByteCode::builtinZipArrays(ArityType arity) {
     for (size_t i = 0; i < inputSize; ++i) {
         auto elem = viewFromStack(localVariables + i);
         if (!value::isArray(elem.tag)) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
 
         inputs.emplace_back(elem.tag, elem.value);
@@ -343,11 +343,11 @@ value::TagValueMaybeOwned ByteCode::isMemberImpl(value::TagValueView expr,
                                                  value::TagValueView arr,
                                                  CollatorInterface* collator) {
     if (!value::isArray(arr.tag) && arr.tag != value::TypeTags::inList) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     if (expr.tag == value::TypeTags::Nothing) {
-        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
+        return value::TagValueMaybeOwned::boolean(false);
     }
 
     if (arr.tag == value::TypeTags::inList) {
@@ -356,13 +356,13 @@ value::TagValueMaybeOwned ByteCode::isMemberImpl(value::TagValueView expr,
         InList* inList = value::getInListView(arr.value);
         const bool found = inList->contains(expr.tag, expr.value);
 
-        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
+        return value::TagValueMaybeOwned::boolean(found);
     } else if (arr.tag == value::TypeTags::ArraySet) {
         // An empty ArraySet may not have a collation, but we don't need one to definitively
         // determine that the empty set doesn't contain the value we are checking.
         auto arrSet = value::getArraySetView(arr.value);
         if (arrSet->size() == 0) {
-            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
+            return value::TagValueMaybeOwned::boolean(false);
         }
         auto& values = arrSet->values();
         if (collator != nullptr) {
@@ -374,9 +374,8 @@ value::TagValueMaybeOwned ByteCode::isMemberImpl(value::TagValueView expr,
                     "Expected ArraySet to have matching collator",
                     CollatorInterface::collatorsMatch(collator, arrSet->getCollator()));
         }
-        return {false,
-                value::TypeTags::Boolean,
-                value::bitcastFrom<bool>(values.find({expr.tag, expr.value}) != values.end())};
+        return value::TagValueMaybeOwned::boolean(values.find({expr.tag, expr.value}) !=
+                                                  values.end());
     }
     const bool found =
         value::arrayAny(arr.tag, arr.value, [&](value::TypeTags elemTag, value::Value elemVal) {
@@ -387,7 +386,7 @@ value::TagValueMaybeOwned ByteCode::isMemberImpl(value::TagValueView expr,
             return false;
         });
 
-    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(found)};
+    return value::TagValueMaybeOwned::boolean(found);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinIsMember(ArityType arity) {
@@ -409,7 +408,7 @@ value::TagValueMaybeOwned ByteCode::builtinCollIsMember(ArityType arity) {
         collator = value::getCollatorView(collatorView.value);
     } else {
         // If a third parameter was supplied but it is not a Collator, return Nothing.
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     return ByteCode::isMemberImpl(expr, arr, collator);
@@ -420,7 +419,7 @@ value::TagValueMaybeOwned ByteCode::builtinExtractSubArray(ArityType arity) {
     auto limitView = viewFromStack(1);
 
     if (!value::isArray(arrayView.tag) || limitView.tag != value::TypeTags::NumberInt32) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto limit = value::bitcastTo<int32_t>(limitView.value);
@@ -444,13 +443,13 @@ value::TagValueMaybeOwned ByteCode::builtinExtractSubArray(ArityType arity) {
         }
     } else {
         if (limit < 0) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
         length = limit;
 
         auto skipView = viewFromStack(2);
         if (skipView.tag != value::TypeTags::NumberInt32) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
 
         auto skip = value::bitcastTo<int32_t>(skipView.value);
@@ -528,15 +527,15 @@ value::TagValueMaybeOwned ByteCode::builtinIsArrayEmpty(ArityType arity) {
     auto arr = viewFromStack(0);
 
     if (!value::isArray(arr.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     if (arr.tag == value::TypeTags::Array) {
         auto arrayView = value::getArrayView(arr.value);
-        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(arrayView->size() == 0)};
+        return value::TagValueMaybeOwned::boolean(arrayView->size() == 0);
     } else if (arr.tagIn(value::TypeTags::bsonArray, value::TypeTags::ArraySet)) {
         value::ArrayEnumerator enumerator(arr.tag, arr.value);
-        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(enumerator.atEnd())};
+        return value::TagValueMaybeOwned::boolean(enumerator.atEnd());
     } else {
         // Earlier in this function we bailed out if the 'arrayType' wasn't Array, ArraySet or
         // bsonArray, so it should be impossible to reach this point.
@@ -549,7 +548,7 @@ value::TagValueMaybeOwned ByteCode::builtinReverseArray(ArityType arity) {
     auto input = viewFromStack(0);
 
     if (!value::isArray(input.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto result = value::TagValueOwned::fromRaw(value::makeNewArray());
@@ -605,13 +604,13 @@ value::TagValueMaybeOwned ByteCode::builtinSortArray(ArityType arity) {
     auto input = viewFromStack(0);
 
     if (!value::isArray(input.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto spec = viewFromStack(1);
 
     if (!value::isObject(spec.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     CollatorInterface* collator = nullptr;
@@ -622,7 +621,7 @@ value::TagValueMaybeOwned ByteCode::builtinSortArray(ArityType arity) {
             collator = value::getCollatorView(collatorView.value);
         } else {
             // If a third parameter was supplied but it is not a Collator, return Nothing.
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
     }
 
@@ -771,12 +770,12 @@ value::TagValueMaybeOwned ByteCode::topOrBottomImpl(ArityType arity, TopBottomSe
 
     auto input = viewFromStack(0);
     if (!value::isArray(input.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto spec = viewFromStack(1);
     if (!value::isObject(spec.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     const CollatorInterface* collator = nullptr;
@@ -786,7 +785,7 @@ value::TagValueMaybeOwned ByteCode::topOrBottomImpl(ArityType arity, TopBottomSe
             collator = value::getCollatorView(collatorView.value);
         } else {
             // If a third parameter was supplied but it is not a Collator, return Nothing.
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
     }
 
@@ -850,17 +849,17 @@ value::TagValueMaybeOwned ByteCode::topOrBottomNImpl(ArityType arity, TopBottomS
     auto nView = viewFromStack(0);
     int64_t n = extractNParameter(nView);
     if (n < 0) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto input = viewFromStack(1);
     if (!value::isArray(input.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto spec = viewFromStack(2);
     if (!value::isObject(spec.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     const CollatorInterface* collator = nullptr;
@@ -870,7 +869,7 @@ value::TagValueMaybeOwned ByteCode::topOrBottomNImpl(ArityType arity, TopBottomS
             collator = value::getCollatorView(collatorView.value);
         } else {
             // If a fourth parameter was supplied but it is not a Collator, return Nothing.
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
     }
 
@@ -952,7 +951,7 @@ value::TagValueMaybeOwned ByteCode::builtinArrayToObject(ArityType arity) {
     auto arr = viewFromStack(0);
 
     if (!value::isArray(arr.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto obj = value::TagValueOwned::fromRaw(value::makeNewObject());
@@ -1095,12 +1094,12 @@ value::TagValueMaybeOwned ByteCode::builtinUnwindArray(ArityType arity) {
     auto arr = viewFromStack(0);
 
     if (!value::isArray(arr.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     value::ArrayEnumerator arrayEnumerator(arr.tag, arr.value);
     if (arrayEnumerator.atEnd()) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto result = value::TagValueOwned::fromRaw(value::makeNewArray());
@@ -1129,7 +1128,7 @@ value::TagValueMaybeOwned ByteCode::builtinArrayToSet(ArityType arity) {
     auto arr = viewFromStack(0);
 
     if (!value::isArray(arr.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto result = value::TagValueOwned::fromRaw(value::makeNewArraySet());
@@ -1154,13 +1153,13 @@ value::TagValueMaybeOwned ByteCode::builtinCollArrayToSet(ArityType arity) {
 
     auto collView = viewFromStack(0);
     if (collView.tag != value::TypeTags::collator) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto arr = viewFromStack(1);
 
     if (!value::isArray(arr.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto result = value::TagValueOwned::fromRaw(

@@ -196,8 +196,7 @@ value::TagValueMaybeOwned ByteCode::genericRoundTrunc(std::string funcName,
             if (!asDec.isInfinite()) {
                 asDec = asDec.quantize(quantum, roundingMode);
             }
-            return {
-                false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(asDec.toDouble())};
+            return value::TagValueMaybeOwned::numberDouble(asDec.toDouble());
         }
         case value::TypeTags::NumberInt32:
         case value::TypeTags::NumberInt64: {
@@ -216,14 +215,12 @@ value::TagValueMaybeOwned ByteCode::genericRoundTrunc(std::string funcName,
             if (numTag == value::TypeTags::NumberInt64 ||
                 outll > std::numeric_limits<int32_t>::max()) {
                 // Even if the original was an int to begin with - it has to be a long now.
-                return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(outll)};
+                return value::TagValueMaybeOwned::numberInt64(outll);
             }
-            return {false,
-                    value::TypeTags::NumberInt32,
-                    value::bitcastFrom<int32_t>(static_cast<int32_t>(outll))};
+            return value::TagValueMaybeOwned::numberInt32(static_cast<int32_t>(outll));
         }
         default:
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
     }
 }
 
@@ -236,7 +233,7 @@ value::TagValueMaybeOwned ByteCode::scalarRoundTrunc(std::string funcName,
     if (arity == 2) {
         auto placeArg = viewFromStack(1);
         if (!value::isNumber(placeArg.tag)) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
         place = convertNumericToInt32(placeArg);
     }
@@ -277,10 +274,10 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSum(ArityType arity) {
             resultTag = value::getWidestNumericalType(resultTag, arg.tag);
         } else if (arg.tag == value::TypeTags::Nothing || arg.tag == value::TypeTags::Null) {
             // What to do about null and nothing?
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         } else {
             // What to do about non-numeric types like arrays and objects?
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
     }
 
@@ -295,7 +292,7 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSum(ArityType arity) {
             }
         }
         if (haveDate) {
-            return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(sum.toLong())};
+            return value::TagValueMaybeOwned::date(sum.toLong());
         } else {
             auto [tag, val] = value::makeCopyDecimal(sum);
             return {true, tag, val};
@@ -316,38 +313,32 @@ value::TagValueMaybeOwned ByteCode::builtinDoubleDoubleSum(ArityType arity) {
         }
         if (haveDate) {
             uassert(ErrorCodes::Overflow, "date overflow in $add", sum.fitsLong());
-            return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(sum.getLong())};
+            return value::TagValueMaybeOwned::date(sum.getLong());
         } else {
             switch (resultTag) {
                 case value::TypeTags::NumberInt32: {
                     auto result = sum.getLong();
                     if (sum.fitsLong() && result >= std::numeric_limits<int32_t>::min() &&
                         result <= std::numeric_limits<int32_t>::max()) {
-                        return {false,
-                                value::TypeTags::NumberInt32,
-                                value::bitcastFrom<int32_t>(result)};
+                        return value::TagValueMaybeOwned::numberInt32(static_cast<int32_t>(result));
                     }
                     [[fallthrough]];  // To the larger type
                 }
                 case value::TypeTags::NumberInt64: {
                     if (sum.fitsLong()) {
-                        return {false,
-                                value::TypeTags::NumberInt64,
-                                value::bitcastFrom<int64_t>(sum.getLong())};
+                        return value::TagValueMaybeOwned::numberInt64(sum.getLong());
                     }
                     [[fallthrough]];  // To the larger type.
                 }
                 case value::TypeTags::NumberDouble: {
-                    return {false,
-                            value::TypeTags::NumberDouble,
-                            value::bitcastFrom<double>(sum.getDouble())};
+                    return value::TagValueMaybeOwned::numberDouble(sum.getDouble());
                 }
                 default:
                     MONGO_UNREACHABLE_TASSERT(11122941);
             }
         }
     }
-    return {false, value::TypeTags::Nothing, 0};
+    return value::TagValueMaybeOwned::nothing();
 }  // ByteCode::builtinDoubleDoubleSum
 
 value::TagValueMaybeOwned ByteCode::builtinConvertSimpleSumToDoubleDoubleSum(ArityType arity) {

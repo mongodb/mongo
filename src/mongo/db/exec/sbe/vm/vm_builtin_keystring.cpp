@@ -46,13 +46,13 @@ value::TagValueMaybeOwned ByteCode::genericNewKeyString(ArityType arity,
     auto discriminatorView = viewFromStack(arity - 1u);
     if (!value::isNumber(versionView.tag) || !value::isNumber(orderingView.tag) ||
         !value::isNumber(discriminatorView.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto version = value::numericCast<int64_t>(versionView);
     auto discriminator = value::numericCast<int64_t>(discriminatorView);
     if ((version < 0 || version > 1) || (discriminator < 0 || discriminator > 2)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto ksVersion = static_cast<key_string::Version>(version);
@@ -247,7 +247,7 @@ value::TagValueMaybeOwned ByteCode::builtinCollNewKeyString(ArityType arity) {
 
     auto collatorView = viewFromStack(arity - 1u);
     if (collatorView.tag != value::TypeTags::collator) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto collator = value::getCollatorView(collatorView.value);
     return genericNewKeyString(arity - 1u, collator);

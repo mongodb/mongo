@@ -39,7 +39,7 @@ value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
 
     // We operate only on objects.
     if (!value::isObject(inObj.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     // Build the set of fields to drop.
@@ -48,7 +48,7 @@ value::TagValueMaybeOwned ByteCode::builtinDropFields(ArityType arity) {
         auto field = viewFromStack(idx);
 
         if (!value::isString(field.tag)) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
 
         restrictFieldsSet.emplace(value::getStringView(field.tag, field.value));
@@ -96,7 +96,7 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
 
     // We operate only on objects.
     if (!value::isObject(inObj.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     // Build the set of fields to keep.
@@ -105,7 +105,7 @@ value::TagValueMaybeOwned ByteCode::builtinKeepFields(ArityType arity) {
         auto field = viewFromStack(idx);
 
         if (!value::isString(field.tag)) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
 
         keepFieldsSet.emplace(value::getStringView(field.tag, field.value));
@@ -163,7 +163,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewObj(ArityType arity) {
             auto nameView = viewFromStack(idx);
 
             if (!value::isString(nameView.tag)) {
-                return {false, value::TypeTags::Nothing, 0};
+                return value::TagValueMaybeOwned::nothing();
             }
 
             names.emplace_back(value::getStringView(nameView.tag, nameView.value));
@@ -198,7 +198,7 @@ value::TagValueMaybeOwned ByteCode::builtinNewBsonObj(ArityType arity) {
         auto nameView = viewFromStack(idx);
         auto fieldView = viewFromStack(idx + 1);
         if (!value::isString(nameView.tag)) {
-            return {false, value::TypeTags::Nothing, 0};
+            return value::TagValueMaybeOwned::nothing();
         }
 
         auto name = value::getStringView(nameView.tag, nameView.value);
@@ -280,13 +280,13 @@ value::TagValueMaybeOwned ByteCode::builtinBsonSize(ArityType arity) {
         BSONObjBuilder objBuilder;
         bson::convertToBsonObj(objBuilder, value::getObjectView(operand.value));
         int32_t sz = objBuilder.done<BSONObj::LargeSizeTrait>().objsize();
-        return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(sz)};
+        return value::TagValueMaybeOwned::numberInt32(sz);
     } else if (operand.tag == value::TypeTags::bsonObject) {
         auto beginObj = value::getRawPointerView(operand.value);
         int32_t sz = ConstDataView(beginObj).read<LittleEndian<int32_t>>();
-        return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(sz)};
+        return value::TagValueMaybeOwned::numberInt32(sz);
     }
-    return {false, value::TypeTags::Nothing, 0};
+    return value::TagValueMaybeOwned::nothing();
 }
 
 value::TagValueMaybeOwned ByteCode::builtinObjectToArray(ArityType arity) {
@@ -295,7 +295,7 @@ value::TagValueMaybeOwned ByteCode::builtinObjectToArray(ArityType arity) {
     auto obj = viewFromStack(0);
 
     if (!value::isObject(obj.tag)) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto [arrTag, arrVal] = value::makeNewArray();

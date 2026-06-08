@@ -58,7 +58,7 @@ std::pair<SortSpec*, CollatorInterface*> ByteCode::generateSortKeyHelper(ArityTy
 value::TagValueMaybeOwned ByteCode::builtinGenerateCheapSortKey(ArityType arity) {
     auto [sortSpec, collator] = generateSortKeyHelper(arity);
     if (!sortSpec) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     // We "move" the object argument into the sort spec.
@@ -73,7 +73,7 @@ value::TagValueMaybeOwned ByteCode::builtinGenerateCheapSortKey(ArityType arity)
 value::TagValueMaybeOwned ByteCode::builtinGenerateSortKey(ArityType arity) {
     auto [sortSpec, collator] = generateSortKeyHelper(arity);
     if (!sortSpec) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto objView = viewFromStack(1);
@@ -101,7 +101,7 @@ value::TagValueMaybeOwned ByteCode::builtinSortKeyComponentVectorGetElement(Arit
     auto idx = viewFromStack(1);
     if (sortVec.tag != value::TypeTags::sortKeyComponentVector ||
         idx.tag != value::TypeTags::NumberInt32) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     auto* sortObj = value::getSortKeyComponentVectorView(sortVec.value);
@@ -119,7 +119,7 @@ value::TagValueMaybeOwned ByteCode::builtinSortKeyComponentVectorToArray(ArityTy
 
     auto sortVecView = viewFromStack(0);
     if (sortVecView.tag != value::TypeTags::sortKeyComponentVector) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     auto* sortVec = value::getSortKeyComponentVectorView(sortVecView.value);
 
@@ -217,7 +217,7 @@ value::TagValueMaybeOwned ByteCode::builtinGetSortKey(ArityType arity) {
         if (inputTag != value::TypeTags::Nothing) {
             return value::TagValueMaybeOwned::fromRaw(moveFromStack(0));
         } else {
-            return {false, value::TypeTags::Null, 0};
+            return value::TagValueMaybeOwned::null();
         }
     }
 

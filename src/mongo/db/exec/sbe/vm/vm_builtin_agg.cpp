@@ -226,7 +226,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggSetUnion(ArityType arity) {
 
     auto newSet = value::TagValueOwned::fromRaw(moveOwnedFromStack(1));
     if (!value::isArray(newSet.tag())) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     value::arrayForEach(
@@ -263,7 +263,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggCollSetUnion(ArityType arity) {
 
     auto newSet = value::TagValueOwned::fromRaw(moveOwnedFromStack(2));
     if (!value::isArray(newSet.tag())) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
 
     value::arrayForEach(
@@ -356,7 +356,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggFirstNNeedsMoreInput(ArityType ari
             maxSize.tag == value::TypeTags::NumberInt64);
 
     bool needMoreInput = (array->size() < maxSize.value);
-    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(needMoreInput)};
+    return value::TagValueMaybeOwned::boolean(needMoreInput);
 }
 
 namespace {
@@ -1304,7 +1304,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggExpMovingAvgFinalize(ArityType ari
 
     auto [resultTag, resultVal] = state->getAt(static_cast<size_t>(AggExpMovingAvgElems::kResult));
     if (resultTag == value::TypeTags::Null) {
-        return {false, value::TypeTags::Null, 0};
+        return value::TagValueMaybeOwned::null();
     }
     uassert(7821205, "Unexpected result type", resultTag == value::TypeTags::NumberDecimal);
 
@@ -1316,7 +1316,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggExpMovingAvgFinalize(ArityType ari
         return {true, resultTag, resultVal};
     } else {
         auto result = value::bitcastTo<Decimal128>(resultVal).toDouble();
-        return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(result)};
+        return value::TagValueMaybeOwned::numberDouble(result);
     }
 }
 
@@ -1525,7 +1525,7 @@ value::TagValueMaybeOwned ByteCode::integralOfTwoPointsByTrapezoidalRule(
         value::isNaN(prevSortByVal.tag, prevSortByVal.value) ||
         value::isNaN(newInput.tag, newInput.value) ||
         value::isNaN(newSortByVal.tag, newSortByVal.value)) {
-        return {false, value::TypeTags::NumberInt64, 0};
+        return value::TagValueMaybeOwned::numberInt64(0);
     }
 
     if ((prevSortByVal.tag == value::TypeTags::Date && newSortByVal.tag == value::TypeTags::Date) ||
@@ -1544,7 +1544,7 @@ value::TagValueMaybeOwned ByteCode::integralOfTwoPointsByTrapezoidalRule(
                                  value::bitcastFrom<int32_t>(2));
         return result;
     } else {
-        return {false, value::TypeTags::NumberInt64, 0};
+        return value::TagValueMaybeOwned::numberInt64(0);
     }
 }
 
@@ -1839,13 +1839,11 @@ value::TagValueMaybeOwned ByteCode::builtinAggIntegralFinalize(ArityType arity) 
     auto queueSize = arrayQueueSize(inputQueue);
     uassert(7821118, "Queue sizes should match", queueSize == arrayQueueSize(sortByQueue));
     if (queueSize == 0) {
-        return {false, value::TypeTags::Null, 0};
+        return value::TagValueMaybeOwned::null();
     }
 
     if (nanCount > 0) {
-        return {false,
-                value::TypeTags::NumberDouble,
-                value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())};
+        return value::TagValueMaybeOwned::numberDouble(std::numeric_limits<double>::quiet_NaN());
     }
 
     auto resultTagVal = aggRemovableSumFinalizeImpl(integral);
@@ -1871,7 +1869,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggDerivativeFinalize(ArityType arity
 
     if (sortByFirstTagVal.tag() == value::TypeTags::Nothing ||
         sortByLastTagVal.tag() == value::TypeTags::Nothing) {
-        return {false, value::TypeTags::Null, 0};
+        return value::TagValueMaybeOwned::null();
     }
 
     boost::optional<int64_t> unitMillis;
@@ -1909,11 +1907,11 @@ value::TagValueMaybeOwned ByteCode::builtinAggDerivativeFinalize(ArityType arity
     // Return null if the sortBy delta is zero
     if (runTagVal.tag() == value::TypeTags::NumberDecimal) {
         if (numericCast<Decimal128>(runTagVal.tag(), runTagVal.value()).isZero()) {
-            return {false, value::TypeTags::Null, 0};
+            return value::TagValueMaybeOwned::null();
         }
     } else {
         if (numericCast<double>(runTagVal.tag(), runTagVal.value()) == 0) {
-            return {false, value::TypeTags::Null, 0};
+            return value::TagValueMaybeOwned::null();
         }
     }
 
@@ -1996,16 +1994,15 @@ value::TagValueMaybeOwned covarianceCheckNonFinite(value::TypeTags xTag,
     checkValue(yTag, yVal);
 
     if (nanCnt == 0 && posCnt == 0 && negCnt == 0) {
-        return {false, value::TypeTags::Nothing, 0};
+        return value::TagValueMaybeOwned::nothing();
     }
     if (nanCnt > 0 || posCnt * negCnt > 0) {
         if (isDecimal) {
             auto [decimalTag, decimalVal] = value::makeCopyDecimal(Decimal128::kPositiveNaN);
             return {true, decimalTag, decimalVal};
         } else {
-            return {false,
-                    value::TypeTags::NumberDouble,
-                    value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN())};
+            return value::TagValueMaybeOwned::numberDouble(
+                std::numeric_limits<double>::quiet_NaN());
         }
     }
     if (isDecimal) {
@@ -2018,13 +2015,10 @@ value::TagValueMaybeOwned covarianceCheckNonFinite(value::TypeTags xTag,
         }
     } else {
         if (posCnt > 0) {
-            return {false,
-                    value::TypeTags::NumberDouble,
-                    value::bitcastFrom<double>(std::numeric_limits<double>::infinity())};
+            return value::TagValueMaybeOwned::numberDouble(std::numeric_limits<double>::infinity());
         } else {
-            return {false,
-                    value::TypeTags::NumberDouble,
-                    value::bitcastFrom<double>(-std::numeric_limits<double>::infinity())};
+            return value::TagValueMaybeOwned::numberDouble(
+                -std::numeric_limits<double>::infinity());
         }
     }
 }  // covarianceCheckNonFinite
@@ -2033,25 +2027,25 @@ value::TagValueMaybeOwned covarianceCheckNonFinite(value::TypeTags xTag,
 value::TagValueMaybeOwned ByteCode::aggRemovableAvgFinalizeImpl(value::Array* sumState,
                                                                 int64_t count) {
     if (count == 0) {
-        return {false, sbe::value::TypeTags::Null, 0};
+        return value::TagValueMaybeOwned::null();
     }
     auto sumTagVal = aggRemovableSumFinalizeImpl(sumState);
 
     if (sumTagVal.tag() == value::TypeTags::NumberInt32) {
         auto sum = static_cast<double>(value::bitcastTo<int>(sumTagVal.value()));
         auto avg = sum / static_cast<double>(count);
-        return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(avg)};
+        return value::TagValueMaybeOwned::numberDouble(avg);
     } else if (sumTagVal.tag() == value::TypeTags::NumberInt64) {
         auto sum = static_cast<double>(value::bitcastTo<long long>(sumTagVal.value()));
         auto avg = sum / static_cast<double>(count);
-        return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(avg)};
+        return value::TagValueMaybeOwned::numberDouble(avg);
     } else if (sumTagVal.tag() == value::TypeTags::NumberDouble) {
         auto sum = value::bitcastTo<double>(sumTagVal.value());
         if (std::isnan(sum) || std::isinf(sum)) {
             return {false, sumTagVal.tag(), sumTagVal.value()};
         }
         auto avg = sum / static_cast<double>(count);
-        return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(avg)};
+        return value::TagValueMaybeOwned::numberDouble(avg);
     } else if (sumTagVal.tag() == value::TypeTags::NumberDecimal) {
         auto sum = value::bitcastTo<Decimal128>(sumTagVal.value());
         if (sum.isNaN() || sum.isInfinite()) {
@@ -2288,12 +2282,12 @@ value::TagValueMaybeOwned ByteCode::builtinAggCovarianceFinalize(ArityType arity
         covarianceState(stateTagVal.tag(), stateTagVal.value());
 
     if (count == 1 && !isSamp) {
-        return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0)};
+        return value::TagValueMaybeOwned::numberDouble(0.0);
     }
 
     double adjustedCount = (isSamp ? count - 1 : count);
     if (adjustedCount <= 0) {
-        return {false, value::TypeTags::Null, 0};
+        return value::TagValueMaybeOwned::null();
     }
 
     auto cXYTagVal = aggRemovableSumFinalizeImpl(cXYState);
@@ -2670,11 +2664,11 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableStdDevFinalize(ArityType 
     auto [state, sumState, m2State, count, nonFiniteCount] =
         removableStdDevState(stateTagVal.tag(), stateTagVal.value());
     if (nonFiniteCount > 0) {
-        return {false, value::TypeTags::Null, 0};
+        return value::TagValueMaybeOwned::null();
     }
     const long long adjustedCount = isSamp ? count - 1 : count;
     if (adjustedCount <= 0) {
-        return {false, value::TypeTags::Null, 0};
+        return value::TagValueMaybeOwned::null();
     }
     auto m2 = aggDoubleDoubleSumFinalizeImpl(m2State);
     auto squaredDifferences =
@@ -2686,11 +2680,9 @@ value::TagValueMaybeOwned ByteCode::builtinAggRemovableStdDevFinalize(ArityType 
         // we reset _m2 and return 0 for the standard deviation.
         // If we're doing a population std dev of one element, it is also correct to return 0.
         genericResetDoubleDoubleSumState(m2State);
-        return {false, value::TypeTags::NumberInt32, 0};
+        return value::TagValueMaybeOwned::numberInt32(0);
     }
-    return {false,
-            value::TypeTags::NumberDouble,
-            value::bitcastFrom<double>(sqrt(squaredDifferences / adjustedCount))};
+    return value::TagValueMaybeOwned::numberDouble(sqrt(squaredDifferences / adjustedCount));
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAggRemovableStdDevSampFinalize(ArityType arity) {
@@ -2757,12 +2749,12 @@ value::TagValueMaybeOwned ByteCode::builtinAggLinearFillCanAdd(ArityType arity) 
     // positive it means there are still more finalize calls to be made. when count == 0 we have
     // exhausted this window.
     if (y2.tag != value::TypeTags::Null) {
-        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(count == 0)};
+        return value::TagValueMaybeOwned::boolean(count == 0);
     }
 
     // if y2 is null it means we have not yet found the upper window bound so keep on adding input
     // values
-    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
+    return value::TagValueMaybeOwned::boolean(true);
 }
 
 value::TagValueMaybeOwned ByteCode::builtinAggLinearFillAdd(ArityType arity) {
@@ -2863,7 +2855,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggLinearFillFinalize(ArityType arity
 
     // if y2 is null it means the current window is the last window frame in the partition
     if (y2.tag == value::TypeTags::Null) {
-        return {false, value::TypeTags::Null, 0};
+        return value::TagValueMaybeOwned::null();
     }
 
     // If count == 0, we are currently handling the last document in the window frame (x2/y2)
@@ -2876,7 +2868,7 @@ value::TagValueMaybeOwned ByteCode::builtinAggLinearFillFinalize(ArityType arity
 
     // If y1 is null it means the current window is the first window frame in the partition
     if (y1.tag == value::TypeTags::Null) {
-        return {false, value::TypeTags::Null, 0};
+        return value::TagValueMaybeOwned::null();
     }
     return linearFillInterpolate(x1, y1, x2, y2, {sortByTagVal.tag(), sortByTagVal.value()});
 }
