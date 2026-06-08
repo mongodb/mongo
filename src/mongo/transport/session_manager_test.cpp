@@ -102,7 +102,7 @@ TEST_F(SessionManagerTest, TestActiveClientOperationsOnDelist) {
     {
         auto opCtx = client->makeOperationContext();
         ASSERT_EQ(getActiveOperations(), 1);
-        getServiceContext()->killAndMarkOperationAsPendingDestruction(opCtx.get());
+        getServiceContext()->killAndDelistOperation(opCtx.get());
         ASSERT_EQ(getActiveOperations(), 0);
     }
     ASSERT_EQ(getActiveOperations(), 0);

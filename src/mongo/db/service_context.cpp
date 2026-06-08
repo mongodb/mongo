@@ -28,8 +28,11 @@
  */
 
 
-#include "mongo/db/service_context.h"
-
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
@@ -37,6 +40,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -47,6 +51,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/observable_mutex_registry.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/system_tick_source.h"
@@ -54,10 +59,7 @@
 #include <exception>
 #include <list>
 #include <memory>
-
-#include <absl/container/node_hash_set.h>
-#include <absl/meta/type_traits.h>
-#include <boost/optional/optional.hpp>
+#include <queue>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -369,13 +371,7 @@ void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx
     invariant(service);
 
     onDestroy(opCtx, service->_clientObservers);
-    {
-        std::lock_guard clientLock(*client);
-        // Assigning a new opCtx to the client must never precede the destruction of any existing
-        // opCtx that references the client.
-        invariant(client->getOperationContext() == opCtx);
-        client->_setOperationContext({});
-    }
+    service->_delistOperation(opCtx);
     opCtx->getBaton()->detach();
 
     delete opCtx;
@@ -469,33 +465,44 @@ void ServiceContext::killOperation(ClientLock& clientLock,
     }
 }
 
-void ServiceContext::_killAndMarkOperationAsPendingDestruction(
-    OperationContext* opCtx, boost::optional<ErrorCodes::Error> killCode) {
+void ServiceContext::_delistOperation(OperationContext* opCtx) {
+    auto client = opCtx->getClient();
+    {
+        std::lock_guard clientLock(*client);
+        if (!client->getOperationContext()) {
+            // We've already delisted this operation.
+            return;
+        }
+        // Assigning a new opCtx to the client must never precede the destruction of any existing
+        // opCtx that references the client.
+        invariant(client->getOperationContext() == opCtx);
+        client->_setOperationContext({});
+    }
+    opCtx->releaseOperationKey();
+}
+
+void ServiceContext::delistOperation(OperationContext* opCtx) {
     auto client = opCtx->getClient();
     invariant(client);
 
     auto service = client->getServiceContext();
     invariant(service == this);
 
-    opCtx->releaseOperationKey();
+    _delistOperation(opCtx);
+}
+
+void ServiceContext::killAndDelistOperation(OperationContext* opCtx, ErrorCodes::Error killCode) {
+
+    auto client = opCtx->getClient();
+    invariant(client);
+
+    auto service = client->getServiceContext();
+    invariant(service == this);
+
+    _delistOperation(opCtx);
 
     ClientLock clientLock(client);
-    if (killCode) {
-        killOperation(clientLock, opCtx, *killCode);
-    }
-    client->_opCtxIsPendingDestruction = true;
-    if (client->_session) {
-        client->_session->setInOperation(false);
-    }
-}
-
-void ServiceContext::markOperationAsPendingDestruction(OperationContext* opCtx) {
-    _killAndMarkOperationAsPendingDestruction(opCtx, boost::none);
-}
-
-void ServiceContext::killAndMarkOperationAsPendingDestruction(OperationContext* opCtx,
-                                                              ErrorCodes::Error killCode) {
-    _killAndMarkOperationAsPendingDestruction(opCtx, killCode);
+    killOperation(clientLock, opCtx, killCode);
 }
 
 void ServiceContext::unsetKillAllOperations() {

@@ -39,6 +39,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -47,6 +48,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
@@ -58,7 +60,10 @@
 #include <thread>
 #include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 MONGO_MOD_PUBLIC;
 
@@ -238,17 +243,6 @@ public:
      */
     OperationContext* getOperationContext() {
         return _opCtx;
-    }
-
-    /**
-     * Checks if the operation context associated with this client is for an operation that has
-     * completed and is pending destruction. If this returns true, user-facing operations like CurOp
-     * should treat the operation context as if it was nullptr.
-     *
-     * See ServiceContext::markOperationContextAsPendingDestruction().
-     */
-    bool operationContextIsPendingDestruction() const {
-        return _opCtxIsPendingDestruction;
     }
 
     // TODO(spencer): SERVER-10228 SERVER-14779 Remove this/move it fully into OperationContext.
@@ -448,10 +442,6 @@ private:
 
     // If != NULL, then contains the currently active OperationContext
     OperationContext* _opCtx = nullptr;
-
-    // If true, the OperationContext stored in _opCtx is pending destruction and should not be
-    // treated as an active operation for user-facing things like CurOp.
-    bool _opCtxIsPendingDestruction = false;
 
     // If the active system client operation is allowed to be killed.
     ClientOperationKillableByStepdown _operationKillable{true};

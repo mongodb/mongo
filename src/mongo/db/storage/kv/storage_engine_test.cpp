@@ -65,9 +65,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
@@ -82,7 +80,6 @@
 #include <mutex>
 #include <set>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -1372,52 +1369,6 @@ TEST_F(StorageEngineTest, DirectoryPerDBAndSplitIndexes) {
         storageGlobalParams.directoryperdb = false;
         wiredTigerGlobalOptions.directoryForIndexes = false;
     });
-}
-
-TEST_F(StorageEngineTest, ReinitializeStorageEngineKillsOperations) {
-    unittest::Barrier barrier(2);
-    bool interrupted = false;
-    unittest::JoinThread thread([&, svcCtx = getServiceContext()] {
-        ThreadClient client(svcCtx->getService());
-        auto opCtx = client->makeOperationContext();
-        barrier.countDownAndWait();
-        try {
-            opCtx->sleepFor(Minutes(10));
-        } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>&) {
-            interrupted = true;
-        }
-        opCtx.reset();
-        barrier.countDownAndWait();
-    });
-    barrier.countDownAndWait();
-
-    auto opCtx = cc().makeOperationContext();
-    _storageEngine = reconfigureStorageEngine(opCtx.get(), [] {});
-    barrier.countDownAndWait();
-    ASSERT_TRUE(interrupted);
-}
-
-TEST_F(StorageEngineTest, ReinitializeStorageEngineWaitsForOperationsPendingDestruction) {
-    unittest::Barrier barrier(2);
-    bool interrupted = false;
-    unittest::JoinThread thread([&, svcCtx = getServiceContext()] {
-        ThreadClient client(svcCtx->getService());
-        auto opCtx = client->makeOperationContext();
-        svcCtx->markOperationAsPendingDestruction(opCtx.get());
-        barrier.countDownAndWait();
-        try {
-            opCtx->sleepFor(Minutes(10));
-        } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>&) {
-            interrupted = true;
-        }
-        // note: intentionally no barrier here. The required synchronization is provided by the wait
-        // on the opctx being destroyed.
-    });
-    barrier.countDownAndWait();
-
-    auto opCtx = cc().makeOperationContext();
-    _storageEngine = reconfigureStorageEngine(opCtx.get(), [] {});
-    ASSERT_TRUE(interrupted);
 }
 
 }  // namespace
