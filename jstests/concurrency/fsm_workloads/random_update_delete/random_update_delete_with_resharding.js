@@ -80,12 +80,24 @@ export const $config = extendWorkload($partialConfig, function ($config, $super)
     $config.states.reshardCollection = function reshardCollection(db, collName, connCache) {
         const namespace = `${db}.${collName}`;
         jsTestLog(`Attempting to reshard collection ${namespace}`);
-        const result = db.adminCommand({
-            reshardCollection: namespace,
-            key: this.getShardKey(collName),
-            numInitialChunks: 1,
-            forceRedistribution: true,
-        });
+
+        let result;
+        assert.soon(() => {
+            result = db.adminCommand({
+                reshardCollection: namespace,
+                key: this.getShardKey(collName),
+                numInitialChunks: 1,
+                forceRedistribution: true,
+            });
+
+            if (result.code === 28799 || result.code === 4952606) {
+                jsTestLog("reshardCollection hit transient sampling failure, retrying", {result});
+                return false;
+            }
+
+            return true;
+        }, "reshardCollection kept failing with transient sampling error");
+
         if (
             result.code === ErrorCodes.NamespaceNotFound &&
             FixtureHelpers.maySkipImplicitSharding() &&
