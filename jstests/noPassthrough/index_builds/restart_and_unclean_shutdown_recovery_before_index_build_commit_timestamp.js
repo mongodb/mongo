@@ -3,7 +3,9 @@
  * timestamp before the commit timestamp of an index build.
  *
  * @tags: [
- *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
+ *   # MissingIndexIdent relies on the index build being restarted when the node restarts, which
+ *   # does not apply to primary-driven index builds.
+ *   primary_driven_index_builds_incompatible,
  *   requires_persistence,
  *   requires_replication,
  * ]

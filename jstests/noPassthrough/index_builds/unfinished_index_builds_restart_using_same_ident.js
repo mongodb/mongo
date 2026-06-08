@@ -6,8 +6,9 @@
  *     requires_persistence,
  *     requires_replication,
  *     requires_wiredtiger,
- *     # Primary driven index builds are aborted when a new primary steps up.
- *     primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
+ *     # Primary-driven index builds always resume on step up without dropping/recreating any
+ *     # tables, so the premise of this test does not apply.
+ *     primary_driven_index_builds_incompatible,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

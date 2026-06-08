@@ -3,7 +3,6 @@
  * skipped records that still cause key generation errors.
  *
  * @tags: [
- *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
  *   # TODO(SERVER-109702): Evaluate if a primary-driven index build compatible test should be created.
  *   requires_commit_quorum,
  *   requires_fcv_71,
