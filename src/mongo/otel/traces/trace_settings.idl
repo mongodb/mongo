@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo::otel::traces"
+    cpp_includes:
+        - "mongo/otel/traces/trace_settings.h"
 
 server_parameters:
     opentelemetryTraceDirectory:
@@ -46,6 +48,16 @@ server_parameters:
         cpp_varname: gOpenTelemetryHttpEndpoint
         cpp_vartype: std::string
         redact: false
+    openTelemetryTracingHttpExportHeaders:
+        description: >-
+            A BSON document of to include as HTTP headers when exporting traces. The field name is
+            the header name and the value is either a string or an array of strings, representing
+            the header value(s). Only applies to the HTTP exporter.
+        set_at: startup
+        cpp_class:
+            name: OpenTelemetryTracingHttpExportHeaders
+            override_set: true
+        redact: true
     openTelemetryTracingCompression:
         description: >-
             Compression type for exporting OTel traces. Valid options are ["none", "gzip"]. Default
@@ -81,3 +93,13 @@ server_parameters:
         redact: false
         default: 2048
         validator: {gte: 1}
+    openTelemetryTracingResourceAttributes:
+        description: >-
+            A BSON document of key-value string pairs to add as resource attributes to all exported
+            spans. Attributes "service.name" and "service.instance.id" are set with default values
+            if no user configuration is provided for these attributes.
+        set_at: startup
+        cpp_class:
+            name: OpenTelemetryTracingResourceAttributes
+            override_set: true
+        redact: false

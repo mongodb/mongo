@@ -19,9 +19,18 @@ idl_generator(
     src = "trace_settings.idl",
 )
 
+idl_generator(
+    name = "tracing_feature_flag_gen",
+    src = "tracing_feature_flag.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "trace_settings",
     srcs = [
+        "trace_settings.cpp",
         ":trace_settings_gen",
     ],
     deps = [
@@ -29,11 +38,18 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "tracing_feature_flag_gen",
-    src = "tracing_feature_flag.idl",
+mongo_cc_unit_test(
+    name = "trace_settings_test",
+    srcs = [
+        "trace_settings_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_sixth_group",
+        "tracing_test",
+    ],
     deps = [
-        "//src/mongo/db:basic_types_gen",
+        ":trace_settings",
+        "//src/mongo/db:server_parameter",
     ],
 )
 
@@ -86,7 +102,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "tracing_initialization",
     deps = [
-        ":tracing_initialization_base",
+        ":trace_settings",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
@@ -105,6 +121,7 @@ mongo_cc_library(
     deps = [
         ":trace_settings",
         "//src/mongo/db:server_base",
+        "//src/mongo/stdx",
     ],
 )
 
@@ -192,6 +209,26 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context_test_fixture",
+        "//src/third_party/opentelemetry-cpp/api",
+        "//src/third_party/opentelemetry-cpp/sdk/src/trace",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "tracer_provider_service_test",
+    srcs = [
+        "tracer_provider_service_test.cpp",
+    ],
+    tags = [
+        "mongo_unittest_fourth_group",
+        "tracing_test",
+    ],
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        ":trace_settings",
+        ":tracing_initialization_impl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/third_party/opentelemetry-cpp/api",
         "//src/third_party/opentelemetry-cpp/sdk/src/trace",
     ],

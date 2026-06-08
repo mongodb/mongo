@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/traces/trace_settings.h"
 #include "mongo/otel/traces/trace_settings_gen.h"
 
 #include <fmt/format.h>
@@ -64,11 +65,18 @@ opentelemetry::sdk::trace::BatchSpanProcessorOptions makeBatchSpanProcessorOptio
     return opts;
 }
 
-/** Builds the OTel Resource with service identity attributes. */
+/**
+ * Builds the OTel Resource with service identity plus any user-supplied attributes. Attributes
+ * "service.name" and "service.instance.id" are set with default values if no user configuration is
+ * provided.
+ */
 opentelemetry::sdk::resource::Resource makeResource(StringData name, StringData pid) {
     opentelemetry::sdk::resource::ResourceAttributes attrs;
     attrs["service.name"] = std::string(name);
     attrs["service.instance.id"] = std::string(pid);
+    for (auto& [key, value] : getTracingResourceAttributes()) {
+        attrs[key] = value;
+    }
     return opentelemetry::sdk::resource::Resource::Create(attrs);
 }
 }  // namespace
@@ -97,6 +105,11 @@ Status TracerProviderService::initializeHttp(std::string name, std::string endpo
     opentelemetry::exporter::otlp::OtlpHttpExporterOptions opts;
     opts.url = std::move(endpoint);
     opts.compression = gOpenTelemetryTracingCompression;
+    for (auto& [headerName, headerValues] : getTracingHttpExportHeaders()) {
+        for (const std::string& value : headerValues) {
+            opts.http_headers.emplace(headerName, value);
+        }
+    }
 
     auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(opts);
     auto processor = opentelemetry::sdk::trace::BatchSpanProcessorFactory::Create(
