@@ -418,7 +418,9 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     opCtx, ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode);
                 topology_change_helpers::propagateClusterUserWriteBlockToReplicaSet(
                     opCtx, _getTargeter(opCtx), **executor);
-                _unblockFCVChangesOnNewShard(opCtx, **executor);
+                const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+                _unblockFCVChangesOnNewShard(opCtx, **executor, isAuthoritative);
                 topology_change_helpers::unblockDDLCoordinators(opCtx,
                                                                 /*removeRecoveryDocument*/ false);
             }))
@@ -902,7 +904,9 @@ void AddShardCoordinator::_blockFCVChangesOnReplicaSet(
 }
 
 void AddShardCoordinator::_unblockFCVChangesOnNewShard(
-    OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor) {
+    OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    bool isAuthoritative) {
     // Drop the collection to clean up the namespace
     auto& targeter = _getTargeter(opCtx);
     const auto osi = (*_osiGenerator())(opCtx);
@@ -910,6 +914,7 @@ void AddShardCoordinator::_unblockFCVChangesOnNewShard(
         NamespaceString::kBlockFCVChangesNamespace);
     dropCollectionParticipantCommand.setDropSystemCollections(true);
     dropCollectionParticipantCommand.setRequireCollectionEmpty(false);
+    dropCollectionParticipantCommand.setForceLegacyRefresh(!isAuthoritative);
     generic_argument_util::setMajorityWriteConcern(dropCollectionParticipantCommand);
     generic_argument_util::setOperationSessionInfo(dropCollectionParticipantCommand, osi);
     const auto dropCmdResponse =

@@ -112,9 +112,9 @@ public:
                 ns(),
                 fromMigrate,
                 dropSystemCollections,
+                request().getForceLegacyRefresh().value_or(true),
                 request().getCollectionUUID(),
-                request().getRequireCollectionEmpty(),
-                request().getForceLegacyRefresh().value_or(true));
+                request().getRequireCollectionEmpty());
 
             // Since no write that generated a retryable write oplog entry with this sessionId and
             // txnNumber happened, we need to make a dummy write so that the session gets durably

@@ -76,9 +76,9 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       bool fromMigrate,
                                                       bool dropSystemCollections,
+                                                      bool forceLegacyRefresh,
                                                       const boost::optional<UUID>& expectedUUID,
-                                                      bool requireCollectionEmpty,
-                                                      bool forceLegacyRefresh) {
+                                                      bool requireCollectionEmpty) {
 
     boost::optional<UUID> collectionUUID;
     {
@@ -434,9 +434,9 @@ void DropCollectionCoordinator::_commitDropCollection(
             session,
             fromMigrate,
             false /* dropSystemCollections */,
+            !isAuthoritative /* forceLegacyRefresh */,
             boost::none /* collectionUUID */,
-            false /* requireCollectionEmpty */,
-            !isAuthoritative /* forceLegacyRefresh */);
+            false /* requireCollectionEmpty */);
     };
 
     auto otherParticipants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);

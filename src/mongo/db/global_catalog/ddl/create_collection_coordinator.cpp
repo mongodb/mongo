@@ -550,7 +550,8 @@ void broadcastDropCollection(OperationContext* opCtx,
                              const CancellationToken& token,
                              const OperationSessionInfo& osi,
                              const boost::optional<UUID>& expectedUUID,
-                             bool fromMigrate) {
+                             bool fromMigrate,
+                             bool isAuthoritative) {
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
@@ -571,6 +572,7 @@ void broadcastDropCollection(OperationContext* opCtx,
         osi,
         fromMigrate,
         false /* dropSystemCollections */,
+        !isAuthoritative /* forceLegacyRefresh */,
         expectedUUID);
 }
 
@@ -2335,6 +2337,9 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
     OperationContext* opCtx,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
+    const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+
     if (!_firstExecution) {
         AllShardsAndConfigCausalityBarrier barrier{**executor, token};
         performCausalityBarrier(opCtx, barrier);
@@ -2374,6 +2379,7 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
                 session,
                 true /* fromMigrate */,
                 false /* dropSystemCollections */,
+                !isAuthoritative /* forceLegacyRefresh */,
                 _uuid);
         }
     }
@@ -2398,6 +2404,7 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
             session,
             true,
             false,
+            !isAuthoritative /* forceLegacyRefresh */,
             _uuid);
     }
 }
@@ -2454,6 +2461,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
                 // TODO SERVER-83774: Remove the following tassert and skip the broadcast if the
                 // _uuid does not exist.
                 tassert(10644512, "Expected _uuid to be set", _uuid);
+                const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                    AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
                 const auto session = getNewSession(opCtx);
                 broadcastDropCollection(opCtx,
                                         nss(),
@@ -2462,7 +2471,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
                                         token,
                                         session,
                                         _uuid,
-                                        false /*fromMigrate*/);
+                                        false /*fromMigrate*/,
+                                        isAuthoritative /*isAuthoritative*/);
             }
 
 

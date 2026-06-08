@@ -272,9 +272,9 @@ MONGO_MOD_NEEDS_REPLACEMENT void sendDropCollectionParticipantCommandToShards(
     const OperationSessionInfo& osi,
     bool fromMigrate,
     bool dropSystemCollections,
+    bool forceLegacyRefresh,
     const boost::optional<UUID>& collectionUUID = boost::none,
-    bool requireCollectionEmpty = false,
-    bool forceLegacyRefresh = true);
+    bool requireCollectionEmpty = false);
 
 MONGO_MOD_NEEDS_REPLACEMENT BSONObj getCriticalSectionReasonForRename(const NamespaceString& from,
                                                                       const NamespaceString& to);

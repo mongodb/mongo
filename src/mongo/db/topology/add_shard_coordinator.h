@@ -106,7 +106,8 @@ private:
                                       std::shared_ptr<executor::TaskExecutor> executor);
 
     void _unblockFCVChangesOnNewShard(OperationContext* opCtx,
-                                      std::shared_ptr<executor::TaskExecutor> executor);
+                                      std::shared_ptr<executor::TaskExecutor> executor,
+                                      bool isAuthoritative);
 
     topology_change_helpers::UserWriteBlockingLevel _getUserWritesBlockFromReplicaSet(
         OperationContext* opCtx);

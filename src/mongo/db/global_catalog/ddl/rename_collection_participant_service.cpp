@@ -90,9 +90,9 @@ void dropCollectionLocally(OperationContext* opCtx,
                                                      nss,
                                                      markFromMigrate,
                                                      false /* dropSystemCollections */,
-                                                     boost::none,
-                                                     false,
-                                                     isNonAuthoritative);
+                                                     isNonAuthoritative /* forceLegacyRefresh */,
+                                                     boost::none /* expectedUUID */,
+                                                     false /* requireCollectionEmpty */);
     LOGV2_DEBUG(5515100,
                 1,
                 "Dropped target collection locally on renameCollection participant.",

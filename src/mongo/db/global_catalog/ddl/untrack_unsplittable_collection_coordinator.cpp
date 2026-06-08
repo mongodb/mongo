@@ -194,9 +194,9 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
             session,
             true /* fromMigrate */,
             false /* dropSystemCollections */,
+            !isAuthoritative /* forceLegacyRefresh */,
             coll.getUuid(),
-            true /*requireCollectionEmpty*/,
-            !isAuthoritative /* forceLegacyRefresh */);
+            true /* requireCollectionEmpty */);
     }
 }
 

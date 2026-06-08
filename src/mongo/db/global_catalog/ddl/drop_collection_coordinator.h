@@ -72,8 +72,8 @@ public:
     void checkIfOptionsConflict(const BSONObj& doc) const final {}
 
     /**
-     * Locally drops a collection, cleans its CollectionShardingRuntime metadata and refreshes the
-     * catalog cache.
+     * Locally drops a collection, cleans its CollectionShardingRuntime metadata and, when
+     * forceLegacyRefresh is true, refreshes the filtering metadata cache.
      *
      * When fromMigrate is set, the related oplog entry will be marked with a 'fromMigrate' field to
      * reduce its visibility.
@@ -85,16 +85,14 @@ public:
      * this is a no-op. If expectedUUID is not set, no UUID check will be performed.
      *
      * If requireCollectionEmpty is set to true and the collection has records, this is a no-op.
-     *
-     * TODO (SERVER-123314): Investigate `forceLegacyRefresh` on all callers.
      */
     static void dropCollectionLocally(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       bool fromMigrate,
                                       bool dropSystemCollections,
+                                      bool forceLegacyRefresh,
                                       const boost::optional<UUID>& expectedUUID = boost::none,
-                                      bool requireCollectionEmpty = false,
-                                      bool forceLegacyRefresh = true);
+                                      bool requireCollectionEmpty = false);
 
 protected:
     bool isInCriticalSection(Phase phase) const override;

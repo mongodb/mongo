@@ -372,9 +372,9 @@ void DropDatabaseCoordinator::_dropTrackedCollection(
             getNewSession(opCtx),
             fromMigrate,
             false /* dropSystemCollections */,
+            !isAuthoritative /* forceLegacyRefresh */,
             boost::none /* collectionUUID */,
-            false /* requireCollectionEmpty */,
-            !isAuthoritative /* forceLegacyRefresh */);
+            false /* requireCollectionEmpty */);
     };
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     // Remove primary shard from participants

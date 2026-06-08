@@ -269,7 +269,10 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
             Phase::kDropCollectionOnShardsNotOwningData,
             [this, token, executor = executor, anchor = shared_from_this()](auto* opCtx) {
                 if (_doc.getOriginalCollection().has_value()) {
-                    // Drop collection form any shard that is not db primary and does not owning
+                    const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+                        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+
+                    // Drop collection from any shard that is not db primary and does not own
                     // data (getting rid of possible stale incarnations due to SERVER-87010).
                     std::vector<ShardId> participantsNotOwningData;
 
@@ -292,6 +295,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                         session,
                         true /* fromMigrate */,
                         false /* dropSystemCollections */,
+                        !isAuthoritative /* forceLegacyRefresh */,
                         _doc.getOriginalCollection()->getUuid());
                 }
             }))

@@ -850,6 +850,9 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
         return;
     }
 
+    const bool isAuthoritative = _doc.getAuthoritativeMetadataAccessLevel() >=
+        AuthoritativeMetadataAccessLevelEnum::kWritesAllowed;
+
     // Make a copy of this container since `getNewSession` changes the coordinator document.
     const auto collectionsToClone = *_doc.getCollectionsToClone();
     for (const auto& nss : collectionsToClone) {
@@ -862,7 +865,8 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
             token,
             session,
             true /* fromMigrate */,
-            true /* dropSystemCollections */);
+            true /* dropSystemCollections */,
+            !isAuthoritative /* forceLegacyRefresh */);
     }
 }
 

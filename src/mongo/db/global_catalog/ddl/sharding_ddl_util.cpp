@@ -661,9 +661,9 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   const OperationSessionInfo& osi,
                                                   bool fromMigrate,
                                                   bool dropSystemCollections,
+                                                  bool forceLegacyRefresh,
                                                   const boost::optional<UUID>& collectionUUID,
-                                                  bool requireCollectionEmpty,
-                                                  bool forceLegacyRefresh) {
+                                                  bool requireCollectionEmpty) {
     ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
     dropCollectionParticipant.setFromMigrate(fromMigrate);
     dropCollectionParticipant.setDropSystemCollections(dropSystemCollections);
