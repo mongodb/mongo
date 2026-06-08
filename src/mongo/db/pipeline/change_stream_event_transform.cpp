@@ -645,6 +645,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             // should have been filtered out by the change stream's oplog match filter already.
             tasserted(11945200, "Change stream encountered unexpected 'km' oplog entry");
         }
+        case repl::OpTypeEnum::kCMKRotation: {
+            // CMK rotation ('cmk') oplog entries should not show up in change streams. They
+            // should have been filtered out by the change stream's oplog match filter already.
+            tasserted(11945201, "Change stream encountered unexpected 'cmk' oplog entry");
+        }
         default: {
             // This static_assert is here so that it causes a compile error when new oplog entry
             // types are added without handling/ignoring them in change streams code. In case a new
@@ -652,7 +657,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             // simply adjust the number of expected oplog entry types below. If the new oplog entry
             // type needs to be handled in change streams, add it to the code below and also to the
             // change stream oplog match filter.
-            constexpr size_t kExpectedOplogEntryTypes = 9;
+            constexpr size_t kExpectedOplogEntryTypes = 10;
             static_assert(
                 idlEnumCount<repl::OpTypeEnum> == kExpectedOplogEntryTypes,
                 "unexpected number of oplog entry types - when adding a new oplog entry type, "

@@ -1214,13 +1214,22 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
         }
     }
 
+    if (op->getOpType() == OpTypeEnum::kCMKRotation) {
+        if (!status.isOK()) {
+            // We were unable to apply a CMK rotation oplog, we should log and shutdown server.
+            LOGV2_ERROR(12725001, "Unable to apply CMKRotation oplog entry", "error"_attr = status);
+            return status;
+        }
+    }
+
     if (op->getOpType() == OpTypeEnum::kNoop) {
         // No-ops should never fail application, since there's nothing to do.
-        // If keyMaterial has failed, it should be caught above
+        // If keyMaterial or CMKRotation have failed, it should be caught above.
         invariant(status);
     }
 
-    if (op->getOpType() == OpTypeEnum::kNoop || op->getOpType() == OpTypeEnum::kKeyMaterial) {
+    if (op->getOpType() == OpTypeEnum::kNoop || op->getOpType() == OpTypeEnum::kKeyMaterial ||
+        op->getOpType() == OpTypeEnum::kCMKRotation) {
         if (op->isNewPrimaryNoop()) {
             ReplicationMetrics::get(opCtx).setParticipantNewTermDates(op->getWallClockTime(),
                                                                       applyStartTime);

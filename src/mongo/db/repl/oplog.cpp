@@ -559,6 +559,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     invariant(oplogEntry->getUuid() || oplogEntry->getOpType() == OpTypeEnum::kNoop ||
                   oplogEntry->getOpType() == OpTypeEnum::kCommand ||
                   oplogEntry->getOpType() == OpTypeEnum::kKeyMaterial ||
+                  oplogEntry->getOpType() == OpTypeEnum::kCMKRotation ||
                   DurableOplogEntry::isContainerOpType(oplogEntry->getOpType()),
               str::stream() << "Expected uuid for logOp with oplog entry: "
                             << redact(oplogEntry->toBSON()));
@@ -574,9 +575,10 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
         return {};
     }
 
-    // TODO SERVER-51301 to remove this block for kNoop, not kKeyMaterial.
+    // TODO SERVER-51301 to remove this block for kNoop, not kKeyMaterial or kCMKRotation.
     if (oplogEntry->getOpType() == repl::OpTypeEnum::kNoop ||
-        oplogEntry->getOpType() == repl::OpTypeEnum::kKeyMaterial) {
+        oplogEntry->getOpType() == repl::OpTypeEnum::kKeyMaterial ||
+        oplogEntry->getOpType() == repl::OpTypeEnum::kCMKRotation) {
         shard_role_details::getRecoveryUnit(opCtx)->ignoreAllMultiTimestampConstraints();
     }
 
@@ -2149,7 +2151,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         }
 
         return Status::OK();
-    } else if (opType == OpTypeEnum::kKeyMaterial) {
+    } else if (opType == OpTypeEnum::kKeyMaterial || opType == OpTypeEnum::kCMKRotation) {
         if (mode == OplogApplication::Mode::kSecondary ||
             mode == OplogApplication::Mode::kInitialSync || OplogApplication::inRecovering(mode)) {
             auto handler = OplogKeyEntryHandler::get(opCtx->getServiceContext());

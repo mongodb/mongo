@@ -488,8 +488,9 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
         uuids.insert(opUUID.get());
     }
 
-    // No namespaces for a no-op or keyMaterial.
-    if (opType == OpTypeEnum::kNoop || opType == OpTypeEnum::kKeyMaterial) {
+    // No namespaces for a no-op, keyMaterial, or kCMKRotation.
+    if (opType == OpTypeEnum::kNoop || opType == OpTypeEnum::kKeyMaterial ||
+        opType == OpTypeEnum::kCMKRotation) {
         return std::make_pair(std::set<NamespaceString>(), std::set<UUID>());
     }
 
@@ -1005,8 +1006,9 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
         return status;
     }
 
-    // No information to record for a no-op.
-    if (opType == OpTypeEnum::kNoop || opType == OpTypeEnum::kKeyMaterial) {
+    // No information to record for a no-op, KeyMaterial, or CMKRotation.
+    if (opType == OpTypeEnum::kNoop || opType == OpTypeEnum::kKeyMaterial ||
+        opType == OpTypeEnum::kCMKRotation) {
         return Status::OK();
     }
 

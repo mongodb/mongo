@@ -190,7 +190,8 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
     for (const auto& op : txnOps) {
         try {
             if (op.getOpType() == repl::OpTypeEnum::kNoop ||
-                op.getOpType() == repl::OpTypeEnum::kKeyMaterial) {
+                op.getOpType() == repl::OpTypeEnum::kKeyMaterial ||
+                op.getOpType() == repl::OpTypeEnum::kCMKRotation) {
                 continue;
             }
 
@@ -634,7 +635,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // transaction.
     for (const auto& op : txnOps) {
         if (op.getOpType() == repl::OpTypeEnum::kNoop ||
-            op.getOpType() == repl::OpTypeEnum::kKeyMaterial) {
+            op.getOpType() == repl::OpTypeEnum::kKeyMaterial ||
+            op.getOpType() == repl::OpTypeEnum::kCMKRotation) {
             continue;
         }
         auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);

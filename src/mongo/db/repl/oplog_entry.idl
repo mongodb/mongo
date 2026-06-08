@@ -60,6 +60,7 @@ enums:
             kContainerDelete: "cd"
             kNoop: "n"
             kKeyMaterial: "km"
+            kCMKRotation: "cmk"
     RetryImage:
         description:
             "Dictates whether a pre-image or post-image is to be stored on behalf of this

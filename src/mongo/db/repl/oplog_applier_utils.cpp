@@ -460,7 +460,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     if (opType == OpTypeEnum::kNoop) {
         incrementOpsAppliedStats(1);
         return Status::OK();
-    } else if (opType == OpTypeEnum::kKeyMaterial) {
+    } else if (opType == OpTypeEnum::kKeyMaterial || opType == OpTypeEnum::kCMKRotation) {
         auto handler = OplogKeyEntryHandler::get(opCtx->getServiceContext());
         auto status = handler->applyOplogEntry(opCtx, repl::OplogEntry(*op));
         if (!status.isOK()) {

@@ -448,6 +448,7 @@ bool DurableOplogEntry::isCrudOpType(OpTypeEnum opType) {
         case OpTypeEnum::kCommand:
         case OpTypeEnum::kNoop:
         case OpTypeEnum::kKeyMaterial:
+        case OpTypeEnum::kCMKRotation:
             return false;
     }
     MONGO_UNREACHABLE;
@@ -474,6 +475,7 @@ bool DurableOplogEntry::isUpdateOrDelete() const {
         case OpTypeEnum::kContainerDelete:
         case OpTypeEnum::kNoop:
         case OpTypeEnum::kKeyMaterial:
+        case OpTypeEnum::kCMKRotation:
             return false;
     }
     MONGO_UNREACHABLE;

@@ -67,7 +67,7 @@ BSONObj getCRUDOplogEntryTypesFilter() {
     // expected oplog entry types below. If the new oplog entry type needs to be handled in change
     // streams, add it to the code below and also to the change stream event transformer, which
     // transforms oplog entries into change events.
-    constexpr size_t kExpectedOplogEntryTypes = 9;
+    constexpr size_t kExpectedOplogEntryTypes = 10;
     static_assert(idlEnumCount<repl::OpTypeEnum> == kExpectedOplogEntryTypes,
                   "unexpected number of oplog entry types - when adding a new oplog entry type, "
                   "please make sure that the change stream oplog filter handles it correctly!");
@@ -84,6 +84,7 @@ BSONObj getCRUDOplogEntryTypesFilter() {
     // - "cu": container update
     // - "cd": container delete
     // - "km": key material
+    // - "cmk": CMK rotation
     return BSON("$in" << BSON_ARRAY("d" << "i" << "u"));
 }
 

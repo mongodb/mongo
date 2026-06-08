@@ -239,7 +239,8 @@ Status _applyOps(OperationContext* opCtx,
                         case OpTypeEnum::kNoop: {
                             return Status::OK();
                         }
-                        case OpTypeEnum::kKeyMaterial: {
+                        case OpTypeEnum::kKeyMaterial:
+                        case OpTypeEnum::kCMKRotation: {
                             auto handler = OplogKeyEntryHandler::get(opCtx->getServiceContext());
                             return handler->applyOplogEntry(opCtx, entry);
                         }
