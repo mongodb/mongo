@@ -63,6 +63,10 @@ void serialize(BSONArrayBuilder& builder, const ObservableMutexRegistry::StatsRe
     BSONObjBuilder subObjBuilder;
     invariant(entry.mutexId && entry.registered);
     subObjBuilder.append(ObservableMutexRegistry::kIdFieldName, entry.mutexId.get());
+    if (entry.instanceLabel) {
+        subObjBuilder.append(ObservableMutexRegistry::kInstanceLabelFieldName,
+                             entry.instanceLabel.get());
+    }
     subObjBuilder.appendDate(ObservableMutexRegistry::kRegisteredFieldName, entry.registered.get());
     serialize(subObjBuilder, entry.data);
 
@@ -121,9 +125,11 @@ ObservableMutexRegistry::_collectStats() {
     }
     // Integrate the new entries into `_mutexEntries`.
     for (NewMutexEntry& entry : newEntries) {
-        _mutexEntries[std::move(entry.tag)].push_back({.id = _nextMutexId++,
-                                                       .registrationTime = entry.registrationTime,
-                                                       .token = std::move(entry.token)});
+        _mutexEntries[std::move(entry.tag)].push_back(
+            {.id = _nextMutexId++,
+             .instanceLabel = std::move(entry.instanceLabel),
+             .registrationTime = entry.registrationTime,
+             .token = std::move(entry.token)});
     }
 
     StringMap<std::vector<StatsRecord>> statsMap;
@@ -139,7 +145,8 @@ ObservableMutexRegistry::_collectStats() {
                 *removedTotal += stats;
                 it = entries.erase(it);
             } else {
-                records.push_back(StatsRecord{stats, it->id, it->registrationTime});
+                records.push_back(
+                    StatsRecord{stats, it->id, it->registrationTime, it->instanceLabel});
                 ++it;
             }
         }

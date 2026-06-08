@@ -83,9 +83,10 @@ public:
         ObservableMutexRegistry::kRegistrationMutexTag,
         ObservableMutexRegistry::kCollectionMutexTag};
 
-    std::unique_ptr<MockObservableMutex> makeMutexAndAddToRegistry(TaggedStats stats) {
+    std::unique_ptr<MockObservableMutex> makeMutexAndAddToRegistry(
+        TaggedStats stats, boost::optional<StringData> instanceLabel = boost::none) {
         auto m = std::make_unique<MockObservableMutex>(stats.data);
-        _registry.add(stats.tag, m->getMutex());
+        _registry.add(stats.tag, m->getMutex(), instanceLabel);
         return m;
     }
 
@@ -138,6 +139,15 @@ private:
                     ASSERT_TRUE(obj.hasField(ObservableMutexRegistry::kRegisteredFieldName));
                     ASSERT_EQ(obj.getField(ObservableMutexRegistry::kIdFieldName).Long(),
                               *listAllData->at(i).mutexId + std::size(kInternalMutexTags));
+
+                    if (const auto& instanceLabel = listAllData->at(i).instanceLabel) {
+                        ASSERT_EQ(
+                            obj.getStringField(ObservableMutexRegistry::kInstanceLabelFieldName),
+                            *instanceLabel);
+                    } else {
+                        ASSERT_FALSE(
+                            obj.hasField(ObservableMutexRegistry::kInstanceLabelFieldName));
+                    }
 
                     assertStats(obj.getObjectField(ObservableMutexRegistry::kExclusiveFieldName),
                                 listAllData->at(i).data.exclusiveAcquisitions);
@@ -257,6 +267,24 @@ TEST_F(ObservableMutexRegistryReportTest, ListAll) {
 
     // When listAll is disabled, we should still see stats for the invalidated mutex.
     assertReport({{statsA, statsB}}, {.listAll = false, .skipInternalMutexes = true});
+}
+
+TEST_F(ObservableMutexRegistryReportTest, ListAllWithInstanceLabel) {
+    TaggedStats statsA0 = {"A", {{3, 2, 500}, {1, 0, 17}}};
+    TaggedStats statsA1 = {"A", {{5, 1, 200}, {4, 2, 50}}};
+
+    auto mutexA0 = makeMutexAndAddToRegistry(statsA0, "my-pool"_sd);
+    auto mutexA1 = makeMutexAndAddToRegistry(statsA1);
+
+    auto dummyTimestamp = Date_t::now();
+
+    std::vector<StatsRecord> listAllA = {
+        {statsA0.data, 0, dummyTimestamp, std::string("my-pool")},
+        {statsA1.data, 1, dummyTimestamp},
+    };
+
+    assertReport({{"A", statsA0.data + statsA1.data, listAllA}},
+                 {.listAll = true, .skipInternalMutexes = true});
 }
 
 TEST_F(ObservableMutexRegistryReportTest, MutexIdShouldNeverChangeAfterInvalidation) {

@@ -701,7 +701,7 @@ ConnectionPool::ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> im
       _options(std::move(options)),
       _controller(_options.controllerFactory()),
       _manager(_options.egressConnectionCloserManager) {
-    ObservableMutexRegistry::get().add("ConnectionPool::_mutex", _mutex);
+    ObservableMutexRegistry::get().add("ConnectionPool::_mutex", _mutex, StringData(_name));
 
     if (_manager) {
         _manager->add(this);

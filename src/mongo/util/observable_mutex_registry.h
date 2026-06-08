@@ -53,6 +53,7 @@ public:
     static constexpr auto kMutexFieldName = "mutexes"_sd;
     static constexpr auto kIdFieldName = "id"_sd;
     static constexpr auto kRegisteredFieldName = "registered"_sd;
+    static constexpr auto kInstanceLabelFieldName = "instanceLabel"_sd;
 
     static constexpr auto kRegistrationMutexTag = "ObservableMutexRegistry::_registrationMutex"_sd;
     static constexpr auto kCollectionMutexTag = "ObservableMutexRegistry::_collectionMutex"_sd;
@@ -61,6 +62,7 @@ public:
         MutexStats data;
         boost::optional<int64_t> mutexId;
         boost::optional<Date_t> registered;
+        boost::optional<std::string> instanceLabel;
     };
 
     static ObservableMutexRegistry& get();
@@ -71,12 +73,24 @@ public:
         add(kCollectionMutexTag, _collectionMutex);
     }
 
+    /**
+     * Adds a mutex to the registry in order for its stats to be included in `report`.
+     * - `tag`: groups this mutex with others of the same tag; stats are aggregated per tag.
+     * - `mutex`: the mutex instance to register.
+     * - `instanceLabel`: optional human-readable label to distinguish individual instances under
+     * the same tag; included in the "mutexes" list when `listAll` is enabled in `report`.
+     */
     template <typename MutexType>
-    void add(StringData tag, const MutexType& mutex) {
+    void add(StringData tag,
+             const MutexType& mutex,
+             boost::optional<StringData> instanceLabel = boost::none) {
 // TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
 #if !__has_feature(thread_sanitizer)
         std::list<NewMutexEntry> newNode;
         newNode.push_back({.tag = std::string(tag),
+                           .instanceLabel = instanceLabel
+                               ? boost::optional<std::string>(*instanceLabel)
+                               : boost::none,
                            .registrationTime = _clockSource->now(),
                            .token = mutex.token()});
         std::lock_guard lk(_registrationMutex);
@@ -106,18 +120,20 @@ public:
      *             "total": "0",
      *             "contentions": "0",
      *             "waitCycles": "0",
-     *         }
+     *         },
      *         "mutexes" : [    // Only emitted if listAll == true.
      *             {
-     *                 id": 0
-     *                 registered: ...
+     *                 "id": 0,
+     *                 "instanceLabel": ...,   // Only emitted if label was provided at
+     * registration.
+     *                 "registered": ...,
      *                 "exclusive": {
      *                     ...
-     *                 }
+     *                 },
      *                 "shared": {
      *                     ...
      *                 }
-     *             }
+     *             },
      *             ...
      *         ]
      *     }
@@ -129,6 +145,7 @@ private:
     // `MutexEntry` is what is stored for each registered mutex.
     struct MutexEntry {
         int64_t id;
+        boost::optional<std::string> instanceLabel;
         Date_t registrationTime;
         std::shared_ptr<ObservationToken> token;
     };
@@ -137,6 +154,7 @@ private:
     // `report` then converts the `NewMutexEntry` into a `MutexEntry`.
     struct NewMutexEntry {
         std::string tag;
+        boost::optional<std::string> instanceLabel;
         Date_t registrationTime;
         std::shared_ptr<ObservationToken> token;
     };

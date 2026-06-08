@@ -80,7 +80,8 @@ public:
           _connPoolOptions(connPoolOptions),
           _transientSSLContext(transientSSLContext),
           _instanceName(instanceName) {
-        ObservableMutexRegistry::get().add("TLTypeFactory::_mutex", _mutex);
+        ObservableMutexRegistry::get().add(
+            "TLTypeFactory::_mutex", _mutex, StringData(_instanceName));
     }
 
     std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(

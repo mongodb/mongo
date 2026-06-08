@@ -174,7 +174,8 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
       _metadataHook(std::move(metadataHook)),
       _state(kDefault),
       _trackShardRequestCounts{trackShardRequestCounts} {
-    ObservableMutexRegistry::get().add("NetworkInterfaceTL::_mutex", _mutex);
+    ObservableMutexRegistry::get().add(
+        "NetworkInterfaceTL::_mutex", _mutex, StringData(_instanceName));
 }
 
 NetworkInterfaceTL::~NetworkInterfaceTL() {

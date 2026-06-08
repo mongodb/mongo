@@ -16,6 +16,12 @@ const kSampleFields = [
     "logv2::RamLog(global)::_mutex",
     "logv2::RamLog(startupWarnings)::_mutex",
 ];
+
+// Constants for expected fields that register with an instanceLabel; only emitted when listAll is enabled.
+// All tested topologies (mongos, mongod primary, mongod secondary) instantiate these networking
+// components, so each mutex is expected to appear in every serverStatus response.
+const kSampleInstanceLabelFields = ["ConnectionPool::_mutex", "NetworkInterfaceTL::_mutex", "TLTypeFactory::_mutex"];
+
 let checkNum = 1;
 
 function runServerStatus(conn, options) {
@@ -45,6 +51,20 @@ function runServerStatusAndAssert(conn, options, listAll) {
             errors.push(`'mutexes' presence mismatch in ${field}`);
         }
     }
+
+    if (listAll) {
+        for (const field of kSampleInstanceLabelFields) {
+            const entry = resp[field];
+            if (!entry) {
+                errors.push(`Missing field: ${field}`);
+                continue;
+            }
+            if (!entry["mutexes"] || !entry["mutexes"].every((m) => m["instanceLabel"] != undefined)) {
+                errors.push(`Missing mutex 'instanceLabel' in ${field}`);
+            }
+        }
+    }
+
     assert.eq(errors, []);
 }
 
