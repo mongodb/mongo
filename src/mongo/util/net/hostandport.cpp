@@ -50,7 +50,7 @@ StatusWith<HostAndPort> HostAndPort::parse(StringData text) {
     return StatusWith<HostAndPort>(result);
 }
 
-Status validateHostAndPort(const std::string& hostAndPortStr, const boost::optional<TenantId>&) {
+Status validateHostAndPort(StringData hostAndPortStr, const boost::optional<TenantId>&) {
     if (hostAndPortStr.empty()) {
         return Status::OK();
     }
@@ -63,7 +63,7 @@ HostAndPort::HostAndPort(StringData text) {
     uassertStatusOK(initialize(text));
 }
 
-HostAndPort::HostAndPort(const std::string& h, int p) : _host(h), _port(p) {}
+HostAndPort::HostAndPort(std::string h, int p) : _host(std::move(h)), _port(p) {}
 
 bool HostAndPort::operator<(const HostAndPort& r) const {
     const int cmp = host().compare(r.host());
@@ -134,6 +134,10 @@ bool HostAndPort::empty() const {
 }
 
 Status HostAndPort::initialize(StringData s) {
+    if (s.empty()) {
+        return Status(ErrorCodes::FailedToParse, "Cannot parse HostAndPort from empty string");
+    }
+
     size_t colonPos = s.rfind(':');
     StringData hostPart = s.substr(0, colonPos);
 
@@ -143,13 +147,11 @@ Status HostAndPort::initialize(StringData s) {
     if (openBracketPos != std::string::npos) {
         if (openBracketPos != 0) {
             return Status(ErrorCodes::FailedToParse,
-                          str::stream()
-                              << "'[' present, but not first character in " << std::string{s});
+                          fmt::format("'[' present, but not first character in {}", s));
         }
         if (closeBracketPos == std::string::npos) {
             return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "ipv6 address is missing closing ']' in hostname in "
-                                        << std::string{s});
+                          fmt::format("ipv6 address is missing closing ']' in hostname in {}", s));
         }
 
         hostPart = s.substr(openBracketPos + 1, closeBracketPos - openBracketPos - 1);
@@ -158,29 +160,26 @@ Status HostAndPort::initialize(StringData s) {
             // If the last colon is inside the brackets, then there must not be a port.
             if (s.size() != closeBracketPos + 1) {
                 return Status(ErrorCodes::FailedToParse,
-                              str::stream() << "missing colon after ']' before the port in "
-                                            << std::string{s});
+                              fmt::format("missing colon after ']' before the port in {}", s));
             }
             colonPos = std::string::npos;
         } else if (colonPos != closeBracketPos + 1) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Extraneous characters between ']' and pre-port ':'"
-                                        << " in " << std::string{s});
+            return Status(
+                ErrorCodes::FailedToParse,
+                fmt::format("Extraneous characters between ']' and pre-port ':' in {}", s));
         }
     } else if (closeBracketPos != std::string::npos) {
-        return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "']' present without '[' in " << std::string{s});
+        return Status(ErrorCodes::FailedToParse, fmt::format("']' present without '[' in {}", s));
     } else if (s.find(':') != colonPos) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream()
-                          << "More than one ':' detected. If this is an ipv6 address,"
-                          << " it needs to be surrounded by '[' and ']'; " << std::string{s});
+                      fmt::format("More than one ':' detected. If this is an ipv6 address, it "
+                                  "needs to be surrounded by '[' and ']'; {}",
+                                  s));
     }
 
     if (hostPart.empty()) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Empty host component parsing HostAndPort from \""
-                                    << str::escape(std::string{s}) << "\"");
+                      fmt::format("Empty host component parsing HostAndPort from {}", s));
     }
 
     int port;
@@ -191,15 +190,14 @@ Status HostAndPort::initialize(StringData s) {
             return status;
         }
         if (port <= 0 || port > 65535) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Port number " << port
-                                        << " out of range parsing HostAndPort from \""
-                                        << str::escape(std::string{s}) << "\"");
+            return Status(
+                ErrorCodes::FailedToParse,
+                fmt::format("Port number {} out of range parsing HostAndPort from {}", port, s));
         }
     } else {
         port = -1;
     }
-    _host = std::string{hostPart};
+    _host.assign(hostPart.data(), hostPart.size());
     _port = port;
     return Status::OK();
 }
