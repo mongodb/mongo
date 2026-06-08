@@ -31,12 +31,12 @@
 #   - 'release': rollout complete; retained here as a historical record.
 
 rollout:
-  featureFlagCostBasedRanker: {}
   featureFlagExtractFieldPathsSbeStage: {}
-  featureFlagMultiPlanLimiter: {}
   featureFlagSbeAccumulators: {}
   featureFlagSbeUpgradeBinaryTrees: {}
   featureFlagUnifiedWriteExecutor: {}
 
 release:
+  featureFlagCostBasedRanker: {}
   featureFlagImprovedDepsAnalysis: {}
+  featureFlagMultiPlanLimiter: {}
