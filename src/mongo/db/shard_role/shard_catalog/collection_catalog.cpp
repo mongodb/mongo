@@ -430,12 +430,7 @@ public:
     static constexpr size_t kNumStaticActions = 2;
 
     static void setCollectionInCatalog(CollectionCatalog& catalog,
-                                       std::shared_ptr<Collection> collection,
-                                       boost::optional<Timestamp> commitTime) {
-        if (commitTime) {
-            collection->setMinimumValidSnapshot(*commitTime);
-        }
-
+                                       std::shared_ptr<Collection> collection) {
         catalog._collections = catalog._collections.set(collection->ns(), collection);
         catalog._catalog = catalog._catalog.set(collection->uuid(), collection);
         auto dbIdPair = std::make_pair(collection->ns().dbName(), collection->uuid());
@@ -517,6 +512,16 @@ public:
 
                 if (!UncommittedCatalogUpdates::isTwoPhaseCommitEntry(entry)) {
                     continue;
+                }
+
+                // Set the minimum valid snapshot for the new collection instance before it is
+                // inserted as commit pending. Once registered, concurrent readers can see the new
+                // instance and reuse it if compatible with their snapshot. So anything that's
+                // registered must be in its final state. The fact that the commit might eventually
+                // fail is not relevant, as commit pending entries force readers to check the
+                // durable storage for compatibility.
+                if (commitTs && entry.collection) {
+                    entry.collection->setMinimumValidSnapshot(*commitTs);
                 }
 
                 PendingCommitEntry pendingEntry{entry.collection, commitTs};
@@ -651,10 +656,10 @@ public:
                 });
             switch (entry.action) {
                 case UncommittedCatalogUpdates::Entry::Action::kWritableCollection: {
-                    writeJobs.push_back([collection = std::move(entry.collection),
-                                         commitTime](CollectionCatalog& catalog) {
-                        setCollectionInCatalog(catalog, std::move(collection), commitTime);
-                    });
+                    writeJobs.push_back(
+                        [collection = std::move(entry.collection)](CollectionCatalog& catalog) {
+                            setCollectionInCatalog(catalog, std::move(collection));
+                        });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection: {

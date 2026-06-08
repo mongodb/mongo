@@ -1247,6 +1247,21 @@ public:
             catalogOperations);
     }
 
+    void concurrentCreateIndexAndRunCatalogOperations(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        BSONObj indexSpec,
+        Timestamp timestamp,
+        std::function<void(OperationContext* opCtx)> catalogOperations) {
+        _concurrentDDLOperationAndCatalogQueries(
+            opCtx,
+            timestamp,
+            [this, &nss, &indexSpec](OperationContext* opCtx) {
+                _createIndex(opCtx, nss, indexSpec);
+            },
+            catalogOperations);
+    }
+
     void concurrentDropCollectionAndEstablishConsistentCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,
@@ -1829,6 +1844,55 @@ TEST_F(CollectionCatalogTimestampTest, MinimumValidSnapshot) {
     coll = CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
     ASSERT(coll);
     ASSERT_EQ(coll->getMinimumValidSnapshot(), dropIndexTs);
+}
+
+TEST_F(CollectionCatalogTimestampTest, MinimumValidSnapshotSetForCommitPendingCreate) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(20, 20);
+
+    concurrentCreateAndRunCatalogOperations(
+        opCtx.get(), nss, boost::none, createCollectionTs, [&](OperationContext* readOpCtx) {
+            OneOffRead oor(readOpCtx, Timestamp());
+            Lock::GlobalLock globalLock(readOpCtx, MODE_IS);
+
+            auto coll = CollectionCatalog::get(readOpCtx)->establishConsistentCollection(
+                readOpCtx, nss, boost::none);
+            ASSERT(coll);
+
+            auto minValid = coll->getMinimumValidSnapshot();
+            ASSERT(minValid) << "A commit pending collection must have its minimum valid snapshot.";
+            ASSERT_EQ(*minValid, createCollectionTs);
+        });
+}
+
+TEST_F(CollectionCatalogTimestampTest, MinimumValidSnapshotBumpedForCommitPendingClone) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+
+    concurrentCreateIndexAndRunCatalogOperations(
+        opCtx.get(),
+        nss,
+        BSON("v" << 2 << "name"
+                 << "x_1"
+                 << "key" << BSON("x" << 1)),
+        createIndexTs,
+        [&](OperationContext* readOpCtx) {
+            OneOffRead oor(readOpCtx, Timestamp());
+            Lock::GlobalLock globalLock(readOpCtx, MODE_IS);
+
+            auto coll = CollectionCatalog::get(readOpCtx)->establishConsistentCollection(
+                readOpCtx, nss, boost::none);
+            ASSERT(coll);
+
+            auto minValid = coll->getMinimumValidSnapshot();
+            ASSERT(minValid) << "Pending collection must have a minimum valid snapshot.";
+            ASSERT_EQ(*minValid, createIndexTs)
+                << "Pending clone's minimum valid snapshot must equal the current DDL commit "
+                   "timestamp, not the previous DDL timestamp inherited from the source.";
+        });
 }
 
 TEST_F(CollectionCatalogTimestampTest, OpenCollectionBeforeCreateTimestamp) {
