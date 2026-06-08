@@ -996,9 +996,10 @@ TEST_F(DConcurrencyTestFixture, FailedGlobalLockShouldUnlockRSTLOnlyOnce) {
         ErrorCodes::LockTimeout);
     auto opCtx2Locker = shard_role_details::getLocker(opCtx2);
     // GlobalLock failed, but the RSTL should be successfully acquired and pending unlocked.
-    ASSERT(opCtx2Locker->getRequestsForTest().find(resourceIdGlobal).finished());
-    ASSERT_EQ(opCtx2Locker->getRequestsForTest().find(resourceRSTL).objAddr()->unlockPending, 1U);
-    ASSERT_EQ(opCtx2Locker->getRequestsForTest().find(resourceRSTL).objAddr()->recursiveCount, 1U);
+    auto requestsSnapshot = opCtx2Locker->getRequestsForTest();
+    ASSERT(requestsSnapshot.find(resourceIdGlobal) == requestsSnapshot.end());
+    ASSERT_EQ(requestsSnapshot.find(resourceRSTL)->value().unlockPending, 1U);
+    ASSERT_EQ(requestsSnapshot.find(resourceRSTL)->value().recursiveCount, 1U);
     shard_role_details::getLocker(opCtx2)->endWriteUnitOfWork();
     ASSERT_EQ(shard_role_details::getLocker(opCtx1)->getLockMode(resourceRSTL), MODE_IX);
     ASSERT_EQ(shard_role_details::getLocker(opCtx2)->getLockMode(resourceRSTL), MODE_NONE);
