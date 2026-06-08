@@ -2961,7 +2961,7 @@ void FLE2IndexedTextEncryptedValue::verifyTotalTagCountIsWithinLimit(ConstDataRa
 
     ConstDataRangeCursor cursor(toParse);
     cursor.advance(kCountsOffset);
-    auto edgeCount = cursor.readAndAdvance<uint32_t>();
+    auto edgeCount = cursor.readAndAdvance<LittleEndian<uint32_t>>();
     uassert(12773701,
             "FLE2IndexedTextEncryptedValue contains tags that exceed the tag limit",
             edgeCount <= EncryptionInformationHelpers::kFLE2PerFieldTagLimit);
