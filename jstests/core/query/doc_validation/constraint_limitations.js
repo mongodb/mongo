@@ -374,8 +374,6 @@ canUpgradeToConstraintWithNoValidatorWithErrorAction();
 cannotUpgradeToConstraintFromModerate();
 cannotUpgradeToConstraintFromOff();
 cannotUpgradeToConstraintFromImplicitStrict();
-// TODO SERVER-123709 add case to make sure we can't upgrade with non compliant docs on both rs and
-// sharding.
 
 // avoid downgrade problems (collections with constraint validationLevel can't be downgraded)
 myDb.runCommand({drop: collName, writeConcern: {w: "majority"}});
