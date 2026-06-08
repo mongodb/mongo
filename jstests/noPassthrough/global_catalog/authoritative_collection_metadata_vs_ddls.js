@@ -286,7 +286,7 @@ describe("Authoritative collection metadata vs DDLs", function () {
             });
         });
 
-        it("cleans up stale shard catalog chunks when merge/split leaves leftovers", function () {
+        it("shard catalog stays in sync with global catalog across refine + merge + refine", function () {
             const dbName2 = uniqueDbName("refine_stale");
             const ns2 = `${dbName2}.coll`;
             const db2 = st.s.getDB(dbName2);
@@ -323,8 +323,10 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 });
             }
 
-            // Merge the 2 chunks into 1. Global catalog now has 1 chunk, but shard catalog is
-            // stale: it still has 2 chunks with the old refined key.
+            // Merge the 2 chunks into 1. Both catalogs must converge: with authoritative chunk
+            // operations the coordinator installs the new chunk layout into the per-shard
+            // catalog (config.shard.catalog.chunks) atomically with the configsvr commit, so
+            // the shard catalog mirrors the global catalog immediately after the merge returns.
             assert.commandWorked(
                 db2.adminCommand({
                     mergeChunks: ns2,
@@ -340,8 +342,13 @@ describe("Authoritative collection metadata vs DDLs", function () {
                 const allGlobalChunks = getAllGlobalCatalogChunks(globalMeta.uuid);
                 assert.eq(1, allGlobalChunks.length, "Expected 1 chunk after merge");
 
-                const shardChunks = getShardCatalogChunks(st.rs0.getPrimary(), globalMeta.uuid);
-                assert.eq(2, shardChunks.length, "Shard catalog should still have 2 stale chunks");
+                st.rs0.nodes.forEach((node) => {
+                    assertShardCatalogOnNode(node, ns2, {
+                        expectedUuid: globalMeta.uuid,
+                        expectedKey: {x: 1, y: 1},
+                        expectedChunks: allGlobalChunks,
+                    });
+                });
             }
 
             // Second refine: {x: 1, y: 1} -> {x: 1, y: 1, z: 1}.

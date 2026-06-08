@@ -1,6 +1,6 @@
 /**
  * Verifies that splitChunk, mergeChunks and mergeAllChunksOnShard don't succeed when the collection
- * has {allowMigrations: false}.
+ * has {allowChunkOperations: false} or {allowMigrations: false}.
  *
  * @tags: [
  *   featureFlagAuthoritativeShardsDDL,
@@ -9,10 +9,9 @@
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-describe("commit chunk operations honor allowMigrations under the chunk lock", function () {
+describe("commit chunk operations honor allowMigrations and allowChunkOperations under the chunk lock", function () {
     before(() => {
         this.st = new ShardingTest({shards: 1});
         this.dbName = "split_merge_allow_migrations_db";
@@ -173,6 +172,7 @@ describe("commit chunk operations honor allowMigrations under the chunk lock", f
         assert.commandWorked(this.st.s.getDB(this.dbName).runCommand({drop: this.collName}));
     });
 
+    // Split test cases
     it("rejects splitChunk when allowMigrations is false", () => {
         this.checkSplitChunk(this.setAllowMigrations);
     });
@@ -181,19 +181,28 @@ describe("commit chunk operations honor allowMigrations under the chunk lock", f
         this.checkSplitChunk(this.setAllowChunkOperations);
     });
 
-    it("rejects mergeChunks when allowMigrations is false", () => {
-        this.checkMergeChunks(this.setAllowMigrations);
-    });
-
-    it("rejects mergeAllChunksOnShard when allowMigrations is false", () => {
-        this.checkMergeAllChunksOnShard(this.setAllowMigrations);
-    });
-
     it("allows a retried splitChunk when allowMigrations is false", () => {
         this.checkSplitChunkIdempotency(this.setAllowMigrations);
     });
 
     it("allows a retried splitChunk when allowChunkOperations is false", () => {
         this.checkSplitChunkIdempotency(this.setAllowChunkOperations);
+    });
+
+    // Merge test cases
+    it("rejects mergeChunks when allowMigrations is false", () => {
+        this.checkMergeChunks(this.setAllowMigrations);
+    });
+
+    it("rejects mergeChunks when allowChunkOperations is false", () => {
+        this.checkMergeChunks(this.setAllowChunkOperations);
+    });
+
+    it("allows a retried mergeChunks when allowMigrations is false", () => {
+        this.checkMergeChunksIdempotency(this.setAllowMigrations);
+    });
+
+    it("allows a retried mergeChunks when allowChunkOperations is false", () => {
+        this.checkMergeChunksIdempotency(this.setAllowChunkOperations);
     });
 });

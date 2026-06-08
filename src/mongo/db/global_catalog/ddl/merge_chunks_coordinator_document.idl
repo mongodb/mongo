@@ -36,6 +36,7 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/global_catalog/ddl/sharding_coordinator.idl"
     - "mongo/db/global_catalog/ddl/merge_chunk_request.idl"
+    - "mongo/db/versioning_protocol/chunk_version.idl"
 
 enums:
     MergeChunksCoordinatorPhase:
@@ -43,6 +44,11 @@ enums:
         type: string
         values:
             kUnset: "unset"
+            kCheckPreconditions: "checkPreconditions"
+            kAcquireCriticalSection: "acquireCriticalSection"
+            kGlobalCatalogCommit: "globalCatalogCommit"
+            kShardCatalogCommit: "shardCatalogCommit"
+            kReleaseCriticalSection: "releaseCriticalSection"
 
 structs:
     MergeChunksCoordinatorDocument:
