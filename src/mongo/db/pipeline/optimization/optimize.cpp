@@ -29,9 +29,7 @@
 
 #include "mongo/db/pipeline/optimization/optimize.h"
 
-#include "mongo/db/pipeline/optimization/graph_validation_rules.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
-#include "mongo/db/query/query_optimization_knobs_gen.h"
 
 namespace mongo::pipeline_optimization {
 namespace rbr = rule_based_rewrites::pipeline;
@@ -67,13 +65,6 @@ void optimizePipeline(Pipeline& pipeline) {
         return;
     }
 
-    // Remove previously inserted validation stages if the dependency graph validation knob is
-    // enabled.
-    // TODO SERVER-127305: Move removal of validation stages into a separate optimization rule.
-    if (internalEnableDependencyGraphValidation.loadRelaxed()) {
-        removeArraynessValidationStages(pipeline);
-    }
-
     if (pipeline.getContext()->getOptionalQuerySettings() &&
         pipeline.getContext()
             ->getQueryKnobConfiguration()
@@ -82,12 +73,6 @@ void optimizePipeline(Pipeline& pipeline) {
     }
     applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline), Tags::Reordering);
     applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline), Tags::InPlace);
-
-    // Insert validation stages if the dependency graph validation knob is enabled.
-    // TODO SERVER-127305: Move insertion of validation stages into a separate optimization rule.
-    if (internalEnableDependencyGraphValidation.loadRelaxed()) {
-        insertArraynessValidationStages(pipeline);
-    }
 }
 
 /**

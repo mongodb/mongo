@@ -377,9 +377,6 @@ const skippedStages = [
     "$_internalReshardingIterateTransaction",
     "$_internalReshardingOwnershipMatch",
     "$_addReshardingResumeId",
-
-    // Test-only internal stages for validation.
-    "$_internalAssertDataAssumptions",
 ];
 
 const testedStages = [...errorTests, ...noUnpackTests, ...unpackTests].map((test) => test.stage);

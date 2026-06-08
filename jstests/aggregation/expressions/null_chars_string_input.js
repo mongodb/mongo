@@ -423,7 +423,6 @@ const skips = new Set([
     "$_internalSetWindowFields",
     "$_internalShardServerInfo",
     "$_internalShredDocuments",
-    "$_internalAssertDataAssumptions",
     "$_internalSplitPipeline",
     "$_internalStreamingGroup",
     "$_internalUnpackBucket", // Tested in timeseries_explicit_unpack_bucket.js.

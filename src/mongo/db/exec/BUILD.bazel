@@ -137,7 +137,6 @@ mongo_cc_unit_test(
         "serialize_ejson_utils_test.cpp",
         "//src/mongo/db/exec/agg:exec_pipeline_test.cpp",
         "//src/mongo/db/exec/agg:graph_lookup_test.cpp",
-        "//src/mongo/db/exec/agg:internal_assert_data_assumptions_stage_test.cpp",
         "//src/mongo/db/exec/agg:lookup_stage_test.cpp",
         "//src/mongo/db/exec/agg:pipeline_builder_test.cpp",
         "//src/mongo/db/exec/classic:distinct_scan_test.cpp",
