@@ -700,6 +700,14 @@ const internalCommandsMap = {
             key: {},
         },
     },
+    _shardsvrReshardingDonorGetCloneCount: {
+        testname: "_shardsvrReshardingDonorGetCloneCount",
+        command: {
+            _shardsvrReshardingDonorGetCloneCount: "test.x",
+            reshardingUUID: UUID(),
+            cloneTimestamp: Timestamp(1, 1),
+        },
+    },
     _shardsvrReshardingDonorFetchFinalCollectionStats: {
         testname: "_shardsvrReshardingDonorFetchFinalCollectionStats",
         command: {

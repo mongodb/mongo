@@ -48,6 +48,7 @@ export const commandsRemovedFromMongodSinceLastLTS = [
 export const commandsAddedToMongodSinceLastLTS = [
     "_flushShardRegistry",
     "releaseMemory",
+    "_shardsvrReshardingDonorGetCloneCount",
     "_shardsvrReshardingDonorFetchFinalCollectionStats",
     "_shardsvrReshardingRecipientFetchFinalCollectionStats",
     "_shardsvrReshardingDonorStartChangeStreamsMonitor",

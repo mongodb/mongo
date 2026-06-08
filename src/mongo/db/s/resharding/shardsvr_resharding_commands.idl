@@ -55,6 +55,15 @@ structs:
                 type: safeInt64
                 description: "The change in the number of documents during the applying phase."
 
+    ShardsvrReshardingDonorGetCloneCountResponse:
+        description: "Response for the _shardsvrReshardingDonorGetCloneCount command."
+        is_command_reply: true
+        strict: false
+        fields:
+            documentsToCopy:
+                type: safeInt64
+                description: "Number of owned documents on this donor at the clone timestamp."
+
 commands:
     _shardsvrReshardDonorInitialize:
         description:
@@ -125,6 +134,25 @@ commands:
             reshardingUUID:
                 type: uuid
                 description: "The UUID for the resharding operation."
+
+    _shardsvrReshardingDonorGetCloneCount:
+        command_name: _shardsvrReshardingDonorGetCloneCount
+        cpp_name: ShardsvrReshardingDonorGetCloneCount
+        description:
+            "The internal command sent by the coordinator to a resharding donor shard to count
+            the documents owned by this donor at the clone timestamp."
+        namespace: type
+        type: namespacestring
+        reply_type: ShardsvrReshardingDonorGetCloneCountResponse
+        api_version: ""
+        strict: false
+        fields:
+            reshardingUUID:
+                type: uuid
+                description: "The UUID for the resharding operation."
+            cloneTimestamp:
+                type: timestamp
+                description: "The clone timestamp for the resharding operation."
 
     _shardsvrReshardRecipientInitialize:
         description:
