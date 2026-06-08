@@ -1471,28 +1471,30 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteWithDeadEndS
     }
 }
 
-DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTestDeathTest,
-                   RejectsRawApplyOpsAppliedSeparately,
-                   "Tripwire assertion.*9572400") {
+// The batch preparer unrolls retryable applyOps (both kApplyOpsAppliedSeparately and
+// kApplyOpsAppliedAtomically) into individual CRUD ops before they reach session application, so a
+// raw retryable applyOps should never legitimately reach tryApplyOperation. The tassert there is a
+// safety net that must reject both retryable-applyOps tags.
+class ReshardingOplogSessionApplicationRetryableApplyOpsTest
+    : public ReshardingOplogSessionApplicationTest,
+      public testing::WithParamInterface<repl::MultiOplogEntryType> {};
+
+INSTANTIATE_TEST_SUITE_P(RetryableApplyOpsMultiOpTypes,
+                         ReshardingOplogSessionApplicationRetryableApplyOpsTest,
+                         testing::Values(repl::MultiOplogEntryType::kApplyOpsAppliedSeparately,
+                                         repl::MultiOplogEntryType::kApplyOpsAppliedAtomically));
+
+TEST_P(ReshardingOplogSessionApplicationRetryableApplyOpsTest, RejectsRawRetryableApplyOps) {
     auto lsid = makeLogicalSessionIdForTest();
-    auto oplogEntry =
-        makeApplyOpsOp(lsid, 100, repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+    auto oplogEntry = makeApplyOpsOp(lsid, 100, GetParam());
 
     auto opCtx = makeOperationContext();
     ReshardingOplogSessionApplication applier{oplogBufferNss()};
-    applier.tryApplyOperation(opCtx.get(), oplogEntry);
-}
-
-DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTestDeathTest,
-                   RejectsRawApplyOpsAppliedAtomically,
-                   "Tripwire assertion.*9572400") {
-    auto lsid = makeLogicalSessionIdForTest();
-    auto oplogEntry =
-        makeApplyOpsOp(lsid, 100, repl::MultiOplogEntryType::kApplyOpsAppliedAtomically);
-
-    auto opCtx = makeOperationContext();
-    ReshardingOplogSessionApplication applier{oplogBufferNss()};
-    applier.tryApplyOperation(opCtx.get(), oplogEntry);
+    ASSERT_THROWS_WITH_CHECK(
+        applier.tryApplyOperation(opCtx.get(), oplogEntry), DBException, [](const DBException& ex) {
+            EXPECT_EQ(ex.code(), 9572400);
+            assertionCount.tripwire.subtractAndFetch(1);
+        });
 }
 
 }  // namespace
