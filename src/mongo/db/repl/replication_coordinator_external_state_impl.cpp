@@ -169,7 +169,7 @@ constexpr std::size_t kOplogApplyBufferCount = 10 * 1000;
 constexpr std::size_t kOplogApplyBufferSizeLegacy = 256 * 1024 * 1024;
 
 // The count of items in the oplog application buffer
-OplogBufferMetrics oplogBufferMetrics;
+OplogBufferMetrics& oplogBufferMetrics = *MetricBuilder<OplogBufferMetrics>("repl.buffer");
 
 /**
  * Returns new thread pool for thread pool task executor.

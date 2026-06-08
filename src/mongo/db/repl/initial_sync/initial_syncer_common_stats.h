@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/counter.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -42,17 +42,17 @@ namespace initial_sync_common_stats {
 // The number of initial sync attempts that have failed since server startup. Each instance of
 // InitialSyncer may run multiple attempts to fulfill an initial sync request that is triggered
 // when InitialSyncer::startup() is called.
-extern otel::metrics::Counter<int64_t>& initialSyncFailedAttempts;
+extern Counter64& initialSyncFailedAttempts;
 
 // The number of initial sync requests that have been requested and failed. Each instance of
 // InitialSyncer (upon successful startup()) corresponds to a single initial sync request.
 // This value does not include the number of times where a InitialSyncer is created successfully
 // but failed in startup().
-extern otel::metrics::Counter<int64_t>& initialSyncFailures;
+extern Counter64& initialSyncFailures;
 
 // The number of initial sync requests that have been requested and completed successfully. Each
 // instance of InitialSyncer corresponds to a single initial sync request.
-extern otel::metrics::Counter<int64_t>& initialSyncCompletes;
+extern Counter64& initialSyncCompletes;
 
 void LogInitialSyncAttemptStats(const StatusWith<OpTimeAndWallTime>& attemptResult,
                                 bool hasRetries,

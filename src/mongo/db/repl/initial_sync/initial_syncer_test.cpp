@@ -47,7 +47,6 @@
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/initial_sync/collection_cloner.h"
-#include "mongo/db/repl/initial_sync/initial_syncer_common_stats.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -91,8 +90,6 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
-#include "mongo/otel/metrics/metric_names.h"
-#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/type_traits.h"
@@ -5897,71 +5894,6 @@ TEST_F(InitialSyncerTest, InitialSyncerWaitLoopExitsOnFirstCheckWhenStableTsAlre
     _mock->runUntilIdle();
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
-}
-
-TEST_F(InitialSyncerTest, InitialSyncOtelMetricsIncrementOnFailedInitialSync) {
-    otel::metrics::OtelMetricsCapturer capturer;
-    auto initialSyncer = &getInitialSyncer();
-    auto opCtx = makeOpCtx();
-
-    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
-
-    ASSERT_OK(initialSyncer->startup(opCtx.get(), 1U));
-
-    auto net = getNet();
-    _simulateChooseSyncSourceFailure(net, _options.syncSourceRetryWait);
-    advanceClock(net, _options.initialSyncRetryWait);
-
-    initialSyncer->join();
-    ASSERT_EQUALS(ErrorCodes::InitialSyncOplogSourceMissing, _lastApplied);
-
-    ASSERT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kInitialSyncFailedAttempts), 1);
-    ASSERT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kInitialSyncFailures), 1);
-}
-
-TEST_F(InitialSyncerTest, InitialSyncOtelMetricsIncrementOnSuccessfulInitialSync) {
-    otel::metrics::OtelMetricsCapturer capturer;
-
-    // Skip reconstructing prepared transactions at the end of initial sync because
-    // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
-    // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
-    FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
-    FailPointEnableBlock skipRecoverUserWriteCriticalSections(
-        "skipRecoverUserWriteCriticalSections");
-
-    auto initialSyncer = &getInitialSyncer();
-    auto opCtx = makeOpCtx();
-
-    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-
-    _mock
-        ->expect(
-            BSON("find" << "oplog.rs"),
-            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
-        .times(2);
-
-    _mock
-        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
-                 makeCursorResponse(
-                     0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
-        .times(1);
-
-    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
-    _mock->runUntilExpectationsSatisfied();
-
-    _mock
-        ->expect(
-            [](auto& request) { return request["find"].str() == "oplog.rs"; },
-            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
-        .times(1);
-
-    getOplogFetcher()->receiveBatch(0LL, {makeOplogEntryObj(1)});
-    _mock->runUntilExpectationsSatisfied();
-
-    initialSyncer->join();
-    ASSERT_OK(_lastApplied.getStatus());
-
-    ASSERT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kInitialSyncCompleted), 1);
 }
 
 }  // namespace

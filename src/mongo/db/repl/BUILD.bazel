@@ -522,7 +522,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/storage/key_string",
-        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 
@@ -544,7 +543,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db/storage/key_string",
-        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 
@@ -555,7 +553,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 

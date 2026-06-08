@@ -33,8 +33,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/repl/oplog_batch.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/otel/metrics/metrics_service.h"
-#include "mongo/otel/metrics/metrics_updown_counter.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/modules.h"
@@ -50,35 +48,6 @@ namespace mongo {
 class OperationContext;
 
 namespace repl {
-
-using otel::metrics::MetricNames;
-using otel::metrics::MetricsService;
-using otel::metrics::MetricUnit;
-using otel::metrics::ServerStatusOptions;
-
-static auto& applyBufferCountMetric = MetricsService::instance().createInt64UpDownCounter(
-    MetricNames::kOplogApplyBufferCount,
-    "Number of oplog batches applied across all databases.",
-    MetricUnit::kOperations,
-    {.serverStatusOptions = ServerStatusOptions({.dottedPath = "repl.buffer.apply.count"})});
-
-static auto& applyBufferSizeMetric = MetricsService::instance().createInt64UpDownCounter(
-    MetricNames::kOplogApplyBufferSize,
-    "Current size of the oplog apply buffer in bytes",
-    MetricUnit::kBytes,
-    {.serverStatusOptions = ServerStatusOptions({.dottedPath = "repl.buffer.apply.size"})});
-
-static auto& writeBufferCountMetric = MetricsService::instance().createInt64UpDownCounter(
-    MetricNames::kOplogWriteBufferCount,
-    "Number of oplog batches applied across all databases.",
-    MetricUnit::kOperations,
-    {.serverStatusOptions = ServerStatusOptions({.dottedPath = "repl.buffer.write.count"})});
-
-static auto& writeBufferSizeMetric = MetricsService::instance().createInt64UpDownCounter(
-    MetricNames::kOplogWriteBufferSize,
-    "Current size of the oplog write buffer in bytes",
-    MetricUnit::kBytes,
-    {.serverStatusOptions = ServerStatusOptions({.dottedPath = "repl.buffer.write.size"})});
 
 /**
  * Interface for temporary container of oplog entries (in BSON format) from sync source by
@@ -242,11 +211,6 @@ struct OplogBuffer::Cost {
 
 class MONGO_MOD_PRIVATE OplogBuffer::Counters {
 public:
-    Counters() = delete;
-    Counters(otel::metrics::UpDownCounter<int64_t>& countMetric,
-             otel::metrics::UpDownCounter<int64_t>& sizeMetric)
-        : _countMetric(countMetric), _sizeMetric(sizeMetric) {}
-
     // Number of operations in this OplogBuffer.
     Counter64 count;
 
@@ -280,34 +244,29 @@ public:
      * This function should only be called by a single thread.
      */
     void clear() {
-        decrementN(count.get(), size.get());
+        count.decrement(count.get());
+        size.decrement(size.get());
     }
 
     void increment(const Value& value) {
-        incrementN(1, static_cast<size_t>(value.objsize()));
+        count.increment(1);
+        size.increment(std::size_t(value.objsize()));
     }
 
     void incrementN(std::size_t cnt, std::size_t sz) {
         count.increment(cnt);
-        _countMetric.add(static_cast<long>(cnt));
         size.increment(sz);
-        _sizeMetric.add(static_cast<long>(sz));
     }
 
     void decrement(const Value& value) {
-        decrementN(1, static_cast<size_t>(value.objsize()));
+        count.decrement(1);
+        size.decrement(std::size_t(value.objsize()));
     }
 
     void decrementN(std::size_t cnt, std::size_t sz) {
         count.decrement(cnt);
-        _countMetric.add(-static_cast<long>(cnt));
         size.decrement(sz);
-        _sizeMetric.add(-static_cast<long>(sz));
     }
-
-private:
-    otel::metrics::UpDownCounter<int64_t>& _countMetric;
-    otel::metrics::UpDownCounter<int64_t>& _sizeMetric;
 };
 
 class MONGO_MOD_PUB OplogBufferMetrics {
@@ -346,8 +305,8 @@ public:
     }
 
 private:
-    OplogBuffer::Counters _writeBufferCounter{writeBufferCountMetric, writeBufferSizeMetric};
-    OplogBuffer::Counters _applyBufferCounter{applyBufferCountMetric, applyBufferSizeMetric};
+    OplogBuffer::Counters _writeBufferCounter;
+    OplogBuffer::Counters _applyBufferCounter;
 };
 
 /**
