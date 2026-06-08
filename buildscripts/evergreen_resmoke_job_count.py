@@ -34,7 +34,7 @@ SYS_PLATFORM = sys.platform
 
 # Task factor overrides common to several {A,UB}SAN variants.
 _AUBSAN_TASK_FACTOR_OVERRIDES = [
-    {"task": r"sharding_auth.*", "factor": 0.25},
+    {"task": r".*shard.*", "factor": 0.25},
     {"task": r"bulk_write_targeted_override.*", "factor": 0.25},
     {"task": r".*causally_consistent_jscore_passthrough.*", "factor": 0.25},
     {"task": r"change_streams$", "factor": 0.5},
@@ -47,6 +47,7 @@ _AUBSAN_TASK_FACTOR_OVERRIDES = [
     {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
     {"task": r"sharding_jscore_passthrough.*", "factor": 0.25},
     {"task": r"sharding.*stepdown.*jscore_passthrough.*", "factor": 0.125},
+    {"task": "sharding_stepdown_fcv_upgrade_downgrade_jscore_passthrough", "factor": 0.09375},
 ]
 # Apply factor for a task based on the build variant it is running on.
 VARIANT_TASK_FACTOR_OVERRIDES = {
