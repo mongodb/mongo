@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/index/2d_common.h"
+#include "mongo/db/index/geo/2d_common.h"
 
 namespace mongo::index2d {
 void parse2dParams(const BSONObj& infoObj, TwoDIndexingParams* out) {

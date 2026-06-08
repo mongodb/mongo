@@ -12,20 +12,14 @@ exports_files(
 mongo_cc_library(
     name = "expression_params",
     srcs = [
-        "2d_common.cpp",
         "expression_params.cpp",
-        "s2_common.cpp",
     ],
     deps = [
-        "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/geo:geometry",
-        "//src/mongo/db/geo:geoparser",
-        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/index/geo:geo_expression_params",
         "//src/mongo/db/query/collation:collator_interface",
         "//src/mongo/db/storage/key_string",
-        "//src/third_party/s2",
     ],
 )
 
@@ -68,22 +62,22 @@ mongo_cc_unit_test(
 mongo_cc_library(
     name = "index_access_method",
     srcs = [
-        "2d_access_method.cpp",
-        "2d_key_generator.cpp",
         "btree_access_method.cpp",
         "btree_key_generator.cpp",
         "expression_keys_private.cpp",
         "fts_access_method.cpp",
-        "geo_key_extraction_failure_info.cpp",
         "hash_access_method.cpp",
         "index_access_method.cpp",
-        "s2_access_method.cpp",
-        "s2_key_generator.cpp",
         "sort_key_generator.cpp",
         "wildcard_access_method.cpp",
         "wildcard_key_generator.cpp",
         "wildcard_metadata_key.cpp",
         "wildcard_validation.cpp",
+        "//src/mongo/db/index/geo:2d_access_method.cpp",
+        "//src/mongo/db/index/geo:2d_key_generator.cpp",
+        "//src/mongo/db/index/geo:geo_key_extraction_failure_info.cpp",
+        "//src/mongo/db/index/geo:s2_access_method.cpp",
+        "//src/mongo/db/index/geo:s2_key_generator.cpp",
         "//src/mongo/db/shard_role/shard_catalog:index_descriptor.cpp",
     ],
     deps = [
@@ -160,13 +154,9 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "db_index_test",
     srcs = [
-        "2d_key_generator_test.cpp",
         "btree_key_generator_test.cpp",
         "hash_key_generator_test.cpp",
         "multikey_paths_test.cpp",
-        "s2_bucket_key_generator_test.cpp",
-        "s2_key_generator_test.cpp",
-        "s2_validate_missing_entry_heuristic_test.cpp",
         "sort_key_generator_test.cpp",
         "wildcard_key_generator_test.cpp",
         "wildcard_validation_test.cpp",
@@ -209,6 +199,7 @@ mongo_cc_unit_test(
         ":multikey_paths",
         "//src/mongo/db:mongohasher",
         "//src/mongo/db/fts:base_fts",
+        "//src/mongo/db/index/geo:geo_expression_params",
         "//src/mongo/db/query/collation:collator_interface_mock",
         "//src/mongo/unittest:golden_test_base",
     ],

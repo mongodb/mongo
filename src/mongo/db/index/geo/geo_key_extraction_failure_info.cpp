@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/index/geo_key_extraction_failure_info.h"
+#include "mongo/db/index/geo/geo_key_extraction_failure_info.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"

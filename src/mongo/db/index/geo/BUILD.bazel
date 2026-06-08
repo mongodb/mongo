@@ -1,0 +1,51 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "geo_expression_params",
+    srcs = [
+        "2d_common.cpp",
+        "s2_common.cpp",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/geo:geometry",
+        "//src/mongo/db/geo:geoparser",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db/query/collation:collator_interface",
+        "//src/mongo/db/storage/key_string",
+        "//src/third_party/s2",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "geo_index_test",
+    srcs = [
+        "2d_key_generator_test.cpp",
+        "s2_bucket_key_generator_test.cpp",
+        "s2_key_generator_test.cpp",
+        "s2_validate_missing_entry_heuristic_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":geo_expression_params",
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db/index:expression_params",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/index:multikey_paths",
+        "//src/mongo/db/query/collation:collator_interface_mock",
+        "//src/third_party/snappy",
+    ],
+)

@@ -54,7 +54,7 @@
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/hash.h"
-#include "mongo/db/index/s2_common.h"
+#include "mongo/db/index/geo/s2_common.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/expression_geo_index_knobs_gen.h"

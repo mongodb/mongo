@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/index/s2_key_generator.h"
+#include "mongo/db/index/geo/s2_key_generator.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -36,9 +36,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/db/index/geo/s2_common.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/index/s2_common.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/storage/key_string/key_string.h"

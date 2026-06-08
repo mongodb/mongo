@@ -48,7 +48,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/client.h"
-#include "mongo/db/index/geo_key_extraction_failure_info.h"
+#include "mongo/db/index/geo/geo_key_extraction_failure_info.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index_names.h"

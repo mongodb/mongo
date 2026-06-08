@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/index/2d_key_generator.h"
+#include "mongo/db/index/geo/2d_key_generator.h"
 
 #include "mongo/db/query/bson/multikey_dotted_path_support.h"
 

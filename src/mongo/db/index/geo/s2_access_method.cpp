@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/index/s2_access_method.h"
+#include "mongo/db/index/geo/s2_access_method.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -36,8 +36,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
-#include "mongo/db/index/s2_common.h"
-#include "mongo/db/index/s2_key_generator.h"
+#include "mongo/db/index/geo/s2_common.h"
+#include "mongo/db/index/geo/s2_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"

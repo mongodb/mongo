@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/index/s2_common.h"
+#include "mongo/db/index/geo/s2_common.h"
 
 #include <s2.h>
 #include <s2cellid.h>

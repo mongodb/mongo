@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,37 +29,24 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/index/s2_access_method.h"
-#include "mongo/db/index/s2_common.h"
-#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
-#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/index/geo/2d_common.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
-#include <set>
+MONGO_MOD_PUBLIC;
+namespace mongo::index2d {
 
-namespace mongo {
-
-// Public: instantiated in index_access_method.cpp (index_builds module) and fixSpec() called from
-// index_catalog_impl.cpp (catalog_and_routing.shard_role module)
-class MONGO_MOD_PUBLIC S2BucketAccessMethod : public S2AccessMethod {
-public:
-    S2BucketAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree)
-        : S2AccessMethod(btreeState, std::move(btree), IndexNames::GEO_2DSPHERE_BUCKET) {}
-
-    /**
-     * Takes an index spec object for this index and returns a copy tweaked to conform to the
-     * expected format.  When an index build is initiated, this function is called on the spec
-     * object the user provides, and the return value of this function is the final spec object
-     * that gets saved in the index catalog.
-     *
-     * Returns a non-OK status if 'specObj' is invalid.
-     */
-    static StatusWith<BSONObj> fixSpec(const BSONObj& specObj) {
-        std::set<long long> allowedVersions = {S2_INDEX_VERSION_4, S2_INDEX_VERSION_3};
-        return S2AccessMethod::_fixSpecHelper(specObj, allowedVersions);
-    }
-};
-
-}  // namespace mongo
+/**
+ * Generates keys for 2d access method, used for 2d index type.
+ */
+void get2DKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
+               const BSONObj& obj,
+               const TwoDIndexingParams& params,
+               KeyStringSet* keys,
+               key_string::Version keyStringVersion,
+               Ordering ordering,
+               const boost::optional<RecordId>& id = boost::none);
+}  // namespace mongo::index2d

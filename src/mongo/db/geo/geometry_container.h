@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/geo/shapes.h"
-#include "mongo/db/index/s2_common.h"
+#include "mongo/db/index/geo/s2_common.h"
 #include "mongo/util/modules.h"
 
 #include <memory>

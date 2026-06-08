@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/index/2d_access_method.h"
+#include "mongo/db/index/geo/2d_access_method.h"
 
-#include "mongo/db/index/2d_key_generator.h"
 #include "mongo/db/index/expression_keys_private.h"
+#include "mongo/db/index/geo/2d_key_generator.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 

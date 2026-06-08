@@ -30,7 +30,7 @@
 #include "mongo/db/query/timeseries/timeseries_translation.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/index/s2_common.h"
+#include "mongo/db/index/geo/s2_common.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
