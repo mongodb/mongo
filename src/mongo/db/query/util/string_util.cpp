@@ -35,6 +35,7 @@
 namespace mongo {
 
 namespace query_string_util {
+
 unsigned int levenshteinDistance(const std::string& s1, const std::string& s2) {
     if (s1.empty()) {
         return s2.size();
@@ -133,6 +134,36 @@ std::vector<std::pair<std::string, std::vector<std::string>>> computeTypoSuggest
         }
     }
     return suggestions;
+}
+
+std::vector<std::pair<std::string, std::vector<std::string>>> computeTypoSuggestions(
+    const std::vector<std::string>& validStrings,
+    const std::vector<std::string>& typos,
+    size_t maxCells) {
+    // Sum matrix cells across all (typo, validString) pairs. Use saturating addition to avoid
+    // overflow from near-BSON-limit field names before the comparison fires.
+    size_t totalCells = 0;
+    for (const auto& typo : typos) {
+        for (const auto& valid : validStrings) {
+            size_t cells = (typo.size() + 1) * (valid.size() + 1);
+            totalCells = (totalCells > maxCells - cells) ? maxCells + 1 : totalCells + cells;
+        }
+    }
+    if (totalCells > maxCells) {
+        // Budget exceeded: skip Levenshtein computation and return all valid strings as
+        // unranked suggestions so the error message still lists valid options.
+        std::vector<std::pair<std::string, std::vector<std::string>>> suggestions;
+        for (const auto& typo : typos) {
+            suggestions.push_back({typo, validStrings});
+        }
+        return suggestions;
+    }
+    return computeTypoSuggestions(validStrings, typos);
+}
+
+std::vector<std::pair<std::string, std::vector<std::string>>> safeComputeTypoSuggestions(
+    const std::vector<std::string>& validStrings, const std::vector<std::string>& typos) {
+    return computeTypoSuggestions(validStrings, typos, kDefaultMaxLevenshteinTotalCells);
 }
 
 }  // namespace query_string_util

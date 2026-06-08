@@ -174,7 +174,7 @@ void failWeightsValidationWithPipelineSuggestions(
     // The first entry in the pair is the name of the invalid weight,
     // the second entry is the list of the suggested unmatched pipeline.
     std::vector<std::pair<std::string, std::vector<std::string>>> suggestions =
-        query_string_util::computeTypoSuggestions(unmatchedPipelines, invalidWeights);
+        query_string_util::safeComputeTypoSuggestions(unmatchedPipelines, invalidWeights);
 
     // 'i' is the index into the 'suggestions' array.
     auto convertSingleSuggestionToString = [&](const std::size_t i) -> std::string {
