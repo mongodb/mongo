@@ -30,8 +30,6 @@ executor:
           skipInterNodeCollectionHashValidation: true
           # TODO(SERVER-115393): Remove if possible.
           supportsParallelReplSetInitiateAndStop: false
-          # TODO(SERVER-112499): Remove.
-          skipEnforceFastCountOnValidate: true
           # TODO(SLS-1414): Remove.
           doesNotSupportGracefulStepdown: true
           # TODO(SERVER-113063): Remove.

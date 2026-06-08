@@ -789,63 +789,29 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           << " invalid documents.");
     }
 
-    if (_validateState->shouldEnforceFastCount(opCtx)) {
-        const auto fastCountType = _validateState->getDetectedFastCountType(opCtx);
-        const bool enforceCount = _validateState->enforceFastCountRequested();
-        const bool enforceSize = _validateState->enforceFastSizeRequested();
-        switch (fastCountType) {
-            case CollectionValidation::FastCountType::legacySizeStorer:
-                if (enforceCount) {
-                    if (const auto fastCount = coll->latestSizeCount(opCtx).count;
-                        fastCount != _numRecords) {
-                        results->addError(
-                            fmt::format("fast count ({}) does not match number of "
-                                        "records ({}) for collection '{}'",
-                                        fastCount,
-                                        _numRecords,
-                                        coll->ns().toStringForErrorMsg()));
-                    }
-                }
-                if (enforceSize) {
-                    if (const auto fastSize = coll->latestSizeCount(opCtx).size;
-                        fastSize != dataSizeTotal) {
-                        results->addError(
-                            fmt::format("fast size ({}) does not match data size ({}) for "
-                                        "collection '{}'",
-                                        fastSize,
-                                        dataSizeTotal,
-                                        coll->ns().toStringForErrorMsg()));
-                    }
-                }
-                break;
-            case CollectionValidation::FastCountType::replicated:
-                if (enforceCount) {
-                    if (const auto fastCount = coll->latestSizeCount(opCtx).count;
-                        fastCount != _numRecords) {
-                        results->addError(
-                            fmt::format("replicated fast count ({}) does not match number of "
-                                        "records ({}) for collection '{}'",
-                                        fastCount,
-                                        _numRecords,
-                                        coll->ns().toStringForErrorMsg()));
-                    }
-                }
-                if (enforceSize) {
-                    if (const auto fastSize = coll->latestSizeCount(opCtx).size;
-                        fastSize != dataSizeTotal) {
-                        results->addError(
-                            fmt::format("replicated fast size ({}) does not match data size ({}) "
-                                        "for collection '{}'",
-                                        fastSize,
-                                        dataSizeTotal,
-                                        coll->ns().toStringForErrorMsg()));
-                    }
-                }
-                break;
-            case CollectionValidation::FastCountType::both:
-                break;
-            case CollectionValidation::FastCountType::neither:
-                break;
+    const CollectionValidation::FastCountType fastCountType =
+        _validateState->getDetectedFastCountType(opCtx);
+    if (_validateState->shouldEnforceFastCount(opCtx, fastCountType)) {
+        if (const auto fastCount = coll->latestSizeCount(opCtx).count; fastCount != _numRecords) {
+            results->addError(
+                fmt::format("fast count ({}) does not match number of "
+                            "records ({}) for collection '{}' with fast count store type '{}'",
+                            fastCount,
+                            _numRecords,
+                            coll->ns().toStringForErrorMsg(),
+                            toString(fastCountType)));
+        }
+    }
+
+    if (_validateState->shouldEnforceFastSize(opCtx, fastCountType)) {
+        if (const auto fastSize = coll->latestSizeCount(opCtx).size; fastSize != dataSizeTotal) {
+            results->addError(
+                fmt::format("fast size ({}) does not match data size ({}) "
+                            "for collection '{}' with fast count store type '{}'",
+                            fastSize,
+                            dataSizeTotal,
+                            coll->ns().toStringForErrorMsg(),
+                            toString(fastCountType)));
         }
     }
 

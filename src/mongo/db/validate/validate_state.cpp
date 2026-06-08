@@ -36,6 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/replicated_fast_count/replicated_fast_count_enabled.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -83,6 +84,7 @@ ResourceMutex validateLock("validateLock");
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangDuringValidationInitialization);
+MONGO_FAIL_POINT_DEFINE(skipEnforcingFastSizeAndCount);
 
 namespace CollectionValidation {
 
@@ -129,9 +131,15 @@ ValidateState::ValidateState(OperationContext* opCtx,
         uassert(11950900,
                 "Cannot fix errors when validation is run in the background",
                 !isBackground());
+        // If the persistence provider does use replicated fast count, we enforce
+        // fast count unconditionally and do not fix the value up when performing validation, so it
+        // is not incompatible with fixErrors.
         uassert(11950901,
                 "Cannot enforce fast count when fixErrors is enabled",
-                !shouldEnforceFastCount(opCtx));
+                !shouldEnforceFastCount(opCtx, getDetectedFastCountType(opCtx)) ||
+                    rss::ReplicatedStorageService::get(opCtx)
+                        .getPersistenceProvider()
+                        .shouldUseReplicatedFastCount());
     }
 
     if (adjustMultikey()) {
@@ -178,41 +186,79 @@ Status ValidateState::_checkUnreplicatedFastCountCollectionExists(OperationConte
     return Status::OK();
 }
 
-bool ValidateState::shouldEnforceFastCount(OperationContext* opCtx) const {
-    if (enforceFastCountRequested() || enforceFastSizeRequested()) {
-        if (_nss.isOplog() || _nss.isChangeStreamPreImagesCollection()) {
-            // Oplog writers only take a global IX lock, so the oplog can still be written to even
-            // during full validation despite its collection X lock. This can cause validate to
-            // incorrectly report an incorrect fast count on the oplog when run in enforceFastCount
-            // mode.
-            // The oplog entries are also written to the change stream pre-images collection. This
-            // collection is also prone to fast count failures.
-            return false;
-        } else if (_nss == NamespaceString::kIndexBuildEntryNamespace) {
-            // Do not enforce fast count on the 'config.system.indexBuilds' collection. This is an
-            // internal collection that should not be queried and is empty most of the time.
-            return false;
-        } else if (_nss == NamespaceString::kSessionTransactionsTableNamespace) {
-            // The 'config.transactions' collection is an implicitly replicated collection used for
-            // internal bookkeeping for retryable writes and multi-statement transactions.
-            // Replication rollback won't adjust the size storer counts for the
-            // 'config.transactions' collection. We therefore do not enforce fast count on it.
-            return false;
-        } else if (_nss == NamespaceString::kConfigImagesNamespace) {
-            // The 'config.image_collection' collection is an implicitly replicated collection used
-            // for internal bookkeeping for retryable writes. Replication rollback won't adjust the
-            // size storer counts for the 'config.image_collection' collection. We therefore do not
-            // enforce fast count on it.
-            return false;
-        } else if (isReplicatedFastCountEnabled(opCtx) && (_nss.isAdminDB() || _nss.isConfigDB())) {
-            // TODO(SERVER-119984): Revisit this, enforce if possible.
-            return false;
-        }
-
-        return true;
+bool ValidateState::_isNSEligibleForSizeStorerValidation() const {
+    if (_nss.isOplog() || _nss.isChangeStreamPreImagesCollection()) {
+        // Oplog writers only take a global IX lock, so the oplog can still be written to even
+        // during full validation despite its collection X lock. This can cause validate to
+        // incorrectly report an incorrect fast count on the oplog when run in enforceFastCount
+        // mode.
+        // The oplog entries are also written to the change stream pre-images collection. This
+        // collection is also prone to fast count failures.
+        return false;
+    } else if (_nss == NamespaceString::kIndexBuildEntryNamespace) {
+        // Do not enforce fast count on the 'config.system.indexBuilds' collection. This is an
+        // internal collection that should not be queried and is empty most of the time.
+        return false;
+    } else if (_nss == NamespaceString::kSessionTransactionsTableNamespace) {
+        // The 'config.transactions' collection is an implicitly replicated collection used for
+        // internal bookkeeping for retryable writes and multi-statement transactions.
+        // Replication rollback won't adjust the size storer counts for the
+        // 'config.transactions' collection. We therefore do not enforce fast count on it.
+        return false;
+    } else if (_nss == NamespaceString::kConfigImagesNamespace) {
+        // The 'config.image_collection' collection is an implicitly replicated collection used
+        // for internal bookkeeping for retryable writes. Replication rollback won't adjust the
+        // size storer counts for the 'config.image_collection' collection. We therefore do not
+        // enforce fast count on it.
+        return false;
     }
+    return true;
+}
 
-    return false;
+bool ValidateState::shouldEnforceFastCount(OperationContext* opCtx, FastCountType type) const {
+    if (MONGO_unlikely(skipEnforcingFastSizeAndCount.shouldFail())) {
+        return false;
+    }
+    if (isBackground()) {
+        return false;
+    }
+    if (rss::ReplicatedStorageService::get(opCtx)
+            .getPersistenceProvider()
+            .shouldUseReplicatedFastCount()) {
+        // Oplog writers only take a global IX lock, so the oplog can still be written to even
+        // during full validation despite validation taking the collection X lock.
+        // TODO SERVER-128375: Remove early return when table type is neither, enforce state in
+        // separate check.
+        return !_nss.isOplog() && type != FastCountType::neither &&
+            isReplicatedFastCountEligible(_nss);
+    } else {
+        // TODO SERVER-128302: Re-enable validation when the fast count type is both.
+        return type != FastCountType::both && _isNSEligibleForSizeStorerValidation() &&
+            enforceFastCountRequested();
+    }
+}
+
+bool ValidateState::shouldEnforceFastSize(OperationContext* opCtx, FastCountType type) const {
+    if (MONGO_unlikely(skipEnforcingFastSizeAndCount.shouldFail())) {
+        return false;
+    }
+    if (isBackground()) {
+        return false;
+    }
+    if (rss::ReplicatedStorageService::get(opCtx)
+            .getPersistenceProvider()
+            .shouldUseReplicatedFastCount()) {
+        // Oplog writers only take a global IX lock, so the oplog can still be written to even
+        // during full validation despite validation taking the collection X lock.
+        // TODO SERVER-128375: Remove early return when table type is neither, enforce state in
+        // separate check.
+        return !_nss.isOplog() && type != FastCountType::neither &&
+            isReplicatedFastCountEligible(_nss);
+    } else {
+        // TODO SERVER-128302: Re-enable validation when the fast count type is both.
+        return type != FastCountType::both && _isNSEligibleForSizeStorerValidation() &&
+            enforceFastSizeRequested();
+    }
 }
 
 FastCountType ValidateState::getDetectedFastCountType(OperationContext* opCtx) const {

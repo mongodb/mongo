@@ -101,11 +101,42 @@ public:
     }
 
     /**
-     * Returns true if fast count and/or size is being validated, and the collection supports fast
-     * count. Certain internal collections are not supported by fast count.
-     * TODO SERVER-117326: Remove 'opCtx' parameter.
+     * Returns true if fast count is being validated, and the collection supports fast
+     * count.
+     *
+     * If the persistence provider uses replicated fast count, this will return true for any
+     * collection that is tracked by the replicated fast count system and is eligible to have its
+     * size and count validated.
+     *
+     * If the persistence provider does not use replicated fast count, this will return true if the
+     * collection is eligible to have its size and count validated and the parameter to enforce fast
+     * count validation is set.
+     *
+     * If the fast count type is both or neither, it will return false.
+     * TODO SERVER-128302: Validate fast count on eligible collections when the fast count type is
+     * both.
+     *
      */
-    bool shouldEnforceFastCount(OperationContext* opCtx) const;
+    bool shouldEnforceFastCount(OperationContext* opCtx, FastCountType type) const;
+
+    /**
+     * Returns true if fast size is being validated, and the collection supports fast
+     * size.
+     *
+     * If the persistence provider uses replicated fast count, this will return true for any
+     * collection that is tracked by the replicated fast count system and is eligible to have its
+     * size and count validated.
+     *
+     * If the persistence provider does not use replicated fast count, this will return true if the
+     * collection is eligible to have its size and count validated and the parameter to enforce fast
+     * size validation is set.
+     *
+     * If the fast count type is both or neither, it will return false.
+     * TODO SERVER-128302: Validate fast size on eligible collections when the fast count type is
+     * both.
+     *
+     */
+    bool shouldEnforceFastSize(OperationContext* opCtx, FastCountType type) const;
 
     FastCountType getDetectedFastCountType(OperationContext* opCtx) const;
 
@@ -180,6 +211,12 @@ private:
      * Status::OK() if the collection exists and an error otherwise.
      */
     Status _checkUnreplicatedFastCountCollectionExists(OperationContext* opCtx) const;
+
+    /**
+     * Returns true if the namespace is eligible to have its fast count and size validated when the
+     * size and count is stored in the size storer.
+     */
+    bool _isNSEligibleForSizeStorerValidation() const;
 
     // This lock needs to be obtained before the global lock. Initialise in the validation
     // constructor. Oplog Batch Applier takes this lock in exclusive mode when applying the batch.

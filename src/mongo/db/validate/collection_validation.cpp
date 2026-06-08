@@ -962,7 +962,10 @@ Status validate(OperationContext* opCtx,
         results->setFastCountType({fastCountType});
 
         const bool shouldEnforceFastCountOrSize =
-            validateState.enforceFastCountRequested() || validateState.enforceFastSizeRequested();
+            validateState.shouldEnforceFastCount(opCtx, fastCountType) ||
+            validateState.shouldEnforceFastSize(opCtx, fastCountType);
+        // TODO SERVER-128375: Add more thorough checks around the state of the fast count store
+        // type.
         if (shouldEnforceFastCountOrSize && fastCountType == FastCountType::neither) {
             LOGV2_ERROR(ErrorCodes::InvalidOptions, "Neither FastCount table found");
             results->addError("Neither FastCount table found", false);
