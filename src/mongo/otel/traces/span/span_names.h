@@ -42,6 +42,19 @@ private:
     constexpr Passkey() = default;
 };
 
+/**
+ * Indicates whether a span should be included in sampled traces by default when no explicit
+ * sampling decision has been made by the caller.
+ *
+ * "yes" means this span is an entry point to an operation we always want to trace (e.g., the
+ * root span of a tracked operation). Only a small number of spans should be "yes" — typically
+ * only the outermost entry points to operations listed as sampled-by-default in the OTel design.
+ * Child spans within a sampled trace are captured automatically and should remain "no".
+ *
+ * "no" means the span defers sampling to the parent context or the configured sampler.
+ */
+enum class SampledByDefault : bool { no, yes };
+
 /** Wrapper class around a string to ensure `SpanName`s are only constructed in certain places. */
 class MONGO_MOD_PUBLIC SpanName {
 public:
@@ -51,10 +64,15 @@ public:
      * are meant to facilitate cases where the span names should not be visible outside some
      * module, in order to prevent leaking information related to that module.
      */
-    constexpr SpanName(StringData name, Passkey<SpanNameMaker>) : _name(name) {}
+    constexpr SpanName(StringData name, Passkey<SpanNameMaker>, SampledByDefault sampledByDefault)
+        : _name(name), _sampledByDefault{sampledByDefault} {}
 
     constexpr StringData getName() const {
         return _name;
+    }
+
+    constexpr SampledByDefault getSampledByDefault() const {
+        return _sampledByDefault;
     }
 
     constexpr bool operator==(const SpanName& other) const {
@@ -63,11 +81,13 @@ public:
 
 private:
     StringData _name;
+    SampledByDefault _sampledByDefault;
 };
 
 /** Helper to create SpanName instances. */
-class MONGO_MOD_FILE_PRIVATE SpanNameMaker{public : static constexpr SpanName make(StringData name){
-    return SpanName(name, Passkey<SpanNameMaker>{});
+class MONGO_MOD_FILE_PRIVATE SpanNameMaker{public : static constexpr SpanName make(
+    StringData name, SampledByDefault sampledByDefault = SampledByDefault::no){
+    return SpanName(name, Passkey<SpanNameMaker>{}, sampledByDefault);
 }  // namespace mongo::otel::traces
 }
 ;
