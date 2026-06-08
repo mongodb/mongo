@@ -77,7 +77,7 @@ void logExceptionRateLimited(const DBException& ex) {
 int _idxInt(StringData idx) {
     int value = INT_MIN;
     auto [ptr, ec] = std::from_chars(idx.data(), idx.data() + idx.size(), value);
-    // Ensure that the parsing consume the entire buffer
+    // Ensure that the parsing consumes the entire buffer.
     if (ec != std::errc{} || ptr != idx.data() + idx.size()) {
         return INT_MIN;
     }

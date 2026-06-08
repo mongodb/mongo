@@ -56,7 +56,6 @@
 #include "mongo/util/tracking/context.h"
 
 #include <climits>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -75,14 +74,14 @@ namespace {
 /**
  * Attempts to parse the field name to integer.
  */
-// TODO (SERVER-123878): Use std::from_chars instead of std::stoi.
 int idxInt(StringData idx) {
-    try {
-        auto idxInt = std::stoi(std::string{idx});
-        return idxInt;
-    } catch (const std::invalid_argument&) {
+    int value = INT_MIN;
+    auto [ptr, ec] = std::from_chars(idx.data(), idx.data() + idx.size(), value);
+    // Ensure that the parsing consumes the entire buffer.
+    if (ec != std::errc{} || ptr != idx.data() + idx.size()) {
         return INT_MIN;
     }
+    return value;
 }
 }  // namespace
 
