@@ -1156,6 +1156,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         if (collTag != value::TypeTags::collator) {
             auto [tag, val] = value::copyValue(accTag, accVal);
             topStack(true, tag, val);
+            if (accOwned) {
+                value::releaseValue(accTag, accVal);
+            }
             return;
         }
         auto collator = value::getCollatorView(collVal);
@@ -1198,6 +1201,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
         if (collTag != value::TypeTags::collator) {
             auto [tag, val] = value::copyValue(accTag, accVal);
             topStack(true, tag, val);
+            if (accOwned) {
+                value::releaseValue(accTag, accVal);
+            }
             return;
         }
         auto collator = value::getCollatorView(collVal);

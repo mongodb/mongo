@@ -30,6 +30,7 @@
 
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_instruction.h"
 #include "mongo/unittest/death_test.h"
@@ -77,6 +78,46 @@ DEATH_TEST(SBEVMBytecodeValidationDeathTest,
     code.instrs().resize(1, kInvalidOpcode);
     sbe::vm::ByteCode interpreter;
     interpreter.run(&code);
+}
+
+TEST(CodeFragmentTest, AggCollMinMalformedCollation) {
+    auto [accTag, accVal] = sbe::value::makeNewString("accumulate me"_sd);
+    sbe::value::OwnedValueAccessor accAccessor;
+    accAccessor.reset(accTag, accVal);
+
+    sbe::vm::CodeFragment fragment;
+    fragment.appendMoveVal(&accAccessor);
+    fragment.appendConstVal(sbe::value::TypeTags::Nothing, sbe::value::Value{0});
+    sbe::value::TagValueOwned field{sbe::value::makeNewString("fieldName"_sd)};
+    fragment.appendConstVal(field.tag(), field.value());
+    fragment.appendCollMin();
+
+    sbe::vm::ByteCode vm;
+    auto res = vm.run(&fragment);
+
+    ASSERT(res.owned());
+    ASSERT(sbe::value::isString(res.tag()));
+    ASSERT_EQ(sbe::value::getStringView(res.tag(), res.value()), "accumulate me"_sd);
+}
+
+TEST(CodeFragmentTest, AggCollMaxMalformedCollation) {
+    auto [accTag, accVal] = sbe::value::makeNewString("accumulate me"_sd);
+    sbe::value::OwnedValueAccessor accAccessor;
+    accAccessor.reset(accTag, accVal);
+
+    sbe::vm::CodeFragment fragment;
+    fragment.appendMoveVal(&accAccessor);
+    fragment.appendConstVal(sbe::value::TypeTags::Nothing, sbe::value::Value{0});
+    sbe::value::TagValueOwned field{sbe::value::makeNewString("fieldName"_sd)};
+    fragment.appendConstVal(field.tag(), field.value());
+    fragment.appendCollMax();
+
+    sbe::vm::ByteCode vm;
+    auto res = vm.run(&fragment);
+
+    ASSERT(res.owned());
+    ASSERT(sbe::value::isString(res.tag()));
+    ASSERT_EQ(sbe::value::getStringView(res.tag(), res.value()), "accumulate me"_sd);
 }
 
 DEATH_TEST(SBEVMBytecodeValidationDeathTest,
