@@ -373,6 +373,10 @@ public:
         return Status::OK();
     }
 
+    virtual boost::optional<Timestamp> getTimestamp() const {
+        return boost::none;
+    }
+
     /**
      * Returns true if a commit timestamp has been assigned to writes in this transaction.
      * Otherwise, returns false.

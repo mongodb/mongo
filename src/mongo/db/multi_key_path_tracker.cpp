@@ -38,6 +38,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <iterator>
 #include <sstream>
@@ -49,6 +50,23 @@ namespace mongo {
 
 const OperationContext::Decoration<MultikeyPathTracker> MultikeyPathTracker::get =
     OperationContext::declareDecoration<MultikeyPathTracker>();
+
+bool MultikeyPathInfo::sameIndexAndCollectionAtTime(const MultikeyPathInfo& info) const {
+    return collectionUUID == info.collectionUUID && indexName == info.indexName &&
+        earliestTimestamp == info.earliestTimestamp;
+}
+
+void MultikeyPathInfo::mergePathsAndKeys(MultikeyPathInfo&& info) {
+    invariant(sameIndexAndCollectionAtTime(info));
+
+    if (multikeyPaths.empty()) {
+        multikeyPaths = std::move(info.multikeyPaths);
+    } else if (!info.multikeyPaths.empty()) {
+        MultikeyPathTracker::mergeMultikeyPaths(&multikeyPaths, info.multikeyPaths);
+    }
+    multikeyMetadataKeys.insert(std::make_move_iterator(info.multikeyMetadataKeys.begin()),
+                                std::make_move_iterator(info.multikeyMetadataKeys.end()));
+}
 
 // static
 std::string MultikeyPathTracker::dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
@@ -89,25 +107,35 @@ bool MultikeyPathTracker::covers(const MultikeyPaths& parent, const MultikeyPath
     }
     return true;
 }
+WorkerMultikeyPathInfo MultikeyPathTracker::sortByTimestamp() const {
+    WorkerMultikeyPathInfo sortedPathInfo;
+    sortedPathInfo.reserve(_multikeyPathInfo.size());
+    for (const MultikeyPathInfo& info : _multikeyPathInfo) {
+        sortedPathInfo.push_back(info);
+    }
+    std::stable_sort(sortedPathInfo.begin(),
+                     sortedPathInfo.end(),
+                     [](const MultikeyPathInfo& lhs, const MultikeyPathInfo& rhs) {
+                         return lhs.earliestTimestamp < rhs.earliestTimestamp;
+                     });
+    return sortedPathInfo;
+}
 
-void MultikeyPathTracker::addMultikeyPathInfo(MultikeyPathInfo info) {
+void MultikeyPathTracker::addMultikeyPathInfo(MultikeyPathInfo&& info) {
     invariant(_trackMultikeyPathInfo);
-    // Merge the `MultikeyPathInfo` input into the accumulated value being tracked for the
-    // (collection, index) key.
+    // Add entries to _multikeyPathInfo keyed by (collection UUID, index, timestamp). Entries that
+    // share the same (uuid, index, timestamp) are merged immediately because they represent the
+    // same catalog write made by the primary.
     for (auto& existingChanges : _multikeyPathInfo) {
-        if (existingChanges.nss != info.nss || existingChanges.indexName != info.indexName) {
+        if (!existingChanges.sameIndexAndCollectionAtTime(info)) {
             continue;
         }
-
-        mergeMultikeyPaths(&existingChanges.multikeyPaths, info.multikeyPaths);
-        existingChanges.multikeyMetadataKeys.insert(
-            std::make_move_iterator(info.multikeyMetadataKeys.begin()),
-            std::make_move_iterator(info.multikeyMetadataKeys.end()));
+        existingChanges.mergePathsAndKeys(std::move(info));
         return;
     }
 
-    // If an existing entry wasn't found for the (collection, index) input, create a new entry.
-    _multikeyPathInfo.emplace_back(info);
+    // No entry for this write yet; create a new one.
+    _multikeyPathInfo.push_back(std::move(info));
 }
 
 void MultikeyPathTracker::clear() {
@@ -131,6 +159,7 @@ boost::optional<MultikeyPaths> MultikeyPathTracker::getMultikeyPathInfo(
 }
 
 void MultikeyPathTracker::startTrackingMultikeyPathInfo() {
+    invariant(!_trackMultikeyPathInfo);
     _trackMultikeyPathInfo = true;
 }
 

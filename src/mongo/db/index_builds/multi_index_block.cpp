@@ -698,12 +698,14 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     // Refrain from persisting any multikey updates as a result from building the index. Instead,
     // accumulate them in the `MultikeyPathTracker` and do the write as part of the update that
     // commits the index.
+    auto& multikeyPathTracker = MultikeyPathTracker::get(opCtx);
     ScopeGuard stopTracker(
-        [this, opCtx] { MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo(); });
-    if (MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo()) {
+        [&multikeyPathTracker] { multikeyPathTracker.stopTrackingMultikeyPathInfo(); });
+    if (multikeyPathTracker.isTrackingMultikeyPathInfo()) {
         stopTracker.dismiss();
+    } else {
+        multikeyPathTracker.startTrackingMultikeyPathInfo();
     }
-    MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo();
 
     const char* curopMessage = "Index Build: scanning collection";
     ProgressMeterHolder progress;

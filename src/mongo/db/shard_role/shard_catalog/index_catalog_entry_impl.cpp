@@ -215,6 +215,7 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     MultikeyPaths indexMultikeyPathsForWrite;
     auto isMultikeyForWrite = _catalogIsMultikey(opCtx, collection, &indexMultikeyPathsForWrite);
     auto indexTracksMultikeyPathsInCatalog = !indexMultikeyPathsForWrite.empty();
+    auto& multikeyPathTracker = MultikeyPathTracker::get(opCtx);
     invariant(!(indexTracksMultikeyPathsInCatalog && multikeyMetadataKeys.size() > 0));
     // If the index is already set as multikey and we don't have any path-level information to
     // update, then there's nothing more for us to do.
@@ -272,12 +273,15 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // current clock time. Once a background index is committed, if a future write makes
     // it multikey, that write will be marked as "isTrackingMultikeyPathInfo" on the applier's
     // OperationContext and we can safely defer that write to the end of the batch.
-    if (MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo()) {
-        MultikeyPathTracker::get(opCtx).addMultikeyPathInfo({collection->ns(),
-                                                             collection->uuid(),
-                                                             _descriptor.indexName(),
-                                                             multikeyMetadataKeys,
-                                                             std::move(paths)});
+    if (multikeyPathTracker.isTrackingMultikeyPathInfo()) {
+        auto earliestTimestamp =
+            shard_role_details::getRecoveryUnit(opCtx)->getTimestamp().value_or(Timestamp());
+        multikeyPathTracker.addMultikeyPathInfo({collection->ns(),
+                                                 collection->uuid(),
+                                                 _descriptor.indexName(),
+                                                 multikeyMetadataKeys,
+                                                 std::move(paths),
+                                                 earliestTimestamp});
         return;
     }
 

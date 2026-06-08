@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -50,6 +51,20 @@ struct MONGO_MOD_PUBLIC MultikeyPathInfo {
     std::string indexName;
     KeyStringSet multikeyMetadataKeys;
     MultikeyPaths multikeyPaths;
+    // The oplog entry timestamp of the first write that made the index multikey.
+    Timestamp earliestTimestamp;
+
+    /**
+     * True when 'info' targets the same collection and index at the same write timestamp as this
+     * entry.
+     */
+    bool sameIndexAndCollectionAtTime(const MultikeyPathInfo& info) const;
+
+    /**
+     * Merges only multikey path and metadata-key state from 'info'. This does not update identity
+     * fields.
+     */
+    void mergePathsAndKeys(MultikeyPathInfo&& info);
 };
 
 using WorkerMultikeyPathInfo MONGO_MOD_PUBLIC = std::vector<MultikeyPathInfo>;
@@ -57,8 +72,13 @@ using WorkerMultikeyPathInfo MONGO_MOD_PUBLIC = std::vector<MultikeyPathInfo>;
 /**
  * An OperationContext decoration that tracks which indexes should be made multikey. This is used
  * by IndexCatalogEntryImpl::setMultikey() to track what indexes should be set as multikey during
- * secondary oplog application. This both marks if the multikey path information should be tracked
- * instead of set immediately and saves the multikey path information for later if needed.
+ * secondary oplog application and primary vectored inserts with per-document timestamps. This both
+ * marks if the multikey path information should be tracked instead of set immediately and saves the
+ * multikey path information for later if needed. Deferred writes must be applied at the exact
+ * timestamp of the write that first made the index multikey for timestamp consistency.
+ * The tracker stores one entry per (collection UUID, index, timestamp). Entries with the same
+ * timestamp are merged immediately, and entries with different timestamps are sorted later so
+ * deferred multikey writes are applied in timestamp order.
  */
 class MONGO_MOD_PUBLIC MultikeyPathTracker {
 public:
@@ -81,10 +101,11 @@ public:
 
     /**
      * Appends the provided multikey path information to the list of indexes to set as multikey
-     * after the current replication batch finishes.
-     * Must call startTrackingMultikeyPathInfo() first.
+     * after the current replication batch finishes. Entries from the same insert or update are
+     * merged immediately; entries from different writes are saved for later sorted
+     * application. Must call startTrackingMultikeyPathInfo() first.
      */
-    void addMultikeyPathInfo(MultikeyPathInfo info);
+    void addMultikeyPathInfo(MultikeyPathInfo&& info);
 
     /**
      * Clears out any multikey path information that has been appended.
@@ -96,6 +117,13 @@ public:
      * Returns the multikey path information that has been saved.
      */
     const WorkerMultikeyPathInfo& getMultikeyPathInfo() const;
+
+    /**
+     * Returns tracked multikey path info sorted by timestamp. Used by secondaries and by the
+     * primary when applying deferred multikey catalog writes for vectored inserts with
+     * per-document timestamps.
+     */
+    WorkerMultikeyPathInfo sortByTimestamp() const;
 
     /**
      * Returns the multikey path information for the given inputs, or boost::none if none exist.
@@ -127,7 +155,6 @@ public:
      * has been appended to the list of indexes to set as multikey.
      */
     bool isEmpty() const;
-
 
 private:
     WorkerMultikeyPathInfo _multikeyPathInfo;

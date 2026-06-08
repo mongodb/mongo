@@ -122,6 +122,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <numeric>
 #include <ostream>
 #include <set>
 #include <string>
@@ -4008,6 +4009,378 @@ void testWorkerMultikeyPaths(OperationContext* opCtx,
     ASSERT_EQ(pathInfo.size(), numPaths);
 }
 
+void collectWorkerMultikeyPathInfo(OperationContext* opCtx,
+                                   std::vector<ApplierOperation> ops,
+                                   WorkerMultikeyPathInfo* pathInfo) {
+    TestApplyOplogGroupApplier oplogApplier(
+        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary, false));
+    const bool dataIsConsistent = true;
+    ASSERT_OK(oplogApplier.applyOplogBatchPerWorker(opCtx, ops, *pathInfo, dataIsConsistent));
+}
+
+void applyOplogBatchAndCollectWorkerMultikeyPathInfo(OperationContext* opCtx,
+                                                     std::vector<OplogEntry>* ops,
+                                                     WorkerMultikeyPathInfo* pathInfo) {
+    NoopOplogApplierObserver observer;
+    auto workerPool = makeReplWorkerPool();
+    OplogApplierImpl oplogApplier(nullptr,
+                                  nullptr,
+                                  &observer,
+                                  ReplicationCoordinator::get(opCtx),
+                                  nullptr,
+                                  nullptr,
+                                  OplogApplier::Options(OplogApplication::Mode::kSecondary, false),
+                                  workerPool.get());
+    std::vector<std::vector<ApplierOperation>> writerVectors(
+        workerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    oplogApplier.fillWriterVectors_forTest(opCtx, ops, &writerVectors, &derivedOps);
+
+    TestApplyOplogGroupApplier workerApplier(
+        nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary, false));
+    for (auto& writer : writerVectors) {
+        if (writer.empty()) {
+            continue;
+        }
+        WorkerMultikeyPathInfo workerPathInfo;
+        const bool dataIsConsistent = true;
+        ASSERT_OK(workerApplier.applyOplogBatchPerWorker(
+            opCtx, writer, workerPathInfo, dataIsConsistent));
+        pathInfo->insert(pathInfo->end(), workerPathInfo.begin(), workerPathInfo.end());
+    }
+}
+
+BSONObj makeUpdateApplyOpsEntry(const NamespaceString& nss,
+                                const UUID& uuid,
+                                const BSONObj& documentToUpdate,
+                                const BSONObj& updatedDocument) {
+    return BSON("op" << "u"
+                     << "ns" << nss.toString_forTest() << "ui" << uuid << "o" << updatedDocument
+                     << "o2" << documentToUpdate);
+}
+
+TEST_F(OplogApplierImplTest, StartTrackingMultikeyPathInfoDoesNotClearExistingInfo) {
+    auto& tracker = MultikeyPathTracker::get(_opCtx.get());
+    tracker.startTrackingMultikeyPathInfo();
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 UUID::gen(),
+                                 "a_1",
+                                 {},
+                                 MultikeyPaths{{0U}},
+                                 Timestamp(Seconds(1), 0)});
+    tracker.stopTrackingMultikeyPathInfo();
+
+    tracker.startTrackingMultikeyPathInfo();
+    ASSERT_EQ(1UL, tracker.getMultikeyPathInfo().size());
+
+    tracker.stopTrackingMultikeyPathInfo();
+    tracker.clear();
+}
+
+TEST_F(OplogApplierImplTest, MultikeyPathTrackerKeepsDifferentTimestampPathsSeparate) {
+    auto& tracker = MultikeyPathTracker::get(_opCtx.get());
+    const auto uuid = UUID::gen();
+    tracker.startTrackingMultikeyPathInfo();
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 uuid,
+                                 "a_1_b_1",
+                                 {},
+                                 MultikeyPaths{{0U}, {}},
+                                 Timestamp(Seconds(1), 0)});
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 uuid,
+                                 "a_1_b_1",
+                                 {},
+                                 MultikeyPaths{{}, {0U}},
+                                 Timestamp(Seconds(2), 0)});
+
+    ASSERT_EQ(2UL, tracker.getMultikeyPathInfo().size());
+    ASSERT_EQ(MultikeyPaths({{0U}, {}}), tracker.getMultikeyPathInfo()[0].multikeyPaths);
+    ASSERT_EQ(MultikeyPaths({{}, {0U}}), tracker.getMultikeyPathInfo()[1].multikeyPaths);
+
+    tracker.stopTrackingMultikeyPathInfo();
+    tracker.clear();
+}
+
+TEST_F(OplogApplierImplTest, MultikeyPathTrackerEquivalentEntriesCollapseRegardlessOfOrder) {
+    // Three entries with the same index, collection, and timestamp pushed in arbitrary order with
+    // different sub-paths must collapse into a single tracker entry whose paths are the union.
+    const auto uuid = UUID::gen();
+    const auto ts = Timestamp(Seconds(1), 0);
+    const std::vector<MultikeyPathInfo> entries = {
+        {makeNamespace("tracker"), uuid, "a_1_b_1", {}, MultikeyPaths{{0U}, {}}, ts},
+        {makeNamespace("tracker"), uuid, "a_1_b_1", {}, MultikeyPaths{{}, {0U}}, ts},
+        {makeNamespace("tracker"), uuid, "a_1_b_1", {}, MultikeyPaths{{0U}, {0U}}, ts},
+    };
+
+    auto buildPathInfoAndHistory = [&](const std::vector<size_t>& order) {
+        MultikeyPathTracker tracker;
+        tracker.startTrackingMultikeyPathInfo();
+        for (const auto idx : order) {
+            tracker.addMultikeyPathInfo(MultikeyPathInfo(entries[idx]));
+        }
+
+        return std::make_pair(tracker.getMultikeyPathInfo(), tracker.sortByTimestamp());
+    };
+
+    // Every ordering of the equivalent entries must collapse into the same single tracker entry
+    // and the same single-element timestamp history.
+    std::vector<size_t> order(entries.size());
+    std::iota(order.begin(), order.end(), 0);
+    do {
+        auto [pathInfo, history] = buildPathInfoAndHistory(order);
+
+        ASSERT_EQ(1UL, pathInfo.size());
+        ASSERT_EQ(MultikeyPaths({{0U}, {0U}}), pathInfo[0].multikeyPaths);
+        ASSERT_EQ(1UL, history.size());
+        ASSERT_EQ(ts, history[0].earliestTimestamp);
+        ASSERT_EQ(MultikeyPaths({{0U}, {0U}}), history[0].multikeyPaths);
+    } while (std::next_permutation(order.begin(), order.end()));
+}
+
+TEST_F(OplogApplierImplTest, MultikeyPathTrackerHistoryHandlesMultipleIndicesIndependently) {
+    // Two indices interleaved across timestamps must be sorted without merging changes from
+    // different timestamps or indices.
+    auto& tracker = MultikeyPathTracker::get(_opCtx.get());
+    const auto uuidA = UUID::gen();
+    const auto uuidB = UUID::gen();
+    tracker.startTrackingMultikeyPathInfo();
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 uuidA,
+                                 "a_1_b_1",
+                                 {},
+                                 MultikeyPaths{{0U}, {}},
+                                 Timestamp(Seconds(1), 0)});
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 uuidB,
+                                 "c_1",
+                                 {},
+                                 MultikeyPaths{{0U}},
+                                 Timestamp(Seconds(2), 0)});
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 uuidA,
+                                 "a_1_b_1",
+                                 {},
+                                 MultikeyPaths{{}, {0U}},
+                                 Timestamp(Seconds(3), 0)});
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 uuidB,
+                                 "c_1",
+                                 {},
+                                 MultikeyPaths{{1U}},
+                                 Timestamp(Seconds(4), 0)});
+
+    auto history = tracker.sortByTimestamp();
+    ASSERT_EQ(4UL, history.size());
+
+    ASSERT_EQ(Timestamp(Seconds(1), 0), history[0].earliestTimestamp);
+    ASSERT_EQ(uuidA, history[0].collectionUUID);
+    ASSERT_EQ(MultikeyPaths({{0U}, {}}), history[0].multikeyPaths);
+
+    ASSERT_EQ(Timestamp(Seconds(2), 0), history[1].earliestTimestamp);
+    ASSERT_EQ(uuidB, history[1].collectionUUID);
+    ASSERT_EQ(MultikeyPaths({{0U}}), history[1].multikeyPaths);
+
+    ASSERT_EQ(Timestamp(Seconds(3), 0), history[2].earliestTimestamp);
+    ASSERT_EQ(uuidA, history[2].collectionUUID);
+    ASSERT_EQ(MultikeyPaths({{}, {0U}}), history[2].multikeyPaths);
+
+    ASSERT_EQ(Timestamp(Seconds(4), 0), history[3].earliestTimestamp);
+    ASSERT_EQ(uuidB, history[3].collectionUUID);
+    ASSERT_EQ(MultikeyPaths({{1U}}), history[3].multikeyPaths);
+
+    tracker.stopTrackingMultikeyPathInfo();
+    tracker.clear();
+}
+
+TEST_F(OplogApplierImplTest, MultikeyPathTrackerHistoryDoesNotAccumulateAcrossManyTimestamps) {
+    // Ten distinct timestamps for the same compound index, each adding a new component to one of
+    // the two fields. The history at Tk must contain only the delta observed at Tk. Catalog writes
+    // later merge these deltas into the current durable metadata state.
+    auto& tracker = MultikeyPathTracker::get(_opCtx.get());
+    const auto uuid = UUID::gen();
+    tracker.startTrackingMultikeyPathInfo();
+    constexpr int kNumEntries = 10;
+    for (int i = 1; i <= kNumEntries; ++i) {
+        MultikeyPaths paths(2);
+        paths[!(i % 2)].insert(static_cast<size_t>(i));
+        tracker.addMultikeyPathInfo(
+            {makeNamespace("tracker"), uuid, "a_1_b_1", {}, paths, Timestamp(Seconds(i), 0)});
+    }
+
+    auto history = tracker.sortByTimestamp();
+    ASSERT_EQ(static_cast<size_t>(kNumEntries), history.size());
+
+    for (int i = 1; i <= kNumEntries; ++i) {
+        MultikeyPaths expected(2);
+        expected[!(i % 2)].insert(static_cast<size_t>(i));
+        ASSERT_EQ(Timestamp(Seconds(i), 0), history[i - 1].earliestTimestamp)
+            << "at index " << (i - 1);
+        ASSERT_EQ(expected, history[i - 1].multikeyPaths) << "at index " << (i - 1);
+    }
+
+    tracker.stopTrackingMultikeyPathInfo();
+    tracker.clear();
+}
+
+TEST_F(OplogApplierImplTest, MultikeyPathTrackerKeepsWildcardMetadataKeysDeltaByTimestamp) {
+    auto makeMetadataKeys = [](std::initializer_list<int> values) {
+        KeyStringSet keys;
+        for (const auto value : values) {
+            key_string::HeapBuilder builder(
+                key_string::Version::V1, BSON("" << value), key_string::ALL_ASCENDING);
+            keys.insert(builder.release());
+        }
+        return keys;
+    };
+
+    auto& tracker = MultikeyPathTracker::get(_opCtx.get());
+    const auto uuid = UUID::gen();
+    tracker.startTrackingMultikeyPathInfo();
+
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 uuid,
+                                 "$**_1",
+                                 makeMetadataKeys({1, 2}),
+                                 {},
+                                 Timestamp(Seconds(1), 0)});
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 uuid,
+                                 "$**_1",
+                                 makeMetadataKeys({3}),
+                                 {},
+                                 Timestamp(Seconds(1), 0)});
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 uuid,
+                                 "$**_1",
+                                 makeMetadataKeys({4, 5}),
+                                 {},
+                                 Timestamp(Seconds(2), 0)});
+
+    auto history = tracker.sortByTimestamp();
+    ASSERT_EQ(2UL, history.size());
+
+    ASSERT_EQ(Timestamp(Seconds(1), 0), history[0].earliestTimestamp);
+    ASSERT_EQ(makeMetadataKeys({1, 2, 3}), history[0].multikeyMetadataKeys);
+
+    ASSERT_EQ(Timestamp(Seconds(2), 0), history[1].earliestTimestamp);
+    ASSERT_EQ(makeMetadataKeys({4, 5}), history[1].multikeyMetadataKeys);
+
+    tracker.stopTrackingMultikeyPathInfo();
+    tracker.clear();
+}
+
+TEST_F(OplogApplierImplTest, MultikeyPathTrackerHistoryIsIndependentOfInsertionOrder) {
+    // The same set of entries inserted in two different orders (forward and shuffled) must
+    // produce the exact same history.
+    const auto uuid = UUID::gen();
+    auto buildHistory = [&](const std::vector<int>& order) {
+        MultikeyPathTracker tracker;
+        tracker.startTrackingMultikeyPathInfo();
+        for (int i : order) {
+            MultikeyPaths paths(2);
+            paths[i % 2].insert(static_cast<size_t>(i));
+            tracker.addMultikeyPathInfo(
+                {makeNamespace("tracker"), uuid, "a_1_b_1", {}, paths, Timestamp(Seconds(i), 0)});
+        }
+        return tracker.sortByTimestamp();
+    };
+
+    auto forward = buildHistory({1, 2, 3, 4, 5});
+    auto shuffled = buildHistory({3, 1, 5, 2, 4});
+
+    ASSERT_EQ(forward.size(), shuffled.size());
+    for (size_t i = 0; i < forward.size(); ++i) {
+        ASSERT_EQ(forward[i].earliestTimestamp, shuffled[i].earliestTimestamp) << "at index " << i;
+        ASSERT_EQ(forward[i].multikeyPaths, shuffled[i].multikeyPaths) << "at index " << i;
+    }
+}
+
+TEST_F(OplogApplierImplTest, MultikeyPathTrackerHistoryTreatsDifferentUUIDsAsDifferentIndices) {
+    // Two entries with the same index name but different collection UUIDs (e.g. drop+recreate)
+    // must be tracked as independent histories.
+    auto& tracker = MultikeyPathTracker::get(_opCtx.get());
+    const auto uuidOld = UUID::gen();
+    const auto uuidNew = UUID::gen();
+    tracker.startTrackingMultikeyPathInfo();
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 uuidOld,
+                                 "a_1",
+                                 {},
+                                 MultikeyPaths{{0U}},
+                                 Timestamp(Seconds(1), 0)});
+    tracker.addMultikeyPathInfo({makeNamespace("tracker"),
+                                 uuidNew,
+                                 "a_1",
+                                 {},
+                                 MultikeyPaths{{1U}},
+                                 Timestamp(Seconds(2), 0)});
+
+    auto history = tracker.sortByTimestamp();
+    ASSERT_EQ(2UL, history.size());
+    ASSERT_EQ(uuidOld, history[0].collectionUUID);
+    ASSERT_EQ(MultikeyPaths({{0U}}), history[0].multikeyPaths);
+    ASSERT_EQ(uuidNew, history[1].collectionUUID);
+    ASSERT_EQ(MultikeyPaths({{1U}}), history[1].multikeyPaths);
+
+    tracker.stopTrackingMultikeyPathInfo();
+    tracker.clear();
+}
+
+TEST_F(OplogApplierImplTest, MultikeyPathTrackerHistoryIsEmptyWhenTrackerIsEmpty) {
+    MultikeyPathTracker tracker;
+    ASSERT_TRUE(tracker.sortByTimestamp().empty());
+}
+
+TEST_F(OplogApplierImplTest, MultikeyPathTrackerHistoryAcrossMultipleWorkers) {
+    // Mirrors the real applier flow: multiple worker trackers each contribute a subset of entries,
+    // they get merged into one tracker, and the final history is the same as if all entries had
+    // gone into a single tracker in timestamp order.
+    const auto uuid = UUID::gen();
+
+    MultikeyPathTracker workerOne;
+    workerOne.startTrackingMultikeyPathInfo();
+    workerOne.addMultikeyPathInfo({makeNamespace("tracker"),
+                                   uuid,
+                                   "a_1_b_1",
+                                   {},
+                                   MultikeyPaths{{0U}, {}},
+                                   Timestamp(Seconds(1), 0)});
+    workerOne.addMultikeyPathInfo({makeNamespace("tracker"),
+                                   uuid,
+                                   "a_1_b_1",
+                                   {},
+                                   MultikeyPaths{{}, {0U}},
+                                   Timestamp(Seconds(3), 0)});
+
+    MultikeyPathTracker workerTwo;
+    workerTwo.startTrackingMultikeyPathInfo();
+    workerTwo.addMultikeyPathInfo({makeNamespace("tracker"),
+                                   uuid,
+                                   "a_1_b_1",
+                                   {},
+                                   MultikeyPaths{{1U}, {}},
+                                   Timestamp(Seconds(2), 0)});
+
+    MultikeyPathTracker merged;
+    merged.startTrackingMultikeyPathInfo();
+    for (MultikeyPathInfo info : workerOne.getMultikeyPathInfo()) {
+        merged.addMultikeyPathInfo(std::move(info));
+    }
+    for (MultikeyPathInfo info : workerTwo.getMultikeyPathInfo()) {
+        merged.addMultikeyPathInfo(std::move(info));
+    }
+
+    auto history = merged.sortByTimestamp();
+    ASSERT_EQ(3UL, history.size());
+    ASSERT_EQ(Timestamp(Seconds(1), 0), history[0].earliestTimestamp);
+    ASSERT_EQ(MultikeyPaths({{0U}, {}}), history[0].multikeyPaths);
+    ASSERT_EQ(Timestamp(Seconds(2), 0), history[1].earliestTimestamp);
+    ASSERT_EQ(MultikeyPaths({{1U}, {}}), history[1].multikeyPaths);
+    ASSERT_EQ(Timestamp(Seconds(3), 0), history[2].earliestTimestamp);
+    ASSERT_EQ(MultikeyPaths({{}, {0U}}), history[2].multikeyPaths);
+}
+
 TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsWorkerMultikeyPathInfoOnInsert) {
     // Set the state as secondary as we are going to apply createIndexes oplog entry.
     ASSERT_OK(
@@ -4029,8 +4402,175 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsWorkerMultikeyPathInf
     {
         auto doc = BSON("_id" << 1 << "a" << BSON_ARRAY(4 << 5));
         auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(3), 0), 1LL}, nss, doc);
-        testWorkerMultikeyPaths(_opCtx.get(), op, 1UL);
+        WorkerMultikeyPathInfo pathInfo;
+        collectWorkerMultikeyPathInfo(_opCtx.get(), {ApplierOperation{&op}}, &pathInfo);
+        ASSERT_EQ(1UL, pathInfo.size());
+        ASSERT_EQ(Timestamp(Seconds(3), 0), pathInfo[0].earliestTimestamp);
     }
+}
+
+TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncUsesTriggeringTimestampForGroupedInserts) {
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
+
+    NamespaceString nss = makeNamespace("test");
+
+    {
+        auto op = makeCreateCollectionOplogEntry(
+            _opCtx.get(), {Timestamp(Seconds(1), 0), 1LL}, nss, kUuid);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
+    }
+    {
+        auto keyPattern = BSON("a" << 1);
+        auto op = makeCreateIndexOplogEntry(
+            {Timestamp(Seconds(2), 0), 1LL}, nss, "a_1", keyPattern, kUuid);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
+    }
+
+    auto scalarTimeInsert = Timestamp(Seconds(3), 0);
+    auto multikeyTimeInsert = Timestamp(Seconds(4), 0);
+    auto scalarInsert =
+        makeInsertDocumentOplogEntry({scalarTimeInsert, 1LL}, nss, BSON("_id" << 1 << "a" << 1));
+    auto multikeyInsert = makeInsertDocumentOplogEntry(
+        {multikeyTimeInsert, 1LL}, nss, BSON("_id" << 2 << "a" << BSON_ARRAY(4 << 5)));
+
+    std::vector<ApplierOperation> ops = {ApplierOperation{&scalarInsert},
+                                         ApplierOperation{&multikeyInsert}};
+    OplogEntryOrGroupedInserts groupedInserts(ops.begin(), ops.end());
+    ASSERT_TRUE(groupedInserts.isGroupedInserts());
+
+    WorkerMultikeyPathInfo pathInfo;
+    auto& multikeyPathTracker = MultikeyPathTracker::get(_opCtx.get());
+    {
+        ON_BLOCK_EXIT(
+            [&multikeyPathTracker] { multikeyPathTracker.stopTrackingMultikeyPathInfo(); });
+        multikeyPathTracker.startTrackingMultikeyPathInfo();
+        ASSERT_OK(_applyOplogEntryOrGroupedInsertsWrapper(
+            _opCtx.get(), groupedInserts, OplogApplication::Mode::kSecondary));
+    }
+    ASSERT_FALSE(multikeyPathTracker.isTrackingMultikeyPathInfo());
+    pathInfo = multikeyPathTracker.getMultikeyPathInfo();
+    multikeyPathTracker.clear();
+
+    ASSERT_EQ(1UL, pathInfo.size());
+    ASSERT_EQ("a_1", pathInfo[0].indexName);
+    ASSERT_EQ(multikeyTimeInsert, pathInfo[0].earliestTimestamp);
+}
+
+TEST_F(OplogApplierImplTest,
+       OplogApplicationThreadFuncUsesPrepareOpTimestampForApplyOpsMultikeyUpdate) {
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
+
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    const NamespaceString nss = makeNamespace("prepared_txn_update");
+    const auto uuid = UUID::gen();
+
+    {
+        auto op = makeCreateCollectionOplogEntry(
+            _opCtx.get(), {Timestamp(Seconds(1), 0), 1LL}, nss, uuid);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
+    }
+    {
+        auto op = makeCreateIndexOplogEntry(
+            {Timestamp(Seconds(2), 0), 1LL}, nss, "a_1", BSON("a" << 1), uuid);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
+    }
+    {
+        auto op = makeInsertDocumentOplogEntry(
+            {Timestamp(Seconds(3), 0), 1LL}, nss, BSON("_id" << 1 << "a" << 1));
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
+    }
+
+    const auto lsid = makeLogicalSessionId(_opCtx.get());
+    const TxnNumber txnNum(0);
+    auto prepareOp = makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        {Timestamp(Seconds(4), 0), 1LL},
+        nss,
+        BSON("applyOps"
+             << BSON_ARRAY(makeUpdateApplyOpsEntry(
+                    nss, uuid, BSON("_id" << 1), BSON("_id" << 1 << "a" << BSON_ARRAY(4 << 5))))
+             << "prepare" << true),
+        lsid,
+        txnNum,
+        {StmtId(0)},
+        OpTime());
+
+    WorkerMultikeyPathInfo pathInfo;
+    std::vector<OplogEntry> prepareOps{prepareOp};
+    applyOplogBatchAndCollectWorkerMultikeyPathInfo(_opCtx.get(), &prepareOps, &pathInfo);
+
+    ASSERT_EQ(1UL, pathInfo.size());
+    ASSERT_EQ("a_1", pathInfo[0].indexName);
+    ASSERT(pathInfo[0].earliestTimestamp.isNull());
+
+    auto commitOp = makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        {Timestamp(Seconds(5), 0), 1LL},
+        nss,
+        BSON("commitTransaction" << 1 << "commitTimestamp" << prepareOp.getTimestamp()),
+        lsid,
+        txnNum,
+        {StmtId(1)},
+        prepareOp.getOpTime());
+    WorkerMultikeyPathInfo commitPathInfo;
+    std::vector<OplogEntry> commitOps{commitOp};
+    applyOplogBatchAndCollectWorkerMultikeyPathInfo(_opCtx.get(), &commitOps, &commitPathInfo);
+    ASSERT_TRUE(commitPathInfo.empty());
+}
+
+TEST_F(OplogApplierImplTest,
+       OplogApplicationThreadFuncUsesPrepareOpTimestampForApplyOpsMultikeyInsert) {
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
+
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    const NamespaceString nss = makeNamespace("prepared_txn_insert");
+    const auto uuid = UUID::gen();
+
+    {
+        auto op = makeCreateCollectionOplogEntry(
+            _opCtx.get(), {Timestamp(Seconds(1), 0), 1LL}, nss, uuid);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
+    }
+    {
+        auto op = makeCreateIndexOplogEntry(
+            {Timestamp(Seconds(2), 0), 1LL}, nss, "a_1", BSON("a" << 1), uuid);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
+    }
+
+    const auto lsid = makeLogicalSessionId(_opCtx.get());
+    const TxnNumber txnNum(0);
+    auto prepareOp = makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        {Timestamp(Seconds(3), 0), 1LL},
+        nss,
+        BSON("applyOps" << BSON_ARRAY(makeInsertApplyOpsEntry(
+                               nss, uuid, BSON("_id" << 1 << "a" << BSON_ARRAY(4 << 5))))
+                        << "prepare" << true),
+        lsid,
+        txnNum,
+        {StmtId(0)},
+        OpTime());
+
+    WorkerMultikeyPathInfo pathInfo;
+    std::vector<OplogEntry> prepareOps{prepareOp};
+    applyOplogBatchAndCollectWorkerMultikeyPathInfo(_opCtx.get(), &prepareOps, &pathInfo);
+
+    ASSERT_EQ(1UL, pathInfo.size());
+    ASSERT_EQ("a_1", pathInfo[0].indexName);
+    ASSERT(pathInfo[0].earliestTimestamp.isNull());
+
+    auto commitOp = makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        {Timestamp(Seconds(4), 0), 1LL},
+        nss,
+        BSON("commitTransaction" << 1 << "commitTimestamp" << prepareOp.getTimestamp()),
+        lsid,
+        txnNum,
+        {StmtId(1)},
+        prepareOp.getOpTime());
+    WorkerMultikeyPathInfo commitPathInfo;
+    std::vector<OplogEntry> commitOps{commitOp};
+    applyOplogBatchAndCollectWorkerMultikeyPathInfo(_opCtx.get(), &commitOps, &commitPathInfo);
+    ASSERT_TRUE(commitPathInfo.empty());
 }
 
 TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsMultipleWorkerMultikeyPathInfo) {
@@ -4061,19 +4601,31 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsMultipleWorkerMultike
     }
 
     {
-        auto docA = BSON("_id" << 1 << "a" << BSON_ARRAY(4 << 5));
-        auto opA = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, docA);
-        auto docB = BSON("_id" << 2 << "b" << BSON_ARRAY(6 << 7));
-        auto opB = makeInsertDocumentOplogEntry({Timestamp(Seconds(5), 0), 1LL}, nss, docB);
+        auto seedDocA = makeInsertDocumentOplogEntry(
+            {Timestamp(Seconds(4), 0), 1LL}, nss, BSON("_id" << 1 << "a" << 1));
+        auto seedDocB = makeInsertDocumentOplogEntry(
+            {Timestamp(Seconds(5), 0), 1LL}, nss, BSON("_id" << 2 << "b" << 1));
+        auto opA = makeUpdateDocumentOplogEntry({Timestamp(Seconds(6), 0), 1LL},
+                                                nss,
+                                                BSON("_id" << 1),
+                                                BSON("_id" << 1 << "a" << BSON_ARRAY(4 << 5)));
+        auto opB = makeUpdateDocumentOplogEntry({Timestamp(Seconds(7), 0), 1LL},
+                                                nss,
+                                                BSON("_id" << 2),
+                                                BSON("_id" << 2 << "b" << BSON_ARRAY(6 << 7)));
 
-        TestApplyOplogGroupApplier oplogApplier(
-            nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary, false));
         WorkerMultikeyPathInfo pathInfo;
-        std::vector<ApplierOperation> ops = {ApplierOperation{&opA}, ApplierOperation{&opB}};
-        const bool dataIsConsistent = true;
-        ASSERT_OK(
-            oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), ops, pathInfo, dataIsConsistent));
+        collectWorkerMultikeyPathInfo(_opCtx.get(),
+                                      {ApplierOperation{&seedDocA},
+                                       ApplierOperation{&seedDocB},
+                                       ApplierOperation{&opA},
+                                       ApplierOperation{&opB}},
+                                      &pathInfo);
         ASSERT_EQ(pathInfo.size(), 2UL);
+        ASSERT_EQ("a_1", pathInfo[0].indexName);
+        ASSERT_EQ(Timestamp(Seconds(6), 0), pathInfo[0].earliestTimestamp);
+        ASSERT_EQ("b_1", pathInfo[1].indexName);
+        ASSERT_EQ(Timestamp(Seconds(7), 0), pathInfo[1].earliestTimestamp);
     }
 }
 

@@ -199,6 +199,19 @@ Status finishAndLogApply(OperationContext* opCtx,
     return finalStatus;
 }
 
+WorkerMultikeyPathInfo mergeAndSortWorkerMultikeyPathInfo(
+    std::vector<WorkerMultikeyPathInfo> multikeyVector) {
+    MultikeyPathTracker mergedMultikeyPathInfo;
+    mergedMultikeyPathInfo.startTrackingMultikeyPathInfo();
+    for (auto& infoVector : multikeyVector) {
+        for (auto& info : infoVector) {
+            mergedMultikeyPathInfo.addMultikeyPathInfo(std::move(info));
+        }
+    }
+
+    return mergedMultikeyPathInfo.sortByTimestamp();
+}
+
 namespace {
 // Tracks writes to the side table config.image_collection.  This collection is implicitly
 // replicated, and to avoid out-of-order writes, we only want to do the last write
@@ -927,23 +940,26 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         }
     }
 
-    Timestamp firstTimeInBatch = ops.front().getTimestamp();
-    // Set any indexes to multikey that this batch ignored.
-    for (const WorkerMultikeyPathInfo& infoVector : multikeyVector) {
-        for (const MultikeyPathInfo& info : infoVector) {
-            // We timestamp every multikey write with the first timestamp in the batch. It is always
-            // safe to set an index as multikey too early, just not too late. We conservatively pick
-            // the first timestamp in the batch since we do not have enough information to find out
-            // the timestamp of the first write that set the given multikey path.
-            fassert(50686,
-                    _storageInterface->setIndexIsMultikey(opCtx,
-                                                          info.nss,
-                                                          info.collectionUUID,
-                                                          info.indexName,
-                                                          info.multikeyMetadataKeys,
-                                                          info.multikeyPaths,
-                                                          firstTimeInBatch));
-        }
+    // Merge worker-local multikey info before applying deferred catalog writes. The same index can
+    // appear more than once when different paths become multikey at different timestamps.
+    const Timestamp firstTimeInBatch = ops.front().getTimestamp();
+    const WorkerMultikeyPathInfo mergedMultikeyPathInfo =
+        mergeAndSortWorkerMultikeyPathInfo(std::move(multikeyVector));
+    for (const MultikeyPathInfo& info : mergedMultikeyPathInfo) {
+        // TODO SERVER-128354: Use the actual transaction commit timestamp for entries registered
+        // without a timestamp. Falling back to firstTimeInBatch preserves the old conservative
+        // behavior, but does not guarantee exact primary/secondary multikey timestamp consistency
+        // for prepared transaction cases where the commit timestamp is discovered later.
+        const Timestamp ts =
+            info.earliestTimestamp.isNull() ? firstTimeInBatch : info.earliestTimestamp;
+        fassert(50686,
+                _storageInterface->setIndexIsMultikey(opCtx,
+                                                      info.nss,
+                                                      info.collectionUUID,
+                                                      info.indexName,
+                                                      info.multikeyMetadataKeys,
+                                                      info.multikeyPaths,
+                                                      ts));
     }
 
     // Increment the counter for the number of ops applied during catchup if the node is in catchup
@@ -1267,10 +1283,12 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
 
     invariant(!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo());
     invariant(workerMultikeyPathInfo.empty());
-    auto newPaths = MultikeyPathTracker::get(opCtx).getMultikeyPathInfo();
+    auto& multikeyPathTracker = MultikeyPathTracker::get(opCtx);
+    const auto& newPaths = multikeyPathTracker.getMultikeyPathInfo();
     if (!newPaths.empty()) {
-        std::swap(workerMultikeyPathInfo, newPaths);
+        workerMultikeyPathInfo = newPaths;
     }
+    multikeyPathTracker.clear();
 
     return Status::OK();
 }

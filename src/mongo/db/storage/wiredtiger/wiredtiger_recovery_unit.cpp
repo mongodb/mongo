@@ -892,6 +892,10 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
     return wtRCToStatus(rc, *_session, "timestamp_transaction");
 }
 
+boost::optional<Timestamp> WiredTigerRecoveryUnit::getTimestamp() const {
+    return _lastTimestampSet;
+}
+
 void WiredTigerRecoveryUnit::setCommitTimestamp(Timestamp timestamp) {
     // This can be called either outside of a WriteUnitOfWork or in a prepared transaction after
     // setPrepareTimestamp() is called. Prepared transactions ensure the correct timestamping

@@ -48,6 +48,7 @@
 #include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"

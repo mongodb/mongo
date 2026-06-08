@@ -29,25 +29,20 @@
  * Transactional states 5-8 randomly prepare the transaction before commit with probability
  * `prepareProbability`, exercising both unprepared and prepared commit paths.
  *
- * TODO (SERVER-110904): Amend comment below and remove 'shouldAssert' parameter to always assert.
- * Non-transactional (NOT expected to be timestamp-consistent yet):
+ * Non-transactional (expected to be timestamp-consistent):
  * 9. insertWildcardMkDirect: N (1-5) non-transactional multikey inserts on distinct fields into
  *    a pre-existing wildcard-indexed collection. Adjacent inserts may be batched together
  *    during oplog application on the secondary, exercising batched multikey-metadata apply.
- *    Logs inconsistencies but does not assert.
  * 10. insertRegularMkDirect: N (1-5) non-transactional multikey inserts into a pre-existing
  *     regular-indexed collection that has a separate {field: 1} index per field in
  *     INDEXED_FIELDS, with each insert targeting a distinct field. Adjacent inserts may
- *     be batched together during oplog application on the secondary. Logs inconsistencies but
- *     does not assert.
+ *     be batched together during oplog application on the secondary.
  * 11. updateWildcardMkDirect: N (1-5) non-transactional updates of pre-inserted scalar fields
  *     to arrays against a pre-existing wildcard-indexed collection. Adjacent updates may be
- *     batched together during oplog application on the secondary. Logs inconsistencies but
- *     does not assert.
+ *     batched together during oplog application on the secondary.
  * 12. updateRegularMkDirect: N (1-5) non-transactional updates of pre-inserted scalars to
  *     arrays against the same multi-index regular collection as state 10. Adjacent updates may
- *     be batched together during oplog application on the secondary. Logs inconsistencies but
- *     does not assert.
+ *     be batched together during oplog application on the secondary.
  * 13. dropAndRecreateIndex: Non-transactionally drops a random index (wildcard or one of the
  *     regular per-field indexes) on a random pool collection and immediately recreates it.
  *     Stresses the interaction between index lifecycle and concurrent multikey side-writes
@@ -266,8 +261,7 @@ export const $config = (function () {
         return prev ? prev.ts : null;
     }
 
-    // Checks multikey metadata consistency. If shouldAssert is false, logs mismatches
-    // instead of asserting (for non-txn paths where consistency is not yet guaranteed).
+    // Checks multikey metadata consistency between primary and secondary at two timestamps.
     function verifyMultikeyConsistency(
         primary,
         secondary,
@@ -278,7 +272,6 @@ export const $config = (function () {
         fieldNames,
         ts1,
         ts2,
-        shouldAssert,
     ) {
         for (const ts of [ts1, ts2]) {
             const pIndexes = getCatalogMetadata(primary, dbName, collName, ts);
@@ -287,20 +280,11 @@ export const $config = (function () {
 
             // Both must agree on collection existence.
             if (!pIndexes || !sIndexes) {
-                if (shouldAssert) {
-                    assert.eq(
-                        !pIndexes,
-                        !sIndexes,
-                        "Catalog entry presence mismatch at ts " + tojson(ts) + " for " + collName,
-                    );
-                } else if (!!pIndexes !== !!sIndexes) {
-                    jsTestLog(
-                        "NON-TXN inconsistency (expected): catalog presence mismatch at " +
-                            tojson(ts) +
-                            " for " +
-                            collName,
-                    );
-                }
+                assert.eq(
+                    !pIndexes,
+                    !sIndexes,
+                    "Catalog entry presence mismatch at ts " + tojson(ts) + " for " + collName,
+                );
                 continue;
             }
 
@@ -312,87 +296,41 @@ export const $config = (function () {
                 if (!pIdx || !sIdx) continue;
 
                 if (pIdx.multikey !== sIdx.multikey) {
-                    if (shouldAssert) {
-                        assert.eq(
-                            pIdx.multikey,
-                            sIdx.multikey,
-                            "Index multikey flag mismatch at ts " +
-                                tojson(ts) +
-                                " for " +
-                                collName +
-                                " field " +
-                                fieldName,
-                        );
-                    } else {
-                        jsTestLog(
-                            "NON-TXN inconsistency (expected): index flag mismatch at " +
-                                tojson(ts) +
-                                " for " +
-                                collName +
-                                " field " +
-                                fieldName +
-                                ": primary=" +
-                                pIdx.multikey +
-                                ", secondary=" +
-                                sIdx.multikey,
-                        );
-                    }
+                    assert.eq(
+                        pIdx.multikey,
+                        sIdx.multikey,
+                        "Index multikey flag mismatch at ts " + tojson(ts) + " for " + collName + " field " + fieldName,
+                    );
                     continue;
                 }
 
                 if (indexType === IndexType.REGULAR) {
                     const pPaths = pIdx.multikeyPaths[fieldName];
                     const sPaths = sIdx.multikeyPaths[fieldName];
-                    if (shouldAssert) {
-                        assert.eq(
-                            pPaths,
-                            sPaths,
-                            "Regular multikeyPaths mismatch at ts " +
-                                tojson(ts) +
-                                " for " +
-                                collName +
-                                " field " +
-                                fieldName,
-                        );
-                    } else if (bsonWoCompare(pPaths, sPaths) !== 0) {
-                        jsTestLog(
-                            "NON-TXN inconsistency (expected): regular paths mismatch at " +
-                                tojson(ts) +
-                                " for " +
-                                collName +
-                                " field " +
-                                fieldName,
-                        );
-                    }
+                    assert.eq(
+                        pPaths,
+                        sPaths,
+                        "Regular multikeyPaths mismatch at ts " +
+                            tojson(ts) +
+                            " for " +
+                            collName +
+                            " field " +
+                            fieldName,
+                    );
                 } else {
                     const pPaths = getWildcardMultikeyPaths(primary, dbName, collName, ts, wildcardHint, fieldName);
                     const sPaths = getWildcardMultikeyPaths(secondary, dbName, collName, ts, wildcardHint, fieldName);
                     if (pPaths === undefined || sPaths === undefined) continue;
-                    if (shouldAssert) {
-                        assert.sameMembers(
-                            pPaths,
-                            sPaths,
-                            "Wildcard multiKeyPaths mismatch at ts " +
-                                tojson(ts) +
-                                " for " +
-                                collName +
-                                " field " +
-                                fieldName,
-                        );
-                    } else {
-                        try {
-                            assert.sameMembers(pPaths, sPaths);
-                        } catch (e) {
-                            jsTestLog(
-                                "NON-TXN inconsistency (expected): wildcard paths mismatch at " +
-                                    tojson(ts) +
-                                    " for " +
-                                    collName +
-                                    " field " +
-                                    fieldName,
-                            );
-                        }
-                    }
+                    assert.sameMembers(
+                        pPaths,
+                        sPaths,
+                        "Wildcard multiKeyPaths mismatch at ts " +
+                            tojson(ts) +
+                            " for " +
+                            collName +
+                            " field " +
+                            fieldName,
+                    );
                 }
             }
         }
@@ -436,13 +374,12 @@ export const $config = (function () {
             fields,
             txnEntry.ts,
             prevTs,
-            true /* shouldAssert */,
         );
     }
 
     // After a sequence of non-transactional ops, locates the first and last oplog entries
-    // matching `firstMatch` / `lastMatch`, computes the prior timestamp, and logs (without
-    // asserting) any multikey inconsistency between primary and secondary.
+    // matching `firstMatch` / `lastMatch`, computes the prior timestamp, and asserts multikey
+    // consistency between primary and secondary.
     function verifyDirectMultikey(state, db, myCollName, firstMatch, lastMatch, indexType, wildcardHint, fields) {
         const primary = db.getMongo();
         const dbName = db.getName();
@@ -462,7 +399,6 @@ export const $config = (function () {
             fields,
             lastEntry.ts,
             prevTs,
-            false /* shouldAssert */,
         );
     }
 

@@ -1974,13 +1974,16 @@ Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
         return Status::OK();
     }
 
-    if (Status status = shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(bsonRecords[0].ts);
-        !status.isOK()) {
-        return status;
-    }
+    const WorkerMultikeyPathInfo multikeyHistory = tracker.sortByTimestamp();
 
-    for (const MultikeyPathInfo& newPath : newPaths) {
+    for (const MultikeyPathInfo& newPath : multikeyHistory) {
         invariant(newPath.nss == coll->ns());
+        invariant(!newPath.earliestTimestamp.isNull());
+        if (Status status =
+                shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(newPath.earliestTimestamp);
+            !status.isOK()) {
+            return status;
+        }
         auto idx = findIndexByName(
             opCtx, newPath.indexName, InclusionPolicy::kReady | InclusionPolicy::kUnfinished);
         if (!idx) {

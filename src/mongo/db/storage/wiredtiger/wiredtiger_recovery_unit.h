@@ -103,6 +103,8 @@ public:
 
     Status setTimestamp(Timestamp timestamp) override;
 
+    boost::optional<Timestamp> getTimestamp() const override;
+
     bool isTimestamped() const override {
         return _isTimestamped;
     }
