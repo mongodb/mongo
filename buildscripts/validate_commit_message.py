@@ -134,12 +134,12 @@ The decision to add this check was made in SERVER-101443, please feel free to le
     for banned_string in BANNED_STRINGS:
         if "".join(banned_string.split()) in stripped_message:
             LOGGER.error(
-                """PR title/description contains a banned string (ignoring whitespace).
-Please update the PR title and description to not contain the following banned string.
+                f"""PR title/description contains a banned string (ignoring whitespace).
+Please update the PR title and description to not contain the following banned string:
+banned string: "{banned_string}"
+commit message: "{commit.message}"
 {RETRY_INSTRUCTIONS}
-The decision to add this check was made in SERVER-101443, please feel free to leave comments/feedback on that ticket.""",
-                banned_string=banned_string,
-                commit_message=commit.message,
+The decision to add this check was made in SERVER-101443, please feel free to leave comments/feedback on that ticket."""
             )
             return False
 
