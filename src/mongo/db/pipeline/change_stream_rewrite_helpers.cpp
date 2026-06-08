@@ -1457,11 +1457,11 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocumentBeforeChange(
 }
 
 // Map of fields names for which a simple rename is sufficient when rewriting.
-StringMap<std::string> renameRegistry = {
-    {"clusterTime", "ts"}, {"lsid", "lsid"}, {"txnNumber", "txnNumber"}};
+const StringMap<std::string> renameRegistry = {
+    {"clusterTime", "ts"}, {"lsid", "lsid"}, {"txnNumber", "txnNumber"}, {"wallTime", "wall"}};
 
 // Map of field names to corresponding MatchExpression rewrite functions.
-StringMap<MatchExpressionRewrite> matchRewriteRegistry = {
+const StringMap<MatchExpressionRewrite> matchRewriteRegistry = {
     {"operationType", matchRewriteOperationType},
     {"documentKey", matchRewriteDocumentKey},
     {"fullDocument", matchRewriteFullDocument},
@@ -1471,10 +1471,11 @@ StringMap<MatchExpressionRewrite> matchRewriteRegistry = {
     {"to", matchRewriteTo}};
 
 // Map of field names to corresponding agg Expression rewrite functions.
-StringMap<AggExpressionRewrite> exprRewriteRegistry = {{"operationType", exprRewriteOperationType},
-                                                       {"documentKey", exprRewriteDocumentKey},
-                                                       {"ns", exprRewriteNs},
-                                                       {"to", exprRewriteTo}};
+const StringMap<AggExpressionRewrite> exprRewriteRegistry = {
+    {"operationType", exprRewriteOperationType},
+    {"documentKey", exprRewriteDocumentKey},
+    {"ns", exprRewriteNs},
+    {"to", exprRewriteTo}};
 
 // Traverse the Expression tree and rewrite as many of them as possible. Note that the rewrite is
 // performed in-place; that is, the Expression passed into the function is mutated by it.
@@ -1583,8 +1584,8 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
         }
 
         // Other paths have custom rewrite logic.
-        if (exprRewriteRegistry.contains(firstPath)) {
-            return exprRewriteRegistry[firstPath](expCtx, fieldExpr, allowInexact, backingBsonObjs);
+        if (auto it = exprRewriteRegistry.find(firstPath); it != exprRewriteRegistry.end()) {
+            return (it->second)(expCtx, fieldExpr, allowInexact, backingBsonObjs);
         }
 
         // Others cannot be rewritten at all.
@@ -1729,9 +1730,9 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
                 }
 
                 // Other paths have custom rewrite logic.
-                if (matchRewriteRegistry.contains(firstPath)) {
-                    return matchRewriteRegistry[firstPath](
-                        expCtx, pathME, allowInexact, backingBsonObjs);
+                if (auto it = matchRewriteRegistry.find(firstPath);
+                    it != matchRewriteRegistry.end()) {
+                    return (it->second)(expCtx, pathME, allowInexact, backingBsonObjs);
                 }
 
                 // Others cannot be rewritten at all.

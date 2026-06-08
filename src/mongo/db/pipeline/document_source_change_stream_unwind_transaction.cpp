@@ -66,8 +66,14 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamUnwindTransaction,
                             DocumentSourceChangeStreamUnwindTransaction::id)
 
 namespace {
-const std::set<std::string> kUnwindExcludedFields = {"clusterTime", "lsid", "txnNumber"};
-}
+// These fields are excluded from the unwind transaction filter because individual operation
+// entries within the o.applyOps array do not have these fields. They are populated later by
+// _addRequiredTransactionFields() from the enclosing applyOps oplog entry.
+// "wallTime" is excluded because DurableReplOperation (the type of individual o.applyOps entries)
+// does not have a "wall" field. The wallTime predicate is evaluated later in the pipeline.
+const std::set<std::string> kUnwindExcludedFields = {
+    "clusterTime", "lsid", "txnNumber", "wallTime"};
+}  // namespace
 
 namespace change_stream_filter {
 /**
