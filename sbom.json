@@ -11,6 +11,14 @@
         "phase": "pre-build"
       }
     ],
+    "tools": {
+      "services": [
+        {
+          "name": "Endor Labs Inc",
+          "version": "v1.7.988"
+        }
+      ]
+    },
     "component": {
       "type": "application",
       "bom-ref": "pkg:github/mongodb/mongo@master",
@@ -28,16 +36,7 @@
       "description": "The MongoDB Database",
       "licenses": [
         {
-          "license": {
-            "id": "SSPL-1.0",
-            "url": "https://www.mongodb.com/legal/licensing/community-edition"
-          }
-        },
-        {
-          "license": {
-            "name": "MongoDB Enterprise Advanced License",
-            "url": "https://www.mongodb.com/products/self-managed/enterprise-advanced"
-          }
+          "expression": "SSPL-1.0 OR LicenseRef-MongoDB-Enterprise-Advanced-License"
         }
       ],
       "cpe": "cpe:2.3:a:mongodb:mongodb:master:*:*:*:*:*:*:*",
@@ -72,14 +71,6 @@
       "name": "MongoDB, Inc.",
       "url": [
         "https://mongodb.com"
-      ]
-    },
-    "tools": {
-      "services": [
-        {
-          "name": "Endor Labs Inc",
-          "version": "v1.7.988"
-        }
       ]
     }
   },
