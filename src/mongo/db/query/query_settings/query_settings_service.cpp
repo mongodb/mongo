@@ -870,18 +870,19 @@ bool allowQuerySettingsFromClient(Client* client) {
 
 bool isDefault(const QuerySettings& settings) {
     // The 'serialization_context' and 'comment' fields are not significant.
-    static_assert(QuerySettings::fieldNames.size() == 5,
+    static_assert(QuerySettings::fieldNames.size() == 6,
                   "A new field has been added to the QuerySettings structure, isDefault should be "
                   "updated appropriately.");
 
     // For the 'reject' field of type OptionalBool, consider both 'false' and missing value as
     // default.
-    return !(settings.getQueryFramework() || settings.getIndexHints() || settings.getReject());
+    return !(settings.getQueryFramework() || settings.getIndexHints() || settings.getReject() ||
+             settings.getQueryKnobs());
 }
 
 QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& rhs) {
     static_assert(
-        QuerySettings::fieldNames.size() == 5,
+        QuerySettings::fieldNames.size() == 6,
         "A new field has been added to the QuerySettings structure, mergeQuerySettings() should be "
         "updated appropriately.");
 
@@ -902,6 +903,11 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
 
     if (auto comment = rhs.getComment()) {
         querySettings.setComment(comment);
+    }
+
+    // TODO SERVER-123662: Merge the knobs.
+    if (const auto& knobs = rhs.getQueryKnobs()) {
+        querySettings.setQueryKnobs(knobs);
     }
 
     return querySettings;
@@ -961,6 +967,9 @@ void QuerySettingsService::simplifyQuerySettings(QuerySettings& settings) const 
     // If reject is present, but is false, set to an empty optional.
     if (settings.getReject().has_value() && !settings.getReject()) {
         settings.setReject({});
+    }
+    if (const auto& knobs = settings.getQueryKnobs(); knobs.has_value() && knobs->empty()) {
+        settings.setQueryKnobs(boost::none);
     }
 
     const auto& indexes = settings.getIndexHints();

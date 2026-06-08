@@ -34,6 +34,7 @@
 #include "mongo/db/commands/query_cmd/query_settings_cmds_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/logv2/log.h"
@@ -315,6 +316,13 @@ public:
             const boost::optional<QueryInstance> representativeQuery,
             const boost::optional<const RepresentativeQueryInfo&> representativeQueryInfo,
             const query_shape::QueryShapeHash& queryShapeHash) {
+            uassert(12324800,
+                    "Unknown field 'queryKnobs' in setQuerySettings",
+                    !request().getSettings().getQueryKnobs() ||
+                        feature_flags::gFeatureFlagPqsQueryKnobs.isEnabled(
+                            VersionContext::getDecoration(opCtx),
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
             // Validate that both 'representativeQuery' and 'representativeQueryInfo' are either
             // empty or not empty.
             dassert(!(representativeQuery.has_value() ^ representativeQueryInfo.has_value()));

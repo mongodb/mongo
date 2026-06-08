@@ -32,6 +32,7 @@ global:
         - "mongo/db/query/query_settings/query_framework_serialization.h"
         - "mongo/db/query/query_settings/index_hints_serialization.h"
         - "mongo/db/query/query_settings/query_settings_comment.h"
+        - "mongo/db/query/query_settings/query_knob_overrides.h"
     mod_visibility: private
 
 imports:
@@ -65,6 +66,13 @@ types:
         cpp_type: "query_settings::Comment"
         serializer: "mongo::query_settings::Comment::serializeToBSON"
         deserializer: "mongo::query_settings::Comment::parseFromBSON"
+        is_view: false
+    QuerySettingsKnobOverrides:
+        description: "Object in the form of '{[wireName]: [knobValue]}'  which will override the global query knob values."
+        bson_serialization_type: any
+        cpp_type: "query_settings::QuerySettingsKnobOverrides"
+        serializer: "mongo::query_settings::QuerySettingsKnobOverrides::toBSON"
+        deserializer: "mongo::query_settings::QuerySettingsKnobOverrides::fromBSON"
         is_view: false
 
 structs:
@@ -101,6 +109,10 @@ structs:
                 stability: internal
             comment:
                 type: Comment
+                optional: true
+                stability: internal
+            queryKnobs:
+                type: QuerySettingsKnobOverrides
                 optional: true
                 stability: internal
         mod_visibility: public

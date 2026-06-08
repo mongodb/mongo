@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/query_knobs/query_knob.h"
 
 #include <span>
@@ -52,11 +55,20 @@ public:
     struct Entry {
         QueryKnobId id;
         QueryKnobValue value;
+
+        // Compare by id, then value.
+        auto operator<=>(const Entry&) const = default;
     };
 
     static QuerySettingsKnobOverrides fromBSON(const BSONObj& obj);
+    static QuerySettingsKnobOverrides fromBSON(const BSONElement& element) {
+        return fromBSON(element.Obj());
+    }
 
     BSONObj toBSON() const;
+    void toBSON(StringData fieldName, BSONObjBuilder* builder) const {
+        builder->append(fieldName, toBSON());
+    }
 
     bool empty() const {
         return _entries.empty();
@@ -65,6 +77,8 @@ public:
     std::span<const Entry> entries() const {
         return _entries;
     }
+
+    auto operator<=>(const QuerySettingsKnobOverrides&) const = default;
 
 private:
     std::vector<Entry> _entries;

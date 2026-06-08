@@ -50,7 +50,7 @@ namespace mongo {
 
 // Removal sentinel (null on wire, used during PQS merge).
 struct DeleteQueryKnobOverride {
-    friend constexpr bool operator==(DeleteQueryKnobOverride, DeleteQueryKnobOverride) = default;
+    friend constexpr auto operator<=>(DeleteQueryKnobOverride, DeleteQueryKnobOverride) = default;
 };
 
 // Enum-typed knobs are stored as int.
@@ -101,9 +101,7 @@ struct QueryKnobId {
     using value_t = std::uint16_t;
     constexpr static auto kUninitialized = std::numeric_limits<value_t>::max();
 
-    friend bool operator==(const QueryKnobId& lhs, const QueryKnobId& rhs) {
-        return rhs.value == lhs.value;
-    }
+    friend auto operator<=>(const QueryKnobId& lhs, const QueryKnobId& rhs) = default;
 
     bool initialized() const {
         return value != kUninitialized;
@@ -204,7 +202,7 @@ template <>
 struct ConverterTraits<double> {
     static QueryKnobValue fromBSON(const BSONElement& elem) {
         const double val = elem.Double();
-        tassert(12324700, "query knob double value must not be NaN", !std::isnan(val));
+        uassert(ErrorCodes::BadValue, "query knob double value must not be NaN", !std::isnan(val));
         return val;
     }
     static void toBSON(BSONObjBuilder& b, StringData field, const QueryKnobValue& val) {

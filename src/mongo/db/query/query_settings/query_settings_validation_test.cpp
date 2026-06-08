@@ -322,5 +322,14 @@ TEST_F(QuerySettingsValidationTestFixture,
                        ErrorCodes::BSONObjectTooLarge);
 }
 
+TEST_F(QuerySettingsValidationTestFixture, SimplifyQuerySettingsClearsEmptyKnobs) {
+    QuerySettings settings;
+    settings.setQueryKnobs(QuerySettingsKnobOverrides::fromBSON(BSONObj{}));
+    ASSERT_TRUE(settings.getQueryKnobs().has_value());
+    ASSERT_TRUE(settings.getQueryKnobs()->empty());
+    service().simplifyQuerySettings(settings);
+    ASSERT_FALSE(settings.getQueryKnobs().has_value());
+}
+
 }  // namespace
 }  // namespace mongo::query_settings

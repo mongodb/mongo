@@ -118,7 +118,7 @@ size_t hash_value(const IndexHintSpec& v) {
 
 size_t hash_value(const QuerySettings& querySettings) {
     // The 'serialization_context' and 'comment' fields are not significant.
-    static_assert(QuerySettings::fieldNames.size() == 5,
+    static_assert(QuerySettings::fieldNames.size() == 6,
                   "A new field has been added to the QuerySettings structure, adjust the hash "
                   "function accordingly");
 
@@ -126,6 +126,7 @@ size_t hash_value(const QuerySettings& querySettings) {
     boost::hash_combine(hash, querySettings.getQueryFramework());
     boost::hash_combine(hash, querySettings.getIndexHints());
     boost::hash_combine(hash, querySettings.getReject());
+    boost::hash_combine(hash, querySettings.getQueryKnobs());
     return hash;
 }
 

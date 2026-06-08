@@ -79,6 +79,21 @@ TEST(QuerySettingsHashTest, QuerySettingsHashExcludesComment) {
     ASSERT_EQ(hashA, hashB);
 }
 
+TEST(QuerySettingsHashTest, QuerySettingsHashIncludesQueryKnobs) {
+    // Change queryKnobs in query settings, verify that the hash differs.
+    QuerySettings settings;
+    auto hashA = mongo::query_settings::hash(settings);
+
+    settings.setQueryKnobs(makeKnobOverrides("{testIntKnobWire: 42}"));
+    auto hashB = mongo::query_settings::hash(settings);
+
+    settings.setQueryKnobs(makeKnobOverrides("{testBoolKnobWire: true}"));
+    auto hashC = mongo::query_settings::hash(settings);
+
+    ASSERT_NE(hashA, hashB);
+    ASSERT_NE(hashB, hashC);
+}
+
 TEST(QuerySettingsHashTest, QuerySettingsHashStability) {
     // Verify that the hash resulting from setting each query setting matches a "golden" value,
     // guarding stability of this hash.
@@ -93,7 +108,7 @@ TEST(QuerySettingsHashTest, QuerySettingsHashStability) {
     settings.setReject(true);
     auto observedHash = mongo::query_settings::hash(settings);
 
-    static const size_t expectedHash = 0xd14b8e06bcb187b;
+    static const size_t expectedHash = 0x7ed84960c1893d5c;
 
     ASSERT_EQ(observedHash, expectedHash)
         << fmt::format("{:#016x} != {:#016x}", observedHash, expectedHash);

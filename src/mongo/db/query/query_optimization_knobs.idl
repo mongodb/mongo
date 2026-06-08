@@ -817,6 +817,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: planRankerMode
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     automaticCEPlanRankingStrategy:
         description: "Controls the plan ranking strategy to use when automaticCE is selected as internalQueryCBRCEMode"
@@ -830,6 +833,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: automaticCEPlanRankingStrategy
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     samplingConfidenceInterval:
         description: >-
@@ -845,6 +851,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: samplingConfidenceInterval
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     samplingMarginOfError:
         description: >-
@@ -863,6 +872,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: samplingMarginOfError
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     internalQuerySamplingCEMethod:
         description: >-
@@ -878,6 +890,9 @@ server_parameters:
         annotations:
             query_knob:
                 wire_name: samplingCEMethod
+                pqs_settable: true
+                fcv:
+                    min: "9.0"
 
     # TODO SERVER-63949: Consolidate CBRSamplingCEMethod and JoinSamplingCEMethod.
     internalJoinOptimizationSamplingCEMethod:
