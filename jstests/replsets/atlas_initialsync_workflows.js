@@ -102,7 +102,17 @@ function testReplaceWithInitialSync(secondariesDown) {
     }
 
     jsTestLog("Starting a new replacement node with empty data directory.");
-    rst.start(node, {startClean: true}, true /* restart */);
+    // The replacement node starts empty and must perform a full initial sync. When one or two
+    // secondaries are disconnected, only the primary (and one secondary) can acknowledge writes,
+    // which is below the majority of the 4-member voting config (the disconnected secondary is still
+    // a voting member). So while the replacement node is in STARTUP2 the sync source can never
+    // advance its stable timestamp to our beginApplyingTimestamp. Disable
+    // `initialSyncWaitForSyncSourceLastStableRecoveryTs` so initial sync can proceed.
+    rst.start(
+        node,
+        {startClean: true, setParameter: {initialSyncWaitForSyncSourceLastStableRecoveryTs: false}},
+        true /* restart */,
+    );
     // We can't use awaitSecondaryNodes because the set might not be healthy.
     assert.soonNoExcept(() => node.adminCommand({isMaster: 1}).secondary);
 
